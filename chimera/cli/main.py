@@ -114,16 +114,22 @@ def agent(
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
     max_steps: int = typer.Option(8, "--max-steps", help="Max tool-calling steps."),
     workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root for tools."),
+    fuse: bool = typer.Option(False, "--fuse", help="Route deep-reasoning turns through fusion."),
 ) -> None:
     """Run the ReAct agent loop with native tools. Requires a provider key."""
     from chimera.core import Agent, AgentConfig
-    from chimera.providers import LLMGateway, MissingCredentialsError
+    from chimera.providers import LLMGateway, MissingCredentialsError, SupportsComplete
     from chimera.tools import default_registry
 
     try:
         gateway = LLMGateway()
+        backend: SupportsComplete = gateway
+        if fuse:
+            from chimera.fusion import FusionEngine, RoutedBackend
+
+            backend = RoutedBackend(gateway, FusionEngine(gateway))
         registry = default_registry(Path(workspace))
-        runner = Agent(gateway, registry, AgentConfig(model=model, max_steps=max_steps))
+        runner = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
         result = runner.run(task)
     except MissingCredentialsError as exc:
         console.print(f"[red]{exc}[/red]")
@@ -134,6 +140,32 @@ def agent(
         f"[dim]({result.stopped_reason}, {result.steps} steps, "
         f"{result.tool_calls_made} tool calls)[/dim]"
     )
+
+
+@app.command()
+def fuse(
+    prompt: str = typer.Argument(..., help="The prompt to run through the fusion engine."),
+    show_panel: bool = typer.Option(False, "--show-panel", help="Show panel answers + judge analysis."),
+) -> None:
+    """Run a prompt through the LLM-Fusion engine (panel -> judge -> synthesizer)."""
+    from chimera.fusion import FusionEngine
+    from chimera.providers import LLMGateway, Message, MissingCredentialsError
+
+    try:
+        engine = FusionEngine(LLMGateway())
+        trace = engine.run([Message(role="user", content=prompt)])
+    except MissingCredentialsError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    if show_panel:
+        for response in trace.panel:
+            body = response.error or response.content
+            console.print(Panel(body, title=f"panel: {response.model}", title_align="left"))
+        console.print(Panel(trace.judge_analysis, title="judge", title_align="left"))
+        console.print(Panel(trace.final, title="[bold green]final[/bold green]", title_align="left"))
+    else:
+        console.print(trace.final)
 
 
 @app.command()

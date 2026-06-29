@@ -91,3 +91,15 @@ def test_cron_add_invalid_expression(monkeypatch: pytest.MonkeyPatch, tmp_path: 
         assert result.exit_code == 1
     finally:
         get_settings.cache_clear()
+
+
+def test_fuse_without_key_exits(monkeypatch: pytest.MonkeyPatch) -> None:
+    for var in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OPENROUTER_API_KEY",
+                "GEMINI_API_KEY", "DEEPSEEK_API_KEY"):
+        monkeypatch.delenv(var, raising=False)
+    get_settings.cache_clear()
+    try:
+        result = runner.invoke(app, ["fuse", "hello"])
+        assert result.exit_code == 1
+    finally:
+        get_settings.cache_clear()

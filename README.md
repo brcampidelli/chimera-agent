@@ -20,7 +20,7 @@ It is built as a progression of four capability tiers on top of a transversal fu
 (human-assigned and self-learned) · integrations via **MCP** + arbitrary REST/OpenAPI tools ·
 migration from other agents (Hermes/OpenClaw) bringing config, memory and skills.
 
-> Status: **early alpha** — building the MVP (Tiers 1+2 + Fusion engine). See the build plan below.
+> Status: **early alpha**. Done: M0 foundations, M1 (Tier-1 + tools/skills/integrations/crons/migration), M2 (LLM-Fusion engine + cost-aware router). Next: M3 (Tier-2 autonomous loop).
 
 ## Why Chimera (the differentiation thesis)
 
@@ -49,7 +49,8 @@ chimera models                       # default model + fusion panel
 chimera tools                        # list native tools (files, shell, http, ...)
 chimera skills                       # list built-in skills
 chimera run "PROMPT"                 # single-shot Tier-1 completion (needs a key)
-chimera agent "TASK"                 # ReAct agent loop with tools (needs a key)
+chimera fuse "PROMPT" --show-panel   # LLM-Fusion: panel -> judge -> synthesizer
+chimera agent "TASK" --fuse          # ReAct agent loop; route deep turns through fusion
 chimera cron add NAME "0 9 * * *" "run report"   # schedule a job
 chimera cron list                    # list scheduled jobs
 chimera migrate hermes ~/.hermes     # preview importing config + skills (dry-run)
