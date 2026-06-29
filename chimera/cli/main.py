@@ -93,6 +93,18 @@ def models() -> None:
 
 
 @app.command()
+def guard(action: str = typer.Argument(..., help="The action/command to evaluate.")) -> None:
+    """Show the governance verdict (allow/warn/review/block) for an action."""
+    from chimera.governance import TrustKernel
+
+    verdict = TrustKernel().evaluate(action)
+    colors = {"allow": "green", "warn": "yellow", "review": "yellow", "block": "red"}
+    color = colors[verdict.decision.value]
+    detail = f" (rule: {verdict.rule})" if verdict.rule else ""
+    console.print(f"[{color}]{verdict.decision.value.upper()}[/{color}] {verdict.reason}{detail}")
+
+
+@app.command()
 def run(
     prompt: str = typer.Argument(..., help="The prompt to send."),
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
@@ -117,6 +129,7 @@ def agent(
     max_steps: int = typer.Option(8, "--max-steps", help="Max tool-calling steps."),
     workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root for tools."),
     fuse: bool = typer.Option(False, "--fuse", help="Route deep-reasoning turns through fusion."),
+    guard: bool = typer.Option(False, "--guard", help="Gate tool calls through the governance kernel."),
 ) -> None:
     """Run the ReAct agent loop with native tools. Requires a provider key."""
     from chimera.core import Agent, AgentConfig
@@ -131,6 +144,11 @@ def agent(
 
             backend = RoutedBackend(gateway, FusionEngine(gateway))
         registry = default_registry(Path(workspace))
+        if guard:
+            from chimera.governance import AuditLog, TrustKernel, govern_registry
+
+            kernel = TrustKernel(audit=AuditLog(get_settings().home / "audit.jsonl"))
+            registry = govern_registry(registry, kernel)
         runner = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
         result = runner.run(task)
     except MissingCredentialsError as exc:
@@ -181,6 +199,7 @@ def solve(
     no_plan: bool = typer.Option(False, "--no-plan", help="Skip the planning step."),
     no_manager: bool = typer.Option(False, "--no-manager", help="Skip Manager review."),
     fuse: bool = typer.Option(False, "--fuse", help="Route deep-reasoning turns through fusion."),
+    guard: bool = typer.Option(False, "--guard", help="Gate tool calls through the governance kernel."),
 ) -> None:
     """Tier-2: autonomously solve a task with plan + verify-or-revert. Requires a key."""
     from chimera.core import (
@@ -210,7 +229,12 @@ def solve(
 
         backend = RoutedBackend(gateway, FusionEngine(gateway))
 
-    worker = Agent(backend, default_registry(workspace_path), AgentConfig(model=model, max_steps=max_steps))
+    registry = default_registry(workspace_path)
+    if guard:
+        from chimera.governance import AuditLog, TrustKernel, govern_registry
+
+        registry = govern_registry(registry, TrustKernel(audit=AuditLog(settings.home / "audit.jsonl")))
+    worker = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
     auto = AutonomousAgent(
         worker,
         planner=None if no_plan else Planner(gateway, model),

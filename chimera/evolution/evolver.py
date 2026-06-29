@@ -13,6 +13,7 @@ import re
 from collections.abc import Callable
 
 from chimera.evolution.learned_skill import LearnedSkill
+from chimera.governance.validator import SkillValidator
 from chimera.providers.gateway import Message, SupportsComplete
 from chimera.telemetry import get_logger
 
@@ -92,10 +93,18 @@ class SkillEvolver:
         *,
         test_input: dict[str, str],
         check: Callable[[str], bool],
+        validator: SkillValidator | None = None,
     ) -> LearnedSkill | None:
-        """Propose a skill and keep it only if it passes the test; else discard."""
+        """Propose a skill and keep it only if it validates and passes the test.
+
+        When a ``validator`` is given, a proposal that fails static validation
+        (the constrained edit surface) is rejected before it is ever run.
+        """
         skill = self.propose(task, solution)
         if skill is None:
+            return None
+        if validator is not None and not validator.validate(skill.to_dict()).accepted:
+            _log.debug("rejected learned skill %s (failed validation)", skill.name)
             return None
         if self.test_skill(skill, test_input, check):
             _log.debug("kept learned skill %s", skill.name)
