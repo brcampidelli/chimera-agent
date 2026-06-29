@@ -41,6 +41,24 @@ uv run chimera doctor  # check your environment
 uv run chimera version
 ```
 
+### Commands
+
+```bash
+chimera doctor                       # environment + key check
+chimera models                       # default model + fusion panel
+chimera tools                        # list native tools (files, shell, http, ...)
+chimera skills                       # list built-in skills
+chimera run "PROMPT"                 # single-shot Tier-1 completion (needs a key)
+chimera agent "TASK"                 # ReAct agent loop with tools (needs a key)
+chimera cron add NAME "0 9 * * *" "run report"   # schedule a job
+chimera cron list                    # list scheduled jobs
+chimera migrate hermes ~/.hermes     # preview importing config + skills (dry-run)
+chimera migrate hermes ~/.hermes --apply
+```
+
+Add integrations from code: `chimera.integrations.OpenAPIConnector` turns an OpenAPI
+spec into tools, and `connect_stdio(...)` (with the `mcp` extra) wraps an MCP server.
+
 ## Architecture (high level)
 
 ```

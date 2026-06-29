@@ -4,6 +4,10 @@ A Tool is a single, well-described capability the agent can invoke (read a file,
 run a shell command, fetch a URL, ...). Tools expose an OpenAI/LiteLLM-compatible
 function schema so they can be advertised to any model through the gateway.
 
+``name``, ``description`` and ``parameters`` are instance attributes: static tools
+set them as class attributes, while *dynamically generated* tools (from an OpenAPI
+spec or an MCP server) set them per instance in ``__init__``.
+
 Skills (see :mod:`chimera.skills`) are higher-level, *learned* procedures that may
 compose several tools; tools are the primitive, hand-written building blocks.
 """
@@ -11,19 +15,15 @@ compose several tools; tools are the primitive, hand-written building blocks.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar
+from typing import Any
 
 
 class Tool(ABC):
-    """Base class for a single agent capability.
+    """Base class for a single agent capability."""
 
-    Subclasses set :attr:`name`, :attr:`description` and :attr:`parameters`
-    (a JSON Schema describing the arguments) and implement :meth:`run`.
-    """
-
-    name: ClassVar[str]
-    description: ClassVar[str]
-    parameters: ClassVar[dict[str, Any]] = {"type": "object", "properties": {}}
+    name: str
+    description: str
+    parameters: dict[str, Any] = {"type": "object", "properties": {}}
 
     @abstractmethod
     def run(self, **kwargs: Any) -> str:

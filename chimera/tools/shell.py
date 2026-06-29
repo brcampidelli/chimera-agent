@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any
 
 from chimera.tools.base import Tool
 
@@ -18,12 +18,12 @@ _DEFAULT_TIMEOUT = 60
 
 
 class RunShellTool(Tool):
-    name: ClassVar[str] = "run_shell"
-    description: ClassVar[str] = (
+    name = "run_shell"
+    description = (
         "Run a shell command in the workspace directory and return its output. "
         "Use with care: this can modify the system."
     )
-    parameters: ClassVar[dict[str, Any]] = {
+    parameters = {
         "type": "object",
         "properties": {
             "command": {"type": "string", "description": "The shell command to run."},

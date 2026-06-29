@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import Any
 
 from chimera.tools.base import Tool
 
@@ -11,9 +11,9 @@ _DEFAULT_TIMEOUT = 30.0
 
 
 class HttpGetTool(Tool):
-    name: ClassVar[str] = "http_get"
-    description: ClassVar[str] = "Fetch a URL with an HTTP GET and return status + body text."
-    parameters: ClassVar[dict[str, Any]] = {
+    name = "http_get"
+    description = "Fetch a URL with an HTTP GET and return status + body text."
+    parameters = {
         "type": "object",
         "properties": {
             "url": {"type": "string", "description": "The URL to fetch (http/https)."},

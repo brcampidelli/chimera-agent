@@ -1,0 +1,5 @@
+# Normalize line endings to LF in the repository (Python project, cross-platform).
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.gif binary

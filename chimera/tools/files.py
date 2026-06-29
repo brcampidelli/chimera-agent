@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any
 
 from chimera.tools.base import Tool
 from chimera.tools.workspace import resolve_in_workspace
@@ -19,9 +19,9 @@ class _WorkspaceTool(Tool):
 
 
 class ReadFileTool(_WorkspaceTool):
-    name: ClassVar[str] = "read_file"
-    description: ClassVar[str] = "Read a UTF-8 text file from the workspace."
-    parameters: ClassVar[dict[str, Any]] = {
+    name = "read_file"
+    description = "Read a UTF-8 text file from the workspace."
+    parameters = {
         "type": "object",
         "properties": {"path": {"type": "string", "description": "Path relative to the workspace."}},
         "required": ["path"],
@@ -38,9 +38,9 @@ class ReadFileTool(_WorkspaceTool):
 
 
 class WriteFileTool(_WorkspaceTool):
-    name: ClassVar[str] = "write_file"
-    description: ClassVar[str] = "Write (create or overwrite) a UTF-8 text file in the workspace."
-    parameters: ClassVar[dict[str, Any]] = {
+    name = "write_file"
+    description = "Write (create or overwrite) a UTF-8 text file in the workspace."
+    parameters = {
         "type": "object",
         "properties": {
             "path": {"type": "string", "description": "Path relative to the workspace."},
@@ -58,9 +58,9 @@ class WriteFileTool(_WorkspaceTool):
 
 
 class ListDirTool(_WorkspaceTool):
-    name: ClassVar[str] = "list_dir"
-    description: ClassVar[str] = "List entries of a directory in the workspace."
-    parameters: ClassVar[dict[str, Any]] = {
+    name = "list_dir"
+    description = "List entries of a directory in the workspace."
+    parameters = {
         "type": "object",
         "properties": {
             "path": {"type": "string", "description": "Directory path relative to the workspace (default '.')."}

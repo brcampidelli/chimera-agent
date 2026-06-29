@@ -1,5 +1,11 @@
 """Scheduler: crons (human-assigned and self-learned) + a SOP event engine.
 
-Gives the agent proactivity (heartbeat). The agent can detect recurring patterns
-and propose its own crons. Implemented in milestone M1 (v1) and M4 (self-learned).
+Gives the agent proactivity (heartbeat). v1 supports cron expressions and event
+triggers; self-learned crons (the agent proposing its own automations) arrive in M4.
 """
+
+from chimera.scheduler.engine import Scheduler
+from chimera.scheduler.models import CronJob
+from chimera.scheduler.store import CronStore
+
+__all__ = ["CronJob", "CronStore", "Scheduler"]

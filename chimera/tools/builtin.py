@@ -7,7 +7,7 @@ on. Higher-level, *learned* procedures live in :mod:`chimera.skills`.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any
 
 from chimera.tools.base import Tool
 from chimera.tools.files import ListDirTool, ReadFileTool, WriteFileTool
@@ -19,9 +19,9 @@ from chimera.tools.shell import RunShellTool
 class EchoTool(Tool):
     """Return the provided text unchanged (useful for tests and demos)."""
 
-    name: ClassVar[str] = "echo"
-    description: ClassVar[str] = "Echo back the given text exactly."
-    parameters: ClassVar[dict[str, Any]] = {
+    name = "echo"
+    description = "Echo back the given text exactly."
+    parameters = {
         "type": "object",
         "properties": {"text": {"type": "string", "description": "Text to echo."}},
         "required": ["text"],
