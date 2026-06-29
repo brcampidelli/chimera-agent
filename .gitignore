@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+*.egg
+
+# Virtual envs / uv
+.venv/
+.uv/
+uv.lock
+
+# Env / secrets
+.env
+.env.local
+*.key
+
+# Caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+
+# Chimera runtime data (state lives outside the LLM context)
+.chimera/
+data/
+*.sqlite
+*.sqlite3
+*.db
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
