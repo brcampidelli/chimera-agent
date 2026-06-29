@@ -169,6 +169,73 @@ def fuse(
 
 
 @app.command()
+def solve(
+    task: str = typer.Argument(..., help="The task to solve autonomously."),
+    verify: str = typer.Option(None, "--verify", help="Verification command (exit 0 == success)."),
+    workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root."),
+    model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
+    max_attempts: int = typer.Option(3, "--max-attempts", help="Max verify-or-revert attempts."),
+    max_steps: int = typer.Option(8, "--max-steps", help="Max tool-calling steps per attempt."),
+    no_plan: bool = typer.Option(False, "--no-plan", help="Skip the planning step."),
+    no_manager: bool = typer.Option(False, "--no-manager", help="Skip Manager review."),
+    fuse: bool = typer.Option(False, "--fuse", help="Route deep-reasoning turns through fusion."),
+) -> None:
+    """Tier-2: autonomously solve a task with plan + verify-or-revert. Requires a key."""
+    from chimera.core import (
+        Agent,
+        AgentConfig,
+        AutonomousAgent,
+        AutonomousConfig,
+        Manager,
+        Planner,
+        WorkspaceGuard,
+    )
+    from chimera.core.verify import CommandVerifier
+    from chimera.evolution import ExperienceBuffer
+    from chimera.providers import LLMGateway, MissingCredentialsError, SupportsComplete
+    from chimera.tools import default_registry
+
+    settings = get_settings()
+    if not settings.has_any_key():
+        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+        raise typer.Exit(code=1)
+
+    workspace_path = Path(workspace)
+    gateway = LLMGateway()
+    backend: SupportsComplete = gateway
+    if fuse:
+        from chimera.fusion import FusionEngine, RoutedBackend
+
+        backend = RoutedBackend(gateway, FusionEngine(gateway))
+
+    worker = Agent(backend, default_registry(workspace_path), AgentConfig(model=model, max_steps=max_steps))
+    auto = AutonomousAgent(
+        worker,
+        planner=None if no_plan else Planner(gateway, model),
+        manager=None if no_manager else Manager(gateway, model),
+        verifier=CommandVerifier(verify, workspace_path) if verify else None,
+        guard=WorkspaceGuard(workspace_path),
+        experience=ExperienceBuffer(settings.home / "experience.json"),
+        spine_workspace=workspace_path,
+        config=AutonomousConfig(
+            max_attempts=max_attempts, use_planner=not no_plan, use_manager=not no_manager
+        ),
+    )
+
+    try:
+        result = auto.run(task)
+    except MissingCredentialsError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    console.print(result.answer)
+    status = "[green]success[/green]" if result.success else "[red]failed[/red]"
+    console.print(f"[dim]{status} after {len(result.attempts)} attempt(s)[/dim]")
+    if not result.success:
+        raise typer.Exit(code=1)
+
+
+@app.command()
 def tools(workspace: str = typer.Option(".", "--workspace", "-w")) -> None:
     """List the built-in native tools."""
     from chimera.tools import default_registry

@@ -1,8 +1,9 @@
-"""Core agent loop: ReAct, planner, persistable state machine, verify-or-revert.
+"""Core agent loop + Tier-2 autonomy.
 
-State is kept *outside* the LLM context (transcript + git + DB) to resist
-continuous-evolution degradation. The minimal tool-calling loop lands in M1; the
-planner and verify-or-revert mature in M3.
+The minimal tool-calling loop (M1) plus the autonomous runner (M3): plan -> execute
+-> Manager review -> verify-or-revert, with an experience buffer. State is kept
+*outside* the LLM context (transcript + workspace snapshots) to resist
+continuous-evolution degradation.
 """
 
 from chimera.core.agent import (
@@ -10,6 +11,23 @@ from chimera.core.agent import (
     Agent,
     AgentConfig,
     AgentResult,
+)
+from chimera.core.autonomous import (
+    Attempt,
+    AutonomousAgent,
+    AutonomousConfig,
+    AutonomousResult,
+    Worker,
+)
+from chimera.core.checkpoint import FileSnapshot, WorkspaceGuard
+from chimera.core.planner import Plan, Planner
+from chimera.core.spine import assemble_spine
+from chimera.core.supervisor import Manager, Review
+from chimera.core.verify import (
+    CommandVerifier,
+    NullVerifier,
+    VerificationResult,
+    Verifier,
 )
 from chimera.providers import SupportsComplete
 
@@ -19,4 +37,20 @@ __all__ = [
     "AgentResult",
     "SupportsComplete",
     "DEFAULT_SYSTEM_PROMPT",
+    "AutonomousAgent",
+    "AutonomousConfig",
+    "AutonomousResult",
+    "Attempt",
+    "Worker",
+    "Planner",
+    "Plan",
+    "Manager",
+    "Review",
+    "WorkspaceGuard",
+    "FileSnapshot",
+    "Verifier",
+    "VerificationResult",
+    "CommandVerifier",
+    "NullVerifier",
+    "assemble_spine",
 ]
