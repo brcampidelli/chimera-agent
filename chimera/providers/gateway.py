@@ -11,8 +11,9 @@ fast and never fails just because a provider SDK or key is missing.
 
 from __future__ import annotations
 
+import json
 import os
-from typing import Any, Literal
+from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field
 
@@ -43,21 +44,50 @@ class Message(BaseModel):
         return {"role": self.role, "content": self.content}
 
 
+class ToolCall(BaseModel):
+    """A single tool/function call requested by the model."""
+
+    id: str
+    name: str
+    arguments: dict[str, Any] = Field(default_factory=dict)
+
+
 class CompletionResult(BaseModel):
     """Normalized result of a single model call."""
 
     content: str
     model: str
+    tool_calls: list[ToolCall] | None = None
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
     raw: dict[str, Any] | None = Field(default=None, repr=False)
 
 
-MessageLike = Message | dict[str, str]
+MessageLike = Message | dict[str, Any]
 
 
-def _to_message_dicts(messages: list[MessageLike]) -> list[dict[str, str]]:
+def _to_message_dicts(messages: list[MessageLike]) -> list[dict[str, Any]]:
     return [m.as_dict() if isinstance(m, Message) else m for m in messages]
+
+
+class SupportsComplete(Protocol):
+    """Structural type for anything that answers a chat completion.
+
+    The single-model :class:`LLMGateway` satisfies it today; the LLM-Fusion engine
+    (M2) will satisfy it too, so agents and skills can depend on this interface
+    rather than a concrete backend.
+    """
+
+    def complete(
+        self,
+        messages: list[MessageLike],
+        *,
+        model: str | None = ...,
+        temperature: float = ...,
+        max_tokens: int | None = ...,
+        tools: list[dict[str, Any]] | None = ...,
+        **kwargs: Any,
+    ) -> CompletionResult: ...
 
 
 class MissingCredentialsError(RuntimeError):
@@ -161,10 +191,13 @@ class LLMGateway:
     @staticmethod
     def _normalize(response: Any, model: str) -> CompletionResult:
         content = ""
+        tool_calls: list[ToolCall] | None = None
         prompt_tokens: int | None = None
         completion_tokens: int | None = None
         try:
-            content = response.choices[0].message.content or ""
+            message = response.choices[0].message
+            content = message.content or ""
+            tool_calls = LLMGateway._parse_tool_calls(message)
         except (AttributeError, IndexError, TypeError):
             _log.warning("could not extract content from response for model=%s", model)
         usage = getattr(response, "usage", None)
@@ -174,6 +207,33 @@ class LLMGateway:
         return CompletionResult(
             content=content,
             model=model,
+            tool_calls=tool_calls,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
         )
+
+    @staticmethod
+    def _parse_tool_calls(message: Any) -> list[ToolCall] | None:
+        raw_calls = getattr(message, "tool_calls", None)
+        if not raw_calls:
+            return None
+        parsed: list[ToolCall] = []
+        for call in raw_calls:
+            fn = getattr(call, "function", None)
+            if fn is None:
+                continue
+            raw_args = getattr(fn, "arguments", None)
+            arguments: dict[str, Any] = {}
+            if isinstance(raw_args, str):
+                try:
+                    loaded = json.loads(raw_args or "{}")
+                    if isinstance(loaded, dict):
+                        arguments = loaded
+                except json.JSONDecodeError:
+                    _log.warning("could not parse tool arguments: %r", raw_args)
+            elif isinstance(raw_args, dict):
+                arguments = raw_args
+            parsed.append(
+                ToolCall(id=getattr(call, "id", "") or "", name=fn.name, arguments=arguments)
+            )
+        return parsed or None

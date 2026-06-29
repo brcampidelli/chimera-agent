@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from chimera.providers.gateway import SupportsComplete
 from chimera.skills.base import Skill
 from chimera.telemetry import get_logger
 
@@ -47,10 +48,15 @@ class SkillRegistry:
         return list(self._skills.values())
 
 
-def default_registry() -> SkillRegistry:
-    """Build a registry pre-loaded with the built-in skill library."""
+def default_registry(
+    backend: SupportsComplete | None = None, model: str | None = None
+) -> SkillRegistry:
+    """Build a registry pre-loaded with the built-in skill library.
+
+    LLM-backed skills use ``backend`` (or lazily build the default gateway).
+    """
     from chimera.skills.builtin import register_builtin_skills
 
     registry = SkillRegistry()
-    register_builtin_skills(registry)
+    register_builtin_skills(registry, backend=backend, model=model)
     return registry

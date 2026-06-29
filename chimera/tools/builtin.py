@@ -1,16 +1,19 @@
-"""A minimal set of native tools shipped with Chimera.
+"""The native tool library shipped with Chimera.
 
-This will grow into the full built-in toolset (files, shell, http, git, ...). For
-now it carries one trivial, dependency-free tool that exercises the registry and
-serves as the canonical example of the :class:`~chimera.tools.base.Tool` pattern.
+These are the primitive, hand-written capabilities the agent loop and skills build
+on. Higher-level, *learned* procedures live in :mod:`chimera.skills`.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, ClassVar
 
 from chimera.tools.base import Tool
+from chimera.tools.files import ListDirTool, ReadFileTool, WriteFileTool
+from chimera.tools.http import HttpGetTool
 from chimera.tools.registry import ToolRegistry
+from chimera.tools.shell import RunShellTool
 
 
 class EchoTool(Tool):
@@ -28,8 +31,16 @@ class EchoTool(Tool):
         return str(kwargs.get("text", ""))
 
 
-def default_registry() -> ToolRegistry:
-    """Build a registry pre-populated with the built-in native tools."""
+def default_registry(workspace: Path | None = None) -> ToolRegistry:
+    """Build a registry pre-populated with the built-in native tools.
+
+    File and shell tools are rooted at ``workspace`` (default: current directory).
+    """
     registry = ToolRegistry()
     registry.register(EchoTool())
+    registry.register(ReadFileTool(workspace))
+    registry.register(WriteFileTool(workspace))
+    registry.register(ListDirTool(workspace))
+    registry.register(RunShellTool(workspace))
+    registry.register(HttpGetTool())
     return registry

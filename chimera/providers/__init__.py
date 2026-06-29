@@ -5,6 +5,15 @@ from chimera.providers.gateway import (
     LLMGateway,
     Message,
     MissingCredentialsError,
+    SupportsComplete,
+    ToolCall,
 )
 
-__all__ = ["CompletionResult", "LLMGateway", "Message", "MissingCredentialsError"]
+__all__ = [
+    "CompletionResult",
+    "LLMGateway",
+    "Message",
+    "MissingCredentialsError",
+    "SupportsComplete",
+    "ToolCall",
+]
