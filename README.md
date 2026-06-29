@@ -24,9 +24,10 @@ migration from other agents (Hermes/OpenClaw) bringing config, memory and skills
 > tools/skills/integrations/crons/migration) · M2 (LLM-Fusion engine + cost-aware router) ·
 > M3 (Tier-2 autonomous: plan → execute → Manager review → verify-or-revert + experience
 > buffer) · M4 (self-evolution v1: Memory Manager + memory-merge migration, learned-skill
-> evolver, self-learned crons, continuous-evolution benchmark) · **M5 (governance kernel:
-> allow/warn/block/review trust layer + static validator + audit + governed tools)**.
-> Next: M6 (multi-agent teams).
+> evolver, self-learned crons, continuous-evolution benchmark) · M5 (governance kernel:
+> allow/warn/block/review trust layer + static validator + audit + governed tools) ·
+> **M6 (Tier-3 multi-agent: roles, sequential & supervisor crews, MOC comms, shared
+> memory, parallel review)**. Next: M7 (self-evolving ecosystem).
 
 ## Why Chimera (the differentiation thesis)
 
@@ -59,6 +60,7 @@ chimera fuse "PROMPT" --show-panel   # LLM-Fusion: panel -> judge -> synthesizer
 chimera agent "TASK" --fuse          # ReAct agent loop; route deep turns through fusion
 chimera solve "TASK" --verify "pytest -q" --guard   # Tier-2 with governance on tool calls
 chimera guard "rm -rf /"             # preview a governance verdict (allow/warn/review/block)
+chimera crew "TASK" --mode supervisor       # Tier-3 multi-agent crew
 chimera cron add NAME "0 9 * * *" "run report"   # schedule a job
 chimera cron list                    # list scheduled jobs
 chimera cron learn                   # propose crons from recurring tasks (disabled)

@@ -127,6 +127,23 @@ def test_bench_without_key_exits(monkeypatch: pytest.MonkeyPatch) -> None:
         get_settings.cache_clear()
 
 
+def test_crew_without_key_exits(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_keys(monkeypatch)
+    try:
+        result = runner.invoke(app, ["crew", "design a thing"])
+        assert result.exit_code == 1
+    finally:
+        get_settings.cache_clear()
+
+
+def test_guard_command() -> None:
+    blocked = runner.invoke(app, ["guard", "rm -rf /"])
+    assert blocked.exit_code == 0
+    assert "BLOCK" in blocked.stdout
+    allowed = runner.invoke(app, ["guard", "ls -la"])
+    assert "ALLOW" in allowed.stdout
+
+
 def test_memory_add_list_search(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _isolated_home(monkeypatch, tmp_path)
     try:

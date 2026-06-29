@@ -532,5 +532,46 @@ def bench(
     console.print(table)
 
 
+@app.command()
+def crew(
+    task: str = typer.Argument(..., help="The task for the crew."),
+    mode: str = typer.Option("sequential", "--mode", help="sequential | supervisor"),
+    model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
+    fuse: bool = typer.Option(False, "--fuse", help="Use the fusion engine as the backend."),
+) -> None:
+    """Run a multi-agent crew on a task (Tier 3). Requires a provider key."""
+    from chimera.orchestration import Role, RoleAgent, SupervisorCrew, demo_crew
+    from chimera.providers import LLMGateway, SupportsComplete
+
+    settings = get_settings()
+    if not settings.has_any_key():
+        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+        raise typer.Exit(code=1)
+
+    gateway = LLMGateway()
+    backend: SupportsComplete = gateway
+    if fuse:
+        from chimera.fusion import FusionEngine, RoutedBackend
+
+        backend = RoutedBackend(gateway, FusionEngine(gateway))
+
+    if mode == "supervisor":
+        supervisor = RoleAgent(
+            Role("supervisor", "You coordinate a team and synthesize the single best final answer."),
+            backend,
+        )
+        workers = [
+            RoleAgent(Role("analyst", "You analyze the task and surface the key facts and trade-offs."), backend),
+            RoleAgent(Role("engineer", "You propose a concrete, practical implementation."), backend),
+            RoleAgent(Role("skeptic", "You find flaws, risks and missing cases in the approach."), backend),
+        ]
+        result = SupervisorCrew(supervisor, workers).run(task)
+    else:
+        result = demo_crew(backend).run(task)
+
+    console.print(result.answer)
+    console.print(f"[dim]({mode} crew, {len(result.transcript)} agent messages)[/dim]")
+
+
 if __name__ == "__main__":
     app()
