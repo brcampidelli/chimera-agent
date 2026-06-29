@@ -116,3 +116,38 @@ def test_solve_without_key_exits(monkeypatch: pytest.MonkeyPatch) -> None:
         assert result.exit_code == 1
     finally:
         get_settings.cache_clear()
+
+
+def test_bench_without_key_exits(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_keys(monkeypatch)
+    try:
+        result = runner.invoke(app, ["bench"])
+        assert result.exit_code == 1
+    finally:
+        get_settings.cache_clear()
+
+
+def test_memory_add_list_search(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    _isolated_home(monkeypatch, tmp_path)
+    try:
+        added = runner.invoke(app, ["memory", "add", "Bruno prefers PT-BR"])
+        assert added.exit_code == 0
+        assert "ADD" in added.stdout
+
+        listed = runner.invoke(app, ["memory", "list"])
+        assert "PT-BR" in listed.stdout
+
+        found = runner.invoke(app, ["memory", "search", "prefers"])
+        assert "PT-BR" in found.stdout
+    finally:
+        get_settings.cache_clear()
+
+
+def test_cron_learn_empty_history(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    _isolated_home(monkeypatch, tmp_path)
+    try:
+        result = runner.invoke(app, ["cron", "learn"])
+        assert result.exit_code == 0
+        assert "no recurring" in result.stdout
+    finally:
+        get_settings.cache_clear()

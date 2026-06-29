@@ -20,10 +20,11 @@ It is built as a progression of four capability tiers on top of a transversal fu
 (human-assigned and self-learned) · integrations via **MCP** + arbitrary REST/OpenAPI tools ·
 migration from other agents (Hermes/OpenClaw) bringing config, memory and skills.
 
-> Status: **MVP complete** (Tiers 1+2 + Fusion). Done: M0 foundations · M1 (Tier-1 +
+> Status: **MVP complete + self-evolution v1**. Done: M0 foundations · M1 (Tier-1 +
 > tools/skills/integrations/crons/migration) · M2 (LLM-Fusion engine + cost-aware router) ·
-> M3 (Tier-2 autonomous loop: plan → execute → Manager review → verify-or-revert, with an
-> experience buffer). Next: M4 (self-evolution: skill discovery, self-learned crons, memory merge).
+> M3 (Tier-2 autonomous: plan → execute → Manager review → verify-or-revert + experience
+> buffer) · **M4 (self-evolution v1: Memory Manager + memory-merge migration, learned-skill
+> evolver, self-learned crons, continuous-evolution benchmark)**. Next: M5 (governance kernel).
 
 ## Why Chimera (the differentiation thesis)
 
@@ -57,8 +58,11 @@ chimera agent "TASK" --fuse          # ReAct agent loop; route deep turns throug
 chimera solve "TASK" --verify "pytest -q"   # Tier-2: plan -> execute -> verify-or-revert
 chimera cron add NAME "0 9 * * *" "run report"   # schedule a job
 chimera cron list                    # list scheduled jobs
-chimera migrate hermes ~/.hermes     # preview importing config + skills (dry-run)
-chimera migrate hermes ~/.hermes --apply
+chimera cron learn                   # propose crons from recurring tasks (disabled)
+chimera memory add "a durable fact"  # curated long-term memory (deduped)
+chimera memory search "query"
+chimera bench                        # continuous-evolution benchmark (degradation metrics)
+chimera migrate hermes ~/.hermes --apply   # import config + skills + merge memory
 ```
 
 Add integrations from code: `chimera.integrations.OpenAPIConnector` turns an OpenAPI

@@ -61,6 +61,36 @@ def test_openclaw_scan_json_config(tmp_path: Path) -> None:
     assert result.skills == ["summarize"]
 
 
+def test_memory_items_parsed(tmp_path: Path) -> None:
+    home = _make_hermes_home(tmp_path)
+    (home / "MEMORY.md").write_text(
+        "# Index\n- fact one\n- fact two\n\nplain fact\n", encoding="utf-8"
+    )
+    items = get_importer("hermes", home).memory_items()
+    contents = [i.content for i in items]
+    assert "fact one" in contents
+    assert "fact two" in contents
+    assert "plain fact" in contents
+    assert all(i.source == "hermes" for i in items)
+
+
+def test_apply_merges_memory(tmp_path: Path) -> None:
+    from chimera.memory import MemoryManager, MemoryStore
+
+    home = _make_hermes_home(tmp_path)
+    (home / "MEMORY.md").write_text("- alpha\n- beta\n", encoding="utf-8")
+    manager = MemoryManager(MemoryStore(tmp_path / "mem.json"))
+
+    result = get_importer("hermes", home).apply(tmp_path / "out", memory_manager=manager)
+    assert result.memory_merged == {"ADD": 2, "UPDATE": 0, "NOOP": 0}
+    assert len(manager.store) == 2
+
+    # re-applying merges again -> all NOOP (non-destructive, deduped)
+    result2 = get_importer("hermes", home).apply(tmp_path / "out", memory_manager=manager)
+    assert result2.memory_merged == {"ADD": 0, "UPDATE": 0, "NOOP": 2}
+    assert len(manager.store) == 2
+
+
 def test_unknown_source_raises(tmp_path: Path) -> None:
     with pytest.raises(ValueError):
         get_importer("nonexistent", tmp_path)

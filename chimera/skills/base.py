@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import time
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -61,9 +61,9 @@ class Skill(ABC):
     raises (failures become a ``SkillResult`` with ``ok=False``).
     """
 
-    name: ClassVar[str]
-    description: ClassVar[str]
-    version: ClassVar[str] = "0.1.0"
+    name: str
+    description: str
+    version: str = "0.1.0"
 
     def __init__(self) -> None:
         self.metrics = SkillMetrics()

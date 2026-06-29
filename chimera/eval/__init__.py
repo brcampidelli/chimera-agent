@@ -1,5 +1,25 @@
 """Evaluation harness: benchmarks (incl. continuous-evolution), LLM-as-judge.
 
 The continuous-evolution benchmark measures degradation over chained tasks — the
-key proof that Chimera resists the EvoClaw problem. Runs from milestone M2 onward.
+key proof that Chimera resists the EvoClaw problem.
 """
+
+from chimera.eval.continuous import (
+    EvalTask,
+    EvolutionReport,
+    SingleModelSolver,
+    Solver,
+    TaskOutcome,
+    demo_tasks,
+    run_continuous,
+)
+
+__all__ = [
+    "EvalTask",
+    "EvolutionReport",
+    "TaskOutcome",
+    "Solver",
+    "SingleModelSolver",
+    "run_continuous",
+    "demo_tasks",
+]

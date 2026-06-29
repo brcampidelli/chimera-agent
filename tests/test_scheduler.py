@@ -71,6 +71,18 @@ def test_store_persists_across_instances(tmp_path: Path) -> None:
     assert "abc" not in CronStore(path)
 
 
+def test_enable_disable(tmp_path: Path) -> None:
+    sched = _scheduler(tmp_path)
+    job = sched.schedule_cron("daily", "0 9 * * *", "x", now=NOW)
+
+    sched.disable(job.id)
+    assert sched.store.get(job.id).enabled is False
+
+    enabled = sched.enable(job.id, now=NOW)
+    assert enabled.enabled is True
+    assert enabled.next_run is not None and enabled.next_run > NOW
+
+
 def test_disabled_job_not_due(tmp_path: Path) -> None:
     sched = _scheduler(tmp_path)
     job = sched.schedule_cron("daily", "0 9 * * *", "x", now=NOW)

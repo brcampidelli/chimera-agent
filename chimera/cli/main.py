@@ -1,15 +1,16 @@
 """Chimera command-line interface (CLI-first).
 
 Commands:
-  version            show the version
-  doctor             check the environment (Python, keys, model config)
-  models             show the default model and the fusion panel
-  run PROMPT         single-shot Tier-1 completion (needs a provider key)
-  agent TASK         run the ReAct agent loop with native tools (needs a key)
-  tools              list the built-in native tools
-  skills             list the built-in skills
-  cron ...           manage scheduled jobs (add/list/remove)
-  migrate SOURCE DIR import config + skills from another agent (Hermes/OpenClaw)
+  version / doctor / models     status & configuration
+  run PROMPT                     single-shot Tier-1 completion
+  fuse PROMPT                    LLM-Fusion (panel -> judge -> synthesizer)
+  agent TASK                     ReAct agent loop with native tools
+  solve TASK                     Tier-2 autonomous (plan + verify-or-revert)
+  tools / skills                 list native tools / built-in skills
+  memory ...                     curated long-term memory (add/search/list)
+  cron ...                       scheduled jobs (add/list/remove/enable/disable/learn)
+  migrate SOURCE DIR             import config/skills/memory from another agent
+  bench                          continuous-evolution benchmark
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ from chimera import __version__
 from chimera.config import get_settings
 
 if TYPE_CHECKING:
+    from chimera.memory import MemoryManager
     from chimera.scheduler import CronStore
 
 app = typer.Typer(
@@ -281,13 +283,21 @@ def migrate(
         raise typer.Exit(code=1) from exc
 
     target = Path(home) if home else get_settings().home
-    result = importer.apply(target) if apply else importer.scan()
+    if apply:
+        from chimera.memory import MemoryManager, MemoryStore
+
+        manager = MemoryManager(MemoryStore(target / "memory.json"))
+        result = importer.apply(target, memory_manager=manager)
+    else:
+        result = importer.scan()
 
     table = Table(title=f"Migration: {source}", show_header=False, title_style="bold")
     table.add_row("Mode", "apply" if apply else "dry-run")
     table.add_row("Default model", result.default_model or "[dim]none[/dim]")
     table.add_row("Skills", ", ".join(result.skills) or "[dim]none[/dim]")
     table.add_row("Memory files", ", ".join(result.memory_files) or "[dim]none[/dim]")
+    if result.memory_merged is not None:
+        table.add_row("Memory merged", str(result.memory_merged))
     console.print(table)
     for note in result.notes:
         console.print(f"[yellow]note:[/yellow] {note}")
@@ -358,6 +368,144 @@ def cron_remove(job_id: str = typer.Argument(..., help="The job id to remove."))
         raise typer.Exit(code=1)
     store.remove(job_id)
     console.print(f"[green]removed[/green] {job_id}")
+
+
+@cron_app.command("enable")
+def cron_enable(job_id: str = typer.Argument(..., help="The job id to enable.")) -> None:
+    """Enable a job (e.g. an agent-proposed one) and schedule its next run."""
+    import time
+
+    from chimera.scheduler import Scheduler
+
+    store = _cron_store()
+    if job_id not in store:
+        console.print(f"[yellow]no job with id {job_id}[/yellow]")
+        raise typer.Exit(code=1)
+    Scheduler(store).enable(job_id, now=time.time())
+    console.print(f"[green]enabled[/green] {job_id}")
+
+
+@cron_app.command("disable")
+def cron_disable(job_id: str = typer.Argument(..., help="The job id to disable.")) -> None:
+    """Disable a job without deleting it."""
+    from chimera.scheduler import Scheduler
+
+    store = _cron_store()
+    if job_id not in store:
+        console.print(f"[yellow]no job with id {job_id}[/yellow]")
+        raise typer.Exit(code=1)
+    Scheduler(store).disable(job_id)
+    console.print(f"[green]disabled[/green] {job_id}")
+
+
+@cron_app.command("learn")
+def cron_learn(min_occurrences: int = typer.Option(3, "--min", help="Min repeats to propose.")) -> None:
+    """Propose crons from recurring tasks in the experience buffer (disabled, pending approval)."""
+    from chimera.evolution import ExperienceBuffer
+    from chimera.scheduler import CronLearner, Scheduler
+
+    history = [e.task for e in ExperienceBuffer(get_settings().home / "experience.json").all()]
+    proposals = CronLearner(min_occurrences=min_occurrences).analyze(history)
+    if not proposals:
+        console.print("[dim]no recurring tasks found in history[/dim]")
+        return
+    jobs = CronLearner(min_occurrences=min_occurrences).register_proposals(
+        Scheduler(_cron_store()), proposals
+    )
+    console.print(f"proposed {len(jobs)} cron(s) (disabled — enable with 'chimera cron enable ID'):")
+    for job in jobs:
+        console.print(f"  [cyan]{job.id}[/cyan] {job.name} (seen {job.metadata['occurrences']}x)")
+
+
+# --- memory subcommands -------------------------------------------------------
+
+memory_app = typer.Typer(help="Curated long-term memory.", no_args_is_help=True)
+app.add_typer(memory_app, name="memory")
+
+
+def _memory_manager() -> MemoryManager:
+    from chimera.memory import MemoryManager, MemoryStore
+
+    return MemoryManager(MemoryStore(get_settings().home / "memory.json"))
+
+
+@memory_app.command("add")
+def memory_add(
+    content: str = typer.Argument(..., help="The fact to remember."),
+    key: str = typer.Option(None, "--key", help="Optional dedup key."),
+) -> None:
+    """Remember a fact (ADD / UPDATE / NOOP, deduped)."""
+    op, item = _memory_manager().remember(content, key=key)
+    console.print(f"[green]{op}[/green] {item.id}")
+
+
+@memory_app.command("search")
+def memory_search(
+    query: str = typer.Argument(..., help="Search query."),
+    k: int = typer.Option(5, "--k", help="Max results."),
+) -> None:
+    """Search memory (keyword)."""
+    hits = _memory_manager().search(query, k=k)
+    if not hits:
+        console.print("[dim]no matches[/dim]")
+        return
+    for item in hits:
+        console.print(f"[cyan]{item.id}[/cyan] ({item.source}) {item.content}")
+
+
+@memory_app.command("list")
+def memory_list() -> None:
+    """List all memory items."""
+    items = _memory_manager().store.all()
+    if not items:
+        console.print("[dim]memory is empty[/dim]")
+        return
+    table = Table(title="Memory", show_header=True, header_style="bold")
+    for col in ("id", "kind", "source", "content"):
+        table.add_column(col)
+    for item in items:
+        table.add_row(item.id, item.kind, item.source, item.content)
+    console.print(table)
+
+
+@app.command()
+def bench(
+    limit: int = typer.Option(0, "--limit", help="Limit number of demo tasks (0 = all)."),
+    model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
+    fuse: bool = typer.Option(False, "--fuse", help="Use the fusion engine as the solver."),
+) -> None:
+    """Run the continuous-evolution benchmark on a demo task set. Requires a key."""
+    from chimera.eval import SingleModelSolver, demo_tasks, run_continuous
+    from chimera.providers import LLMGateway, SupportsComplete
+
+    settings = get_settings()
+    if not settings.has_any_key():
+        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+        raise typer.Exit(code=1)
+
+    gateway = LLMGateway()
+    backend: SupportsComplete = gateway
+    if fuse:
+        from chimera.fusion import FusionEngine, RoutedBackend
+
+        backend = RoutedBackend(gateway, FusionEngine(gateway))
+
+    tasks = demo_tasks()
+    if limit > 0:
+        tasks = tasks[:limit]
+
+    report = run_continuous(
+        SingleModelSolver(backend, model),
+        tasks,
+        on_task=lambda o: console.print(
+            f"  {'[green]PASS[/green]' if o.passed else '[red]FAIL[/red]'} {o.id}"
+        ),
+    )
+    summary = report.summary()
+    table = Table(title="Continuous-evolution benchmark", show_header=False, title_style="bold")
+    for key, value in summary.items():
+        table.add_row(key, str(value))
+    console.print(table)
 
 
 if __name__ == "__main__":

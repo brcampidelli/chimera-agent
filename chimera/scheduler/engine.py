@@ -92,6 +92,21 @@ class Scheduler:
             if job.enabled and job.trigger == "event" and job.schedule == event
         ]
 
+    def enable(self, job_id: str, *, now: float) -> CronJob:
+        """Enable a job; for cron jobs, (re)compute the next run from ``now``."""
+        job = self.store.get(job_id)
+        job.enabled = True
+        if job.trigger == "cron":
+            job.next_run = _next_after(job.schedule, now)
+        self.store.add(job)
+        return job
+
+    def disable(self, job_id: str) -> CronJob:
+        job = self.store.get(job_id)
+        job.enabled = False
+        self.store.add(job)
+        return job
+
     def mark_ran(self, job: CronJob, now: float) -> None:
         job.last_run = now
         if job.trigger == "cron":

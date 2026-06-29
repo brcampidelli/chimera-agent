@@ -7,7 +7,7 @@ refines them over time.
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import Any
 
 from chimera.skills.base import SkillResult
 from chimera.skills.llm_skill import LLMSkill
@@ -21,9 +21,9 @@ def _require_str(kwargs: dict[str, Any], key: str) -> str | None:
 class CompleteCodeSkill(LLMSkill):
     """Continue a snippet of code (autocomplete)."""
 
-    name: ClassVar[str] = "complete_code"
-    description: ClassVar[str] = "Continue/complete a snippet of code from a prefix."
-    version: ClassVar[str] = "0.1.0"
+    name = "complete_code"
+    description = "Continue/complete a snippet of code from a prefix."
+    version = "0.1.0"
 
     def run(self, **kwargs: Any) -> SkillResult:
         code = _require_str(kwargs, "code") or _require_str(kwargs, "prefix")
@@ -40,9 +40,9 @@ class CompleteCodeSkill(LLMSkill):
 class FixCodeSkill(LLMSkill):
     """Apply a targeted fix to code given a described problem or error."""
 
-    name: ClassVar[str] = "fix_code"
-    description: ClassVar[str] = "Fix a bug in code given the code and a problem/error description."
-    version: ClassVar[str] = "0.1.0"
+    name = "fix_code"
+    description = "Fix a bug in code given the code and a problem/error description."
+    version = "0.1.0"
 
     def run(self, **kwargs: Any) -> SkillResult:
         code = _require_str(kwargs, "code")
@@ -60,9 +60,9 @@ class FixCodeSkill(LLMSkill):
 class GenerateScriptSkill(LLMSkill):
     """Generate a single runnable script from a description."""
 
-    name: ClassVar[str] = "generate_script"
-    description: ClassVar[str] = "Generate a single runnable script from a natural-language description."
-    version: ClassVar[str] = "0.1.0"
+    name = "generate_script"
+    description = "Generate a single runnable script from a natural-language description."
+    version = "0.1.0"
 
     def run(self, **kwargs: Any) -> SkillResult:
         description = _require_str(kwargs, "description") or _require_str(kwargs, "task")

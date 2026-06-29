@@ -1,15 +1,16 @@
 """Migration framework: bring config, skills and memory from another agent.
 
 ``scan`` produces a non-destructive preview (dry-run); ``apply`` writes the imported
-artifacts under the Chimera home. Long-term *memory merge* is intentionally deferred
-to M4 (it reuses the Memory Manager): for now memory files are detected and reported,
-never silently dropped.
+artifacts under the Chimera home and — when given a :class:`MemoryManager` — *merges*
+the source agent's long-term memory into Chimera's, deduping rather than overwriting.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import shutil
+import uuid
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
@@ -17,10 +18,13 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, Field
 
+from chimera.memory.manager import MemoryManager
+from chimera.memory.models import MemoryItem
 from chimera.telemetry import get_logger
 
 _log = get_logger("migration.base")
-_MEMORY_DEFERRED = "long-term memory merge is deferred to M4 (Memory Manager)"
+_MEMORY_NOTE = "memory files found; run --apply to merge into Chimera memory (dedup, non-destructive)"
+_BULLET = re.compile(r"^[-*]\s+")
 
 
 class MigrationResult(BaseModel):
@@ -33,6 +37,7 @@ class MigrationResult(BaseModel):
     config: dict[str, Any] = Field(default_factory=dict)
     skills: list[str] = Field(default_factory=list)
     memory_files: list[str] = Field(default_factory=list)
+    memory_merged: dict[str, int] | None = None
     notes: list[str] = Field(default_factory=list)
 
 
@@ -54,8 +59,15 @@ class Importer(ABC):
         """Map skill name -> path to copy on apply."""
         raise NotImplementedError
 
-    def apply(self, target_home: Path) -> MigrationResult:
-        """Write imported config + skills under ``target_home/imported/<source>``."""
+    @abstractmethod
+    def memory_items(self) -> list[MemoryItem]:
+        """Parse the source agent's long-term memory files into items."""
+        raise NotImplementedError
+
+    def apply(
+        self, target_home: Path, *, memory_manager: MemoryManager | None = None
+    ) -> MigrationResult:
+        """Write imported config + skills; optionally merge memory (deduped)."""
         result = self.scan()
         result.dry_run = False
         dest = Path(target_home) / "imported" / self.source
@@ -71,6 +83,12 @@ class Importer(ABC):
             elif src.is_file():
                 shutil.copy2(src, target if target.suffix else target.with_suffix(src.suffix))
         result.notes.append(f"imported into {dest}")
+
+        if memory_manager is not None:
+            items = self.memory_items()
+            result.memory_merged = memory_manager.merge(items)
+            result.notes.append(f"merged {len(items)} memory item(s): {result.memory_merged}")
+
         _log.debug("applied migration from %s", self.home)
         return result
 
@@ -136,6 +154,26 @@ class DirectoryImporter(Importer):
                 found.append(name)
         return found
 
+    def memory_items(self) -> list[MemoryItem]:
+        items: list[MemoryItem] = []
+        for name in self._memory_files():
+            text = (self.home / name).read_text(encoding="utf-8")
+            for raw in text.splitlines():
+                line = raw.strip()
+                if not line or line.startswith("#"):
+                    continue
+                content = _BULLET.sub("", line)
+                items.append(
+                    MemoryItem(
+                        id=uuid.uuid4().hex[:8],
+                        kind="semantic",
+                        content=content,
+                        source=self.source,
+                        metadata={"file": name},
+                    )
+                )
+        return items
+
     def scan(self) -> MigrationResult:
         config = self._read_config()
         default_model = self._extract_model(config)
@@ -143,7 +181,7 @@ class DirectoryImporter(Importer):
         memory_files = self._memory_files()
         notes: list[str] = []
         if memory_files:
-            notes.append(_MEMORY_DEFERRED)
+            notes.append(_MEMORY_NOTE)
         if not config:
             notes.append("no config file found")
         return MigrationResult(
