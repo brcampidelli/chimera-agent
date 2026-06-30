@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   scenarios` run an everyday-assistant task set (date/unit conversions, sentiment,
   email extraction, action items, summarization) with deterministic checks. 7/7
   pass live against a real model.
+- **M8 — Full-screen TUI** (`chimera tui`, Textual): a scrolling chat log + input
+  + status bar over the same `ChatSession`. Blocking model calls run in a thread
+  worker so the UI stays responsive. Adds `textual` as a dependency.
 
 ## [0.1.0] - 2026-06-30
 

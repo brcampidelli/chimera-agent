@@ -82,7 +82,19 @@ uv run chimera chat --fuse          # fuse deep-reasoning turns
 uv run chimera chat --no-memory     # don't recall long-term memory
 ```
 
-The same conversational core powers the upcoming TUI and messaging gateway.
+The same conversational core powers the TUI and (upcoming) messaging gateway.
+
+### `tui` — full-screen terminal app
+
+A Textual full-screen UI over the same conversational core: a scrolling chat log,
+an input box, and a status bar. Same flags as `chat`.
+
+```bash
+uv run chimera tui
+uv run chimera tui --fuse --no-memory
+```
+
+`/reset` clears context, `/exit` (or `Ctrl+C`) quits.
 
 ### `run` — Tier-1, single-shot completion
 
