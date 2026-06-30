@@ -4,6 +4,7 @@ The continuous-evolution benchmark measures degradation over chained tasks — t
 key proof that Chimera resists the EvoClaw problem.
 """
 
+from chimera.eval.chained import ChainStep, demo_chain, run_chain
 from chimera.eval.continuous import (
     EvalTask,
     EvolutionReport,
@@ -22,4 +23,7 @@ __all__ = [
     "SingleModelSolver",
     "run_continuous",
     "demo_tasks",
+    "ChainStep",
+    "run_chain",
+    "demo_chain",
 ]

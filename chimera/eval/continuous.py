@@ -138,4 +138,8 @@ def demo_tasks() -> list[EvalTask]:
         EvalTask("count", "How many letters in 'hello'? Reply with only the number.", lambda o: "5" in o),
         EvalTask("upper", "Uppercase the word 'go'. Reply with only the result.", lambda o: "GO" in o),
         EvalTask("max", "What is the larger of 7 and 3? Reply with only the number.", lambda o: "7" in o),
+        EvalTask("mult", "What is 6 times 7? Reply with only the number.", lambda o: "42" in o),
+        EvalTask("first", "Reply with only the first letter of the word 'chimera'.", lambda o: "c" in o.lower()),
+        EvalTask("bool", "Is 10 greater than 2? Reply with only 'yes' or 'no'.", lambda o: "yes" in o.lower()),
+        EvalTask("even", "Is 4 even? Reply with only 'yes' or 'no'.", lambda o: "yes" in o.lower()),
     ]

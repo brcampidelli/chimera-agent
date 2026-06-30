@@ -497,9 +497,16 @@ def bench(
     limit: int = typer.Option(0, "--limit", help="Limit number of demo tasks (0 = all)."),
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
     fuse: bool = typer.Option(False, "--fuse", help="Use the fusion engine as the solver."),
+    chain: bool = typer.Option(False, "--chain", help="Run the stateful chained benchmark (error propagation)."),
 ) -> None:
     """Run the continuous-evolution benchmark on a demo task set. Requires a key."""
-    from chimera.eval import SingleModelSolver, demo_tasks, run_continuous
+    from chimera.eval import (
+        SingleModelSolver,
+        demo_chain,
+        demo_tasks,
+        run_chain,
+        run_continuous,
+    )
     from chimera.providers import LLMGateway, SupportsComplete
 
     settings = get_settings()
@@ -514,19 +521,25 @@ def bench(
 
         backend = RoutedBackend(gateway, FusionEngine(gateway))
 
-    tasks = demo_tasks()
-    if limit > 0:
-        tasks = tasks[:limit]
+    solver = SingleModelSolver(backend, model)
+    if chain:
+        report = run_chain(solver, demo_chain(limit or 8), initial_state="0")
+        title = "Chained continuous-evolution benchmark"
+    else:
+        tasks = demo_tasks()
+        if limit > 0:
+            tasks = tasks[:limit]
+        report = run_continuous(
+            solver,
+            tasks,
+            on_task=lambda o: console.print(
+                f"  {'[green]PASS[/green]' if o.passed else '[red]FAIL[/red]'} {o.id}"
+            ),
+        )
+        title = "Continuous-evolution benchmark"
 
-    report = run_continuous(
-        SingleModelSolver(backend, model),
-        tasks,
-        on_task=lambda o: console.print(
-            f"  {'[green]PASS[/green]' if o.passed else '[red]FAIL[/red]'} {o.id}"
-        ),
-    )
     summary = report.summary()
-    table = Table(title="Continuous-evolution benchmark", show_header=False, title_style="bold")
+    table = Table(title=title, show_header=False, title_style="bold")
     for key, value in summary.items():
         table.add_row(key, str(value))
     console.print(table)
