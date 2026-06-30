@@ -79,3 +79,9 @@ warn_unused_ignores = false
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+# The default run is hermetic (no network). Integration tests hit a real
+# provider and are opt-in via `-m integration`.
+addopts = "-m 'not integration'"
+markers = [
+    "integration: live test that calls a real provider API (needs OPENROUTER_API_KEY)",
+]
