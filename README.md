@@ -80,6 +80,8 @@ chimera guard "rm -rf /"               # preview a governance verdict
 chimera migrate hermes ~/.hermes --apply   # import config + skills + merge memory
 ```
 
+See the **[Usage Guide](docs/usage.md)** for install, configuration, and every command with copy-paste examples.
+
 ## Architecture
 
 ```
