@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **SDLC lifecycle crew** (`chimera lifecycle`): a pre-assembled **plan → build →
+  test → review** pipeline. `plan` decomposes the task, `build` implements it, `test`
+  runs the verifier as the **verify-or-revert** gate (revert + retry on failure), and a
+  reviewer role critiques the verified result. Built on the Tier-2 `AutonomousAgent`,
+  so the per-stage gate is the same executable ground truth used everywhere. Verified
+  live (built `solution.py`, verified `add(2,3)==5`, then reviewed).
 - **Docker execution sandbox** (`CHIMERA_SANDBOX=docker`): the shell tool can now run
   each command inside an ephemeral, network-isolated container
   ([docker/Dockerfile.sandbox](docker/Dockerfile.sandbox)) — workspace bind-mounted,

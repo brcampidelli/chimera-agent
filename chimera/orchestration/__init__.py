@@ -13,6 +13,12 @@ from chimera.orchestration.crew import (
     demo_crew,
     parallel_review,
 )
+from chimera.orchestration.lifecycle import (
+    LifecycleCrew,
+    LifecycleResult,
+    StageResult,
+    lifecycle_crew,
+)
 from chimera.orchestration.roles import Role, RoleAgent
 
 __all__ = [
@@ -26,4 +32,8 @@ __all__ = [
     "CrewResult",
     "parallel_review",
     "demo_crew",
+    "LifecycleCrew",
+    "LifecycleResult",
+    "StageResult",
+    "lifecycle_crew",
 ]

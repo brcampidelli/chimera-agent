@@ -1181,6 +1181,43 @@ def crew(
 
 
 @app.command()
+def lifecycle(
+    task: str = typer.Argument(..., help="The feature/task to take through the SDLC."),
+    verify: str = typer.Option(None, "--verify", help="Test command for the test stage (exit 0)."),
+    workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root."),
+    model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
+    max_attempts: int = typer.Option(2, "--max-attempts", help="Build/test verify-or-revert budget."),
+) -> None:
+    """SDLC crew: plan -> build -> test -> review with verify-or-revert. Requires a key."""
+    from chimera.orchestration import lifecycle_crew
+    from chimera.providers import LLMGateway, MissingCredentialsError
+
+    if not get_settings().has_any_key():
+        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+        raise typer.Exit(code=1)
+
+    crew = lifecycle_crew(
+        LLMGateway(),
+        workspace=Path(workspace),
+        verify=verify,
+        model=model,
+        max_build_attempts=max_attempts,
+    )
+    try:
+        result = crew.run(task)
+    except MissingCredentialsError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    for stage in result.stages:
+        mark = "[green]✓[/green]" if stage.passed else "[red]✗[/red]"
+        console.print(f"{mark} [bold]{stage.name}[/bold]")
+        console.print(f"  {stage.output.strip()[:500]}")
+    status = "[green]success[/green]" if result.success else "[red]failed[/red]"
+    console.print(f"\nlifecycle: {status}")
+
+
+@app.command()
 def meta(
     task: str = typer.Argument(..., help="The task to design a specialized agent for."),
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),

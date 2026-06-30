@@ -222,6 +222,19 @@ final answer.
 uv run chimera crew "Propose a minimal architecture for a URL shortener service."
 ```
 
+### `lifecycle` — SDLC crew (plan → build → test → review)
+
+A pre-assembled software-lifecycle pipeline with **verify-or-revert** at the test
+stage: `plan` decomposes the task, `build` implements it, `test` runs the verifier
+(reverting and retrying the build on failure), and a reviewer critiques the result.
+
+```bash
+uv run chimera lifecycle "Add an add(a,b) function to solution.py" \
+  --workspace ./scratch --verify "python -c \"import solution; assert solution.add(2,3)==5\""
+```
+
+Each stage prints with a ✓/✗; the run is `success` only if the test stage's verifier passed.
+
 ### `meta` — agents building agents
 
 Designs a specialized agent blueprint (name, tools, role prompt) for a task.
