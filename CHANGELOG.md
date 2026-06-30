@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Collective skill evolution** (OpenClaw-Skill, 2606.16774): `CollectiveSkillEvolver`
+  proposes a candidate skill from each model of the fusion panel and keeps the one that
+  **transfers best** across the panel, gated by the governance validator — cross-model
+  agreement as the quality signal.
+- **Step-level failure attribution** (SkillAdaptor, 2606.01311): `localize_fault` finds
+  the first failed tool step in a transcript, `attribute` links it to the most-overlapping
+  skill, and `qualify` accepts a revision only on non-regression — precise blame instead of
+  diffusing a single early error across unrelated steps.
+- **Cascade rubric evaluation** (DailyReport, 2606.12871): `evaluate_cascade` scores an
+  answer across importance-weighted dimensions (instruction-following → factuality →
+  rationality) as a cascade — a downstream dimension is scored only if the upstream clears
+  its gate.
+- **Self-optimizable agent spec + meta-search** (OpenJarvis, 2605.17172): `AgentSpec`
+  bundles the agent's editable primitives into one optimizable unit; `search_spec` runs a
+  propose → evaluate → keep-on-non-regression loop (`model_proposer` emits coordinated
+  edits) — config-level self-improvement gated against drift.
 - **Data-recipe curation** (Data Recipes for Agentic Models, 2606.24855): SFT curation
   gained two opt-in knobs — `evolve export --min-steps N` keeps only long-horizon traces
   (deeper tool-use is higher-value supervision) and `--diverse` caps examples to one per
