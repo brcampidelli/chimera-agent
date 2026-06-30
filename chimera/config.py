@@ -92,6 +92,9 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", validation_alias="CHIMERA_LOG_LEVEL")
     home: Path = Field(default=Path(".chimera"), validation_alias="CHIMERA_HOME")
 
+    # --- Exact-match completion cache for tool-free turns (HORIZON prompt caching) ---
+    cache: bool = Field(default=False, validation_alias="CHIMERA_CACHE")
+
     # --- Execution sandbox for the shell tool (local = host, docker = isolated) ---
     sandbox: str = Field(default="local", validation_alias="CHIMERA_SANDBOX")
     sandbox_image: str = Field(

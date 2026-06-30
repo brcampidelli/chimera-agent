@@ -184,3 +184,98 @@ def test_no_pool_passes_no_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
 
     LLMGateway().complete([Message(role="user", content="hi")], model="openrouter/x")
     assert "api_key" not in captured
+
+
+# --- Completion cache (HORIZON prompt caching) ---------------------------------------
+
+
+def test_cache_key_is_deterministic() -> None:
+    from chimera.providers.cache import CompletionCache
+
+    msgs = [{"role": "user", "content": "hi"}]
+    k1 = CompletionCache.key(model="m", messages=msgs, temperature=0.0, max_tokens=None)
+    k2 = CompletionCache.key(model="m", messages=msgs, temperature=0.0, max_tokens=None)
+    other = CompletionCache.key(
+        model="m", messages=[{"role": "user", "content": "bye"}], temperature=0.0, max_tokens=None
+    )
+    assert k1 == k2 != other
+
+
+def test_cache_persists(tmp_path: Any) -> None:
+    from chimera.providers.cache import CompletionCache
+
+    CompletionCache(tmp_path / "c.json").put("k", {"content": "v"})
+    assert CompletionCache(tmp_path / "c.json").get("k") == {"content": "v"}
+
+
+def test_gateway_caches_tool_free_completions(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    monkeypatch.setenv("CHIMERA_CACHE", "1")
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path / "home"))
+    get_settings.cache_clear()
+    import litellm
+
+    calls = {"n": 0}
+
+    def fake(*, model: str, **_: Any) -> SimpleNamespace:
+        calls["n"] += 1
+        return _resp("cached-answer")
+
+    monkeypatch.setattr(litellm, "completion", fake)
+    from chimera.providers import LLMGateway
+    from chimera.providers.gateway import Message
+
+    gateway = LLMGateway()
+    msgs = [Message(role="user", content="same prompt")]
+    first = gateway.complete(msgs, model="m", temperature=0.0)
+    second = gateway.complete(msgs, model="m", temperature=0.0)
+    assert first.content == second.content == "cached-answer"
+    assert calls["n"] == 1  # the second call was served from cache
+
+
+def test_cache_off_by_default(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path / "home"))
+    get_settings.cache_clear()
+    import litellm
+
+    calls = {"n": 0}
+
+    def fake(*, model: str, **_: Any) -> SimpleNamespace:
+        calls["n"] += 1
+        return _resp("x")
+
+    monkeypatch.setattr(litellm, "completion", fake)
+    from chimera.providers import LLMGateway
+    from chimera.providers.gateway import Message
+
+    gateway = LLMGateway()
+    msgs = [Message(role="user", content="p")]
+    gateway.complete(msgs, model="m")
+    gateway.complete(msgs, model="m")
+    assert calls["n"] == 2  # no caching unless CHIMERA_CACHE is on
+
+
+def test_cache_skips_tool_turns(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    monkeypatch.setenv("CHIMERA_CACHE", "1")
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path / "home"))
+    get_settings.cache_clear()
+    import litellm
+
+    calls = {"n": 0}
+
+    def fake(*, model: str, **_: Any) -> SimpleNamespace:
+        calls["n"] += 1
+        return _resp("x")
+
+    monkeypatch.setattr(litellm, "completion", fake)
+    from chimera.providers import LLMGateway
+    from chimera.providers.gateway import Message
+
+    gateway = LLMGateway()
+    msgs = [Message(role="user", content="p")]
+    tools = [{"type": "function", "function": {"name": "f"}}]
+    gateway.complete(msgs, model="m", tools=tools)
+    gateway.complete(msgs, model="m", tools=tools)
+    assert calls["n"] == 2  # tool turns always hit the model live

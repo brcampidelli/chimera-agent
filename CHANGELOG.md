@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Prompt caching** (`CHIMERA_CACHE=on`, HORIZON): an exact-match completion cache
+  returns a stored result for an identical tool-free `(model, messages, temperature,
+  max_tokens)` request, skipping the API call — saving cost/latency on repeated
+  reasoning turns (fusion panel/judge/synth, planner, reviewer, benchmark re-runs).
+  Opt-in; tool turns always hit the model live. Verified live (the same prompt returned
+  the same answer on the cached call, with no second API call).
 - **Drift gate — spec↔code** (`chimera drift <spec.yaml>`, Spec Growth Engine): a spec
   is a small YAML of requirements (`defines` a symbol / `contains` a regex / `absent` a
   regex / `command` exits 0); the gate checks the workspace against it and **exits

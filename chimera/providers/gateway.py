@@ -22,6 +22,7 @@ from typing import Any, Literal, Protocol
 from pydantic import BaseModel, Field
 
 from chimera.config import Settings, get_settings
+from chimera.providers.cache import CompletionCache
 from chimera.telemetry import get_logger
 
 _log = get_logger("providers.gateway")
@@ -156,6 +157,11 @@ class LLMGateway:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
         self._rotators: dict[str, _KeyRotator] = {}
+        self.cache: CompletionCache | None = (
+            CompletionCache(self.settings.home / "cache" / "completions.json")
+            if self.settings.cache
+            else None
+        )
         self._export_keys_to_env()
 
     def _export_keys_to_env(self) -> None:
@@ -212,6 +218,27 @@ class LLMGateway:
             )
 
         extra = self._provider_kwargs()
+        message_dicts = _to_message_dicts(messages)
+
+        # HORIZON-style prompt caching: serve an identical tool-free request from cache.
+        cache_key: str | None = None
+        if self.cache is not None and tools is None:
+            cache_key = CompletionCache.key(
+                model=resolved,
+                messages=message_dicts,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+            hit = self.cache.get(cache_key)
+            if hit is not None:
+                _log.debug("cache hit model=%s", resolved)
+                return CompletionResult(
+                    content=hit.get("content", ""),
+                    model=hit.get("model", resolved),
+                    prompt_tokens=hit.get("prompt_tokens"),
+                    completion_tokens=hit.get("completion_tokens"),
+                )
+
         last_exc: Exception | None = None
         for candidate in self._model_candidates(resolved):
             provider = candidate.split("/", 1)[0]
@@ -224,13 +251,24 @@ class LLMGateway:
                     _log.debug("completion model=%s msgs=%d", candidate, len(messages))
                     response = litellm.completion(
                         model=candidate,
-                        messages=_to_message_dicts(messages),
+                        messages=message_dicts,
                         temperature=temperature,
                         max_tokens=max_tokens,
                         tools=tools,
                         **call_kwargs,
                     )
-                    return self._normalize(response, candidate)
+                    result = self._normalize(response, candidate)
+                    if cache_key is not None and self.cache is not None and result.tool_calls is None:
+                        self.cache.put(
+                            cache_key,
+                            {
+                                "content": result.content,
+                                "model": result.model,
+                                "prompt_tokens": result.prompt_tokens,
+                                "completion_tokens": result.completion_tokens,
+                            },
+                        )
+                    return result
                 except Exception as exc:  # noqa: BLE001 — try next key, then next model
                     last_exc = exc
                     _log.warning("model %s failed: %s", candidate, exc)

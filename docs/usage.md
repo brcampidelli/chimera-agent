@@ -44,7 +44,8 @@ CHIMERA_FUSION_SYNTHESIZER=openrouter/openai/gpt-4o-mini
 ```
 
 Other knobs: `CHIMERA_HOME` (state dir, default `.chimera`), `CHIMERA_LOG_LEVEL`
-(`INFO` / `DEBUG`).
+(`INFO` / `DEBUG`), `CHIMERA_CACHE` (`on`/`off`, default off — caches identical
+tool-free completions to skip repeated API calls).
 
 **Providers, fallback & self-hosted.** Any LiteLLM `provider/model` slug works
 (`openai/…`, `anthropic/…`, `gemini/…`, `ollama/…`, `openrouter/…`, …). For a
