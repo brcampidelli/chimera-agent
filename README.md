@@ -24,10 +24,12 @@ inspired by OpenRouter Fusion — instead of relying on a single frontier model,
 *continuous-evolution degradation* that limits today's agents.
 
 > **Status:** early development (0.1.x). The full build plan (M0–M7) is implemented —
-> Tiers 1–4 + the Fusion engine + self-evolution + a governance kernel — plus an
-> **interfaces layer** (chat, TUI, HTTP gateway), **opt-in model evolution**, and a
-> **features layer** (Vision, Deliverable Mode, Pets, …).
-> 224 tests (+ opt-in live integration) · `mypy --strict` clean · `ruff` clean.
+> Tiers 1–4 + the Fusion engine + multi-level self-evolution + a governance kernel —
+> plus a **closed behavioural learning loop**, an **operational layer** (Kanban + worker
+> lanes, SDLC crew, a declarative loop DSL), **execution isolation** (Docker sandbox +
+> git worktrees), and the **paper techniques** it was designed around (HORIZON, VIBEMed,
+> Spec Growth, AgentTrust v2, AutoMegaKernel, Meta-Agent, MOC).
+> 300 tests (+ opt-in live integration) · `mypy --strict` clean · `ruff` clean.
 
 ---
 
@@ -39,33 +41,36 @@ bring security/sandboxing but don't evolve. **Chimera combines all four:**
 
 - 🧬 **Fusion-as-reasoning** — the panel→judge→synthesizer engine is the reasoning core, not an add-on. The lift comes from the *synthesis* step itself, not only model diversity.
 - 🪜 **Four capability tiers in one progression** — augmented tools → single-task autonomous → multi-agent teams → self-evolving ecosystem.
-- ♻️ **Multi-level self-evolution** that explicitly attacks continuous-evolution degradation (externalized state, drift-resistant context, verify-or-revert, experience buffer).
-- 🛡️ **A governance kernel that also self-improves** — allow/warn/block/review, with a statically-validated self-modification surface.
+- ♻️ **A closed, multi-level self-evolution loop** that explicitly attacks continuous-evolution degradation (externalized state, drift-resistant context, verify-or-revert, an experience buffer fed back into planning).
+- 🛡️ **A governance kernel that also self-improves** — allow/warn/block/review, with a statically-validated self-modification surface and guarded precedent.
 
 ## Features
 
 **Reasoning & autonomy**
 - **LLM-Fusion engine** — provider-agnostic panel of frontier + open models, a judge that surfaces consensus/contradictions/blind-spots, and a synthesizer; a **cost-aware router** fuses only when it pays (tool turns stay single-model).
-- **Tier-2 autonomy** — plan → execute → Manager review → **verify-or-revert** (workspace snapshot/restore + a command verifier), with a git-style experience buffer.
+- **Tier-2 autonomy** — plan → execute → Manager review → **verify-or-revert** (workspace snapshot/restore + a command verifier), with **git-worktree isolation** (`solve --isolate`) so edits only land when verified.
+- **SDLC lifecycle crew** (`chimera lifecycle`) — a pre-assembled **plan → build → test → review** pipeline with verify-or-revert at the test stage.
 - **Multi-agent teams** — role specialization, sequential & supervisor crews, MOC message consolidation, shared memory, parallel review.
 
 **Self-evolution & governance**
-- **Self-evolution** — a Memory Manager (ADD/UPDATE/DELETE/NOOP dedup), a skill evolver that *writes and tests its own skills* (propose → test → keep/discard), self-learned crons, and a **continuous-evolution benchmark** (plus an EvoClaw naive-vs-guarded stress test) that measures degradation.
-- **Opt-in model evolution** — `solve` collects trajectories; `evolve` curates them into SFT/DPO datasets and emits a runnable LoRA recipe. Training stays **external and opt-in** — never automatic.
-- **Governance & safety** — a self-improving trust kernel (allow/warn/block/review), a static validator for the self-modification edit surface, an append-only audit log, and governed tools.
+- **Closed behavioural loop** — past failures feed the planner (lessons), verified successes auto-write memory, and recurring tasks auto-evolve a validated, smoke-tested skill — all gated by verify-or-revert. Plus a continuous-evolution benchmark and an EvoClaw naive-vs-guarded stress test.
+- **Hierarchical memory** — working / episodic / semantic / persona **+ a graph layer** (`memory graph`) that recalls facts by entity, not only keyword.
+- **Opt-in model evolution** — `solve` collects trajectories; `evolve` curates SFT/DPO datasets and emits a runnable LoRA recipe. Training stays external/opt-in.
+- **Governance kernel** — allow/warn/block/review (lexical rules + optional semantic judge, with rule distillation and a **guarded precedent store**), a static validator for the self-modification surface, an append-only audit log, governed tools, a **four-actor change model**, and a **spec↔code drift gate** (`chimera drift`).
 
 **Providers**
 - **Any model, one interface** — provider-agnostic via LiteLLM (100+ models through `provider/model` slugs); first-class keys for OpenRouter/OpenAI/Anthropic/Gemini/DeepSeek.
-- **Self-hosted & resilient** — custom endpoints for **Ollama/vLLM** (`CHIMERA_API_BASE`), **fallback chains** across models, **credential pools** with round-robin key rotation, and a live **`/model`** switch in `chat`/`tui`.
+- **Self-hosted & resilient** — custom endpoints for **Ollama/vLLM** (`CHIMERA_API_BASE`), **fallback chains**, **credential pools** with round-robin rotation, a live **`/model`** switch, and **prompt caching** (`CHIMERA_CACHE`) for repeated reasoning turns.
 
-**Interfaces & integrations**
-- **CLI-first, plus interfaces** — a `chat` REPL, a full-screen **TUI** (Textual), and a **messaging gateway** HTTP server with one conversation (and memory) per chat.
-- **Integrations** — a first-class **MCP** client (stdio) + an **OpenAPI/REST → tool** importer, so you can add any platform or API.
-- **Crons & proactivity** — human-assigned and self-learned scheduled jobs.
-- **Migration** — import config, skills and **long-term memory** from Hermes Agent / OpenClaw (memory is *merged*, never overwritten).
+**Orchestration, interfaces & integrations**
+- **Kanban + worker lanes** (`chimera kanban`) — a task board (backlog → doing → review → done) where cards dispatch to a `solve` or `crew` lane; `kanban learn` turns recurring tasks into cards.
+- **Loop Engineering** (`chimera workflow`) — author an autonomous loop as YAML (steps that `use` the stack, with `when` conditions and `repeat`/`until` loops).
+- **Interfaces** — a `chat` REPL, a full-screen **TUI** (Textual), and a **messaging gateway** HTTP server with one conversation (and memory) per chat.
+- **Execution sandbox** — run the shell tool locally or in an isolated **Docker** container (`CHIMERA_SANDBOX=docker`).
+- **Integrations** — a first-class **MCP** client (stdio) + an **OpenAPI/REST → tool** importer; **crons** (human-assigned and self-learned, with confirmation); **migration** of config/skills/long-term memory from Hermes Agent / OpenClaw.
 
 **Built-in extras**
-- **Vision** (image paste), **Deliverable Mode** (produce polished, self-contained artifacts), and a **Pet** companion — plus pre-set credential slots for web search, image generation, TTS/voice and more (`chimera features` shows what's ready and what each needs).
+- **Vision** (image paste), **Deliverable Mode** (polished artifacts), and a **Pet** companion — plus pre-set credential slots for web search, image generation, TTS/voice and more (`chimera features`).
 
 ## Quickstart
 
@@ -87,18 +92,19 @@ chimera serve                         # messaging gateway HTTP server (per-chat 
 chimera run "PROMPT" --image pic.png   # single-shot Tier-1 (vision-capable with --image)
 chimera deliver "a launch plan" -o plan.md   # Deliverable Mode: produce a polished artifact
 chimera fuse "PROMPT" --show-panel     # LLM-Fusion: panel -> judge -> synthesizer
-chimera agent "TASK" --fuse --guard    # ReAct agent loop (governed tool calls)
-chimera solve "TASK" --verify "pytest -q"   # Tier-2 autonomous: plan -> verify-or-revert
+chimera solve "TASK" --verify "pytest -q" --isolate   # Tier-2: verify-or-revert, git-worktree isolated
+chimera lifecycle "TASK" --verify "..."   # SDLC crew: plan -> build -> test -> review
+chimera workflow flow.yaml             # run a declarative loop (Loop Engineering)
 chimera crew "TASK" --mode supervisor  # Tier-3 multi-agent crew
 chimera meta "an agent for X"          # Tier-4 meta-agent: design a specialized agent
-chimera memory add "a durable fact"    # curated long-term memory (deduped)
-chimera cron add NAME "0 9 * * *" "run report"   # schedule a job
-chimera cron learn                     # propose crons from recurring tasks (disabled)
+chimera kanban add/board/run/learn     # task board with worker lanes (solve/crew)
+chimera drift spec.yaml                # spec<->code drift gate (exit 1 on drift)
+chimera memory add / graph             # curated long-term memory + entity-relation graph
+chimera cron add / learn               # scheduled jobs (assigned + self-learned, confirmed)
 chimera bench                          # continuous-evolution benchmark
-chimera guard "rm -rf /"               # preview a governance verdict
 chimera migrate hermes ~/.hermes --apply   # import config + skills + merge memory
-chimera evolve status / recipe             # opt-in model evolution: SFT/DPO data + LoRA recipe
-chimera pet new --name Chimi               # adopt a virtual companion (stats decay over time)
+chimera evolve status / recipe         # opt-in model evolution: SFT/DPO data + LoRA recipe
+chimera pet new --name Chimi           # adopt a virtual companion
 ```
 
 See the **[Usage Guide](docs/usage.md)** for install, configuration, and every command with copy-paste examples.
@@ -107,22 +113,24 @@ See the **[Usage Guide](docs/usage.md)** for install, configuration, and every c
 
 ```
 chimera/
-  core/          agent loop (ReAct) + Tier-2 autonomy (plan, verify-or-revert, supervisor)
+  core/          agent loop (ReAct) + Tier-2 autonomy (plan, verify-or-revert) + git-worktree isolation
   fusion/        panel -> judge -> synthesizer + cost-aware router
-  memory/        working / episodic / semantic / persona + Memory Manager
+  memory/        working / episodic / semantic / persona + graph layer + Memory Manager
   skills/        built-in library + skill-context retrieval
-  evolution/     learned-skill evolver, experience buffer
-  governance/    trust kernel (allow/warn/block/review), static validator, audit, governed tools
-  orchestration/ roles, sequential & supervisor crews, MOC comms
+  evolution/     learned-skill evolver, auto-evolve hook, experience buffer
+  governance/    trust kernel (rules + judge + guarded precedent), static validator, drift gate, four-actor model, audit
+  orchestration/ roles, sequential/supervisor crews, MOC comms, SDLC lifecycle crew
   ecosystem/     meta-agent, change-tempo governance, trajectory collection, model evolution
+  kanban/        task board + worker lanes (dispatch to crews / solve)
+  workflow/      declarative loop DSL (Loop Engineering)
   tools/         native tools (files, shell, http)
+  sandbox/       execution backends (local / docker-isolated)
   integrations/  MCP client (stdio) + OpenAPI->tool importer
   scheduler/     crons (assigned + self-learned) + SOP engine
   migration/     import from Hermes/OpenClaw (config, skills, memory-merge)
-  providers/     LLM gateway (LiteLLM) — fallback chains, credential pools, custom endpoints
+  providers/     LLM gateway (LiteLLM) — fallback, credential pools, custom endpoints, prompt cache
   interface/     conversational ChatSession (shared by chat, TUI, gateway)
-  tui/           full-screen Textual app
-  server/        messaging gateway + HTTP transport (per-chat sessions)
+  tui/  server/   full-screen Textual app · messaging gateway + HTTP transport
   eval/          continuous-evolution + EvoClaw stress test + daily scenarios
   cli/           the `chimera` command (CLI-first)
 ```
@@ -133,23 +141,16 @@ See [docs/architecture.md](docs/architecture.md) for the full design and the res
 
 | Milestone | Status |
 |---|---|
-| M0 — Foundations (gateway, config, CLI) | ✅ |
-| M1 — Tier 1 + tools/skills/integrations/crons/migration | ✅ |
-| M2 — LLM-Fusion engine + cost-aware router | ✅ |
-| M3 — Tier 2 autonomous (verify-or-revert) | ✅ |
-| M4 — Self-evolution (memory, skills, learned crons, benchmark) | ✅ |
-| M5 — Governance kernel | ✅ |
-| M6 — Tier 3 multi-agent teams | ✅ |
-| M7 — Tier 4 self-evolving ecosystem | ✅ |
+| M0–M7 — Tiers 1–4 + Fusion + self-evolution + governance | ✅ |
 | M8 — Interfaces (chat/TUI/gateway), EvoClaw stress-test, opt-in model evolution | ✅ |
-| Provider layer — self-hosted endpoints, fallback chains, credential pools, `/model` | ✅ |
-| Features — Vision, Deliverable Mode, Pets + pre-set capability slots | ✅ |
+| Provider layer — self-hosted endpoints, fallback chains, credential pools, `/model`, prompt cache | ✅ |
+| Closed behavioural loop — experience→planner, auto-memory, auto-skill (governed) | ✅ |
+| Operational orchestration — Kanban + worker lanes, SDLC lifecycle crew, Loop DSL | ✅ |
+| Execution isolation — Docker sandbox + git worktrees | ✅ |
+| Paper techniques — HORIZON · VIBEMed · Spec Growth · AgentTrust v2 · AutoMegaKernel · Meta-Agent · MOC | ✅ |
 
-Post-M7, the agent has been hardened against real provider models (live-tested:
-Fusion, Tier-2 `solve`, the daily scenario suite, the HTTP gateway, the OpenAPI
-importer, and the stdio MCP client). Next: deeper continuous-evolution validation
-at scale, more provider integrations (OAuth logins, credential-pool tuning), and an
-optional LangGraph durability backend.
+Next: deeper continuous-evolution validation at scale, provider OAuth logins, and an
+optional LangGraph durability backend. Model training (LoRA/DPO) stays external/opt-in by design.
 
 ## Development
 
