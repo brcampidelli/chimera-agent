@@ -16,11 +16,23 @@ from chimera.ecosystem.evolution import (
     write_recipe,
 )
 from chimera.ecosystem.meta_agent import AgentBlueprint, MetaAgent, MetaEvalReport
+from chimera.ecosystem.spec import (
+    AgentSpec,
+    SearchStep,
+    SpecSearchResult,
+    model_proposer,
+    search_spec,
+)
 from chimera.ecosystem.trajectory import Trajectory, TrajectoryCollector
 
 __all__ = [
     "Change",
     "ChangeQueue",
+    "AgentSpec",
+    "SearchStep",
+    "SpecSearchResult",
+    "search_spec",
+    "model_proposer",
     "AgentBlueprint",
     "MetaAgent",
     "MetaEvalReport",
