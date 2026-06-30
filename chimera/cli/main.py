@@ -157,6 +157,40 @@ def run(
 
 
 @app.command()
+def deliver(
+    request: str = typer.Argument(..., help="What to produce (a report, plan, spec, README...)."),
+    out: str = typer.Option(None, "--out", "-o", help="Write the deliverable to this file."),
+    fmt: str = typer.Option("md", "--format", "-f", help="md | txt | html"),
+    model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
+    fuse: bool = typer.Option(False, "--fuse", help="Use the fusion engine for higher quality."),
+) -> None:
+    """Deliverable Mode: produce a polished, self-contained artifact. Requires a key."""
+    from chimera.deliver import produce_deliverable
+    from chimera.providers import LLMGateway, MissingCredentialsError, SupportsComplete
+
+    settings = get_settings()
+    if not settings.has_any_key():
+        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+        raise typer.Exit(code=1)
+    gateway = LLMGateway()
+    backend: SupportsComplete = gateway
+    if fuse:
+        from chimera.fusion import FusionEngine
+
+        backend = FusionEngine(gateway)
+    try:
+        document = produce_deliverable(backend, request, fmt=fmt, model=model)
+    except MissingCredentialsError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+    if out:
+        Path(out).write_text(document, encoding="utf-8")
+        console.print(f"[green]wrote[/green] {out} [dim]({len(document)} chars)[/dim]")
+    else:
+        console.print(document)
+
+
+@app.command()
 def agent(
     task: str = typer.Argument(..., help="The task for the agent to accomplish."),
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),

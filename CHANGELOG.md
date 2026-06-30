@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   base64 data-URL encoded) in the OpenAI/LiteLLM multimodal format; `chimera run
   --image <path|url>` (repeatable) sends them to a vision model. Verified live
   (gemini-2.5-flash read a generated image's colour).
+- **Deliverable Mode** (`chimera deliver`): produce a polished, self-contained
+  artifact (report/plan/spec, md/txt/html) and write it to a file; `--fuse` for
+  higher quality. Verified live.
 
 - **M8 — Interfaces (in progress)**: a shared conversational `ChatSession` core
   (multi-turn, memory-aware) and an interactive `chimera chat` REPL — the

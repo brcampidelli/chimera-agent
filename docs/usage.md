@@ -125,6 +125,16 @@ uv run chimera run "Summarize this error" --model openrouter/openai/gpt-4o-mini
 uv run chimera run "What's in this chart?" --image chart.png -m openrouter/google/gemini-2.5-flash
 ```
 
+### `deliver` — Deliverable Mode (produce an artifact)
+
+Where `run`/`chat` answer conversationally, `deliver` produces a complete,
+self-contained document (report, plan, spec, README...) and writes it to a file.
+
+```bash
+uv run chimera deliver "A one-page launch plan for a URL shortener" --out plan.md
+uv run chimera deliver "An HTML status page" --format html -o status.html --fuse
+```
+
 ### `agent` — the raw ReAct tool-calling loop
 
 Thought → Action (tool) → Observation, until a final answer. Tools are scoped to

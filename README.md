@@ -69,7 +69,8 @@ chimera doctor / models               # status & configuration
 chimera chat                          # interactive multi-turn assistant (your right-hand)
 chimera tui                           # full-screen terminal app (Textual)
 chimera serve                         # messaging gateway HTTP server (per-chat sessions)
-chimera run "PROMPT"                   # single-shot Tier-1 completion
+chimera run "PROMPT" --image pic.png   # single-shot Tier-1 (vision-capable with --image)
+chimera deliver "a launch plan" -o plan.md   # Deliverable Mode: produce a polished artifact
 chimera fuse "PROMPT" --show-panel     # LLM-Fusion: panel -> judge -> synthesizer
 chimera agent "TASK" --fuse --guard    # ReAct agent loop (governed tool calls)
 chimera solve "TASK" --verify "pytest -q"   # Tier-2 autonomous: plan -> verify-or-revert
