@@ -30,6 +30,7 @@ from chimera.eval.rubric import (
     model_judge,
 )
 from chimera.eval.scenarios import Scenario, daily_scenarios, run_scenarios
+from chimera.eval.spec_tuning import scenario_scorer
 
 __all__ = [
     "EvalTask",
@@ -56,4 +57,5 @@ __all__ = [
     "evaluate_cascade",
     "cascade_dimensions",
     "model_judge",
+    "scenario_scorer",
 ]

@@ -29,13 +29,30 @@ class Review:
 
 
 class Manager:
-    """Reviews a Worker's result and approves or requests a revision."""
+    """Reviews a Worker's result and approves or requests a revision.
 
-    def __init__(self, backend: SupportsComplete, model: str | None = None) -> None:
+    With ``use_rubric`` the verdict is the **cascade rubric** (DailyReport): the result
+    is scored on instruction-following → factuality → rationality and approved on the
+    importance-weighted overall, with feedback naming the weakest dimension. Otherwise a
+    single APPROVED/REVISE verdict is used.
+    """
+
+    def __init__(
+        self,
+        backend: SupportsComplete,
+        model: str | None = None,
+        *,
+        use_rubric: bool = False,
+        rubric_threshold: float = 0.6,
+    ) -> None:
         self.backend = backend
         self.model = model
+        self.use_rubric = use_rubric
+        self.rubric_threshold = rubric_threshold
 
     def review(self, task: str, proposed: str, *, context: str = "") -> Review:
+        if self.use_rubric:
+            return self._review_rubric(task, proposed)
         user = f"Task:\n{task}\n\nWorker's result:\n{proposed}"
         if context:
             user = f"{context}\n\n{user}"
@@ -45,6 +62,21 @@ class Manager:
             temperature=0.0,
         ).content.strip()
         return self._parse_verdict(verdict)
+
+    def _review_rubric(self, task: str, proposed: str) -> Review:
+        from chimera.eval.rubric import cascade_dimensions, evaluate_cascade, model_judge
+
+        dims = cascade_dimensions(model_judge(self.backend, self.model))
+        result = evaluate_cascade(proposed, task, dims)
+        if result.overall >= self.rubric_threshold:
+            return Review(approved=True)
+        worst = min(result.scores, key=lambda name: result.scores[name]) if result.scores else "?"
+        score = result.scores.get(worst, 0.0)
+        feedback = (
+            f"Weakest dimension: {worst} ({score:.2f}); overall {result.overall:.2f} "
+            f"< {self.rubric_threshold:.2f}. Strengthen that aspect."
+        )
+        return Review(approved=False, feedback=feedback)
 
     @staticmethod
     def _parse_verdict(verdict: str) -> Review:

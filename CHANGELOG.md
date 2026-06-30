@@ -6,7 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **`chimera evolve tune`** (OpenJarvis): self-optimize the agent spec via meta-search —
+  each round a model proposes a coordinated edit, scored on the daily scenarios and kept
+  only on non-regression. `scenario_scorer` turns the scenario suite into a reusable
+  scorer for `search_spec`.
+
 ### Changed
+- **Cascade rubric as a review criterion.** `solve --rubric` makes the Manager judge a
+  result on the cascade rubric (instruction-following → factuality → rationality),
+  approving on the importance-weighted overall and naming the weakest dimension on a
+  revision. Default review is unchanged.
 - **Collective skill + step attribution are now wired into the autonomous loop.** The
   auto-evolver proposes a recurring skill across the fusion panel and keeps the most
   transferable one when `solve --fuse` runs with a ≥2-model panel (falls back to

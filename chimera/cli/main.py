@@ -430,6 +430,7 @@ def solve(
     max_steps: int = typer.Option(8, "--max-steps", help="Max tool-calling steps per attempt."),
     no_plan: bool = typer.Option(False, "--no-plan", help="Skip the planning step."),
     no_manager: bool = typer.Option(False, "--no-manager", help="Skip Manager review."),
+    rubric: bool = typer.Option(False, "--rubric", help="Manager reviews via the cascade rubric."),
     fuse: bool = typer.Option(False, "--fuse", help="Route deep-reasoning turns through fusion."),
     guard: bool = typer.Option(False, "--guard", help="Gate tool calls through the governance kernel."),
     collect: bool = typer.Option(
@@ -500,7 +501,7 @@ def solve(
         auto = AutonomousAgent(
             worker,
             planner=None if no_plan else Planner(planner_backend, model),
-            manager=None if no_manager else Manager(gateway, model),
+            manager=None if no_manager else Manager(gateway, model, use_rubric=rubric),
             verifier=CommandVerifier(verify, ws) if verify else None,
             guard=WorkspaceGuard(ws),
             experience=ExperienceBuffer(settings.home / "experience.json"),
@@ -1047,6 +1048,65 @@ def evolve_recipe(
     for path in files:
         console.print(f"[green]wrote[/green] {path}")
     console.print("[dim]Training is external + opt-in: run it on a GPU, review the result before use.[/dim]")
+
+
+@evolve_app.command("tune")
+def evolve_tune(
+    rounds: int = typer.Option(2, "--rounds", help="Meta-search rounds."),
+    model: str = typer.Option(None, "--model", help="Base model for the spec."),
+    max_steps: int = typer.Option(8, "--max-steps", help="Initial runtime step budget."),
+) -> None:
+    """Self-optimize the agent spec (OpenJarvis meta-search) against the daily scenarios.
+
+    Each round a model proposes a coordinated edit to the spec; the candidate is scored on
+    the daily scenarios and kept only on non-regression. Uses real model calls.
+    """
+    from chimera.core.agent import DEFAULT_SYSTEM_PROMPT, Agent, AgentConfig
+    from chimera.ecosystem import AgentSpec, model_proposer, search_spec
+    from chimera.eval import daily_scenarios, scenario_scorer
+    from chimera.providers import LLMGateway, MissingCredentialsError
+    from chimera.tools import default_registry
+
+    settings = get_settings()
+    if not settings.has_any_key():
+        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+        raise typer.Exit(code=1)
+
+    gateway = LLMGateway()
+    registry = default_registry(Path("."))
+
+    class _SpecSolver:
+        def __init__(self, spec: AgentSpec) -> None:
+            self._agent = Agent(
+                gateway,
+                registry,
+                AgentConfig(
+                    model=spec.model,
+                    max_steps=spec.max_steps,
+                    system_prompt=spec.system_prompt or DEFAULT_SYSTEM_PROMPT,
+                ),
+            )
+
+        def solve(self, prompt: str) -> str:
+            return self._agent.run(prompt).answer
+
+    scorer = scenario_scorer(_SpecSolver, daily_scenarios())
+    initial = AgentSpec(model=model, max_steps=max_steps)
+    try:
+        result = search_spec(initial, scorer, model_proposer(gateway, model), rounds=rounds)
+    except MissingCredentialsError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title="Spec meta-search", show_header=True)
+    table.add_column("round")
+    table.add_column("score")
+    table.add_column("kept")
+    for index, step in enumerate(result.history):
+        table.add_row(str(index), f"{step.score:.3f}", "✓" if step.accepted else "·")
+    console.print(table)
+    console.print(f"[green]best score[/green] {result.best_score:.3f}")
+    console.print(f"[dim]best spec:[/dim] {result.best.to_dict()}")
 
 
 pet_app = typer.Typer(help="Your virtual companion — a chimera that needs care.", no_args_is_help=True)

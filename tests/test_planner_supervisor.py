@@ -42,6 +42,19 @@ def test_manager_requests_revision() -> None:
     assert review.feedback == "handle the empty input case"
 
 
+def test_manager_rubric_approves_high_score() -> None:
+    # every dimension scores 1.0 -> overall 1.0 >= threshold -> approved
+    review = Manager(FixedBackend("1.0"), use_rubric=True).review("task", "great result")
+    assert review.approved is True
+
+
+def test_manager_rubric_rejects_low_score_with_dimension_feedback() -> None:
+    # instruction-following scores 0.1 (< gate) -> cascade stops, overall low -> rejected
+    review = Manager(FixedBackend("0.1"), use_rubric=True).review("task", "bad result")
+    assert review.approved is False
+    assert "instruction_following" in review.feedback
+
+
 def test_manager_non_standard_reply_is_revision() -> None:
     review = Manager(FixedBackend("This is wrong because X")).review("task", "result")
     assert review.approved is False
