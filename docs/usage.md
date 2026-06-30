@@ -71,6 +71,19 @@ uv run chimera doctor
 uv run chimera models
 ```
 
+### `chat` — interactive multi-turn assistant (your right-hand)
+
+An interactive REPL with conversation memory and tool use — the daily driver.
+It recalls relevant long-term memory and threads the conversation across turns.
+
+```bash
+uv run chimera chat                 # start chatting; /exit to quit, /reset to clear context
+uv run chimera chat --fuse          # fuse deep-reasoning turns
+uv run chimera chat --no-memory     # don't recall long-term memory
+```
+
+The same conversational core powers the upcoming TUI and messaging gateway.
+
 ### `run` — Tier-1, single-shot completion
 
 A single model call, no tools, no fusion. Cheapest path.

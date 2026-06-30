@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **M8 — Interfaces (in progress)**: a shared conversational `ChatSession` core
+  (multi-turn, memory-aware) and an interactive `chimera chat` REPL — the
+  foundation the TUI and messaging gateway will reuse.
+
 ## [0.1.0] - 2026-06-30
 
 First tagged release. The initial build plan (M0–M7) is complete, then hardened

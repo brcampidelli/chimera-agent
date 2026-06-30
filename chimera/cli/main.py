@@ -182,6 +182,65 @@ def agent(
 
 
 @app.command()
+def chat(
+    model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
+    max_steps: int = typer.Option(6, "--max-steps", help="Max tool-calling steps per message."),
+    workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root for tools."),
+    fuse: bool = typer.Option(False, "--fuse", help="Route deep-reasoning turns through fusion."),
+    no_memory: bool = typer.Option(False, "--no-memory", help="Don't recall long-term memory."),
+) -> None:
+    """Interactive multi-turn chat — your terminal right-hand. Requires a key."""
+    from chimera.core import Agent, AgentConfig
+    from chimera.interface import ChatSession
+    from chimera.providers import LLMGateway, MissingCredentialsError, SupportsComplete
+    from chimera.tools import default_registry
+
+    settings = get_settings()
+    if not settings.has_any_key():
+        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+        raise typer.Exit(code=1)
+
+    gateway = LLMGateway()
+    backend: SupportsComplete = gateway
+    if fuse:
+        from chimera.fusion import FusionEngine, RoutedBackend
+
+        backend = RoutedBackend(gateway, FusionEngine(gateway))
+    agent = Agent(backend, default_registry(Path(workspace)), AgentConfig(model=model, max_steps=max_steps))
+    session = ChatSession(agent, memory=None if no_memory else _memory_manager())
+
+    console.print(
+        "[bold]Chimera chat[/bold] — your terminal right-hand. "
+        "[cyan]/exit[/cyan] to quit, [cyan]/reset[/cyan] to clear context."
+    )
+    while True:
+        try:
+            message = console.input("[bold green]you ›[/bold green] ").strip()
+        except (EOFError, KeyboardInterrupt):
+            console.print("\n[dim]bye[/dim]")
+            break
+        if not message:
+            continue
+        if message in ("/exit", "/quit", "/q"):
+            console.print("[dim]bye[/dim]")
+            break
+        if message == "/reset":
+            session.reset()
+            console.print("[dim]context cleared[/dim]")
+            continue
+        try:
+            with console.status("[dim]thinking…[/dim]"):
+                reply = session.send(message)
+        except MissingCredentialsError as exc:
+            console.print(f"[red]{exc}[/red]")
+            break
+        except Exception as exc:  # noqa: BLE001 — keep the REPL alive on transient errors
+            console.print(f"[red]error: {exc}[/red]")
+            continue
+        console.print(f"[bold magenta]chimera ›[/bold magenta] {reply}")
+
+
+@app.command()
 def fuse(
     prompt: str = typer.Argument(..., help="The prompt to run through the fusion engine."),
     show_panel: bool = typer.Option(False, "--show-panel", help="Show panel answers + judge analysis."),

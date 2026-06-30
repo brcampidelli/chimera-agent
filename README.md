@@ -66,6 +66,7 @@ uv run chimera doctor       # check your environment
 
 ```bash
 chimera doctor / models               # status & configuration
+chimera chat                          # interactive multi-turn assistant (your right-hand)
 chimera run "PROMPT"                   # single-shot Tier-1 completion
 chimera fuse "PROMPT" --show-panel     # LLM-Fusion: panel -> judge -> synthesizer
 chimera agent "TASK" --fuse --guard    # ReAct agent loop (governed tool calls)
