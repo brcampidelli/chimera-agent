@@ -6,12 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **MCP stdio client teardown**: the live session now opens and closes the stdio
+  client's `AsyncExitStack` in a single background task, fixing an anyio
+  "exit cancel scope in a different task" crash on `close()` (surfaced by the new
+  live MCP test). `list_tools`/`call_tool` were already working; only teardown broke.
+
 ### Added
-- **Live validation — OpenAPI importer & TUI**: an opt-in integration test imports
-  a real public OpenAPI spec (httpbin, 73 operations), pours the generated tools
-  into a `ToolRegistry`, and calls one live (real HTTP 200); a headless Textual
-  driver smoke drives the TUI through the real event loop (type → submit → worker
-  reply, `/model` switch, `/exit`). Closes the two remaining "unit-only" gaps.
+- **Live validation — OpenAPI importer, MCP client & TUI**: opt-in integration
+  tests now (1) import a real public OpenAPI spec (httpbin, 73 operations), pour
+  the generated tools into a `ToolRegistry`, and call one live (real HTTP 200);
+  (2) spawn a real MCP server over stdio (a FastMCP server) and drive it through
+  Chimera's client — real `initialize`/`tools/list`/`tools/call` handshake, then
+  register + call `add`/`echo` (also verified live against the third-party
+  `@modelcontextprotocol/server-everything`). A headless Textual driver smoke
+  drives the TUI through the real event loop (type → submit → worker reply,
+  `/model` switch, `/exit`). Closes the remaining "unit-only" gaps.
 - **AI providers — credential pools / key rotation**: `CHIMERA_<PROVIDER>_KEYS`
   (comma-separated) gives a provider a pool of keys, rotated round-robin across
   calls (spreading load / rate limits) with failover to the next key within a

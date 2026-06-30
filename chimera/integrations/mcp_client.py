@@ -11,6 +11,7 @@ Two layers:
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
@@ -105,17 +106,24 @@ class StdioMCPSession:
         self._loop: Any = None
         self._thread: Any = None
         self._session: Any = None
-        self._stack: Any = None
+        self._stop_event: Any = None
+        self._serve_future: Any = None
+        self._connect_error: Exception | None = None
+        self._ready = threading.Event()
 
     def start(self) -> StdioMCPSession:
         import asyncio
-        import threading
 
         self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
         self._thread.start()
-        future = asyncio.run_coroutine_threadsafe(self._connect(), self._loop)
-        future.result(timeout=self.connect_timeout)
+        # The session lives entirely inside _serve (one task) so the stdio client's
+        # anyio cancel scopes are entered and exited in the same task.
+        self._serve_future = asyncio.run_coroutine_threadsafe(self._serve(), self._loop)
+        if not self._ready.wait(timeout=self.connect_timeout):
+            raise TimeoutError(f"MCP server '{self.command}' did not become ready")
+        if self._connect_error is not None:
+            raise self._connect_error
         return self
 
     def _run_loop(self) -> None:
@@ -124,18 +132,28 @@ class StdioMCPSession:
         asyncio.set_event_loop(self._loop)
         self._loop.run_forever()
 
-    async def _connect(self) -> None:
+    async def _serve(self) -> None:
+        import asyncio
         from contextlib import AsyncExitStack
 
         from mcp import ClientSession, StdioServerParameters
         from mcp.client.stdio import stdio_client
 
-        self._stack = AsyncExitStack()
-        params = StdioServerParameters(command=self.command, args=self.args, env=self.env)
-        read, write = await self._stack.enter_async_context(stdio_client(params))
-        self._session = await self._stack.enter_async_context(ClientSession(read, write))
-        await self._session.initialize()
-        _log.debug("MCP stdio session connected: %s", self.command)
+        self._stop_event = asyncio.Event()
+        try:
+            async with AsyncExitStack() as stack:
+                params = StdioServerParameters(
+                    command=self.command, args=self.args, env=self.env
+                )
+                read, write = await stack.enter_async_context(stdio_client(params))
+                self._session = await stack.enter_async_context(ClientSession(read, write))
+                await self._session.initialize()
+                _log.debug("MCP stdio session connected: %s", self.command)
+                self._ready.set()
+                await self._stop_event.wait()  # hold the streams open in THIS task
+        except Exception as exc:  # noqa: BLE001 — surface connect failures to start()
+            self._connect_error = exc
+            self._ready.set()
 
     def list_tools(self) -> list[MCPToolSpec]:
         import asyncio
@@ -161,10 +179,14 @@ class StdioMCPSession:
         return _content_to_text(result)
 
     def close(self) -> None:
-        import asyncio
+        # Signal _serve to exit; its AsyncExitStack then unwinds in its own task.
+        if self._loop is not None and self._stop_event is not None:
+            self._loop.call_soon_threadsafe(self._stop_event.set)
+        if self._serve_future is not None:
+            from contextlib import suppress
 
-        if self._stack is not None and self._loop is not None:
-            asyncio.run_coroutine_threadsafe(self._stack.aclose(), self._loop).result(timeout=10)
+            with suppress(Exception):  # best-effort teardown
+                self._serve_future.result(timeout=10)
         if self._loop is not None:
             self._loop.call_soon_threadsafe(self._loop.stop)
 
