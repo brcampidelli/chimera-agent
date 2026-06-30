@@ -29,7 +29,7 @@ inspired by OpenRouter Fusion — instead of relying on a single frontier model,
 > lanes, SDLC crew, a declarative loop DSL), **execution isolation** (Docker sandbox +
 > git worktrees), and the **paper techniques** it was designed around (HORIZON, VIBEMed,
 > Spec Growth, AgentTrust v2, AutoMegaKernel, Meta-Agent, MOC).
-> 300 tests (+ opt-in live integration) · `mypy --strict` clean · `ruff` clean.
+> 332 tests (+ opt-in live integration) · `mypy --strict` clean · `ruff` clean.
 
 ---
 
@@ -148,6 +148,7 @@ See [docs/architecture.md](docs/architecture.md) for the full design and the res
 | Operational orchestration — Kanban + worker lanes, SDLC lifecycle crew, Loop DSL | ✅ |
 | Execution isolation — Docker sandbox + git worktrees | ✅ |
 | Paper techniques — HORIZON · VIBEMed · Spec Growth · AgentTrust v2 · AutoMegaKernel · Meta-Agent · MOC | ✅ |
+| Paper techniques (II) — MemGate · multi-factor memory value · Data Recipes · OpenClaw-Skill · SkillAdaptor · DailyReport · OpenJarvis spec-search | ✅ |
 
 Next: deeper continuous-evolution validation at scale, provider OAuth logins, and an
 optional LangGraph durability backend. Model training (LoRA/DPO) stays external/opt-in by design.
