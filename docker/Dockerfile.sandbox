@@ -1,0 +1,20 @@
+# Execution sandbox image for Chimera's shell tool.
+#
+# The agent runs each shell command inside an ephemeral container built from this
+# image, with the workspace bind-mounted and the network disabled by default:
+#
+#   docker run --rm --network none --memory 512m \
+#       -v <workspace>:/workspace -w /workspace chimera-sandbox sh -c "<command>"
+#
+# Build:  docker build -t chimera-sandbox -f docker/Dockerfile.sandbox .
+# Use:    CHIMERA_SANDBOX=docker CHIMERA_SANDBOX_IMAGE=chimera-sandbox \
+#             uv run chimera solve "..." --workspace ./scratch
+FROM python:3.12-slim
+
+# Common build/test tooling the agent is likely to invoke inside the sandbox.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir uv
+
+WORKDIR /workspace

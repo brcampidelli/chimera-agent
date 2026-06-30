@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Docker execution sandbox** (`CHIMERA_SANDBOX=docker`): the shell tool can now run
+  each command inside an ephemeral, network-isolated container
+  ([docker/Dockerfile.sandbox](docker/Dockerfile.sandbox)) — workspace bind-mounted,
+  root fs discarded (`--rm`), memory capped, network off by default — instead of
+  directly on the host. A `Sandbox` seam with `LocalSandbox`/`DockerSandbox`; the
+  default stays `local`. Degrades gracefully to local when Docker is unavailable
+  (verified live: the fallback ran the command and logged a warning).
 - **Kanban board + worker lanes** (`chimera kanban`): a JSON-backed task board
   (backlog → doing → review → done) where each card names a worker *lane* that
   dispatches it to the agent stack — `solve` (Tier-2 autonomous, verify-or-revert) or

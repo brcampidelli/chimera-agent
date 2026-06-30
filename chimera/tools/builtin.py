@@ -36,12 +36,14 @@ def default_registry(workspace: Path | None = None) -> ToolRegistry:
 
     File and shell tools are rooted at ``workspace`` (default: current directory).
     """
+    from chimera.sandbox import get_sandbox
+
     registry = ToolRegistry()
     registry.register(EchoTool())
     registry.register(ReadFileTool(workspace))
     registry.register(WriteFileTool(workspace))
     registry.register(ListDirTool(workspace))
-    registry.register(RunShellTool(workspace))
+    registry.register(RunShellTool(workspace, get_sandbox()))
     registry.register(HttpGetTool())
 
     # Key-gated optional tools light up when their credential is set.

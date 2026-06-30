@@ -92,6 +92,12 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", validation_alias="CHIMERA_LOG_LEVEL")
     home: Path = Field(default=Path(".chimera"), validation_alias="CHIMERA_HOME")
 
+    # --- Execution sandbox for the shell tool (local = host, docker = isolated) ---
+    sandbox: str = Field(default="local", validation_alias="CHIMERA_SANDBOX")
+    sandbox_image: str = Field(
+        default="python:3.12-slim", validation_alias="CHIMERA_SANDBOX_IMAGE"
+    )
+
     @field_validator(
         "fusion_panel",
         "fallback_models",

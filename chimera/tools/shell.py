@@ -7,11 +7,13 @@ it (allow/warn/block/review) and the sandbox layer (M3/M5) will isolate it.
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from chimera.tools.base import Tool
+
+if TYPE_CHECKING:
+    from chimera.sandbox.base import Sandbox
 
 _MAX_OUTPUT_CHARS = 20_000
 _DEFAULT_TIMEOUT = 60
@@ -32,24 +34,20 @@ class RunShellTool(Tool):
         "required": ["command"],
     }
 
-    def __init__(self, workspace: Path | None = None) -> None:
+    def __init__(self, workspace: Path | None = None, sandbox: Sandbox | None = None) -> None:
         self.workspace = (workspace or Path.cwd()).resolve()
+        self._sandbox = sandbox
 
     def run(self, **kwargs: Any) -> str:
+        from chimera.sandbox import LocalSandbox
+
         command = str(kwargs["command"])
         timeout = int(kwargs.get("timeout") or _DEFAULT_TIMEOUT)
-        try:
-            proc = subprocess.run(
-                command,
-                shell=True,
-                cwd=self.workspace,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
-        except subprocess.TimeoutExpired:
+        sandbox = self._sandbox or LocalSandbox()
+        result = sandbox.run(command, timeout=timeout, cwd=self.workspace)
+        if result.timed_out:
             return f"error: command timed out after {timeout}s"
-        out = (proc.stdout or "") + (proc.stderr or "")
+        out = result.output
         if len(out) > _MAX_OUTPUT_CHARS:
             out = out[:_MAX_OUTPUT_CHARS] + f"\n... [truncated, {len(out)} chars total]"
-        return f"[exit {proc.returncode}]\n{out}".rstrip()
+        return f"[exit {result.exit_code}]\n{out}".rstrip()
