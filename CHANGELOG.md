@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Data-recipe curation** (Data Recipes for Agentic Models, 2606.24855): SFT curation
+  gained two opt-in knobs — `evolve export --min-steps N` keeps only long-horizon traces
+  (deeper tool-use is higher-value supervision) and `--diverse` caps examples to one per
+  task (task-description diversity is the curation bottleneck). Trajectories now record
+  their tool-calling step count. Defaults preserve current behaviour.
 - **Memory admission gate** (MemGate, 2606.06054): recall now passes through a trust
   boundary — a recalled memory enters the prompt only if it is relevant to the query
   *and* free of override/injection markers (a memory-based jailbreak defense). On by

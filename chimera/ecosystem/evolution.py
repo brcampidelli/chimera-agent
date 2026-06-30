@@ -21,25 +21,43 @@ from chimera.ecosystem.trajectory import Trajectory, TrajectoryCollector
 
 @dataclass
 class CurationConfig:
-    """How to filter raw trajectories into training data."""
+    """How to filter raw trajectories into training data.
+
+    The ``min_steps`` / ``max_per_prompt`` knobs apply the *Data Recipes for Agentic
+    Models* findings: long-horizon traces (>= 5 turns) are higher-value supervision, and
+    task-description diversity is the bottleneck at scale, so capping examples per unique
+    task avoids over-representing a few prompts.
+    """
 
     min_reward: float = 0.0
     dedup: bool = True
     min_margin: float = 0.0  # DPO: require chosen.reward - rejected.reward > this
+    min_steps: int = 0  # long-horizon: keep only traces with >= this many tool-calling steps
+    max_per_prompt: int = 0  # diversity: cap SFT examples per unique task (0 = unlimited)
 
 
 def curate_sft(trajectories: list[Trajectory], config: CurationConfig | None = None) -> list[dict[str, Any]]:
-    """Successful, reward-gated, de-duplicated chat examples (highest reward first)."""
+    """Successful, reward-gated, de-duplicated chat examples (highest reward first).
+
+    Applies the long-horizon and diversity recipes when configured.
+    """
     cfg = config or CurationConfig()
     seen: set[tuple[str, str]] = set()
+    per_prompt: dict[str, int] = {}
     rows: list[dict[str, Any]] = []
     for item in sorted(trajectories, key=lambda t: -t.reward):
         if item.outcome != "success" or item.reward < cfg.min_reward:
             continue
-        key = (item.prompt.strip(), item.response.strip())
+        if item.steps < cfg.min_steps:  # long-horizon recipe
+            continue
+        prompt = item.prompt.strip()
+        if cfg.max_per_prompt and per_prompt.get(prompt, 0) >= cfg.max_per_prompt:
+            continue  # diversity recipe: cap examples per unique task
+        key = (prompt, item.response.strip())
         if cfg.dedup and key in seen:
             continue
         seen.add(key)
+        per_prompt[prompt] = per_prompt.get(prompt, 0) + 1
         rows.append(
             {
                 "messages": [

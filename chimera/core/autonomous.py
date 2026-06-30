@@ -134,7 +134,8 @@ class AutonomousAgent:
         for index in range(1, self.config.max_attempts + 1):
             snapshot = self.guard.snapshot() if self.guard else None
             prompt = self._compose(task, plan, context, feedback)
-            answer = self.worker.run(prompt).answer
+            agent_result = self.worker.run(prompt)
+            answer = agent_result.answer
 
             # Executable evidence is ground truth: when a verifier is present it
             # decides success, and the Manager is consulted only for feedback on a
@@ -161,7 +162,9 @@ class AutonomousAgent:
             if self.trajectories is not None:
                 # Each attempt is a (task -> answer) trajectory; multiple attempts on
                 # one task give success/failure pairs — the raw signal for DPO.
-                self.trajectories.record(task, answer, outcome=outcome, reward=1.0 if ok else 0.0)
+                self.trajectories.record(
+                    task, answer, outcome=outcome, reward=1.0 if ok else 0.0, steps=agent_result.steps
+                )
 
             if ok:
                 _log.debug("task succeeded on attempt %d", index)

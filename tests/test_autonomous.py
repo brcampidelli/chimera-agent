@@ -158,6 +158,17 @@ def test_trajectories_recorded(tmp_path: Path) -> None:
     assert items[0].reward == 1.0
 
 
+def test_trajectory_records_steps(tmp_path: Path) -> None:
+    from chimera.ecosystem import TrajectoryCollector
+
+    collector = TrajectoryCollector(tmp_path / "traj.jsonl")
+    auto = AutonomousAgent(
+        FakeWorker("ans"), trajectories=collector, config=AutonomousConfig(use_planner=False)
+    )
+    auto.run("do X")
+    assert collector.all()[0].steps == 1  # FakeWorker reports steps=1 (long-horizon signal)
+
+
 def test_experience_recorded(tmp_path: Path) -> None:
     buf = ExperienceBuffer(tmp_path / "exp.json")
     auto = AutonomousAgent(FakeWorker(), experience=buf, config=AutonomousConfig(use_planner=False))

@@ -23,6 +23,7 @@ class Trajectory(BaseModel):
     response: str
     outcome: Outcome = "unknown"
     reward: float = 0.0
+    steps: int = 0  # tool-calling steps — a long-horizon signal for data curation
 
 
 class TrajectoryCollector:
@@ -42,9 +43,22 @@ class TrajectoryCollector:
                 self._items.append(Trajectory.model_validate_json(line))
 
     def record(
-        self, prompt: str, response: str, *, outcome: Outcome = "unknown", reward: float = 0.0
+        self,
+        prompt: str,
+        response: str,
+        *,
+        outcome: Outcome = "unknown",
+        reward: float = 0.0,
+        steps: int = 0,
     ) -> Trajectory:
-        item = Trajectory(seq=len(self._items), prompt=prompt, response=response, outcome=outcome, reward=reward)
+        item = Trajectory(
+            seq=len(self._items),
+            prompt=prompt,
+            response=response,
+            outcome=outcome,
+            reward=reward,
+            steps=steps,
+        )
         self._items.append(item)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a", encoding="utf-8") as handle:
