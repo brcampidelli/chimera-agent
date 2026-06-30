@@ -1,1 +1,22 @@
-"""Gateway/API + messaging (later phase). Not part of the CLI-first MVP."""
+"""Messaging gateway + HTTP server.
+
+The gateway routes per-chat messages into ChatSessions; adapters (local now,
+Discord/Telegram next) and the HTTP server are its transports.
+"""
+
+from chimera.server.gateway import (
+    Adapter,
+    InboundMessage,
+    LocalAdapter,
+    MessageGateway,
+)
+from chimera.server.http import handle, make_server
+
+__all__ = [
+    "InboundMessage",
+    "MessageGateway",
+    "Adapter",
+    "LocalAdapter",
+    "handle",
+    "make_server",
+]

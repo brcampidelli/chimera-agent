@@ -272,6 +272,55 @@ def tui(
 
 
 @app.command()
+def serve(
+    host: str = typer.Option("127.0.0.1", "--host", help="Bind host."),
+    port: int = typer.Option(8765, "--port", help="Bind port."),
+    model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
+    max_steps: int = typer.Option(6, "--max-steps", help="Max tool-calling steps per message."),
+    workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root for tools."),
+    fuse: bool = typer.Option(False, "--fuse", help="Route deep-reasoning turns through fusion."),
+    no_memory: bool = typer.Option(False, "--no-memory", help="Don't recall long-term memory."),
+) -> None:
+    """Run the messaging gateway HTTP server (POST /chat, GET /health). Requires a key."""
+    from chimera.core import Agent, AgentConfig
+    from chimera.interface import ChatSession
+    from chimera.providers import LLMGateway, SupportsComplete
+    from chimera.server import MessageGateway, make_server
+    from chimera.tools import default_registry
+
+    settings = get_settings()
+    if not settings.has_any_key():
+        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+        raise typer.Exit(code=1)
+
+    llm = LLMGateway()
+    backend: SupportsComplete = llm
+    if fuse:
+        from chimera.fusion import FusionEngine, RoutedBackend
+
+        backend = RoutedBackend(llm, FusionEngine(llm))
+
+    workspace_path = Path(workspace)
+    shared_memory = None if no_memory else _memory_manager()
+
+    def factory() -> ChatSession:
+        runner = Agent(backend, default_registry(workspace_path), AgentConfig(model=model, max_steps=max_steps))
+        return ChatSession(runner, memory=shared_memory)
+
+    server = make_server(MessageGateway(factory), host, port)
+    console.print(
+        f"[bold]Chimera gateway[/bold] on http://{host}:{port}  "
+        "[dim](POST /chat, GET /health). Ctrl+C to stop.[/dim]"
+    )
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        console.print("\n[dim]stopped[/dim]")
+    finally:
+        server.shutdown()
+
+
+@app.command()
 def fuse(
     prompt: str = typer.Argument(..., help="The prompt to run through the fusion engine."),
     show_panel: bool = typer.Option(False, "--show-panel", help="Show panel answers + judge analysis."),

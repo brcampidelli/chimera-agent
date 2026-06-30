@@ -68,6 +68,7 @@ uv run chimera doctor       # check your environment
 chimera doctor / models               # status & configuration
 chimera chat                          # interactive multi-turn assistant (your right-hand)
 chimera tui                           # full-screen terminal app (Textual)
+chimera serve                         # messaging gateway HTTP server (per-chat sessions)
 chimera run "PROMPT"                   # single-shot Tier-1 completion
 chimera fuse "PROMPT" --show-panel     # LLM-Fusion: panel -> judge -> synthesizer
 chimera agent "TASK" --fuse --guard    # ReAct agent loop (governed tool calls)

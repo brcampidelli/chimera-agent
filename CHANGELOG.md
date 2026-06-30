@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **M8 — Full-screen TUI** (`chimera tui`, Textual): a scrolling chat log + input
   + status bar over the same `ChatSession`. Blocking model calls run in a thread
   worker so the UI stays responsive. Adds `textual` as a dependency.
+- **M8 — Messaging gateway + HTTP server** (`chimera serve`): a `MessageGateway`
+  routes each chat to its own `ChatSession` (per-conversation context, shared
+  long-term memory); a stdlib HTTP transport exposes `POST /chat` and `GET
+  /health`, and a `LocalAdapter` covers in-process use. Discord/Telegram adapters
+  plug into the same `on_message` seam next. Verified live (per-chat memory).
 
 ## [0.1.0] - 2026-06-30
 

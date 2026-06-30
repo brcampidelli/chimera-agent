@@ -96,6 +96,19 @@ uv run chimera tui --fuse --no-memory
 
 `/reset` clears context, `/exit` (or `Ctrl+C`) quits.
 
+### `serve` — messaging gateway HTTP server
+
+Exposes the agent over HTTP, with one conversation (and its memory) **per chat**.
+This is the hub messaging adapters (Discord/Telegram, coming next) plug into.
+
+```bash
+uv run chimera serve --port 8765
+# GET  /health           -> {"status":"ok","active_chats":N}
+# POST /chat  {"text":"...", "chat_id":"alice"}  -> {"reply":"...","chat_id":"alice"}
+```
+
+Each `chat_id` keeps its own context, so different users/threads don't mix.
+
 ### `run` — Tier-1, single-shot completion
 
 A single model call, no tools, no fusion. Cheapest path.
