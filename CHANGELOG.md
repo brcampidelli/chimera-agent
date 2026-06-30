@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   context, so the agent avoids repeating past failure modes across runs/sessions.
   Advisory only — verify-or-revert still decides success, so a misleading lesson can
   never corrupt the workspace.
+- **Behavioural learning loop (2/3) — auto-write memory on success**: a verified-
+  successful `solve` now curates one deduped long-term memory fact (keyed per task,
+  so re-solving UPDATEs the entry rather than bloating memory). Only verified
+  successes are written — the verify-or-revert gate keeps failed/unverified work out
+  of memory; `--no-remember` opts out. Later `chat`/`crew` recall then surfaces it.
 
 ### Fixed
 - **MCP stdio client teardown**: the live session now opens and closes the stdio

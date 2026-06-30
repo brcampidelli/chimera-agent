@@ -15,6 +15,7 @@ Every dependency is injectable, so the whole loop is testable without a network.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
@@ -32,10 +33,20 @@ from chimera.telemetry import get_logger
 _log = get_logger("core.autonomous")
 
 
+def _slug(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:80]
+
+
 class Worker(Protocol):
     """Anything that can execute a task and return a result (the agent loop)."""
 
     def run(self, task: str) -> AgentResult: ...
+
+
+class SupportsRemember(Protocol):
+    """Anything that can store a durable fact (a MemoryManager)."""
+
+    def remember(self, content: str, *, key: str | None = None) -> object: ...
 
 
 @dataclass
@@ -78,6 +89,7 @@ class AutonomousAgent:
         guard: WorkspaceGuard | None = None,
         experience: ExperienceBuffer | None = None,
         trajectories: TrajectoryCollector | None = None,
+        memory: SupportsRemember | None = None,
         spine_workspace: Path | None = None,
         config: AutonomousConfig | None = None,
     ) -> None:
@@ -88,6 +100,7 @@ class AutonomousAgent:
         self.guard = guard
         self.experience = experience
         self.trajectories = trajectories
+        self.memory = memory
         self.spine_workspace = spine_workspace
         self.config = config or AutonomousConfig()
 
@@ -141,6 +154,7 @@ class AutonomousAgent:
 
             if ok:
                 _log.debug("task succeeded on attempt %d", index)
+                self._remember_success(task, answer)
                 return AutonomousResult(answer=answer, success=True, attempts=attempts, plan=plan)
 
             feedback = fb or (
@@ -154,6 +168,19 @@ class AutonomousAgent:
         if self.experience is None:
             return ""
         return format_lessons(self.experience.relevant(task))
+
+    def _remember_success(self, task: str, answer: str) -> None:
+        """On a verified success, curate one deduped long-term memory fact.
+
+        Only verified successes reach here (the verify-or-revert gate), so failed
+        or unverified work is never memorised. The MemoryManager dedups by key, so
+        re-solving the same task UPDATEs the entry rather than bloating memory.
+        """
+        if self.memory is None:
+            return
+        snippet = next((line.strip() for line in answer.splitlines() if line.strip()), "")[:160]
+        fact = f"Accomplished: {task}" + (f" — {snippet}" if snippet else "")
+        self.memory.remember(fact, key=f"solve:{_slug(task)}")
 
     def _review(self, task: str, answer: str, context: str) -> tuple[bool, str]:
         if self.manager is None or not self.config.use_manager:

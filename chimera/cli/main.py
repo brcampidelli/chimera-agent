@@ -434,6 +434,9 @@ def solve(
     collect: bool = typer.Option(
         True, "--collect/--no-collect", help="Record trajectories for opt-in model evolution."
     ),
+    no_remember: bool = typer.Option(
+        False, "--no-remember", help="Don't auto-write a long-term memory fact on success."
+    ),
 ) -> None:
     """Tier-2: autonomously solve a task with plan + verify-or-revert. Requires a key."""
     from chimera.core import (
@@ -484,6 +487,7 @@ def solve(
         guard=WorkspaceGuard(workspace_path),
         experience=ExperienceBuffer(settings.home / "experience.json"),
         trajectories=TrajectoryCollector(settings.home / "trajectories.jsonl") if collect else None,
+        memory=None if no_remember else _memory_manager(),
         spine_workspace=workspace_path,
         config=AutonomousConfig(
             max_attempts=max_attempts, use_planner=not no_plan, use_manager=not no_manager

@@ -202,6 +202,41 @@ def test_experience_is_recalled_into_planner_and_worker(tmp_path: Path) -> None:
     assert all("paint the garden fence" not in p for p in worker.prompts)  # unrelated excluded
 
 
+class RecordingMemory:
+    def __init__(self) -> None:
+        self.saved: list[tuple[str, str | None]] = []
+
+    def remember(self, content: str, *, key: str | None = None) -> object:
+        self.saved.append((content, key))
+        return ("ADD", None)
+
+
+def test_remembers_on_verified_success() -> None:
+    mem = RecordingMemory()
+    auto = AutonomousAgent(
+        FakeWorker("the answer"), memory=mem, config=AutonomousConfig(use_planner=False)
+    )
+    auto.run("ship the feature")
+    assert len(mem.saved) == 1
+    content, key = mem.saved[0]
+    assert "ship the feature" in content
+    assert key == "solve:ship-the-feature"  # deduped by a stable per-task key
+
+
+def test_does_not_remember_on_failure(tmp_path: Path) -> None:
+    mem = RecordingMemory()
+    auto = AutonomousAgent(
+        FakeWorker(workspace=tmp_path, filename="x.txt"),
+        verifier=FailVerifier(),
+        guard=WorkspaceGuard(tmp_path),
+        memory=mem,
+        config=AutonomousConfig(max_attempts=2, use_planner=False),
+    )
+    result = auto.run("do the thing")
+    assert result.success is False
+    assert mem.saved == []  # verify-or-revert gate: unverified work is never memorised
+
+
 def test_plan_is_attached() -> None:
     auto = AutonomousAgent(
         FakeWorker(),
