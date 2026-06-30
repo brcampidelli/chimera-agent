@@ -156,7 +156,7 @@ def test_guard_command() -> None:
 def test_memory_add_list_search(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _isolated_home(monkeypatch, tmp_path)
     try:
-        added = runner.invoke(app, ["memory", "add", "Bruno prefers PT-BR"])
+        added = runner.invoke(app, ["memory", "add", "Alex prefers PT-BR"])
         assert added.exit_code == 0
         assert "ADD" in added.stdout
 

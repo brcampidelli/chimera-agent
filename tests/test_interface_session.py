@@ -32,9 +32,9 @@ def test_send_records_turns_and_returns_answer() -> None:
 def test_history_is_threaded_into_later_prompts() -> None:
     agent = RecordingAgent()
     session = ChatSession(agent)
-    session.send("my name is Bruno")
+    session.send("my name is Alex")
     session.send("what is my name?")
-    assert "my name is Bruno" in agent.prompts[1]
+    assert "my name is Alex" in agent.prompts[1]
     assert "reply#1" in agent.prompts[1]
 
 
@@ -50,7 +50,7 @@ def test_reset_clears_conversation() -> None:
 
 def test_memory_is_recalled_into_the_prompt(tmp_path: Path) -> None:
     memory = MemoryManager(MemoryStore(tmp_path / "m.json"))
-    memory.remember("Bruno prefers absolute imports")
+    memory.remember("Alex prefers absolute imports")
     agent = RecordingAgent()
     session = ChatSession(agent, memory=memory)
     session.send("any rule about imports?")

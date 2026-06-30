@@ -43,11 +43,11 @@ def test_learned_skill_runs_template() -> None:
         name="greet",
         description="d",
         prompt_template="Greet {name}.",
-        backend=RoutingBackend(skill_output="Hi Bruno!"),
+        backend=RoutingBackend(skill_output="Hi Alex!"),
     )
-    result = skill.execute(name="Bruno")
+    result = skill.execute(name="Alex")
     assert result.ok is True
-    assert result.output == "Hi Bruno!"
+    assert result.output == "Hi Alex!"
 
 
 def test_learned_skill_missing_variable() -> None:
@@ -101,4 +101,4 @@ def test_skill_store_roundtrip(tmp_path: Path) -> None:
     backend = RoutingBackend(skill_output="Hello!")
     skills = reopened.skills(backend=backend)
     assert len(skills) == 1
-    assert skills[0].execute(name="Bruno").output == "Hello!"
+    assert skills[0].execute(name="Alex").output == "Hello!"

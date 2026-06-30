@@ -13,8 +13,8 @@ def _manager(tmp_path: Path) -> MemoryManager:
 
 def test_remember_add_then_noop(tmp_path: Path) -> None:
     mgr = _manager(tmp_path)
-    op1, _ = mgr.remember("Bruno prefers PT-BR")
-    op2, _ = mgr.remember("bruno prefers pt-br")  # same content, normalized
+    op1, _ = mgr.remember("Alex prefers PT-BR")
+    op2, _ = mgr.remember("alex prefers pt-br")  # same content, normalized
     assert op1 == "ADD"
     assert op2 == "NOOP"
     assert len(mgr.store) == 1

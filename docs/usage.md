@@ -230,7 +230,7 @@ uv run chimera bench --fuse              # use fusion as the solver
 ### `memory` — curated long-term memory
 
 ```bash
-uv run chimera memory add "Bruno prefers TypeScript strict and absolute imports"
+uv run chimera memory add "Alex prefers TypeScript strict and absolute imports"
 uv run chimera memory search "imports"
 uv run chimera memory list
 ```
