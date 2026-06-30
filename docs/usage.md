@@ -331,6 +331,18 @@ steps:
 uv run chimera workflow examples/workflow.yaml --workspace ./scratch
 ```
 
+### `drift` — spec↔code drift gate
+
+Keep a spec and the code aligned. A spec is a small YAML of requirements
+(`defines` a symbol / `contains` a regex / `absent` a regex / `command` exits 0). The
+gate exits non-zero on drift, so it doubles as a verifier.
+
+```bash
+uv run chimera drift examples/spec.yaml --workspace ./scratch
+# as a verifier inside solve:
+uv run chimera solve "..." --verify "chimera drift examples/spec.yaml -w ."
+```
+
 ### `migrate` — import from another agent
 
 Brings **config + skills** from Hermes or OpenClaw, and with `--apply` also

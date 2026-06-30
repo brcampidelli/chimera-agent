@@ -1323,6 +1323,27 @@ def workflow(
 
 
 @app.command()
+def drift(
+    spec: str = typer.Argument(..., help="Spec YAML file."),
+    workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root."),
+) -> None:
+    """Drift gate: check the workspace against a spec (Spec Growth). Exit 1 on drift."""
+    from chimera.governance import check_drift, load_spec
+
+    report = check_drift(load_spec(spec), Path(workspace))
+    console.print(f"[bold]{report.name}[/bold]")
+    for result in report.results:
+        mark = "[green]✓[/green]" if result.satisfied else "[red]✗[/red]"
+        detail = f" — {result.detail}" if result.detail else ""
+        console.print(f"  {mark} {result.id}{detail}")
+    if report.aligned:
+        console.print("[green]aligned[/green] — spec and code are in sync")
+    else:
+        console.print("[red]drift[/red] — spec and code are out of sync")
+        raise typer.Exit(code=1)
+
+
+@app.command()
 def meta(
     task: str = typer.Argument(..., help="The task to design a specialized agent for."),
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),

@@ -198,6 +198,25 @@ def test_kanban_add_board_and_move(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
         get_settings.cache_clear()
 
 
+def test_drift_cli_aligned_and_drift(tmp_path: Path) -> None:
+    (tmp_path / "m.py").write_text("def greet(n):\n    return n\n", encoding="utf-8")
+    aligned_spec = tmp_path / "ok.yaml"
+    aligned_spec.write_text(
+        "name: g\nrequirements:\n  - id: has-greet\n    check: defines\n    target: greet\n",
+        encoding="utf-8",
+    )
+    ok = runner.invoke(app, ["drift", str(aligned_spec), "-w", str(tmp_path)])
+    assert ok.exit_code == 0 and "aligned" in ok.stdout
+
+    drift_spec = tmp_path / "bad.yaml"
+    drift_spec.write_text(
+        "name: g\nrequirements:\n  - id: missing\n    check: defines\n    target: nope\n",
+        encoding="utf-8",
+    )
+    drifted = runner.invoke(app, ["drift", str(drift_spec), "-w", str(tmp_path)])
+    assert drifted.exit_code == 1 and "drift" in drifted.stdout
+
+
 def test_memory_graph_builds_from_memory(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

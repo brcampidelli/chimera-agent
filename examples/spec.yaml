@@ -1,0 +1,20 @@
+# A spec the drift gate checks the workspace against:
+#   chimera drift examples/spec.yaml --workspace ./scratch
+# It exits non-zero on drift, so it also works as a verifier:
+#   chimera solve "..." --verify "chimera drift examples/spec.yaml -w ."
+name: greeting-module
+requirements:
+  - id: defines-greet
+    text: "A greet() function exists"
+    check: defines
+    target: greet
+
+  - id: no-todos
+    text: "No TODO markers are left behind"
+    check: absent
+    target: "TODO"
+
+  - id: imports-clean
+    text: "The module imports without error"
+    check: command
+    target: 'python -c "import greeting"'

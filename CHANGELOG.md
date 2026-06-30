@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Drift gate — spec↔code** (`chimera drift <spec.yaml>`, Spec Growth Engine): a spec
+  is a small YAML of requirements (`defines` a symbol / `contains` a regex / `absent` a
+  regex / `command` exits 0); the gate checks the workspace against it and **exits
+  non-zero on drift**, so spec and code stay aligned or the change is rejected. Doubles
+  as a verifier (`solve --verify "chimera drift spec.yaml"`). Example in
+  `examples/spec.yaml`; verified live (aligned, then a stray TODO produced drift).
 - **Graph memory layer** (`chimera memory graph`): extracts `(source, relation, target)`
   triples from long-term memory with a deterministic heuristic extractor, building an
   entity-relation graph so facts can be recalled by **entity** (`related_facts`) rather

@@ -6,6 +6,13 @@ statically-validated edit surface.
 """
 
 from chimera.governance.audit import AuditLog
+from chimera.governance.drift import (
+    DriftReport,
+    Requirement,
+    Spec,
+    check_drift,
+    load_spec,
+)
 from chimera.governance.governed_tool import GovernedTool, govern_registry
 from chimera.governance.kernel import TrustKernel
 from chimera.governance.policy import Decision, Rule, RuleSet, Verdict
@@ -27,4 +34,9 @@ __all__ = [
     "SkillValidator",
     "ScheduleValidator",
     "ValidationResult",
+    "Spec",
+    "Requirement",
+    "DriftReport",
+    "check_drift",
+    "load_spec",
 ]
