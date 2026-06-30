@@ -630,6 +630,47 @@ def bench(
 
 
 @app.command()
+def evoclaw(
+    length: int = typer.Option(12, "--length", help="Number of chained steps."),
+    model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
+    retries: int = typer.Option(2, "--retries", help="Verify-or-revert retries per step (guarded)."),
+) -> None:
+    """Stress-test continuous-evolution degradation: naive vs guarded. Requires a key."""
+    from chimera.eval import SingleModelSolver, compare, counter_chain
+    from chimera.providers import LLMGateway, MissingCredentialsError
+
+    settings = get_settings()
+    if not settings.has_any_key():
+        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+        raise typer.Exit(code=1)
+
+    gateway = LLMGateway()
+    try:
+        comparison = compare(
+            lambda: SingleModelSolver(gateway, model),
+            counter_chain(length),
+            initial_state="0",
+            max_retries=retries,
+        )
+    except MissingCredentialsError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title="EvoClaw stress test (naive vs guarded)", show_header=True, header_style="bold")
+    table.add_column("metric")
+    table.add_column("naive", justify="right")
+    table.add_column("guarded", justify="right")
+    naive, guarded = comparison.naive.summary(), comparison.guarded.summary()
+    for key in ("pass_rate", "first_half", "second_half", "degradation", "longest_streak"):
+        table.add_row(key, str(naive[key]), str(guarded[key]))
+    console.print(table)
+    console.print(
+        f"[bold]degradation gap:[/bold] {comparison.degradation_gap} "
+        "[dim](naive − guarded; >0 means the countermeasures held)[/dim]"
+    )
+
+
+@app.command()
 def crew(
     task: str = typer.Argument(..., help="The task for the crew."),
     mode: str = typer.Option("sequential", "--mode", help="sequential | supervisor"),

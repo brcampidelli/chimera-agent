@@ -14,6 +14,14 @@ from chimera.eval.continuous import (
     demo_tasks,
     run_continuous,
 )
+from chimera.eval.evoclaw import (
+    EvoComparison,
+    EvoStep,
+    compare,
+    counter_chain,
+    run_guarded,
+    run_naive,
+)
 
 __all__ = [
     "EvalTask",
@@ -26,4 +34,10 @@ __all__ = [
     "ChainStep",
     "run_chain",
     "demo_chain",
+    "EvoStep",
+    "EvoComparison",
+    "run_naive",
+    "run_guarded",
+    "compare",
+    "counter_chain",
 ]

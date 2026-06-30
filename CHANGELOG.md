@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **M8 — Interfaces (in progress)**: a shared conversational `ChatSession` core
   (multi-turn, memory-aware) and an interactive `chimera chat` REPL — the
   foundation the TUI and messaging gateway will reuse.
+- **M8 — EvoClaw stress test**: `chimera/eval/evoclaw.py` runs the same stateful
+  chain in two regimes — *naive* (errors propagate) vs *guarded* (externalized
+  state + verify-or-revert + retry) — and reports the degradation gap. New
+  `chimera evoclaw` CLI runs the A/B against a real model. Tests prove the guard
+  resists the propagation that sinks the naive regime.
 
 ## [0.1.0] - 2026-06-30
 
