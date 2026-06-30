@@ -118,6 +118,13 @@ uv run chimera run "In one sentence, what is an AI agent?"
 uv run chimera run "Summarize this error" --model openrouter/openai/gpt-4o-mini
 ```
 
+**Vision / image paste.** Attach images with `--image` (a path or URL, repeatable)
+— needs a vision-capable model:
+
+```bash
+uv run chimera run "What's in this chart?" --image chart.png -m openrouter/google/gemini-2.5-flash
+```
+
 ### `agent` — the raw ReAct tool-calling loop
 
 Thought → Action (tool) → Observation, until a final answer. Tools are scoped to

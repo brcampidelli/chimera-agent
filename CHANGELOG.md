@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Vision / image paste**: `Message` now carries images (local paths or URLs,
+  base64 data-URL encoded) in the OpenAI/LiteLLM multimodal format; `chimera run
+  --image <path|url>` (repeatable) sends them to a vision model. Verified live
+  (gemini-2.5-flash read a generated image's colour).
+
 - **M8 — Interfaces (in progress)**: a shared conversational `ChatSession` core
   (multi-turn, memory-aware) and an interactive `chimera chat` REPL — the
   foundation the TUI and messaging gateway will reuse.

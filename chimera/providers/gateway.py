@@ -11,8 +11,11 @@ fast and never fails just because a provider SDK or key is missing.
 
 from __future__ import annotations
 
+import base64
 import json
+import mimetypes
 import os
+from pathlib import Path
 from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field
@@ -34,14 +37,33 @@ _KEY_ENV_VARS = {
 }
 
 
+def _image_to_url(ref: str) -> str:
+    """A URL/data-URI passes through; a local path is read and base64 data-encoded."""
+    if ref.startswith(("http://", "https://", "data:")):
+        return ref
+    path = Path(ref)
+    mime = mimetypes.guess_type(path.name)[0] or "image/png"
+    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:{mime};base64,{encoded}"
+
+
 class Message(BaseModel):
-    """A single chat message."""
+    """A single chat message, optionally carrying images (for vision models)."""
 
     role: Role
     content: str
+    images: list[str] = Field(default_factory=list)  # local paths or URLs
 
-    def as_dict(self) -> dict[str, str]:
-        return {"role": self.role, "content": self.content}
+    def as_dict(self) -> dict[str, Any]:
+        if not self.images:
+            return {"role": self.role, "content": self.content}
+        # OpenAI/LiteLLM multimodal format: content becomes a list of typed parts.
+        parts: list[dict[str, Any]] = []
+        if self.content:
+            parts.append({"type": "text", "text": self.content})
+        for ref in self.images:
+            parts.append({"type": "image_url", "image_url": {"url": _image_to_url(ref)}})
+        return {"role": self.role, "content": parts}
 
 
 class ToolCall(BaseModel):

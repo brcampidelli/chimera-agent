@@ -59,6 +59,11 @@ app = typer.Typer(
 )
 console = Console()
 
+# Module-level so the list-typed default isn't a call-in-default (ruff B008).
+_IMAGE_OPTION = typer.Option(
+    None, "--image", help="Attach an image (path or URL); repeatable. Needs a vision model."
+)
+
 
 @app.command()
 def version() -> None:
@@ -129,13 +134,22 @@ def run(
     prompt: str = typer.Argument(..., help="The prompt to send."),
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
     system: str = typer.Option(None, "--system", "-s", help="Optional system prompt."),
+    image: list[str] | None = _IMAGE_OPTION,
 ) -> None:
     """Run a single-shot Tier-1 completion (no fusion). Requires a provider key."""
     from chimera.providers import LLMGateway, MissingCredentialsError
+    from chimera.providers.gateway import Message, MessageLike
 
     try:
         gateway = LLMGateway()
-        answer = gateway.quick(prompt, model=model, system=system)
+        if image:
+            messages: list[MessageLike] = []
+            if system:
+                messages.append(Message(role="system", content=system))
+            messages.append(Message(role="user", content=prompt, images=image))
+            answer = gateway.complete(messages, model=model).content
+        else:
+            answer = gateway.quick(prompt, model=model, system=system)
     except MissingCredentialsError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
