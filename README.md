@@ -1,6 +1,8 @@
 <div align="center">
 
-# 🦁 Chimera
+<img src="assets/logo.png" alt="Chimera logo" width="160" />
+
+# Chimera
 
 **An open-source, self-evolving AI agent whose reasoning core is an LLM-Fusion engine.**
 
