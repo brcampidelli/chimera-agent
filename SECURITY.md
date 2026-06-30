@@ -5,7 +5,7 @@ APIs and modify its own skills. We take its safety surface seriously.
 
 ## Supported versions
 
-Chimera is in early alpha (`0.0.x`). Security fixes are applied to the latest `main`.
+Chimera is in early development (`0.1.x`). Security fixes are applied to the latest `main`.
 
 ## Reporting a vulnerability
 
