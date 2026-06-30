@@ -27,6 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   third run. **This closes the cross-task behavioural learning loop** (within-task
   verify-or-revert was already closed).
 
+### Changed
+- **Self-learned crons — now interactive (enabled with confirmation)**: `chimera cron
+  learn` turns recurring tasks (from the experience buffer) into cron jobs through an
+  explicit per-proposal confirmation — the human-in-the-loop approval that keeps
+  automation creation under control. Confirmed proposals are validated
+  (`ScheduleValidator`) and created **enabled**; `--yes` confirms all, `--schedule`
+  overrides the suggested time. Previously it only registered disabled proposals
+  awaiting a separate `cron enable`.
+
 ### Fixed
 - **MCP stdio client teardown**: the live session now opens and closes the stdio
   client's `AsyncExitStack` in a single background task, fixing an anyio

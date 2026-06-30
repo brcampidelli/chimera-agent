@@ -177,3 +177,22 @@ def test_cron_learn_empty_history(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
         assert "no recurring" in result.stdout
     finally:
         get_settings.cache_clear()
+
+
+def test_cron_learn_creates_confirmed_jobs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    _isolated_home(monkeypatch, tmp_path)
+    try:
+        from chimera.evolution import ExperienceBuffer
+
+        buf = ExperienceBuffer(tmp_path / "chimera_home" / "experience.json")
+        buf.record("back up the database", "success")
+        buf.record("back up the database", "success")  # recurs (>= 2)
+
+        learned = runner.invoke(app, ["cron", "learn", "--min", "2", "--yes"])
+        assert learned.exit_code == 0
+        assert "created 1 cron" in learned.stdout
+
+        listed = runner.invoke(app, ["cron", "list"])
+        assert "back-up-the-database" in listed.stdout  # the confirmed job is now stored
+    finally:
+        get_settings.cache_clear()

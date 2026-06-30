@@ -69,22 +69,33 @@ class CronLearner:
                 )
         return proposals
 
+    def build_job(
+        self, proposal: CronProposal, *, enabled: bool, schedule: str | None = None
+    ) -> CronJob:
+        """Build an agent-created :class:`CronJob` from a proposal (not yet stored).
+
+        ``enabled`` is the caller's call: the unattended ``register_proposals`` path
+        keeps it ``False`` (human enables later), while an interactive flow can pass
+        ``True`` once the human has confirmed it.
+        """
+        return CronJob(
+            id=uuid.uuid4().hex[:8],
+            name=proposal.name,
+            trigger="cron",
+            schedule=schedule or proposal.suggested_schedule,
+            action=proposal.action,
+            created_by="agent",
+            enabled=enabled,
+            metadata={"occurrences": proposal.occurrences, "proposed": True},
+        )
+
     def register_proposals(
         self, scheduler: Scheduler, proposals: list[CronProposal]
     ) -> list[CronJob]:
         """Add proposals as **disabled** agent-created jobs awaiting approval."""
         jobs: list[CronJob] = []
         for proposal in proposals:
-            job = CronJob(
-                id=uuid.uuid4().hex[:8],
-                name=proposal.name,
-                trigger="cron",
-                schedule=proposal.suggested_schedule,
-                action=proposal.action,
-                created_by="agent",
-                enabled=False,
-                metadata={"occurrences": proposal.occurrences, "proposed": True},
-            )
+            job = self.build_job(proposal, enabled=False)
             scheduler.store.add(job)
             jobs.append(job)
         return jobs

@@ -682,22 +682,46 @@ def cron_disable(job_id: str = typer.Argument(..., help="The job id to disable."
 
 
 @cron_app.command("learn")
-def cron_learn(min_occurrences: int = typer.Option(3, "--min", help="Min repeats to propose.")) -> None:
-    """Propose crons from recurring tasks in the experience buffer (disabled, pending approval)."""
+def cron_learn(
+    min_occurrences: int = typer.Option(3, "--min", help="Min repeats to propose."),
+    schedule: str = typer.Option(None, "--schedule", help="Override the suggested cron schedule."),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Create every proposal without prompting."),
+) -> None:
+    """Propose crons from recurring tasks and create the ones you confirm.
+
+    Each proposal is shown for explicit confirmation (the human-in-the-loop approval
+    that keeps automation creation under control); confirmed jobs are validated and
+    created enabled. ``--yes`` confirms all (use deliberately).
+    """
     from chimera.evolution import ExperienceBuffer
+    from chimera.governance.validator import ScheduleValidator
     from chimera.scheduler import CronLearner, Scheduler
 
-    history = [e.task for e in ExperienceBuffer(get_settings().home / "experience.json").all()]
-    proposals = CronLearner(min_occurrences=min_occurrences).analyze(history)
+    settings = get_settings()
+    history = [e.task for e in ExperienceBuffer(settings.home / "experience.json").all()]
+    learner = CronLearner(min_occurrences=min_occurrences)
+    proposals = learner.analyze(history)
     if not proposals:
         console.print("[dim]no recurring tasks found in history[/dim]")
         return
-    jobs = CronLearner(min_occurrences=min_occurrences).register_proposals(
-        Scheduler(_cron_store()), proposals
-    )
-    console.print(f"proposed {len(jobs)} cron(s) (disabled — enable with 'chimera cron enable ID'):")
-    for job in jobs:
-        console.print(f"  [cyan]{job.id}[/cyan] {job.name} (seen {job.metadata['occurrences']}x)")
+
+    scheduler = Scheduler(_cron_store())
+    validator = ScheduleValidator()
+    created = 0
+    for proposal in proposals:
+        sched = schedule or proposal.suggested_schedule
+        if not validator.validate(sched).accepted:
+            console.print(f"[yellow]skip[/yellow] {proposal.name}: invalid schedule '{sched}'")
+            continue
+        summary = f"[cyan]{proposal.name}[/cyan] (seen {proposal.occurrences}x) → '{sched}'"
+        if yes or typer.confirm(f"Create cron {summary} for: {proposal.action}?", default=False):
+            job = learner.build_job(proposal, enabled=True, schedule=sched)
+            scheduler.store.add(job)
+            created += 1
+            console.print(f"  [green]created[/green] {job.id} {job.name} (enabled)")
+        else:
+            console.print(f"  [dim]skipped[/dim] {proposal.name}")
+    console.print(f"created {created} cron(s) of {len(proposals)} proposed.")
 
 
 # --- memory subcommands -------------------------------------------------------
