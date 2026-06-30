@@ -6,6 +6,15 @@ opt-in, external model-level evolution (LoRA/SFT/DPO).
 """
 
 from chimera.ecosystem.change_queue import Change, ChangeQueue
+from chimera.ecosystem.evolution import (
+    CurationConfig,
+    EvolutionReadiness,
+    assess,
+    curate_dpo,
+    curate_sft,
+    write_jsonl,
+    write_recipe,
+)
 from chimera.ecosystem.meta_agent import AgentBlueprint, MetaAgent, MetaEvalReport
 from chimera.ecosystem.trajectory import Trajectory, TrajectoryCollector
 
@@ -17,4 +26,11 @@ __all__ = [
     "MetaEvalReport",
     "Trajectory",
     "TrajectoryCollector",
+    "CurationConfig",
+    "EvolutionReadiness",
+    "assess",
+    "curate_sft",
+    "curate_dpo",
+    "write_jsonl",
+    "write_recipe",
 ]

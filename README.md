@@ -81,6 +81,7 @@ chimera cron learn                     # propose crons from recurring tasks (dis
 chimera bench                          # continuous-evolution benchmark
 chimera guard "rm -rf /"               # preview a governance verdict
 chimera migrate hermes ~/.hermes --apply   # import config + skills + merge memory
+chimera evolve status                      # opt-in model evolution: SFT/DPO from trajectories
 ```
 
 See the **[Usage Guide](docs/usage.md)** for install, configuration, and every command with copy-paste examples.

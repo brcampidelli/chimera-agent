@@ -30,6 +30,7 @@ from chimera import __version__
 from chimera.config import get_settings
 
 if TYPE_CHECKING:
+    from chimera.ecosystem import TrajectoryCollector
     from chimera.memory import MemoryManager
     from chimera.scheduler import CronStore
 
@@ -358,6 +359,9 @@ def solve(
     no_manager: bool = typer.Option(False, "--no-manager", help="Skip Manager review."),
     fuse: bool = typer.Option(False, "--fuse", help="Route deep-reasoning turns through fusion."),
     guard: bool = typer.Option(False, "--guard", help="Gate tool calls through the governance kernel."),
+    collect: bool = typer.Option(
+        True, "--collect/--no-collect", help="Record trajectories for opt-in model evolution."
+    ),
 ) -> None:
     """Tier-2: autonomously solve a task with plan + verify-or-revert. Requires a key."""
     from chimera.core import (
@@ -370,6 +374,7 @@ def solve(
         WorkspaceGuard,
     )
     from chimera.core.verify import CommandVerifier
+    from chimera.ecosystem import TrajectoryCollector
     from chimera.evolution import ExperienceBuffer
     from chimera.providers import LLMGateway, MissingCredentialsError, SupportsComplete
     from chimera.tools import default_registry
@@ -406,6 +411,7 @@ def solve(
         verifier=CommandVerifier(verify, workspace_path) if verify else None,
         guard=WorkspaceGuard(workspace_path),
         experience=ExperienceBuffer(settings.home / "experience.json"),
+        trajectories=TrajectoryCollector(settings.home / "trajectories.jsonl") if collect else None,
         spine_workspace=workspace_path,
         config=AutonomousConfig(
             max_attempts=max_attempts, use_planner=not no_plan, use_manager=not no_manager
@@ -654,6 +660,81 @@ def memory_list() -> None:
     for item in items:
         table.add_row(item.id, item.kind, item.source, item.content)
     console.print(table)
+
+
+evolve_app = typer.Typer(
+    help="Opt-in model evolution (curate trajectories -> LoRA/DPO recipe).", no_args_is_help=True
+)
+app.add_typer(evolve_app, name="evolve")
+
+
+def _collector(path: str | None) -> TrajectoryCollector:
+    from chimera.ecosystem import TrajectoryCollector
+
+    target = Path(path) if path else get_settings().home / "trajectories.jsonl"
+    return TrajectoryCollector(target)
+
+
+@evolve_app.command("status")
+def evolve_status(
+    traj: str = typer.Option(None, "--traj", help="Trajectory JSONL (default: <home>/trajectories.jsonl)."),
+    min_reward: float = typer.Option(0.0, "--min-reward", help="Drop examples below this reward."),
+    min_examples: int = typer.Option(30, "--min-examples", help="Examples needed before training is worth it."),
+) -> None:
+    """Show how much training signal the collected trajectories hold."""
+    from chimera.ecosystem import CurationConfig, assess
+
+    readiness = assess(_collector(traj), CurationConfig(min_reward=min_reward), min_examples=min_examples)
+    table = Table(title="Model-evolution readiness", show_header=False, title_style="bold")
+    table.add_row("trajectories", str(readiness.total))
+    table.add_row("successes / failures", f"{readiness.successes} / {readiness.failures}")
+    table.add_row("SFT examples", str(readiness.sft_examples))
+    table.add_row("DPO pairs", str(readiness.dpo_pairs))
+    table.add_row("ready to train", "[green]yes[/green]" if readiness.ready else "[yellow]no[/yellow]")
+    console.print(table)
+    console.print(f"[dim]{readiness.reason}[/dim]")
+
+
+@evolve_app.command("export")
+def evolve_export(
+    out: str = typer.Option(..., "--out", help="Output JSONL path."),
+    fmt: str = typer.Option("sft", "--format", help="sft | dpo"),
+    traj: str = typer.Option(None, "--traj", help="Trajectory JSONL (default: <home>/trajectories.jsonl)."),
+    min_reward: float = typer.Option(0.0, "--min-reward", help="Drop examples below this reward."),
+    no_dedup: bool = typer.Option(False, "--no-dedup", help="Keep duplicate examples."),
+    min_margin: float = typer.Option(0.0, "--min-margin", help="DPO: min reward margin chosen − rejected."),
+) -> None:
+    """Export a curated SFT or DPO dataset from trajectories."""
+    from chimera.ecosystem import CurationConfig, curate_dpo, curate_sft, write_jsonl
+
+    if fmt not in ("sft", "dpo"):
+        console.print("[red]--format must be 'sft' or 'dpo'.[/red]")
+        raise typer.Exit(code=1)
+    config = CurationConfig(min_reward=min_reward, dedup=not no_dedup, min_margin=min_margin)
+    items = _collector(traj).all()
+    rows = curate_sft(items, config) if fmt == "sft" else curate_dpo(items, config)
+    count = write_jsonl(Path(out), rows)
+    console.print(f"[green]wrote {count} {fmt} example(s)[/green] to {out}")
+
+
+@evolve_app.command("recipe")
+def evolve_recipe(
+    out: str = typer.Option(..., "--out", help="Directory for the training recipe."),
+    fmt: str = typer.Option("sft", "--format", help="sft | dpo"),
+    base_model: str = typer.Option("meta-llama/Llama-3.1-8B-Instruct", "--base-model"),
+    dataset: str = typer.Option("dataset.jsonl", "--dataset", help="Dataset filename the script reads."),
+) -> None:
+    """Emit a runnable LoRA training recipe (train.py + README + requirements)."""
+    from chimera.ecosystem import write_recipe
+
+    try:
+        files = write_recipe(Path(out), base_model=base_model, fmt=fmt, dataset=dataset)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+    for path in files:
+        console.print(f"[green]wrote[/green] {path}")
+    console.print("[dim]Training is external + opt-in: run it on a GPU, review the result before use.[/dim]")
 
 
 @app.command()

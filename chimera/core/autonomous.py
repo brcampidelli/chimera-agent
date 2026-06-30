@@ -25,6 +25,7 @@ from chimera.core.planner import Plan, Planner
 from chimera.core.spine import assemble_spine
 from chimera.core.supervisor import Manager
 from chimera.core.verify import Verifier
+from chimera.ecosystem.trajectory import TrajectoryCollector
 from chimera.evolution.experience import ExperienceBuffer, Outcome
 from chimera.telemetry import get_logger
 
@@ -76,6 +77,7 @@ class AutonomousAgent:
         verifier: Verifier | None = None,
         guard: WorkspaceGuard | None = None,
         experience: ExperienceBuffer | None = None,
+        trajectories: TrajectoryCollector | None = None,
         spine_workspace: Path | None = None,
         config: AutonomousConfig | None = None,
     ) -> None:
@@ -85,6 +87,7 @@ class AutonomousAgent:
         self.verifier = verifier
         self.guard = guard
         self.experience = experience
+        self.trajectories = trajectories
         self.spine_workspace = spine_workspace
         self.config = config or AutonomousConfig()
 
@@ -122,9 +125,13 @@ class AutonomousAgent:
                 attempt.reverted = True
 
             attempts.append(attempt)
+            outcome: Outcome = "success" if ok else "failure"
             if self.experience is not None:
-                outcome: Outcome = "success" if ok else "failure"
                 self.experience.record(task, outcome, detail=(fb or vout)[:500])
+            if self.trajectories is not None:
+                # Each attempt is a (task -> answer) trajectory; multiple attempts on
+                # one task give success/failure pairs — the raw signal for DPO.
+                self.trajectories.record(task, answer, outcome=outcome, reward=1.0 if ok else 0.0)
 
             if ok:
                 _log.debug("task succeeded on attempt %d", index)

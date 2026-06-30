@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   long-term memory); a stdlib HTTP transport exposes `POST /chat` and `GET
   /health`, and a `LocalAdapter` covers in-process use. Discord/Telegram adapters
   plug into the same `on_message` seam next. Verified live (per-chat memory).
+- **M8 — Opt-in model evolution** (`chimera evolve`): `solve --collect` logs
+  trajectories; `evolve` curates them into SFT/DPO datasets (reward gating, dedup,
+  preference margins), reports training readiness, and emits a runnable LoRA recipe
+  (train.py + README + requirements). Training stays external/opt-in — never
+  automatic. Optional `train` extra for the heavy libs.
 
 ## [0.1.0] - 2026-06-30
 

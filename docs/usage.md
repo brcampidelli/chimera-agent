@@ -232,6 +232,24 @@ uv run chimera migrate openclaw /path/to/openclaw/home --apply
 The memory merge reports `{ADD, UPDATE, NOOP}` counts — duplicates become
 `NOOP`, so re-running is safe.
 
+### `evolve` — opt-in model evolution (advanced)
+
+`chimera solve --collect` (on by default) logs each run as a trajectory. The
+`evolve` commands turn those into training-ready datasets and a runnable LoRA
+recipe. **Training is external and opt-in** — it changes model weights, so it
+never happens automatically; Chimera prepares the data and a script and stops.
+
+```bash
+chimera evolve status                          # is there enough signal to train?
+chimera evolve export --format sft --out d.jsonl   # curated SFT dataset (successes)
+chimera evolve export --format dpo --out d.jsonl   # preference pairs (success vs failure)
+chimera evolve recipe --out ./recipe --format dpo  # train.py + README + requirements
+```
+
+Then, on a GPU (or Colab): `pip install chimera-agent[train]` (or the recipe's
+`requirements.txt`) and `python recipe/train.py`. Point `CHIMERA_DEFAULT_MODEL`
+at the base model + adapter when serving.
+
 ---
 
 ## Tips

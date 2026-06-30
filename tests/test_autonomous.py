@@ -143,6 +143,21 @@ def test_passing_verifier_overrides_manager_rejection(tmp_path: Path) -> None:
     assert (tmp_path / "out.txt").exists()
 
 
+def test_trajectories_recorded(tmp_path: Path) -> None:
+    from chimera.ecosystem import TrajectoryCollector
+
+    collector = TrajectoryCollector(tmp_path / "traj.jsonl")
+    auto = AutonomousAgent(
+        FakeWorker("ans"), trajectories=collector, config=AutonomousConfig(use_planner=False)
+    )
+    auto.run("do X")
+    items = collector.all()
+    assert len(items) == 1
+    assert items[0].prompt == "do X"
+    assert items[0].outcome == "success"
+    assert items[0].reward == 1.0
+
+
 def test_experience_recorded(tmp_path: Path) -> None:
     buf = ExperienceBuffer(tmp_path / "exp.json")
     auto = AutonomousAgent(FakeWorker(), experience=buf, config=AutonomousConfig(use_planner=False))
