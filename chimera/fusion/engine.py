@@ -94,6 +94,7 @@ class FusionEngine:
         self.config = config or FusionConfig.from_settings()
 
     def run(self, messages: list[MessageLike]) -> FusionTrace:
+        _log.debug("fusion engaged: %d-model panel -> judge -> synthesizer", len(self.config.panel))
         panel = self._run_panel(messages)
         judge_analysis = self._run_judge(messages, panel)
         final = self._run_synth(messages, judge_analysis)

@@ -243,10 +243,16 @@ def solve(
     workspace_path = Path(workspace)
     gateway = LLMGateway()
     backend: SupportsComplete = gateway
+    planner_backend: SupportsComplete = gateway
     if fuse:
         from chimera.fusion import FusionEngine, RoutedBackend
 
-        backend = RoutedBackend(gateway, FusionEngine(gateway))
+        engine = FusionEngine(gateway)
+        backend = RoutedBackend(gateway, engine)
+        # Planning is a deep, tool-free reasoning turn — exactly where fusion pays
+        # off — so route the plan through fusion directly (the worker keeps the
+        # router: single-model for tool turns, fusion only for tool-free reasoning).
+        planner_backend = engine
 
     registry = default_registry(workspace_path)
     if guard:
@@ -256,7 +262,7 @@ def solve(
     worker = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
     auto = AutonomousAgent(
         worker,
-        planner=None if no_plan else Planner(gateway, model),
+        planner=None if no_plan else Planner(planner_backend, model),
         manager=None if no_manager else Manager(gateway, model),
         verifier=CommandVerifier(verify, workspace_path) if verify else None,
         guard=WorkspaceGuard(workspace_path),
