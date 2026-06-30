@@ -1218,6 +1218,34 @@ def lifecycle(
 
 
 @app.command()
+def workflow(
+    file: str = typer.Argument(..., help="Workflow YAML file (declarative loop)."),
+    workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root."),
+    model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
+) -> None:
+    """Run a declarative workflow — a designed loop — from a YAML file. Requires a key."""
+    from chimera.workflow import load_workflow, run_workflow
+    from chimera.workflow.executors import build_executors
+
+    if not get_settings().has_any_key():
+        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+        raise typer.Exit(code=1)
+
+    flow = load_workflow(file)
+    result = run_workflow(flow, build_executors(workspace=Path(workspace), model=model))
+    console.print(f"[bold]{result.name}[/bold]")
+    for run in result.runs:
+        if run.skipped:
+            console.print(f"  [dim]– {run.name} (skipped)[/dim]")
+            continue
+        mark = "[green]✓[/green]" if run.success else "[red]✗[/red]"
+        extra = f" ×{run.attempts}" if run.attempts > 1 else ""
+        console.print(f"  {mark} {run.name} [{run.uses}]{extra}")
+    status = "[green]success[/green]" if result.success else "[red]failed[/red]"
+    console.print(f"workflow: {status}")
+
+
+@app.command()
 def meta(
     task: str = typer.Argument(..., help="The task to design a specialized agent for."),
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),

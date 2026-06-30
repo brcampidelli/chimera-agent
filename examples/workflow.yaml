@@ -1,0 +1,21 @@
+# A designed loop (run with: chimera workflow examples/workflow.yaml -w ./scratch)
+#
+# Each step `uses` a capability of the agent stack. `when` gates a step on the
+# previous one; `repeat` + `until` make a step loop until it succeeds.
+name: build-and-report
+steps:
+  # Tier-2 autonomous build, gated by an executable verifier; retried up to twice.
+  - name: build
+    uses: solve
+    with:
+      task: "Create greeting.py with a function greet(name) returning 'Hello, ' + name."
+      verify: "python -c \"import greeting; assert greeting.greet('x') == 'Hello, x'\""
+    repeat: 2
+    until: success
+
+  # Only runs if the build succeeded.
+  - name: report
+    uses: run
+    when: prev_succeeded
+    with:
+      prompt: "Write a one-line changelog entry for adding greeting.greet()."

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Loop Engineering — declarative workflows** (`chimera workflow <file>`): author an
+  autonomous loop as YAML — an ordered list of steps that `use` the agent stack
+  (`run` / `shell` / `solve` / `crew` / `lifecycle`), gate on the previous step
+  (`when: prev_succeeded|prev_failed`), and loop (`repeat` up to N, `until: success`).
+  Designed flows instead of ad-hoc prompts. The runner takes injected executors, so
+  the control flow is fully unit-tested; the real executors dispatch to the stack.
+  Example in `examples/workflow.yaml`; verified live (a solve+verify build step, then
+  a report step gated on its success).
 - **SDLC lifecycle crew** (`chimera lifecycle`): a pre-assembled **plan → build →
   test → review** pipeline. `plan` decomposes the task, `build` implements it, `test`
   runs the verifier as the **verify-or-revert** gate (revert + retry on failure), and a

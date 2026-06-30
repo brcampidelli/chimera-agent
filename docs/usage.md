@@ -295,6 +295,32 @@ uv run chimera kanban move <id> done        # manual move
 
 `run` walks each card backlog → doing → done (success) or → review (needs attention).
 
+### `workflow` — designed loops (Loop Engineering)
+
+Author an autonomous loop as YAML instead of an ad-hoc prompt. Each step `uses` a
+capability (`run` / `shell` / `solve` / `crew` / `lifecycle`), can be gated on the
+previous step (`when: prev_succeeded | prev_failed`), and can loop (`repeat`, `until:
+success`).
+
+```yaml
+# examples/workflow.yaml
+name: build-and-report
+steps:
+  - name: build
+    uses: solve
+    with: { task: "Create greeting.py with greet(name)", verify: "python -c \"import greeting\"" }
+    repeat: 2
+    until: success
+  - name: report
+    uses: run
+    when: prev_succeeded
+    with: { prompt: "One-line changelog for greet()" }
+```
+
+```bash
+uv run chimera workflow examples/workflow.yaml --workspace ./scratch
+```
+
 ### `migrate` — import from another agent
 
 Brings **config + skills** from Hermes or OpenClaw, and with `--apply` also
