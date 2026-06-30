@@ -915,6 +915,34 @@ def memory_list() -> None:
     console.print(table)
 
 
+@memory_app.command("graph")
+def memory_graph(
+    entity: str = typer.Option(None, "--entity", "-e", help="Show relations for one entity."),
+) -> None:
+    """Build an entity-relation graph from long-term memory and show it."""
+    from chimera.memory import build_graph
+
+    settings = get_settings()
+    texts = [item.content for item in _memory_manager().store.all()]
+    graph = build_graph(texts)
+    graph.save(settings.home / "memory_graph.json")
+
+    if entity:
+        relations = graph.relations_of(entity)
+        if not relations:
+            console.print(f"[dim]no relations for '{entity}'[/dim]")
+            return
+        for relation in relations:
+            console.print(f"  {relation.source} [cyan]{relation.relation}[/cyan] {relation.target}")
+        return
+
+    console.print(
+        f"[bold]{len(graph)} relation(s) across {len(graph.entities())} entit(y/ies)[/bold]"
+    )
+    for relation in graph.relations()[:30]:
+        console.print(f"  {relation.source} [cyan]{relation.relation}[/cyan] {relation.target}")
+
+
 evolve_app = typer.Typer(
     help="Opt-in model evolution (curate trajectories -> LoRA/DPO recipe).", no_args_is_help=True
 )

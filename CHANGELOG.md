@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Graph memory layer** (`chimera memory graph`): extracts `(source, relation, target)`
+  triples from long-term memory with a deterministic heuristic extractor, building an
+  entity-relation graph so facts can be recalled by **entity** (`related_facts`) rather
+  than only by keyword — the VIBEMed `graph` layer (alongside working/episodic/semantic/
+  persona). `memory graph --entity X` shows one entity's relations. Verified live.
 - **Git-worktree isolation** (`chimera solve --isolate`, HORIZON-style): when the
   workspace is a git repo, the run executes in a throwaway worktree on its own branch
   — the agent's edits never touch the main checkout until they're verified, then only

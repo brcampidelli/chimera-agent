@@ -198,6 +198,19 @@ def test_kanban_add_board_and_move(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
         get_settings.cache_clear()
 
 
+def test_memory_graph_builds_from_memory(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _isolated_home(monkeypatch, tmp_path)
+    try:
+        runner.invoke(app, ["memory", "add", "PassaPro uses Supabase"])
+        out = runner.invoke(app, ["memory", "graph"])
+        assert out.exit_code == 0
+        assert "PassaPro" in out.stdout and "uses" in out.stdout and "Supabase" in out.stdout
+    finally:
+        get_settings.cache_clear()
+
+
 def test_kanban_learn_turns_recurring_tasks_into_cards(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

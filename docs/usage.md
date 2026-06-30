@@ -270,7 +270,13 @@ uv run chimera bench --fuse              # use fusion as the solver
 uv run chimera memory add "Alex prefers TypeScript strict and absolute imports"
 uv run chimera memory search "imports"
 uv run chimera memory list
+uv run chimera memory graph                 # entity-relation graph from memory
+uv run chimera memory graph --entity PassaPro   # one entity's relations
 ```
+
+The **graph layer** extracts `(source, relation, target)` triples from your memories
+(`PassaPro uses Supabase`, `Alex prefers TypeScript`), so facts can be recalled by
+entity, not only by keyword.
 
 ### `cron` — scheduled jobs & event SOPs
 
