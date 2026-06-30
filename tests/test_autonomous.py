@@ -124,6 +124,25 @@ def test_manager_revision_then_approval() -> None:
     assert result.attempts[1].approved is True
 
 
+def test_passing_verifier_overrides_manager_rejection(tmp_path: Path) -> None:
+    # Executable evidence is ground truth: a strict Manager that rejects (e.g. it
+    # judged the narration, not the artifact) must NOT revert verified-correct work.
+    worker = FakeWorker(workspace=tmp_path, filename="out.txt")
+    auto = AutonomousAgent(
+        worker,
+        manager=Manager(FixedBackend("REVISE: I cannot confirm the file exists")),
+        verifier=FlakyVerifier(fail_times=0),  # always passes
+        guard=WorkspaceGuard(tmp_path),
+        config=AutonomousConfig(use_planner=False),
+    )
+    result = auto.run("create out.txt")
+
+    assert result.success is True
+    assert len(result.attempts) == 1
+    assert result.attempts[0].reverted is False
+    assert (tmp_path / "out.txt").exists()
+
+
 def test_experience_recorded(tmp_path: Path) -> None:
     buf = ExperienceBuffer(tmp_path / "exp.json")
     auto = AutonomousAgent(FakeWorker(), experience=buf, config=AutonomousConfig(use_planner=False))

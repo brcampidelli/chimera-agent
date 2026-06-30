@@ -46,3 +46,20 @@ def test_manager_non_standard_reply_is_revision() -> None:
     review = Manager(FixedBackend("This is wrong because X")).review("task", "result")
     assert review.approved is False
     assert "wrong" in review.feedback
+
+
+def test_manager_approves_with_markdown() -> None:
+    review = Manager(FixedBackend("**APPROVED**")).review("task", "result")
+    assert review.approved is True
+
+
+def test_manager_approves_with_preamble() -> None:
+    # Models often add a sentence before the verdict; that must not revert good work.
+    review = Manager(FixedBackend("The result is correct and complete. APPROVED")).review("t", "r")
+    assert review.approved is True
+
+
+def test_manager_revise_wins_over_approved_when_both_present() -> None:
+    review = Manager(FixedBackend("Almost approved, but REVISE: add a docstring")).review("t", "r")
+    assert review.approved is False
+    assert "docstring" in review.feedback

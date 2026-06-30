@@ -51,12 +51,9 @@ class Attempt:
     approved: bool
     verified: bool
     reverted: bool
+    success: bool = False
     feedback: str = ""
     verify_output: str = ""
-
-    @property
-    def success(self) -> bool:
-        return self.approved and self.verified
 
 
 @dataclass
@@ -106,20 +103,30 @@ class AutonomousAgent:
             prompt = self._compose(task, plan, context, feedback)
             answer = self.worker.run(prompt).answer
 
-            approved, fb = self._review(task, answer, context)
-            verified, vout = self._verify(approved)
-            attempt = Attempt(index, answer, approved, verified, False, fb, vout)
+            # Executable evidence is ground truth: when a verifier is present it
+            # decides success, and the Manager is consulted only for feedback on a
+            # failing attempt. Otherwise the Manager's approval is the gate. This
+            # stops a strict reviewer from vetoing — and reverting — verified-correct
+            # work just because it judged the narration rather than the artifact.
+            verified, vout = self._verify()
+            if self.verifier is not None:
+                ok = verified
+                approved, fb = (True, "") if verified else self._review(task, answer, context)
+            else:
+                approved, fb = self._review(task, answer, context)
+                ok = approved
 
-            if not attempt.success and snapshot is not None and self.guard is not None:
+            attempt = Attempt(index, answer, approved, verified, False, ok, fb, vout)
+            if not ok and snapshot is not None and self.guard is not None:
                 self.guard.restore(snapshot)
                 attempt.reverted = True
 
             attempts.append(attempt)
             if self.experience is not None:
-                outcome: Outcome = "success" if attempt.success else "failure"
+                outcome: Outcome = "success" if ok else "failure"
                 self.experience.record(task, outcome, detail=(fb or vout)[:500])
 
-            if attempt.success:
+            if ok:
                 _log.debug("task succeeded on attempt %d", index)
                 return AutonomousResult(answer=answer, success=True, attempts=attempts, plan=plan)
 
@@ -136,9 +143,7 @@ class AutonomousAgent:
         review = self.manager.review(task, answer, context=context)
         return review.approved, review.feedback
 
-    def _verify(self, approved: bool) -> tuple[bool, str]:
-        if not approved:
-            return False, ""
+    def _verify(self) -> tuple[bool, str]:
         if self.verifier is None:
             return True, ""
         result = self.verifier.verify()
