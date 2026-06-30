@@ -136,6 +136,15 @@ def test_crew_without_key_exits(monkeypatch: pytest.MonkeyPatch) -> None:
         get_settings.cache_clear()
 
 
+def test_meta_without_key_exits(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_keys(monkeypatch)
+    try:
+        result = runner.invoke(app, ["meta", "an agent for research"])
+        assert result.exit_code == 1
+    finally:
+        get_settings.cache_clear()
+
+
 def test_guard_command() -> None:
     blocked = runner.invoke(app, ["guard", "rm -rf /"])
     assert blocked.exit_code == 0

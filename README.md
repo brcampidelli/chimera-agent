@@ -26,8 +26,10 @@ migration from other agents (Hermes/OpenClaw) bringing config, memory and skills
 > buffer) · M4 (self-evolution v1: Memory Manager + memory-merge migration, learned-skill
 > evolver, self-learned crons, continuous-evolution benchmark) · M5 (governance kernel:
 > allow/warn/block/review trust layer + static validator + audit + governed tools) ·
-> **M6 (Tier-3 multi-agent: roles, sequential & supervisor crews, MOC comms, shared
-> memory, parallel review)**. Next: M7 (self-evolving ecosystem).
+> M6 (Tier-3 multi-agent: roles, sequential & supervisor crews, MOC comms, shared memory,
+> parallel review) · **M7 (Tier-4 ecosystem: meta-agent with isolation + hidden-test
+> reward-hack defense, change-tempo governance, trajectory collection for opt-in model
+> evolution)**. All 8 milestones (M0–M7) complete.
 
 ## Why Chimera (the differentiation thesis)
 
@@ -61,6 +63,7 @@ chimera agent "TASK" --fuse          # ReAct agent loop; route deep turns throug
 chimera solve "TASK" --verify "pytest -q" --guard   # Tier-2 with governance on tool calls
 chimera guard "rm -rf /"             # preview a governance verdict (allow/warn/review/block)
 chimera crew "TASK" --mode supervisor       # Tier-3 multi-agent crew
+chimera meta "an agent for X"        # Tier-4 meta-agent: design a specialized agent
 chimera cron add NAME "0 9 * * *" "run report"   # schedule a job
 chimera cron list                    # list scheduled jobs
 chimera cron learn                   # propose crons from recurring tasks (disabled)

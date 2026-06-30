@@ -297,7 +297,7 @@ def migrate(
     apply: bool = typer.Option(False, "--apply", help="Write artifacts (default: dry-run preview)."),
     home: str = typer.Option(None, "--home", help="Target Chimera home (default: from config)."),
 ) -> None:
-    """Import config + skills from another agent. Memory merge arrives in M4."""
+    """Import config + skills from another agent; --apply also merges long-term memory."""
     from chimera.migration import get_importer
 
     try:
@@ -571,6 +571,33 @@ def crew(
 
     console.print(result.answer)
     console.print(f"[dim]({mode} crew, {len(result.transcript)} agent messages)[/dim]")
+
+
+@app.command()
+def meta(
+    task: str = typer.Argument(..., help="The task to design a specialized agent for."),
+    model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
+) -> None:
+    """Meta-agent: design a specialized agent blueprint for a task. Requires a key."""
+    from chimera.ecosystem import MetaAgent
+    from chimera.providers import LLMGateway
+    from chimera.tools import default_registry
+
+    if not get_settings().has_any_key():
+        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+        raise typer.Exit(code=1)
+
+    allowed = default_registry().names()
+    blueprint = MetaAgent(LLMGateway(), allowed_tools=allowed, model=model).design(task)
+    if blueprint is None:
+        console.print("[red]the meta-agent could not produce a valid blueprint[/red]")
+        raise typer.Exit(code=1)
+
+    table = Table(title="Agent blueprint", show_header=False, title_style="bold")
+    table.add_row("Name", blueprint.name)
+    table.add_row("Tools", ", ".join(blueprint.tools) or "[dim]none[/dim]")
+    table.add_row("Role prompt", blueprint.role_prompt)
+    console.print(table)
 
 
 if __name__ == "__main__":
