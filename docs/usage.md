@@ -52,8 +52,13 @@ self-hosted / OpenAI-compatible server (Ollama, vLLM) set `CHIMERA_API_BASE`
 (e.g. `http://localhost:11434` with `CHIMERA_DEFAULT_MODEL=ollama/llama3`). Set
 `CHIMERA_FALLBACK_MODELS` (comma-separated) to fail over to another model if the
 primary errors. In `chat`/`tui`, `/model <slug>` switches the model mid-session.
-*(OAuth/subscription logins — Copilot, Claude Max, etc. — aren't wired yet; API
-keys and any LiteLLM-supported endpoint are.)*
+
+**Credential pools.** Give a provider several keys with
+`CHIMERA_<PROVIDER>_KEYS` (e.g. `CHIMERA_OPENROUTER_KEYS=key1,key2,key3`). The
+gateway rotates them round-robin across calls (spreading load / rate limits) and,
+within a single call, fails over to the next key if one errors. A pool replaces
+that provider's single `*_API_KEY`. *(OAuth/subscription logins — Copilot, Claude
+Max, etc. — aren't wired yet; API keys and any LiteLLM-supported endpoint are.)*
 
 Check everything is wired up:
 

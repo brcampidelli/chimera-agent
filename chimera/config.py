@@ -39,6 +39,23 @@ class Settings(BaseSettings):
     gemini_api_key: str | None = Field(default=None, validation_alias="GEMINI_API_KEY")
     deepseek_api_key: str | None = Field(default=None, validation_alias="DEEPSEEK_API_KEY")
 
+    # --- Credential pools: comma-separated keys per provider, rotated round-robin ---
+    openrouter_keys: Annotated[list[str], NoDecode] = Field(
+        default_factory=list, validation_alias="CHIMERA_OPENROUTER_KEYS"
+    )
+    openai_keys: Annotated[list[str], NoDecode] = Field(
+        default_factory=list, validation_alias="CHIMERA_OPENAI_KEYS"
+    )
+    anthropic_keys: Annotated[list[str], NoDecode] = Field(
+        default_factory=list, validation_alias="CHIMERA_ANTHROPIC_KEYS"
+    )
+    gemini_keys: Annotated[list[str], NoDecode] = Field(
+        default_factory=list, validation_alias="CHIMERA_GEMINI_KEYS"
+    )
+    deepseek_keys: Annotated[list[str], NoDecode] = Field(
+        default_factory=list, validation_alias="CHIMERA_DEEPSEEK_KEYS"
+    )
+
     # --- Optional feature credentials (pre-set slots; set only what you use) ---
     tavily_api_key: str | None = Field(default=None, validation_alias="TAVILY_API_KEY")
     brave_api_key: str | None = Field(default=None, validation_alias="BRAVE_API_KEY")
@@ -75,7 +92,16 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", validation_alias="CHIMERA_LOG_LEVEL")
     home: Path = Field(default=Path(".chimera"), validation_alias="CHIMERA_HOME")
 
-    @field_validator("fusion_panel", "fallback_models", mode="before")
+    @field_validator(
+        "fusion_panel",
+        "fallback_models",
+        "openrouter_keys",
+        "openai_keys",
+        "anthropic_keys",
+        "gemini_keys",
+        "deepseek_keys",
+        mode="before",
+    )
     @classmethod
     def _split_panel(cls, value: object) -> object:
         """Accept a comma-separated string from the environment."""
@@ -83,16 +109,39 @@ class Settings(BaseSettings):
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
 
-    def configured_providers(self) -> list[str]:
-        """Names of providers that currently have a key set."""
-        mapping = {
+    def credential_pool(self, provider: str) -> list[str]:
+        """Only the explicit multi-key pool (``CHIMERA_<PROVIDER>_KEYS``), [] if unset.
+
+        This is what the gateway rotates round-robin. A provider with just a single
+        ``*_API_KEY`` returns [] here — its key is read from the environment as before.
+        """
+        pools = {
+            "openrouter": self.openrouter_keys,
+            "openai": self.openai_keys,
+            "anthropic": self.anthropic_keys,
+            "gemini": self.gemini_keys,
+            "deepseek": self.deepseek_keys,
+        }
+        return list(pools.get(provider, []))
+
+    def key_pool(self, provider: str) -> list[str]:
+        """Usable keys for a provider: the pool if set, else the single key."""
+        pool = self.credential_pool(provider)
+        if pool:
+            return pool
+        single = {
             "openrouter": self.openrouter_api_key,
             "openai": self.openai_api_key,
             "anthropic": self.anthropic_api_key,
             "gemini": self.gemini_api_key,
             "deepseek": self.deepseek_api_key,
-        }
-        return [name for name, key in mapping.items() if key]
+        }.get(provider)
+        return [single] if single else []
+
+    def configured_providers(self) -> list[str]:
+        """Names of providers that currently have a key (single or pool)."""
+        names = ("openrouter", "openai", "anthropic", "gemini", "deepseek")
+        return [name for name in names if self.key_pool(name)]
 
     def has_any_key(self) -> bool:
         return bool(self.configured_providers())

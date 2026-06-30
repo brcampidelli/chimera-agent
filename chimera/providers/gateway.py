@@ -15,6 +15,7 @@ import base64
 import json
 import mimetypes
 import os
+import threading
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
@@ -116,6 +117,30 @@ class MissingCredentialsError(RuntimeError):
     """Raised when a model call is attempted but no provider key is configured."""
 
 
+class _KeyRotator:
+    """Round-robin over a provider's credential pool, thread-safe.
+
+    The fusion panel calls the gateway from multiple threads at once, so the
+    rotating index is guarded by a lock. ``order()`` returns every key (so a
+    single call can fail over across keys) starting at the rotating offset, and
+    advances the offset by one so successive calls spread load round-robin.
+    """
+
+    def __init__(self, keys: list[str]) -> None:
+        self._keys = keys
+        self._index = 0
+        self._lock = threading.Lock()
+
+    def order(self) -> list[str]:
+        if not self._keys:
+            return []
+        n = len(self._keys)
+        with self._lock:
+            start = self._index
+            self._index = (self._index + 1) % n
+        return [self._keys[(start + offset) % n] for offset in range(n)]
+
+
 class LLMGateway:
     """Calls LLMs through LiteLLM with Chimera's defaults.
 
@@ -130,6 +155,7 @@ class LLMGateway:
 
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
+        self._rotators: dict[str, _KeyRotator] = {}
         self._export_keys_to_env()
 
     def _export_keys_to_env(self) -> None:
@@ -152,6 +178,18 @@ class LLMGateway:
             if fallback and fallback not in candidates:
                 candidates.append(fallback)
         return candidates
+
+    def _key_order(self, provider: str) -> list[str]:
+        """Keys to try for a provider this call ([] when there is no pool/key).
+
+        Empty means "let LiteLLM read the key from the environment" (today's
+        behaviour); a non-empty pool is rotated round-robin across calls.
+        """
+        rotator = self._rotators.get(provider)
+        if rotator is None:
+            rotator = _KeyRotator(self.settings.credential_pool(provider))
+            self._rotators[provider] = rotator
+        return rotator.order()
 
     def complete(
         self,
@@ -176,22 +214,27 @@ class LLMGateway:
         extra = self._provider_kwargs()
         last_exc: Exception | None = None
         for candidate in self._model_candidates(resolved):
-            try:
-                _log.debug("completion model=%s msgs=%d", candidate, len(messages))
-                response = litellm.completion(
-                    model=candidate,
-                    messages=_to_message_dicts(messages),
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    tools=tools,
-                    **extra,
-                    **kwargs,
-                )
-                return self._normalize(response, candidate)
-            except Exception as exc:  # noqa: BLE001 — try the next model in the fallback chain
-                last_exc = exc
-                _log.warning("model %s failed: %s", candidate, exc)
-        assert last_exc is not None  # _model_candidates is never empty
+            provider = candidate.split("/", 1)[0]
+            api_keys: tuple[str | None, ...] = tuple(self._key_order(provider)) or (None,)
+            for api_key in api_keys:
+                call_kwargs: dict[str, Any] = dict(extra, **kwargs)
+                if api_key:
+                    call_kwargs["api_key"] = api_key
+                try:
+                    _log.debug("completion model=%s msgs=%d", candidate, len(messages))
+                    response = litellm.completion(
+                        model=candidate,
+                        messages=_to_message_dicts(messages),
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        tools=tools,
+                        **call_kwargs,
+                    )
+                    return self._normalize(response, candidate)
+                except Exception as exc:  # noqa: BLE001 — try next key, then next model
+                    last_exc = exc
+                    _log.warning("model %s failed: %s", candidate, exc)
+        assert last_exc is not None  # there is always at least one (candidate, key) attempt
         raise last_exc
 
     async def acomplete(

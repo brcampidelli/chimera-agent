@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **AI providers — credential pools / key rotation**: `CHIMERA_<PROVIDER>_KEYS`
+  (comma-separated) gives a provider a pool of keys, rotated round-robin across
+  calls (spreading load / rate limits) with failover to the next key within a
+  single call. Thread-safe (the fusion panel calls concurrently); a pool-only
+  provider counts as configured. Verified live (an invalid key failed over to a
+  working one) and confirmed the fusion path is unaffected.
 - **AI providers — self-hosted, fallback chain & live model switch**:
   `CHIMERA_API_BASE` sends requests to a custom OpenAI-compatible endpoint
   (Ollama, vLLM, …); `CHIMERA_FALLBACK_MODELS` (comma-separated) fails over to the
