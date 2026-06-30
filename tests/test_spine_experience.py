@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from chimera.core.spine import assemble_spine
-from chimera.evolution import ExperienceBuffer
+from chimera.evolution import Experience, ExperienceBuffer, format_lessons
 
 
 def test_spine_includes_referenced_file(tmp_path: Path) -> None:
@@ -47,3 +47,24 @@ def test_experience_buffer_persists(tmp_path: Path) -> None:
     reopened = ExperienceBuffer(path)
     assert len(reopened) == 1
     assert reopened.failures()[0].detail == "d"
+
+
+def test_experience_relevant_ranks_by_overlap_and_favours_failures(tmp_path: Path) -> None:
+    buf = ExperienceBuffer(tmp_path / "exp.json")
+    buf.record("write a parser for csv files", "success", "")
+    buf.record("write a parser for csv files", "failure", "off-by-one error")
+    buf.record("bake a chocolate cake", "success", "")
+
+    rel = buf.relevant("write a csv parser", k=2)
+    assert [e.task for e in rel] == [
+        "write a parser for csv files",  # the failure ranks first (favoured at tie)
+        "write a parser for csv files",
+    ]
+    assert rel[0].outcome == "failure"
+    assert buf.relevant("xylophone zebra quokka") == []  # nothing overlaps
+
+
+def test_format_lessons_renders_block_and_is_empty_for_none() -> None:
+    assert format_lessons([]) == ""
+    block = format_lessons([Experience(seq=0, task="do X", outcome="failure", detail="why it broke")])
+    assert "FAILED" in block and "do X" in block and "why it broke" in block

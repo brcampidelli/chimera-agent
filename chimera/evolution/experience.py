@@ -8,12 +8,19 @@ attempts. v1 is a simple JSON-backed log; the evolution engine (M4) builds on it
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel
 
 Outcome = Literal["success", "failure"]
+
+_WORD = re.compile(r"[a-z0-9]+")
+
+
+def _tokens(text: str) -> set[str]:
+    return {word for word in _WORD.findall(text.lower()) if len(word) >= 2}
 
 
 class Experience(BaseModel):
@@ -60,5 +67,43 @@ class ExperienceBuffer:
     def successes(self) -> list[Experience]:
         return [e for e in self._items if e.outcome == "success"]
 
+    def relevant(self, task: str, k: int = 3) -> list[Experience]:
+        """Prior experiences most relevant to ``task``, by task-token overlap.
+
+        Failures are favoured slightly — a negative example ("this approach failed")
+        carries more planning signal than another success. Returns at most ``k``,
+        most-relevant first; empty when nothing overlaps.
+        """
+        query = _tokens(task)
+        if not query:
+            return []
+        scored: list[tuple[float, int, Experience]] = []
+        for exp in self._items:
+            overlap = len(query & _tokens(exp.task))
+            if overlap == 0:
+                continue
+            score = overlap + (0.5 if exp.outcome == "failure" else 0.0)
+            # newer entries win ties (higher seq), so -seq sorts ascending as a tiebreak
+            scored.append((score, exp.seq, exp))
+        scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
+        return [exp for _, _, exp in scored[:k]]
+
     def __len__(self) -> int:
         return len(self._items)
+
+
+def format_lessons(items: list[Experience]) -> str:
+    """Render prior experiences as a compact 'lessons' block for a planner prompt.
+
+    Returns "" for an empty list so callers can fold it into context unconditionally.
+    The lessons are advisory only: the attempt they shape is still gated by
+    verify-or-revert, so a misleading lesson can never corrupt the workspace.
+    """
+    if not items:
+        return ""
+    lines = ["Lessons from past attempts on similar tasks (avoid repeating failures):"]
+    for exp in items:
+        tag = "FAILED" if exp.outcome == "failure" else "ok"
+        detail = f" — {exp.detail}" if exp.detail else ""
+        lines.append(f"- [{tag}] {exp.task}{detail}")
+    return "\n".join(lines)

@@ -165,6 +165,43 @@ def test_experience_recorded(tmp_path: Path) -> None:
     assert len(buf.successes()) == 1
 
 
+def test_experience_is_recalled_into_planner_and_worker(tmp_path: Path) -> None:
+    # Seed a relevant prior failure (+ an unrelated success that must NOT be pulled in).
+    buf = ExperienceBuffer(tmp_path / "exp.json")
+    buf.record("create config file with retries", "failure", detail="forgot the retry flag")
+    buf.record("paint the garden fence", "success", detail="looks great")
+
+    class RecordingWorker:
+        def __init__(self) -> None:
+            self.prompts: list[str] = []
+
+        def run(self, task: str) -> AgentResult:
+            self.prompts.append(task)
+            return AgentResult(answer="ok", steps=1, stopped_reason="final")
+
+    class RecordingBackend:
+        def __init__(self) -> None:
+            self.seen: list[str] = []
+
+        def complete(self, messages: list[Any], **kwargs: Any) -> CompletionResult:
+            self.seen.append(messages[-1].content)  # the user message
+            return CompletionResult(content="1. do it", model="fake")
+
+    worker = RecordingWorker()
+    backend = RecordingBackend()
+    auto = AutonomousAgent(
+        worker,
+        planner=Planner(backend),
+        experience=buf,
+        config=AutonomousConfig(use_planner=True),
+    )
+    auto.run("create config file with retries")
+
+    assert any("forgot the retry flag" in s for s in backend.seen)  # planner saw the lesson
+    assert any("forgot the retry flag" in p for p in worker.prompts)  # worker saw it too
+    assert all("paint the garden fence" not in p for p in worker.prompts)  # unrelated excluded
+
+
 def test_plan_is_attached() -> None:
     auto = AutonomousAgent(
         FakeWorker(),

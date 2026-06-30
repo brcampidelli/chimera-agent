@@ -26,7 +26,7 @@ from chimera.core.spine import assemble_spine
 from chimera.core.supervisor import Manager
 from chimera.core.verify import Verifier
 from chimera.ecosystem.trajectory import TrajectoryCollector
-from chimera.evolution.experience import ExperienceBuffer, Outcome
+from chimera.evolution.experience import ExperienceBuffer, Outcome, format_lessons
 from chimera.telemetry import get_logger
 
 _log = get_logger("core.autonomous")
@@ -92,7 +92,13 @@ class AutonomousAgent:
         self.config = config or AutonomousConfig()
 
     def run(self, task: str) -> AutonomousResult:
-        context = assemble_spine(self.spine_workspace, task) if self.spine_workspace else ""
+        spine = assemble_spine(self.spine_workspace, task) if self.spine_workspace else ""
+        # Behavioural loop: fold lessons from PRIOR runs (recalled before this run
+        # records anything) into the planner + worker context, so the agent avoids
+        # repeating past failure modes. Advisory only — verify-or-revert below still
+        # decides success, so a misleading lesson can't corrupt the workspace.
+        lessons = self._recall_lessons(task)
+        context = "\n\n".join(part for part in (spine, lessons) if part)
         plan = (
             self.planner.plan(task, context=context)
             if self.planner and self.config.use_planner
@@ -143,6 +149,11 @@ class AutonomousAgent:
 
         last = attempts[-1].answer if attempts else ""
         return AutonomousResult(answer=last, success=False, attempts=attempts, plan=plan)
+
+    def _recall_lessons(self, task: str) -> str:
+        if self.experience is None:
+            return ""
+        return format_lessons(self.experience.relevant(task))
 
     def _review(self, task: str, answer: str, context: str) -> tuple[bool, str]:
         if self.manager is None or not self.config.use_manager:
