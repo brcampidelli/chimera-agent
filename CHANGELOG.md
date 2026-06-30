@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   state + verify-or-revert + retry) — and reports the degradation gap. New
   `chimera evoclaw` CLI runs the A/B against a real model. Tests prove the guard
   resists the propagation that sinks the naive regime.
+- **M8 — Right-hand scenario suite**: `chimera/eval/scenarios.py` + `chimera
+  scenarios` run an everyday-assistant task set (date/unit conversions, sentiment,
+  email extraction, action items, summarization) with deterministic checks. 7/7
+  pass live against a real model.
 
 ## [0.1.0] - 2026-06-30
 

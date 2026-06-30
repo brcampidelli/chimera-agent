@@ -22,6 +22,7 @@ from chimera.eval.evoclaw import (
     run_guarded,
     run_naive,
 )
+from chimera.eval.scenarios import Scenario, daily_scenarios, run_scenarios
 
 __all__ = [
     "EvalTask",
@@ -40,4 +41,7 @@ __all__ = [
     "run_guarded",
     "compare",
     "counter_chain",
+    "Scenario",
+    "run_scenarios",
+    "daily_scenarios",
 ]

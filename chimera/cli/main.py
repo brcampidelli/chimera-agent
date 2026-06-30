@@ -671,6 +671,38 @@ def evoclaw(
 
 
 @app.command()
+def scenarios(
+    model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
+) -> None:
+    """Run the daily right-hand scenario suite (live). Requires a key."""
+    from chimera.eval import SingleModelSolver, daily_scenarios, run_scenarios
+    from chimera.providers import LLMGateway, MissingCredentialsError
+
+    settings = get_settings()
+    if not settings.has_any_key():
+        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+        raise typer.Exit(code=1)
+
+    gateway = LLMGateway()
+    try:
+        report = run_scenarios(
+            SingleModelSolver(gateway, model),
+            daily_scenarios(),
+            on_result=lambda o: console.print(
+                f"  {'[green]PASS[/green]' if o.passed else '[red]FAIL[/red]'} {o.id}"
+            ),
+        )
+    except MissingCredentialsError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    console.print(
+        f"[bold]{report.passed}/{report.total} passed[/bold] "
+        f"(pass_rate {report.summary()['pass_rate']})"
+    )
+
+
+@app.command()
 def crew(
     task: str = typer.Argument(..., help="The task for the crew."),
     mode: str = typer.Option("sequential", "--mode", help="sequential | supervisor"),
