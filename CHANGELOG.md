@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Live validation — OpenAPI importer & TUI**: an opt-in integration test imports
+  a real public OpenAPI spec (httpbin, 73 operations), pours the generated tools
+  into a `ToolRegistry`, and calls one live (real HTTP 200); a headless Textual
+  driver smoke drives the TUI through the real event loop (type → submit → worker
+  reply, `/model` switch, `/exit`). Closes the two remaining "unit-only" gaps.
 - **AI providers — credential pools / key rotation**: `CHIMERA_<PROVIDER>_KEYS`
   (comma-separated) gives a provider a pool of keys, rotated round-robin across
   calls (spreading load / rate limits) with failover to the next key within a
