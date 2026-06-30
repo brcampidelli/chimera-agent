@@ -22,6 +22,13 @@ from chimera.eval.evoclaw import (
     run_guarded,
     run_naive,
 )
+from chimera.eval.rubric import (
+    Dimension,
+    RubricResult,
+    cascade_dimensions,
+    evaluate_cascade,
+    model_judge,
+)
 from chimera.eval.scenarios import Scenario, daily_scenarios, run_scenarios
 
 __all__ = [
@@ -44,4 +51,9 @@ __all__ = [
     "Scenario",
     "run_scenarios",
     "daily_scenarios",
+    "Dimension",
+    "RubricResult",
+    "evaluate_cascade",
+    "cascade_dimensions",
+    "model_judge",
 ]
