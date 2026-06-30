@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/logo.png" alt="Logo de Chimera" width="160" />
+<img src="assets/logo.png" alt="Logo de Chimera" width="200" />
 
 # Chimera
 
