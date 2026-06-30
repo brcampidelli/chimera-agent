@@ -46,6 +46,15 @@ CHIMERA_FUSION_SYNTHESIZER=openrouter/openai/gpt-4o-mini
 Other knobs: `CHIMERA_HOME` (state dir, default `.chimera`), `CHIMERA_LOG_LEVEL`
 (`INFO` / `DEBUG`).
 
+**Providers, fallback & self-hosted.** Any LiteLLM `provider/model` slug works
+(`openai/…`, `anthropic/…`, `gemini/…`, `ollama/…`, `openrouter/…`, …). For a
+self-hosted / OpenAI-compatible server (Ollama, vLLM) set `CHIMERA_API_BASE`
+(e.g. `http://localhost:11434` with `CHIMERA_DEFAULT_MODEL=ollama/llama3`). Set
+`CHIMERA_FALLBACK_MODELS` (comma-separated) to fail over to another model if the
+primary errors. In `chat`/`tui`, `/model <slug>` switches the model mid-session.
+*(OAuth/subscription logins — Copilot, Claude Max, etc. — aren't wired yet; API
+keys and any LiteLLM-supported endpoint are.)*
+
 Check everything is wired up:
 
 ```bash

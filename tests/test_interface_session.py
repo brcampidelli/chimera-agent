@@ -57,6 +57,26 @@ def test_memory_is_recalled_into_the_prompt(tmp_path: Path) -> None:
     assert "absolute imports" in agent.prompts[0]
 
 
+def test_set_model_updates_the_agent_config() -> None:
+    from chimera.core import AgentConfig
+
+    class AgentWithConfig:
+        def __init__(self) -> None:
+            self.config = AgentConfig(model="old")
+
+        def run(self, task: str) -> AgentResult:
+            return AgentResult(answer="x", steps=1, stopped_reason="final")
+
+    agent = AgentWithConfig()
+    session = ChatSession(agent)
+    assert session.set_model("new") is True
+    assert agent.config.model == "new"
+
+
+def test_set_model_is_false_without_a_config() -> None:
+    assert ChatSession(RecordingAgent()).set_model("x") is False
+
+
 def test_history_window_is_bounded() -> None:
     agent = RecordingAgent()
     session = ChatSession(agent, max_history=2)

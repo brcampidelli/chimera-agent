@@ -56,6 +56,17 @@ class ChatSession:
         """Forget the conversation (long-term memory is untouched)."""
         self.turns.clear()
 
+    def set_model(self, model: str | None) -> bool:
+        """Switch the underlying agent's model mid-session (None = back to default).
+
+        Returns True if the agent exposed a model setting to change.
+        """
+        config = getattr(self.agent, "config", None)
+        if config is not None and hasattr(config, "model"):
+            config.model = model
+            return True
+        return False
+
     def _compose(self, message: str) -> str:
         parts: list[str] = []
         if self.memory is not None:

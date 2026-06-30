@@ -54,6 +54,14 @@ class Settings(BaseSettings):
         default="openrouter/openai/gpt-5.5", validation_alias="CHIMERA_DEFAULT_MODEL"
     )
 
+    # --- Custom endpoint for self-hosted/OpenAI-compatible servers (Ollama, vLLM) ---
+    api_base: str | None = Field(default=None, validation_alias="CHIMERA_API_BASE")
+
+    # --- Fallback chain: tried in order if the primary model errors ---
+    fallback_models: Annotated[list[str], NoDecode] = Field(
+        default_factory=list, validation_alias="CHIMERA_FALLBACK_MODELS"
+    )
+
     # --- Fusion engine (panel -> judge -> synthesizer) ---
     fusion_panel: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: list(_DEFAULT_PANEL), validation_alias="CHIMERA_FUSION_PANEL"
@@ -67,7 +75,7 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", validation_alias="CHIMERA_LOG_LEVEL")
     home: Path = Field(default=Path(".chimera"), validation_alias="CHIMERA_HOME")
 
-    @field_validator("fusion_panel", mode="before")
+    @field_validator("fusion_panel", "fallback_models", mode="before")
     @classmethod
     def _split_panel(cls, value: object) -> object:
         """Accept a comma-separated string from the environment."""

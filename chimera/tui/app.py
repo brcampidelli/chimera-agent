@@ -32,7 +32,7 @@ class ChimeraTUI(App[None]):
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
         yield RichLog(id="log", wrap=True, markup=True, highlight=False)
-        yield Input(id="prompt", placeholder="Message Chimera…  ( /reset · /exit )")
+        yield Input(id="prompt", placeholder="Message Chimera…  ( /model <slug> · /reset · /exit )")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -48,6 +48,11 @@ class ChimeraTUI(App[None]):
             return
         if text in ("/exit", "/quit", "/q"):
             self.exit()
+            return
+        if text.startswith("/model"):
+            slug = text[len("/model") :].strip() or None
+            self.session.set_model(slug)
+            self._append(f"[dim]model → {slug or 'default'}[/dim]")
             return
         self._append(f"[bold green]you ›[/bold green] {text}")
         self.run_worker(lambda: self._respond(text), thread=True, exclusive=True)

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **AI providers — self-hosted, fallback chain & live model switch**:
+  `CHIMERA_API_BASE` sends requests to a custom OpenAI-compatible endpoint
+  (Ollama, vLLM, …); `CHIMERA_FALLBACK_MODELS` (comma-separated) fails over to the
+  next model when the primary errors; and `/model <slug>` switches the model
+  mid-session in `chat`/`tui`. OAuth/subscription provider logins remain a
+  documented preset (not wired). Verified live (broken primary fell back; `/model`
+  switched models).
+
 - **Vision / image paste**: `Message` now carries images (local paths or URLs,
   base64 data-URL encoded) in the OpenAI/LiteLLM multimodal format; `chimera run
   --image <path|url>` (repeatable) sends them to a vision model. Verified live

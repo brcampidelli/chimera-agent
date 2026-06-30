@@ -277,7 +277,7 @@ def chat(
 
     console.print(
         "[bold]Chimera chat[/bold] — your terminal right-hand. "
-        "[cyan]/exit[/cyan] to quit, [cyan]/reset[/cyan] to clear context."
+        "[cyan]/model <slug>[/cyan] to switch, [cyan]/reset[/cyan] to clear, [cyan]/exit[/cyan] to quit."
     )
     while True:
         try:
@@ -293,6 +293,13 @@ def chat(
         if message == "/reset":
             session.reset()
             console.print("[dim]context cleared[/dim]")
+            continue
+        if message.startswith("/model"):
+            slug = message[len("/model") :].strip() or None
+            ok = session.set_model(slug)
+            console.print(
+                f"[dim]model → {slug or 'default'}[/dim]" if ok else "[red]can't switch model[/red]"
+            )
             continue
         try:
             with console.status("[dim]thinking…[/dim]"):

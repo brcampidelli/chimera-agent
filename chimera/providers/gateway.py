@@ -141,6 +141,18 @@ class LLMGateway:
     def _resolve_model(self, model: str | None) -> str:
         return model or self.settings.default_model
 
+    def _provider_kwargs(self) -> dict[str, Any]:
+        """Extra litellm kwargs — a custom endpoint for self-hosted/compatible servers."""
+        return {"api_base": self.settings.api_base} if self.settings.api_base else {}
+
+    def _model_candidates(self, resolved: str) -> list[str]:
+        """The primary model followed by any configured fallbacks, in order, deduped."""
+        candidates = [resolved]
+        for fallback in self.settings.fallback_models:
+            if fallback and fallback not in candidates:
+                candidates.append(fallback)
+        return candidates
+
     def complete(
         self,
         messages: list[MessageLike],
@@ -151,7 +163,7 @@ class LLMGateway:
         tools: list[dict[str, Any]] | None = None,
         **kwargs: Any,
     ) -> CompletionResult:
-        """Run a synchronous chat completion and return a normalized result."""
+        """Run a synchronous chat completion (with the fallback chain) and normalize it."""
         import litellm  # lazy: heavy import, keep CLI startup fast
 
         resolved = self._resolve_model(model)
@@ -161,16 +173,26 @@ class LLMGateway:
                 f"{list(_KEY_ENV_VARS.values())} in your environment or .env."
             )
 
-        _log.debug("completion model=%s msgs=%d", resolved, len(messages))
-        response = litellm.completion(
-            model=resolved,
-            messages=_to_message_dicts(messages),
-            temperature=temperature,
-            max_tokens=max_tokens,
-            tools=tools,
-            **kwargs,
-        )
-        return self._normalize(response, resolved)
+        extra = self._provider_kwargs()
+        last_exc: Exception | None = None
+        for candidate in self._model_candidates(resolved):
+            try:
+                _log.debug("completion model=%s msgs=%d", candidate, len(messages))
+                response = litellm.completion(
+                    model=candidate,
+                    messages=_to_message_dicts(messages),
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    tools=tools,
+                    **extra,
+                    **kwargs,
+                )
+                return self._normalize(response, candidate)
+            except Exception as exc:  # noqa: BLE001 — try the next model in the fallback chain
+                last_exc = exc
+                _log.warning("model %s failed: %s", candidate, exc)
+        assert last_exc is not None  # _model_candidates is never empty
+        raise last_exc
 
     async def acomplete(
         self,
@@ -198,6 +220,7 @@ class LLMGateway:
             temperature=temperature,
             max_tokens=max_tokens,
             tools=tools,
+            **self._provider_kwargs(),
             **kwargs,
         )
         return self._normalize(response, resolved)
