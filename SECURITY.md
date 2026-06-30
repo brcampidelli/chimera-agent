@@ -14,7 +14,7 @@ Chimera is in early alpha (`0.0.x`). Security fixes are applied to the latest `m
 Report privately via GitHub Security Advisories:
 <https://github.com/brcampidelli/chimera-agent/security/advisories/new>
 
-Or email the maintainer: **brcampidelli@gmail.com**.
+Or email the project: **chimeraagent01@gmail.com**.
 
 Please include:
 - a description of the issue and its impact,
