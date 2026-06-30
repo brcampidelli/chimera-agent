@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Governance fidelity — precedent RAG + four-actor model**: the `TrustKernel` now
+  carries a guarded `PrecedentStore` — a judge verdict becomes a usable precedent only
+  after **two agreements** for the same action, after which a *similar* action is
+  decided by recalling the precedent (token-overlap RAG) instead of re-invoking the
+  expensive judge (AgentTrust v2's guarded precedent). And `FourActorGovernance` runs a
+  change through **author → reviewer (advisory) → gatekeeper (authoritative hard gate) →
+  auditor (audit log)**, separating advice from authority (Spec Growth Engine's 4-actor
+  model). Closes the last two paper sub-mechanisms.
 - **Prompt caching** (`CHIMERA_CACHE=on`, HORIZON): an exact-match completion cache
   returns a stored result for an identical tool-free `(model, messages, temperature,
   max_tokens)` request, skipping the API call — saving cost/latency on repeated

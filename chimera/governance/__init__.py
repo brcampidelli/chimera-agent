@@ -5,6 +5,12 @@ hard-blocks a benign action. Self-modification is only accepted through a
 statically-validated edit surface.
 """
 
+from chimera.governance.actors import (
+    ActorResult,
+    ChangeProposal,
+    FourActorGovernance,
+    GovernanceDecision,
+)
 from chimera.governance.audit import AuditLog
 from chimera.governance.drift import (
     DriftReport,
@@ -16,6 +22,7 @@ from chimera.governance.drift import (
 from chimera.governance.governed_tool import GovernedTool, govern_registry
 from chimera.governance.kernel import TrustKernel
 from chimera.governance.policy import Decision, Rule, RuleSet, Verdict
+from chimera.governance.precedent import PrecedentStore
 from chimera.governance.validator import (
     ScheduleValidator,
     SkillValidator,
@@ -39,4 +46,9 @@ __all__ = [
     "DriftReport",
     "check_drift",
     "load_spec",
+    "PrecedentStore",
+    "FourActorGovernance",
+    "ChangeProposal",
+    "GovernanceDecision",
+    "ActorResult",
 ]

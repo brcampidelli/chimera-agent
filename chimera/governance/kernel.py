@@ -13,6 +13,7 @@ from collections.abc import Callable
 
 from chimera.governance.audit import AuditLog
 from chimera.governance.policy import Decision, Rule, RuleSet, Verdict, more_severe
+from chimera.governance.precedent import PrecedentStore
 from chimera.telemetry import get_logger
 
 _log = get_logger("governance.kernel")
@@ -29,20 +30,31 @@ class TrustKernel:
         *,
         judge: JudgeFn | None = None,
         audit: AuditLog | None = None,
+        precedents: PrecedentStore | None = None,
         default: Decision = Decision.ALLOW,
     ) -> None:
         self.ruleset = ruleset or RuleSet()
         self.learned = RuleSet(use_defaults=False)
         self.judge = judge
         self.audit = audit
+        self.precedents = precedents
         self.default = default
 
     def evaluate(self, action: str, *, context: str = "") -> Verdict:
         verdict = more_severe(self.ruleset.evaluate(action), self.learned.evaluate(action))
         source = "lexical"
+        # Precedent RAG: a confirmed precedent (2 judges agreed) answers a similar
+        # action cheaply, before the expensive judge is consulted again.
+        if verdict is None and self.precedents is not None:
+            recalled = self.precedents.recall(action)
+            if recalled is not None:
+                verdict = Verdict(recalled, "matched a confirmed precedent", "precedent")
+                source = "precedent"
         if verdict is None and self.judge is not None:
             verdict = self.judge(action)
             source = "judge"
+            if self.precedents is not None:
+                self.precedents.observe(action, verdict.decision)
         if verdict is None:
             verdict = Verdict(self.default, "no rule matched; default policy", "default")
             source = "default"
