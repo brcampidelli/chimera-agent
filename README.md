@@ -23,9 +23,11 @@ inspired by OpenRouter Fusion — instead of relying on a single frontier model,
 **improves itself over time** (memory → skills → model) while resisting the
 *continuous-evolution degradation* that limits today's agents.
 
-> **Status:** early alpha. All 8 milestones of the build plan (M0–M7) are implemented:
-> Tiers 1–4 + the Fusion engine + self-evolution + a governance kernel.
-> 158 tests · `mypy --strict` clean · `ruff` clean.
+> **Status:** early development (0.1.x). The full build plan (M0–M7) is implemented —
+> Tiers 1–4 + the Fusion engine + self-evolution + a governance kernel — plus an
+> **interfaces layer** (chat, TUI, HTTP gateway), **opt-in model evolution**, and a
+> **features layer** (Vision, Deliverable Mode, Pets, …).
+> 224 tests (+ opt-in live integration) · `mypy --strict` clean · `ruff` clean.
 
 ---
 
@@ -42,15 +44,28 @@ bring security/sandboxing but don't evolve. **Chimera combines all four:**
 
 ## Features
 
+**Reasoning & autonomy**
 - **LLM-Fusion engine** — provider-agnostic panel of frontier + open models, a judge that surfaces consensus/contradictions/blind-spots, and a synthesizer; a **cost-aware router** fuses only when it pays (tool turns stay single-model).
 - **Tier-2 autonomy** — plan → execute → Manager review → **verify-or-revert** (workspace snapshot/restore + a command verifier), with a git-style experience buffer.
-- **Self-evolution** — a Memory Manager (ADD/UPDATE/DELETE/NOOP dedup), a skill evolver that *writes and tests its own skills* (propose → test → keep/discard), self-learned crons, and a **continuous-evolution benchmark** that measures degradation.
 - **Multi-agent teams** — role specialization, sequential & supervisor crews, MOC message consolidation, shared memory, parallel review.
-- **Governance & safety** — a self-improving trust kernel, a static validator for the self-modification edit surface, an append-only audit log, and governed tools.
-- **Integrations** — first-class **MCP** client + an **OpenAPI/REST → tool** importer, so you can add any platform or API.
+
+**Self-evolution & governance**
+- **Self-evolution** — a Memory Manager (ADD/UPDATE/DELETE/NOOP dedup), a skill evolver that *writes and tests its own skills* (propose → test → keep/discard), self-learned crons, and a **continuous-evolution benchmark** (plus an EvoClaw naive-vs-guarded stress test) that measures degradation.
+- **Opt-in model evolution** — `solve` collects trajectories; `evolve` curates them into SFT/DPO datasets and emits a runnable LoRA recipe. Training stays **external and opt-in** — never automatic.
+- **Governance & safety** — a self-improving trust kernel (allow/warn/block/review), a static validator for the self-modification edit surface, an append-only audit log, and governed tools.
+
+**Providers**
+- **Any model, one interface** — provider-agnostic via LiteLLM (100+ models through `provider/model` slugs); first-class keys for OpenRouter/OpenAI/Anthropic/Gemini/DeepSeek.
+- **Self-hosted & resilient** — custom endpoints for **Ollama/vLLM** (`CHIMERA_API_BASE`), **fallback chains** across models, **credential pools** with round-robin key rotation, and a live **`/model`** switch in `chat`/`tui`.
+
+**Interfaces & integrations**
+- **CLI-first, plus interfaces** — a `chat` REPL, a full-screen **TUI** (Textual), and a **messaging gateway** HTTP server with one conversation (and memory) per chat.
+- **Integrations** — a first-class **MCP** client (stdio) + an **OpenAPI/REST → tool** importer, so you can add any platform or API.
 - **Crons & proactivity** — human-assigned and self-learned scheduled jobs.
 - **Migration** — import config, skills and **long-term memory** from Hermes Agent / OpenClaw (memory is *merged*, never overwritten).
-- **CLI-first** — everything works from the terminal; provider-agnostic via LiteLLM/OpenRouter.
+
+**Built-in extras**
+- **Vision** (image paste), **Deliverable Mode** (produce polished, self-contained artifacts), and a **Pet** companion — plus pre-set credential slots for web search, image generation, TTS/voice and more (`chimera features` shows what's ready and what each needs).
 
 ## Quickstart
 
@@ -82,7 +97,8 @@ chimera cron learn                     # propose crons from recurring tasks (dis
 chimera bench                          # continuous-evolution benchmark
 chimera guard "rm -rf /"               # preview a governance verdict
 chimera migrate hermes ~/.hermes --apply   # import config + skills + merge memory
-chimera evolve status                      # opt-in model evolution: SFT/DPO from trajectories
+chimera evolve status / recipe             # opt-in model evolution: SFT/DPO data + LoRA recipe
+chimera pet new --name Chimi               # adopt a virtual companion (stats decay over time)
 ```
 
 See the **[Usage Guide](docs/usage.md)** for install, configuration, and every command with copy-paste examples.
@@ -98,13 +114,16 @@ chimera/
   evolution/     learned-skill evolver, experience buffer
   governance/    trust kernel (allow/warn/block/review), static validator, audit, governed tools
   orchestration/ roles, sequential & supervisor crews, MOC comms
-  ecosystem/     meta-agent, change-tempo governance, trajectory collection
+  ecosystem/     meta-agent, change-tempo governance, trajectory collection, model evolution
   tools/         native tools (files, shell, http)
-  integrations/  MCP client + OpenAPI->tool importer
+  integrations/  MCP client (stdio) + OpenAPI->tool importer
   scheduler/     crons (assigned + self-learned) + SOP engine
   migration/     import from Hermes/OpenClaw (config, skills, memory-merge)
-  providers/     LLM adapters (LiteLLM / OpenRouter)
-  eval/          continuous-evolution benchmark, demo tasks
+  providers/     LLM gateway (LiteLLM) — fallback chains, credential pools, custom endpoints
+  interface/     conversational ChatSession (shared by chat, TUI, gateway)
+  tui/           full-screen Textual app
+  server/        messaging gateway + HTTP transport (per-chat sessions)
+  eval/          continuous-evolution + EvoClaw stress test + daily scenarios
   cli/           the `chimera` command (CLI-first)
 ```
 
@@ -122,8 +141,15 @@ See [docs/architecture.md](docs/architecture.md) for the full design and the res
 | M5 — Governance kernel | ✅ |
 | M6 — Tier 3 multi-agent teams | ✅ |
 | M7 — Tier 4 self-evolving ecosystem | ✅ |
+| M8 — Interfaces (chat/TUI/gateway), EvoClaw stress-test, opt-in model evolution | ✅ |
+| Provider layer — self-hosted endpoints, fallback chains, credential pools, `/model` | ✅ |
+| Features — Vision, Deliverable Mode, Pets + pre-set capability slots | ✅ |
 
-Next: validation against real models at scale, an expanded continuous-evolution suite, and an optional LangGraph durability backend.
+Post-M7, the agent has been hardened against real provider models (live-tested:
+Fusion, Tier-2 `solve`, the daily scenario suite, the HTTP gateway, the OpenAPI
+importer, and the stdio MCP client). Next: deeper continuous-evolution validation
+at scale, more provider integrations (OAuth logins, credential-pool tuning), and an
+optional LangGraph durability backend.
 
 ## Development
 
