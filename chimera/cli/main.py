@@ -915,6 +915,15 @@ def memory_list() -> None:
     console.print(table)
 
 
+@memory_app.command("prune")
+def memory_prune(
+    max_items: int = typer.Option(50, "--max", help="Keep the N highest-value memories."),
+) -> None:
+    """Prune low-value memory under a budget (multi-factor value model)."""
+    removed = _memory_manager().prune(max_items)
+    console.print(f"pruned {removed} low-value memory item(s)")
+
+
 @memory_app.command("graph")
 def memory_graph(
     entity: str = typer.Option(None, "--entity", "-e", help="Show relations for one entity."),

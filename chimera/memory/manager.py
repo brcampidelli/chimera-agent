@@ -89,6 +89,21 @@ class MemoryManager:
         _log.debug("merged %d items: %s", len(items), counts)
         return counts
 
+    def prune(self, max_items: int) -> int:
+        """Keep the ``max_items`` highest-value memories; remove the rest. Returns count.
+
+        Value is the multi-factor model in :mod:`chimera.memory.value` (recency,
+        specificity, kind, curation, reliability) — not a single cue.
+        """
+        from chimera.memory.value import rank
+
+        items = self.store.all()
+        if len(items) <= max_items:
+            return 0
+        for _, item in rank(items)[max_items:]:
+            self.store.remove(item.id)
+        return len(items) - max_items
+
     def search(self, query: str, *, k: int = 5) -> list[MemoryItem]:
         """Keyword retrieval over memory content (vector retrieval comes later)."""
         terms = set(_TOKEN.findall(query.lower()))

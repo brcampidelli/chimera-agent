@@ -5,10 +5,12 @@ merge imported memory without overwriting existing history. The graph layer
 (:mod:`chimera.memory.graph`) extracts entity-relation triples for recall by entity.
 """
 
+from chimera.memory.gate import MemoryGate
 from chimera.memory.graph import MemoryGraph, Relation, build_graph, extract_relations
 from chimera.memory.manager import MemoryManager
 from chimera.memory.models import MemoryItem, MemoryKind
 from chimera.memory.store import MemoryStore
+from chimera.memory.value import ValueWeights, rank, value
 
 __all__ = [
     "MemoryItem",
@@ -19,4 +21,8 @@ __all__ = [
     "Relation",
     "build_graph",
     "extract_relations",
+    "MemoryGate",
+    "value",
+    "rank",
+    "ValueWeights",
 ]

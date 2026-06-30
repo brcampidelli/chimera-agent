@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Memory admission gate** (MemGate, 2606.06054): recall now passes through a trust
+  boundary — a recalled memory enters the prompt only if it is relevant to the query
+  *and* free of override/injection markers (a memory-based jailbreak defense). On by
+  default in `chat`/`tui`/`serve`. Verified live (an injected memory was blocked, the
+  clean one admitted).
+- **Multi-factor memory value + pruning** (2606.12945): `memory prune --max N` keeps the
+  highest-value memories under a budget, scored by a weighted multi-factor model
+  (recency, specificity, kind, curation, reliability) instead of a single cue — the
+  interpretable, deterministic version of value-directed forgetting. Verified live.
 - **Governance fidelity — precedent RAG + four-actor model**: the `TrustKernel` now
   carries a guarded `PrecedentStore` — a judge verdict becomes a usable precedent only
   after **two agreements** for the same action, after which a *similar* action is

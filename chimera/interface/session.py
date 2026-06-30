@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import Protocol
 
 from chimera.core.agent import AgentResult
+from chimera.memory.gate import MemoryGate
 from chimera.memory.models import MemoryItem
 
 
@@ -42,6 +43,7 @@ class ChatSession:
 
     agent: SupportsRun
     memory: SupportsRecall | None = None
+    gate: MemoryGate | None = field(default_factory=MemoryGate)
     max_history: int = 6
     memory_k: int = 3
     turns: list[ChatTurn] = field(default_factory=list)
@@ -70,7 +72,10 @@ class ChatSession:
     def _compose(self, message: str) -> str:
         parts: list[str] = []
         if self.memory is not None:
-            facts = [item.content for item in self.memory.search(message, k=self.memory_k)]
+            items = self.memory.search(message, k=self.memory_k)
+            if self.gate is not None:
+                items = self.gate.filter(items, message)  # admission gate (trust boundary)
+            facts = [item.content for item in items]
             if facts:
                 parts.append("Relevant facts from memory:\n" + "\n".join(f"- {f}" for f in facts))
         if self.turns:

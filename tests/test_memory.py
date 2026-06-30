@@ -20,6 +20,18 @@ def test_remember_add_then_noop(tmp_path: Path) -> None:
     assert len(mgr.store) == 1
 
 
+def test_prune_keeps_highest_value(tmp_path: Path) -> None:
+    mgr = _manager(tmp_path)
+    mgr.add("a low working scratch note", kind="working")
+    mgr.add("Alex prefers TypeScript strict and absolute imports", kind="persona", key="alex-prefs")
+    mgr.add("another working scratch", kind="working")
+    removed = mgr.prune(max_items=1)
+    assert removed == 2
+    remaining = mgr.store.all()
+    assert len(remaining) == 1
+    assert "Alex prefers" in remaining[0].content  # the persona/keyed fact survived
+
+
 def test_remember_update_by_key(tmp_path: Path) -> None:
     mgr = _manager(tmp_path)
     mgr.remember("default model is X", key="default-model")

@@ -273,7 +273,13 @@ uv run chimera memory search "imports"
 uv run chimera memory list
 uv run chimera memory graph                 # entity-relation graph from memory
 uv run chimera memory graph --entity PassaPro   # one entity's relations
+uv run chimera memory prune --max 50        # keep the N highest-value memories (multi-factor)
 ```
+
+Recall passes through an **admission gate** (a trust boundary): a recalled memory enters
+the prompt only if it is relevant *and* free of override/injection text (memory-based
+jailbreak defense). `memory prune` forgets under a budget by a multi-factor **value**
+model (recency, specificity, kind, curation, reliability) — not a single cue.
 
 The **graph layer** extracts `(source, relation, target)` triples from your memories
 (`PassaPro uses Supabase`, `Alex prefers TypeScript`), so facts can be recalled by
