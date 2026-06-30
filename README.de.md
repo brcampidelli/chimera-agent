@@ -24,10 +24,12 @@ inspiriert von OpenRouter Fusion — statt sich auf ein einzelnes Frontier-Model
 *Degradation durch kontinuierliche Evolution* widersteht, die heutige Agenten einschränkt.
 
 > **Status:** frühe Entwicklung (0.1.x). Der vollständige Bauplan (M0–M7) ist umgesetzt —
-> Tiers 1–4 + die Fusion-Engine + Selbstevolution + ein Governance-Kernel — plus eine
-> **Interface-Schicht** (Chat, TUI, HTTP-Gateway), **opt-in Modell-Evolution** und eine
-> **Feature-Schicht** (Vision, Deliverable-Modus, Pets, …).
-> 224 Tests (+ opt-in Live-Integration) · `mypy --strict` sauber · `ruff` sauber.
+> Tiers 1–4 + die Fusion-Engine + mehrstufige Selbstevolution + ein Governance-Kernel —
+> plus eine **geschlossene Verhaltens-Lernschleife**, eine **operative Schicht** (Kanban +
+> Worker-Lanes, SDLC-Crew, ein deklaratives Loop-DSL), **Ausführungsisolation** (Docker-
+> Sandbox + git worktrees) und die **Paper-Techniken**, um die herum es entworfen wurde
+> (HORIZON, VIBEMed, Spec Growth, AgentTrust v2, AutoMegaKernel, Meta-Agent, MOC).
+> 300 Tests (+ opt-in Live-Integration) · `mypy --strict` sauber · `ruff` sauber.
 
 ---
 
@@ -40,33 +42,36 @@ TrustClaw/NemoClaw/ZeroClaw bringen Sicherheit/Sandboxing, entwickeln sich aber 
 
 - 🧬 **Fusion als Denken** — die Panel→Richter→Synthesizer-Engine ist der Denk-Kern, kein Add-on. Der Mehrwert entsteht durch den *Synthese*-Schritt selbst, nicht nur durch Modellvielfalt.
 - 🪜 **Vier Fähigkeitsstufen in einer Progression** — erweiterte Werkzeuge → autonom für Einzelaufgaben → Multi-Agenten-Teams → selbstevolvierendes Ökosystem.
-- ♻️ **Mehrstufige Selbstevolution**, die der Degradation durch kontinuierliche Evolution gezielt entgegenwirkt (externalisierter Zustand, drift-resistenter Kontext, Verify-or-Revert, Erfahrungs-Buffer).
-- 🛡️ **Ein Governance-Kernel, der sich ebenfalls verbessert** — allow/warn/block/review, mit einer statisch validierten Selbstmodifikations-Oberfläche.
+- ♻️ **Eine geschlossene, mehrstufige Selbstevolutionsschleife**, die der Degradation durch kontinuierliche Evolution gezielt entgegenwirkt (externalisierter Zustand, drift-resistenter Kontext, Verify-or-Revert, ein in die Planung zurückgeführter Erfahrungs-Buffer).
+- 🛡️ **Ein Governance-Kernel, der sich ebenfalls verbessert** — allow/warn/block/review, mit statisch validierter Selbstmodifikations-Oberfläche und geschütztem Präzedenzfall.
 
 ## Funktionen
 
 **Denken & Autonomie**
 - **LLM-Fusion-Engine** — anbieterunabhängiges Panel aus Frontier- + offenen Modellen, ein Richter, der Konsens/Widersprüche/blinde Flecken aufzeigt, und ein Synthesizer; ein **kostenbewusster Router** fusioniert nur, wenn es sich lohnt (Tool-Schritte bleiben Einzelmodell).
-- **Tier-2-Autonomie** — planen → ausführen → Manager-Review → **Verify-or-Revert** (Workspace-Snapshot/Restore + ein Befehls-Verifizierer), mit einem git-artigen Erfahrungs-Buffer.
-- **Multi-Agenten-Teams** — Rollenspezialisierung, sequentielle und Supervisor-Crews, MOC-Nachrichtenkonsolidierung, gemeinsames Gedächtnis, parallele Review.
+- **Tier-2-Autonomie** — planen → ausführen → Manager-Review → **Verify-or-Revert** (Workspace-Snapshot/Restore + ein Befehls-Verifizierer), mit **git-worktree-Isolation** (`solve --isolate`) — Änderungen landen nur, wenn verifiziert.
+- **SDLC-Lifecycle-Crew** (`chimera lifecycle`) — eine vorgefertigte **Plan → Build → Test → Review**-Pipeline mit Verify-or-Revert in der Test-Phase.
+- **Multi-Agenten-Teams** — Rollenspezialisierung, sequentielle und Supervisor-Crews, MOC-Konsolidierung, gemeinsames Gedächtnis, parallele Review.
 
 **Selbstevolution & Governance**
-- **Selbstevolution** — ein Memory Manager (ADD/UPDATE/DELETE/NOOP-Dedup), ein Skill-Evolver, der *eigene Skills schreibt und testet* (vorschlagen → testen → behalten/verwerfen), selbstgelernte Crons und ein **Continuous-Evolution-Benchmark** (plus ein EvoClaw-Stresstest naive vs. guarded), der die Degradation misst.
-- **Opt-in Modell-Evolution** — `solve` sammelt Trajektorien; `evolve` kuratiert sie zu SFT/DPO-Datasets und erzeugt ein lauffähiges LoRA-Rezept. Das Training bleibt **extern und opt-in** — niemals automatisch.
-- **Governance & Sicherheit** — ein sich selbst verbessernder Trust-Kernel (allow/warn/block/review), ein statischer Validator für die Selbstmodifikations-Oberfläche, ein Append-only-Audit-Log und governte Tools.
+- **Geschlossene Verhaltensschleife** — vergangene Fehler speisen den Planner (Lektionen), verifizierte Erfolge schreiben automatisch ins Gedächtnis, und wiederkehrende Aufgaben entwickeln automatisch eine validierte, smoke-getestete Skill — alles per Verify-or-Revert gegated. Plus Continuous-Evolution-Benchmark und EvoClaw-Stresstest naive vs. guarded.
+- **Hierarchisches Gedächtnis** — working / episodic / semantic / persona **+ eine Graph-Schicht** (`memory graph`), die Fakten nach Entität abruft, nicht nur nach Schlagwort.
+- **Opt-in Modell-Evolution** — `solve` sammelt Trajektorien; `evolve` kuratiert SFT/DPO-Datasets und erzeugt ein lauffähiges LoRA-Rezept. Das Training bleibt extern/opt-in.
+- **Governance-Kernel** — allow/warn/block/review (lexikalische Regeln + optionaler semantischer Richter, mit Regel-Distillation und einem **geschützten Präzedenz-Speicher**), ein statischer Validator für die Selbstmodifikations-Oberfläche, ein Append-only-Audit-Log, governte Tools, ein **Vier-Akteur-Änderungsmodell** und ein **Spec↔Code-Drift-Gate** (`chimera drift`).
 
 **Anbieter**
 - **Jedes Modell, eine Schnittstelle** — anbieterunabhängig via LiteLLM (100+ Modelle über `provider/model`-Slugs); First-Class-Keys für OpenRouter/OpenAI/Anthropic/Gemini/DeepSeek.
-- **Self-hosted & robust** — eigene Endpoints für **Ollama/vLLM** (`CHIMERA_API_BASE`), **Fallback-Ketten** über Modelle, **Credential Pools** mit Round-Robin-Key-Rotation und ein Live-**`/model`**-Wechsel in `chat`/`tui`.
+- **Self-hosted & robust** — eigene Endpoints für **Ollama/vLLM** (`CHIMERA_API_BASE`), **Fallback-Ketten**, **Credential Pools** mit Round-Robin-Rotation, ein Live-**`/model`**-Wechsel und **Prompt-Caching** (`CHIMERA_CACHE`) für wiederholte Reasoning-Schritte.
 
-**Schnittstellen & Integrationen**
-- **CLI-first, plus Schnittstellen** — eine `chat`-REPL, eine Vollbild-**TUI** (Textual) und ein **Messaging-Gateway** als HTTP-Server mit einer Konversation (und Gedächtnis) pro Chat.
-- **Integrationen** — ein First-Class-**MCP**-Client (stdio) + ein **OpenAPI/REST → Tool**-Importer, um jede Plattform oder API hinzuzufügen.
-- **Crons & Proaktivität** — von Menschen zugewiesene und selbstgelernte geplante Aufgaben.
-- **Migration** — importiert Config, Skills und **Langzeitgedächtnis** aus Hermes Agent / OpenClaw (das Gedächtnis wird *zusammengeführt*, nie überschrieben).
+**Orchestrierung, Schnittstellen & Integrationen**
+- **Kanban + Worker-Lanes** (`chimera kanban`) — ein Task-Board (Backlog → Doing → Review → Done), dessen Karten an eine `solve`- oder `crew`-Lane verteilt werden; `kanban learn` macht wiederkehrende Aufgaben zu Karten.
+- **Loop Engineering** (`chimera workflow`) — eine autonome Schleife als YAML verfassen (Schritte, die die Stack `nutzen`, mit `when`-Bedingungen und `repeat`/`until`-Schleifen).
+- **Schnittstellen** — eine `chat`-REPL, eine Vollbild-**TUI** (Textual) und ein **Messaging-Gateway** als HTTP-Server mit einer Konversation (und Gedächtnis) pro Chat.
+- **Ausführungs-Sandbox** — das Shell-Tool lokal oder in einem isolierten **Docker**-Container ausführen (`CHIMERA_SANDBOX=docker`).
+- **Integrationen** — ein First-Class-**MCP**-Client (stdio) + ein **OpenAPI/REST → Tool**-Importer; **Crons** (von Menschen zugewiesen und selbstgelernt, mit Bestätigung); **Migration** von Config/Skills/Langzeitgedächtnis aus Hermes Agent / OpenClaw.
 
 **Eingebaute Extras**
-- **Vision** (Bild einfügen), **Deliverable-Modus** (erzeugt polierte, eigenständige Artefakte) und ein **Pet**-Begleiter — plus voreingestellte Credential-Slots für Websuche, Bildgenerierung, TTS/Sprache und mehr (`chimera features` zeigt, was bereit ist und was jeweils benötigt wird).
+- **Vision** (Bild einfügen), **Deliverable-Modus** (polierte Artefakte) und ein **Pet**-Begleiter — plus voreingestellte Credential-Slots für Websuche, Bildgenerierung, TTS/Sprache und mehr (`chimera features`).
 
 ## Schnellstart
 
@@ -86,20 +91,21 @@ chimera chat                          # interaktiver Mehrrunden-Assistent (deine
 chimera tui                           # Vollbild-Terminal-App (Textual)
 chimera serve                         # Messaging-Gateway-HTTP-Server (Sitzungen pro Chat)
 chimera run "PROMPT" --image pic.png   # Tier-1 Single-Shot (mit Vision via --image)
-chimera deliver "ein Launch-Plan" -o plan.md   # Deliverable-Modus: erzeugt ein poliertes Artefakt
+chimera deliver "ein Plan" -o plan.md   # Deliverable-Modus: erzeugt ein poliertes Artefakt
 chimera fuse "PROMPT" --show-panel     # LLM-Fusion: Panel -> Richter -> Synthesizer
-chimera agent "AUFGABE" --fuse --guard    # ReAct-Tool-Schleife (governte Tool-Aufrufe)
-chimera solve "AUFGABE" --verify "pytest -q"   # Tier-2 autonom: planen -> Verify-or-Revert
+chimera solve "AUFGABE" --verify "pytest -q" --isolate   # Tier-2: Verify-or-Revert, git-worktree-isoliert
+chimera lifecycle "AUFGABE" --verify "..."   # SDLC-Crew: Plan -> Build -> Test -> Review
+chimera workflow flow.yaml             # eine deklarative Schleife ausführen (Loop Engineering)
 chimera crew "AUFGABE" --mode supervisor  # Tier-3 Multi-Agenten-Crew
 chimera meta "ein Agent für X"          # Tier-4 Meta-Agent: entwirft einen spezialisierten Agenten
-chimera memory add "ein dauerhafter Fakt"    # kuratiertes Langzeitgedächtnis (dedupliziert)
-chimera cron add NAME "0 9 * * *" "Bericht ausführen"   # eine Aufgabe planen
-chimera cron learn                     # schlägt Crons aus wiederkehrenden Aufgaben vor (deaktiviert)
+chimera kanban add/board/run/learn     # Task-Board mit Worker-Lanes (solve/crew)
+chimera drift spec.yaml                # Spec<->Code-Drift-Gate (Exit 1 bei Drift)
+chimera memory add / graph             # kuratiertes Langzeitgedächtnis + Entität-Relation-Graph
+chimera cron add / learn               # geplante Jobs (zugewiesen + selbstgelernt, bestätigt)
 chimera bench                          # Continuous-Evolution-Benchmark
-chimera guard "rm -rf /"               # Vorschau eines Governance-Urteils
 chimera migrate hermes ~/.hermes --apply   # importiert Config + Skills + führt Gedächtnis zusammen
-chimera evolve status / recipe             # opt-in Modell-Evolution: SFT/DPO-Daten + LoRA-Rezept
-chimera pet new --name Chimi               # adoptiere einen virtuellen Begleiter (Stats verfallen mit der Zeit)
+chimera evolve status / recipe         # opt-in Modell-Evolution: SFT/DPO-Daten + LoRA-Rezept
+chimera pet new --name Chimi           # adoptiere einen virtuellen Begleiter
 ```
 
 Siehe den **[Nutzungsleitfaden](docs/usage.md)** für Installation, Konfiguration und jeden Befehl mit Copy-Paste-Beispielen.
@@ -108,22 +114,24 @@ Siehe den **[Nutzungsleitfaden](docs/usage.md)** für Installation, Konfiguratio
 
 ```
 chimera/
-  core/          Agenten-Schleife (ReAct) + Tier-2-Autonomie (Plan, Verify-or-Revert, Supervisor)
+  core/          Agenten-Schleife (ReAct) + Tier-2-Autonomie (Plan, Verify-or-Revert) + git-worktree-Isolation
   fusion/        Panel -> Richter -> Synthesizer + kostenbewusster Router
-  memory/        working / episodic / semantic / persona + Memory Manager
+  memory/        working / episodic / semantic / persona + Graph-Schicht + Memory Manager
   skills/        eingebaute Bibliothek + Skill-Context-Retrieval
-  evolution/     Evolver für gelernte Skills, Erfahrungs-Buffer
-  governance/    Trust-Kernel (allow/warn/block/review), statischer Validator, Audit, governte Tools
-  orchestration/ Rollen, sequentielle und Supervisor-Crews, MOC-Comms
+  evolution/     Skill-Evolver, Auto-Evolve-Hook, Erfahrungs-Buffer
+  governance/    Trust-Kernel (Regeln + Richter + geschützter Präzedenzfall), statischer Validator, Drift-Gate, Vier-Akteur-Modell, Audit
+  orchestration/ Rollen, sequentielle/Supervisor-Crews, MOC-Comms, SDLC-Lifecycle-Crew
   ecosystem/     Meta-Agent, Change-Tempo-Governance, Trajektorien-Sammlung, Modell-Evolution
+  kanban/        Task-Board + Worker-Lanes (Verteilung an Crews / solve)
+  workflow/      deklaratives Loop-DSL (Loop Engineering)
   tools/         native Tools (Dateien, Shell, HTTP)
+  sandbox/       Ausführungs-Backends (local / docker-isoliert)
   integrations/  MCP-Client (stdio) + OpenAPI->Tool-Importer
   scheduler/     Crons (zugewiesen + selbstgelernt) + SOP-Engine
   migration/     Import aus Hermes/OpenClaw (Config, Skills, Gedächtnis-Merge)
-  providers/     LLM-Gateway (LiteLLM) — Fallback-Ketten, Credential Pools, eigene Endpoints
+  providers/     LLM-Gateway (LiteLLM) — Fallback, Credential Pools, eigene Endpoints, Prompt-Cache
   interface/     konversationelle ChatSession (geteilt von Chat, TUI, Gateway)
-  tui/           Vollbild-Textual-App
-  server/        Messaging-Gateway + HTTP-Transport (Sitzungen pro Chat)
+  tui/  server/   Vollbild-Textual-App · Messaging-Gateway + HTTP-Transport
   eval/          Continuous-Evolution + EvoClaw-Stresstest + tägliche Szenarien
   cli/           der `chimera`-Befehl (CLI-first)
 ```
@@ -134,22 +142,16 @@ Siehe [docs/architecture.md](docs/architecture.md) für das vollständige Design
 
 | Meilenstein | Status |
 |---|---|
-| M0 — Grundlagen (Gateway, Config, CLI) | ✅ |
-| M1 — Tier 1 + Tools/Skills/Integrationen/Crons/Migration | ✅ |
-| M2 — LLM-Fusion-Engine + kostenbewusster Router | ✅ |
-| M3 — Tier 2 autonom (Verify-or-Revert) | ✅ |
-| M4 — Selbstevolution (Gedächtnis, Skills, gelernte Crons, Benchmark) | ✅ |
-| M5 — Governance-Kernel | ✅ |
-| M6 — Tier 3 Multi-Agenten-Teams | ✅ |
-| M7 — Tier 4 selbstevolvierendes Ökosystem | ✅ |
+| M0–M7 — Tiers 1–4 + Fusion + Selbstevolution + Governance | ✅ |
 | M8 — Schnittstellen (Chat/TUI/Gateway), EvoClaw-Stresstest, opt-in Modell-Evolution | ✅ |
-| Anbieter-Schicht — self-hosted Endpoints, Fallback-Ketten, Credential Pools, `/model` | ✅ |
-| Funktionen — Vision, Deliverable-Modus, Pets + voreingestellte Fähigkeits-Slots | ✅ |
+| Anbieter-Schicht — self-hosted Endpoints, Fallback, Credential Pools, `/model`, Prompt-Cache | ✅ |
+| Geschlossene Verhaltensschleife — Erfahrung→Planner, Auto-Gedächtnis, Auto-Skill (governt) | ✅ |
+| Operative Orchestrierung — Kanban + Worker-Lanes, SDLC-Crew, Loop-DSL | ✅ |
+| Ausführungsisolation — Docker-Sandbox + git worktrees | ✅ |
+| Paper-Techniken — HORIZON · VIBEMed · Spec Growth · AgentTrust v2 · AutoMegaKernel · Meta-Agent · MOC | ✅ |
 
-Nach M7 wurde der Agent gegen reale Anbieter-Modelle gehärtet (live getestet: Fusion, Tier-2-`solve`,
-die tägliche Szenario-Suite, das HTTP-Gateway, der OpenAPI-Importer und der stdio-MCP-Client).
-Als Nächstes: tiefere Continuous-Evolution-Validierung im großen Maßstab, mehr Anbieter-Integrationen
-(OAuth-Logins, Credential-Pool-Tuning) und ein optionales LangGraph-Durability-Backend.
+Als Nächstes: tiefere Continuous-Evolution-Validierung im großen Maßstab, Anbieter-OAuth-Logins und ein
+optionales LangGraph-Durability-Backend. Modell-Training (LoRA/DPO) bleibt extern/opt-in by design.
 
 ## Entwicklung
 
