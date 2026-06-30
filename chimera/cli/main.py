@@ -15,7 +15,9 @@ Commands:
 
 from __future__ import annotations
 
+import contextlib
 import platform
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -30,6 +32,23 @@ from chimera.config import get_settings
 if TYPE_CHECKING:
     from chimera.memory import MemoryManager
     from chimera.scheduler import CronStore
+
+
+def _force_utf8_streams() -> None:
+    """Make stdout/stderr UTF-8 so model output never crashes a legacy console.
+
+    Windows terminals default to cp1252, which raises UnicodeEncodeError on
+    common model output (em dashes, non-breaking hyphens, emoji). Reconfiguring
+    to UTF-8 with a safe error handler keeps the CLI robust everywhere.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            with contextlib.suppress(ValueError, OSError):  # detached/odd streams
+                reconfigure(encoding="utf-8", errors="backslashreplace")
+
+
+_force_utf8_streams()
 
 app = typer.Typer(
     name="chimera",
