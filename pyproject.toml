@@ -54,8 +54,10 @@ dev = [
 chimera = "chimera.cli.main:app"
 
 [project.urls]
-Homepage = "https://github.com/brcampidelli/chimera"
-Repository = "https://github.com/brcampidelli/chimera"
+Homepage = "https://github.com/brcampidelli/chimera-agent"
+Repository = "https://github.com/brcampidelli/chimera-agent"
+Issues = "https://github.com/brcampidelli/chimera-agent/issues"
+Changelog = "https://github.com/brcampidelli/chimera-agent/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["chimera"]
