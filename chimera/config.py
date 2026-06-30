@@ -39,6 +39,16 @@ class Settings(BaseSettings):
     gemini_api_key: str | None = Field(default=None, validation_alias="GEMINI_API_KEY")
     deepseek_api_key: str | None = Field(default=None, validation_alias="DEEPSEEK_API_KEY")
 
+    # --- Optional feature credentials (pre-set slots; set only what you use) ---
+    tavily_api_key: str | None = Field(default=None, validation_alias="TAVILY_API_KEY")
+    brave_api_key: str | None = Field(default=None, validation_alias="BRAVE_API_KEY")
+    serpapi_key: str | None = Field(default=None, validation_alias="SERPAPI_API_KEY")
+    x_bearer_token: str | None = Field(default=None, validation_alias="X_BEARER_TOKEN")
+    stability_api_key: str | None = Field(default=None, validation_alias="STABILITY_API_KEY")
+    elevenlabs_api_key: str | None = Field(default=None, validation_alias="ELEVENLABS_API_KEY")
+    spotify_client_id: str | None = Field(default=None, validation_alias="SPOTIFY_CLIENT_ID")
+    spotify_client_secret: str | None = Field(default=None, validation_alias="SPOTIFY_CLIENT_SECRET")
+
     # --- Default single model (Tier 1 / cheap tasks) ---
     default_model: str = Field(
         default="openrouter/openai/gpt-5.5", validation_alias="CHIMERA_DEFAULT_MODEL"
@@ -78,6 +88,24 @@ class Settings(BaseSettings):
 
     def has_any_key(self) -> bool:
         return bool(self.configured_providers())
+
+    def credentials(self) -> dict[str, str | None]:
+        """All known credential slots keyed by env-var name (value or None)."""
+        return {
+            "OPENROUTER_API_KEY": self.openrouter_api_key,
+            "OPENAI_API_KEY": self.openai_api_key,
+            "ANTHROPIC_API_KEY": self.anthropic_api_key,
+            "GEMINI_API_KEY": self.gemini_api_key,
+            "DEEPSEEK_API_KEY": self.deepseek_api_key,
+            "TAVILY_API_KEY": self.tavily_api_key,
+            "BRAVE_API_KEY": self.brave_api_key,
+            "SERPAPI_API_KEY": self.serpapi_key,
+            "X_BEARER_TOKEN": self.x_bearer_token,
+            "STABILITY_API_KEY": self.stability_api_key,
+            "ELEVENLABS_API_KEY": self.elevenlabs_api_key,
+            "SPOTIFY_CLIENT_ID": self.spotify_client_id,
+            "SPOTIFY_CLIENT_SECRET": self.spotify_client_secret,
+        }
 
 
 @lru_cache(maxsize=1)

@@ -120,6 +120,21 @@ def models() -> None:
 
 
 @app.command()
+def features() -> None:
+    """Show optional capabilities and what each needs (a key or a dependency)."""
+    from chimera.features import feature_status
+
+    table = Table(title="Optional features", show_header=True, header_style="bold")
+    table.add_column("feature")
+    table.add_column("status")
+    table.add_column("how to enable / use")
+    for status in feature_status():
+        state = "[green]ready[/green]" if status.ready else f"[yellow]{status.blocker}[/yellow]"
+        table.add_row(status.feature.name, state, status.feature.how)
+    console.print(table)
+
+
+@app.command()
 def guard(action: str = typer.Argument(..., help="The action/command to evaluate.")) -> None:
     """Show the governance verdict (allow/warn/review/block) for an action."""
     from chimera.governance import TrustKernel

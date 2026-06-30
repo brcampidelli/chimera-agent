@@ -43,4 +43,12 @@ def default_registry(workspace: Path | None = None) -> ToolRegistry:
     registry.register(ListDirTool(workspace))
     registry.register(RunShellTool(workspace))
     registry.register(HttpGetTool())
+
+    # Key-gated optional tools light up when their credential is set.
+    from chimera.config import get_settings
+
+    if get_settings().tavily_api_key:
+        from chimera.tools.web import WebSearchTool
+
+        registry.register(WebSearchTool())
     return registry

@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   higher quality. Verified live.
 - **Pet / companion** (`chimera pet`): a persistent virtual companion with stats
   that decay over time (feed/play/rest); deterministic logic, no key needed.
+- **Optional-features presets** (`chimera features`): pre-set credential slots
+  (Tavily/Brave/Serp, X, Stability, ElevenLabs, Spotify) + a live readiness
+  checklist showing which capabilities are on and what each needs (a key or a
+  dependency). Reference `web_search` tool (Tavily) auto-registers when
+  `TAVILY_API_KEY` is set — the template for the rest (others also plug in via
+  MCP / OpenAPI->tool).
 
 - **M8 — Interfaces (in progress)**: a shared conversational `ChatSession` core
   (multi-turn, memory-aware) and an interactive `chimera chat` REPL — the

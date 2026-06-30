@@ -65,7 +65,7 @@ uv run chimera doctor       # check your environment
 ## Commands
 
 ```bash
-chimera doctor / models               # status & configuration
+chimera doctor / models / features    # status, configuration, optional capabilities
 chimera chat                          # interactive multi-turn assistant (your right-hand)
 chimera tui                           # full-screen terminal app (Textual)
 chimera serve                         # messaging gateway HTTP server (per-chat sessions)

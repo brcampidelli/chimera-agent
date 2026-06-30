@@ -51,7 +51,15 @@ Check everything is wired up:
 ```bash
 uv run chimera doctor    # shows version, default model, configured providers
 uv run chimera models    # shows the fusion panel / judge / synthesizer
+uv run chimera features  # optional capabilities + what each needs (key/dep)
 ```
+
+**Optional features.** Vision, Deliverable Mode and the Pet are built in. The rest
+(web search, X search, image generation, TTS/voice, Spotify, browser) are pre-set
+slots: fill the matching credential in `.env` (or install the dependency) and the
+capability activates. `chimera features` is the live checklist. The `web_search`
+tool (Tavily) auto-registers the moment `TAVILY_API_KEY` is set — and is the
+template for adding the others (or use the MCP client / OpenAPI->tool importer).
 
 > **Free vs paid models.** OpenRouter `:free` models cost nothing but are
 > rate-limited upstream — fine for a quick `run`, flaky for multi-call commands
