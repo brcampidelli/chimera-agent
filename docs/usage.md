@@ -203,6 +203,15 @@ Useful flags:
 | `--fuse` | produce the **plan** via fusion (deep reasoning) |
 | `--guard` | gate every tool call through the governance kernel |
 | `--no-plan` / `--no-manager` | skip the planning / review stage |
+| `--no-remember` | don't auto-write a memory fact on success |
+| `--no-evolve-skills` | don't auto-propose a learned skill when a task recurs |
+
+**`solve` learns across runs.** Each run feeds a closed behavioural loop, all gated by
+verify-or-revert so only verified work has any effect: (1) relevant **lessons** from
+past attempts (failures favoured) are folded into the plan/prompt; (2) on a verified
+success a deduped **memory** fact is written (recalled later by `chat`/`crew`); and
+(3) when a task pattern recurs (≥ 2 prior successes), a reusable **skill** is proposed
+and kept only if it passes governance validation and an executable smoke test.
 
 ### `crew` — Tier-3 multi-agent
 

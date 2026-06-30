@@ -49,6 +49,12 @@ class SupportsRemember(Protocol):
     def remember(self, content: str, *, key: str | None = None) -> object: ...
 
 
+class SupportsAutoEvolve(Protocol):
+    """Turns a recurring success into a learned skill (an AutoSkillEvolver)."""
+
+    def maybe_evolve(self, task: str, solution: str, prior_successes: int) -> object: ...
+
+
 @dataclass
 class AutonomousConfig:
     max_attempts: int = 3
@@ -90,6 +96,7 @@ class AutonomousAgent:
         experience: ExperienceBuffer | None = None,
         trajectories: TrajectoryCollector | None = None,
         memory: SupportsRemember | None = None,
+        auto_evolver: SupportsAutoEvolve | None = None,
         spine_workspace: Path | None = None,
         config: AutonomousConfig | None = None,
     ) -> None:
@@ -101,6 +108,7 @@ class AutonomousAgent:
         self.experience = experience
         self.trajectories = trajectories
         self.memory = memory
+        self.auto_evolver = auto_evolver
         self.spine_workspace = spine_workspace
         self.config = config or AutonomousConfig()
 
@@ -112,6 +120,9 @@ class AutonomousAgent:
         # decides success, so a misleading lesson can't corrupt the workspace.
         lessons = self._recall_lessons(task)
         context = "\n\n".join(part for part in (spine, lessons) if part)
+        # how many times this task pattern has already succeeded (before this run) —
+        # the recurrence signal that gates auto-skill-evolution
+        prior_successes = self._count_prior_successes(task)
         plan = (
             self.planner.plan(task, context=context)
             if self.planner and self.config.use_planner
@@ -155,6 +166,8 @@ class AutonomousAgent:
             if ok:
                 _log.debug("task succeeded on attempt %d", index)
                 self._remember_success(task, answer)
+                if self.auto_evolver is not None:
+                    self.auto_evolver.maybe_evolve(task, answer, prior_successes)
                 return AutonomousResult(answer=answer, success=True, attempts=attempts, plan=plan)
 
             feedback = fb or (
@@ -168,6 +181,11 @@ class AutonomousAgent:
         if self.experience is None:
             return ""
         return format_lessons(self.experience.relevant(task))
+
+    def _count_prior_successes(self, task: str) -> int:
+        if self.experience is None:
+            return 0
+        return sum(1 for exp in self.experience.relevant(task, k=25) if exp.outcome == "success")
 
     def _remember_success(self, task: str, answer: str) -> None:
         """On a verified success, curate one deduped long-term memory fact.

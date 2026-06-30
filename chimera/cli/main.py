@@ -437,6 +437,9 @@ def solve(
     no_remember: bool = typer.Option(
         False, "--no-remember", help="Don't auto-write a long-term memory fact on success."
     ),
+    no_evolve_skills: bool = typer.Option(
+        False, "--no-evolve-skills", help="Don't auto-propose a learned skill when a task recurs."
+    ),
 ) -> None:
     """Tier-2: autonomously solve a task with plan + verify-or-revert. Requires a key."""
     from chimera.core import (
@@ -450,7 +453,8 @@ def solve(
     )
     from chimera.core.verify import CommandVerifier
     from chimera.ecosystem import TrajectoryCollector
-    from chimera.evolution import ExperienceBuffer
+    from chimera.evolution import AutoSkillEvolver, ExperienceBuffer, SkillEvolver, SkillStore
+    from chimera.governance.validator import SkillValidator
     from chimera.providers import LLMGateway, MissingCredentialsError, SupportsComplete
     from chimera.tools import default_registry
 
@@ -488,6 +492,15 @@ def solve(
         experience=ExperienceBuffer(settings.home / "experience.json"),
         trajectories=TrajectoryCollector(settings.home / "trajectories.jsonl") if collect else None,
         memory=None if no_remember else _memory_manager(),
+        auto_evolver=(
+            None
+            if no_evolve_skills
+            else AutoSkillEvolver(
+                SkillEvolver(gateway, model),
+                SkillStore(settings.home / "skills.json"),
+                validator=SkillValidator(),
+            )
+        ),
         spine_workspace=workspace_path,
         config=AutonomousConfig(
             max_attempts=max_attempts, use_planner=not no_plan, use_manager=not no_manager

@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   so re-solving UPDATEs the entry rather than bloating memory). Only verified
   successes are written — the verify-or-revert gate keeps failed/unverified work out
   of memory; `--no-remember` opts out. Later `chat`/`crew` recall then surfaces it.
+- **Behavioural learning loop (3/3) — auto-evolve skills on recurrence**: when a task
+  pattern recurs (≥ 2 prior verified successes), a verified-successful `solve` proposes
+  a reusable `LearnedSkill` and keeps it only if it clears two gates — the
+  `SkillValidator` (governance) and an executable smoke test (the skill must run and
+  produce output). Stored deduped by name; `--no-evolve-skills` opts out. Verified
+  live: solving the same task three times produced a validated, stored skill on the
+  third run. **This closes the cross-task behavioural learning loop** (within-task
+  verify-or-revert was already closed).
 
 ### Fixed
 - **MCP stdio client teardown**: the live session now opens and closes the stdio

@@ -237,6 +237,44 @@ def test_does_not_remember_on_failure(tmp_path: Path) -> None:
     assert mem.saved == []  # verify-or-revert gate: unverified work is never memorised
 
 
+class RecordingEvolver:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str, int]] = []
+
+    def maybe_evolve(self, task: str, solution: str, prior_successes: int) -> object:
+        self.calls.append((task, solution, prior_successes))
+        return None
+
+
+def test_auto_evolver_fired_on_success_with_recurrence_count(tmp_path: Path) -> None:
+    buf = ExperienceBuffer(tmp_path / "exp.json")
+    buf.record("build the weekly report", "success", "")
+    buf.record("build the weekly report", "success", "")  # 2 prior successes
+    evolver = RecordingEvolver()
+    auto = AutonomousAgent(
+        FakeWorker("ok"),
+        experience=buf,
+        auto_evolver=evolver,
+        config=AutonomousConfig(use_planner=False),
+    )
+    auto.run("build the weekly report")
+    assert len(evolver.calls) == 1
+    assert evolver.calls[0][2] == 2  # prior successes counted before this run recorded its own
+
+
+def test_auto_evolver_not_fired_on_failure(tmp_path: Path) -> None:
+    evolver = RecordingEvolver()
+    auto = AutonomousAgent(
+        FakeWorker(workspace=tmp_path, filename="x.txt"),
+        verifier=FailVerifier(),
+        guard=WorkspaceGuard(tmp_path),
+        auto_evolver=evolver,
+        config=AutonomousConfig(max_attempts=1, use_planner=False),
+    )
+    assert auto.run("do X").success is False
+    assert evolver.calls == []  # no skill evolution from unverified work
+
+
 def test_plan_is_attached() -> None:
     auto = AutonomousAgent(
         FakeWorker(),
