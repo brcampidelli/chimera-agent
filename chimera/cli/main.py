@@ -441,6 +441,9 @@ def solve(
     no_evolve_skills: bool = typer.Option(
         False, "--no-evolve-skills", help="Don't auto-propose a learned skill when a task recurs."
     ),
+    isolate: bool = typer.Option(
+        False, "--isolate", help="Run in an isolated git worktree; changes copied back only on success."
+    ),
 ) -> None:
     """Tier-2: autonomously solve a task with plan + verify-or-revert. Requires a key."""
     from chimera.core import (
@@ -452,6 +455,7 @@ def solve(
         Planner,
         WorkspaceGuard,
     )
+    from chimera.core.autonomous import AutonomousResult
     from chimera.core.verify import CommandVerifier
     from chimera.ecosystem import TrajectoryCollector
     from chimera.evolution import AutoSkillEvolver, ExperienceBuffer, SkillEvolver, SkillStore
@@ -478,38 +482,47 @@ def solve(
         # router: single-model for tool turns, fusion only for tool-free reasoning).
         planner_backend = engine
 
-    registry = default_registry(workspace_path)
-    if guard:
-        from chimera.governance import AuditLog, TrustKernel, govern_registry
+    def _run_solve(ws: Path) -> AutonomousResult:
+        registry = default_registry(ws)
+        if guard:
+            from chimera.governance import AuditLog, TrustKernel, govern_registry
 
-        registry = govern_registry(registry, TrustKernel(audit=AuditLog(settings.home / "audit.jsonl")))
-    worker = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
-    auto = AutonomousAgent(
-        worker,
-        planner=None if no_plan else Planner(planner_backend, model),
-        manager=None if no_manager else Manager(gateway, model),
-        verifier=CommandVerifier(verify, workspace_path) if verify else None,
-        guard=WorkspaceGuard(workspace_path),
-        experience=ExperienceBuffer(settings.home / "experience.json"),
-        trajectories=TrajectoryCollector(settings.home / "trajectories.jsonl") if collect else None,
-        memory=None if no_remember else _memory_manager(),
-        auto_evolver=(
-            None
-            if no_evolve_skills
-            else AutoSkillEvolver(
-                SkillEvolver(gateway, model),
-                SkillStore(settings.home / "skills.json"),
-                validator=SkillValidator(),
+            registry = govern_registry(
+                registry, TrustKernel(audit=AuditLog(settings.home / "audit.jsonl"))
             )
-        ),
-        spine_workspace=workspace_path,
-        config=AutonomousConfig(
-            max_attempts=max_attempts, use_planner=not no_plan, use_manager=not no_manager
-        ),
-    )
+        worker = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
+        auto = AutonomousAgent(
+            worker,
+            planner=None if no_plan else Planner(planner_backend, model),
+            manager=None if no_manager else Manager(gateway, model),
+            verifier=CommandVerifier(verify, ws) if verify else None,
+            guard=WorkspaceGuard(ws),
+            experience=ExperienceBuffer(settings.home / "experience.json"),
+            trajectories=TrajectoryCollector(settings.home / "trajectories.jsonl") if collect else None,
+            memory=None if no_remember else _memory_manager(),
+            auto_evolver=(
+                None
+                if no_evolve_skills
+                else AutoSkillEvolver(
+                    SkillEvolver(gateway, model),
+                    SkillStore(settings.home / "skills.json"),
+                    validator=SkillValidator(),
+                )
+            ),
+            spine_workspace=ws,
+            config=AutonomousConfig(
+                max_attempts=max_attempts, use_planner=not no_plan, use_manager=not no_manager
+            ),
+        )
+        return auto.run(task)
 
     try:
-        result = auto.run(task)
+        if isolate:
+            from chimera.core.worktree import run_in_worktree
+
+            result = run_in_worktree(workspace_path, _run_solve, succeeded=lambda r: r.success)
+        else:
+            result = _run_solve(workspace_path)
     except MissingCredentialsError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc

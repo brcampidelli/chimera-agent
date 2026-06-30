@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Git-worktree isolation** (`chimera solve --isolate`, HORIZON-style): when the
+  workspace is a git repo, the run executes in a throwaway worktree on its own branch
+  — the agent's edits never touch the main checkout until they're verified, then only
+  the files it actually changed are copied back (on success) or discarded (on failure).
+  A no-op outside a git repo. Verified live (built a file in isolation, copied back on
+  success, worktree removed).
 - **Loop Engineering — declarative workflows** (`chimera workflow <file>`): author an
   autonomous loop as YAML — an ordered list of steps that `use` the agent stack
   (`run` / `shell` / `solve` / `crew` / `lifecycle`), gate on the previous step

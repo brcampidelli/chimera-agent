@@ -205,6 +205,7 @@ Useful flags:
 | `--no-plan` / `--no-manager` | skip the planning / review stage |
 | `--no-remember` | don't auto-write a memory fact on success |
 | `--no-evolve-skills` | don't auto-propose a learned skill when a task recurs |
+| `--isolate` | run in a throwaway git worktree; changed files copied back only on success |
 
 **`solve` learns across runs.** Each run feeds a closed behavioural loop, all gated by
 verify-or-revert so only verified work has any effect: (1) relevant **lessons** from
