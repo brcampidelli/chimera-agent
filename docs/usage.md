@@ -267,6 +267,16 @@ Then, on a GPU (or Colab): `pip install chimera-agent[train]` (or the recipe's
 `requirements.txt`) and `python recipe/train.py`. Point `CHIMERA_DEFAULT_MODEL`
 at the base model + adapter when serving.
 
+### `pet` — a virtual companion
+
+A persistent little companion whose stats drift while you're away. No key needed.
+
+```bash
+chimera pet new --name Chimi      # adopt one
+chimera pet status                # check in (fullness / happiness / energy / mood)
+chimera pet feed | play | rest    # interact
+```
+
 ---
 
 ## Tips

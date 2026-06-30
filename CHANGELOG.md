@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Deliverable Mode** (`chimera deliver`): produce a polished, self-contained
   artifact (report/plan/spec, md/txt/html) and write it to a file; `--fuse` for
   higher quality. Verified live.
+- **Pet / companion** (`chimera pet`): a persistent virtual companion with stats
+  that decay over time (feed/play/rest); deterministic logic, no key needed.
 
 - **M8 — Interfaces (in progress)**: a shared conversational `ChatSession` core
   (multi-turn, memory-aware) and an interactive `chimera chat` REPL — the
