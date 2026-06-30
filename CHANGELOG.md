@@ -6,7 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-The initial build plan (M0–M7) is complete. Highlights, by milestone:
+## [0.1.0] - 2026-06-30
+
+First tagged release. The initial build plan (M0–M7) is complete, then hardened
+against real provider models. Highlights, by milestone:
 
 ### Added
 - **M0 — Foundations**: package scaffold, provider-agnostic LLM gateway (LiteLLM),
@@ -29,5 +32,17 @@ The initial build plan (M0–M7) is complete. Highlights, by milestone:
   hidden-test reward-hack detection, change-tempo governance, trajectory collection
   (SFT/DPO export) seeding opt-in model evolution.
 
+### Hardened (post-M7, validated against real OpenRouter models)
+- **Tier-2 correctness**: the executable verifier is now authoritative — a strict
+  Manager can no longer veto and revert work that already passed verification
+  (a data-loss bug found only under live testing). Manager verdict parsing also
+  tolerates markdown/preamble.
+- **`solve --fuse`** now routes the *plan* through the fusion engine (deep,
+  tool-free reasoning); previously the flag was effectively a no-op.
+- **Stateful chained benchmark** (`bench --chain`) measuring error propagation.
+- **Windows**: CLI forces UTF-8 output so model text never crashes a cp1252 console.
+- **Hermetic tests** (no accidental network) + an opt-in live integration smoke test.
+
 ### Quality
-- 158 tests · `mypy --strict` clean · `ruff` clean · CI across Python 3.11/3.12.
+- 166 tests · `mypy --strict` clean · `ruff` clean · CI across Python 3.11/3.12 +
+  opt-in live integration job. Usage guide in `docs/usage.md`.
