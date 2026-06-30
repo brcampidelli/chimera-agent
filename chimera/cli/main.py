@@ -32,6 +32,7 @@ from chimera.config import get_settings
 
 if TYPE_CHECKING:
     from chimera.ecosystem import TrajectoryCollector
+    from chimera.kanban import KanbanBoard
     from chimera.memory import MemoryManager
     from chimera.pet import Pet, PetStore
     from chimera.scheduler import CronStore
@@ -722,6 +723,96 @@ def cron_learn(
         else:
             console.print(f"  [dim]skipped[/dim] {proposal.name}")
     console.print(f"created {created} cron(s) of {len(proposals)} proposed.")
+
+
+# --- kanban subcommands -------------------------------------------------------
+
+kanban_app = typer.Typer(help="Task board with worker lanes (backlog/doing/review/done).", no_args_is_help=True)
+app.add_typer(kanban_app, name="kanban")
+
+
+def _board() -> KanbanBoard:
+    from chimera.kanban import KanbanBoard
+
+    return KanbanBoard(get_settings().home / "kanban.json")
+
+
+@kanban_app.command("add")
+def kanban_add(
+    title: str = typer.Argument(..., help="Short card title."),
+    action: str = typer.Option(None, "--action", "-a", help="Task text to run (defaults to title)."),
+    lane: str = typer.Option("solve", "--lane", "-l", help="Worker lane: solve | crew."),
+    verify: str = typer.Option(None, "--verify", help="Verify command for the solve lane (exit 0)."),
+) -> None:
+    """Add a card to the backlog."""
+    card = _board().add(title, action or title, lane=lane, verify=verify)
+    console.print(f"added [cyan]{card.id}[/cyan] to backlog (lane {card.lane})")
+
+
+@kanban_app.command("board")
+def kanban_board() -> None:
+    """Show the board, column by column."""
+    from chimera.kanban import COLUMNS
+
+    board = _board()
+    for column in COLUMNS:
+        cards = board.cards(column)
+        console.print(f"[bold]{column}[/bold] ([cyan]{len(cards)}[/cyan])")
+        for card in cards:
+            mark = "" if card.success is None else (" [green]✓[/green]" if card.success else " [red]✗[/red]")
+            console.print(f"  [cyan]{card.id}[/cyan] [{card.lane}] {card.title}{mark}")
+
+
+@kanban_app.command("move")
+def kanban_move(
+    card_id: str = typer.Argument(..., help="Card id."),
+    column: str = typer.Argument(..., help="backlog | doing | review | done."),
+) -> None:
+    """Move a card to another column."""
+    from chimera.kanban import COLUMNS
+
+    if column not in COLUMNS:
+        console.print(f"[red]invalid column '{column}' (use {', '.join(COLUMNS)})[/red]")
+        raise typer.Exit(code=1)
+    board = _board()
+    if board.get(card_id) is None:
+        console.print(f"[red]no card {card_id}[/red]")
+        raise typer.Exit(code=1)
+    board.move(card_id, column)  # type: ignore[arg-type]
+    console.print(f"moved [cyan]{card_id}[/cyan] -> {column}")
+
+
+@kanban_app.command("rm")
+def kanban_rm(card_id: str = typer.Argument(..., help="Card id.")) -> None:
+    """Remove a card."""
+    console.print(f"removed [cyan]{card_id}[/cyan]" if _board().remove(card_id) else "[dim]no such card[/dim]")
+
+
+@kanban_app.command("run")
+def kanban_run(
+    limit: int = typer.Option(None, "--limit", "-n", help="Max backlog cards to dispatch."),
+    workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace for the solve lane."),
+    model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
+) -> None:
+    """Dispatch backlog cards through their lanes (solve/crew). Requires a key."""
+    from chimera.kanban import LaneRunner, dispatch
+    from chimera.kanban.lanes import CrewLane, SolveLane
+
+    if not get_settings().has_any_key():
+        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+        raise typer.Exit(code=1)
+    board = _board()
+    runners: dict[str, LaneRunner] = {
+        "solve": SolveLane(workspace=Path(workspace), model=model),
+        "crew": CrewLane(model=model),
+    }
+    outcomes = dispatch(board, runners, limit=limit)
+    if not outcomes:
+        console.print("[dim]nothing in backlog to run[/dim]")
+        return
+    for outcome in outcomes:
+        tag = "[green]done[/green]" if outcome.success else "[yellow]review[/yellow]"
+        console.print(f"  [cyan]{outcome.card_id}[/cyan] [{outcome.lane}] -> {tag}")
 
 
 # --- memory subcommands -------------------------------------------------------

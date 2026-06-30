@@ -179,6 +179,25 @@ def test_cron_learn_empty_history(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
         get_settings.cache_clear()
 
 
+def test_kanban_add_board_and_move(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    import re
+
+    _isolated_home(monkeypatch, tmp_path)
+    try:
+        added = runner.invoke(app, ["kanban", "add", "Fix the bug", "--lane", "solve"])
+        assert added.exit_code == 0 and "backlog" in added.stdout
+        card_id = re.search(r"added (\w+)", added.stdout).group(1)  # type: ignore[union-attr]
+
+        board = runner.invoke(app, ["kanban", "board"])
+        assert "Fix the bug" in board.stdout
+
+        moved = runner.invoke(app, ["kanban", "move", card_id, "doing"])
+        assert moved.exit_code == 0
+        assert runner.invoke(app, ["kanban", "move", card_id, "nonsense"]).exit_code == 1
+    finally:
+        get_settings.cache_clear()
+
+
 def test_cron_learn_creates_confirmed_jobs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _isolated_home(monkeypatch, tmp_path)
     try:

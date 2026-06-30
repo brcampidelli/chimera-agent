@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Kanban board + worker lanes** (`chimera kanban`): a JSON-backed task board
+  (backlog → doing → review → done) where each card names a worker *lane* that
+  dispatches it to the agent stack — `solve` (Tier-2 autonomous, verify-or-revert) or
+  `crew` (Tier-3 role pipeline). `kanban add/board/move/rm` manage cards; `kanban run`
+  pulls backlog cards through their lanes (success → done, failure → review). The
+  operational-orchestration surface — the loop the agent already runs, made visible
+  and queued. Verified live (a solve card and a crew card dispatched to done).
 - **Behavioural learning loop (1/3) — experience → planner**: `solve` now recalls the
   most relevant prior experiences (`ExperienceBuffer.relevant`, by task-token overlap,
   failures favoured) and folds them as a "lessons" block into the planner and worker

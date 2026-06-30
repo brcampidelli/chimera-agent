@@ -265,6 +265,23 @@ uv run chimera cron add daily-report "0 9 * * *" "generate the daily report"
 uv run chimera cron list
 ```
 
+### `kanban` — task board with worker lanes
+
+A board (`backlog → doing → review → done`) where each card names a *lane* that
+dispatches it to the agent stack: `solve` (Tier-2 autonomous, verify-or-revert) or
+`crew` (Tier-3 role pipeline). The operational view of the loop the agent already runs.
+
+```bash
+uv run chimera kanban add "Fix the flaky test" -a "make test_login deterministic" \
+  --lane solve --verify "pytest -q tests/test_login.py"
+uv run chimera kanban add "Compare REST vs gRPC" --lane crew
+uv run chimera kanban board                 # show the columns
+uv run chimera kanban run -w ./scratch      # dispatch backlog cards through their lanes
+uv run chimera kanban move <id> done        # manual move
+```
+
+`run` walks each card backlog → doing → done (success) or → review (needs attention).
+
 ### `migrate` — import from another agent
 
 Brings **config + skills** from Hermes or OpenClaw, and with `--apply` also
