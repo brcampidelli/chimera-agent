@@ -291,9 +291,12 @@ uv run chimera kanban add "Compare REST vs gRPC" --lane crew
 uv run chimera kanban board                 # show the columns
 uv run chimera kanban run -w ./scratch      # dispatch backlog cards through their lanes
 uv run chimera kanban move <id> done        # manual move
+uv run chimera kanban learn --min 3 --yes   # recurring tasks (experience) -> cards
 ```
 
 `run` walks each card backlog → doing → done (success) or → review (needs attention).
+`learn` reuses the cron-learner's recurrence detector to queue tasks the agent
+repeats (deduped against the board) — schedule it to auto-fill the backlog.
 
 ### `workflow` — designed loops (Loop Engineering)
 

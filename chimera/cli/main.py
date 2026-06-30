@@ -815,6 +815,42 @@ def kanban_run(
         console.print(f"  [cyan]{outcome.card_id}[/cyan] [{outcome.lane}] -> {tag}")
 
 
+@kanban_app.command("learn")
+def kanban_learn(
+    min_occurrences: int = typer.Option(3, "--min", help="Min repeats to turn into a card."),
+    lane: str = typer.Option("solve", "--lane", "-l", help="Lane for the created cards."),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Add every card without prompting."),
+) -> None:
+    """Turn recurring tasks (from the experience buffer) into backlog cards.
+
+    Uses the cron-learner's recurrence detector; each card is confirmed (or --yes), and
+    a task already on the board is skipped — so re-running is safe.
+    """
+    from chimera.evolution import ExperienceBuffer
+    from chimera.scheduler import CronLearner
+
+    history = [e.task for e in ExperienceBuffer(get_settings().home / "experience.json").all()]
+    proposals = CronLearner(min_occurrences=min_occurrences).analyze(history)
+    if not proposals:
+        console.print("[dim]no recurring tasks found in history[/dim]")
+        return
+
+    board = _board()
+    existing = {card.action for card in board.cards()}
+    created = 0
+    for proposal in proposals:
+        if proposal.action in existing:
+            console.print(f"[dim]skip {proposal.name} (already on the board)[/dim]")
+            continue
+        if yes or typer.confirm(
+            f"Add card '{proposal.name}' (seen {proposal.occurrences}x)?", default=False
+        ):
+            card = board.add(proposal.name, proposal.action, lane=lane)
+            created += 1
+            console.print(f"  [green]added[/green] {card.id} {proposal.name}")
+    console.print(f"added {created} card(s) of {len(proposals)} recurring task(s).")
+
+
 # --- memory subcommands -------------------------------------------------------
 
 memory_app = typer.Typer(help="Curated long-term memory.", no_args_is_help=True)

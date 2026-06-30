@@ -28,6 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   directly on the host. A `Sandbox` seam with `LocalSandbox`/`DockerSandbox`; the
   default stays `local`. Degrades gracefully to local when Docker is unavailable
   (verified live: the fallback ran the command and logged a warning).
+- **Kanban ↔ cron-learner — recurring tasks become cards** (`chimera kanban learn`):
+  reuses the cron-learner's recurrence detector over the experience buffer to create
+  backlog cards for tasks the agent repeats (per-card confirmation, `--yes`, deduped
+  against the board). Schedule it to auto-fill the backlog; then `kanban run` dispatches
+  the cards. Verified live (two recurring tasks queued, the one-off excluded).
 - **Kanban board + worker lanes** (`chimera kanban`): a JSON-backed task board
   (backlog → doing → review → done) where each card names a worker *lane* that
   dispatches it to the agent stack — `solve` (Tier-2 autonomous, verify-or-revert) or

@@ -198,6 +198,30 @@ def test_kanban_add_board_and_move(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
         get_settings.cache_clear()
 
 
+def test_kanban_learn_turns_recurring_tasks_into_cards(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _isolated_home(monkeypatch, tmp_path)
+    try:
+        from chimera.evolution import ExperienceBuffer
+
+        buf = ExperienceBuffer(tmp_path / "chimera_home" / "experience.json")
+        for _ in range(3):
+            buf.record("rotate the access logs", "success")
+
+        learned = runner.invoke(app, ["kanban", "learn", "--min", "3", "--yes"])
+        assert learned.exit_code == 0
+        assert "added 1 card" in learned.stdout
+
+        board = runner.invoke(app, ["kanban", "board"])
+        assert "rotate-the-access" in board.stdout
+
+        again = runner.invoke(app, ["kanban", "learn", "--min", "3", "--yes"])
+        assert "added 0 card" in again.stdout  # dedup: already on the board
+    finally:
+        get_settings.cache_clear()
+
+
 def test_cron_learn_creates_confirmed_jobs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _isolated_home(monkeypatch, tmp_path)
     try:
