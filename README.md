@@ -48,14 +48,14 @@ bring security/sandboxing but don't evolve. **Chimera combines all four:**
 
 **Reasoning & autonomy**
 - **LLM-Fusion engine** — provider-agnostic panel of frontier + open models, a judge that surfaces consensus/contradictions/blind-spots, and a synthesizer; a **cost-aware router** fuses only when it pays (tool turns stay single-model).
-- **Tier-2 autonomy** — plan → execute → Manager review → **verify-or-revert** (workspace snapshot/restore + a command verifier), with **git-worktree isolation** (`solve --isolate`) so edits only land when verified.
+- **Tier-2 autonomy** — plan → execute → Manager review (optionally via a **cascade rubric**, `solve --rubric`) → **verify-or-revert** (workspace snapshot/restore + a command verifier), with **git-worktree isolation** (`solve --isolate`) so edits only land when verified.
 - **SDLC lifecycle crew** (`chimera lifecycle`) — a pre-assembled **plan → build → test → review** pipeline with verify-or-revert at the test stage.
 - **Multi-agent teams** — role specialization, sequential & supervisor crews, MOC message consolidation, shared memory, parallel review.
 
 **Self-evolution & governance**
-- **Closed behavioural loop** — past failures feed the planner (lessons), verified successes auto-write memory, and recurring tasks auto-evolve a validated, smoke-tested skill — all gated by verify-or-revert. Plus a continuous-evolution benchmark and an EvoClaw naive-vs-guarded stress test.
+- **Closed behavioural loop** — past failures feed the planner (lessons), verified successes auto-write memory, and recurring tasks auto-evolve a validated, smoke-tested skill (proposed across the fusion panel and kept by cross-model transferability when fusion is on) — all gated by verify-or-revert; a failed attempt is pinpointed to its first faulty step on the retry. Plus a continuous-evolution benchmark and an EvoClaw naive-vs-guarded stress test.
 - **Hierarchical memory** — working / episodic / semantic / persona **+ a graph layer** (`memory graph`) that recalls facts by entity, not only keyword.
-- **Opt-in model evolution** — `solve` collects trajectories; `evolve` curates SFT/DPO datasets and emits a runnable LoRA recipe. Training stays external/opt-in.
+- **Opt-in model evolution** — `solve` collects trajectories; `evolve` curates SFT/DPO datasets and emits a runnable LoRA recipe, and **`evolve tune`** self-optimizes the agent spec (meta-search, kept on non-regression) against the daily scenarios. Training stays external/opt-in.
 - **Governance kernel** — allow/warn/block/review (lexical rules + optional semantic judge, with rule distillation and a **guarded precedent store**), a static validator for the self-modification surface, an append-only audit log, governed tools, a **four-actor change model**, and a **spec↔code drift gate** (`chimera drift`).
 
 **Providers**
@@ -92,7 +92,7 @@ chimera serve                         # messaging gateway HTTP server (per-chat 
 chimera run "PROMPT" --image pic.png   # single-shot Tier-1 (vision-capable with --image)
 chimera deliver "a launch plan" -o plan.md   # Deliverable Mode: produce a polished artifact
 chimera fuse "PROMPT" --show-panel     # LLM-Fusion: panel -> judge -> synthesizer
-chimera solve "TASK" --verify "pytest -q" --isolate   # Tier-2: verify-or-revert, git-worktree isolated
+chimera solve "TASK" --verify "pytest -q" --rubric --isolate   # Tier-2: verify-or-revert (+ cascade-rubric review), git-worktree isolated
 chimera lifecycle "TASK" --verify "..."   # SDLC crew: plan -> build -> test -> review
 chimera workflow flow.yaml             # run a declarative loop (Loop Engineering)
 chimera crew "TASK" --mode supervisor  # Tier-3 multi-agent crew
@@ -103,7 +103,7 @@ chimera memory add / graph             # curated long-term memory + entity-relat
 chimera cron add / learn               # scheduled jobs (assigned + self-learned, confirmed)
 chimera bench                          # continuous-evolution benchmark
 chimera migrate hermes ~/.hermes --apply   # import config + skills + merge memory
-chimera evolve status / recipe         # opt-in model evolution: SFT/DPO data + LoRA recipe
+chimera evolve status / tune / recipe   # opt-in evolution: spec meta-search (tune), SFT/DPO data + LoRA recipe
 chimera pet new --name Chimi           # adopt a virtual companion
 ```
 

@@ -92,7 +92,7 @@ chimera serve                         # servidor HTTP del gateway de mensajería
 chimera run "PROMPT" --image pic.png   # Tier-1 de un disparo (con visión vía --image)
 chimera deliver "un plan" -o plan.md   # Modo Entregable: produce un artefacto pulido
 chimera fuse "PROMPT" --show-panel     # LLM-Fusion: panel -> juez -> sintetizador
-chimera solve "TAREA" --verify "pytest -q" --isolate   # Tier-2: verify-or-revert, aislado en git worktree
+chimera solve "TAREA" --verify "pytest -q" --rubric --isolate   # Tier-2: verify-or-revert (+ revisión por rúbrica), aislado en git worktree
 chimera lifecycle "TAREA" --verify "..."   # crew SDLC: plan -> build -> test -> review
 chimera workflow flow.yaml             # ejecuta un bucle declarativo (Loop Engineering)
 chimera crew "TAREA" --mode supervisor  # crew multiagente Tier-3
@@ -103,7 +103,7 @@ chimera memory add / graph             # memoria de largo plazo curada + grafo e
 chimera cron add / learn               # tareas programadas (asignadas + autoaprendidas, confirmadas)
 chimera bench                          # benchmark de evolución continua
 chimera migrate hermes ~/.hermes --apply   # importa config + skills + fusiona memoria
-chimera evolve status / recipe         # evolución de modelo opt-in: datos SFT/DPO + receta LoRA
+chimera evolve status / tune / recipe   # evolución opt-in: meta-búsqueda de spec (tune), datos SFT/DPO + receta LoRA
 chimera pet new --name Chimi           # adopta un compañero virtual
 ```
 

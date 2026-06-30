@@ -204,15 +204,18 @@ Useful flags:
 | `--fuse` | produce the **plan** via fusion (deep reasoning) |
 | `--guard` | gate every tool call through the governance kernel |
 | `--no-plan` / `--no-manager` | skip the planning / review stage |
+| `--rubric` | Manager judges via the **cascade rubric** (instruction-following → factuality → rationality) |
 | `--no-remember` | don't auto-write a memory fact on success |
 | `--no-evolve-skills` | don't auto-propose a learned skill when a task recurs |
 | `--isolate` | run in a throwaway git worktree; changed files copied back only on success |
 
 **`solve` learns across runs.** Each run feeds a closed behavioural loop, all gated by
 verify-or-revert so only verified work has any effect: (1) relevant **lessons** from
-past attempts (failures favoured) are folded into the plan/prompt; (2) on a verified
+past attempts (failures favoured) are folded into the plan/prompt, and a failed attempt's
+**first faulty step** is localized and fed into the retry; (2) on a verified
 success a deduped **memory** fact is written (recalled later by `chat`/`crew`); and
-(3) when a task pattern recurs (≥ 2 prior successes), a reusable **skill** is proposed
+(3) when a task pattern recurs (≥ 2 prior successes), a reusable **skill** is proposed —
+across the fusion panel and kept by cross-model **transferability** when `--fuse` is on —
 and kept only if it passes governance validation and an executable smoke test.
 
 ### `crew` — Tier-3 multi-agent
@@ -374,13 +377,21 @@ never happens automatically; Chimera prepares the data and a script and stops.
 
 ```bash
 chimera evolve status                          # is there enough signal to train?
-chimera evolve export --format sft --out d.jsonl   # curated SFT dataset (successes)
+chimera evolve export --format sft --out d.jsonl --min-steps 5 --diverse   # long-horizon, one example per task
 chimera evolve export --format dpo --out d.jsonl   # preference pairs (success vs failure)
 chimera evolve recipe --out ./recipe --format dpo  # train.py + README + requirements
+chimera evolve tune --rounds 2                  # self-optimize the agent spec (no weights changed)
 ```
 
-Then, on a GPU (or Colab): `pip install chimera-agent[train]` (or the recipe's
-`requirements.txt`) and `python recipe/train.py`. Point `CHIMERA_DEFAULT_MODEL`
+`export` accepts two recipe knobs: `--min-steps N` keeps only long-horizon traces and
+`--diverse` keeps at most one example per task (task diversity is the curation
+bottleneck). `evolve tune` is different from training — it runs a **meta-search** over the
+agent *spec* (model, system prompt, step budget, panel, memory depth), scoring each
+candidate on the daily scenarios and keeping an edit only on **non-regression**. It calls
+models but never changes weights, so it is safe to run anytime.
+
+Then, to actually train, on a GPU (or Colab): `pip install chimera-agent[train]` (or the
+recipe's `requirements.txt`) and `python recipe/train.py`. Point `CHIMERA_DEFAULT_MODEL`
 at the base model + adapter when serving.
 
 ### `pet` — a virtual companion

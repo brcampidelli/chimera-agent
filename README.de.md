@@ -93,7 +93,7 @@ chimera serve                         # Messaging-Gateway-HTTP-Server (Sitzungen
 chimera run "PROMPT" --image pic.png   # Tier-1 Single-Shot (mit Vision via --image)
 chimera deliver "ein Plan" -o plan.md   # Deliverable-Modus: erzeugt ein poliertes Artefakt
 chimera fuse "PROMPT" --show-panel     # LLM-Fusion: Panel -> Richter -> Synthesizer
-chimera solve "AUFGABE" --verify "pytest -q" --isolate   # Tier-2: Verify-or-Revert, git-worktree-isoliert
+chimera solve "AUFGABE" --verify "pytest -q" --rubric --isolate   # Tier-2: Verify-or-Revert (+ Kaskaden-Rubrik-Review), git-worktree-isoliert
 chimera lifecycle "AUFGABE" --verify "..."   # SDLC-Crew: Plan -> Build -> Test -> Review
 chimera workflow flow.yaml             # eine deklarative Schleife ausführen (Loop Engineering)
 chimera crew "AUFGABE" --mode supervisor  # Tier-3 Multi-Agenten-Crew
@@ -104,7 +104,7 @@ chimera memory add / graph             # kuratiertes Langzeitgedächtnis + Entit
 chimera cron add / learn               # geplante Jobs (zugewiesen + selbstgelernt, bestätigt)
 chimera bench                          # Continuous-Evolution-Benchmark
 chimera migrate hermes ~/.hermes --apply   # importiert Config + Skills + führt Gedächtnis zusammen
-chimera evolve status / recipe         # opt-in Modell-Evolution: SFT/DPO-Daten + LoRA-Rezept
+chimera evolve status / tune / recipe   # opt-in Evolution: Spec-Meta-Suche (tune), SFT/DPO-Daten + LoRA-Rezept
 chimera pet new --name Chimi           # adoptiere einen virtuellen Begleiter
 ```
 
