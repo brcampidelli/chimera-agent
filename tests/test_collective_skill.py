@@ -69,3 +69,33 @@ def test_evolve_collective_rejects_below_transfer_threshold() -> None:
         "task", "sol", test_input={"x": "t"}, check=lambda o: bool(o.strip()), min_transfer=0.5
     )
     assert out is None
+
+
+def test_auto_evolver_uses_collective_path(tmp_path: Any) -> None:
+    from chimera.evolution import AutoSkillEvolver, SkillEvolver, SkillStore
+
+    backend = ModelBackend({"m1": PROPOSAL_A, "m2": PROPOSAL_A})
+    store = SkillStore(tmp_path / "skills.json")
+    auto = AutoSkillEvolver(
+        SkillEvolver(backend),
+        store,
+        collective=CollectiveSkillEvolver(backend, ["m1", "m2"]),
+    )
+    kept = auto.maybe_evolve("task", "sol", prior_successes=2)
+    assert kept is not None and kept.name == "skill_a"
+    assert "skill_a" in store
+
+
+def test_auto_evolver_collective_rejects_untransferable(tmp_path: Any) -> None:
+    from chimera.evolution import AutoSkillEvolver, SkillEvolver, SkillStore
+
+    # propose succeeds but the skill produces empty output on every model -> not kept
+    backend = QueuedBackend({"m1": [PROPOSAL_A, ""], "m2": [PROPOSAL_A, ""]})
+    store = SkillStore(tmp_path / "skills.json")
+    auto = AutoSkillEvolver(
+        SkillEvolver(backend),
+        store,
+        collective=CollectiveSkillEvolver(backend, ["m1", "m2"]),
+    )
+    assert auto.maybe_evolve("task", "sol", prior_successes=2) is None
+    assert "skill_a" not in store

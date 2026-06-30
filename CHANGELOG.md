@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **Collective skill + step attribution are now wired into the autonomous loop.** The
+  auto-evolver proposes a recurring skill across the fusion panel and keeps the most
+  transferable one when `solve --fuse` runs with a ≥2-model panel (falls back to
+  single-model otherwise). And a failed `solve` attempt folds the SkillAdaptor
+  step-level diagnosis — the first failed tool step — into the retry feedback, so one
+  early error is pinpointed instead of diffusing across the next attempt.
+
 ### Added
 - **Collective skill evolution** (OpenClaw-Skill, 2606.16774): `CollectiveSkillEvolver`
   proposes a candidate skill from each model of the fusion panel and keeps the one that

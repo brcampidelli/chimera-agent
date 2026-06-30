@@ -176,6 +176,12 @@ class AutonomousAgent:
             feedback = fb or (
                 f"Verification failed:\n{vout}" if vout else "The attempt did not pass verification."
             )
+            # Step-level failure attribution (SkillAdaptor): if a tool step errored,
+            # point the retry at the FIRST faulty step instead of letting one early
+            # error diffuse across the whole next attempt.
+            hint = self._fault_hint(agent_result)
+            if hint:
+                feedback = f"{feedback}\n\n{hint}" if feedback else hint
 
         last = attempts[-1].answer if attempts else ""
         return AutonomousResult(answer=last, success=False, attempts=attempts, plan=plan)
@@ -214,6 +220,17 @@ class AutonomousAgent:
             return True, ""
         result = self.verifier.verify()
         return result.passed, result.output
+
+    @staticmethod
+    def _fault_hint(result: AgentResult) -> str:
+        """Localize the first failed tool step (SkillAdaptor) to sharpen the retry."""
+        from chimera.evolution.attribution import localize_fault
+
+        transcript = [msg for msg in result.transcript if isinstance(msg, dict)]
+        fault = localize_fault(transcript)
+        if fault is None:
+            return ""
+        return f"Step-level diagnosis — the first failing step was tool `{fault.tool}`: {fault.error[:200]}"
 
     @staticmethod
     def _compose(task: str, plan: Plan | None, context: str, feedback: str) -> str:

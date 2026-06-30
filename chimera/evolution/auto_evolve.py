@@ -17,12 +17,16 @@ non-destructive; the gates above keep it honest rather than guarding against har
 from __future__ import annotations
 
 import string
+from typing import TYPE_CHECKING
 
 from chimera.evolution.evolver import SkillEvolver
 from chimera.evolution.learned_skill import LearnedSkill
 from chimera.evolution.skill_store import SkillStore
 from chimera.governance.validator import SkillValidator
 from chimera.telemetry import get_logger
+
+if TYPE_CHECKING:
+    from chimera.evolution.collective import CollectiveSkillEvolver
 
 _log = get_logger("evolution.auto")
 
@@ -41,17 +45,28 @@ class AutoSkillEvolver:
         *,
         validator: SkillValidator | None = None,
         min_recurrences: int = 2,
+        collective: CollectiveSkillEvolver | None = None,
+        min_transfer: float = 0.5,
     ) -> None:
         self.evolver = evolver
         self.store = store
         self.validator = validator
         self.min_recurrences = min_recurrences
+        # When a fusion panel is available, prefer a candidate proposed across the
+        # panel and kept by cross-model transferability (OpenClaw-Skill) over a
+        # single-model proposal. Falls back to single-model when unset.
+        self.collective = collective
+        self.min_transfer = min_transfer
 
     def maybe_evolve(self, task: str, solution: str, prior_successes: int) -> LearnedSkill | None:
         """Return the kept skill, or None if not recurring / rejected / untested."""
         if prior_successes < self.min_recurrences:
             return None  # not recurring enough yet
+        if self.collective is not None:
+            return self._evolve_collective(task, solution)
+        return self._evolve_single(task, solution)
 
+    def _evolve_single(self, task: str, solution: str) -> LearnedSkill | None:
         candidate = self.evolver.propose(task, solution)
         if candidate is None:
             return None
@@ -73,3 +88,29 @@ class AutoSkillEvolver:
         self.store.add(candidate)
         _log.debug("kept auto-skill %s", candidate.name)
         return candidate
+
+    def _evolve_collective(self, task: str, solution: str) -> LearnedSkill | None:
+        """Propose across the fusion panel; keep the most transferable validated skill.
+
+        Cross-model transferability is the executable gate here — it subsumes the
+        single-model smoke test, since the skill must run and produce output on the
+        panel models rather than on just one.
+        """
+        assert self.collective is not None
+        best: LearnedSkill | None = None
+        best_score = -1.0
+        for candidate in self.collective.propose_collective(task, solution):
+            if candidate.name in self.store:
+                continue
+            if self.validator is not None and not self.validator.validate(candidate.to_dict()).accepted:
+                continue
+            test_input = {field: task for field in _placeholders(candidate.prompt_template)}
+            score = self.collective.transferability(candidate, test_input, lambda out: bool(out.strip()))
+            if score > best_score:
+                best, best_score = candidate, score
+        if best is None or best_score < self.min_transfer:
+            _log.debug("no transferable auto-skill kept (best=%.2f)", best_score)
+            return None
+        self.store.add(best)
+        _log.debug("kept collective auto-skill %s (transfer=%.2f)", best.name, best_score)
+        return best

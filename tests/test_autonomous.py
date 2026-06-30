@@ -67,6 +67,56 @@ class FixedBackend:
         return CompletionResult(content=self.content, model="fake")
 
 
+def _tool_error_transcript(tool: str, error: str) -> list[Any]:
+    return [
+        {"role": "assistant", "content": "", "tool_calls": [{"function": {"name": tool}}]},
+        {"role": "tool", "content": error},
+    ]
+
+
+def test_fault_hint_localizes_failed_tool_step() -> None:
+    result = AgentResult(
+        answer="x",
+        steps=2,
+        stopped_reason="final",
+        transcript=_tool_error_transcript("run_shell", "error: command exited 1"),
+    )
+    hint = AutonomousAgent._fault_hint(result)
+    assert "run_shell" in hint and "exited 1" in hint
+
+
+def test_fault_hint_empty_when_no_tool_error() -> None:
+    result = AgentResult(answer="x", steps=1, stopped_reason="final", transcript=[])
+    assert AutonomousAgent._fault_hint(result) == ""
+
+
+def test_retry_feedback_includes_step_level_diagnosis() -> None:
+    class FaultingWorker:
+        def __init__(self) -> None:
+            self.prompts: list[str] = []
+
+        def run(self, task: str) -> AgentResult:
+            self.prompts.append(task)
+            return AgentResult(
+                answer="ans",
+                steps=1,
+                stopped_reason="final",
+                transcript=_tool_error_transcript("write_file", "error: permission denied"),
+            )
+
+    worker = FaultingWorker()
+    auto = AutonomousAgent(
+        worker,
+        verifier=FlakyVerifier(fail_times=1),  # attempt 1 fails, attempt 2 passes
+        config=AutonomousConfig(use_planner=False, use_manager=False, max_attempts=2),
+    )
+    result = auto.run("do X")
+    assert result.success is True
+    # the retry prompt must carry the localized first-fault from attempt 1
+    assert "write_file" in worker.prompts[1]
+    assert "permission denied" in worker.prompts[1]
+
+
 def test_success_on_first_attempt() -> None:
     auto = AutonomousAgent(FakeWorker("answer"), config=AutonomousConfig(use_planner=False))
     result = auto.run("do something")

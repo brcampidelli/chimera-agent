@@ -458,7 +458,13 @@ def solve(
     from chimera.core.autonomous import AutonomousResult
     from chimera.core.verify import CommandVerifier
     from chimera.ecosystem import TrajectoryCollector
-    from chimera.evolution import AutoSkillEvolver, ExperienceBuffer, SkillEvolver, SkillStore
+    from chimera.evolution import (
+        AutoSkillEvolver,
+        CollectiveSkillEvolver,
+        ExperienceBuffer,
+        SkillEvolver,
+        SkillStore,
+    )
     from chimera.governance.validator import SkillValidator
     from chimera.providers import LLMGateway, MissingCredentialsError, SupportsComplete
     from chimera.tools import default_registry
@@ -507,6 +513,14 @@ def solve(
                     SkillEvolver(gateway, model),
                     SkillStore(settings.home / "skills.json"),
                     validator=SkillValidator(),
+                    # With fusion on and a real panel, evolve skills across the panel and
+                    # keep the most transferable one (OpenClaw-Skill) instead of a
+                    # single-model proposal.
+                    collective=(
+                        CollectiveSkillEvolver(gateway, settings.fusion_panel, validator=SkillValidator())
+                        if fuse and len(settings.fusion_panel) >= 2
+                        else None
+                    ),
                 )
             ),
             spine_workspace=ws,
