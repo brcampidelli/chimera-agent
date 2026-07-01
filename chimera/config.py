@@ -95,6 +95,9 @@ class Settings(BaseSettings):
     # --- Exact-match completion cache for tool-free turns (HORIZON prompt caching) ---
     cache: bool = Field(default=False, validation_alias="CHIMERA_CACHE")
 
+    # --- Long-term memory backend: json (default, zero-dep) or sqlite (FTS5 full-text) ---
+    memory_backend: str = Field(default="json", validation_alias="CHIMERA_MEMORY_BACKEND")
+
     # --- Auto-fuse error-sensitive turns in solve/crew without an explicit --fuse.
     # Off by default (fusion costs 2-3x); when on, the cost-aware router still keeps
     # cheap/tool turns single-model and only fuses deep or error-sensitive ones. ---

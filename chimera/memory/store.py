@@ -4,8 +4,20 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Protocol
 
 from chimera.memory.models import MemoryItem, MemoryKind
+
+
+class MemoryBackend(Protocol):
+    """What the MemoryManager needs of a store — satisfied by JSON and SQLite backends."""
+
+    def add(self, item: MemoryItem) -> None: ...
+    def get(self, item_id: str) -> MemoryItem: ...
+    def remove(self, item_id: str) -> None: ...
+    def all(self) -> list[MemoryItem]: ...
+    def by_kind(self, kind: MemoryKind) -> list[MemoryItem]: ...
+    def __len__(self) -> int: ...
 
 
 class MemoryStore:

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **SQLite + FTS5 memory backend** (`CHIMERA_MEMORY_BACKEND=sqlite`): an optional store with
+  a full-text index, so recall is phrase/substring-aware and stays fast as memory grows —
+  addressing the top memory gap vs. Hermes (keyword-only JSON). The `MemoryManager` prefers
+  a backend's `search` when present; JSON stays the zero-dependency default. Degrades to a
+  `LIKE` search if a Python build lacks FTS5.
 - **Native Signal** (`chimera serve --signal`): two-way via a `signal-cli-rest-api` bridge
   you run (Docker) — poll `GET /v1/receive` + `POST /v2/send` over `httpx`, no Python
   dependency, same adapter shape as Telegram. Pure envelope parsing/filtering is fully

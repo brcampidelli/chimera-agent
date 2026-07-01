@@ -1058,9 +1058,12 @@ app.add_typer(memory_app, name="memory")
 
 
 def _memory_manager() -> MemoryManager:
-    from chimera.memory import MemoryManager, MemoryStore
+    from chimera.memory import MemoryManager, MemoryStore, SqliteMemoryStore
 
-    return MemoryManager(MemoryStore(get_settings().home / "memory.json"))
+    settings = get_settings()
+    if settings.memory_backend == "sqlite":
+        return MemoryManager(SqliteMemoryStore(settings.home / "memory.db"))
+    return MemoryManager(MemoryStore(settings.home / "memory.json"))
 
 
 def _recall_graph(memory: MemoryManager | None) -> MemoryGraph | None:

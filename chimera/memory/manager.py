@@ -12,7 +12,7 @@ import re
 import uuid
 
 from chimera.memory.models import MemoryItem, MemoryKind
-from chimera.memory.store import MemoryStore
+from chimera.memory.store import MemoryBackend
 from chimera.telemetry import get_logger
 
 _log = get_logger("memory.manager")
@@ -26,7 +26,7 @@ def _normalize(text: str) -> str:
 class MemoryManager:
     """Curates a :class:`MemoryStore`."""
 
-    def __init__(self, store: MemoryStore) -> None:
+    def __init__(self, store: MemoryBackend) -> None:
         self.store = store
 
     def add(
@@ -105,7 +105,11 @@ class MemoryManager:
         return len(items) - max_items
 
     def search(self, query: str, *, k: int = 5) -> list[MemoryItem]:
-        """Keyword retrieval over memory content (vector retrieval comes later)."""
+        """Retrieve relevant memories — full-text if the backend supports it, else keyword."""
+        backend_search = getattr(self.store, "search", None)
+        if callable(backend_search):  # e.g. the SQLite/FTS5 store
+            result: list[MemoryItem] = backend_search(query, k=k)
+            return result
         terms = set(_TOKEN.findall(query.lower()))
         if not terms:
             return []
