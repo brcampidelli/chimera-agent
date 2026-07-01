@@ -48,15 +48,17 @@ aportan seguridad/sandbox pero no evolucionan. **Chimera combina las cuatro:**
 
 **Razonamiento y autonomía**
 - **Motor LLM-Fusion** — panel agnóstico de proveedor de modelos de frontera + abiertos, un juez que revela consensos/contradicciones/puntos ciegos, y un sintetizador; un **enrutador consciente del costo** fusiona solo cuando compensa (los turnos de herramienta usan un único modelo).
-- **Autonomía Tier-2** — planificar → ejecutar → revisión del Manager → **verify-or-revert** (snapshot/restauración del workspace + un verificador por comando), con **aislamiento en git worktree** (`solve --isolate`) — los cambios solo se aplican si se verifican.
+- **Autonomía Tier-2** — planificar → ejecutar → revisión del Manager (opcionalmente vía una **rúbrica en cascada**, `solve --rubric`) → **verify-or-revert** (snapshot/restauración del workspace + un verificador por comando), con **aislamiento en git worktree** (`solve --isolate`) — los cambios solo se aplican si se verifican.
 - **Crew de ciclo de vida SDLC** (`chimera lifecycle`) — pipeline pre-armado **plan → build → test → review** con verify-or-revert en la etapa de test.
-- **Equipos multiagente** — especialización por roles, crews secuenciales y supervisor, consolidación MOC, memoria compartida, revisión paralela.
+- **Equipos multiagente** — especialización por roles, crews secuenciales y supervisor, consolidación de mensajes MOC, memoria compartida, revisión paralela. Los roles de crew pueden ser **workers que usan herramientas** (con su propio loop + herramientas), no solo personas de un solo disparo, y cualquier agente puede **`spawn_subagent`** (`solve --subagents`) para delegar una subtarea a un subagente aislado y con alcance de herramientas acotado que devuelve solo su resultado (sin recursión, limitado por allowlist). **`IsolatedCrew`** (`chimera crew-isolated`) va más allá — workers que usan herramientas dividen una tarea, cada uno editando en su **propio git worktree** en paralelo, con merge-back consciente de conflictos y una puerta `--verify` opcional por worker (un worker cuyo test falla es rechazado y sus ediciones descartadas).
+- **Aislamiento paralelo** (`chimera solve-batch`) — resuelve muchas tareas a la vez, cada una en su **propio git worktree**; las ediciones sin conflicto se fusionan de vuelta y los archivos que dos workers tocaron a la vez se marcan como conflictos, no se sobrescriben. Un worker que se cae falla su unidad, no el lote (`run_in_processes` añade una frontera de proceso/RPC para aislar fallos).
+- **Context Explorer** (`chimera explore`, `solve --explorer`) — un subagente aislado estilo FastContext que localiza código mediante su propia búsqueda de solo lectura con `grep`/`glob`/lectura y devuelve únicamente un bloque de evidencia compacto `file:line`, manteniendo limpio el contexto del agente principal. Corre sobre cualquier modelo (idealmente barato).
 
 **Autoevolución y gobernanza**
-- **Bucle conductual cerrado** — los fallos pasados alimentan el planner (lecciones), los éxitos verificados auto-escriben memoria, y las tareas recurrentes auto-evolucionan una skill validada y smoke-testeada — todo gateado por verify-or-revert. Más benchmark de evolución continua y stress test EvoClaw naive-vs-guarded.
-- **Memoria jerárquica** — working / episodic / semantic / persona **+ capa graph** (`memory graph`) que recupera hechos por entidad, no solo por keyword.
-- **Evolución de modelo opt-in** — `solve` recolecta trayectorias; `evolve` cura datasets SFT/DPO y emite una receta LoRA ejecutable. El entrenamiento queda externo/opt-in.
-- **Kernel de gobernanza** — allow/warn/block/review (reglas léxicas + juez semántico opcional, con destilación de reglas y **precedente guardado**), validador estático de la superficie de automodificación, registro de auditoría append-only, herramientas gobernadas, **modelo de cambio de 4 actores**, y **drift gate spec↔código** (`chimera drift`).
+- **Bucle conductual cerrado** — los fallos pasados alimentan el planner (lecciones), los éxitos verificados auto-escriben memoria, y las tareas recurrentes auto-evolucionan una skill validada y smoke-testeada (propuesta a través del panel de fusión y conservada por transferibilidad entre modelos cuando la fusión está activa) — todo gateado por verify-or-revert; un intento fallido se ubica en su primer paso defectuoso en el reintento. Más un benchmark de evolución continua y un stress test EvoClaw naive-vs-guarded.
+- **Memoria jerárquica** — working / episodic / semantic / persona **+ una capa graph** (`memory graph`) que recupera hechos por entidad; un backend de texto completo **SQLite/FTS5** opcional (`CHIMERA_MEMORY_BACKEND=sqlite`); un **perfil de usuario entre sesiones** (hechos de persona aplicados en cada turno); **consolidación por LLM** (`memory consolidate`) que fusiona hechos casi duplicados; y **nudges** que sugieren guardar las preferencias que enuncias en el chat.
+- **Evolución de modelo opt-in** — `solve` recolecta trayectorias; `evolve` cura datasets SFT/DPO y emite una receta LoRA ejecutable, y **`evolve tune`** auto-optimiza la spec del agente (meta-búsqueda, conservada bajo no-regresión) contra los escenarios diarios. El entrenamiento queda externo/opt-in.
+- **Kernel de gobernanza** — allow/warn/block/review (reglas léxicas + juez semántico opcional, con destilación de reglas y un **almacén de precedentes guardado**), un validador estático de la superficie de automodificación, un registro de auditoría append-only, herramientas gobernadas, un **modelo de cambio de 4 actores**, y un **drift gate spec↔código** (`chimera drift`).
 
 **Proveedores**
 - **Cualquier modelo, una interfaz** — agnóstico de proveedor vía LiteLLM (100+ modelos mediante slugs `provider/model`); claves first-class para OpenRouter/OpenAI/Anthropic/Gemini/DeepSeek.
@@ -65,12 +67,13 @@ aportan seguridad/sandbox pero no evolucionan. **Chimera combina las cuatro:**
 **Orquestación, interfaces e integraciones**
 - **Kanban + worker lanes** (`chimera kanban`) — un tablero (backlog → doing → review → done) donde las tarjetas se despachan a una lane `solve` o `crew`; `kanban learn` convierte tareas recurrentes en tarjetas.
 - **Loop Engineering** (`chimera workflow`) — escribe un bucle autónomo en YAML (pasos que `usan` la stack, con condiciones `when` y bucles `repeat`/`until`).
-- **Interfaces** — un REPL `chat`, una **TUI** a pantalla completa (Textual) y un **gateway de mensajería** (HTTP, o **Discord/Telegram/Slack/Signal nativo** vía `serve --discord|--telegram|--slack|--signal`) con una conversación (y memoria) por chat; el agente también puede **enviar** mensajes con la herramienta `send_message` (WhatsApp bidireccional vía webhook).
+- **Interfaces** — un REPL `chat`, una **TUI** a pantalla completa (Textual) y un **gateway de mensajería** (HTTP, o **Discord / Telegram / Slack / Signal nativo** vía `serve --discord|--telegram|--slack|--signal`) con una conversación (y memoria) por chat; el agente también puede **enviar** mensajes con la herramienta `send_message`. **WhatsApp** funciona bidireccionalmente vía un webhook de la Cloud API (`POST /whatsapp`).
 - **Sandbox de ejecución** — ejecuta el shell localmente o en un contenedor **Docker** aislado (`CHIMERA_SANDBOX=docker`).
-- **Integraciones** — un cliente **MCP** (stdio) first-class + un importador **OpenAPI/REST → tool**; **crons** (asignados y autoaprendidos, con confirmación); **migración** de config/skills/memoria de largo plazo de Hermes Agent / OpenClaw.
+- **Integraciones** — un cliente **MCP** (stdio) first-class + un importador **OpenAPI/REST → tool**; **crons + triggers webhook** (`serve` ejecuta una tarea al recibir un `POST /webhook/<hook>` entrante — desatendido); **migración** de config/skills/memoria de largo plazo de Hermes Agent / OpenClaw.
 
 **Extras integrados**
-- **Vision** (pegar imagen), **Modo Entregable** (artefactos pulidos) y un **Pet** compañero — más slots de credenciales pre-set para búsqueda web, generación de imágenes, TTS/voz y más (`chimera features`).
+- **Herramientas de referencia** — con baterías incluidas: `execute_code` siempre activo (Python en sandbox), `code_interpreter` (sesión con estado), `arxiv_search`; con puerta de config `web_search`, `generate_image` (OpenAI), `text_to_speech` (ElevenLabs), `send_email`/`read_email` (SMTP/IMAP), `calendar_events` (`.ics`); y `youtube_transcript` (extra opt-in). Servicios REST arbitrarios siguen conectándose vía el importador OpenAPI→tool.
+- **Vision** (pegar imagen), **Modo Entregable** (artefactos pulidos) y un **Pet** compañero — mira todas las capacidades opcionales con `chimera features`.
 
 ## Inicio rápido
 
@@ -88,11 +91,11 @@ uv run chimera doctor       # verifica tu entorno
 chimera doctor / models / features    # estado, configuración, capacidades opcionales
 chimera chat                          # asistente multironda interactivo (tu mano derecha)
 chimera tui                           # app de terminal a pantalla completa (Textual)
-chimera serve [--discord|--telegram|--slack|--signal]  # gateway de mensajería: HTTP, o bot de plataforma nativo
+chimera serve [--discord|--telegram|--slack]  # gateway de mensajería: HTTP, o bot de plataforma nativo
 chimera run "PROMPT" --image pic.png   # Tier-1 de un disparo (con visión vía --image)
 chimera deliver "un plan" -o plan.md   # Modo Entregable: produce un artefacto pulido
 chimera fuse "PROMPT" --show-panel     # LLM-Fusion: panel -> juez -> sintetizador
-chimera solve "TAREA" --verify "pytest -q" --rubric --isolate   # Tier-2: verify-or-revert (+ revisión por rúbrica), aislado en git worktree
+chimera solve "TAREA" --verify "pytest -q" --rubric --isolate   # Tier-2: verify-or-revert (+ revisión por rúbrica en cascada), aislado en git worktree
 chimera lifecycle "TAREA" --verify "..."   # crew SDLC: plan -> build -> test -> review
 chimera workflow flow.yaml             # ejecuta un bucle declarativo (Loop Engineering)
 chimera crew "TAREA" --mode supervisor  # crew multiagente Tier-3
