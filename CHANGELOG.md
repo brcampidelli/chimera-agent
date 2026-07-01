@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Parallel multi-agent isolation** (`chimera solve-batch`, `chimera.orchestration.run_isolated`):
+  solve several tasks concurrently, each in its **own git worktree**, so parallel file edits
+  never collide. On merge-back a file two tasks both changed is reported as a **conflict** and
+  left for you to resolve rather than silently overwritten (mechanical "one file, one owner").
+  A crashing/hanging worker becomes a failed result instead of taking down the batch. Plus
+  `run_in_processes` for fault/CPU isolation of self-contained units across a process (RPC)
+  boundary. Closes the distributed-isolation gap for single-box production scale.
 - **Skill nudges**: during `chat`, when the same kind of request recurs and no skill covers
   it, Chimera suggests saving it as a reusable skill ("🛠️ done this 3× — save as a skill?").
   The skill analogue of memory nudges: pure/deterministic (reuses token-Jaccard clustering),

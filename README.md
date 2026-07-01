@@ -51,6 +51,7 @@ bring security/sandboxing but don't evolve. **Chimera combines all four:**
 - **Tier-2 autonomy** — plan → execute → Manager review (optionally via a **cascade rubric**, `solve --rubric`) → **verify-or-revert** (workspace snapshot/restore + a command verifier), with **git-worktree isolation** (`solve --isolate`) so edits only land when verified.
 - **SDLC lifecycle crew** (`chimera lifecycle`) — a pre-assembled **plan → build → test → review** pipeline with verify-or-revert at the test stage.
 - **Multi-agent teams** — role specialization, sequential & supervisor crews, MOC message consolidation, shared memory, parallel review.
+- **Parallel isolation** (`chimera solve-batch`) — solve many tasks at once, each in its **own git worktree**; non-conflicting edits merge back and files two workers both touched are flagged as conflicts, not clobbered. A crashing worker fails its unit, not the batch (`run_in_processes` adds a process/RPC boundary for fault isolation).
 
 **Self-evolution & governance**
 - **Closed behavioural loop** — past failures feed the planner (lessons), verified successes auto-write memory, and recurring tasks auto-evolve a validated, smoke-tested skill (proposed across the fusion panel and kept by cross-model transferability when fusion is on) — all gated by verify-or-revert; a failed attempt is pinpointed to its first faulty step on the retry. Plus a continuous-evolution benchmark and an EvoClaw naive-vs-guarded stress test.

@@ -13,6 +13,12 @@ from chimera.orchestration.crew import (
     demo_crew,
     parallel_review,
 )
+from chimera.orchestration.isolation import (
+    IsolatedBatch,
+    IsolatedResult,
+    run_in_processes,
+    run_isolated,
+)
 from chimera.orchestration.lifecycle import (
     LifecycleCrew,
     LifecycleResult,
@@ -36,4 +42,8 @@ __all__ = [
     "LifecycleResult",
     "StageResult",
     "lifecycle_crew",
+    "run_isolated",
+    "run_in_processes",
+    "IsolatedResult",
+    "IsolatedBatch",
 ]

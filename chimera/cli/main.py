@@ -6,6 +6,7 @@ Commands:
   fuse PROMPT                    LLM-Fusion (panel -> judge -> synthesizer)
   agent TASK                     ReAct agent loop with native tools
   solve TASK                     Tier-2 autonomous (plan + verify-or-revert)
+  solve-batch TASKS...           Tier-3: solve tasks in parallel, each in its own worktree
   tools / skills                 list native tools / built-in skills
   memory ...                     curated long-term memory (add/search/list)
   cron ...                       scheduled jobs (add/list/remove/enable/disable/learn)
@@ -18,6 +19,7 @@ from __future__ import annotations
 import contextlib
 import platform
 import sys
+from collections.abc import Callable
 from datetime import UTC
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -69,6 +71,7 @@ console = Console()
 _IMAGE_OPTION = typer.Option(
     None, "--image", help="Attach an image (path or URL); repeatable. Needs a vision model."
 )
+_BATCH_TASKS_ARG = typer.Argument(..., help="Tasks to solve in parallel, each isolated.")
 
 
 @app.command()
@@ -735,6 +738,85 @@ def solve(
     status = "[green]success[/green]" if result.success else "[red]failed[/red]"
     console.print(f"[dim]{status} after {len(result.attempts)} attempt(s)[/dim]")
     if not result.success:
+        raise typer.Exit(code=1)
+
+
+@app.command(name="solve-batch")
+def solve_batch(
+    tasks: list[str] = _BATCH_TASKS_ARG,
+    workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root (a git repo, to isolate)."),
+    model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
+    max_steps: int = typer.Option(6, "--max-steps", help="Max tool-calling steps per task."),
+    max_attempts: int = typer.Option(2, "--max-attempts", help="Max verify-or-revert attempts per task."),
+    max_workers: int = typer.Option(4, "--max-workers", help="Max concurrent isolated workers."),
+    fuse: bool = typer.Option(False, "--fuse", help="Route deep-reasoning turns through fusion."),
+) -> None:
+    """Solve several tasks concurrently, each in its own git worktree (Tier-3 isolation).
+
+    Every task runs against an isolated checkout, so parallel edits never collide. On
+    merge-back, a file two tasks both changed is reported as a conflict and left for you
+    to resolve rather than silently overwritten. Needs a git repo to isolate.
+    """
+    from chimera.core import (
+        Agent,
+        AgentConfig,
+        AutonomousAgent,
+        AutonomousConfig,
+        Manager,
+        Planner,
+        WorkspaceGuard,
+    )
+    from chimera.core.autonomous import AutonomousResult
+    from chimera.orchestration import run_isolated
+    from chimera.providers import LLMGateway, MissingCredentialsError
+
+    settings = get_settings()
+    if not settings.has_any_key():
+        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+        raise typer.Exit(code=1)
+
+    gateway = LLMGateway()
+    backend: SupportsComplete = gateway
+    if fuse or settings.auto_fuse:
+        from chimera.fusion import FusionEngine, RoutedBackend
+
+        backend = RoutedBackend(gateway, FusionEngine(gateway))
+
+    def make_runner(one_task: str) -> Callable[[Path], AutonomousResult]:
+        def run(ws: Path) -> AutonomousResult:
+            from chimera.tools import default_registry
+
+            worker = Agent(backend, default_registry(ws), AgentConfig(model=model, max_steps=max_steps))
+            auto = AutonomousAgent(
+                worker,
+                planner=Planner(gateway, model),
+                manager=Manager(gateway, model),
+                guard=WorkspaceGuard(ws),
+                spine_workspace=ws,
+                config=AutonomousConfig(max_attempts=max_attempts),
+            )
+            return auto.run(one_task)
+
+        return run
+
+    units = [(f"task{i + 1}", make_runner(task)) for i, task in enumerate(tasks)]
+    try:
+        batch = run_isolated(
+            Path(workspace), units, succeeded=lambda r: r.success, max_workers=max_workers
+        )
+    except MissingCredentialsError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    for (name, _), result in zip(units, batch.results, strict=True):
+        status = "[green]ok[/green]" if result.ok else f"[red]failed[/red] ({result.error or 'unsolved'})"
+        console.print(f"[bold]{name}[/bold]: {status}")
+    console.print(
+        f"[dim]merged {batch.merged} file(s) across {len(units)} task(s)[/dim]"
+    )
+    if batch.conflicts:
+        console.print(f"[yellow]conflicts (not merged):[/yellow] {', '.join(batch.conflicts)}")
+    if not batch.ok:
         raise typer.Exit(code=1)
 
 

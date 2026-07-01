@@ -66,11 +66,17 @@ class GitWorktree:
         result = _git(["diff", "--cached", "--name-only", "HEAD"], self.path)
         return [line for line in result.stdout.splitlines() if line.strip()]
 
-    def copy_back_to(self, dest: Path) -> int:
-        """Apply only the changed files to ``dest``. Returns the number of changes."""
+    def copy_back_to(self, dest: Path, *, only: set[str] | None = None) -> int:
+        """Apply the changed files to ``dest``. Returns the number of changes.
+
+        When ``only`` is given, restrict the copy to those relative paths (used to skip
+        files another isolated worker also touched — i.e. cross-worker conflicts).
+        """
         dest = Path(dest).resolve()
         count = 0
         for rel in self.changed_paths():
+            if only is not None and rel not in only:
+                continue
             if any(part in _IGNORE_DIRS for part in Path(rel).parts):
                 continue
             src = self.path / rel
