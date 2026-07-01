@@ -29,17 +29,28 @@ def _similar(a: str, b: str, threshold: float) -> bool:
     return len(ta & tb) / len(ta | tb) >= threshold  # Jaccard overlap
 
 
-def cluster(items: list[MemoryItem], *, threshold: float = 0.5) -> list[list[MemoryItem]]:
-    """Greedily group memories whose content is similar (Jaccard >= threshold)."""
-    clusters: list[list[MemoryItem]] = []
-    for item in items:
-        for group in clusters:
-            if _similar(item.content, group[0].content, threshold):
-                group.append(item)
+def group_similar(texts: list[str], *, threshold: float = 0.5) -> list[list[int]]:
+    """Greedily group *indices* of texts whose content is similar (Jaccard >= threshold).
+
+    A generic clustering primitive reused by memory consolidation and skill nudges.
+    """
+    groups: list[list[int]] = []
+    reps: list[str] = []  # one representative text per group
+    for index, text in enumerate(texts):
+        for group_index, rep in enumerate(reps):
+            if _similar(text, rep, threshold):
+                groups[group_index].append(index)
                 break
         else:
-            clusters.append([item])
-    return clusters
+            groups.append([index])
+            reps.append(text)
+    return groups
+
+
+def cluster(items: list[MemoryItem], *, threshold: float = 0.5) -> list[list[MemoryItem]]:
+    """Greedily group memories whose content is similar (Jaccard >= threshold)."""
+    groups = group_similar([item.content for item in items], threshold=threshold)
+    return [[items[i] for i in group] for group in groups]
 
 
 def model_summarizer(backend: object, model: str | None = None) -> Summarizer:

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Skill nudges**: during `chat`, when the same kind of request recurs and no skill covers
+  it, Chimera suggests saving it as a reusable skill ("🛠️ done this 3× — save as a skill?").
+  The skill analogue of memory nudges: pure/deterministic (reuses token-Jaccard clustering),
+  shown once each, and suppressed when an existing learned skill already covers the task. It
+  only surfaces — the autonomous `AutoSkillEvolver` is still what actually writes skills.
+- **Budgeted auto-consolidation** (`CHIMERA_AUTO_CONSOLIDATE=1`, `CHIMERA_MEMORY_BUDGET=N`):
+  on `chat` exit, if memory has grown past the budget, near-duplicate facts are consolidated
+  with the model. Skipped entirely while memory is small (no wasted calls); best-effort, never
+  blocks exit. `MemoryManager.autoconsolidate()` is the reusable primitive.
 - **LLM memory consolidation** (`chimera memory consolidate`): clusters near-duplicate facts
   by token-Jaccard similarity and merges each cluster into one model-summarised fact, cutting
   memory bloat while preserving specifics. Complements value-based `prune` (which drops) — this

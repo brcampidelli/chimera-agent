@@ -281,22 +281,26 @@ def chat(
     session = ChatSession(
         agent, memory=mem, graph=_recall_graph(mem), profile=mem.profile() if mem is not None else ""
     )
+    skill_names = _learned_skill_labels(settings)
 
     console.print(
         "[bold]Chimera chat[/bold] — your terminal right-hand. "
         "[cyan]/model <slug>[/cyan] to switch, [cyan]/reset[/cyan] to clear, [cyan]/exit[/cyan] to quit."
     )
     nudged: set[str] = set()  # preferences already suggested this session
+    skill_nudged: set[str] = set()  # recurring tasks already suggested as skills
     while True:
         try:
             message = console.input("[bold green]you ›[/bold green] ").strip()
         except (EOFError, KeyboardInterrupt):
             console.print("\n[dim]bye[/dim]")
+            _maybe_autoconsolidate(mem, settings)
             break
         if not message:
             continue
         if message in ("/exit", "/quit", "/q"):
             console.print("[dim]bye[/dim]")
+            _maybe_autoconsolidate(mem, settings)
             break
         if message == "/reset":
             session.reset()
@@ -328,6 +332,7 @@ def chat(
                         f"[dim]💡 remember this? [/dim][yellow]{fact}[/yellow]"
                         f"[dim] → memory add --persona \"{fact}\"[/dim]"
                     )
+        _emit_skill_nudges(session, skill_names, skill_nudged)
 
 
 @app.command()
@@ -1079,6 +1084,45 @@ def _memory_manager() -> MemoryManager:
     if settings.memory_backend == "sqlite":
         return MemoryManager(SqliteMemoryStore(settings.home / "memory.db"))
     return MemoryManager(MemoryStore(settings.home / "memory.json"))
+
+
+def _learned_skill_labels(settings: Settings) -> list[str]:
+    """Name + description strings of stored learned skills (to avoid re-nudging)."""
+    from chimera.evolution import SkillStore
+
+    return SkillStore(settings.home / "skills.json").labels()
+
+
+def _emit_skill_nudges(session: object, known_skills: list[str], already: set[str]) -> None:
+    """Suggest saving a recurring in-session task as a reusable skill (once each)."""
+    from chimera.evolution import detect_skill_nudges
+
+    tasks = [turn.user for turn in session.turns]  # type: ignore[attr-defined]
+    for nudge in detect_skill_nudges(tasks, known_skills):
+        if nudge.task not in already:
+            already.add(nudge.task)
+            console.print(
+                f"[dim]🛠️  done this {nudge.count}× — save as a skill? [/dim]"
+                f"[yellow]{nudge.task}[/yellow][dim] → chimera solve reuses it automatically[/dim]"
+            )
+
+
+def _maybe_autoconsolidate(memory: MemoryManager | None, settings: Settings) -> None:
+    """On session end, consolidate memory if it outgrew the budget (opt-in)."""
+    if memory is None or not settings.auto_consolidate:
+        return
+    try:
+        from chimera.memory.consolidate import model_summarizer
+        from chimera.providers import LLMGateway
+
+        removed = memory.autoconsolidate(
+            model_summarizer(LLMGateway()), max_items=settings.memory_budget
+        )
+    except Exception as exc:  # noqa: BLE001 — best-effort cleanup, never break exit
+        console.print(f"[dim]auto-consolidate skipped: {exc}[/dim]")
+        return
+    if removed:
+        console.print(f"[dim]🧹 consolidated {removed} redundant memory item(s)[/dim]")
 
 
 def _recall_graph(memory: MemoryManager | None) -> MemoryGraph | None:

@@ -10,6 +10,7 @@ from chimera.evolution.collective import CollectiveSkillEvolver
 from chimera.evolution.evolver import SkillEvolver
 from chimera.evolution.experience import Experience, ExperienceBuffer, format_lessons
 from chimera.evolution.learned_skill import LearnedSkill
+from chimera.evolution.skill_nudges import SkillNudge, detect_skill_nudges
 from chimera.evolution.skill_store import SkillStore
 
 __all__ = [
@@ -21,6 +22,8 @@ __all__ = [
     "SkillEvolver",
     "AutoSkillEvolver",
     "CollectiveSkillEvolver",
+    "SkillNudge",
+    "detect_skill_nudges",
     "Fault",
     "localize_fault",
     "attribute",

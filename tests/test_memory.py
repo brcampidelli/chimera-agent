@@ -95,6 +95,33 @@ def test_nudges_ignores_non_preference_statements(tmp_path: Path) -> None:
     assert detect_nudges(["the sky is blue", "the repo has tests"], []) == []
 
 
+def test_autoconsolidate_skips_when_under_budget(tmp_path: Path) -> None:
+    mgr = _manager(tmp_path)
+    mgr.remember("alpha beta gamma", "semantic")
+    mgr.remember("alpha beta gamma delta", "semantic")  # would cluster, but under budget
+    calls: list[list[str]] = []
+
+    def summarizer(facts: list[str]) -> str:
+        calls.append(facts)
+        return "MERGED"
+
+    removed = mgr.autoconsolidate(summarizer, max_items=10, threshold=0.3)
+    assert removed == 0
+    assert calls == []  # summariser never called under budget (no wasted model calls)
+    assert len(mgr.store) == 2
+
+
+def test_autoconsolidate_runs_when_over_budget(tmp_path: Path) -> None:
+    mgr = _manager(tmp_path)
+    mgr.remember("the deploy uses github actions ci", "semantic")
+    mgr.remember("deploy runs on github actions ci pipeline", "semantic")
+    mgr.remember("lunch is at noon downtown", "semantic")
+    removed = mgr.autoconsolidate(
+        lambda facts: "MERGED: " + " / ".join(facts), max_items=2, threshold=0.3
+    )
+    assert removed == 1  # over budget -> the cluster of 2 is merged into 1
+
+
 def test_prune_keeps_highest_value(tmp_path: Path) -> None:
     mgr = _manager(tmp_path)
     mgr.add("a low working scratch note", kind="working")

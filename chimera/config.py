@@ -98,6 +98,12 @@ class Settings(BaseSettings):
     # --- Long-term memory backend: json (default, zero-dep) or sqlite (FTS5 full-text) ---
     memory_backend: str = Field(default="json", validation_alias="CHIMERA_MEMORY_BACKEND")
 
+    # --- Opt-in: at the end of a chat session, if memory has grown past
+    # `memory_budget`, consolidate near-duplicate facts with the model (bounded cost:
+    # skipped entirely while memory is small). Off by default. ---
+    auto_consolidate: bool = Field(default=False, validation_alias="CHIMERA_AUTO_CONSOLIDATE")
+    memory_budget: int = Field(default=200, validation_alias="CHIMERA_MEMORY_BUDGET")
+
     # --- Auto-fuse error-sensitive turns in solve/crew without an explicit --fuse.
     # Off by default (fusion costs 2-3x); when on, the cost-aware router still keeps
     # cheap/tool turns single-model and only fuses deep or error-sensitive ones. ---

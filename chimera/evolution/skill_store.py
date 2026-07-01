@@ -36,6 +36,10 @@ class SkillStore:
     def names(self) -> list[str]:
         return list(self._dicts)
 
+    def labels(self) -> list[str]:
+        """"name description" strings for each skill (e.g. for coverage checks)."""
+        return [f"{d.get('name', '')} {d.get('description', '')}".strip() for d in self._dicts.values()]
+
     def __len__(self) -> int:
         return len(self._dicts)
 

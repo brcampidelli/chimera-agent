@@ -145,6 +145,24 @@ class MemoryManager:
         known = [item.content for item in self.store.all()]
         return detect_nudges(user_texts, known, max_suggestions=max_suggestions)
 
+    def autoconsolidate(
+        self,
+        summarizer: object,
+        *,
+        max_items: int,
+        threshold: float = 0.5,
+        kinds: tuple[MemoryKind, ...] = ("semantic", "episodic"),
+    ) -> int:
+        """Consolidate only when memory has outgrown ``max_items``. Returns net reduction.
+
+        The budgeted, opt-in end-of-session hook: consolidation is skipped entirely while
+        memory is small (no wasted model calls), and only kicks in once it grows past the
+        budget. Returns 0 without calling the summariser when under budget.
+        """
+        if len(self.store.all()) <= max_items:
+            return 0
+        return self.consolidate(summarizer, threshold=threshold, kinds=kinds)
+
     def profile(self, *, max_items: int = 12) -> str:
         """A consolidated user-profile preamble from persona memories (highest-value first).
 
