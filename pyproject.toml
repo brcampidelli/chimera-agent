@@ -48,6 +48,11 @@ messaging = [
     "discord.py>=2.3",
     "slack-sdk>=3.27",
 ]
+# The youtube_transcript reference tool. Fragile by nature (YouTube blocks scraping), so
+# it stays opt-in; every other reference tool needs no extra.
+youtube = [
+    "youtube-transcript-api>=0.6",
+]
 # Opt-in model evolution (LoRA/SFT/DPO). Heavy + GPU-bound — never required by the
 # agent; install only to run a `chimera evolve recipe` training script.
 train = [

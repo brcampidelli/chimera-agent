@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **More reference tools**: `execute_code` (run Python through the sandbox — same isolation
+  and governance as `run_shell`) and `arxiv_search` (public arXiv API, stdlib XML) are
+  always on; `youtube_transcript` is opt-in (the `youtube` extra), degrading gracefully
+  when the library or a transcript is unavailable.
 - **Reference tool library** (batteries, key-gated like `web_search`): `generate_image`
   (OpenAI Images → saves a file), `text_to_speech` (ElevenLabs → saves an mp3), and
   `send_email` (SMTP, Python stdlib — no dependency). Each auto-registers when its
