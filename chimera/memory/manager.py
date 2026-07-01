@@ -104,6 +104,47 @@ class MemoryManager:
             self.store.remove(item.id)
         return len(items) - max_items
 
+    def consolidate(
+        self,
+        summarizer: object,
+        *,
+        threshold: float = 0.5,
+        kinds: tuple[MemoryKind, ...] = ("semantic", "episodic"),
+    ) -> int:
+        """Merge clusters of similar memories into one summarised fact. Returns net reduction.
+
+        ``summarizer`` is a ``list[str] -> str`` callable (see :mod:`chimera.memory.consolidate`).
+        A merge is a write — call it deliberately (e.g. from ``memory consolidate``), not on
+        every turn.
+        """
+        from chimera.memory.consolidate import cluster
+
+        removed = 0
+        for kind in kinds:
+            for group in cluster(self.store.by_kind(kind), threshold=threshold):
+                if len(group) < 2:
+                    continue
+                summary = summarizer([item.content for item in group])  # type: ignore[operator]
+                if not summary.strip():
+                    continue
+                for item in group:
+                    self.store.remove(item.id)
+                self.add(summary, kind, source="chimera")
+                removed += len(group) - 1
+        _log.debug("consolidated: removed %d memories", removed)
+        return removed
+
+    def nudges(self, user_texts: list[str], *, max_suggestions: int = 3) -> list[str]:
+        """Suggest persona facts to save from preferences stated in recent user messages.
+
+        Returns plain fact strings not already in memory (deduped, capped). Empty when
+        there's nothing new worth saving. Storing is the user's call — this only surfaces.
+        """
+        from chimera.memory.nudges import detect_nudges
+
+        known = [item.content for item in self.store.all()]
+        return detect_nudges(user_texts, known, max_suggestions=max_suggestions)
+
     def profile(self, *, max_items: int = 12) -> str:
         """A consolidated user-profile preamble from persona memories (highest-value first).
 

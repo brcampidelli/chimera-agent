@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **LLM memory consolidation** (`chimera memory consolidate`): clusters near-duplicate facts
+  by token-Jaccard similarity and merges each cluster into one model-summarised fact, cutting
+  memory bloat while preserving specifics. Complements value-based `prune` (which drops) — this
+  *merges*. Clustering is pure/deterministic; the summariser is injected, so the logic is
+  tested without a model. An opt-in write (never runs automatically).
+- **Memory nudges**: during `chat`, when you state a first-person preference ("I prefer async",
+  "I always use ruff") that isn't in memory yet, Chimera surfaces a gentle "💡 remember this?"
+  with the exact `memory add --persona` command. Deterministic, deduped, shown once per session;
+  a token-overlap check means it won't re-nudge something already stored. Low-friction path to
+  building the cross-session profile.
 - **Cross-session user profile**: persona memories are consolidated into a profile preamble
   (`chimera memory profile`) that's applied on *every* turn of `chat` / `tui` / `serve` — so
   the agent remembers the user's preferences across conversations without them re-stating it.

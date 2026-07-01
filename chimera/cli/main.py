@@ -286,6 +286,7 @@ def chat(
         "[bold]Chimera chat[/bold] — your terminal right-hand. "
         "[cyan]/model <slug>[/cyan] to switch, [cyan]/reset[/cyan] to clear, [cyan]/exit[/cyan] to quit."
     )
+    nudged: set[str] = set()  # preferences already suggested this session
     while True:
         try:
             message = console.input("[bold green]you ›[/bold green] ").strip()
@@ -318,6 +319,15 @@ def chat(
             console.print(f"[red]error: {exc}[/red]")
             continue
         console.print(f"[bold magenta]chimera ›[/bold magenta] {reply}")
+        if mem is not None:
+            recent = [turn.user for turn in session.turns[-4:]]
+            for fact in mem.nudges(recent):
+                if fact not in nudged:
+                    nudged.add(fact)
+                    console.print(
+                        f"[dim]💡 remember this? [/dim][yellow]{fact}[/yellow]"
+                        f"[dim] → memory add --persona \"{fact}\"[/dim]"
+                    )
 
 
 @app.command()
@@ -1134,6 +1144,29 @@ def memory_prune(
     """Prune low-value memory under a budget (multi-factor value model)."""
     removed = _memory_manager().prune(max_items)
     console.print(f"pruned {removed} low-value memory item(s)")
+
+
+@memory_app.command("consolidate")
+def memory_consolidate(
+    threshold: float = typer.Option(
+        0.5, "--threshold", help="Similarity (Jaccard) to cluster facts; lower = merges more."
+    ),
+) -> None:
+    """Merge clusters of similar memories into one LLM-summarised fact (opt-in write)."""
+    from chimera.memory.consolidate import model_summarizer
+    from chimera.providers import LLMGateway, MissingCredentialsError
+
+    if not get_settings().has_any_key():
+        console.print("[red]no provider API key configured[/red] — set one to summarise")
+        raise typer.Exit(1)
+    try:
+        removed = _memory_manager().consolidate(
+            model_summarizer(LLMGateway()), threshold=threshold
+        )
+    except MissingCredentialsError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    console.print(f"consolidated: merged away {removed} redundant memory item(s)")
 
 
 @memory_app.command("graph")
