@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from chimera.server import DiscordAdapter
-from chimera.server.discord_adapter import _chunks
+from chimera.server import DiscordAdapter, chunk_text
 
 
 def test_inbound_ignores_self_and_empty() -> None:
@@ -43,7 +42,7 @@ def test_send_without_running_client_errors() -> None:
     assert DiscordAdapter("token").send("1", "hi").startswith("error:")
 
 
-def test_chunks_splits_long_text_and_never_empty() -> None:
-    parts = list(_chunks("a" * 4500, 2000))
+def test_chunk_text_splits_and_is_empty_for_empty() -> None:
+    parts = chunk_text("a" * 4500, 2000)
     assert len(parts) == 3 and all(len(p) <= 2000 for p in parts)
-    assert list(_chunks("", 2000)) == ["(no reply)"]
+    assert chunk_text("", 2000) == []

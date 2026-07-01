@@ -10,8 +10,10 @@ from chimera.server.gateway import (
     InboundMessage,
     LocalAdapter,
     MessageGateway,
+    chunk_text,
 )
 from chimera.server.http import handle, make_server
+from chimera.server.telegram_adapter import TelegramAdapter
 
 __all__ = [
     "InboundMessage",
@@ -19,6 +21,8 @@ __all__ = [
     "Adapter",
     "LocalAdapter",
     "DiscordAdapter",
+    "TelegramAdapter",
+    "chunk_text",
     "handle",
     "make_server",
 ]

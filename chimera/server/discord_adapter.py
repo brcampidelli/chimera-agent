@@ -13,21 +13,14 @@ The bot token is read from the environment by the caller — never hard-coded.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from typing import Any
 
-from chimera.server.gateway import InboundMessage
+from chimera.server.gateway import InboundMessage, chunk_text
 from chimera.telemetry import get_logger
 
 _log = get_logger("server.discord")
 _DISCORD_LIMIT = 2000
-
-
-def _chunks(text: str, size: int) -> Iterator[str]:
-    """Split a reply into Discord-sized chunks (never send an empty message)."""
-    body = text or "(no reply)"
-    for start in range(0, len(body), size):
-        yield body[start : start + size]
 
 
 class DiscordAdapter:
@@ -107,7 +100,7 @@ class DiscordAdapter:
             # the gateway — and so the send_message tool can post back during the turn.
             loop = asyncio.get_running_loop()
             reply = await loop.run_in_executor(None, route, inbound)
-            for chunk in _chunks(reply, self.max_chars):
+            for chunk in chunk_text(reply, self.max_chars) or ["(no reply)"]:
                 await message.channel.send(chunk)
 
         client.run(self.token)
@@ -134,7 +127,7 @@ class DiscordAdapter:
         async def _deliver() -> int:
             channel = client.get_channel(int(chat_id)) or await client.fetch_channel(int(chat_id))
             sent = 0
-            for chunk in _chunks(text, self.max_chars):
+            for chunk in chunk_text(text, self.max_chars) or ["(no reply)"]:
                 await channel.send(chunk)
                 sent += 1
             return sent

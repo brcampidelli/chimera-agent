@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Native Telegram** (`chimera serve --telegram`): a second platform on the same adapter
+  pattern (Adapter + MessageSender + pure message-filtering), proving it generalises. Uses
+  the Telegram Bot API over plain HTTP — **no extra dependency** (just the core `httpx`).
+  Token via `CHIMERA_TELEGRAM_BOT_TOKEN`. The Discord/Telegram chunking helper was hoisted
+  to `chunk_text`, and the CLI's platform serving is now a generic `_serve_platform`.
 - **Native Discord** (`chimera serve --discord`): Chimera runs as a Discord bot — each
   channel is its own session, it replies in-channel, and it ignores its own and other
   bots' messages (with an optional user allowlist). Plus a platform-agnostic messaging

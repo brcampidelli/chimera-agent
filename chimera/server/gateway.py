@@ -18,6 +18,11 @@ from typing import Protocol
 from chimera.interface import ChatSession
 
 
+def chunk_text(text: str, size: int) -> list[str]:
+    """Split text into <=size chunks for a platform's message-length limit (empty -> [])."""
+    return [text[start : start + size] for start in range(0, len(text), size)]
+
+
 @dataclass
 class InboundMessage:
     """A message arriving from some platform."""

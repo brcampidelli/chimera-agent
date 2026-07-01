@@ -20,7 +20,7 @@ import platform
 import sys
 from datetime import UTC
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import typer
 from rich.console import Console
@@ -359,8 +359,9 @@ def serve(
     fuse: bool = typer.Option(False, "--fuse", help="Route deep-reasoning turns through fusion."),
     no_memory: bool = typer.Option(False, "--no-memory", help="Don't recall long-term memory."),
     discord: bool = typer.Option(False, "--discord", help="Serve on Discord (needs CHIMERA_DISCORD_BOT_TOKEN + the 'messaging' extra)."),
+    telegram: bool = typer.Option(False, "--telegram", help="Serve on Telegram (needs CHIMERA_TELEGRAM_BOT_TOKEN)."),
 ) -> None:
-    """Run the messaging gateway on HTTP (POST /chat, GET /health) or Discord. Requires a key."""
+    """Run the messaging gateway on HTTP (POST /chat, GET /health), Discord or Telegram. Requires a key."""
     from chimera.core import Agent, AgentConfig
     from chimera.interface import ChatSession
     from chimera.providers import LLMGateway
@@ -383,8 +384,9 @@ def serve(
     shared_memory = None if no_memory else _memory_manager()
     shared_graph = _recall_graph(shared_memory)
 
-    if discord:
-        _serve_discord(settings, backend, model, max_steps, workspace_path, shared_memory, shared_graph)
+    if discord or telegram:
+        adapter = _messaging_adapter(settings, discord=discord)
+        _serve_platform(adapter, backend, model, max_steps, workspace_path, shared_memory, shared_graph)
         return
 
     def factory() -> ChatSession:
@@ -404,8 +406,25 @@ def serve(
         server.shutdown()
 
 
-def _serve_discord(
-    settings: Settings,
+def _messaging_adapter(settings: Settings, *, discord: bool) -> Any:
+    """Build the requested platform adapter (Discord or Telegram) or exit with guidance."""
+    if discord:
+        if not settings.discord_bot_token:
+            console.print("[red]Set CHIMERA_DISCORD_BOT_TOKEN to run the Discord adapter.[/red]")
+            raise typer.Exit(code=1)
+        from chimera.server import DiscordAdapter
+
+        return DiscordAdapter(settings.discord_bot_token)
+    if not settings.telegram_bot_token:
+        console.print("[red]Set CHIMERA_TELEGRAM_BOT_TOKEN to run the Telegram adapter.[/red]")
+        raise typer.Exit(code=1)
+    from chimera.server import TelegramAdapter
+
+    return TelegramAdapter(settings.telegram_bot_token)
+
+
+def _serve_platform(
+    adapter: Any,  # an Adapter that is also a MessageSender (Discord/Telegram)
     backend: SupportsComplete,
     model: str | None,
     max_steps: int,
@@ -413,21 +432,15 @@ def _serve_discord(
     memory: MemoryManager | None,
     graph: MemoryGraph | None,
 ) -> None:
-    """Serve the gateway over Discord: each channel is a session; the agent can also send."""
+    """Serve the gateway over a platform adapter: one session per chat; the agent can send."""
     from chimera.core import Agent, AgentConfig
     from chimera.integrations import SenderRegistry, SendMessageTool
     from chimera.interface import ChatSession
-    from chimera.server import DiscordAdapter, MessageGateway
+    from chimera.server import MessageGateway
     from chimera.tools import default_registry
 
-    token = settings.discord_bot_token
-    if not token:
-        console.print("[red]Set CHIMERA_DISCORD_BOT_TOKEN to run the Discord adapter.[/red]")
-        raise typer.Exit(code=1)
-
     senders = SenderRegistry()
-    adapter = DiscordAdapter(token)
-    senders.register(adapter)  # the agent can send Discord messages via send_message
+    senders.register(adapter)  # the agent can send on this platform via send_message
     send_tool = SendMessageTool(senders)
 
     def factory() -> ChatSession:
@@ -437,13 +450,16 @@ def _serve_discord(
         return ChatSession(runner, memory=memory, graph=graph)
 
     gateway = MessageGateway(factory)
-    console.print("[bold]Chimera on Discord[/bold] [dim]— message the bot in any channel it can see. Ctrl+C to stop.[/dim]")
+    console.print(
+        f"[bold]Chimera on {adapter.platform}[/bold] "
+        "[dim]— message the bot; each chat is its own session. Ctrl+C to stop.[/dim]"
+    )
     try:
         adapter.start(gateway.on_message)  # blocking until interrupted
     except KeyboardInterrupt:
         console.print("\n[dim]stopped[/dim]")
     except ImportError:
-        console.print("[red]Discord needs the 'messaging' extra: uv sync --extra messaging[/red]")
+        console.print("[red]This platform needs an extra dependency: uv sync --extra messaging[/red]")
         raise typer.Exit(code=1) from None
     finally:
         adapter.stop()

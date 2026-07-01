@@ -150,6 +150,14 @@ Create the bot at <https://discord.com/developers>, enable the **Message Content
 and invite it to your server. It replies in any channel it can see (filtered to ignore its
 own and other bots' messages). The token is read from the environment — never hard-coded.
 
+**Native Telegram.** Same adapter pattern, and it needs **no extra dependency** (the
+Telegram Bot API is plain HTTP):
+
+```bash
+export CHIMERA_TELEGRAM_BOT_TOKEN=...      # from @BotFather
+uv run chimera serve --telegram
+```
+
 ### `run` — Tier-1, single-shot completion
 
 A single model call, no tools, no fusion. Cheapest path.
