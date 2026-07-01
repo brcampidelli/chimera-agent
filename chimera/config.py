@@ -109,6 +109,9 @@ class Settings(BaseSettings):
     whatsapp_phone_number_id: str | None = Field(
         default=None, validation_alias="CHIMERA_WHATSAPP_PHONE_NUMBER_ID"
     )
+    whatsapp_verify_token: str | None = Field(
+        default=None, validation_alias="CHIMERA_WHATSAPP_VERIFY_TOKEN"
+    )
     signal_api_url: str | None = Field(default=None, validation_alias="CHIMERA_SIGNAL_API_URL")
     signal_number: str | None = Field(default=None, validation_alias="CHIMERA_SIGNAL_NUMBER")
 

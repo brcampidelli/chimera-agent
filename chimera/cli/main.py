@@ -412,7 +412,11 @@ def serve(
         return ChatSession(runner, memory=shared_memory, graph=shared_graph)
 
     message_gateway = MessageGateway(factory)
-    server = make_server(message_gateway, host, port, webhooks=_webhook_handler(message_gateway))
+    server = make_server(
+        message_gateway, host, port,
+        webhooks=_webhook_handler(message_gateway),
+        whatsapp=_whatsapp_webhook(settings, message_gateway),
+    )
     console.print(
         f"[bold]Chimera gateway[/bold] on http://{host}:{port}  "
         "[dim](POST /chat, POST /webhook/<hook>, GET /health). Ctrl+C to stop.[/dim]"
@@ -510,6 +514,20 @@ def _serve_platform(
         raise typer.Exit(code=1) from None
     finally:
         adapter.stop()
+
+
+def _whatsapp_webhook(settings: Settings, gateway: MessageGateway) -> Any:
+    """A WhatsAppWebhook (Meta verification + inbound routing) when configured, else None."""
+    if not (
+        settings.whatsapp_access_token
+        and settings.whatsapp_phone_number_id
+        and settings.whatsapp_verify_token
+    ):
+        return None
+    from chimera.server import WhatsAppSender, WhatsAppWebhook
+
+    sender = WhatsAppSender(settings.whatsapp_access_token, settings.whatsapp_phone_number_id)
+    return WhatsAppWebhook(sender, settings.whatsapp_verify_token, gateway.on_message)
 
 
 def _webhook_handler(gateway: MessageGateway) -> Any:

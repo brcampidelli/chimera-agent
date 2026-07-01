@@ -86,6 +86,37 @@ def test_http_handle_webhook_ignored_without_handler() -> None:
     assert status == 404
 
 
+class _FakeWhatsApp:
+    def __init__(self) -> None:
+        self.messages: list[dict[str, object]] = []
+
+    def verify(self, params: dict[str, str]) -> str | None:
+        return params.get("hub.challenge") if params.get("hub.verify_token") == "T" else None
+
+    def on_message(self, payload: dict[str, object]) -> int:
+        self.messages.append(payload)
+        return 1
+
+
+def test_http_handle_whatsapp_verification_returns_raw_challenge() -> None:
+    gateway = MessageGateway(EchoSession)
+    whatsapp = _FakeWhatsApp()
+    status, body = handle(
+        gateway, "GET", "/whatsapp?hub.mode=subscribe&hub.verify_token=T&hub.challenge=XYZ", b"", whatsapp=whatsapp
+    )
+    assert status == 200 and body == "XYZ"  # plain-text challenge, not JSON
+    status, _ = handle(gateway, "GET", "/whatsapp?hub.verify_token=BAD", b"", whatsapp=whatsapp)
+    assert status == 403
+
+
+def test_http_handle_whatsapp_inbound_post() -> None:
+    gateway = MessageGateway(EchoSession)
+    whatsapp = _FakeWhatsApp()
+    status, body = handle(gateway, "POST", "/whatsapp", b'{"entry": []}', whatsapp=whatsapp)
+    assert status == 200 and body["received"] == 1
+    assert whatsapp.messages == [{"entry": []}]
+
+
 def test_http_server_end_to_end() -> None:
     gateway = MessageGateway(EchoSession)
     server = make_server(gateway, "127.0.0.1", 0)  # ephemeral port

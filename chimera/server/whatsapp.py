@@ -10,6 +10,7 @@ endpoint; the parser is the building block for that. Credentials come from the e
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from chimera.server.gateway import InboundMessage
@@ -70,3 +71,34 @@ class WhatsAppSender:
         if not text or not sender:
             return None
         return InboundMessage(text=text, chat_id=sender, platform="whatsapp", user=sender)
+
+
+class WhatsAppWebhook:
+    """Two-way WhatsApp over an inbound webhook: Meta verification + message routing.
+
+    Wire the Meta app's webhook at ``https://<your-host>/whatsapp``. The verification and
+    routing are pure/testable; only the HTTP transport (public URL) lives outside.
+    """
+
+    def __init__(
+        self, sender: WhatsAppSender, verify_token: str, route: Callable[[InboundMessage], str]
+    ) -> None:
+        self.sender = sender
+        self.verify_token = verify_token
+        self.route = route
+
+    def verify(self, params: dict[str, str]) -> str | None:
+        """Meta webhook verification (GET): return hub.challenge when the token matches."""
+        if params.get("hub.mode") == "subscribe" and params.get("hub.verify_token") == self.verify_token:
+            return params.get("hub.challenge")
+        return None
+
+    def on_message(self, payload: dict[str, Any]) -> int:
+        """Handle an inbound webhook POST: route the message and reply. Returns count handled."""
+        message = WhatsAppSender.parse_inbound(payload)
+        if message is None:
+            return 0
+        reply = self.route(message)
+        if reply:
+            self.sender.send(message.chat_id, reply)
+        return 1

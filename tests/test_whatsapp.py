@@ -6,7 +6,18 @@ from typing import Any
 
 import pytest
 
-from chimera.server import WhatsAppSender
+from chimera.server import WhatsAppSender, WhatsAppWebhook
+
+
+class _FakeSender:
+    platform = "whatsapp"
+
+    def __init__(self) -> None:
+        self.sent: list[tuple[str, str]] = []
+
+    def send(self, chat_id: str, text: str) -> str:
+        self.sent.append((chat_id, text))
+        return "ok"
 
 
 def _payload(*, text: str = "hi", sender: str = "15551234567", type_: str = "text", message: bool = True) -> dict[str, Any]:
@@ -81,3 +92,24 @@ def test_send_surfaces_api_error(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(httpx, "Client", FakeClient)
     out = WhatsAppSender("bad", "PN").send("1", "hi")
     assert out.startswith("error:") and "invalid token" in out
+
+
+def test_webhook_verify_matches_token() -> None:
+    hook = WhatsAppWebhook(_FakeSender(), "TOKEN", lambda _m: "reply")  # type: ignore[arg-type]
+    assert hook.verify({"hub.mode": "subscribe", "hub.verify_token": "TOKEN", "hub.challenge": "XYZ"}) == "XYZ"
+    assert hook.verify({"hub.mode": "subscribe", "hub.verify_token": "WRONG", "hub.challenge": "XYZ"}) is None
+    assert hook.verify({}) is None
+
+
+def test_webhook_on_message_routes_and_replies() -> None:
+    sender = _FakeSender()
+    routed: list[str] = []
+
+    def route(message: Any) -> str:
+        routed.append(message.text)
+        return f"echo: {message.text}"
+
+    hook = WhatsAppWebhook(sender, "T", route)  # type: ignore[arg-type]
+    assert hook.on_message(_payload(text="hi", sender="15551234567")) == 1
+    assert routed == ["hi"] and sender.sent == [("15551234567", "echo: hi")]
+    assert hook.on_message(_payload(message=False)) == 0  # status update -> nothing sent

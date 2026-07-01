@@ -191,8 +191,11 @@ export CHIMERA_WHATSAPP_PHONE_NUMBER_ID=...
 # in a chat: send_message(platform="whatsapp", chat_id="<E.164 number>", text="done ✅")
 ```
 
-Two-way WhatsApp needs a public Meta webhook pointed at your endpoint; `WhatsAppSender.parse_inbound`
-is the building block for that.
+**Two-way WhatsApp.** Point your Meta app's webhook at `https://<your-host>/whatsapp` and set
+`CHIMERA_WHATSAPP_VERIFY_TOKEN` (any string you choose, matching the app config). `chimera
+serve` then verifies the subscription (`GET /whatsapp`) and routes inbound messages
+(`POST /whatsapp`) through the gateway, replying over the Cloud API. WhatsApp still needs a
+public URL for the webhook — that's the only part outside Chimera.
 
 **Native Signal (two-way).** Signal has no official API, so Chimera talks to a
 [`signal-cli-rest-api`](https://github.com/bbernhard/signal-cli-rest-api) bridge you run

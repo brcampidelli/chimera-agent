@@ -11,6 +11,7 @@ import json
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 from chimera.server.gateway import InboundMessage, MessageGateway
 
@@ -25,10 +26,24 @@ def handle(
     body: bytes,
     *,
     webhooks: WebhookHandler | None = None,
-) -> tuple[int, dict[str, Any]]:
-    """Pure request handler returning ``(status, json_body)``."""
-    if method == "GET" and path == "/health":
+    whatsapp: Any = None,
+) -> tuple[int, dict[str, Any] | str]:
+    """Pure request handler returning ``(status, body)`` — body is a dict (JSON) or a str (text)."""
+    route = urlparse(path).path
+    if method == "GET" and route == "/health":
         return 200, {"status": "ok", "active_chats": gateway.active_chats}
+    if whatsapp is not None and route == "/whatsapp":
+        if method == "GET":  # Meta subscription verification: echo the challenge as plain text
+            params = {key: values[0] for key, values in parse_qs(urlparse(path).query).items()}
+            challenge = whatsapp.verify(params)
+            return (200, challenge) if challenge is not None else (403, {"error": "verification failed"})
+        if method == "POST":
+            try:
+                payload = json.loads(body or b"{}")
+            except json.JSONDecodeError:
+                payload = {}
+            handled = whatsapp.on_message(payload if isinstance(payload, dict) else {})
+            return 200, {"received": handled}
     if method == "POST" and path.startswith("/webhook/") and webhooks is not None:
         hook = path[len("/webhook/") :]
         try:
@@ -70,6 +85,7 @@ def make_server(
     port: int = 8765,
     *,
     webhooks: WebhookHandler | None = None,
+    whatsapp: Any = None,
 ) -> ThreadingHTTPServer:
     """Build (but don't start) an HTTP server wrapping ``gateway`` (and optional webhooks)."""
 
@@ -77,10 +93,13 @@ def make_server(
         def _respond(self, method: str) -> None:
             length = int(self.headers.get("Content-Length", 0) or 0)
             body = self.rfile.read(length) if length else b""
-            status, payload = handle(gateway, method, self.path, body, webhooks=webhooks)
-            data = json.dumps(payload).encode("utf-8")
+            status, payload = handle(gateway, method, self.path, body, webhooks=webhooks, whatsapp=whatsapp)
+            if isinstance(payload, str):  # plain text (e.g. the WhatsApp verification challenge)
+                data, content_type = payload.encode("utf-8"), "text/plain"
+            else:
+                data, content_type = json.dumps(payload).encode("utf-8"), "application/json"
             self.send_response(status)
-            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)
