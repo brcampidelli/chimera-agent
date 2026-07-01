@@ -66,7 +66,7 @@ TrustClaw/NemoClaw/ZeroClaw apportent sécurité/sandbox mais n'évoluent pas. *
 **Orchestration, interfaces & intégrations**
 - **Kanban + worker lanes** (`chimera kanban`) — un tableau (backlog → doing → review → done) dont les cartes sont dispatchées vers une lane `solve` ou `crew` ; `kanban learn` transforme les tâches récurrentes en cartes.
 - **Loop Engineering** (`chimera workflow`) — rédigez une boucle autonome en YAML (étapes qui `utilisent` la stack, avec conditions `when` et boucles `repeat`/`until`).
-- **Interfaces** — un REPL `chat`, une **TUI** plein écran (Textual) et une **passerelle de messagerie** (HTTP, ou **Discord/Telegram/Slack natif** via `serve --discord|--telegram|--slack`) avec une conversation (et mémoire) par chat ; l'agent peut aussi **envoyer** des messages via l'outil `send_message`.
+- **Interfaces** — un REPL `chat`, une **TUI** plein écran (Textual) et une **passerelle de messagerie** (HTTP, ou **Discord/Telegram/Slack/Signal natif** via `serve --discord|--telegram|--slack|--signal`) avec une conversation (et mémoire) par chat ; l'agent peut aussi **envoyer** des messages via l'outil `send_message` (WhatsApp bidirectionnel via webhook).
 - **Sandbox d'exécution** — exécutez l'outil shell localement ou dans un conteneur **Docker** isolé (`CHIMERA_SANDBOX=docker`).
 - **Intégrations** — un client **MCP** (stdio) first-class + un importateur **OpenAPI/REST → tool** ; des **crons** (assignés et auto-appris, avec confirmation) ; la **migration** de config/skills/mémoire long terme depuis Hermes Agent / OpenClaw.
 
@@ -89,7 +89,7 @@ uv run chimera doctor       # vérifiez votre environnement
 chimera doctor / models / features    # statut, configuration, capacités optionnelles
 chimera chat                          # assistant interactif multi-tours (votre bras droit)
 chimera tui                           # app terminal plein écran (Textual)
-chimera serve [--discord|--telegram|--slack]  # passerelle de messagerie : HTTP, ou bot de plateforme natif
+chimera serve [--discord|--telegram|--slack|--signal]  # passerelle de messagerie : HTTP, ou bot de plateforme natif
 chimera run "PROMPT" --image pic.png   # Tier-1 en un coup (avec vision via --image)
 chimera deliver "un plan" -o plan.md   # Mode Livrable : produit un artefact soigné
 chimera fuse "PROMPT" --show-panel     # LLM-Fusion : panel -> juge -> synthétiseur

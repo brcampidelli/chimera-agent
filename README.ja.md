@@ -63,7 +63,7 @@ CrewAI/LangGraph はオーケストレーションは得意でも学習しない
 **オーケストレーション、インターフェースと統合**
 - **カンバン + ワーカー・レーン**（`chimera kanban`）—— タスクボード（backlog → doing → review → done）。カードは `solve` または `crew` レーンへ振り分けられ、`kanban learn` は繰り返しタスクをカードにします。
 - **Loop Engineering**（`chimera workflow`）—— 自律ループを YAML で記述（スタックを `use` するステップ、`when` 条件と `repeat`/`until` ループ付き）。
-- **インターフェース** —— `chat` REPL、フルスクリーンの **TUI**（Textual）、そしてチャットごとに 1 つの会話（と記憶）を持つ **メッセージング・ゲートウェイ**（HTTP、または `serve --discord|--telegram|--slack` による**ネイティブ Discord/Telegram/Slack**）；エージェントは `send_message` ツールでメッセージを**送信**することもできます。
+- **インターフェース** —— `chat` REPL、フルスクリーンの **TUI**（Textual）、そしてチャットごとに 1 つの会話（と記憶）を持つ **メッセージング・ゲートウェイ**（HTTP、または `serve --discord|--telegram|--slack|--signal` による**ネイティブ Discord/Telegram/Slack/Signal**）；エージェントは `send_message` ツールでメッセージを**送信**することもできます（WhatsApp は webhook 経由で双方向）。
 - **実行サンドボックス** —— シェルツールをローカルまたは隔離された **Docker** コンテナで実行（`CHIMERA_SANDBOX=docker`）。
 - **統合** —— ファーストクラスの **MCP** クライアント（stdio）＋ **OpenAPI/REST → ツール** インポーター；**cron**（人による割当と自己学習、確認付き）；Hermes Agent / OpenClaw から設定/スキル/長期記憶を**マイグレーション**。
 
@@ -86,7 +86,7 @@ uv run chimera doctor       # 環境を確認
 chimera doctor / models / features    # ステータス、構成、オプション機能
 chimera chat                          # 対話型マルチターン・アシスタント（あなたの右腕）
 chimera tui                           # フルスクリーン端末アプリ（Textual）
-chimera serve [--discord|--telegram|--slack]  # メッセージング・ゲートウェイ：HTTP、またはネイティブ・プラットフォーム・ボット
+chimera serve [--discord|--telegram|--slack|--signal]  # メッセージング・ゲートウェイ：HTTP、またはネイティブ・プラットフォーム・ボット
 chimera run "PROMPT" --image pic.png   # ティア 1 単発（--image でビジョン対応）
 chimera deliver "計画" -o plan.md       # Deliverable モード：洗練された成果物を生成
 chimera fuse "PROMPT" --show-panel     # LLM-Fusion：パネル -> ジャッジ -> シンセサイザー

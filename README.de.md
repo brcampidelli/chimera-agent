@@ -66,7 +66,7 @@ TrustClaw/NemoClaw/ZeroClaw bringen Sicherheit/Sandboxing, entwickeln sich aber 
 **Orchestrierung, Schnittstellen & Integrationen**
 - **Kanban + Worker-Lanes** (`chimera kanban`) — ein Task-Board (Backlog → Doing → Review → Done), dessen Karten an eine `solve`- oder `crew`-Lane verteilt werden; `kanban learn` macht wiederkehrende Aufgaben zu Karten.
 - **Loop Engineering** (`chimera workflow`) — eine autonome Schleife als YAML verfassen (Schritte, die die Stack `nutzen`, mit `when`-Bedingungen und `repeat`/`until`-Schleifen).
-- **Schnittstellen** — eine `chat`-REPL, eine Vollbild-**TUI** (Textual) und ein **Messaging-Gateway** (HTTP, oder **natives Discord/Telegram/Slack** via `serve --discord|--telegram|--slack`) mit einer Konversation (und Gedächtnis) pro Chat; der Agent kann Nachrichten auch über das `send_message`-Tool **senden**.
+- **Schnittstellen** — eine `chat`-REPL, eine Vollbild-**TUI** (Textual) und ein **Messaging-Gateway** (HTTP, oder **natives Discord/Telegram/Slack/Signal** via `serve --discord|--telegram|--slack|--signal`) mit einer Konversation (und Gedächtnis) pro Chat; der Agent kann Nachrichten auch über das `send_message`-Tool **senden** (WhatsApp zweiseitig via Webhook).
 - **Ausführungs-Sandbox** — das Shell-Tool lokal oder in einem isolierten **Docker**-Container ausführen (`CHIMERA_SANDBOX=docker`).
 - **Integrationen** — ein First-Class-**MCP**-Client (stdio) + ein **OpenAPI/REST → Tool**-Importer; **Crons** (von Menschen zugewiesen und selbstgelernt, mit Bestätigung); **Migration** von Config/Skills/Langzeitgedächtnis aus Hermes Agent / OpenClaw.
 
@@ -89,7 +89,7 @@ uv run chimera doctor       # Umgebung prüfen
 chimera doctor / models / features    # Status, Konfiguration, optionale Fähigkeiten
 chimera chat                          # interaktiver Mehrrunden-Assistent (deine rechte Hand)
 chimera tui                           # Vollbild-Terminal-App (Textual)
-chimera serve [--discord|--telegram|--slack]  # Messaging-Gateway: HTTP oder nativer Plattform-Bot
+chimera serve [--discord|--telegram|--slack|--signal]  # Messaging-Gateway: HTTP oder nativer Plattform-Bot
 chimera run "PROMPT" --image pic.png   # Tier-1 Single-Shot (mit Vision via --image)
 chimera deliver "ein Plan" -o plan.md   # Deliverable-Modus: erzeugt ein poliertes Artefakt
 chimera fuse "PROMPT" --show-panel     # LLM-Fusion: Panel -> Richter -> Synthesizer
