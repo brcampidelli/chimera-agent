@@ -192,8 +192,18 @@ export CHIMERA_WHATSAPP_PHONE_NUMBER_ID=...
 ```
 
 Two-way WhatsApp needs a public Meta webhook pointed at your endpoint; `WhatsAppSender.parse_inbound`
-is the building block for that. **Signal** is not shipped — it has no official API and would
-require running an external `signal-cli`/Matrix bridge, which is out of scope for the core.
+is the building block for that.
+
+**Native Signal (two-way).** Signal has no official API, so Chimera talks to a
+[`signal-cli-rest-api`](https://github.com/bbernhard/signal-cli-rest-api) bridge you run
+(Docker) and link to your number — plain HTTP, no Python dependency:
+
+```bash
+docker run -d -p 8080:8080 -v signal-cli:/home/.local/share/signal-cli bbernhard/signal-cli-rest-api
+export CHIMERA_SIGNAL_API_URL=http://localhost:8080
+export CHIMERA_SIGNAL_NUMBER=+15550000000     # this bot's registered number
+uv run chimera serve --signal
+```
 
 ### `run` — Tier-1, single-shot completion
 

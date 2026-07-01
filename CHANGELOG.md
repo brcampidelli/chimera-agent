@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Native Signal** (`chimera serve --signal`): two-way via a `signal-cli-rest-api` bridge
+  you run (Docker) — poll `GET /v1/receive` + `POST /v2/send` over `httpx`, no Python
+  dependency, same adapter shape as Telegram. Pure envelope parsing/filtering is fully
+  tested. Config: `CHIMERA_SIGNAL_API_URL` + `CHIMERA_SIGNAL_NUMBER`. (The bridge is
+  external, but the adapter is real and tested — not a stub.)
 - **Stateful + productivity tools**: `code_interpreter` (a persistent in-process Python
   session — variables/imports carry across calls, `reset` to clear), `read_email` (IMAP,
   stdlib) and `calendar_events` (any iCalendar `.ics` feed, stdlib parser). `code_interpreter`

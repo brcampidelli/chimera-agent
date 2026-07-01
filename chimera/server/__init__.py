@@ -13,6 +13,7 @@ from chimera.server.gateway import (
     chunk_text,
 )
 from chimera.server.http import WebhookHandler, handle, make_server
+from chimera.server.signal_adapter import SignalAdapter
 from chimera.server.slack_adapter import SlackAdapter
 from chimera.server.telegram_adapter import TelegramAdapter
 from chimera.server.whatsapp import WhatsAppSender
@@ -25,6 +26,7 @@ __all__ = [
     "DiscordAdapter",
     "TelegramAdapter",
     "SlackAdapter",
+    "SignalAdapter",
     "WhatsAppSender",
     "chunk_text",
     "handle",

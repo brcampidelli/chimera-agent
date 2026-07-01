@@ -362,8 +362,9 @@ def serve(
     discord: bool = typer.Option(False, "--discord", help="Serve on Discord (needs CHIMERA_DISCORD_BOT_TOKEN + the 'messaging' extra)."),
     telegram: bool = typer.Option(False, "--telegram", help="Serve on Telegram (needs CHIMERA_TELEGRAM_BOT_TOKEN)."),
     slack: bool = typer.Option(False, "--slack", help="Serve on Slack (needs CHIMERA_SLACK_BOT_TOKEN + CHIMERA_SLACK_APP_TOKEN + the 'messaging' extra)."),
+    signal: bool = typer.Option(False, "--signal", help="Serve on Signal via a signal-cli-rest-api bridge (CHIMERA_SIGNAL_API_URL + CHIMERA_SIGNAL_NUMBER)."),
 ) -> None:
-    """Run the messaging gateway on HTTP (POST /chat, GET /health), Discord, Telegram or Slack. Requires a key."""
+    """Run the messaging gateway on HTTP, Discord, Telegram, Slack or Signal. Requires a key."""
     from chimera.core import Agent, AgentConfig
     from chimera.interface import ChatSession
     from chimera.providers import LLMGateway
@@ -386,7 +387,13 @@ def serve(
     shared_memory = None if no_memory else _memory_manager()
     shared_graph = _recall_graph(shared_memory)
 
-    platform = "discord" if discord else "telegram" if telegram else "slack" if slack else None
+    platform = (
+        "discord" if discord
+        else "telegram" if telegram
+        else "slack" if slack
+        else "signal" if signal
+        else None
+    )
     if platform is not None:
         adapter = _messaging_adapter(settings, platform)
         _serve_platform(adapter, settings, backend, model, max_steps, workspace_path, shared_memory, shared_graph)
@@ -434,12 +441,19 @@ def _messaging_adapter(settings: Settings, platform: str) -> Any:
         from chimera.server import TelegramAdapter
 
         return TelegramAdapter(settings.telegram_bot_token)
-    if not (settings.slack_bot_token and settings.slack_app_token):
-        console.print("[red]Set CHIMERA_SLACK_BOT_TOKEN and CHIMERA_SLACK_APP_TOKEN to run the Slack adapter.[/red]")
-        raise typer.Exit(code=1)
-    from chimera.server import SlackAdapter
+    if platform == "slack":
+        if not (settings.slack_bot_token and settings.slack_app_token):
+            console.print("[red]Set CHIMERA_SLACK_BOT_TOKEN and CHIMERA_SLACK_APP_TOKEN to run the Slack adapter.[/red]")
+            raise typer.Exit(code=1)
+        from chimera.server import SlackAdapter
 
-    return SlackAdapter(settings.slack_bot_token, settings.slack_app_token)
+        return SlackAdapter(settings.slack_bot_token, settings.slack_app_token)
+    if not (settings.signal_api_url and settings.signal_number):
+        console.print("[red]Set CHIMERA_SIGNAL_API_URL and CHIMERA_SIGNAL_NUMBER (run a signal-cli-rest-api bridge).[/red]")
+        raise typer.Exit(code=1)
+    from chimera.server import SignalAdapter
+
+    return SignalAdapter(settings.signal_api_url, settings.signal_number)
 
 
 def _sender_registry(settings: Settings, primary: Any = None) -> Any:

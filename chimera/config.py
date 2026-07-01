@@ -109,6 +109,8 @@ class Settings(BaseSettings):
     whatsapp_phone_number_id: str | None = Field(
         default=None, validation_alias="CHIMERA_WHATSAPP_PHONE_NUMBER_ID"
     )
+    signal_api_url: str | None = Field(default=None, validation_alias="CHIMERA_SIGNAL_API_URL")
+    signal_number: str | None = Field(default=None, validation_alias="CHIMERA_SIGNAL_NUMBER")
 
     # --- Email (SMTP) for the send_email reference tool ---
     smtp_host: str | None = Field(default=None, validation_alias="CHIMERA_SMTP_HOST")

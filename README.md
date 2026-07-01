@@ -65,7 +65,7 @@ bring security/sandboxing but don't evolve. **Chimera combines all four:**
 **Orchestration, interfaces & integrations**
 - **Kanban + worker lanes** (`chimera kanban`) — a task board (backlog → doing → review → done) where cards dispatch to a `solve` or `crew` lane; `kanban learn` turns recurring tasks into cards.
 - **Loop Engineering** (`chimera workflow`) — author an autonomous loop as YAML (steps that `use` the stack, with `when` conditions and `repeat`/`until` loops).
-- **Interfaces** — a `chat` REPL, a full-screen **TUI** (Textual), and a **messaging gateway** (HTTP, or **native Discord / Telegram / Slack** via `serve --discord|--telegram|--slack`) with one conversation (and memory) per chat; the agent can also **send** messages via a `send_message` tool (including send-only **WhatsApp** Cloud API).
+- **Interfaces** — a `chat` REPL, a full-screen **TUI** (Textual), and a **messaging gateway** (HTTP, or **native Discord / Telegram / Slack / Signal** via `serve --discord|--telegram|--slack|--signal`) with one conversation (and memory) per chat; the agent can also **send** messages via a `send_message` tool (including send-only **WhatsApp** Cloud API).
 - **Execution sandbox** — run the shell tool locally or in an isolated **Docker** container (`CHIMERA_SANDBOX=docker`).
 - **Integrations** — a first-class **MCP** client (stdio) + an **OpenAPI/REST → tool** importer; **crons + webhook triggers** (`serve` runs a task on an inbound `POST /webhook/<hook>` — unattended); **migration** of config/skills/long-term memory from Hermes Agent / OpenClaw.
 
