@@ -79,6 +79,15 @@ def test_graph_recall_adds_entity_linked_facts() -> None:
     assert "Stripe is our payment provider" in agent.prompts[0]
 
 
+def test_profile_is_always_in_the_prompt() -> None:
+    agent = RecordingAgent()
+    session = ChatSession(agent, profile="What you know about the user:\n- likes async code")
+    session.send("hi")
+    session.send("something unrelated to async")
+    assert "likes async code" in agent.prompts[0]
+    assert "likes async code" in agent.prompts[1]  # persists every turn, not keyword-gated
+
+
 def test_set_model_updates_the_agent_config() -> None:
     from chimera.core import AgentConfig
 

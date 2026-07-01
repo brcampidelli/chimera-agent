@@ -104,6 +104,22 @@ class MemoryManager:
             self.store.remove(item.id)
         return len(items) - max_items
 
+    def profile(self, *, max_items: int = 12) -> str:
+        """A consolidated user-profile preamble from persona memories (highest-value first).
+
+        Persona facts persist across sessions, so applying them as a preamble on every turn
+        gives cross-session personalization without the user re-stating preferences. Empty
+        string when no persona facts are stored.
+        """
+        from chimera.memory.value import rank
+
+        personas = self.store.by_kind("persona")
+        if not personas:
+            return ""
+        top = [item for _, item in rank(personas)][:max_items]
+        facts = "\n".join(f"- {item.content}" for item in top)
+        return f"What you know about the user:\n{facts}"
+
     def search(self, query: str, *, k: int = 5) -> list[MemoryItem]:
         """Retrieve relevant memories — full-text if the backend supports it, else keyword."""
         backend_search = getattr(self.store, "search", None)

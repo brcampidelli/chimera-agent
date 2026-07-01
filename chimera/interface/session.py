@@ -51,6 +51,7 @@ class ChatSession:
     memory: SupportsRecall | None = None
     graph: SupportsRelated | None = None
     gate: MemoryGate | None = field(default_factory=MemoryGate)
+    profile: str = ""  # persistent user-profile preamble (persona facts), applied every turn
     max_history: int = 6
     memory_k: int = 3
     turns: list[ChatTurn] = field(default_factory=list)
@@ -78,6 +79,8 @@ class ChatSession:
 
     def _compose(self, message: str) -> str:
         parts: list[str] = []
+        if self.profile:  # persistent persona preamble — cross-session personalization
+            parts.append(self.profile)
         facts: list[str] = []
         if self.memory is not None:
             items = self.memory.search(message, k=self.memory_k)

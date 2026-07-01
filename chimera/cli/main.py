@@ -278,7 +278,9 @@ def chat(
         backend = RoutedBackend(gateway, FusionEngine(gateway))
     agent = Agent(backend, default_registry(Path(workspace)), AgentConfig(model=model, max_steps=max_steps))
     mem = None if no_memory else _memory_manager()
-    session = ChatSession(agent, memory=mem, graph=_recall_graph(mem))
+    session = ChatSession(
+        agent, memory=mem, graph=_recall_graph(mem), profile=mem.profile() if mem is not None else ""
+    )
 
     console.print(
         "[bold]Chimera chat[/bold] — your terminal right-hand. "
@@ -346,7 +348,9 @@ def tui(
         backend = RoutedBackend(gateway, FusionEngine(gateway))
     agent = Agent(backend, default_registry(Path(workspace)), AgentConfig(model=model, max_steps=max_steps))
     mem = None if no_memory else _memory_manager()
-    session = ChatSession(agent, memory=mem, graph=_recall_graph(mem))
+    session = ChatSession(
+        agent, memory=mem, graph=_recall_graph(mem), profile=mem.profile() if mem is not None else ""
+    )
     ChimeraTUI(session, model_label=model or settings.default_model).run()
 
 
@@ -386,6 +390,7 @@ def serve(
     workspace_path = Path(workspace)
     shared_memory = None if no_memory else _memory_manager()
     shared_graph = _recall_graph(shared_memory)
+    shared_profile = shared_memory.profile() if shared_memory is not None else ""
 
     platform = (
         "discord" if discord
@@ -409,7 +414,7 @@ def serve(
         if http_send_tool is not None:
             registry.register(http_send_tool)
         runner = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
-        return ChatSession(runner, memory=shared_memory, graph=shared_graph)
+        return ChatSession(runner, memory=shared_memory, graph=shared_graph, profile=shared_profile)
 
     message_gateway = MessageGateway(factory)
     server = make_server(
@@ -1079,10 +1084,18 @@ def _recall_graph(memory: MemoryManager | None) -> MemoryGraph | None:
 def memory_add(
     content: str = typer.Argument(..., help="The fact to remember."),
     key: str = typer.Option(None, "--key", help="Optional dedup key."),
+    persona: bool = typer.Option(False, "--persona", help="Store as a persona fact (part of the cross-session profile)."),
 ) -> None:
     """Remember a fact (ADD / UPDATE / NOOP, deduped)."""
-    op, item = _memory_manager().remember(content, key=key)
+    op, item = _memory_manager().remember(content, "persona" if persona else "semantic", key=key)
     console.print(f"[green]{op}[/green] {item.id}")
+
+
+@memory_app.command("profile")
+def memory_profile() -> None:
+    """Show the consolidated cross-session user profile (persona facts)."""
+    text = _memory_manager().profile()
+    console.print(text or "[dim]no persona facts yet — add some with `memory add --persona`[/dim]")
 
 
 @memory_app.command("search")

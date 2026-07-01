@@ -20,6 +20,17 @@ def test_remember_add_then_noop(tmp_path: Path) -> None:
     assert len(mgr.store) == 1
 
 
+def test_profile_consolidates_persona_facts(tmp_path: Path) -> None:
+    manager = _manager(tmp_path)
+    manager.remember("prefers concise answers", "persona")
+    manager.remember("uses Python and async", "persona")
+    manager.remember("the deploy runs on Fridays", "semantic")  # not persona
+    profile = manager.profile()
+    assert "concise answers" in profile and "uses Python and async" in profile
+    assert "deploy runs on Fridays" not in profile
+    assert _manager(tmp_path / "empty").profile() == ""  # no persona facts -> empty
+
+
 def test_prune_keeps_highest_value(tmp_path: Path) -> None:
     mgr = _manager(tmp_path)
     mgr.add("a low working scratch note", kind="working")

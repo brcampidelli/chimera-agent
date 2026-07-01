@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Cross-session user profile**: persona memories are consolidated into a profile preamble
+  (`chimera memory profile`) that's applied on *every* turn of `chat` / `tui` / `serve` — so
+  the agent remembers the user's preferences across conversations without them re-stating it.
+  Record them with `memory add --persona`. Closes the cross-session personalization gap.
 - **SQLite + FTS5 memory backend** (`CHIMERA_MEMORY_BACKEND=sqlite`): an optional store with
   a full-text index, so recall is phrase/substring-aware and stays fast as memory grows —
   addressing the top memory gap vs. Hermes (keyword-only JSON). The `MemoryManager` prefers
