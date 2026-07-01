@@ -70,7 +70,8 @@ bring security/sandboxing but don't evolve. **Chimera combines all four:**
 - **Integrations** — a first-class **MCP** client (stdio) + an **OpenAPI/REST → tool** importer; **crons** (human-assigned and self-learned, with confirmation); **migration** of config/skills/long-term memory from Hermes Agent / OpenClaw.
 
 **Built-in extras**
-- **Vision** (image paste), **Deliverable Mode** (polished artifacts), and a **Pet** companion — plus pre-set credential slots for web search, image generation, TTS/voice and more (`chimera features`).
+- **Reference tools** — key-gated batteries that auto-register when their credential is set: `web_search`, `generate_image` (OpenAI), `text_to_speech` (ElevenLabs), `send_email` (SMTP). Arbitrary REST services still plug in via the OpenAPI→tool importer.
+- **Vision** (image paste), **Deliverable Mode** (polished artifacts), and a **Pet** companion — see all optional capabilities with `chimera features`.
 
 ## Quickstart
 

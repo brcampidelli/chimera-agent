@@ -106,6 +106,13 @@ class Settings(BaseSettings):
     slack_bot_token: str | None = Field(default=None, validation_alias="CHIMERA_SLACK_BOT_TOKEN")
     slack_app_token: str | None = Field(default=None, validation_alias="CHIMERA_SLACK_APP_TOKEN")
 
+    # --- Email (SMTP) for the send_email reference tool ---
+    smtp_host: str | None = Field(default=None, validation_alias="CHIMERA_SMTP_HOST")
+    smtp_port: int = Field(default=587, validation_alias="CHIMERA_SMTP_PORT")
+    smtp_user: str | None = Field(default=None, validation_alias="CHIMERA_SMTP_USER")
+    smtp_password: str | None = Field(default=None, validation_alias="CHIMERA_SMTP_PASSWORD")
+    smtp_from: str | None = Field(default=None, validation_alias="CHIMERA_SMTP_FROM")
+
     # --- Execution sandbox for the shell tool (local = host, docker = isolated) ---
     sandbox: str = Field(default="local", validation_alias="CHIMERA_SANDBOX")
     sandbox_image: str = Field(

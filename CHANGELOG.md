@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Reference tool library** (batteries, key-gated like `web_search`): `generate_image`
+  (OpenAI Images → saves a file), `text_to_speech` (ElevenLabs → saves an mp3), and
+  `send_email` (SMTP, Python stdlib — no dependency). Each auto-registers when its
+  credential is present, so the agent gains the capability the moment you add the key.
+  Starts closing the "only 6 built-in tools" gap vs. Hermes.
 - **Native Slack** (`chimera serve --slack`): the third platform on the same adapter
   pattern — receives via Socket Mode (`slack-sdk`, the `messaging` extra) and sends via the
   Web API (`chat.postMessage`, plain `httpx`). Pure event-filtering (`_message_from_event`)

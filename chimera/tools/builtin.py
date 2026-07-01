@@ -49,8 +49,21 @@ def default_registry(workspace: Path | None = None) -> ToolRegistry:
     # Key-gated optional tools light up when their credential is set.
     from chimera.config import get_settings
 
-    if get_settings().tavily_api_key:
+    settings = get_settings()
+    if settings.tavily_api_key:
         from chimera.tools.web import WebSearchTool
 
         registry.register(WebSearchTool())
+    if settings.key_pool("openai"):
+        from chimera.tools.media import ImageGenTool
+
+        registry.register(ImageGenTool())
+    if settings.elevenlabs_api_key:
+        from chimera.tools.media import TextToSpeechTool
+
+        registry.register(TextToSpeechTool())
+    if settings.smtp_host and settings.smtp_user and settings.smtp_password:
+        from chimera.tools.email import SendEmailTool
+
+        registry.register(SendEmailTool())
     return registry
