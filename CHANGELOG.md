@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Webhook triggers — unattended operation.** The scheduler gained a `webhook` trigger
+  (`chimera cron add <name> <hook> <task> --webhook`), and the gateway serves
+  `POST /webhook/<hook>`: an inbound HTTP request fires every job registered for that hook,
+  with the POST body handed to the task as context. Chimera can now run on a GitHub push, a
+  Stripe event, or any external ping — no human in the loop. The routing lives in the pure,
+  tested `handle()`; `_serve` wires it to the scheduler.
 - **More reference tools**: `execute_code` (run Python through the sandbox — same isolation
   and governance as `run_shell`) and `arxiv_search` (public arXiv API, stdlib XML) are
   always on; `youtube_transcript` is opt-in (the `youtube` extra), degrading gracefully

@@ -73,6 +73,46 @@ class Scheduler:
         self.store.add(job)
         return job
 
+    def schedule_webhook(
+        self,
+        name: str,
+        hook: str,
+        action: str,
+        *,
+        created_by: CreatedBy = "human",
+    ) -> CronJob:
+        """Register a job fired by an inbound HTTP POST to ``/webhook/<hook>``."""
+        job = CronJob(
+            id=uuid.uuid4().hex[:8],
+            name=name,
+            trigger="webhook",
+            schedule=hook,
+            action=action,
+            created_by=created_by,
+        )
+        self.store.add(job)
+        return job
+
+    def jobs_for_webhook(self, hook: str) -> list[CronJob]:
+        """Enabled webhook jobs registered for ``hook``."""
+        return [
+            job
+            for job in self.store.list()
+            if job.enabled and job.trigger == "webhook" and job.schedule == hook
+        ]
+
+    def fire_webhook(self, hook: str, now: float, dispatch: Callable[[CronJob], None]) -> list[CronJob]:
+        """Dispatch every job registered for ``hook`` (an inbound webhook). Returns those run."""
+        ran: list[CronJob] = []
+        for job in self.jobs_for_webhook(hook):
+            try:
+                dispatch(job)
+            except Exception as exc:  # a failing job must not break the server
+                _log.warning("webhook job %s failed: %s", job.id, exc)
+            self.mark_ran(job, now)
+            ran.append(job)
+        return ran
+
     def due(self, now: float) -> list[CronJob]:
         """Enabled cron jobs whose ``next_run`` is at or before ``now``."""
         return [

@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from chimera.pet import Pet, PetStore
     from chimera.providers import SupportsComplete
     from chimera.scheduler import CronStore
+    from chimera.server import MessageGateway
 
 
 def _force_utf8_streams() -> None:
@@ -395,10 +396,11 @@ def serve(
         runner = Agent(backend, default_registry(workspace_path), AgentConfig(model=model, max_steps=max_steps))
         return ChatSession(runner, memory=shared_memory, graph=shared_graph)
 
-    server = make_server(MessageGateway(factory), host, port)
+    message_gateway = MessageGateway(factory)
+    server = make_server(message_gateway, host, port, webhooks=_webhook_handler(message_gateway))
     console.print(
         f"[bold]Chimera gateway[/bold] on http://{host}:{port}  "
-        "[dim](POST /chat, GET /health). Ctrl+C to stop.[/dim]"
+        "[dim](POST /chat, POST /webhook/<hook>, GET /health). Ctrl+C to stop.[/dim]"
     )
     try:
         server.serve_forever()
@@ -472,6 +474,35 @@ def _serve_platform(
         raise typer.Exit(code=1) from None
     finally:
         adapter.stop()
+
+
+def _webhook_handler(gateway: MessageGateway) -> Any:
+    """Fire scheduler webhook jobs (added via `cron add --webhook`) through the gateway."""
+    import json as _json
+    import time
+
+    from chimera.scheduler import Scheduler
+    from chimera.server import InboundMessage
+
+    scheduler = Scheduler(_cron_store())
+
+    def webhooks(hook: str, payload: dict[str, Any]) -> list[str]:
+        results: list[str] = []
+
+        def dispatch(job: Any) -> None:
+            prompt = job.action
+            if payload:
+                prompt = f"{prompt}\n\nWebhook payload:\n{_json.dumps(payload)}"
+            results.append(
+                gateway.on_message(
+                    InboundMessage(text=prompt, chat_id=f"webhook:{hook}", platform="webhook")
+                )
+            )
+
+        scheduler.fire_webhook(hook, time.time(), dispatch)
+        return results
+
+    return webhooks
 
 
 @app.command()
@@ -734,17 +765,20 @@ def cron_list() -> None:
 @cron_app.command("add")
 def cron_add(
     name: str = typer.Argument(..., help="A human-readable name."),
-    schedule: str = typer.Argument(..., help="Cron expression, or event name with --event."),
+    schedule: str = typer.Argument(..., help="Cron expression, or an event/webhook name."),
     action: str = typer.Argument(..., help="What to do (task description / skill)."),
     event: bool = typer.Option(False, "--event", help="Treat SCHEDULE as an event name."),
+    webhook: bool = typer.Option(False, "--webhook", help="Fire on POST /webhook/<SCHEDULE> (needs 'chimera serve')."),
 ) -> None:
-    """Add a cron or event-triggered job."""
+    """Add a cron, event- or webhook-triggered job."""
     import time
 
     from chimera.scheduler import Scheduler
 
     sched = Scheduler(_cron_store())
-    if event:
+    if webhook:
+        job = sched.schedule_webhook(name, schedule, action)
+    elif event:
         job = sched.schedule_event(name, schedule, action)
     else:
         try:

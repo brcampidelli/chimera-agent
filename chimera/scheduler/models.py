@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-Trigger = Literal["cron", "event"]
+Trigger = Literal["cron", "event", "webhook"]
 CreatedBy = Literal["human", "agent"]
 
 

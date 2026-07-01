@@ -60,6 +60,32 @@ def test_http_handle_health_and_chat() -> None:
     assert status == 404
 
 
+def test_http_handle_webhook_fires_jobs() -> None:
+    gateway = MessageGateway(EchoSession)
+    seen: dict[str, object] = {}
+
+    def webhooks(hook: str, payload: dict[str, object]) -> list[str]:
+        seen["hook"] = hook
+        seen["payload"] = payload
+        return ["ran the job"]
+
+    status, body = handle(gateway, "POST", "/webhook/gh-push", b'{"ref": "main"}', webhooks=webhooks)
+    assert status == 200 and body["fired"] == 1 and body["results"] == ["ran the job"]
+    assert seen == {"hook": "gh-push", "payload": {"ref": "main"}}
+
+
+def test_http_handle_webhook_404_when_no_job() -> None:
+    gateway = MessageGateway(EchoSession)
+    status, _ = handle(gateway, "POST", "/webhook/none", b"{}", webhooks=lambda h, p: [])
+    assert status == 404
+
+
+def test_http_handle_webhook_ignored_without_handler() -> None:
+    gateway = MessageGateway(EchoSession)
+    status, _ = handle(gateway, "POST", "/webhook/x", b"{}")  # no webhooks handler -> not routed
+    assert status == 404
+
+
 def test_http_server_end_to_end() -> None:
     gateway = MessageGateway(EchoSession)
     server = make_server(gateway, "127.0.0.1", 0)  # ephemeral port

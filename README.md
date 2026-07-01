@@ -67,7 +67,7 @@ bring security/sandboxing but don't evolve. **Chimera combines all four:**
 - **Loop Engineering** (`chimera workflow`) — author an autonomous loop as YAML (steps that `use` the stack, with `when` conditions and `repeat`/`until` loops).
 - **Interfaces** — a `chat` REPL, a full-screen **TUI** (Textual), and a **messaging gateway** (HTTP, or **native Discord / Telegram / Slack** via `serve --discord|--telegram|--slack`) with one conversation (and memory) per chat; the agent can also **send** messages back via a `send_message` tool.
 - **Execution sandbox** — run the shell tool locally or in an isolated **Docker** container (`CHIMERA_SANDBOX=docker`).
-- **Integrations** — a first-class **MCP** client (stdio) + an **OpenAPI/REST → tool** importer; **crons** (human-assigned and self-learned, with confirmation); **migration** of config/skills/long-term memory from Hermes Agent / OpenClaw.
+- **Integrations** — a first-class **MCP** client (stdio) + an **OpenAPI/REST → tool** importer; **crons + webhook triggers** (`serve` runs a task on an inbound `POST /webhook/<hook>` — unattended); **migration** of config/skills/long-term memory from Hermes Agent / OpenClaw.
 
 **Built-in extras**
 - **Reference tools** — batteries included: always-on `execute_code` (sandboxed Python) and `arxiv_search`; key-gated `web_search`, `generate_image` (OpenAI), `text_to_speech` (ElevenLabs), `send_email` (SMTP); and `youtube_transcript` (opt-in extra). Arbitrary REST services still plug in via the OpenAPI→tool importer.

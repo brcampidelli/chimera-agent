@@ -8,16 +8,40 @@ logic lives in the pure :func:`handle` function (easy to unit-test); the
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
 from chimera.server.gateway import InboundMessage, MessageGateway
 
+# Given a hook name and the POST payload, fire the matching jobs and return their results.
+WebhookHandler = Callable[[str, dict[str, Any]], list[str]]
 
-def handle(gateway: MessageGateway, method: str, path: str, body: bytes) -> tuple[int, dict[str, Any]]:
+
+def handle(
+    gateway: MessageGateway,
+    method: str,
+    path: str,
+    body: bytes,
+    *,
+    webhooks: WebhookHandler | None = None,
+) -> tuple[int, dict[str, Any]]:
     """Pure request handler returning ``(status, json_body)``."""
     if method == "GET" and path == "/health":
         return 200, {"status": "ok", "active_chats": gateway.active_chats}
+    if method == "POST" and path.startswith("/webhook/") and webhooks is not None:
+        hook = path[len("/webhook/") :]
+        try:
+            payload = json.loads(body or b"{}")
+        except json.JSONDecodeError:
+            payload = {}
+        try:
+            results = webhooks(hook, payload if isinstance(payload, dict) else {})
+        except Exception as exc:  # noqa: BLE001 — surface as 500, don't crash the server
+            return 500, {"error": str(exc)}
+        if not results:
+            return 404, {"error": f"no webhook job registered for {hook!r}"}
+        return 200, {"hook": hook, "fired": len(results), "results": results}
     if method == "POST" and path == "/chat":
         try:
             data = json.loads(body or b"{}")
@@ -41,15 +65,19 @@ def handle(gateway: MessageGateway, method: str, path: str, body: bytes) -> tupl
 
 
 def make_server(
-    gateway: MessageGateway, host: str = "127.0.0.1", port: int = 8765
+    gateway: MessageGateway,
+    host: str = "127.0.0.1",
+    port: int = 8765,
+    *,
+    webhooks: WebhookHandler | None = None,
 ) -> ThreadingHTTPServer:
-    """Build (but don't start) an HTTP server wrapping ``gateway``."""
+    """Build (but don't start) an HTTP server wrapping ``gateway`` (and optional webhooks)."""
 
     class Handler(BaseHTTPRequestHandler):
         def _respond(self, method: str) -> None:
             length = int(self.headers.get("Content-Length", 0) or 0)
             body = self.rfile.read(length) if length else b""
-            status, payload = handle(gateway, method, self.path, body)
+            status, payload = handle(gateway, method, self.path, body, webhooks=webhooks)
             data = json.dumps(payload).encode("utf-8")
             self.send_response(status)
             self.send_header("Content-Type", "application/json")

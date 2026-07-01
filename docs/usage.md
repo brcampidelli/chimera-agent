@@ -137,6 +137,19 @@ uv run chimera serve --port 8765          # HTTP transport
 
 Each `chat_id` keeps its own context, so different users/threads don't mix.
 
+**Unattended operation (webhooks).** Register a job that fires on an inbound HTTP POST, so
+Chimera runs without anyone typing — a GitHub push, a Stripe event, a cron-as-a-service
+ping:
+
+```bash
+chimera cron add "on push" gh-push "Summarize the pushed commits" --webhook
+chimera serve                              # then POST to the hook:
+# curl -X POST localhost:8765/webhook/gh-push -d '{"ref":"refs/heads/main"}'
+```
+
+The POST body is handed to the job's task as context, and every job registered for that
+hook runs. `GET /health` and `POST /chat` still work alongside it.
+
 **Native Discord.** Run Chimera as a Discord bot — each channel is a session, and the agent
 can also send messages via the `send_message` tool:
 

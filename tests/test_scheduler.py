@@ -58,6 +58,20 @@ def test_event_jobs(tmp_path: Path) -> None:
     assert ran[0].last_run == NOW
 
 
+def test_webhook_jobs(tmp_path: Path) -> None:
+    sched = _scheduler(tmp_path)
+    job = sched.schedule_webhook("on gh push", "gh-push", "summarize the push")
+    assert job.trigger == "webhook" and job.schedule == "gh-push"
+    assert [j.id for j in sched.jobs_for_webhook("gh-push")] == [job.id]
+    assert sched.jobs_for_webhook("other") == []
+    # webhook jobs are not time-due and don't fire on unrelated events
+    assert sched.due(NOW) == [] and sched.jobs_for_event("gh-push") == []
+
+    fired: list[str] = []
+    ran = sched.fire_webhook("gh-push", NOW, lambda j: fired.append(j.id))
+    assert fired == [job.id] and ran[0].last_run == NOW
+
+
 def test_store_persists_across_instances(tmp_path: Path) -> None:
     path = tmp_path / "jobs.json"
     store = CronStore(path)
