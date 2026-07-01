@@ -66,15 +66,12 @@ _PRECISION_KEYWORDS = (
     "計算", "いくつ", "いくら", "掛け", "割り算", "正確", "反転", "合計",
 )
 
-# An actual arithmetic expression: digit, operator, digit (e.g. "7 * 11", "29×11").
-_ARITH_EXPR = re.compile(r"\d\s*[+\-*/×÷]\s*\d")
+# An actual arithmetic expression: digit, operator, digit (e.g. "7 * 11", "29×11"),
+# or a percentage (e.g. "15% of 80", "20% tip") — both are exact numeric answers.
+_ARITH_EXPR = re.compile(r"\d\s*[+\-*/×÷]\s*\d|\d\s*%")
 
-
-def _is_error_sensitive(text: str, precision_keywords: tuple[str, ...]) -> bool:
-    low = text.lower()
-    if any(keyword in low for keyword in precision_keywords):
-        return True
-    return bool(_ARITH_EXPR.search(text))
+# Why a turn was (not) routed to fusion — useful for cost auditing and telemetry.
+FuseReason = Literal["mode", "length", "keyword", "precision", "arithmetic", "none"]
 
 
 def _last_user_text(messages: list[MessageLike]) -> str:
@@ -96,18 +93,27 @@ class RoutingPolicy:
     fuse_error_sensitive: bool = True
 
     def should_fuse(self, messages: list[MessageLike]) -> bool:
+        return self.fuse_reason(messages) != "none"
+
+    def fuse_reason(self, messages: list[MessageLike]) -> FuseReason:
+        """Which gate (if any) routes this turn to fusion — the attribution behind should_fuse."""
         if self.mode == "always":
-            return True
+            return "mode"
         if self.mode == "never":
-            return False
+            return "none"
         text = _last_user_text(messages)
         if len(text) >= self.min_chars:  # long, deep-reasoning turn
-            return True
+            return "length"
         low = text.lower()
         if any(keyword in low for keyword in self.keywords):  # explicit intent
-            return True
+            return "keyword"
         # Short but error-sensitive: an exact-answer task a lone model can quietly botch.
-        return self.fuse_error_sensitive and _is_error_sensitive(text, self.precision_keywords)
+        if self.fuse_error_sensitive:
+            if any(keyword in low for keyword in self.precision_keywords):
+                return "precision"
+            if _ARITH_EXPR.search(text):
+                return "arithmetic"
+        return "none"
 
 
 class RoutedBackend:

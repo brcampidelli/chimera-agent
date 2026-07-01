@@ -37,6 +37,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   since fusion costs 2-3x) routes the worker through the cost-aware router in production,
   so deep/error-sensitive turns fuse while cheap/tool turns stay single-model. `--fuse`
   still additionally routes deep *planning* through fusion.
+- **`RoutingPolicy.fuse_reason()`** reports *why* a turn does or doesn't fuse
+  (length / keyword / precision / arithmetic / none) — for cost auditing and telemetry.
+  Calibrated against a mixed session corpus: fusion fires on 0% of casual / coding /
+  chit-chat turns and 100% of reasoning / exact / long turns, ~19% of a typical session;
+  the arithmetic gate now also catches percentages (`15% of 80`).
 - **Cascade rubric as a review criterion.** `solve --rubric` makes the Manager judge a
   result on the cascade rubric (instruction-following → factuality → rationality),
   approving on the importance-weighted overall and naming the weakest dimension on a

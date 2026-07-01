@@ -84,6 +84,7 @@ def test_policy_fuses_short_error_sensitive_tasks() -> None:
         "The number is 68. Multiply it by 4.",  # precision verb
         "How many r's are in 'strawberry'?",  # exact count
         "Compute 7 * 11.",  # arithmetic expression
+        "What is 15% of 80?",  # percentage — an exact numeric answer
         "Reverse the digits of 58.",  # exact transformation
         "Calcule 29 vezes 11.",  # PT-BR
     ):
@@ -96,6 +97,20 @@ def test_error_sensitive_routing_can_be_disabled() -> None:
     policy = RoutingPolicy(mode="auto", fuse_error_sensitive=False)
     prompt = "The number is 68. Multiply it by 4."
     assert policy.should_fuse([{"role": "user", "content": prompt}]) is False
+
+
+def test_fuse_reason_attributes_the_trigger() -> None:
+    policy = RoutingPolicy(mode="auto")
+
+    def reason(text: str) -> str:
+        return policy.fuse_reason([{"role": "user", "content": text}])
+
+    assert reason("a" * 300) == "length"
+    assert reason("please analyze the trade-off") == "keyword"
+    assert reason("How many digits are in 8579?") == "precision"
+    assert reason("What is 7 * 11?") == "arithmetic"
+    assert reason("hi there, thanks a lot!") == "none"
+    assert RoutingPolicy(mode="always").fuse_reason([{"role": "user", "content": "x"}]) == "mode"
 
 
 def test_precision_routing_is_multilingual() -> None:
