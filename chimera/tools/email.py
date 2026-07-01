@@ -50,3 +50,39 @@ class SendEmailTool(Tool):
         except (smtplib.SMTPException, OSError) as exc:
             return f"error: send_email failed: {exc}"
         return f"sent email to {to}"
+
+
+class ReadEmailTool(Tool):
+    name = "read_email"
+    description = "Read the most recent emails (sender + subject) from the configured IMAP mailbox."
+    parameters = {
+        "type": "object",
+        "properties": {
+            "max_results": {"type": "integer", "description": "How many recent emails (default 5)."},
+        },
+        "required": [],
+    }
+
+    def run(self, **kwargs: Any) -> str:
+        import email as email_lib
+        import imaplib
+
+        settings = get_settings()
+        if not (settings.imap_host and settings.imap_user and settings.imap_password):
+            return "error: read_email needs CHIMERA_IMAP_HOST / _USER / _PASSWORD (set them in .env)."
+        count = int(kwargs.get("max_results") or 5)
+        lines: list[str] = []
+        try:
+            with imaplib.IMAP4_SSL(settings.imap_host, settings.imap_port) as mailbox:
+                mailbox.login(settings.imap_user, settings.imap_password)
+                mailbox.select("INBOX")
+                _, data = mailbox.search(None, "ALL")
+                ids = data[0].split()[-count:]
+                for msg_id in reversed(ids):
+                    _, fetched = mailbox.fetch(msg_id, "(RFC822)")
+                    raw = fetched[0][1] if fetched and isinstance(fetched[0], tuple) else b""
+                    message = email_lib.message_from_bytes(raw)
+                    lines.append(f"- {message.get('From', '?')} — {message.get('Subject', '(no subject)')}")
+        except (OSError, imaplib.IMAP4.error) as exc:
+            return f"error: read_email failed: {exc}"
+        return "Recent emails:\n" + "\n".join(lines) if lines else "no emails found"

@@ -117,6 +117,15 @@ class Settings(BaseSettings):
     smtp_password: str | None = Field(default=None, validation_alias="CHIMERA_SMTP_PASSWORD")
     smtp_from: str | None = Field(default=None, validation_alias="CHIMERA_SMTP_FROM")
 
+    # --- IMAP for the read_email reference tool ---
+    imap_host: str | None = Field(default=None, validation_alias="CHIMERA_IMAP_HOST")
+    imap_port: int = Field(default=993, validation_alias="CHIMERA_IMAP_PORT")
+    imap_user: str | None = Field(default=None, validation_alias="CHIMERA_IMAP_USER")
+    imap_password: str | None = Field(default=None, validation_alias="CHIMERA_IMAP_PASSWORD")
+
+    # --- Default iCalendar feed for the calendar_events reference tool ---
+    calendar_ics_url: str | None = Field(default=None, validation_alias="CHIMERA_CALENDAR_ICS_URL")
+
     # --- Execution sandbox for the shell tool (local = host, docker = isolated) ---
     sandbox: str = Field(default="local", validation_alias="CHIMERA_SANDBOX")
     sandbox_image: str = Field(

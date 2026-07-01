@@ -70,7 +70,7 @@ bring security/sandboxing but don't evolve. **Chimera combines all four:**
 - **Integrations** — a first-class **MCP** client (stdio) + an **OpenAPI/REST → tool** importer; **crons + webhook triggers** (`serve` runs a task on an inbound `POST /webhook/<hook>` — unattended); **migration** of config/skills/long-term memory from Hermes Agent / OpenClaw.
 
 **Built-in extras**
-- **Reference tools** — batteries included: always-on `execute_code` (sandboxed Python) and `arxiv_search`; key-gated `web_search`, `generate_image` (OpenAI), `text_to_speech` (ElevenLabs), `send_email` (SMTP); and `youtube_transcript` (opt-in extra). Arbitrary REST services still plug in via the OpenAPI→tool importer.
+- **Reference tools** — batteries included: always-on `execute_code` (sandboxed Python), `code_interpreter` (stateful session), `arxiv_search`; config-gated `web_search`, `generate_image` (OpenAI), `text_to_speech` (ElevenLabs), `send_email`/`read_email` (SMTP/IMAP), `calendar_events` (`.ics`); and `youtube_transcript` (opt-in extra). Arbitrary REST services still plug in via the OpenAPI→tool importer.
 - **Vision** (image paste), **Deliverable Mode** (polished artifacts), and a **Pet** companion — see all optional capabilities with `chimera features`.
 
 ## Quickstart

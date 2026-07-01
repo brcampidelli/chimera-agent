@@ -47,10 +47,11 @@ def default_registry(workspace: Path | None = None) -> ToolRegistry:
     registry.register(HttpGetTool())
 
     # Always-on reference tools (no credential needed).
-    from chimera.tools.code import ExecuteCodeTool
+    from chimera.tools.code import CodeInterpreterTool, ExecuteCodeTool
     from chimera.tools.research import ArxivSearchTool, YouTubeTranscriptTool
 
     registry.register(ExecuteCodeTool(workspace, get_sandbox()))
+    registry.register(CodeInterpreterTool())
     registry.register(ArxivSearchTool())
     registry.register(YouTubeTranscriptTool())
 
@@ -74,4 +75,12 @@ def default_registry(workspace: Path | None = None) -> ToolRegistry:
         from chimera.tools.email import SendEmailTool
 
         registry.register(SendEmailTool())
+    if settings.imap_host and settings.imap_user and settings.imap_password:
+        from chimera.tools.email import ReadEmailTool
+
+        registry.register(ReadEmailTool())
+    if settings.calendar_ics_url:
+        from chimera.tools.calendar import CalendarEventsTool
+
+        registry.register(CalendarEventsTool())
     return registry

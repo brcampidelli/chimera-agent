@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Stateful + productivity tools**: `code_interpreter` (a persistent in-process Python
+  session — variables/imports carry across calls, `reset` to clear), `read_email` (IMAP,
+  stdlib) and `calendar_events` (any iCalendar `.ics` feed, stdlib parser). `code_interpreter`
+  is always on; the other two auto-register when their config is set.
 - **WhatsApp (send)**: a `WhatsAppSender` (Cloud API over `httpx`) auto-registers when
   `CHIMERA_WHATSAPP_ACCESS_TOKEN` + `CHIMERA_WHATSAPP_PHONE_NUMBER_ID` are set, so the agent
   can send WhatsApp messages via `send_message` in any `serve` mode. Ships with a pure,
