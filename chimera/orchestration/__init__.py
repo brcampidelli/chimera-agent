@@ -8,6 +8,9 @@ state is already externalized (memory + transcripts), so the core is substrate-a
 from chimera.orchestration.comms import AgentMessage, consolidate, render
 from chimera.orchestration.crew import (
     CrewResult,
+    IsolatedCrew,
+    IsolatedCrewResult,
+    IsolatedWorker,
     SequentialCrew,
     SupervisorCrew,
     demo_crew,
@@ -46,4 +49,7 @@ __all__ = [
     "run_in_processes",
     "IsolatedResult",
     "IsolatedBatch",
+    "IsolatedCrew",
+    "IsolatedCrewResult",
+    "IsolatedWorker",
 ]
