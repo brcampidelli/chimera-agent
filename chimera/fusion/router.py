@@ -1,13 +1,17 @@
 """Cost-aware routing between a single model and the fusion engine.
 
 Fusion is 2-3x more expensive, so it is *selective*. The router sends tool-calling
-turns to a single model (fusion does not tool-call) and reserves fusion for deep,
-high-stakes reasoning turns — detected by length and intent keywords, or forced via
-the policy mode.
+turns to a single model (fusion does not tool-call) and reserves fusion for turns worth
+the cost: long or deep-reasoning ones (length + intent keywords), **and short but
+error-sensitive ones** — exact computations/transformations where a single wrong token
+ruins the answer (arithmetic, counting, digit ops). Those short tasks used to slip
+through the length/keyword gate and route to a single model, which is exactly where a
+lone model's slip corrupts a long chain; fusing them closes that hole. Forced via mode.
 """
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -33,6 +37,26 @@ _DEFAULT_KEYWORDS = (
     "deep dive",
 )
 
+# Short prompts whose answer is a single exact value — one wrong token = wrong answer.
+# English + a few PT-BR computation verbs (the operator's day-to-day language).
+_PRECISION_KEYWORDS = (
+    "compute", "calculate", "how many", "how much", "multiply", "divide", "subtract",
+    "sum of", "product of", "reverse", "count the", "number of", "digit", "exactly",
+    "round to", "what is the value",
+    "calcule", "quantos", "quantas", "quanto é", "multiplique", "divida", "some os",
+    "dígitos", "digitos",
+)
+
+# An actual arithmetic expression: digit, operator, digit (e.g. "7 * 11", "29×11").
+_ARITH_EXPR = re.compile(r"\d\s*[+\-*/×÷]\s*\d")
+
+
+def _is_error_sensitive(text: str, precision_keywords: tuple[str, ...]) -> bool:
+    low = text.lower()
+    if any(keyword in low for keyword in precision_keywords):
+        return True
+    return bool(_ARITH_EXPR.search(text))
+
 
 def _last_user_text(messages: list[MessageLike]) -> str:
     for message in reversed(messages):
@@ -49,6 +73,8 @@ class RoutingPolicy:
     mode: Mode = "auto"
     min_chars: int = 280
     keywords: tuple[str, ...] = field(default_factory=lambda: _DEFAULT_KEYWORDS)
+    precision_keywords: tuple[str, ...] = field(default_factory=lambda: _PRECISION_KEYWORDS)
+    fuse_error_sensitive: bool = True
 
     def should_fuse(self, messages: list[MessageLike]) -> bool:
         if self.mode == "always":
@@ -56,10 +82,13 @@ class RoutingPolicy:
         if self.mode == "never":
             return False
         text = _last_user_text(messages)
-        if len(text) >= self.min_chars:
+        if len(text) >= self.min_chars:  # long, deep-reasoning turn
             return True
         low = text.lower()
-        return any(keyword in low for keyword in self.keywords)
+        if any(keyword in low for keyword in self.keywords):  # explicit intent
+            return True
+        # Short but error-sensitive: an exact-answer task a lone model can quietly botch.
+        return self.fuse_error_sensitive and _is_error_sensitive(text, self.precision_keywords)
 
 
 class RoutedBackend:

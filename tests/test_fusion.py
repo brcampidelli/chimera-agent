@@ -78,6 +78,26 @@ def test_policy_auto_heuristics() -> None:
     assert policy.should_fuse([{"role": "user", "content": "a" * 60}]) is True
 
 
+def test_policy_fuses_short_error_sensitive_tasks() -> None:
+    policy = RoutingPolicy(mode="auto")  # default min_chars=280
+    for prompt in (
+        "The number is 68. Multiply it by 4.",  # precision verb
+        "How many r's are in 'strawberry'?",  # exact count
+        "Compute 7 * 11.",  # arithmetic expression
+        "Reverse the digits of 58.",  # exact transformation
+        "Calcule 29 vezes 11.",  # PT-BR
+    ):
+        assert policy.should_fuse([{"role": "user", "content": prompt}]) is True, prompt
+    for casual in ("hey, how are you today?", "thanks, that's great!"):
+        assert policy.should_fuse([{"role": "user", "content": casual}]) is False, casual
+
+
+def test_error_sensitive_routing_can_be_disabled() -> None:
+    policy = RoutingPolicy(mode="auto", fuse_error_sensitive=False)
+    prompt = "The number is 68. Multiply it by 4."
+    assert policy.should_fuse([{"role": "user", "content": prompt}]) is False
+
+
 def test_routed_tool_turn_goes_single() -> None:
     single, fusion = StubBackend("single"), StubBackend("fusion")
     rb = RoutedBackend(single, fusion, RoutingPolicy(mode="always"))

@@ -26,6 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   scorer for `search_spec`.
 
 ### Changed
+- **The fusion router now fuses short but error-sensitive turns.** Its gate was length +
+  reasoning-keywords only, so exact-answer tasks (arithmetic, counting, digit ops) fell
+  through to a single model — precisely where a lone slip corrupts a long chain.
+  `RoutingPolicy` gained precision-keyword + arithmetic-expression detection (EN + PT-BR),
+  on by default (`fuse_error_sensitive`, opt-out). Measured live through the *same*
+  `RoutedBackend`: the hard chain collapses with it off (degradation 1.0) and holds with
+  it on (degradation 0.0).
 - **Cascade rubric as a review criterion.** `solve --rubric` makes the Manager judge a
   result on the cascade rubric (instruction-following → factuality → rationality),
   approving on the importance-weighted overall and naming the weakest dimension on a
