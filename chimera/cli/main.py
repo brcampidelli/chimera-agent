@@ -1187,15 +1187,19 @@ def bench(
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
     fuse: bool = typer.Option(False, "--fuse", help="Use the fusion engine as the solver."),
     chain: bool = typer.Option(False, "--chain", help="Run the stateful chained benchmark (error propagation)."),
+    hard: bool = typer.Option(False, "--hard", help="Use the hard suite (traps / propagating chain)."),
 ) -> None:
     """Run the continuous-evolution benchmark on a demo task set. Requires a key."""
     from chimera.eval import (
         SingleModelSolver,
         demo_chain,
         demo_tasks,
+        hard_chain,
+        hard_tasks,
         run_chain,
         run_continuous,
     )
+    from chimera.eval.hard import HARD_CHAIN_START
     from chimera.providers import LLMGateway, SupportsComplete
 
     settings = get_settings()
@@ -1212,10 +1216,12 @@ def bench(
 
     solver = SingleModelSolver(backend, model)
     if chain:
-        report = run_chain(solver, demo_chain(limit or 8), initial_state="0")
-        title = "Chained continuous-evolution benchmark"
+        steps = hard_chain() if hard else demo_chain(limit or 8)
+        start = HARD_CHAIN_START if hard else "0"
+        report = run_chain(solver, steps, initial_state=start)
+        title = ("Hard " if hard else "") + "Chained continuous-evolution benchmark"
     else:
-        tasks = demo_tasks()
+        tasks = hard_tasks() if hard else demo_tasks()
         if limit > 0:
             tasks = tasks[:limit]
         report = run_continuous(

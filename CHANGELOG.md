@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Hard benchmark suites** (`chimera bench --hard`): 12 reasoning-trap tasks and an
+  8-step **stateful** arithmetic chain where an error *propagates*. Unlike the trivial
+  demo sets (which ceiling at 100%), these expose EvoClaw degradation — measured live, a
+  single model breaks mid-chain and collapses 100% → 0% in the second half (degradation
+  1.0), while fusion holds 8/8 (degradation 0.0). A deterministic `OracleSolver` test
+  encodes the propagation collapse permanently.
 - **`chimera evolve tune`** (OpenJarvis): self-optimize the agent spec via meta-search —
   each round a model proposes a coordinated edit, scored on the daily scenarios and kept
   only on non-regression. `scenario_scorer` turns the scenario suite into a reusable

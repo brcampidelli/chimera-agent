@@ -22,6 +22,12 @@ from chimera.eval.evoclaw import (
     run_guarded,
     run_naive,
 )
+from chimera.eval.hard import (
+    HARD_CHAIN_OPS,
+    HARD_CHAIN_START,
+    hard_chain,
+    hard_tasks,
+)
 from chimera.eval.rubric import (
     Dimension,
     RubricResult,
@@ -58,4 +64,8 @@ __all__ = [
     "cascade_dimensions",
     "model_judge",
     "scenario_scorer",
+    "hard_tasks",
+    "hard_chain",
+    "HARD_CHAIN_START",
+    "HARD_CHAIN_OPS",
 ]
