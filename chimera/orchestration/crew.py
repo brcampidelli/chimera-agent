@@ -139,6 +139,7 @@ class IsolatedCrewResult:
     merged: int = 0
     failures: dict[str, str] = field(default_factory=dict)  # worker crashed
     rejected: dict[str, str] = field(default_factory=dict)  # ran but failed verification -> not merged
+    summary: str = ""  # supervisor's unified report (empty unless a supervisor is set)
 
     @property
     def ok(self) -> bool:
@@ -160,10 +161,12 @@ class IsolatedCrew:
         backend: SupportsComplete,
         workers: list[IsolatedWorker],
         *,
+        supervisor: RoleAgent | None = None,
         max_workers: int = 4,
     ) -> None:
         self.backend = backend
         self.workers = workers
+        self.supervisor = supervisor
         self.max_workers = max_workers
 
     def run(
@@ -222,10 +225,31 @@ class IsolatedCrew:
             "isolated crew: %d merged, %d rejected, %d failed, %d conflict(s)",
             len(transcript), len(rejected), len(failures), len(batch.conflicts),
         )
-        return IsolatedCrewResult(
+        crew_result = IsolatedCrewResult(
             transcript=transcript,
             conflicts=batch.conflicts,
             merged=batch.merged,
             failures=failures,
             rejected=rejected,
+        )
+        if self.supervisor is not None:
+            crew_result.summary = self._synthesize(task, crew_result)
+        return crew_result
+
+    def _synthesize(self, task: str, result: IsolatedCrewResult) -> str:
+        """Have the supervisor fold the merged workers' outputs into one unified report."""
+        assert self.supervisor is not None
+        parts: list[str] = []
+        if result.transcript:
+            parts.append("Merged worker outputs:\n" + render(consolidate(result.transcript)))
+        if result.conflicts:
+            parts.append("Files in conflict (NOT merged): " + ", ".join(result.conflicts))
+        if result.rejected:
+            parts.append("Workers rejected by verification: " + ", ".join(result.rejected))
+        if result.failures:
+            parts.append("Workers that crashed: " + ", ".join(result.failures))
+        context = "\n\n".join(parts) if parts else "The team produced no merged output."
+        return self.supervisor.act(
+            f"Synthesize the team's work into a single unified report for the task:\n{task}",
+            context=context,
         )

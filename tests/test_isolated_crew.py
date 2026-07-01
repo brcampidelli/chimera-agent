@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from chimera.orchestration import IsolatedCrew, IsolatedWorker, Role
+from chimera.orchestration import IsolatedCrew, IsolatedWorker, Role, RoleAgent
 from chimera.providers.gateway import CompletionResult, ToolCall
 from chimera.tools import ToolRegistry, WriteFileTool
 
@@ -88,6 +88,38 @@ def test_failing_worker_does_not_sink_the_crew(tmp_path: Path) -> None:
     assert "bad" in res.failures and "worker crashed" in res.failures["bad"]
     assert (tmp_path / "ok.txt").read_text(encoding="utf-8") == "ok"  # the good worker still merged
     assert {m.sender for m in res.transcript} == {"good"}
+
+
+class EchoUserBackend:
+    """Returns the last user message content, so we can inspect what the supervisor saw."""
+
+    def complete(self, messages: list[Any], **kwargs: Any) -> CompletionResult:
+        content = ""
+        for message in messages:
+            data = message.as_dict() if hasattr(message, "as_dict") else message
+            if data.get("role") == "user":
+                content = str(data.get("content", ""))
+        return CompletionResult(content=content, model="fake")
+
+
+def test_supervisor_synthesizes_merged_results(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    supervisor = RoleAgent(Role("supervisor", "SUP"), EchoUserBackend())
+    crew = IsolatedCrew(
+        WritingBackend("_", "_"),
+        [_worker("a", "a.txt", "AAA"), _worker("b", "b.txt", "BBB")],
+        supervisor=supervisor,
+    )
+    res = crew.run("build the thing", tmp_path)
+    assert res.summary  # the supervisor produced a report
+    assert "done a.txt" in res.summary and "done b.txt" in res.summary  # it saw both merged outputs
+    assert "build the thing" in res.summary  # ...for the given task
+
+
+def test_no_supervisor_leaves_summary_empty(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    res = IsolatedCrew(WritingBackend("_", "_"), [_worker("a", "a.txt", "AAA")]).run("t", tmp_path)
+    assert res.summary == ""
 
 
 def test_verify_gate_rejects_a_worker_whose_check_fails(tmp_path: Path) -> None:

@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   division-of-labour counterpart to `solve-batch` (which runs N *separate* tasks): here N
   specialised workers split ONE task with real filesystem isolation. Verified live: two workers
   built modules in parallel worktrees; files both touched were correctly flagged as conflicts.
+  **Optional synthesis** (`--synthesize`): a supervisor folds the merged workers' outputs (plus
+  a note of any conflicts/rejects) into one unified final report (`IsolatedCrewResult.summary`).
 - **Generic subagents** — generalises the Context Explorer pattern two ways. **`SubAgentTool`**
   (`solve --subagents`) gives the main agent a `spawn_subagent(task, tools)` tool: it runs a
   fresh Agent in its own context with only an allowed subset of tools and returns ONLY the final

@@ -850,6 +850,7 @@ def crew_isolated(
     verify: str = typer.Option(None, "--verify", help="Per-worker gate: shell command run in each worktree (exit 0 to merge)."),
     max_steps: int = typer.Option(6, "--max-steps", help="Max tool-calling steps per worker."),
     max_workers: int = typer.Option(4, "--max-workers", help="Max concurrent isolated workers."),
+    synthesize: bool = typer.Option(False, "--synthesize", help="A supervisor folds the merged results into one unified report."),
     fuse: bool = typer.Option(False, "--fuse", help="Route worker turns through fusion."),
 ) -> None:
     """Tier-3: tool-using workers split ONE task, each in its own git worktree, verify-gated.
@@ -859,7 +860,7 @@ def crew_isolated(
     merge back, files two workers both changed are flagged as conflicts, and a worker whose
     check fails is rejected (its edits discarded). Needs a git repo to isolate.
     """
-    from chimera.orchestration import IsolatedCrew, IsolatedWorker, Role
+    from chimera.orchestration import IsolatedCrew, IsolatedWorker, Role, RoleAgent
     from chimera.providers import LLMGateway, MissingCredentialsError
     from chimera.tools import default_registry
 
@@ -887,7 +888,14 @@ def crew_isolated(
             IsolatedWorker(Role(name, prompt), lambda ws: default_registry(ws), max_steps=max_steps)
         )
 
-    crew = IsolatedCrew(backend, workers, max_workers=max_workers)
+    supervisor = None
+    if synthesize:
+        supervisor = RoleAgent(
+            Role("supervisor", "You coordinate a team and write a single, unified final report "
+                 "from the merged worker outputs. Be concise and note any conflicts or rejects."),
+            backend,
+        )
+    crew = IsolatedCrew(backend, workers, supervisor=supervisor, max_workers=max_workers)
     try:
         result = crew.run(task, Path(workspace), verify=verify)
     except MissingCredentialsError as exc:
@@ -903,6 +911,8 @@ def crew_isolated(
     if result.conflicts:
         console.print(f"[yellow]conflicts (not merged):[/yellow] {', '.join(result.conflicts)}")
     console.print(f"[dim]merged {result.merged} file(s) from {len(result.transcript)} worker(s)[/dim]")
+    if result.summary:
+        console.print(Panel(result.summary, title="unified report", border_style="cyan"))
     if not result.ok:
         raise typer.Exit(code=1)
 
