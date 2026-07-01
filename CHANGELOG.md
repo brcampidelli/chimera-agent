@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Native Discord** (`chimera serve --discord`): Chimera runs as a Discord bot — each
+  channel is its own session, it replies in-channel, and it ignores its own and other
+  bots' messages (with an optional user allowlist). Plus a platform-agnostic messaging
+  layer (`SenderRegistry` + a `send_message` tool) so the agent can also *send* messages
+  on connected platforms. `discord.py` is the opt-in `messaging` extra; the bot token is
+  read from `CHIMERA_DISCORD_BOT_TOKEN` (never hard-coded). This closes the biggest
+  integrations gap vs. Hermes and establishes the adapter pattern for Telegram/Slack next.
 - **Entity-aware recall**: `ChatSession` now also pulls facts linked (via the memory
   graph) to entities named in a message, not only keyword hits — so "tell me about Stripe"
   recalls "Stripe is our payment provider" even without a shared keyword. Wired into

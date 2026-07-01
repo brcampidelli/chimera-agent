@@ -65,7 +65,7 @@ bring security/sandboxing but don't evolve. **Chimera combines all four:**
 **Orchestration, interfaces & integrations**
 - **Kanban + worker lanes** (`chimera kanban`) — a task board (backlog → doing → review → done) where cards dispatch to a `solve` or `crew` lane; `kanban learn` turns recurring tasks into cards.
 - **Loop Engineering** (`chimera workflow`) — author an autonomous loop as YAML (steps that `use` the stack, with `when` conditions and `repeat`/`until` loops).
-- **Interfaces** — a `chat` REPL, a full-screen **TUI** (Textual), and a **messaging gateway** HTTP server with one conversation (and memory) per chat.
+- **Interfaces** — a `chat` REPL, a full-screen **TUI** (Textual), and a **messaging gateway** (HTTP or **native Discord**, `serve --discord`) with one conversation (and memory) per chat; the agent can also **send** messages back via a `send_message` tool.
 - **Execution sandbox** — run the shell tool locally or in an isolated **Docker** container (`CHIMERA_SANDBOX=docker`).
 - **Integrations** — a first-class **MCP** client (stdio) + an **OpenAPI/REST → tool** importer; **crons** (human-assigned and self-learned, with confirmation); **migration** of config/skills/long-term memory from Hermes Agent / OpenClaw.
 
@@ -88,7 +88,7 @@ uv run chimera doctor       # check your environment
 chimera doctor / models / features    # status, configuration, optional capabilities
 chimera chat                          # interactive multi-turn assistant (your right-hand)
 chimera tui                           # full-screen terminal app (Textual)
-chimera serve                         # messaging gateway HTTP server (per-chat sessions)
+chimera serve [--discord]             # messaging gateway: HTTP, or a native Discord bot
 chimera run "PROMPT" --image pic.png   # single-shot Tier-1 (vision-capable with --image)
 chimera deliver "a launch plan" -o plan.md   # Deliverable Mode: produce a polished artifact
 chimera fuse "PROMPT" --show-panel     # LLM-Fusion: panel -> judge -> synthesizer

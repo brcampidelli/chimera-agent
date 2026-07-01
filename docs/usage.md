@@ -124,18 +124,31 @@ uv run chimera tui --fuse --no-memory
 
 `/reset` clears context, `/exit` (or `Ctrl+C`) quits.
 
-### `serve` — messaging gateway HTTP server
+### `serve` — messaging gateway (HTTP or Discord)
 
-Exposes the agent over HTTP, with one conversation (and its memory) **per chat**.
-This is the hub messaging adapters (Discord/Telegram, coming next) plug into.
+Exposes the agent with one conversation (and its memory) **per chat**. The routing core is
+transport-agnostic; adapters plug in.
 
 ```bash
-uv run chimera serve --port 8765
+uv run chimera serve --port 8765          # HTTP transport
 # GET  /health           -> {"status":"ok","active_chats":N}
 # POST /chat  {"text":"...", "chat_id":"alice"}  -> {"reply":"...","chat_id":"alice"}
 ```
 
 Each `chat_id` keeps its own context, so different users/threads don't mix.
+
+**Native Discord.** Run Chimera as a Discord bot — each channel is a session, and the agent
+can also send messages via the `send_message` tool:
+
+```bash
+uv sync --extra messaging                 # installs discord.py
+export CHIMERA_DISCORD_BOT_TOKEN=...       # bot token (Message Content intent enabled)
+uv run chimera serve --discord
+```
+
+Create the bot at <https://discord.com/developers>, enable the **Message Content** intent,
+and invite it to your server. It replies in any channel it can see (filtered to ignore its
+own and other bots' messages). The token is read from the environment — never hard-coded.
 
 ### `run` — Tier-1, single-shot completion
 

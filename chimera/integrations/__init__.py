@@ -13,6 +13,11 @@ from chimera.integrations.mcp_client import (
     StdioMCPSession,
     connect_stdio,
 )
+from chimera.integrations.messaging import (
+    MessageSender,
+    SenderRegistry,
+    SendMessageTool,
+)
 from chimera.integrations.openapi import (
     OpenAPIConnector,
     RestApiTool,
@@ -23,6 +28,9 @@ from chimera.integrations.openapi import (
 __all__ = [
     "Connector",
     "ConnectorRegistry",
+    "MessageSender",
+    "SenderRegistry",
+    "SendMessageTool",
     "OpenAPIConnector",
     "RestApiTool",
     "tools_from_openapi",

@@ -1,9 +1,10 @@
 """Messaging gateway + HTTP server.
 
-The gateway routes per-chat messages into ChatSessions; adapters (local now,
-Discord/Telegram next) and the HTTP server are its transports.
+The gateway routes per-chat messages into ChatSessions; adapters (local + Discord, HTTP)
+are its transports.
 """
 
+from chimera.server.discord_adapter import DiscordAdapter
 from chimera.server.gateway import (
     Adapter,
     InboundMessage,
@@ -17,6 +18,7 @@ __all__ = [
     "MessageGateway",
     "Adapter",
     "LocalAdapter",
+    "DiscordAdapter",
     "handle",
     "make_server",
 ]

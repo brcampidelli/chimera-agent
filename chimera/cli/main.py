@@ -31,10 +31,12 @@ from chimera import __version__
 from chimera.config import get_settings
 
 if TYPE_CHECKING:
+    from chimera.config import Settings
     from chimera.ecosystem import TrajectoryCollector
     from chimera.kanban import KanbanBoard
     from chimera.memory import MemoryGraph, MemoryManager
     from chimera.pet import Pet, PetStore
+    from chimera.providers import SupportsComplete
     from chimera.scheduler import CronStore
 
 
@@ -184,7 +186,7 @@ def deliver(
 ) -> None:
     """Deliverable Mode: produce a polished, self-contained artifact. Requires a key."""
     from chimera.deliver import produce_deliverable
-    from chimera.providers import LLMGateway, MissingCredentialsError, SupportsComplete
+    from chimera.providers import LLMGateway, MissingCredentialsError
 
     settings = get_settings()
     if not settings.has_any_key():
@@ -219,7 +221,7 @@ def agent(
 ) -> None:
     """Run the ReAct agent loop with native tools. Requires a provider key."""
     from chimera.core import Agent, AgentConfig
-    from chimera.providers import LLMGateway, MissingCredentialsError, SupportsComplete
+    from chimera.providers import LLMGateway, MissingCredentialsError
     from chimera.tools import default_registry
 
     try:
@@ -259,7 +261,7 @@ def chat(
     """Interactive multi-turn chat — your terminal right-hand. Requires a key."""
     from chimera.core import Agent, AgentConfig
     from chimera.interface import ChatSession
-    from chimera.providers import LLMGateway, MissingCredentialsError, SupportsComplete
+    from chimera.providers import LLMGateway, MissingCredentialsError
     from chimera.tools import default_registry
 
     settings = get_settings()
@@ -326,7 +328,7 @@ def tui(
     """Launch the full-screen TUI — your right-hand. Requires a key."""
     from chimera.core import Agent, AgentConfig
     from chimera.interface import ChatSession
-    from chimera.providers import LLMGateway, SupportsComplete
+    from chimera.providers import LLMGateway
     from chimera.tools import default_registry
     from chimera.tui.app import ChimeraTUI
 
@@ -356,11 +358,12 @@ def serve(
     workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root for tools."),
     fuse: bool = typer.Option(False, "--fuse", help="Route deep-reasoning turns through fusion."),
     no_memory: bool = typer.Option(False, "--no-memory", help="Don't recall long-term memory."),
+    discord: bool = typer.Option(False, "--discord", help="Serve on Discord (needs CHIMERA_DISCORD_BOT_TOKEN + the 'messaging' extra)."),
 ) -> None:
-    """Run the messaging gateway HTTP server (POST /chat, GET /health). Requires a key."""
+    """Run the messaging gateway on HTTP (POST /chat, GET /health) or Discord. Requires a key."""
     from chimera.core import Agent, AgentConfig
     from chimera.interface import ChatSession
-    from chimera.providers import LLMGateway, SupportsComplete
+    from chimera.providers import LLMGateway
     from chimera.server import MessageGateway, make_server
     from chimera.tools import default_registry
 
@@ -380,6 +383,10 @@ def serve(
     shared_memory = None if no_memory else _memory_manager()
     shared_graph = _recall_graph(shared_memory)
 
+    if discord:
+        _serve_discord(settings, backend, model, max_steps, workspace_path, shared_memory, shared_graph)
+        return
+
     def factory() -> ChatSession:
         runner = Agent(backend, default_registry(workspace_path), AgentConfig(model=model, max_steps=max_steps))
         return ChatSession(runner, memory=shared_memory, graph=shared_graph)
@@ -395,6 +402,51 @@ def serve(
         console.print("\n[dim]stopped[/dim]")
     finally:
         server.shutdown()
+
+
+def _serve_discord(
+    settings: Settings,
+    backend: SupportsComplete,
+    model: str | None,
+    max_steps: int,
+    workspace_path: Path,
+    memory: MemoryManager | None,
+    graph: MemoryGraph | None,
+) -> None:
+    """Serve the gateway over Discord: each channel is a session; the agent can also send."""
+    from chimera.core import Agent, AgentConfig
+    from chimera.integrations import SenderRegistry, SendMessageTool
+    from chimera.interface import ChatSession
+    from chimera.server import DiscordAdapter, MessageGateway
+    from chimera.tools import default_registry
+
+    token = settings.discord_bot_token
+    if not token:
+        console.print("[red]Set CHIMERA_DISCORD_BOT_TOKEN to run the Discord adapter.[/red]")
+        raise typer.Exit(code=1)
+
+    senders = SenderRegistry()
+    adapter = DiscordAdapter(token)
+    senders.register(adapter)  # the agent can send Discord messages via send_message
+    send_tool = SendMessageTool(senders)
+
+    def factory() -> ChatSession:
+        registry = default_registry(workspace_path)
+        registry.register(send_tool)
+        runner = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
+        return ChatSession(runner, memory=memory, graph=graph)
+
+    gateway = MessageGateway(factory)
+    console.print("[bold]Chimera on Discord[/bold] [dim]— message the bot in any channel it can see. Ctrl+C to stop.[/dim]")
+    try:
+        adapter.start(gateway.on_message)  # blocking until interrupted
+    except KeyboardInterrupt:
+        console.print("\n[dim]stopped[/dim]")
+    except ImportError:
+        console.print("[red]Discord needs the 'messaging' extra: uv sync --extra messaging[/red]")
+        raise typer.Exit(code=1) from None
+    finally:
+        adapter.stop()
 
 
 @app.command()
@@ -470,7 +522,7 @@ def solve(
         SkillStore,
     )
     from chimera.governance.validator import SkillValidator
-    from chimera.providers import LLMGateway, MissingCredentialsError, SupportsComplete
+    from chimera.providers import LLMGateway, MissingCredentialsError
     from chimera.tools import default_registry
 
     settings = get_settings()
@@ -1216,7 +1268,7 @@ def bench(
         run_continuous,
     )
     from chimera.eval.hard import HARD_CHAIN_START
-    from chimera.providers import LLMGateway, SupportsComplete
+    from chimera.providers import LLMGateway
 
     settings = get_settings()
     if not settings.has_any_key():
@@ -1341,7 +1393,7 @@ def crew(
 ) -> None:
     """Run a multi-agent crew on a task (Tier 3). Requires a provider key."""
     from chimera.orchestration import Role, RoleAgent, SupervisorCrew, demo_crew
-    from chimera.providers import LLMGateway, SupportsComplete
+    from chimera.providers import LLMGateway
 
     settings = get_settings()
     if not settings.has_any_key():

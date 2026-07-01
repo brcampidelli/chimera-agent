@@ -42,6 +42,11 @@ dependencies = [
 mcp = [
     "mcp>=1.0",
 ]
+# Native messaging platform adapters (Discord today). Install to run
+# `chimera serve --discord`; the core agent never requires it.
+messaging = [
+    "discord.py>=2.3",
+]
 # Opt-in model evolution (LoRA/SFT/DPO). Heavy + GPU-bound — never required by the
 # agent; install only to run a `chimera evolve recipe` training script.
 train = [

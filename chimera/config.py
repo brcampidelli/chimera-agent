@@ -100,6 +100,9 @@ class Settings(BaseSettings):
     # cheap/tool turns single-model and only fuses deep or error-sensitive ones. ---
     auto_fuse: bool = Field(default=False, validation_alias="CHIMERA_AUTO_FUSE")
 
+    # --- Messaging: Discord bot token (only needed for `chimera serve --discord`) ---
+    discord_bot_token: str | None = Field(default=None, validation_alias="CHIMERA_DISCORD_BOT_TOKEN")
+
     # --- Execution sandbox for the shell tool (local = host, docker = isolated) ---
     sandbox: str = Field(default="local", validation_alias="CHIMERA_SANDBOX")
     sandbox_image: str = Field(
