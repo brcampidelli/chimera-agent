@@ -65,7 +65,7 @@ aportan seguridad/sandbox pero no evolucionan. **Chimera combina las cuatro:**
 **Orquestación, interfaces e integraciones**
 - **Kanban + worker lanes** (`chimera kanban`) — un tablero (backlog → doing → review → done) donde las tarjetas se despachan a una lane `solve` o `crew`; `kanban learn` convierte tareas recurrentes en tarjetas.
 - **Loop Engineering** (`chimera workflow`) — escribe un bucle autónomo en YAML (pasos que `usan` la stack, con condiciones `when` y bucles `repeat`/`until`).
-- **Interfaces** — un REPL `chat`, una **TUI** a pantalla completa (Textual) y un **gateway de mensajería** HTTP con una conversación (y memoria) por chat.
+- **Interfaces** — un REPL `chat`, una **TUI** a pantalla completa (Textual) y un **gateway de mensajería** (HTTP, o **Discord/Telegram nativo** vía `serve --discord` / `serve --telegram`) con una conversación (y memoria) por chat; el agente también puede **enviar** mensajes con la herramienta `send_message`.
 - **Sandbox de ejecución** — ejecuta el shell localmente o en un contenedor **Docker** aislado (`CHIMERA_SANDBOX=docker`).
 - **Integraciones** — un cliente **MCP** (stdio) first-class + un importador **OpenAPI/REST → tool**; **crons** (asignados y autoaprendidos, con confirmación); **migración** de config/skills/memoria de largo plazo de Hermes Agent / OpenClaw.
 
@@ -88,7 +88,7 @@ uv run chimera doctor       # verifica tu entorno
 chimera doctor / models / features    # estado, configuración, capacidades opcionales
 chimera chat                          # asistente multironda interactivo (tu mano derecha)
 chimera tui                           # app de terminal a pantalla completa (Textual)
-chimera serve                         # servidor HTTP del gateway de mensajería (sesiones por chat)
+chimera serve [--discord|--telegram]  # gateway de mensajería: HTTP, o bot Discord/Telegram nativo
 chimera run "PROMPT" --image pic.png   # Tier-1 de un disparo (con visión vía --image)
 chimera deliver "un plan" -o plan.md   # Modo Entregable: produce un artefacto pulido
 chimera fuse "PROMPT" --show-panel     # LLM-Fusion: panel -> juez -> sintetizador

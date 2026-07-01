@@ -66,7 +66,7 @@ trazem segurança/sandbox mas não evoluem. **O Chimera combina os quatro:**
 **Orquestração, interfaces & integrações**
 - **Kanban + worker lanes** (`chimera kanban`) — quadro de tarefas (backlog → doing → review → done) onde os cards despacham para a lane `solve` ou `crew`; `kanban learn` transforma tarefas recorrentes em cards.
 - **Loop Engineering** (`chimera workflow`) — escreva um loop autônomo em YAML (steps que `usam` a stack, com condições `when` e laços `repeat`/`until`).
-- **Interfaces** — REPL `chat`, **TUI** full-screen (Textual) e um **gateway de mensageria** HTTP com uma conversa (e memória) por chat.
+- **Interfaces** — REPL `chat`, **TUI** full-screen (Textual) e um **gateway de mensageria** (HTTP, ou **Discord/Telegram nativo** via `serve --discord` / `serve --telegram`) com uma conversa (e memória) por chat; o agente também pode **enviar** mensagens via a tool `send_message`.
 - **Sandbox de execução** — rode o shell localmente ou em um container **Docker** isolado (`CHIMERA_SANDBOX=docker`).
 - **Integrações** — cliente **MCP** (stdio) first-class + importador **OpenAPI/REST → tool**; **crons** (atribuídos e auto-aprendidos, com confirmação); **migração** de config/skills/memória de longo prazo do Hermes Agent / OpenClaw.
 
@@ -89,7 +89,7 @@ uv run chimera doctor       # verifique seu ambiente
 chimera doctor / models / features    # status, configuração, capacidades opcionais
 chimera chat                          # assistente multi-turno interativo (seu braço-direito)
 chimera tui                           # app full-screen no terminal (Textual)
-chimera serve                         # servidor HTTP do gateway de mensageria (sessões por chat)
+chimera serve [--discord|--telegram]  # gateway de mensageria: HTTP, ou bot Discord/Telegram nativo
 chimera run "PROMPT" --image pic.png   # Tier-1 single-shot (com visão via --image)
 chimera deliver "um plano" -o plan.md   # Modo Entregável: produz um artefato polido
 chimera fuse "PROMPT" --show-panel     # LLM-Fusion: painel -> juiz -> sintetizador
