@@ -637,6 +637,9 @@ def solve(
     explorer: bool = typer.Option(
         False, "--explorer", help="Give the agent an isolated Context Explorer for repo search (FastContext-style)."
     ),
+    subagents: bool = typer.Option(
+        False, "--subagents", help="Give the agent spawn_subagent to delegate subtasks to isolated subagents."
+    ),
 ) -> None:
     """Tier-2: autonomously solve a task with plan + verify-or-revert. Requires a key."""
     from chimera.core import (
@@ -692,6 +695,11 @@ def solve(
 
             # Cheap explorer model: a narrow localization task doesn't need the worker's model.
             registry.register(ExploreRepositoryTool(gateway, ws, max_turns=max_steps))
+        if subagents:
+            from chimera.core import SubAgentTool
+
+            # The subagent draws from the tools registered so far (minus spawn itself).
+            registry.register(SubAgentTool(gateway, registry, model=model, max_turns=max_steps))
         if guard:
             from chimera.governance import AuditLog, TrustKernel, govern_registry
 

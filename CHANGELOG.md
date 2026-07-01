@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Generic subagents** — generalises the Context Explorer pattern two ways. **`SubAgentTool`**
+  (`solve --subagents`) gives the main agent a `spawn_subagent(task, tools)` tool: it runs a
+  fresh Agent in its own context with only an allowed subset of tools and returns ONLY the final
+  result — so the main agent can fan work out or offload context-heavy subtasks. Two guardrails:
+  no recursion (a subagent is never granted the spawn tool) and it can't exceed the configured
+  allowlist. **Tool-using `RoleAgent`** — a crew role can now be given a tool registry, turning it
+  from a single-shot persona into a real worker that runs its own loop (search/read/edit/run) and
+  returns its answer; crews call `act()` either way, so talkers and doers mix transparently.
+  Verified live: a subagent used grep/read to locate `MAX_RETRIES` and returned just the value.
 - **Context Explorer** (`chimera explore`, `solve --explorer`) — a FastContext-style
   (arXiv 2606.14066) isolated repository-exploration subagent. It takes a natural-language
   query, runs its own bounded read-only search, and returns only a compact `file:line`

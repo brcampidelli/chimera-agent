@@ -60,6 +60,46 @@ def test_role_agent_acts_in_character() -> None:
     assert agent.act("do the thing") == "SYSTEM-PLANNER"
 
 
+class WorkerBackend:
+    """First call requests a tool (if tools are offered); then returns a final answer."""
+
+    def __init__(self) -> None:
+        self.n = 0
+        self.used_tools = False
+
+    def complete(self, messages: list[Any], **kwargs: Any) -> CompletionResult:
+        from chimera.providers.gateway import ToolCall
+
+        self.n += 1
+        if self.n == 1 and kwargs.get("tools"):
+            self.used_tools = True
+            return CompletionResult(
+                content="", model="fake",
+                tool_calls=[ToolCall(id="1", name="echo", arguments={"text": "WORKED"})],
+            )
+        return CompletionResult(content="final:done", model="fake")
+
+
+def test_role_agent_with_tools_runs_a_real_loop() -> None:
+    from chimera.tools import EchoTool, ToolRegistry
+
+    reg = ToolRegistry()
+    reg.register(EchoTool())
+    backend = WorkerBackend()
+    agent = RoleAgent(Role("worker", "WORK"), backend, tools=reg)
+    assert agent.act("do it") == "final:done"
+    assert backend.used_tools  # it actually executed a tool call, not a single-shot reply
+
+
+def test_tool_using_worker_inside_a_crew() -> None:
+    from chimera.tools import EchoTool, ToolRegistry
+
+    reg = ToolRegistry()
+    reg.register(EchoTool())
+    crew = SequentialCrew([RoleAgent(Role("doer", "DO"), WorkerBackend(), tools=reg)])
+    assert crew.run("task").answer == "final:done"
+
+
 # --- sequential crew --------------------------------------------------------
 
 def test_sequential_crew_runs_in_order() -> None:

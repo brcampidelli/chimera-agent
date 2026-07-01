@@ -29,6 +29,7 @@ from chimera.core.explorer import (
 )
 from chimera.core.planner import Plan, Planner
 from chimera.core.spine import assemble_spine
+from chimera.core.subagent import SubAgentTool
 from chimera.core.supervisor import Manager, Review
 from chimera.core.verify import (
     CommandVerifier,
@@ -65,4 +66,5 @@ __all__ = [
     "Evidence",
     "parse_evidence",
     "ExploreRepositoryTool",
+    "SubAgentTool",
 ]
