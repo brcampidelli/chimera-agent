@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Context Explorer** (`chimera explore`, `solve --explorer`) — a FastContext-style
+  (arXiv 2606.14066) isolated repository-exploration subagent. It takes a natural-language
+  query, runs its own bounded read-only search, and returns only a compact `file:line`
+  evidence block — its search turns never touch the main agent's context (the token/degradation
+  win of separating *exploration* from *solving*). Runs on any backend; a cheap model is ideal,
+  since localization is a narrow task. Ships with new **`grep`** (regex over contents) and
+  **`glob`** (path patterns) native tools. Verified live: located the fusion engine at
+  `fusion/engine.py:1-165` with a cheap model in 6 turns. (The paper's *trained* 4B/30B explorer
+  is a separate Tier-4 aspiration via the `evolve` pipeline; this is the untrained architecture.)
 - **Parallel multi-agent isolation** (`chimera solve-batch`, `chimera.orchestration.run_isolated`):
   solve several tasks concurrently, each in its **own git worktree**, so parallel file edits
   never collide. On merge-back a file two tasks both changed is reported as a **conflict** and

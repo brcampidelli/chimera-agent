@@ -7,6 +7,7 @@ Commands:
   agent TASK                     ReAct agent loop with native tools
   solve TASK                     Tier-2 autonomous (plan + verify-or-revert)
   solve-batch TASKS...           Tier-3: solve tasks in parallel, each in its own worktree
+  explore QUERY                  locate code via the isolated Context Explorer subagent
   tools / skills                 list native tools / built-in skills
   memory ...                     curated long-term memory (add/search/list)
   cron ...                       scheduled jobs (add/list/remove/enable/disable/learn)
@@ -633,6 +634,9 @@ def solve(
     isolate: bool = typer.Option(
         False, "--isolate", help="Run in an isolated git worktree; changes copied back only on success."
     ),
+    explorer: bool = typer.Option(
+        False, "--explorer", help="Give the agent an isolated Context Explorer for repo search (FastContext-style)."
+    ),
 ) -> None:
     """Tier-2: autonomously solve a task with plan + verify-or-revert. Requires a key."""
     from chimera.core import (
@@ -683,6 +687,11 @@ def solve(
 
     def _run_solve(ws: Path) -> AutonomousResult:
         registry = default_registry(ws)
+        if explorer:
+            from chimera.core import ExploreRepositoryTool
+
+            # Cheap explorer model: a narrow localization task doesn't need the worker's model.
+            registry.register(ExploreRepositoryTool(gateway, ws, max_turns=max_steps))
         if guard:
             from chimera.governance import AuditLog, TrustKernel, govern_registry
 
@@ -818,6 +827,39 @@ def solve_batch(
         console.print(f"[yellow]conflicts (not merged):[/yellow] {', '.join(batch.conflicts)}")
     if not batch.ok:
         raise typer.Exit(code=1)
+
+
+@app.command()
+def explore(
+    query: str = typer.Argument(..., help="What to locate in the repository."),
+    workspace: str = typer.Option(".", "--workspace", "-w", help="Repository root to explore."),
+    model: str = typer.Option(None, "--model", "-m", help="Model for the explorer (a cheap one is fine)."),
+    max_turns: int = typer.Option(8, "--max-turns", help="Max exploration turns."),
+) -> None:
+    """Locate relevant code via the isolated Context Explorer subagent (FastContext-style).
+
+    Returns only a compact file:line evidence block — the exploration turns never touch your
+    context. A cheap model is usually the right call here; localization is a narrow task.
+    """
+    from chimera.core import ContextExplorer
+    from chimera.providers import LLMGateway, MissingCredentialsError
+
+    if not get_settings().has_any_key():
+        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+        raise typer.Exit(code=1)
+    explorer = ContextExplorer(LLMGateway(), Path(workspace), model=model, max_turns=max_turns)
+    try:
+        result = explorer.explore(query)
+    except MissingCredentialsError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+    if not result.evidence:
+        console.print("[dim]no relevant locations found[/dim]")
+        return
+    for ev in result.evidence:
+        loc = f"[cyan]{ev.path}[/cyan]" + (f":[yellow]{ev.lines}[/yellow]" if ev.lines else "")
+        console.print(f"  {loc}" + (f" [dim]— {ev.note}[/dim]" if ev.note else ""))
+    console.print(f"[dim]{len(result.evidence)} location(s) in {result.turns} turn(s), {result.tool_calls} tool call(s)[/dim]")
 
 
 @app.command()

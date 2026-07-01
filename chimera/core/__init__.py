@@ -20,6 +20,13 @@ from chimera.core.autonomous import (
     Worker,
 )
 from chimera.core.checkpoint import FileSnapshot, WorkspaceGuard
+from chimera.core.explorer import (
+    ContextExplorer,
+    Evidence,
+    ExploreRepositoryTool,
+    ExplorerResult,
+    parse_evidence,
+)
 from chimera.core.planner import Plan, Planner
 from chimera.core.spine import assemble_spine
 from chimera.core.supervisor import Manager, Review
@@ -53,4 +60,9 @@ __all__ = [
     "CommandVerifier",
     "NullVerifier",
     "assemble_spine",
+    "ContextExplorer",
+    "ExplorerResult",
+    "Evidence",
+    "parse_evidence",
+    "ExploreRepositoryTool",
 ]

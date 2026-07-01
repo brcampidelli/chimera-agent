@@ -9,6 +9,7 @@ from chimera.tools.registry import (
     ToolNotFoundError,
     ToolRegistry,
 )
+from chimera.tools.search import GlobTool, GrepTool
 from chimera.tools.shell import RunShellTool
 from chimera.tools.workspace import PathEscapesWorkspaceError, resolve_in_workspace
 
@@ -21,6 +22,8 @@ __all__ = [
     "ReadFileTool",
     "WriteFileTool",
     "ListDirTool",
+    "GrepTool",
+    "GlobTool",
     "RunShellTool",
     "HttpGetTool",
     "PathEscapesWorkspaceError",

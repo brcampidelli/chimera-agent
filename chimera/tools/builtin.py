@@ -13,6 +13,7 @@ from chimera.tools.base import Tool
 from chimera.tools.files import ListDirTool, ReadFileTool, WriteFileTool
 from chimera.tools.http import HttpGetTool
 from chimera.tools.registry import ToolRegistry
+from chimera.tools.search import GlobTool, GrepTool
 from chimera.tools.shell import RunShellTool
 
 
@@ -43,6 +44,8 @@ def default_registry(workspace: Path | None = None) -> ToolRegistry:
     registry.register(ReadFileTool(workspace))
     registry.register(WriteFileTool(workspace))
     registry.register(ListDirTool(workspace))
+    registry.register(GrepTool(workspace))
+    registry.register(GlobTool(workspace))
     registry.register(RunShellTool(workspace, get_sandbox()))
     registry.register(HttpGetTool())
 
