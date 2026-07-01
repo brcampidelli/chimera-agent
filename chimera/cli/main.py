@@ -360,8 +360,9 @@ def serve(
     no_memory: bool = typer.Option(False, "--no-memory", help="Don't recall long-term memory."),
     discord: bool = typer.Option(False, "--discord", help="Serve on Discord (needs CHIMERA_DISCORD_BOT_TOKEN + the 'messaging' extra)."),
     telegram: bool = typer.Option(False, "--telegram", help="Serve on Telegram (needs CHIMERA_TELEGRAM_BOT_TOKEN)."),
+    slack: bool = typer.Option(False, "--slack", help="Serve on Slack (needs CHIMERA_SLACK_BOT_TOKEN + CHIMERA_SLACK_APP_TOKEN + the 'messaging' extra)."),
 ) -> None:
-    """Run the messaging gateway on HTTP (POST /chat, GET /health), Discord or Telegram. Requires a key."""
+    """Run the messaging gateway on HTTP (POST /chat, GET /health), Discord, Telegram or Slack. Requires a key."""
     from chimera.core import Agent, AgentConfig
     from chimera.interface import ChatSession
     from chimera.providers import LLMGateway
@@ -384,8 +385,9 @@ def serve(
     shared_memory = None if no_memory else _memory_manager()
     shared_graph = _recall_graph(shared_memory)
 
-    if discord or telegram:
-        adapter = _messaging_adapter(settings, discord=discord)
+    platform = "discord" if discord else "telegram" if telegram else "slack" if slack else None
+    if platform is not None:
+        adapter = _messaging_adapter(settings, platform)
         _serve_platform(adapter, backend, model, max_steps, workspace_path, shared_memory, shared_graph)
         return
 
@@ -406,21 +408,28 @@ def serve(
         server.shutdown()
 
 
-def _messaging_adapter(settings: Settings, *, discord: bool) -> Any:
-    """Build the requested platform adapter (Discord or Telegram) or exit with guidance."""
-    if discord:
+def _messaging_adapter(settings: Settings, platform: str) -> Any:
+    """Build the requested platform adapter (Discord/Telegram/Slack) or exit with guidance."""
+    if platform == "discord":
         if not settings.discord_bot_token:
             console.print("[red]Set CHIMERA_DISCORD_BOT_TOKEN to run the Discord adapter.[/red]")
             raise typer.Exit(code=1)
         from chimera.server import DiscordAdapter
 
         return DiscordAdapter(settings.discord_bot_token)
-    if not settings.telegram_bot_token:
-        console.print("[red]Set CHIMERA_TELEGRAM_BOT_TOKEN to run the Telegram adapter.[/red]")
-        raise typer.Exit(code=1)
-    from chimera.server import TelegramAdapter
+    if platform == "telegram":
+        if not settings.telegram_bot_token:
+            console.print("[red]Set CHIMERA_TELEGRAM_BOT_TOKEN to run the Telegram adapter.[/red]")
+            raise typer.Exit(code=1)
+        from chimera.server import TelegramAdapter
 
-    return TelegramAdapter(settings.telegram_bot_token)
+        return TelegramAdapter(settings.telegram_bot_token)
+    if not (settings.slack_bot_token and settings.slack_app_token):
+        console.print("[red]Set CHIMERA_SLACK_BOT_TOKEN and CHIMERA_SLACK_APP_TOKEN to run the Slack adapter.[/red]")
+        raise typer.Exit(code=1)
+    from chimera.server import SlackAdapter
+
+    return SlackAdapter(settings.slack_bot_token, settings.slack_app_token)
 
 
 def _serve_platform(

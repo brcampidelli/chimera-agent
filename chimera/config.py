@@ -100,9 +100,11 @@ class Settings(BaseSettings):
     # cheap/tool turns single-model and only fuses deep or error-sensitive ones. ---
     auto_fuse: bool = Field(default=False, validation_alias="CHIMERA_AUTO_FUSE")
 
-    # --- Messaging bot tokens (only needed for `chimera serve --discord/--telegram`) ---
+    # --- Messaging bot tokens (only needed for the matching `chimera serve --<platform>`) ---
     discord_bot_token: str | None = Field(default=None, validation_alias="CHIMERA_DISCORD_BOT_TOKEN")
     telegram_bot_token: str | None = Field(default=None, validation_alias="CHIMERA_TELEGRAM_BOT_TOKEN")
+    slack_bot_token: str | None = Field(default=None, validation_alias="CHIMERA_SLACK_BOT_TOKEN")
+    slack_app_token: str | None = Field(default=None, validation_alias="CHIMERA_SLACK_APP_TOKEN")
 
     # --- Execution sandbox for the shell tool (local = host, docker = isolated) ---
     sandbox: str = Field(default="local", validation_alias="CHIMERA_SANDBOX")

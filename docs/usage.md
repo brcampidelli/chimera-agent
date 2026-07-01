@@ -158,6 +158,16 @@ export CHIMERA_TELEGRAM_BOT_TOKEN=...      # from @BotFather
 uv run chimera serve --telegram
 ```
 
+**Native Slack.** Receives via Socket Mode (needs the `messaging` extra) and sends via the
+Web API. Enable Socket Mode on your Slack app to get an app-level token:
+
+```bash
+uv sync --extra messaging
+export CHIMERA_SLACK_BOT_TOKEN=xoxb-...     # bot token
+export CHIMERA_SLACK_APP_TOKEN=xapp-...     # app-level token (Socket Mode)
+uv run chimera serve --slack
+```
+
 ### `run` — Tier-1, single-shot completion
 
 A single model call, no tools, no fusion. Cheapest path.

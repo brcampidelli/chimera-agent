@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Native Slack** (`chimera serve --slack`): the third platform on the same adapter
+  pattern — receives via Socket Mode (`slack-sdk`, the `messaging` extra) and sends via the
+  Web API (`chat.postMessage`, plain `httpx`). Pure event-filtering (`_message_from_event`)
+  is fully tested. Tokens via `CHIMERA_SLACK_BOT_TOKEN` + `CHIMERA_SLACK_APP_TOKEN`. Three
+  platforms now share one `_serve_platform` — the adapter pattern is proven to generalise.
 - **Native Telegram** (`chimera serve --telegram`): a second platform on the same adapter
   pattern (Adapter + MessageSender + pure message-filtering), proving it generalises. Uses
   the Telegram Bot API over plain HTTP — **no extra dependency** (just the core `httpx`).
