@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Entity-aware recall**: `ChatSession` now also pulls facts linked (via the memory
+  graph) to entities named in a message, not only keyword hits — so "tell me about Stripe"
+  recalls "Stripe is our payment provider" even without a shared keyword. Wired into
+  `chat`, `tui`, and the messaging gateway.
+- **Resilient REST tools**: OpenAPI-generated tools now retry on 429 / 5xx / transport
+  errors with exponential backoff, honouring a `Retry-After` header — so an agent hitting
+  a rate-limited public API recovers instead of failing the turn.
+
 ### Fixed
 - **`bench --fuse` now measures fusion, not the router.** It used a cost-aware
   `RoutedBackend`, whose length/keyword gate declines to fuse short prompts — so on the

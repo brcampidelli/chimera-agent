@@ -22,10 +22,22 @@ _log = get_logger("integrations.openapi")
 _HTTP_METHODS = {"get", "post", "put", "delete", "patch"}
 _MAX_BODY_CHARS = 20_000
 _NON_NAME = re.compile(r"[^a-zA-Z0-9_]+")
+# Statuses worth retrying: rate-limited (429) and transient server errors (5xx).
+_RETRY_STATUS = {429, 500, 502, 503, 504}
 
 
 def _sanitize(text: str) -> str:
     return _NON_NAME.sub("_", text).strip("_") or "op"
+
+
+def _retry_delay(attempt: int, retry_after: str | None, *, backoff: float, cap: float) -> float:
+    """Honour a Retry-After header if present, else exponential backoff, capped."""
+    if retry_after:
+        try:
+            return min(float(retry_after), cap)  # seconds form; date form falls through
+        except ValueError:
+            pass
+    return min(backoff * (2.0**attempt), cap)
 
 
 class RestApiTool(Tool):
@@ -45,6 +57,9 @@ class RestApiTool(Tool):
         has_body: bool,
         headers: dict[str, str] | None = None,
         timeout: float = 30.0,
+        retries: int = 2,
+        backoff: float = 0.5,
+        max_backoff: float = 20.0,
     ) -> None:
         self.name = name
         self.description = description
@@ -57,6 +72,9 @@ class RestApiTool(Tool):
         self.has_body = has_body
         self.headers = headers or {}
         self.timeout = timeout
+        self.retries = retries
+        self.backoff = backoff
+        self.max_backoff = max_backoff
 
     def _url(self, kwargs: dict[str, Any]) -> str:
         path = self.path_template
@@ -65,27 +83,43 @@ class RestApiTool(Tool):
         return f"{self.base_url}{path}"
 
     def run(self, **kwargs: Any) -> str:
+        import time
+
         import httpx  # lazy
 
         url = self._url(kwargs)
         query = {name: kwargs[name] for name in self.query_params if name in kwargs}
         body = kwargs.get("body") if self.has_body else None
-        try:
-            response = httpx.request(
-                self.method,
-                url,
-                params=query or None,
-                json=body,
-                headers=self.headers or None,
-                timeout=self.timeout,
-                follow_redirects=True,
-            )
-        except httpx.HTTPError as exc:
-            return f"error: request failed: {exc}"
-        text = response.text
-        if len(text) > _MAX_BODY_CHARS:
-            text = text[:_MAX_BODY_CHARS] + f"\n... [truncated, {len(text)} chars total]"
-        return f"[{response.status_code}] {self.method} {url}\n{text}"
+        last_error = "request failed"
+        for attempt in range(self.retries + 1):
+            try:
+                response = httpx.request(
+                    self.method,
+                    url,
+                    params=query or None,
+                    json=body,
+                    headers=self.headers or None,
+                    timeout=self.timeout,
+                    follow_redirects=True,
+                )
+            except httpx.HTTPError as exc:  # transient transport error — retry
+                last_error = f"request failed: {exc}"
+                if attempt < self.retries:
+                    time.sleep(_retry_delay(attempt, None, backoff=self.backoff, cap=self.max_backoff))
+                    continue
+                return f"error: {last_error}"
+            if response.status_code in _RETRY_STATUS and attempt < self.retries:
+                delay = _retry_delay(
+                    attempt, response.headers.get("Retry-After"), backoff=self.backoff, cap=self.max_backoff
+                )
+                _log.debug("retrying %s %s after %s (status %d)", self.method, url, delay, response.status_code)
+                time.sleep(delay)
+                continue
+            text = response.text
+            if len(text) > _MAX_BODY_CHARS:
+                text = text[:_MAX_BODY_CHARS] + f"\n... [truncated, {len(text)} chars total]"
+            return f"[{response.status_code}] {self.method} {url}\n{text}"
+        return f"error: {last_error}"
 
 
 def _build_param_schema(
@@ -136,6 +170,8 @@ def tools_from_openapi(
     base_url: str | None = None,
     headers: dict[str, str] | None = None,
     timeout: float = 30.0,
+    retries: int = 2,
+    backoff: float = 0.5,
 ) -> list[RestApiTool]:
     """Generate one :class:`RestApiTool` per operation in ``spec``."""
     servers = spec.get("servers") or []
@@ -168,6 +204,8 @@ def tools_from_openapi(
                     has_body=has_body,
                     headers=headers,
                     timeout=timeout,
+                    retries=retries,
+                    backoff=backoff,
                 )
             )
     _log.debug("generated %d tools from openapi spec", len(tools))
@@ -195,10 +233,12 @@ class OpenAPIConnector(Connector):
         base_url: str | None = None,
         headers: dict[str, str] | None = None,
         timeout: float = 30.0,
+        retries: int = 2,
+        backoff: float = 0.5,
     ) -> None:
         self.name = name
         self._tools = tools_from_openapi(
-            spec, base_url=base_url, headers=headers, timeout=timeout
+            spec, base_url=base_url, headers=headers, timeout=timeout, retries=retries, backoff=backoff
         )
 
     def tools(self) -> list[Tool]:

@@ -68,6 +68,17 @@ def test_session_memory_gate_filters_injected_memory(tmp_path: Path) -> None:
     assert "ignore all previous instructions" not in prompt  # injection blocked by the gate
 
 
+def test_graph_recall_adds_entity_linked_facts() -> None:
+    from chimera.memory import MemoryGraph
+
+    graph = MemoryGraph()
+    graph.add_text("Stripe is our payment provider")  # relation: Stripe -> is -> our payment provider
+    agent = RecordingAgent()
+    session = ChatSession(agent, graph=graph)
+    session.send("tell me about Stripe")  # shares the entity, not a keyword
+    assert "Stripe is our payment provider" in agent.prompts[0]
+
+
 def test_set_model_updates_the_agent_config() -> None:
     from chimera.core import AgentConfig
 

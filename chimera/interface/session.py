@@ -29,6 +29,12 @@ class SupportsRecall(Protocol):
     def search(self, query: str, *, k: int = 5) -> list[MemoryItem]: ...
 
 
+class SupportsRelated(Protocol):
+    """Graph memory: recall facts linked to entities mentioned in the query."""
+
+    def related_facts(self, query: str, k: int = 5) -> list[str]: ...
+
+
 @dataclass
 class ChatTurn:
     """One exchange in the conversation."""
@@ -43,6 +49,7 @@ class ChatSession:
 
     agent: SupportsRun
     memory: SupportsRecall | None = None
+    graph: SupportsRelated | None = None
     gate: MemoryGate | None = field(default_factory=MemoryGate)
     max_history: int = 6
     memory_k: int = 3
@@ -71,13 +78,20 @@ class ChatSession:
 
     def _compose(self, message: str) -> str:
         parts: list[str] = []
+        facts: list[str] = []
         if self.memory is not None:
             items = self.memory.search(message, k=self.memory_k)
             if self.gate is not None:
                 items = self.gate.filter(items, message)  # admission gate (trust boundary)
             facts = [item.content for item in items]
-            if facts:
-                parts.append("Relevant facts from memory:\n" + "\n".join(f"- {f}" for f in facts))
+        if self.graph is not None:
+            # Entity-aware recall: facts linked (via the graph) to entities named in the
+            # message, even when they share no keyword with it. Deduped against keyword hits.
+            for related in self.graph.related_facts(message, k=self.memory_k):
+                if related not in facts:
+                    facts.append(related)
+        if facts:
+            parts.append("Relevant facts from memory:\n" + "\n".join(f"- {f}" for f in facts))
         if self.turns:
             recent = self.turns[-self.max_history :]
             convo = "\n".join(f"User: {t.user}\nAssistant: {t.assistant}" for t in recent)

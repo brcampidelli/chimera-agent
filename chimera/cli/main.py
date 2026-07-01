@@ -33,7 +33,7 @@ from chimera.config import get_settings
 if TYPE_CHECKING:
     from chimera.ecosystem import TrajectoryCollector
     from chimera.kanban import KanbanBoard
-    from chimera.memory import MemoryManager
+    from chimera.memory import MemoryGraph, MemoryManager
     from chimera.pet import Pet, PetStore
     from chimera.scheduler import CronStore
 
@@ -274,7 +274,8 @@ def chat(
 
         backend = RoutedBackend(gateway, FusionEngine(gateway))
     agent = Agent(backend, default_registry(Path(workspace)), AgentConfig(model=model, max_steps=max_steps))
-    session = ChatSession(agent, memory=None if no_memory else _memory_manager())
+    mem = None if no_memory else _memory_manager()
+    session = ChatSession(agent, memory=mem, graph=_recall_graph(mem))
 
     console.print(
         "[bold]Chimera chat[/bold] — your terminal right-hand. "
@@ -341,7 +342,8 @@ def tui(
 
         backend = RoutedBackend(gateway, FusionEngine(gateway))
     agent = Agent(backend, default_registry(Path(workspace)), AgentConfig(model=model, max_steps=max_steps))
-    session = ChatSession(agent, memory=None if no_memory else _memory_manager())
+    mem = None if no_memory else _memory_manager()
+    session = ChatSession(agent, memory=mem, graph=_recall_graph(mem))
     ChimeraTUI(session, model_label=model or settings.default_model).run()
 
 
@@ -376,10 +378,11 @@ def serve(
 
     workspace_path = Path(workspace)
     shared_memory = None if no_memory else _memory_manager()
+    shared_graph = _recall_graph(shared_memory)
 
     def factory() -> ChatSession:
         runner = Agent(backend, default_registry(workspace_path), AgentConfig(model=model, max_steps=max_steps))
-        return ChatSession(runner, memory=shared_memory)
+        return ChatSession(runner, memory=shared_memory, graph=shared_graph)
 
     server = make_server(MessageGateway(factory), host, port)
     console.print(
@@ -893,6 +896,15 @@ def _memory_manager() -> MemoryManager:
     from chimera.memory import MemoryManager, MemoryStore
 
     return MemoryManager(MemoryStore(get_settings().home / "memory.json"))
+
+
+def _recall_graph(memory: MemoryManager | None) -> MemoryGraph | None:
+    """Build an entity-relation graph from stored memory, for entity-aware recall."""
+    if memory is None:
+        return None
+    from chimera.memory import build_graph
+
+    return build_graph([item.content for item in memory.store.all()])
 
 
 @memory_app.command("add")

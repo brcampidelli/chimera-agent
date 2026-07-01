@@ -89,6 +89,48 @@ def test_rest_tool_builds_request(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "[200]" in out
 
 
+def test_rest_tool_retries_on_429_then_succeeds(monkeypatch: pytest.MonkeyPatch) -> None:
+    import time
+
+    import httpx
+
+    calls = {"n": 0}
+
+    def fake_request(method: str, url: str, **kwargs: Any) -> SimpleNamespace:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return SimpleNamespace(status_code=429, text="rate limited", headers={})
+        return SimpleNamespace(status_code=200, text="ok", headers={})
+
+    monkeypatch.setattr(httpx, "request", fake_request)
+    monkeypatch.setattr(time, "sleep", lambda _s: None)  # no real backoff delay
+
+    tool = {t.name: t for t in tools_from_openapi(SPEC)}["get_item"]
+    out = tool.run(id="42")
+    assert calls["n"] == 2  # retried once after the 429
+    assert "[200]" in out
+
+
+def test_rest_tool_gives_up_after_retries(monkeypatch: pytest.MonkeyPatch) -> None:
+    import time
+
+    import httpx
+
+    calls = {"n": 0}
+
+    def fake_request(method: str, url: str, **kwargs: Any) -> SimpleNamespace:
+        calls["n"] += 1
+        raise httpx.ConnectError("boom")
+
+    monkeypatch.setattr(httpx, "request", fake_request)
+    monkeypatch.setattr(time, "sleep", lambda _s: None)
+
+    tool = {t.name: t for t in tools_from_openapi(SPEC, retries=2)}["get_item"]
+    out = tool.run(id="42")
+    assert calls["n"] == 3  # retries + 1 attempts
+    assert out.startswith("error:")
+
+
 def test_openapi_connector_into_registry() -> None:
     connector = OpenAPIConnector("example", SPEC)
     creg = ConnectorRegistry()
