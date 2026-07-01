@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **`bench --fuse` now measures fusion, not the router.** It used a cost-aware
+  `RoutedBackend`, whose length/keyword gate declines to fuse short prompts — so on the
+  hard chain it silently collapsed back to single-model (degradation 1.0, same as no
+  fusion). It now uses the `FusionEngine` directly, matching the flag's documented intent;
+  `bench --hard --chain --fuse` holds 8/8 (degradation 0.0) where single collapses.
+
 ### Added
 - **Hard benchmark suites** (`chimera bench --hard`): 12 reasoning-trap tasks and an
   8-step **stateful** arithmetic chain where an error *propagates*. Unlike the trivial

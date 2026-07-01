@@ -1210,9 +1210,12 @@ def bench(
     gateway = LLMGateway()
     backend: SupportsComplete = gateway
     if fuse:
-        from chimera.fusion import FusionEngine, RoutedBackend
+        # The benchmark measures the fusion engine itself, so use it directly — the
+        # cost-aware RoutedBackend would decline to fuse these short prompts (they fall
+        # under its length/keyword gate) and silently collapse back to single-model.
+        from chimera.fusion import FusionEngine
 
-        backend = RoutedBackend(gateway, FusionEngine(gateway))
+        backend = FusionEngine(gateway)
 
     solver = SingleModelSolver(backend, model)
     if chain:
