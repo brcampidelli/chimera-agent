@@ -389,11 +389,19 @@ def serve(
     platform = "discord" if discord else "telegram" if telegram else "slack" if slack else None
     if platform is not None:
         adapter = _messaging_adapter(settings, platform)
-        _serve_platform(adapter, backend, model, max_steps, workspace_path, shared_memory, shared_graph)
+        _serve_platform(adapter, settings, backend, model, max_steps, workspace_path, shared_memory, shared_graph)
         return
 
+    from chimera.integrations import SendMessageTool
+
+    push_senders = _sender_registry(settings)  # e.g. WhatsApp send, available over HTTP too
+    http_send_tool = SendMessageTool(push_senders) if push_senders.platforms() else None
+
     def factory() -> ChatSession:
-        runner = Agent(backend, default_registry(workspace_path), AgentConfig(model=model, max_steps=max_steps))
+        registry = default_registry(workspace_path)
+        if http_send_tool is not None:
+            registry.register(http_send_tool)
+        runner = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
         return ChatSession(runner, memory=shared_memory, graph=shared_graph)
 
     message_gateway = MessageGateway(factory)
@@ -434,8 +442,23 @@ def _messaging_adapter(settings: Settings, platform: str) -> Any:
     return SlackAdapter(settings.slack_bot_token, settings.slack_app_token)
 
 
+def _sender_registry(settings: Settings, primary: Any = None) -> Any:
+    """A SenderRegistry with the primary adapter (if any) plus configured push senders (WhatsApp)."""
+    from chimera.integrations import SenderRegistry
+
+    registry = SenderRegistry()
+    if primary is not None:
+        registry.register(primary)
+    if settings.whatsapp_access_token and settings.whatsapp_phone_number_id:
+        from chimera.server import WhatsAppSender
+
+        registry.register(WhatsAppSender(settings.whatsapp_access_token, settings.whatsapp_phone_number_id))
+    return registry
+
+
 def _serve_platform(
-    adapter: Any,  # an Adapter that is also a MessageSender (Discord/Telegram)
+    adapter: Any,  # an Adapter that is also a MessageSender (Discord/Telegram/Slack)
+    settings: Settings,
     backend: SupportsComplete,
     model: str | None,
     max_steps: int,
@@ -445,13 +468,12 @@ def _serve_platform(
 ) -> None:
     """Serve the gateway over a platform adapter: one session per chat; the agent can send."""
     from chimera.core import Agent, AgentConfig
-    from chimera.integrations import SenderRegistry, SendMessageTool
+    from chimera.integrations import SendMessageTool
     from chimera.interface import ChatSession
     from chimera.server import MessageGateway
     from chimera.tools import default_registry
 
-    senders = SenderRegistry()
-    senders.register(adapter)  # the agent can send on this platform via send_message
+    senders = _sender_registry(settings, adapter)  # this platform + any configured push senders
     send_tool = SendMessageTool(senders)
 
     def factory() -> ChatSession:

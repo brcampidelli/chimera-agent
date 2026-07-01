@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **WhatsApp (send)**: a `WhatsAppSender` (Cloud API over `httpx`) auto-registers when
+  `CHIMERA_WHATSAPP_ACCESS_TOKEN` + `CHIMERA_WHATSAPP_PHONE_NUMBER_ID` are set, so the agent
+  can send WhatsApp messages via `send_message` in any `serve` mode. Ships with a pure,
+  tested inbound parser (`parse_inbound`) — the building block for two-way once a Meta
+  webhook is wired. (Signal isn't shipped: no official API; it needs an external bridge.)
 - **Webhook triggers — unattended operation.** The scheduler gained a `webhook` trigger
   (`chimera cron add <name> <hook> <task> --webhook`), and the gateway serves
   `POST /webhook/<hook>`: an inbound HTTP request fires every job registered for that hook,

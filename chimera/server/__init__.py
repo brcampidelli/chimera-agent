@@ -15,6 +15,7 @@ from chimera.server.gateway import (
 from chimera.server.http import WebhookHandler, handle, make_server
 from chimera.server.slack_adapter import SlackAdapter
 from chimera.server.telegram_adapter import TelegramAdapter
+from chimera.server.whatsapp import WhatsAppSender
 
 __all__ = [
     "InboundMessage",
@@ -24,6 +25,7 @@ __all__ = [
     "DiscordAdapter",
     "TelegramAdapter",
     "SlackAdapter",
+    "WhatsAppSender",
     "chunk_text",
     "handle",
     "make_server",

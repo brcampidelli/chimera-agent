@@ -105,6 +105,10 @@ class Settings(BaseSettings):
     telegram_bot_token: str | None = Field(default=None, validation_alias="CHIMERA_TELEGRAM_BOT_TOKEN")
     slack_bot_token: str | None = Field(default=None, validation_alias="CHIMERA_SLACK_BOT_TOKEN")
     slack_app_token: str | None = Field(default=None, validation_alias="CHIMERA_SLACK_APP_TOKEN")
+    whatsapp_access_token: str | None = Field(default=None, validation_alias="CHIMERA_WHATSAPP_ACCESS_TOKEN")
+    whatsapp_phone_number_id: str | None = Field(
+        default=None, validation_alias="CHIMERA_WHATSAPP_PHONE_NUMBER_ID"
+    )
 
     # --- Email (SMTP) for the send_email reference tool ---
     smtp_host: str | None = Field(default=None, validation_alias="CHIMERA_SMTP_HOST")

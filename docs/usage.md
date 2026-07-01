@@ -181,6 +181,20 @@ export CHIMERA_SLACK_APP_TOKEN=xapp-...     # app-level token (Socket Mode)
 uv run chimera serve --slack
 ```
 
+**WhatsApp (send).** WhatsApp is *push-based* (messages arrive at a Meta webhook you host),
+so unlike the others there's no connection to open. Set the Cloud API creds and the agent
+can **send** WhatsApp messages via the `send_message` tool in any `serve` mode:
+
+```bash
+export CHIMERA_WHATSAPP_ACCESS_TOKEN=...
+export CHIMERA_WHATSAPP_PHONE_NUMBER_ID=...
+# in a chat: send_message(platform="whatsapp", chat_id="<E.164 number>", text="done ✅")
+```
+
+Two-way WhatsApp needs a public Meta webhook pointed at your endpoint; `WhatsAppSender.parse_inbound`
+is the building block for that. **Signal** is not shipped — it has no official API and would
+require running an external `signal-cli`/Matrix bridge, which is out of scope for the core.
+
 ### `run` — Tier-1, single-shot completion
 
 A single model call, no tools, no fusion. Cheapest path.
