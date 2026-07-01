@@ -29,10 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **The fusion router now fuses short but error-sensitive turns.** Its gate was length +
   reasoning-keywords only, so exact-answer tasks (arithmetic, counting, digit ops) fell
   through to a single model — precisely where a lone slip corrupts a long chain.
-  `RoutingPolicy` gained precision-keyword + arithmetic-expression detection (EN + PT-BR),
-  on by default (`fuse_error_sensitive`, opt-out). Measured live through the *same*
-  `RoutedBackend`: the hard chain collapses with it off (degradation 1.0) and holds with
-  it on (degradation 0.0).
+  `RoutingPolicy` gained precision-keyword + arithmetic-expression detection, with keyword
+  sets in the project's main languages (en/pt/es/de/fr/zh/ja), on by default
+  (`fuse_error_sensitive`, opt-out). Measured live through the *same* `RoutedBackend`: the
+  hard chain collapses with it off (degradation 1.0) and holds with it on (0.0).
+- **`solve`/`crew` can auto-fuse without `--fuse`.** New `CHIMERA_AUTO_FUSE` (default off,
+  since fusion costs 2-3x) routes the worker through the cost-aware router in production,
+  so deep/error-sensitive turns fuse while cheap/tool turns stay single-model. `--fuse`
+  still additionally routes deep *planning* through fusion.
 - **Cascade rubric as a review criterion.** `solve --rubric` makes the Manager judge a
   result on the cascade rubric (instruction-following → factuality → rationality),
   approving on the importance-weighted overall and naming the weakest dimension on a

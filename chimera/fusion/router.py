@@ -22,29 +22,48 @@ _log = get_logger("fusion.router")
 
 Mode = Literal["auto", "always", "never"]
 
+# Deep-reasoning intent, in the project's main languages (en/pt/es/de/fr/zh/ja).
 _DEFAULT_KEYWORDS = (
-    "research",
-    "compare",
-    "analyze",
-    "analyse",
-    "design",
-    "evaluate",
-    "trade-off",
-    "tradeoff",
-    "strategy",
-    "pros and cons",
-    "in depth",
-    "deep dive",
+    # English
+    "research", "compare", "analyze", "analyse", "design", "evaluate",
+    "trade-off", "tradeoff", "strategy", "pros and cons", "in depth", "deep dive",
+    # Portuguese
+    "pesquise", "analise", "avalie", "estratégia", "prós e contras", "aprofunde",
+    # Spanish
+    "investiga", "analiza", "evalúa", "estrategia", "pros y contras", "en profundidad",
+    # German
+    "recherchiere", "vergleiche", "analysiere", "bewerte", "strategie", "vor- und nachteile",
+    # French
+    "recherche", "évalue", "stratégie", "avantages et inconvénients", "en profondeur",
+    # Chinese
+    "研究", "比较", "分析", "评估", "策略", "优缺点", "深入",
+    # Japanese
+    "調査", "比較", "分析", "評価", "戦略", "長所と短所", "詳細",
 )
 
 # Short prompts whose answer is a single exact value — one wrong token = wrong answer.
-# English + a few PT-BR computation verbs (the operator's day-to-day language).
+# Curated to avoid cross-language substring false positives (e.g. no bare "resta"/"some").
 _PRECISION_KEYWORDS = (
+    # English
     "compute", "calculate", "how many", "how much", "multiply", "divide", "subtract",
-    "sum of", "product of", "reverse", "count the", "number of", "digit", "exactly",
+    "sum of", "product of", "reverse", "count the", "number of", "digits", "exactly",
     "round to", "what is the value",
-    "calcule", "quantos", "quantas", "quanto é", "multiplique", "divida", "some os",
-    "dígitos", "digitos",
+    # Portuguese
+    "calcule", "calcular", "quantos", "quantas", "quanto é", "multiplique", "divida",
+    "soma de", "dígitos", "digitos", "quantidade de", "exatamente", "arredonde", "inverta",
+    # Spanish
+    "calcula", "cuántos", "cuántas", "cuantos", "cuánto es", "multiplica", "suma de",
+    "cantidad de", "exactamente", "redondea",
+    # German
+    "berechne", "rechne", "wie viele", "wie viel", "multipliziere", "dividiere",
+    "summe von", "ziffern", "genau", "runde",
+    # French
+    "calcule", "calculer", "combien", "multiplie", "divise", "somme de", "chiffres",
+    "exactement", "arrondis",
+    # Chinese
+    "计算", "多少", "相乘", "乘以", "相除", "除以", "位数", "精确", "反转", "求和",
+    # Japanese
+    "計算", "いくつ", "いくら", "掛け", "割り算", "正確", "反転", "合計",
 )
 
 # An actual arithmetic expression: digit, operator, digit (e.g. "7 * 11", "29×11").

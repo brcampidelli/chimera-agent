@@ -98,6 +98,20 @@ def test_error_sensitive_routing_can_be_disabled() -> None:
     assert policy.should_fuse([{"role": "user", "content": prompt}]) is False
 
 
+def test_precision_routing_is_multilingual() -> None:
+    policy = RoutingPolicy(mode="auto")  # default min_chars=280
+    for prompt in (
+        "How many digits are in 8579?",  # en
+        "Quantos dígitos tem o número 8579?",  # pt
+        "¿Cuántos dígitos hay en 8579?",  # es
+        "Wie viele Ziffern hat 8579?",  # de
+        "Combien de chiffres dans 8579 ?",  # fr
+        "计算 8579 各位数字之和。",  # zh
+        "8579 の桁数はいくつですか？",  # ja
+    ):
+        assert policy.should_fuse([{"role": "user", "content": prompt}]) is True, prompt
+
+
 def test_routed_tool_turn_goes_single() -> None:
     single, fusion = StubBackend("single"), StubBackend("fusion")
     rb = RoutedBackend(single, fusion, RoutingPolicy(mode="always"))

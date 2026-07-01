@@ -45,7 +45,12 @@ CHIMERA_FUSION_SYNTHESIZER=openrouter/openai/gpt-4o-mini
 
 Other knobs: `CHIMERA_HOME` (state dir, default `.chimera`), `CHIMERA_LOG_LEVEL`
 (`INFO` / `DEBUG`), `CHIMERA_CACHE` (`on`/`off`, default off — caches identical
-tool-free completions to skip repeated API calls).
+tool-free completions to skip repeated API calls), and `CHIMERA_AUTO_FUSE` (`on`/`off`,
+default off — auto-fuses deep or **error-sensitive** turns in `solve`/`crew` without an
+explicit `--fuse`; the cost-aware router still keeps cheap/tool turns single-model). The
+router recognises exact-answer prompts (arithmetic, counting, digit ops) in the project's
+main languages (en/pt/es/de/fr/zh/ja), so a critical short step gets fusion's protection
+even when it is too short to trip the length gate.
 
 **Providers, fallback & self-hosted.** Any LiteLLM `provider/model` slug works
 (`openai/…`, `anthropic/…`, `gemini/…`, `ollama/…`, `openrouter/…`, …). For a

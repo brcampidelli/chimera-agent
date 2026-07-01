@@ -479,15 +479,19 @@ def solve(
     gateway = LLMGateway()
     backend: SupportsComplete = gateway
     planner_backend: SupportsComplete = gateway
-    if fuse:
+    # --fuse (explicit) or CHIMERA_AUTO_FUSE (production default) both route the worker
+    # through the cost-aware router, so deep/error-sensitive turns fuse and cheap/tool
+    # turns stay single-model.
+    if fuse or settings.auto_fuse:
         from chimera.fusion import FusionEngine, RoutedBackend
 
         engine = FusionEngine(gateway)
         backend = RoutedBackend(gateway, engine)
-        # Planning is a deep, tool-free reasoning turn — exactly where fusion pays
-        # off — so route the plan through fusion directly (the worker keeps the
-        # router: single-model for tool turns, fusion only for tool-free reasoning).
-        planner_backend = engine
+        # Planning is a deep, tool-free reasoning turn — exactly where fusion pays off —
+        # so an explicit --fuse routes the plan through fusion directly. Auto-fuse keeps
+        # planning single unless asked, to bound cost.
+        if fuse:
+            planner_backend = engine
 
     def _run_solve(ws: Path) -> AutonomousResult:
         registry = default_registry(ws)
@@ -1334,7 +1338,7 @@ def crew(
 
     gateway = LLMGateway()
     backend: SupportsComplete = gateway
-    if fuse:
+    if fuse or settings.auto_fuse:  # explicit --fuse or the CHIMERA_AUTO_FUSE default
         from chimera.fusion import FusionEngine, RoutedBackend
 
         backend = RoutedBackend(gateway, FusionEngine(gateway))
