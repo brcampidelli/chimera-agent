@@ -123,17 +123,26 @@ class IsolatedWorker:
 
 
 @dataclass
+class WorkerOutcome:
+    """What one isolated worker produced — its answer and whether it passed verification."""
+
+    answer: str
+    verified: bool = True
+
+
+@dataclass
 class IsolatedCrewResult:
     """Outcome of an isolated crew run — answers, merged edits, and cross-worker conflicts."""
 
     transcript: list[AgentMessage] = field(default_factory=list)
     conflicts: list[str] = field(default_factory=list)
     merged: int = 0
-    failures: dict[str, str] = field(default_factory=dict)
+    failures: dict[str, str] = field(default_factory=dict)  # worker crashed
+    rejected: dict[str, str] = field(default_factory=dict)  # ran but failed verification -> not merged
 
     @property
     def ok(self) -> bool:
-        return not self.failures and not self.conflicts
+        return not self.failures and not self.rejected and not self.conflicts
 
 
 class IsolatedCrew:
@@ -162,18 +171,32 @@ class IsolatedCrew:
         task: str,
         workspace: Path,
         *,
-        succeeded: Callable[[str], bool] | None = None,
+        verify: str | None = None,
         timeout: float | None = None,
     ) -> IsolatedCrewResult:
-        def make_unit(worker: IsolatedWorker) -> Callable[[Path], str]:
-            def run_worker(ws: Path) -> str:
+        """Run the workers in parallel-isolated worktrees; merge only the verified ones.
+
+        ``verify`` is a shell command run in each worker's own worktree after it finishes
+        (exit 0 == pass). A worker whose changes fail verification is *rejected* — its edits
+        are discarded, not merged — so a broken change never lands. With no ``verify``, every
+        worker that didn't crash merges (subject to conflict detection).
+        """
+
+        def make_unit(worker: IsolatedWorker) -> Callable[[Path], WorkerOutcome]:
+            def run_worker(ws: Path) -> WorkerOutcome:
                 agent = RoleAgent(
                     worker.role,
                     worker.backend or self.backend,
                     tools=worker.tools(ws),
                     max_steps=worker.max_steps,
                 )
-                return agent.act(task)
+                answer = agent.act(task)
+                if verify:
+                    from chimera.core.verify import CommandVerifier
+
+                    passed = CommandVerifier(verify, ws).verify().passed
+                    return WorkerOutcome(answer=answer, verified=passed)
+                return WorkerOutcome(answer=answer, verified=True)
 
             return run_worker
 
@@ -181,21 +204,28 @@ class IsolatedCrew:
         batch = run_isolated(
             Path(workspace),
             units,
-            succeeded=succeeded or (lambda _: True),
+            succeeded=lambda outcome: outcome.verified,  # merge only verified workers
             max_workers=self.max_workers,
             timeout=timeout,
         )
         transcript: list[AgentMessage] = []
         failures: dict[str, str] = {}
+        rejected: dict[str, str] = {}
         for result in batch.results:
-            if result.ok:
-                transcript.append(AgentMessage(result.name, result.value or ""))
-            else:
+            if result.error:  # crashed before producing an outcome
                 failures[result.name] = result.error
+            elif result.value is not None and result.value.verified:  # verified -> merged
+                transcript.append(AgentMessage(result.name, result.value.answer))
+            else:  # ran but failed verification -> changes discarded
+                rejected[result.name] = result.value.answer if result.value is not None else ""
         _log.debug(
-            "isolated crew: %d ok, %d failed, %d merged, %d conflict(s)",
-            len(transcript), len(failures), batch.merged, len(batch.conflicts),
+            "isolated crew: %d merged, %d rejected, %d failed, %d conflict(s)",
+            len(transcript), len(rejected), len(failures), len(batch.conflicts),
         )
         return IsolatedCrewResult(
-            transcript=transcript, conflicts=batch.conflicts, merged=batch.merged, failures=failures
+            transcript=transcript,
+            conflicts=batch.conflicts,
+            merged=batch.merged,
+            failures=failures,
+            rejected=rejected,
         )

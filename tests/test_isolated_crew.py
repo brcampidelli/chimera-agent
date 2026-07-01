@@ -88,3 +88,18 @@ def test_failing_worker_does_not_sink_the_crew(tmp_path: Path) -> None:
     assert "bad" in res.failures and "worker crashed" in res.failures["bad"]
     assert (tmp_path / "ok.txt").read_text(encoding="utf-8") == "ok"  # the good worker still merged
     assert {m.sender for m in res.transcript} == {"good"}
+
+
+def test_verify_gate_rejects_a_worker_whose_check_fails(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    # Each worker writes a marker file; verify passes only when the file says "good".
+    passer = _worker("passer", "out/passer.txt", "good")
+    failer = _worker("failer", "out/failer.txt", "bad")
+    # verify: exit 0 iff the running worktree contains no file whose content is "bad".
+    verify = "python -c \"import pathlib,sys; sys.exit(any(p.read_text()=='bad' for p in pathlib.Path('out').glob('*.txt')))\""
+    res = IsolatedCrew(WritingBackend("_", "_"), [passer, failer]).run("go", tmp_path, verify=verify)
+    assert "failer" in res.rejected  # ran, but its change failed verification
+    assert {m.sender for m in res.transcript} == {"passer"}  # only the verified one merged
+    assert (tmp_path / "out" / "passer.txt").exists()
+    assert not (tmp_path / "out" / "failer.txt").exists()  # rejected change was discarded
+    assert not res.ok  # a rejected worker means the run isn't fully clean

@@ -8,6 +8,7 @@ Commands:
   solve TASK                     Tier-2 autonomous (plan + verify-or-revert)
   solve-batch TASKS...           Tier-3: solve tasks in parallel, each in its own worktree
   explore QUERY                  locate code via the isolated Context Explorer subagent
+  crew-isolated TASK -W ...       tool-using workers split one task in parallel worktrees
   tools / skills                 list native tools / built-in skills
   memory ...                     curated long-term memory (add/search/list)
   cron ...                       scheduled jobs (add/list/remove/enable/disable/learn)
@@ -73,6 +74,9 @@ _IMAGE_OPTION = typer.Option(
     None, "--image", help="Attach an image (path or URL); repeatable. Needs a vision model."
 )
 _BATCH_TASKS_ARG = typer.Argument(..., help="Tasks to solve in parallel, each isolated.")
+_CREW_WORKER_OPT = typer.Option(
+    None, "--worker", "-W", help="A worker as 'name:instruction'; repeatable. Each edits in its own worktree."
+)
 
 
 @app.command()
@@ -834,6 +838,72 @@ def solve_batch(
     if batch.conflicts:
         console.print(f"[yellow]conflicts (not merged):[/yellow] {', '.join(batch.conflicts)}")
     if not batch.ok:
+        raise typer.Exit(code=1)
+
+
+@app.command(name="crew-isolated")
+def crew_isolated(
+    task: str = typer.Argument(..., help="The shared task the workers divide."),
+    worker: list[str] = _CREW_WORKER_OPT,
+    workspace: str = typer.Option(".", "--workspace", "-w", help="Repository root (a git repo, to isolate)."),
+    model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
+    verify: str = typer.Option(None, "--verify", help="Per-worker gate: shell command run in each worktree (exit 0 to merge)."),
+    max_steps: int = typer.Option(6, "--max-steps", help="Max tool-calling steps per worker."),
+    max_workers: int = typer.Option(4, "--max-workers", help="Max concurrent isolated workers."),
+    fuse: bool = typer.Option(False, "--fuse", help="Route worker turns through fusion."),
+) -> None:
+    """Tier-3: tool-using workers split ONE task, each in its own git worktree, verify-gated.
+
+    Define workers with repeated --worker 'name:instruction'. Each runs a real agent loop
+    (search/read/edit) against an isolated checkout; non-conflicting edits that pass --verify
+    merge back, files two workers both changed are flagged as conflicts, and a worker whose
+    check fails is rejected (its edits discarded). Needs a git repo to isolate.
+    """
+    from chimera.orchestration import IsolatedCrew, IsolatedWorker, Role
+    from chimera.providers import LLMGateway, MissingCredentialsError
+    from chimera.tools import default_registry
+
+    settings = get_settings()
+    if not settings.has_any_key():
+        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+        raise typer.Exit(code=1)
+    if not worker:
+        console.print("[red]give at least one --worker 'name:instruction'[/red]")
+        raise typer.Exit(code=1)
+
+    gateway = LLMGateway()
+    backend: SupportsComplete = gateway
+    if fuse or settings.auto_fuse:
+        from chimera.fusion import FusionEngine, RoutedBackend
+
+        backend = RoutedBackend(gateway, FusionEngine(gateway))
+
+    workers = []
+    for i, spec in enumerate(worker):
+        name, sep, instruction = spec.partition(":")
+        name = (name.strip() if sep else "") or f"worker{i + 1}"
+        prompt = (instruction.strip() if sep else spec.strip()) or "Do your part of the task."
+        workers.append(
+            IsolatedWorker(Role(name, prompt), lambda ws: default_registry(ws), max_steps=max_steps)
+        )
+
+    crew = IsolatedCrew(backend, workers, max_workers=max_workers)
+    try:
+        result = crew.run(task, Path(workspace), verify=verify)
+    except MissingCredentialsError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    for msg in result.transcript:
+        console.print(f"[green]✓ {msg.sender}[/green] merged")
+    for name in result.rejected:
+        console.print(f"[yellow]✗ {name}[/yellow] rejected (failed --verify)")
+    for name, err in result.failures.items():
+        console.print(f"[red]✗ {name}[/red] crashed: {err}")
+    if result.conflicts:
+        console.print(f"[yellow]conflicts (not merged):[/yellow] {', '.join(result.conflicts)}")
+    console.print(f"[dim]merged {result.merged} file(s) from {len(result.transcript)} worker(s)[/dim]")
+    if not result.ok:
         raise typer.Exit(code=1)
 
 

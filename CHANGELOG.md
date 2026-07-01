@@ -7,13 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- **`IsolatedCrew`** — composes the three subagent primitives into one: tool-using workers
-  each tackle the SAME task in their OWN git worktree, in parallel. Non-conflicting edits merge
-  back; a file two workers both changed is reported as a conflict, not clobbered; a crashing
-  worker fails only its own unit. `IsolatedWorker(role, tools_factory, backend?)` — the tools
-  factory roots each worker's registry at its isolated checkout. This is the division-of-labour
-  counterpart to `solve-batch` (which runs N *separate* tasks): here N specialised workers split
-  ONE task with real filesystem isolation.
+- **`IsolatedCrew`** (`chimera crew-isolated`) — composes the three subagent primitives into
+  one: tool-using workers each tackle the SAME task in their OWN git worktree, in parallel.
+  Non-conflicting edits merge back; a file two workers both changed is reported as a conflict,
+  not clobbered; a crashing worker fails only its own unit. **Per-worker verification**: pass a
+  `verify` command (via `--verify`) run in each worker's worktree — a worker whose check fails is
+  *rejected* (its edits discarded), so a broken change never lands. `IsolatedWorker(role,
+  tools_factory, backend?)`; the tools factory roots each worker's registry at its isolated
+  checkout. CLI: `crew-isolated TASK -W 'name:instruction' ... --verify CMD`. This is the
+  division-of-labour counterpart to `solve-batch` (which runs N *separate* tasks): here N
+  specialised workers split ONE task with real filesystem isolation. Verified live: two workers
+  built modules in parallel worktrees; files both touched were correctly flagged as conflicts.
 - **Generic subagents** — generalises the Context Explorer pattern two ways. **`SubAgentTool`**
   (`solve --subagents`) gives the main agent a `spawn_subagent(task, tools)` tool: it runs a
   fresh Agent in its own context with only an allowed subset of tools and returns ONLY the final

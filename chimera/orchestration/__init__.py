@@ -13,6 +13,7 @@ from chimera.orchestration.crew import (
     IsolatedWorker,
     SequentialCrew,
     SupervisorCrew,
+    WorkerOutcome,
     demo_crew,
     parallel_review,
 )
@@ -52,4 +53,5 @@ __all__ = [
     "IsolatedCrew",
     "IsolatedCrewResult",
     "IsolatedWorker",
+    "WorkerOutcome",
 ]
