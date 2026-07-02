@@ -13,6 +13,7 @@
 [![Linted with Ruff](https://img.shields.io/badge/lint-ruff-261230.svg)](https://github.com/astral-sh/ruff)
 [![Discord](https://img.shields.io/badge/Discord-join-5865F2.svg?logo=discord&logoColor=white)](https://discord.gg/ACvBbrmguV)
 ![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)
+[![Donate](https://img.shields.io/badge/Donate-Stripe-635BFF.svg?logo=stripe&logoColor=white)](https://donate.stripe.com/9B63cofM491m4SBfe177O00)
 
 <sub><b>English</b> · <a href="README.pt-BR.md">Português</a> · <a href="README.es.md">Español</a> · <a href="README.de.md">Deutsch</a> · <a href="README.fr.md">Français</a> · <a href="README.zh-CN.md">中文</a> · <a href="README.ja.md">日本語</a></sub>
 
@@ -227,6 +228,13 @@ Found a security issue? See [SECURITY.md](SECURITY.md).
 ## Community
 
 Have a question, an idea, or want to contribute? **[Join us on Discord](https://discord.gg/ACvBbrmguV)** — everyone's welcome.
+
+## Support
+
+Chimera is free and open-source, built in the open. If it's useful to you, you can help fund
+its development with a one-time donation — every bit helps and is hugely appreciated. 💜
+
+**[💜 Donate via Stripe](https://donate.stripe.com/9B63cofM491m4SBfe177O00)**
 
 ## License
 

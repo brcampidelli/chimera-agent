@@ -13,6 +13,7 @@
 [![Linted with Ruff](https://img.shields.io/badge/lint-ruff-261230.svg)](https://github.com/astral-sh/ruff)
 [![Discord](https://img.shields.io/badge/Discord-join-5865F2.svg?logo=discord&logoColor=white)](https://discord.gg/ACvBbrmguV)
 ![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)
+[![Donate](https://img.shields.io/badge/Donate-Stripe-635BFF.svg?logo=stripe&logoColor=white)](https://donate.stripe.com/9B63cofM491m4SBfe177O00)
 
 <sub><a href="README.md">English</a> · <a href="README.pt-BR.md">Português</a> · <a href="README.es.md">Español</a> · <a href="README.de.md">Deutsch</a> · <a href="README.fr.md">Français</a> · <a href="README.zh-CN.md">中文</a> · <b>日本語</b></sub>
 
@@ -224,6 +225,12 @@ uv run pytest -q         # テストスイート
 ## コミュニティ
 
 質問、アイデア、あるいは貢献したいことがありますか？ **[Discord に参加してください](https://discord.gg/ACvBbrmguV)** —— どなたでも歓迎します。
+
+## プロジェクトを支援する
+
+Chimera は無料のオープンソースで、オープンに開発されています。もし役に立ったら、寄付で開発を応援していただけます —— どんな支援もとても励みになり、心から感謝します。💜
+
+**[💜 Stripe で寄付する](https://donate.stripe.com/9B63cofM491m4SBfe177O00)**
 
 ## ライセンス
 

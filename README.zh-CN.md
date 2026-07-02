@@ -13,6 +13,7 @@
 [![Linted with Ruff](https://img.shields.io/badge/lint-ruff-261230.svg)](https://github.com/astral-sh/ruff)
 [![Discord](https://img.shields.io/badge/Discord-join-5865F2.svg?logo=discord&logoColor=white)](https://discord.gg/ACvBbrmguV)
 ![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)
+[![Donate](https://img.shields.io/badge/Donate-Stripe-635BFF.svg?logo=stripe&logoColor=white)](https://donate.stripe.com/9B63cofM491m4SBfe177O00)
 
 <sub><a href="README.md">English</a> · <a href="README.pt-BR.md">Português</a> · <a href="README.es.md">Español</a> · <a href="README.de.md">Deutsch</a> · <a href="README.fr.md">Français</a> · <b>中文</b> · <a href="README.ja.md">日本語</a></sub>
 
@@ -219,6 +220,12 @@ uv run pytest -q         # 测试套件
 ## 社区
 
 有问题、有点子，或者想做贡献？**[来 Discord 加入我们](https://discord.gg/ACvBbrmguV)** —— 欢迎每一个人。
+
+## 支持项目
+
+Chimera 完全免费、开源，公开开发。如果它对你有帮助，欢迎通过捐赠支持它的开发 —— 每一份支持都很重要，我们非常感激。💜
+
+**[💜 通过 Stripe 捐赠](https://donate.stripe.com/9B63cofM491m4SBfe177O00)**
 
 ## 许可证
 
