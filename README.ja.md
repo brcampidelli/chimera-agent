@@ -1,177 +1,230 @@
 <div align="center">
 
-<img src="assets/logo-wide.png" alt="Chimera ロゴ" width="460" />
+<img src="assets/logo-wide.png" alt="Chimera logo" width="460" />
 
 # Chimera
 
-**推論コアが LLM フュージョン・エンジンである、オープンソースの自己進化型 AI エージェント。**
+**多くの知性で考え、そして日々賢くなっていく、オープンソースの AI エージェント。**
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![CI](https://github.com/brcampidelli/chimera-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/brcampidelli/chimera-agent/actions/workflows/ci.yml)
 [![Checked with mypy](https://img.shields.io/badge/mypy-strict-2a6db2.svg)](https://mypy-lang.org/)
 [![Linted with Ruff](https://img.shields.io/badge/lint-ruff-261230.svg)](https://github.com/astral-sh/ruff)
-[![Discord](https://img.shields.io/badge/Discord-参加-5865F2.svg?logo=discord&logoColor=white)](https://discord.gg/ACvBbrmguV)
+[![Discord](https://img.shields.io/badge/Discord-join-5865F2.svg?logo=discord&logoColor=white)](https://discord.gg/ACvBbrmguV)
 ![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)
 
 <sub><a href="README.md">English</a> · <a href="README.pt-BR.md">Português</a> · <a href="README.es.md">Español</a> · <a href="README.de.md">Deutsch</a> · <a href="README.fr.md">Français</a> · <a href="README.zh-CN.md">中文</a> · <b>日本語</b></sub>
 
 </div>
 
-Chimera は単一のフロンティアモデルに頼るのではなく、**リクエストごとに複数の LLM を融合** します ——
-OpenRouter Fusion に着想を得た **パネル → ジャッジ → シンセサイザー** のパイプライン ——
-そして**時間とともに自己改善**し（記憶 → スキル → モデル）、今日のエージェントを縛る*継続的進化による劣化*に抗います。
+ほとんどの AI アシスタントは **1 つの** モデルにすべてを賭けていて、チャットが終わればすべてを忘れてしまいます。
+**Chimera は 2 つの点で違います。** 難しい質問には **複数の** AI モデルに同時に尋ね、その答えを 1 つの
+より強い結果に混ぜ合わせます。そして **覚えて学ぶ** ので、使えば使うほど役に立つようになります。ただ会話する
+だけではありません —— 目標を与えれば、計画を立て、ツールを使い、自分の作業を確認し、実際にうまくいったものだけを残します。
 
-> **ステータス：** 初期開発（0.1.x）。ビルド計画の全体（M0–M7）が実装済み —— ティア 1–4
-> + フュージョン・エンジン + 多層の自己進化 + ガバナンス・カーネル —— に加えて、**閉じた行動学習ループ**、
-> **運用層**（カンバン + ワーカー・レーン、SDLC クルー、宣言的ループ DSL）、**実行分離**（Docker サンドボックス
-> + git worktree）、そして設計の基盤となった**論文の技術**（HORIZON、VIBEMed、Spec Growth、AgentTrust v2、
-> AutoMegaKernel、Meta-Agent、MOC）。
-> 332 件のテスト（＋オプトインのライブ統合）· `mypy --strict` クリーン · `ruff` クリーン。
+> **無料・オープンソース（Apache-2.0）、初期段階ながら活発に開発中。** すでにひととおり動きます。会話する、
+> タスクを自分で最後までやらせる、お気に入りのメッセージアプリでボットとして動かす、サーバーにデプロイして
+> 24 時間 365 日働かせる、そして自分の作業から学ぶ様子を眺める。まだ **alpha** です —— 堅牢で入念にテスト
+> されています（460 件以上の自動テスト、変更ごとに厳格な型チェックと lint）が、本番環境で鍛え上げられた
+> 段階にはまだ達していません。
 
 ---
 
 ## なぜ Chimera か
 
-既存のフレームワークはそれぞれ 1 つの軸で強いだけです：Hermes/OpenClaw はスキルを進化させますが単一モデル；
-CrewAI/LangGraph はオーケストレーションは得意でも学習しない；TrustClaw/NemoClaw/ZeroClaw はセキュリティ/
-サンドボックスを提供しますが進化しません。**Chimera はこの 4 つを統合します：**
+ほとんどの AI ツールは **1 人** の専門家に尋ねて、その人が正しいことを願うようなものだと考えてください。Chimera は
+議論する **専門家のパネル**、その答えを比較する **公平なジャッジ**、そして一番よい組み合わせの結果を届ける
+**執筆者** がいるようなものです —— さらに実際に **作業をこなし**、そこから **学ぶ** チームメイトでもあります。
+Chimera を特別にしているものを、平易な言葉で説明します。
 
-- 🧬 **推論としてのフュージョン** —— パネル→ジャッジ→シンセサイザーのエンジンが推論コアであり、後付けではありません。向上はモデルの多様性だけでなく、*合成*ステップそのものから生まれます。
-- 🪜 **一続きの進行における 4 つの能力ティア** —— 拡張ツール → 単一タスク自律 → マルチエージェント・チーム → 自己進化エコシステム。
-- ♻️ **閉じた多層の自己進化ループ**が、継続的進化による劣化に明確に対処します（外部化された状態、ドリフト耐性のあるコンテキスト、verify-or-revert、計画に再投入される経験バッファ）。
-- 🛡️ **自らも改善するガバナンス・カーネル** —— allow/warn/block/review、静的に検証される自己改変サーフェスと保護された判例付き。
+- 🧠 **多くの知性、1 つの答え。** 難しい質問には、Chimera は複数のモデルに同じことを尋ね、1 つのモデルにそれらの答えを比較させ、最後のモデルに一番よい組み合わせの回答を書かせます —— だから、どれか 1 つのモデル単独よりもバランスがよく、間違いにくい答えが得られます。（速く安く保つため、価値のあるときにだけこれを行います。）
+- 🚀 **話すだけでなく、作業をこなす。** 目標を与えてください。それを分解し、ツールを使い、ファイルを編集し、テストを実行し、**合格したときにだけ変更を残します**。何かが壊れたら、それを元に戻してもう一度試します —— だから、あとに散らかしを残しません。
+- 🧬 **使うほど賢くなる。** 会話をまたいであなたの好みや大事な事実を覚え、繰り返すタスクをそっと再利用可能なスキルに変えます。長く動かすうちにじわじわ劣化するのではなく、改善し続けるように作られています —— これは多くのエージェントを密かに蝕む問題です。
+- 🛡️ **設計からして安全。** 危険な操作はすべて先に安全チェックを通り、破壊的なものは確認を求め、信頼できないコードは隔離されたサンドボックスの中で実行できます。
+- 🔌 **どんなモデルでも、どこでも動く。** 大きなホスト型モデルでも、自分のローカルモデルでも、1 つのインターフェースで使えます —— ノート PC でも、月 5 ドルのサーバーでも、24 時間ずっと。
+- 🧩 **本当にあなたのもの。** オープンソース、囲い込みなし、ベンダーのアカウント不要。あなたが動かし、あなたが所有し、何でも変えられます。
 
 ## 機能
 
-**推論と自律**
-- **LLM-Fusion エンジン** —— プロバイダ非依存のフロンティア + オープンモデルのパネル、合意/矛盾/盲点を浮かび上がらせるジャッジ、そしてシンセサイザー；**コストを意識したルーター**は割に合うときだけ融合します（ツール呼び出しのターンは単一モデルのまま）。
-- **ティア 2 自律** —— 計画 → 実行 → Manager レビュー（任意で**カスケード・ルーブリック**経由、`solve --rubric`）→ **verify-or-revert**（ワークスペースのスナップショット/復元 + コマンド検証器）、**git worktree 分離**（`solve --isolate`）付き —— 変更は検証された場合のみ反映されます。
-- **SDLC ライフサイクル・クルー**（`chimera lifecycle`）—— 事前構成の **plan → build → test → review** パイプライン、test 段階で verify-or-revert。
-- **マルチエージェント・チーム** —— 役割の専門化、逐次およびスーパーバイザー crew、MOC メッセージ統合、共有メモリ、並列レビュー。crew の役割は単発のペルソナだけでなく、**独自のループ + ツールを持つツール利用ワーカー**にもなれます。また、任意のエージェントは **`spawn_subagent`**（`solve --subagents`）でサブタスクを、隔離されツールスコープが限定されたサブエージェントに委譲でき、そのサブエージェントは結果だけを返します（再帰なし、allowlist で制限）。**`IsolatedCrew`**（`chimera crew-isolated`）はさらに一歩進めます —— ツール利用ワーカーが 1 つのタスクを分割し、それぞれが**自分専用の git worktree** で並列に編集し、コンフリクトを意識したマージバックと、任意のワーカー単位の `--verify` ゲート（テストに失敗したワーカーは却下され、その編集は破棄される）を備えます。
-- **並列分離**（`chimera solve-batch`）—— 多数のタスクを一度に、それぞれ**自分専用の git worktree** で解決します；コンフリクトのない編集はマージバックされ、2 人のワーカーが両方触れたファイルは上書きされずにコンフリクトとしてフラグが立ちます。クラッシュしたワーカーはそのユニットだけを失敗させ、バッチ全体は失敗しません（`run_in_processes` は障害分離のためにプロセス/RPC 境界を追加します）。
-- **Context Explorer**（`chimera explore`、`solve --explorer`）—— FastContext 型の隔離サブエージェントが、自身の読み取り専用の `grep`/`glob`/read 検索でコードを特定し、コンパクトな `file:line` の証跡ブロックだけを返します。これでメイン・エージェントのコンテキストがクリーンに保たれます。任意の（できれば安価な）モデルで動作します。
+### 🧠 考える・こなす
+- **複数のモデルを 1 つの答えに混ぜ合わせる**（`chimera fuse`）—— モデルのパネル、どこで一致し・食い違い・見落としているかを浮かび上がらせるジャッジ、そして最終的な答えを書くシンセサイザー。賢いルーターは難しい問題にだけこの追加の労力を割きます。
+- **タスクを自分で最後までやる**（`chimera solve`）—— 計画を立て、ツールで実行し、そして **検証して元に戻す**：あなたのチェック（例：テスト）を走らせ、合格したときにだけ変更を残し、そうでなければ元に戻して再試行します。任意で、プロジェクトの隔離されたコピー上で作業でき、証明されるまで何も触れられません。
+- **専門家チーム**（`chimera crew`、`chimera crew-isolated`）—— 役割に特化した複数のエージェントが 1 つの仕事を分担します。分離モードでは、それぞれが **自分専用のコピー上で並列に** 作業します。安全な編集はマージされ、衝突は黙って上書きされる代わりにフラグが立ち、まずいワーカーの変更はワーカーごとのテストで却下できます。スーパーバイザーが全員の作業を 1 つの統一レポートにまとめられます。
+- **委譲と探索** —— どのエージェントも、自己完結したサブタスクを新しい **サブエージェント** に渡せます。サブエージェントは結果だけを報告し、メインの文脈をきれいに保ちます。**Context Explorer**（`chimera explore`）はコードベースの中から適切なファイルと行を見つけ出し、すべてを吐き出す代わりに短い答えを返します。
 
-**自己進化とガバナンス**
-- **閉じた行動ループ** —— 過去の失敗が planner に教訓として入り、検証済みの成功は自動で記憶に書かれ、繰り返しのタスクは検証＆スモークテスト済みのスキルへ自動進化します（フュージョン・パネル全体に提案され、フュージョンが有効なときはモデル横断の転移性で採用される）—— すべて verify-or-revert でゲートされ、失敗した試行はリトライ時に最初の誤ったステップまで特定されます。さらに継続的進化ベンチマークと EvoClaw の naive 対 guarded ストレステスト。
-- **階層メモリ** —— working / episodic / semantic / persona **+ graph 層**（`memory graph`）。エンティティで事実を想起します；任意の **SQLite/FTS5** 全文バックエンド（`CHIMERA_MEMORY_BACKEND=sqlite`）；**セッション横断のユーザー・プロファイル**（毎ターン適用されるペルソナ事実）；近い重複の事実をマージする **LLM 統合**（`memory consolidate`）；そしてチャット中に述べた好みの保存を提案する **nudges**。
-- **オプトインのモデル進化** —— `solve` が軌跡を収集し、`evolve` が SFT/DPO データセットに整えて実行可能な LoRA レシピを出力し、**`evolve tune`** がエージェント・スペックを（メタ探索で、非退行を条件に採用しつつ）日次シナリオに対して自己最適化します。トレーニングは外部/オプトインのまま。
-- **ガバナンス・カーネル** —— allow/warn/block/review（語彙ルール + 任意の意味ジャッジ、ルール蒸留と**保護された判例ストア**付き）、自己改変サーフェスの静的検証器、追記専用の監査ログ、統制ツール、**4 アクターの変更モデル**、そして **spec↔コードのドリフトゲート**（`chimera drift`）。
+### 🧬 記憶と自己改善
+- **長期記憶** —— 短期・最近・事実・あなたについての記憶に加え、物事がどう関連しているかのマップを保持します。記憶を高速な全文データベースに保存し、あなたの好みのプロフィールをどのチャットにも持ち込み、重複したメモを自動でマージし、あなたが好みを口にしたときにそっと保存を提案できます。
+- **新しいスキルを学ぶ** —— 同じ種類のタスクに複数回成功すると、それをテスト済みで再利用可能なスキルに自動で変えます。
+- **任意の自己トレーニング（上級者向け）** —— 自分自身の経験を記録できるので、あとでそこからモデルをファインチューニングできます。既定ではオフ。あなたが頼まない限り、何もトレーニングされません。
 
-**プロバイダ**
-- **どのモデルでも 1 つのインターフェース** —— LiteLLM 経由でプロバイダ非依存（`provider/model` スラッグで 100+ モデル）；OpenRouter/OpenAI/Anthropic/Gemini/DeepSeek のファーストクラス・キー。
-- **セルフホスト＆堅牢** —— **Ollama/vLLM** 向けのカスタム・エンドポイント（`CHIMERA_API_BASE`）、モデル横断の**フォールバック・チェーン**、ラウンドロビンの**クレデンシャル・プール**、ライブ **`/model`** 切替、そして繰り返しの推論ターン向けの **プロンプト・キャッシュ**（`CHIMERA_CACHE`）。
+### 🔌 つなぐ・自動化する
+- **どこでも話しかけられる** —— ターミナルのチャット、フルスクリーンのターミナルアプリ、あるいは **Discord、Telegram、Slack、Signal、WhatsApp** 上のボットとして。シンプルな HTTP エンドポイントもあります。
+- **スケジューリングと能動性** —— 繰り返しの仕事を平易な言葉で与えられます（「毎朝、ニュースを要約して」）。組み込みのスケジューラを動かしておけば、あなたがメッセージを送ったときだけでなく **時間どおりに動きます**。
+- **ツールと連携** —— ファイルの読み書き、シェルコマンドの実行、ウェブの閲覧、そしてサンドボックスでの安全なコード実行。ほぼどんなウェブサービス（その API 経由）や外部ツールともつながり、すでに使っている他のエージェントツールから設定をインポートできます。
+- **すぐ使える機能同梱** —— ウェブ検索、画像生成、テキスト読み上げ、メール、カレンダー、コード実行などが、オンにするだけで使えます。
 
-**オーケストレーション、インターフェースと統合**
-- **カンバン + ワーカー・レーン**（`chimera kanban`）—— タスクボード（backlog → doing → review → done）。カードは `solve` または `crew` レーンへ振り分けられ、`kanban learn` は繰り返しタスクをカードにします。
-- **Loop Engineering**（`chimera workflow`）—— 自律ループを YAML で記述（スタックを `use` するステップ、`when` 条件と `repeat`/`until` ループ付き）。
-- **インターフェース** —— `chat` REPL、フルスクリーンの **TUI**（Textual）、そしてチャットごとに 1 つの会話（と記憶）を持つ **メッセージング・ゲートウェイ**（HTTP、または `serve --discord|--telegram|--slack|--signal` による**ネイティブ Discord/Telegram/Slack/Signal**）；エージェントは `send_message` ツールでメッセージを**送信**することもできます。**WhatsApp** は Cloud API webhook（`POST /whatsapp`）経由で双方向に動作します。
-- **実行サンドボックス** —— シェルツールをローカルまたは隔離された **Docker** コンテナで実行（`CHIMERA_SANDBOX=docker`）。
-- **統合** —— ファーストクラスの **MCP** クライアント（stdio）＋ **OpenAPI/REST → ツール** インポーター；**cron + webhook トリガー**（`serve` は受信した `POST /webhook/<hook>` でタスクを実行 —— 無人）；Hermes Agent / OpenClaw から設定/スキル/長期記憶を**マイグレーション**。
-
-**組み込みエクストラ**
-- **リファレンス・ツール** —— バッテリー同梱：常時有効の `execute_code`（サンドボックス化された Python）、`code_interpreter`（ステートフル・セッション）、`arxiv_search`；設定でゲートされる `web_search`、`generate_image`（OpenAI）、`text_to_speech`（ElevenLabs）、`send_email`/`read_email`（SMTP/IMAP）、`calendar_events`（`.ics`）；そして `youtube_transcript`（オプトインのエクストラ）。任意の REST サービスも OpenAPI→ツール インポーターで接続できます。
-- **Vision**（画像の貼り付け）、**Deliverable モード**（洗練された成果物）、そして **Pet** コンパニオン —— すべてのオプション機能は `chimera features` で確認できます。
+### 🚀 どこでも、安全に動かす
+- **どんなモデルでも、1 つのインターフェース** —— ホスト型モデルでも自分のローカルモデルでも、1 つがダウンしたら自動で切り替わるフォールバックと、複数キーのローテーション付き。
+- **1 コマンドでサーバーにデプロイ** —— Docker（またはベアメタル）で動かせば、起動したままで再起動後も自動で立ち上がります。**[docs/deploy.md](docs/deploy.md)** を参照。
+- **セーフティ・カーネル** —— すべての操作へのチェック（許可 / 警告 / ブロック / 確認）、信頼できないコードのためのサンドボックス、そして何をしたかの完全な監査ログ。
 
 ## クイックスタート
 
-Python **3.11+**（3.12+ 推奨）と [uv](https://docs.astral.sh/uv/) が必要です。
+**Python 3.11+** と [uv](https://docs.astral.sh/uv/)（高速な Python インストーラ）が必要です。
 
+**1. インストール**
 ```bash
+git clone https://github.com/brcampidelli/chimera-agent.git
+cd chimera-agent
 uv sync --extra dev
-cp .env.example .env        # 少なくとも 1 つのプロバイダ・キーを設定（OpenRouter 推奨）
-uv run chimera doctor       # 環境を確認
+```
+
+**2. AI プロバイダのキーを 1 つ追加。** 一番かんたんなのは [OpenRouter](https://openrouter.ai) のキーです —— 1 つのキーで
+100 以上のモデルが使えます。
+```bash
+cp .env.example .env
+# .env を開いて、たとえば次のように設定：  CHIMERA_OPENROUTER_KEYS=sk-or-...
+```
+
+**3. すべて準備できているか確認**
+```bash
+uv run chimera doctor
+```
+
+**4. 試してみる**
+```bash
+uv run chimera chat                         # 会話する（覚えています）
+uv run chimera run "Explain what you can do in 3 bullets"
+uv run chimera fuse "What's the best way to learn to cook?" --show-panel   # 複数モデルが混ざる様子を見る
+uv run chimera solve "add a hello() function to app.py and a test for it" --verify "pytest -q"
+```
+
+**サーバーで動かす（24 時間 365 日働かせる）：**
+```bash
+docker compose up -d      # ゲートウェイ + スケジューラ；自動で再起動
+```
+詳しいガイド（Docker または systemd、スケジューリング、バックアップ、セキュリティ）：**[docs/deploy.md](docs/deploy.md)**。
+
+## 仕組み
+
+Chimera にタスクを与えると、計画を立て、考え（問題が難しいときはモデルを混ぜ合わせ）、ツールで実行し、
+**自分の作業を確認して合格したものだけを残し**、そしてその結果から学びます —— 記憶と新しいスキルを次のタスクへ
+還元しながら。
+
+```mermaid
+flowchart TD
+    U([あなた：タスクまたは質問]) --> P[理解して計画する]
+    P --> Q{難しい問題か？}
+    Q -- はい --> FUSION[複数のモデルに尋ねる<br/>· ジャッジが比較する<br/>· シンセサイザーが最良の答えを書く]
+    Q -- いいえ --> ONE[1 つの速いモデルを使う]
+    FUSION --> ACT[実行：ツール・ファイル・ウェブを使う<br/>またはサブエージェントに委譲する]
+    ONE --> ACT
+    ACT --> V{うまくいったか？<br/>テスト / チェックを実行}
+    V -- はい --> KEEP[変更を残す]
+    V -- いいえ --> REVERT[元に戻し、学んだ教訓で再試行]
+    REVERT --> ACT
+    KEEP --> LEARN[学ぶ：大事なことを記憶に保存し<br/>繰り返す作業を再利用可能なスキルに変える]
+    LEARN --> U
+    MEM[(長期記憶)] -. 想起する .-> P
+    LEARN -. 書き込む .-> MEM
+    GOV[[すべての操作への安全チェック]] -. 守る .-> ACT
 ```
 
 ## コマンド
 
+どのコマンドも `chimera <name>` です（インストール前は `uv run chimera <name>`）。
+
 ```bash
-chimera doctor / models / features    # ステータス、構成、オプション機能
-chimera chat                          # 対話型マルチターン・アシスタント（あなたの右腕）
-chimera tui                           # フルスクリーン端末アプリ（Textual）
-chimera serve [--discord|--telegram|--slack]  # メッセージング・ゲートウェイ：HTTP、またはネイティブ・プラットフォーム・ボット
-chimera run "PROMPT" --image pic.png   # ティア 1 単発（--image でビジョン対応）
-chimera deliver "計画" -o plan.md       # Deliverable モード：洗練された成果物を生成
-chimera fuse "PROMPT" --show-panel     # LLM-Fusion：パネル -> ジャッジ -> シンセサイザー
-chimera solve "タスク" --verify "pytest -q" --rubric --isolate   # ティア 2：verify-or-revert（＋カスケードルーブリック評価）、git worktree 分離
-chimera solve-batch tasks.txt          # 並列分離：多数のタスクをそれぞれ専用 worktree で
-chimera explore "認証はどこで処理される？"   # Context Explorer：file:line の証跡を返す隔離検索
-chimera lifecycle "タスク" --verify "..."   # SDLC クルー：plan -> build -> test -> review
-chimera workflow flow.yaml             # 宣言的ループを実行（Loop Engineering）
-chimera crew "タスク" --mode supervisor  # ティア 3 マルチエージェント crew
-chimera crew-isolated "タスク" --verify "..."   # ツール利用ワーカーが並列 worktree で分割 + マージ
-chimera meta "X のためのエージェント"          # ティア 4 メタエージェント：専用エージェントを設計
-chimera kanban add/board/run/learn     # ワーカー・レーン付きタスクボード（solve/crew）
-chimera drift spec.yaml                # spec<->コードのドリフトゲート（ドリフト時は exit 1）
-chimera memory add / graph / consolidate   # キュレーション済み長期記憶 + エンティティ関係グラフ + LLM 統合
-chimera cron add / learn               # スケジュールジョブ（割当 + 自己学習、確認付き）
-chimera bench                          # 継続的進化ベンチマーク
-chimera migrate hermes ~/.hermes --apply   # 設定 + スキルをインポート + 記憶をマージ
-chimera evolve status / tune / recipe   # オプトイン進化：スペックのメタ探索（tune）、SFT/DPO データ + LoRA レシピ
-chimera pet new --name Chimi           # 仮想コンパニオンを迎える
+chimera doctor / models / features    # セットアップを確認、モデル一覧、オプション機能を見る
+chimera chat                          # ターンをまたいで覚える対話型アシスタント
+chimera tui                           # フルスクリーン端末アプリ
+chimera run "PROMPT" --image pic.png  # 単発の答え（画像を読める）
+chimera fuse "PROMPT" --show-panel    # 複数モデルを混ぜ合わせる：パネル -> ジャッジ -> シンセサイザー
+chimera solve "TASK" --verify "pytest -q" --isolate   # タスクをこなす；チェックに合格したときだけ変更を残す
+chimera crew "TASK" --mode supervisor         # 専門家チームが 1 つのタスクに取り組む
+chimera crew-isolated "TASK" -W "name:role" --verify "..." --synthesize   # チーム、各自が隔離されたコピーで
+chimera explore "where is login handled?"     # 適切なファイル/行を見つけ、短い答えを得る
+chimera deliver "a launch plan" -o plan.md    # 洗練された文書を生成する
+chimera serve --cron [--discord|--telegram|--slack|--signal]   # サービスとして動かす：チャットボット + スケジューラ
+chimera cron add "brief" "0 8 * * *" "Summarize the news"       # 繰り返しの仕事をスケジュールする
+chimera memory add / graph / consolidate      # 長期記憶：保存する、関連づける、整理する
+chimera kanban add/board/run                   # 作業をエージェントに振り分けるタスクボード
+chimera workflow flow.yaml                     # ファイルに記述した繰り返し可能な自動化を実行する
+chimera migrate <source> <dir> --apply         # 別のエージェントツールから設定・スキル・記憶をインポートする
+chimera evolve status / tune / recipe          # 任意：自己最適化する；モデルをファインチューニングするデータを準備する
+chimera pet new --name Chimi                   # 小さな仮想コンパニオンを迎える :)
 ```
 
-インストール、構成、各コマンドのコピペ例については **[使い方ガイド](docs/usage.md)** を参照してください。
+すべてのコマンドをコピペ例つきで見るには **[使い方ガイド](docs/usage.md)** を参照してください。
 
 ## アーキテクチャ
 
+Chimera は各パートが明確に分かれた Python パッケージなので、どの部分も単独で理解したり拡張したりできます。
+
 ```
 chimera/
-  core/          エージェント・ループ（ReAct）+ ティア 2 自律（計画、verify-or-revert）+ git worktree 分離
-  fusion/        パネル -> ジャッジ -> シンセサイザー + コスト意識ルーター
-  memory/        working / episodic / semantic / persona + graph 層 + Memory Manager
-  skills/        組み込みライブラリ + skill-context 取得
-  evolution/     スキル進化器、自動進化フック、経験バッファ
-  governance/    信頼カーネル（ルール + ジャッジ + 保護された判例）、静的検証器、ドリフトゲート、4 アクターモデル、監査
-  orchestration/ 役割、逐次/スーパーバイザー crew、MOC 通信、SDLC ライフサイクル・クルー
-  ecosystem/     メタエージェント、変更テンポのガバナンス、軌跡収集、モデル進化
-  kanban/        タスクボード + ワーカー・レーン（crews / solve への振り分け）
-  workflow/      宣言的ループ DSL（Loop Engineering）
-  tools/         ネイティブ・ツール（ファイル、shell、http）
-  sandbox/       実行バックエンド（local / docker 分離）
-  integrations/  MCP クライアント（stdio）+ OpenAPI->ツール インポーター
-  scheduler/     cron（割当 + 自己学習）+ SOP エンジン
-  migration/     Hermes/OpenClaw からインポート（設定、スキル、記憶マージ）
-  providers/     LLM ゲートウェイ（LiteLLM）—— フォールバック、クレデンシャル・プール、カスタム・エンドポイント、プロンプト・キャッシュ
-  interface/     会話型 ChatSession（chat、TUI、ゲートウェイで共有）
-  tui/  server/   フルスクリーン Textual アプリ · メッセージング・ゲートウェイ + HTTP トランスポート
-  eval/          継続的進化 + EvoClaw ストレステスト + 日常シナリオ
-  cli/           `chimera` コマンド（CLI ファースト）
+  core/          エージェント・ループ：計画、実行、検証、残すか元に戻すか、そして隔離された作業コピー
+  fusion/        「多くの知性」エンジン：パネル -> ジャッジ -> シンセサイザー + 賢いルーター
+  memory/        短期 / 最近 / 事実 / あなたについての記憶 + 関係グラフ
+  skills/        組み込みスキルライブラリと、関連スキルの見つけ方
+  evolution/     成功から新しいスキルを学ぶこと、そしてそこから学ぶ経験
+  governance/    セーフティ・カーネル（許可/警告/ブロック/確認）、監査ログ、変更管理
+  orchestration/ エージェントのチーム：役割、クルー、隔離された並列ワーカー、統一レポート
+  ecosystem/     高度な自己改善：エージェントを設計するエージェント、任意のモデル・トレーニング
+  kanban/        エージェントにカードを渡すタスクボード
+  workflow/      繰り返し可能な自動化をシンプルなファイルに記述して実行する
+  tools/         組み込みツール（ファイル、シェル、ウェブ、検索）+ コード実行
+  sandbox/       ツールをローカルまたは隔離されたコンテナの中で実行する
+  integrations/  外部ツールと任意のウェブ API をつなぐ
+  scheduler/     繰り返しの仕事 + それらを時間どおりに発火させるデーモン
+  migration/     他のエージェントツールから設定を移してくる
+  providers/     すべてのモデルへの 1 つのインターフェース、フォールバックとキー・ローテーション付き
+  interface/     共有の会話エンジン（チャット、アプリ、ボットで使われる）
+  server/        メッセージング・ゲートウェイと HTTP エンドポイント
+  cli/           `chimera` コマンド
 ```
 
-完全な設計と、その基盤となる研究については [docs/architecture.md](docs/architecture.md) を参照してください。
+完全な設計については [docs/architecture.md](docs/architecture.md) を参照してください。
 
-## ロードマップ
+## ビジョンとゴール
 
-| マイルストーン | ステータス |
-|---|---|
-| M0–M7 — ティア 1–4 + フュージョン + 自己進化 + ガバナンス | ✅ |
-| M8 — インターフェース（chat/TUI/ゲートウェイ）、EvoClaw ストレステスト、オプトインのモデル進化 | ✅ |
-| プロバイダ層 —— セルフホスト・エンドポイント、フォールバック、クレデンシャル・プール、`/model`、プロンプト・キャッシュ | ✅ |
-| 閉じた行動ループ —— 経験→planner、自動記憶、自動スキル（統制下） | ✅ |
-| 運用オーケストレーション —— カンバン + ワーカー・レーン、SDLC クルー、Loop DSL | ✅ |
-| 実行分離 —— Docker サンドボックス + git worktree | ✅ |
-| 論文の技術 —— HORIZON · VIBEMed · Spec Growth · AgentTrust v2 · AutoMegaKernel · Meta-Agent · MOC | ✅ |
-| 論文の技術（II）—— MemGate · 多因子メモリ価値 · Data Recipes · OpenClaw-Skill · SkillAdaptor · DailyReport · OpenJarvis スペック探索 | ✅ |
+**Chimera のゴールはシンプルです：誰でも動かせて、1 つを信じるのではなく多くのモデルを組み合わせてより良く推論し、
+使えば使うほど本当に賢くなり、そしてその過程でずっと安全かつ完全にオープンであり続ける AI エージェント。**
 
-次は：大規模での継続的進化のより深い検証、プロバイダの OAuth ログイン、そしてオプションの LangGraph
-永続化バックエンド。モデル学習（LoRA/DPO）は設計上、外部/オプトインのままです。
+今日のほとんどの AI ツールは、賢いけれど忘れっぽい（チャットが終わればすべてを失う）か、有能だけれど閉じている
+（あなたが制御できない）かのどちらかです。そして「自己改善」しようとする多くのものは、長く動かすうちに密かに
+*悪く* なっていきます。Chimera は、別の道を目指す私たちの試みです。
+
+- **より良い思考、けれど請求額は増やさない** —— 役に立つときにだけ複数のモデルを組み合わせるので、無駄なく品質が上がります。
+- **本物の記憶と本物のスキル** —— 大事なことを覚え、繰り返す作業を再利用可能な能力に変えます。
+- **長続きする改善** —— 自分の作業を確認し、状態をモデルの外に安全に保つことで、他のエージェントを蝕むじわじわとした劣化に抗います。
+- **安全で透明** —— すべての操作は確認可能で、破壊的なものは先に尋ねます。
+- **みんなに開かれている** —— 無料、Apache-2.0 ライセンス、コミュニティ主導、囲い込みなし。
+
+まだ初期（alpha）で、私たちは正直さを大切にしています：ヘビーな本番利用ではまだ証明されていません。このビジョンに
+わくわくするなら、ぜひそこへたどり着くのを手伝ってください。
 
 ## 開発
 
 ```bash
-uv run ruff check .      # lint
-uv run mypy chimera      # 型チェック（strict）
-uv run pytest -q         # テスト
+git clone https://github.com/brcampidelli/chimera-agent.git
+cd chimera-agent
+uv sync --extra dev
+
+uv run ruff check .      # スタイル/lint
+uv run mypy chimera      # 厳格な型チェック
+uv run pytest -q         # テストスイート
 ```
 
-[CONTRIBUTING.md](CONTRIBUTING.md) と [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) を参照してください。
-セキュリティ問題：[SECURITY.md](SECURITY.md) を参照してください。
+貢献は大歓迎です —— コード、ドキュメント、アイデア、バグ報告。まずは
+[CONTRIBUTING.md](CONTRIBUTING.md) と [行動規範](CODE_OF_CONDUCT.md) からどうぞ。
+セキュリティ問題を見つけましたか？ [SECURITY.md](SECURITY.md) を参照してください。
 
 ## コミュニティ
 
-**[Discord](https://discord.gg/ACvBbrmguV)** で会話に参加してください —— 質問、アイデア、貢献を歓迎します。
+質問、アイデア、あるいは貢献したいことがありますか？ **[Discord に参加してください](https://discord.gg/ACvBbrmguV)** —— どなたでも歓迎します。
 
 ## ライセンス
 
-[Apache-2.0](LICENSE)。
+[Apache-2.0](LICENSE) —— 自由に使い、変更し、その上に作れます。

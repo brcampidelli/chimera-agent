@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="assets/logo-wide.png" alt="Chimera Logo" width="460" />
+<img src="assets/logo-wide.png" alt="Chimera logo" width="460" />
 
 # Chimera
 
-**Ein quelloffener, sich selbst weiterentwickelnder KI-Agent, dessen Denk-Kern eine LLM-Fusion-Engine ist.**
+**Der quelloffene KI-Agent, der mit vielen Köpfen denkt — und jeden Tag besser wird.**
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
@@ -18,161 +18,220 @@
 
 </div>
 
-Chimera fusioniert **mehrere LLMs pro Anfrage** — eine **Panel → Richter → Synthesizer**-Pipeline,
-inspiriert von OpenRouter Fusion — statt sich auf ein einzelnes Frontier-Modell zu verlassen, und
-**verbessert sich im Laufe der Zeit** (Gedächtnis → Skills → Modell), während sie der
-*Degradation durch kontinuierliche Evolution* widersteht, die heutige Agenten einschränkt.
+Die meisten KI-Assistenten setzen alles auf ein **einziges** Modell und vergessen alles, sobald der
+Chat endet. **Chimera macht zwei Dinge anders:** Bei schweren Fragen fragt es **mehrere** KI-Modelle
+gleichzeitig und verschmilzt ihre Antworten zu einem stärkeren Ergebnis, und es **merkt sich Dinge
+und lernt**, sodass es umso nützlicher wird, je öfter du es benutzt. Es plaudert nicht nur — gib ihm
+ein Ziel, und es plant, nutzt Werkzeuge, überprüft seine eigene Arbeit und behält nur das, was
+wirklich funktioniert.
 
-> **Status:** frühe Entwicklung (0.1.x). Der vollständige Bauplan (M0–M7) ist umgesetzt —
-> Tiers 1–4 + die Fusion-Engine + mehrstufige Selbstevolution + ein Governance-Kernel —
-> plus eine **geschlossene Verhaltens-Lernschleife**, eine **operative Schicht** (Kanban +
-> Worker-Lanes, SDLC-Crew, ein deklaratives Loop-DSL), **Ausführungsisolation** (Docker-
-> Sandbox + git worktrees) und die **Paper-Techniken**, um die herum es entworfen wurde
-> (HORIZON, VIBEMed, Spec Growth, AgentTrust v2, AutoMegaKernel, Meta-Agent, MOC).
-> 332 Tests (+ opt-in Live-Integration) · `mypy --strict` sauber · `ruff` sauber.
+> **Kostenlos und quelloffen (Apache-2.0), in früher, aber aktiver Entwicklung.** Es funktioniert
+> bereits von Anfang bis Ende: chatte mit ihm, lass es Aufgaben eigenständig erledigen, betreibe es
+> als Bot in deiner Lieblings-Messaging-App, stelle es auf einem Server bereit, damit es rund um die
+> Uhr arbeitet, und beobachte, wie es aus seinem Tun lernt. Es ist **Alpha** — solide und ausgiebig
+> getestet (460+ automatisierte Tests, strikte Typprüfung und Linting bei jeder Änderung), aber im
+> Produktivbetrieb noch nicht kampferprobt.
 
 ---
 
 ## Warum Chimera
 
-Bestehende Frameworks sind jeweils auf einer Achse stark: Hermes/OpenClaw entwickeln Skills weiter,
-nutzen aber ein einzelnes Modell; CrewAI/LangGraph orchestrieren gut, lernen aber nicht;
-TrustClaw/NemoClaw/ZeroClaw bringen Sicherheit/Sandboxing, entwickeln sich aber nicht weiter.
-**Chimera vereint alle vier:**
+Stell dir die meisten KI-Werkzeuge so vor, dass du **einen** Experten fragst und hoffst, dass er
+recht hat. Chimera ist wie ein **Gremium aus Experten**, das debattiert, ein **fairer Richter**, der
+ihre Antworten abwägt, und ein **Autor**, der das beste kombinierte Ergebnis liefert — und dann ein
+Teamkollege, der die Arbeit tatsächlich **erledigt** und daraus **lernt**. Was es besonders macht, in
+einfachen Worten:
 
-- 🧬 **Fusion als Denken** — die Panel→Richter→Synthesizer-Engine ist der Denk-Kern, kein Add-on. Der Mehrwert entsteht durch den *Synthese*-Schritt selbst, nicht nur durch Modellvielfalt.
-- 🪜 **Vier Fähigkeitsstufen in einer Progression** — erweiterte Werkzeuge → autonom für Einzelaufgaben → Multi-Agenten-Teams → selbstevolvierendes Ökosystem.
-- ♻️ **Eine geschlossene, mehrstufige Selbstevolutionsschleife**, die der Degradation durch kontinuierliche Evolution gezielt entgegenwirkt (externalisierter Zustand, drift-resistenter Kontext, Verify-or-Revert, ein in die Planung zurückgeführter Erfahrungs-Buffer).
-- 🛡️ **Ein Governance-Kernel, der sich ebenfalls verbessert** — allow/warn/block/review, mit statisch validierter Selbstmodifikations-Oberfläche und geschütztem Präzedenzfall.
+- 🧠 **Viele Köpfe, eine Antwort.** Bei kniffligen Fragen stellt Chimera mehreren Modellen dieselbe Frage, lässt ein Modell ihre Antworten vergleichen und lässt ein finales Modell die beste kombinierte Antwort schreiben — so bekommst du etwas Ausgewogeneres, das seltener falsch liegt als ein einzelnes Modell für sich. (Es tut das nur, wenn es sich lohnt, um schnell und günstig zu bleiben.)
+- 🚀 **Es macht die Arbeit, nicht nur Gerede.** Gib ihm ein Ziel. Es zerlegt es, nutzt Werkzeuge, bearbeitet Dateien, führt die Tests aus und **behält eine Änderung nur, wenn sie besteht**. Geht etwas kaputt, macht es die Änderung rückgängig und versucht es erneut — so hinterlässt es kein Chaos.
+- 🧬 **Es wird besser, je mehr du es benutzt.** Es merkt sich deine Vorlieben und wichtige Fakten über Gespräche hinweg und verwandelt Aufgaben, die es wiederholt, still und leise in wiederverwendbare Fähigkeiten. Es ist darauf ausgelegt, sich stetig zu verbessern, statt über lange Läufe langsam schlechter zu werden — ein Problem, das viele Agenten unbemerkt aushöhlt.
+- 🛡️ **Sicher von Grund auf.** Jede riskante Aktion durchläuft zuerst eine Sicherheitsprüfung, alles Zerstörerische fragt nach Bestätigung, und es kann nicht vertrauenswürdigen Code in einer abgeschotteten Sandbox ausführen.
+- 🔌 **Jedes Modell, läuft überall.** Nutze große gehostete Modelle oder deine eigenen lokalen über eine einzige Schnittstelle — auf deinem Laptop oder einem 5-Dollar-Server, rund um die Uhr.
+- 🧩 **Wirklich deins.** Quelloffen, kein Lock-in, kein Anbieter-Konto nötig. Du betreibst es, es gehört dir, du kannst alles ändern.
 
 ## Funktionen
 
-**Denken & Autonomie**
-- **LLM-Fusion-Engine** — anbieterunabhängiges Panel aus Frontier- + offenen Modellen, ein Richter, der Konsens/Widersprüche/blinde Flecken aufzeigt, und ein Synthesizer; ein **kostenbewusster Router** fusioniert nur, wenn es sich lohnt (Tool-Schritte bleiben Einzelmodell).
-- **Tier-2-Autonomie** — planen → ausführen → Manager-Review (optional über eine **Kaskaden-Rubrik**, `solve --rubric`) → **Verify-or-Revert** (Workspace-Snapshot/Restore + ein Befehls-Verifizierer), mit **git-worktree-Isolation** (`solve --isolate`) — Änderungen landen nur, wenn verifiziert.
-- **SDLC-Lifecycle-Crew** (`chimera lifecycle`) — eine vorgefertigte **Plan → Build → Test → Review**-Pipeline mit Verify-or-Revert in der Test-Phase.
-- **Multi-Agenten-Teams** — Rollenspezialisierung, sequentielle und Supervisor-Crews, MOC-Nachrichtenkonsolidierung, gemeinsames Gedächtnis, parallele Review. Crew-Rollen können **werkzeugnutzende Worker** sein (eigene Schleife + Tools), nicht nur Einzelschuss-Personas, und jeder Agent kann per **`spawn_subagent`** (`solve --subagents`) eine Teilaufgabe an einen isolierten, tool-beschränkten Subagenten delegieren, der nur sein Ergebnis zurückgibt (keine Rekursion, per Allowlist begrenzt). **`IsolatedCrew`** (`chimera crew-isolated`) geht noch weiter — werkzeugnutzende Worker teilen sich eine Aufgabe, jeder editiert parallel in seinem **eigenen git worktree**, mit konflikt-bewusstem Merge-back und einem optionalen Pro-Worker-`--verify`-Gate (ein Worker, dessen Test fehlschlägt, wird abgelehnt und seine Änderungen verworfen).
-- **Parallele Isolation** (`chimera solve-batch`) — viele Aufgaben auf einmal lösen, jede in ihrem **eigenen git worktree**; nicht-konfligierende Änderungen werden zurückgeführt, und Dateien, die zwei Worker beide berührt haben, werden als Konflikte markiert statt überschrieben. Ein abstürzender Worker lässt nur seine Einheit scheitern, nicht den Batch (`run_in_processes` fügt eine Prozess-/RPC-Grenze zur Fehlerisolation hinzu).
-- **Context Explorer** (`chimera explore`, `solve --explorer`) — ein FastContext-artiger isolierter Subagent, der Code über seine eigene read-only `grep`/`glob`/read-Suche findet und nur einen kompakten `file:line`-Evidenzblock zurückgibt, sodass der Kontext des Haupt-Agenten sauber bleibt. Läuft auf jedem (idealerweise günstigen) Modell.
+### 🧠 Denken & Handeln
+- **Mehrere Modelle zu einer Antwort verschmelzen** (`chimera fuse`) — ein Gremium aus Modellen, ein Richter, der aufzeigt, wo sie übereinstimmen, sich widersprechen oder etwas übersehen, und ein Synthesizer, der die finale Antwort schreibt. Ein smarter Router investiert diesen zusätzlichen Aufwand nur bei schweren Problemen.
+- **Aufgaben eigenständig erledigen** (`chimera solve`) — es plant, handelt mit Werkzeugen und **verifiziert dann und macht rückgängig**: Es führt deine Prüfung aus (z. B. Tests) und behält die Änderung nur, wenn sie besteht, andernfalls macht es sie rückgängig und versucht es erneut. Optional arbeitet es an einer isolierten Kopie deines Projekts, sodass nichts angefasst wird, bis es bewiesen ist.
+- **Teams von Spezialisten** (`chimera crew`, `chimera crew-isolated`) — mehrere rollenfokussierte Agenten teilen sich eine Aufgabe. Im isolierten Modus arbeitet jeder an seiner **eigenen privaten Kopie parallel**; sichere Änderungen werden zusammengeführt, Konflikte werden gemeldet statt still überschrieben, und die Änderungen eines schlechten Workers können durch einen Test pro Worker abgelehnt werden. Ein Supervisor kann die Arbeit aller zu einem einheitlichen Bericht zusammenfügen.
+- **Delegieren und erkunden** — jeder Agent kann eine in sich geschlossene Teilaufgabe an einen frischen **Subagenten** übergeben, der nur das Ergebnis zurückmeldet, sodass der Hauptkontext sauber bleibt. Der **Context Explorer** (`chimera explore`) findet die richtigen Dateien und Zeilen in einer Codebasis und liefert eine kurze Antwort, statt alles abzuladen.
 
-**Selbstevolution & Governance**
-- **Geschlossene Verhaltensschleife** — vergangene Fehler speisen den Planner (Lektionen), verifizierte Erfolge schreiben automatisch ins Gedächtnis, und wiederkehrende Aufgaben entwickeln automatisch eine validierte, smoke-getestete Skill (über das Fusion-Panel vorgeschlagen und bei aktivierter Fusion durch modellübergreifende Übertragbarkeit behalten) — alles per Verify-or-Revert gegated; ein fehlgeschlagener Versuch wird beim Retry auf seinen ersten fehlerhaften Schritt eingegrenzt. Plus Continuous-Evolution-Benchmark und EvoClaw-Stresstest naive vs. guarded.
-- **Hierarchisches Gedächtnis** — working / episodic / semantic / persona **+ eine Graph-Schicht** (`memory graph`), die Fakten nach Entität abruft; ein optionales **SQLite/FTS5**-Volltext-Backend (`CHIMERA_MEMORY_BACKEND=sqlite`); ein **sitzungsübergreifendes Nutzerprofil** (Persona-Fakten, die in jeder Runde angewendet werden); **LLM-Konsolidierung** (`memory consolidate`), die nahezu doppelte Fakten zusammenführt; und **Nudges**, die vorschlagen, im Chat geäußerte Präferenzen zu speichern.
-- **Opt-in Modell-Evolution** — `solve` sammelt Trajektorien; `evolve` kuratiert SFT/DPO-Datasets und erzeugt ein lauffähiges LoRA-Rezept, und **`evolve tune`** selbst-optimiert die Agenten-Spec (Meta-Suche, bei Nicht-Regression behalten) anhand der täglichen Szenarien. Das Training bleibt extern/opt-in.
-- **Governance-Kernel** — allow/warn/block/review (lexikalische Regeln + optionaler semantischer Richter, mit Regel-Distillation und einem **geschützten Präzedenz-Speicher**), ein statischer Validator für die Selbstmodifikations-Oberfläche, ein Append-only-Audit-Log, governte Tools, ein **Vier-Akteur-Änderungsmodell** und ein **Spec↔Code-Drift-Gate** (`chimera drift`).
+### 🧬 Gedächtnis & Selbstverbesserung
+- **Langzeitgedächtnis** — es behält Kurzzeit-, jüngste, faktische und Über-dich-Erinnerungen, plus eine Karte, wie Dinge zusammenhängen. Es kann Erinnerungen in einer schnellen Volltext-Datenbank speichern, ein Profil deiner Vorlieben in jeden Chat mitnehmen, doppelte Notizen automatisch zusammenführen und behutsam vorschlagen, eine Vorliebe zu speichern, wenn du eine erwähnst.
+- **Lernt neue Fähigkeiten** — wenn es bei derselben Art von Aufgabe mehr als einmal erfolgreich ist, verwandelt es das automatisch in eine getestete, wiederverwendbare Fähigkeit.
+- **Optionales Selbsttraining (fortgeschritten)** — es kann seine eigene Erfahrung aufzeichnen, damit du später ein Modell daraus feinjustieren kannst. Standardmäßig aus; nichts wird trainiert, ohne dass du danach fragst.
 
-**Anbieter**
-- **Jedes Modell, eine Schnittstelle** — anbieterunabhängig via LiteLLM (100+ Modelle über `provider/model`-Slugs); First-Class-Keys für OpenRouter/OpenAI/Anthropic/Gemini/DeepSeek.
-- **Self-hosted & robust** — eigene Endpoints für **Ollama/vLLM** (`CHIMERA_API_BASE`), **Fallback-Ketten**, **Credential Pools** mit Round-Robin-Rotation, ein Live-**`/model`**-Wechsel und **Prompt-Caching** (`CHIMERA_CACHE`) für wiederholte Reasoning-Schritte.
+### 🔌 Verbinden & Automatisieren
+- **Sprich überall mit ihm** — ein Terminal-Chat, eine Vollbild-Terminal-App oder als Bot auf **Discord, Telegram, Slack, Signal und WhatsApp**. Es gibt außerdem einen einfachen HTTP-Endpunkt.
+- **Zeitplanung & Proaktivität** — gib ihm wiederkehrende Aufgaben in einfacher Sprache ("fasse jeden Morgen die Nachrichten zusammen"). Mit dem eingebauten Scheduler in Betrieb **handelt es pünktlich**, nicht nur, wenn du ihm schreibst.
+- **Werkzeuge & Integrationen** — Dateien lesen und schreiben, Shell-Befehle ausführen, im Web browsen und Code sicher in einer Sandbox ausführen. Verbinde nahezu jeden Webdienst (über seine API) oder ein externes Werkzeug und importiere deine Einrichtung aus anderen Agenten-Werkzeugen, die du bereits nutzt.
+- **Alles inklusive** — Websuche, Bilderzeugung, Text-to-Speech, E-Mail, Kalender, Code-Ausführung und mehr, bereit zum Einschalten.
 
-**Orchestrierung, Schnittstellen & Integrationen**
-- **Kanban + Worker-Lanes** (`chimera kanban`) — ein Task-Board (Backlog → Doing → Review → Done), dessen Karten an eine `solve`- oder `crew`-Lane verteilt werden; `kanban learn` macht wiederkehrende Aufgaben zu Karten.
-- **Loop Engineering** (`chimera workflow`) — eine autonome Schleife als YAML verfassen (Schritte, die die Stack `nutzen`, mit `when`-Bedingungen und `repeat`/`until`-Schleifen).
-- **Schnittstellen** — eine `chat`-REPL, eine Vollbild-**TUI** (Textual) und ein **Messaging-Gateway** (HTTP, oder **natives Discord / Telegram / Slack / Signal** via `serve --discord|--telegram|--slack|--signal`) mit einer Konversation (und Gedächtnis) pro Chat; der Agent kann Nachrichten auch über ein `send_message`-Tool **senden**. **WhatsApp** funktioniert zweiseitig via Cloud-API-Webhook (`POST /whatsapp`).
-- **Ausführungs-Sandbox** — das Shell-Tool lokal oder in einem isolierten **Docker**-Container ausführen (`CHIMERA_SANDBOX=docker`).
-- **Integrationen** — ein First-Class-**MCP**-Client (stdio) + ein **OpenAPI/REST → Tool**-Importer; **Crons + Webhook-Trigger** (`serve` führt eine Aufgabe bei einem eingehenden `POST /webhook/<hook>` aus — unbeaufsichtigt); **Migration** von Config/Skills/Langzeitgedächtnis aus Hermes Agent / OpenClaw.
-
-**Eingebaute Extras**
-- **Referenz-Tools** — Batterien inklusive: immer aktives `execute_code` (sandboxed Python), `code_interpreter` (zustandsbehaftete Session), `arxiv_search`; per Config freischaltbar `web_search`, `generate_image` (OpenAI), `text_to_speech` (ElevenLabs), `send_email`/`read_email` (SMTP/IMAP), `calendar_events` (`.ics`); sowie `youtube_transcript` (opt-in Extra). Beliebige REST-Dienste lassen sich weiterhin über den OpenAPI→Tool-Importer anbinden.
-- **Vision** (Bild einfügen), **Deliverable-Modus** (polierte Artefakte) und ein **Pet**-Begleiter — alle optionalen Fähigkeiten anzeigen mit `chimera features`.
+### 🚀 Überall laufen, sicher
+- **Jedes Modell, eine Schnittstelle** — gehostete Modelle oder deine eigenen lokalen, mit automatischem Fallback, falls eines ausfällt, und Rotation über mehrere Schlüssel.
+- **Server-Deployment mit einem Befehl** — betreibe es mit Docker (oder auf Bare-Metal), sodass es läuft und beim Neustart wieder hochfährt. Siehe **[docs/deploy.md](docs/deploy.md)**.
+- **Sicherheitskern** — eine Prüfung bei jeder Aktion (erlauben / warnen / blockieren / nachfragen), eine Sandbox für nicht vertrauenswürdigen Code und ein vollständiges Audit-Protokoll dessen, was es getan hat.
 
 ## Schnellstart
 
-Benötigt Python **3.11+** (3.12+ empfohlen) und [uv](https://docs.astral.sh/uv/).
+Du brauchst **Python 3.11+** und [uv](https://docs.astral.sh/uv/) (einen schnellen Python-Installer).
 
+**1. Installieren**
 ```bash
+git clone https://github.com/brcampidelli/chimera-agent.git
+cd chimera-agent
 uv sync --extra dev
-cp .env.example .env        # mindestens einen Anbieter-Key setzen (OpenRouter empfohlen)
-uv run chimera doctor       # Umgebung prüfen
+```
+
+**2. Einen KI-Anbieter-Schlüssel hinzufügen.** Am einfachsten ist ein [OpenRouter](https://openrouter.ai)-
+Schlüssel — ein Schlüssel schaltet über 100 Modelle frei.
+```bash
+cp .env.example .env
+# .env öffnen und z. B. setzen:  CHIMERA_OPENROUTER_KEYS=sk-or-...
+```
+
+**3. Prüfen, ob alles bereit ist**
+```bash
+uv run chimera doctor
+```
+
+**4. Ausprobieren**
+```bash
+uv run chimera chat                         # ein Gespräch führen (es merkt sich Dinge)
+uv run chimera run "Explain what you can do in 3 bullets"
+uv run chimera fuse "What's the best way to learn to cook?" --show-panel   # mehrere Modelle verschmolzen sehen
+uv run chimera solve "add a hello() function to app.py and a test for it" --verify "pytest -q"
+```
+
+**Auf einem Server betreiben (damit es rund um die Uhr arbeitet):**
+```bash
+docker compose up -d      # Gateway + Scheduler; startet automatisch neu
+```
+Vollständige Anleitung (Docker oder systemd, Zeitplanung, Backups, Sicherheit): **[docs/deploy.md](docs/deploy.md)**.
+
+## Wie es funktioniert
+
+Gib Chimera eine Aufgabe; es plant, denkt (verschmilzt Modelle, wenn das Problem schwer ist), handelt
+mit Werkzeugen, **überprüft seine eigene Arbeit und behält nur, was besteht**, und lernt dann aus dem
+Ergebnis — indem es Gedächtnis und neue Fähigkeiten in die nächste Aufgabe zurückspeist.
+
+```mermaid
+flowchart TD
+    U([Du: eine Aufgabe oder Frage]) --> P[Verstehen & planen]
+    P --> Q{Ist es ein schweres Problem?}
+    Q -- ja --> FUSION[Mehrere Modelle fragen<br/>· ein Richter vergleicht sie<br/>· ein Synthesizer schreibt die beste Antwort]
+    Q -- nein --> ONE[Ein schnelles Modell nutzen]
+    FUSION --> ACT[Handeln: Werkzeuge, Dateien, das Web<br/>oder an Subagenten delegieren]
+    ONE --> ACT
+    ACT --> V{Hat es funktioniert?<br/>Tests / Prüfungen ausführen}
+    V -- ja --> KEEP[Änderung behalten]
+    V -- nein --> REVERT[Rückgängig & mit der Lektion erneut versuchen]
+    REVERT --> ACT
+    KEEP --> LEARN[Lernen: Wichtiges ins Gedächtnis speichern,<br/>wiederholte Arbeit in eine Fähigkeit verwandeln]
+    LEARN --> U
+    MEM[(Langzeitgedächtnis)] -. erinnert .-> P
+    LEARN -. schreibt .-> MEM
+    GOV[[Sicherheitsprüfung bei jeder Aktion]] -. schützt .-> ACT
 ```
 
 ## Befehle
 
+Jeder Befehl lautet `chimera <name>` (oder `uv run chimera <name>` vor der Installation).
+
 ```bash
-chimera doctor / models / features    # Status, Konfiguration, optionale Fähigkeiten
-chimera chat                          # interaktiver Mehrrunden-Assistent (deine rechte Hand)
-chimera tui                           # Vollbild-Terminal-App (Textual)
-chimera serve [--discord|--telegram|--slack]  # Messaging-Gateway: HTTP oder nativer Plattform-Bot
-chimera run "PROMPT" --image pic.png   # Tier-1 Single-Shot (mit Vision via --image)
-chimera deliver "ein Plan" -o plan.md   # Deliverable-Modus: erzeugt ein poliertes Artefakt
-chimera fuse "PROMPT" --show-panel     # LLM-Fusion: Panel -> Richter -> Synthesizer
-chimera solve "AUFGABE" --verify "pytest -q" --rubric --isolate   # Tier-2: Verify-or-Revert (+ Kaskaden-Rubrik-Review), git-worktree-isoliert
-chimera lifecycle "AUFGABE" --verify "..."   # SDLC-Crew: Plan -> Build -> Test -> Review
-chimera workflow flow.yaml             # eine deklarative Schleife ausführen (Loop Engineering)
-chimera crew "AUFGABE" --mode supervisor  # Tier-3 Multi-Agenten-Crew
-chimera explore "wo wird X behandelt?"  # isolierter Context Explorer (grep/glob/read, file:line-Evidenz)
-chimera meta "ein Agent für X"          # Tier-4 Meta-Agent: entwirft einen spezialisierten Agenten
-chimera kanban add/board/run/learn     # Task-Board mit Worker-Lanes (solve/crew)
-chimera drift spec.yaml                # Spec<->Code-Drift-Gate (Exit 1 bei Drift)
-chimera memory add / graph / consolidate   # kuratiertes Langzeitgedächtnis + Entität-Relation-Graph + LLM-Konsolidierung
-chimera cron add / learn               # geplante Jobs (zugewiesen + selbstgelernt, bestätigt)
-chimera bench                          # Continuous-Evolution-Benchmark
-chimera migrate hermes ~/.hermes --apply   # importiert Config + Skills + führt Gedächtnis zusammen
-chimera evolve status / tune / recipe   # opt-in Evolution: Spec-Meta-Suche (tune), SFT/DPO-Daten + LoRA-Rezept
-chimera pet new --name Chimi           # adoptiere einen virtuellen Begleiter
+chimera doctor / models / features    # Einrichtung prüfen, Modelle auflisten, optionale Fähigkeiten sehen
+chimera chat                          # interaktiver Assistent, der sich über Runden hinweg merkt
+chimera tui                           # Vollbild-Terminal-App
+chimera run "PROMPT" --image pic.png  # Einmal-Antwort (kann ein Bild lesen)
+chimera fuse "PROMPT" --show-panel    # mehrere Modelle verschmelzen: Panel -> Richter -> Synthesizer
+chimera solve "TASK" --verify "pytest -q" --isolate   # eine Aufgabe erledigen; Änderung nur behalten, wenn die Prüfung besteht
+chimera crew "TASK" --mode supervisor         # ein Team von Spezialisten geht eine Aufgabe an
+chimera crew-isolated "TASK" -W "name:role" --verify "..." --synthesize   # Team, jeder in seiner eigenen isolierten Kopie
+chimera explore "where is login handled?"     # die richtigen Dateien/Zeilen finden, eine kurze Antwort erhalten
+chimera deliver "a launch plan" -o plan.md    # ein poliertes Dokument erzeugen
+chimera serve --cron [--discord|--telegram|--slack|--signal]   # als Dienst betreiben: Chat-Bot + Scheduler
+chimera cron add "brief" "0 8 * * *" "Summarize the news"       # wiederkehrende Arbeit planen
+chimera memory add / graph / consolidate      # Langzeitgedächtnis: speichern, verknüpfen, aufräumen
+chimera kanban add/board/run                   # ein Task-Board, das Arbeit an den Agenten verteilt
+chimera workflow flow.yaml                     # eine wiederholbare Automatisierung ausführen, die in einer Datei beschrieben ist
+chimera migrate <source> <dir> --apply         # Einstellungen, Fähigkeiten und Gedächtnis aus einem anderen Agenten-Werkzeug importieren
+chimera evolve status / tune / recipe          # optional: selbst-optimieren; Daten vorbereiten, um ein Modell feinzujustieren
+chimera pet new --name Chimi                   # einen kleinen virtuellen Begleiter adoptieren :)
 ```
 
-Siehe den **[Nutzungsleitfaden](docs/usage.md)** für Installation, Konfiguration und jeden Befehl mit Copy-Paste-Beispielen.
+Siehe den **[Nutzungsleitfaden](docs/usage.md)** für jeden Befehl mit Copy-Paste-Beispielen.
 
 ## Architektur
 
+Chimera ist ein Python-Paket mit klar getrennten Teilen, sodass du jedes Stück für sich verstehen oder
+erweitern kannst:
+
 ```
 chimera/
-  core/          Agenten-Schleife (ReAct) + Tier-2-Autonomie (Plan, Verify-or-Revert) + git-worktree-Isolation
-  fusion/        Panel -> Richter -> Synthesizer + kostenbewusster Router
-  memory/        working / episodic / semantic / persona + Graph-Schicht + Memory Manager
-  skills/        eingebaute Bibliothek + Skill-Context-Retrieval
-  evolution/     Skill-Evolver, Auto-Evolve-Hook, Erfahrungs-Buffer
-  governance/    Trust-Kernel (Regeln + Richter + geschützter Präzedenzfall), statischer Validator, Drift-Gate, Vier-Akteur-Modell, Audit
-  orchestration/ Rollen, sequentielle/Supervisor-Crews, MOC-Comms, SDLC-Lifecycle-Crew
-  ecosystem/     Meta-Agent, Change-Tempo-Governance, Trajektorien-Sammlung, Modell-Evolution
-  kanban/        Task-Board + Worker-Lanes (Verteilung an Crews / solve)
-  workflow/      deklaratives Loop-DSL (Loop Engineering)
-  tools/         native Tools (Dateien, Shell, HTTP)
-  sandbox/       Ausführungs-Backends (local / docker-isoliert)
-  integrations/  MCP-Client (stdio) + OpenAPI->Tool-Importer
-  scheduler/     Crons (zugewiesen + selbstgelernt) + SOP-Engine
-  migration/     Import aus Hermes/OpenClaw (Config, Skills, Gedächtnis-Merge)
-  providers/     LLM-Gateway (LiteLLM) — Fallback, Credential Pools, eigene Endpoints, Prompt-Cache
-  interface/     konversationelle ChatSession (geteilt von Chat, TUI, Gateway)
-  tui/  server/   Vollbild-Textual-App · Messaging-Gateway + HTTP-Transport
-  eval/          Continuous-Evolution + EvoClaw-Stresstest + tägliche Szenarien
-  cli/           der `chimera`-Befehl (CLI-first)
+  core/          die Agenten-Schleife: planen, handeln, verifizieren, behalten-oder-rückgängig und isolierte Arbeitskopien
+  fusion/        die "Viele-Köpfe"-Engine: Panel -> Richter -> Synthesizer + der smarte Router
+  memory/        Kurzzeit- / jüngstes / faktisches / Über-dich-Gedächtnis + ein Beziehungsgraph
+  skills/        die eingebaute Fähigkeitsbibliothek und wie relevante Fähigkeiten gefunden werden
+  evolution/     neue Fähigkeiten aus Erfolg lernen und die Erfahrung, aus der es lernt
+  governance/    der Sicherheitskern (erlauben/warnen/blockieren/nachfragen), Audit-Protokoll und Änderungskontrollen
+  orchestration/ Teams von Agenten: Rollen, Crews, isolierte parallele Worker, einheitliche Berichte
+  ecosystem/     fortgeschrittene Selbstverbesserung: Agenten, die Agenten entwerfen, optionales Modelltraining
+  kanban/        ein Task-Board, das dem Agenten Karten übergibt
+  workflow/      eine wiederholbare Automatisierung in einer einfachen Datei beschreiben und ausführen
+  tools/         eingebaute Werkzeuge (Dateien, Shell, Web, Suche) + Code-Ausführung
+  sandbox/       Werkzeuge lokal oder in einem abgeschotteten Container ausführen
+  integrations/  externe Werkzeuge und jede Web-API verbinden
+  scheduler/     wiederkehrende Aufgaben + der Daemon, der sie pünktlich auslöst
+  migration/     bring deine Einrichtung aus anderen Agenten-Werkzeugen mit
+  providers/     eine Schnittstelle zu jedem Modell, mit Fallback und Schlüsselrotation
+  interface/     die gemeinsame Konversations-Engine (genutzt von Chat, App und Bots)
+  server/        das Messaging-Gateway und der HTTP-Endpunkt
+  cli/           der `chimera`-Befehl
 ```
 
-Siehe [docs/architecture.md](docs/architecture.md) für das vollständige Design und die zugrunde liegende Forschung.
+Siehe [docs/architecture.md](docs/architecture.md) für das vollständige Design.
 
-## Roadmap
+## Vision & Ziele
 
-| Meilenstein | Status |
-|---|---|
-| M0–M7 — Tiers 1–4 + Fusion + Selbstevolution + Governance | ✅ |
-| M8 — Schnittstellen (Chat/TUI/Gateway), EvoClaw-Stresstest, opt-in Modell-Evolution | ✅ |
-| Anbieter-Schicht — self-hosted Endpoints, Fallback, Credential Pools, `/model`, Prompt-Cache | ✅ |
-| Geschlossene Verhaltensschleife — Erfahrung→Planner, Auto-Gedächtnis, Auto-Skill (governt) | ✅ |
-| Operative Orchestrierung — Kanban + Worker-Lanes, SDLC-Crew, Loop-DSL | ✅ |
-| Ausführungsisolation — Docker-Sandbox + git worktrees | ✅ |
-| Paper-Techniken — HORIZON · VIBEMed · Spec Growth · AgentTrust v2 · AutoMegaKernel · Meta-Agent · MOC | ✅ |
-| Paper-Techniken (II) — MemGate · multifaktorieller Speicherwert · Data Recipes · OpenClaw-Skill · SkillAdaptor · DailyReport · OpenJarvis Spec-Suche | ✅ |
+**Chimeras Ziel ist einfach: ein KI-Agent, den jeder betreiben kann, der besser denkt, indem er viele
+Modelle kombiniert, statt einem zu vertrauen, der wirklich besser wird, je mehr er benutzt wird, und
+der dabei sicher und vollständig offen bleibt.**
 
-Als Nächstes: tiefere Continuous-Evolution-Validierung im großen Maßstab, Anbieter-OAuth-Logins und ein
-optionales LangGraph-Durability-Backend. Modell-Training (LoRA/DPO) bleibt extern/opt-in by design.
+Die meisten KI-Werkzeuge heute sind entweder klug-aber-vergesslich (sie verlieren alles, sobald der
+Chat endet) oder leistungsfähig-aber-geschlossen (du kontrollierst sie nicht). Und viele, die
+versuchen, sich "selbst zu verbessern", werden über lange Läufe unbemerkt *schlechter*. Chimera ist
+unser Versuch eines anderen Weges:
+
+- **Besseres Denken, keine höhere Rechnung** — kombiniere mehrere Modelle nur, wenn es hilft, sodass die Qualität steigt, ohne zu verschwenden.
+- **Echtes Gedächtnis und echte Fähigkeiten** — merke dir, was wichtig ist, und verwandle wiederholte Arbeit in wiederverwendbare Fertigkeiten.
+- **Verbesserung, die anhält** — dem langsamen Verfall widerstehen, der andere Agenten aushöhlt, indem es seine eigene Arbeit überprüft und den Zustand sicher außerhalb des Modells hält.
+- **Sicher und transparent** — jede Aktion ist überprüfbar, und zerstörerische fragen zuerst nach.
+- **Offen für alle** — kostenlos, unter Apache-2.0 lizenziert, gemeinschaftsgetrieben, kein Lock-in.
+
+Es ist früh (Alpha), und Ehrlichkeit ist uns wichtig: Es ist im intensiven Produktivbetrieb noch nicht
+bewiesen. Wenn dich diese Vision begeistert, würden wir uns über deine Hilfe freuen, sie zu erreichen.
 
 ## Entwicklung
 
 ```bash
-uv run ruff check .      # Lint
-uv run mypy chimera      # Typprüfung (strict)
-uv run pytest -q         # Tests
+git clone https://github.com/brcampidelli/chimera-agent.git
+cd chimera-agent
+uv sync --extra dev
+
+uv run ruff check .      # Stil/Lint
+uv run mypy chimera      # strikte Typprüfungen
+uv run pytest -q         # die Testsuite
 ```
 
-Siehe [CONTRIBUTING.md](CONTRIBUTING.md) und [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
-Sicherheitsprobleme: siehe [SECURITY.md](SECURITY.md).
+Beiträge sind sehr willkommen — Code, Doku, Ideen, Fehlerberichte. Beginne mit
+[CONTRIBUTING.md](CONTRIBUTING.md) und unserem [Verhaltenskodex](CODE_OF_CONDUCT.md).
+Ein Sicherheitsproblem gefunden? Siehe [SECURITY.md](SECURITY.md).
 
 ## Community
 
-Komm ins Gespräch auf **[Discord](https://discord.gg/ACvBbrmguV)** — Fragen, Ideen und Beiträge sind willkommen.
+Hast du eine Frage, eine Idee oder möchtest du beitragen? **[Komm zu uns auf Discord](https://discord.gg/ACvBbrmguV)** — alle sind willkommen.
 
 ## Lizenz
 
-[Apache-2.0](LICENSE).
+[Apache-2.0](LICENSE) — frei zu nutzen, zu ändern und darauf aufzubauen.
