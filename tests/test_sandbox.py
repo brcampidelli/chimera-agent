@@ -100,7 +100,7 @@ def test_run_shell_uses_injected_sandbox() -> None:
     fake = FakeSandbox()
     out = RunShellTool(sandbox=fake).run(command="echo hi")
     assert "[exit 0]" in out and "hi" in out
-    assert fake.seen == ("echo hi", 60)
+    assert fake.seen == ("echo hi", 180)  # default timeout raised for slow scripts
 
 
 def test_run_shell_reports_timeout() -> None:

@@ -466,21 +466,69 @@ def serve(
             cron_stop.set()
 
 
+def _record_cron_run(runs_log: Path, job: Any, answer: str, webhook_url: str | None) -> None:
+    """Persist a per-run record (delivery confirmation) and optionally deliver it.
+
+    The daemon otherwise only logs a cron's answer; this writes a structured line
+    to ``cron_runs.jsonl`` so an external watchdog can prove a must-fire job ran,
+    and — when ``CHIMERA_CRON_WEBHOOK_URL`` is set — POSTs the answer to that
+    webhook. Delivery is opt-in so it never double-posts jobs whose own prompt
+    already delivers (the recommended per-channel pattern).
+    """
+    import json
+    import time
+    import urllib.request
+
+    answer = answer or ""
+    rec: dict[str, Any] = {
+        "ts": time.time(),
+        "id": getattr(job, "id", None),
+        "name": getattr(job, "name", None),
+        "chars": len(answer),
+        "preview": answer.replace("\n", " ")[:280],
+        "delivered": None,
+    }
+    if webhook_url:
+        try:
+            body = json.dumps({"content": f"⏱️ cron **{rec['name']}**\n{answer[:1800]}"}).encode()
+            req = urllib.request.Request(
+                webhook_url, data=body, method="POST",
+                headers={"Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:  # noqa: S310 — user-set webhook
+                rec["delivered"] = resp.status
+        except Exception as exc:  # noqa: BLE001 — delivery failure must not kill the tick
+            rec["delivered"] = f"error: {exc}"
+    try:
+        runs_log.parent.mkdir(parents=True, exist_ok=True)
+        with runs_log.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    except Exception:  # noqa: BLE001 — best-effort audit; never fatal
+        pass
+
+
 def _start_cron_daemon(
     backend: SupportsComplete, model: str | None, max_steps: int, workspace: Path, tick: int
 ) -> Any:
     """Start the cron daemon in a background thread; return its stop event."""
+    import os
+
     from chimera.core import Agent, AgentConfig
     from chimera.scheduler import CronDaemon, Scheduler, make_agent_dispatch
     from chimera.tools import default_registry
 
     scheduler = Scheduler(_cron_store())
+    runs_log = get_settings().home / "cron_runs.jsonl"
+    webhook_url = os.environ.get("CHIMERA_CRON_WEBHOOK_URL")
 
     def run_task(task: str) -> str:
         agent = Agent(backend, default_registry(workspace), AgentConfig(model=model, max_steps=max_steps))
         return agent.run(task).answer
 
-    daemon = CronDaemon(scheduler, make_agent_dispatch(run_task), tick_seconds=tick)
+    def on_result(job: Any, answer: str) -> None:
+        _record_cron_run(runs_log, job, answer, webhook_url)
+
+    daemon = CronDaemon(scheduler, make_agent_dispatch(run_task, on_result), tick_seconds=tick)
     _thread, stop = daemon.start()
     jobs = len(scheduler.store.list())
     console.print(f"[dim]cron daemon on (tick {tick}s, {jobs} job(s) scheduled)[/dim]")

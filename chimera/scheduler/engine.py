@@ -148,13 +148,21 @@ class Scheduler:
         return job
 
     def mark_ran(self, job: CronJob, now: float) -> None:
-        job.last_run = now
-        if job.trigger == "cron":
-            job.next_run = _next_after(job.schedule, now)
-        self.store.add(job)
+        # Apply the runtime stamp onto the freshest on-disk copy so a concurrent
+        # out-of-band edit (e.g. `chimera cron disable` mid-tick) is not clobbered
+        # by our whole-store write. Falls back to the in-memory job if it's new.
+        self.store.reload_if_changed()
+        target = self.store.get_or_none(job.id) or job
+        target.last_run = now
+        if target.trigger == "cron":
+            target.next_run = _next_after(target.schedule, now)
+        self.store.add(target)
 
     def run_due(self, now: float, dispatch: Callable[[CronJob], None]) -> list[CronJob]:
         """Dispatch every due cron job and advance its schedule. Returns those run."""
+        # Pick up out-of-band edits (add/remove/enable/disable) before computing
+        # what's due, so a running daemon honours CLI changes without a restart.
+        self.store.reload_if_changed()
         ran: list[CronJob] = []
         for job in self.due(now):
             _log.debug("dispatching cron job %s (%s)", job.name, job.id)
