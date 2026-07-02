@@ -1,0 +1,29 @@
+# Chimera Agent — one-command server deployment.
+#   cp .env.example .env   # then fill in a provider key (e.g. CHIMERA_OPENROUTER_KEYS)
+#   docker compose up -d   # build + run, restarts on crash/reboot
+#   docker compose logs -f # watch it
+# State (memory, crons, trajectories, audit) persists in the named volume `chimera-data`.
+
+services:
+  chimera:
+    build: .
+    image: chimera-agent:latest
+    container_name: chimera
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8765:8765"          # HTTP gateway: POST /chat, POST /webhook/<hook>, GET /health
+    volumes:
+      - chimera-data:/data   # CHIMERA_HOME — agent state survives restarts
+    # Default command runs the HTTP gateway + cron daemon. To also serve a chat platform,
+    # uncomment and adjust (and set the matching token in .env):
+    # command: ["serve", "--host", "0.0.0.0", "--cron", "--discord"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8765/health').status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  chimera-data:

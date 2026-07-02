@@ -85,6 +85,10 @@ cp .env.example .env        # set at least one provider key (OpenRouter recommen
 uv run chimera doctor       # check your environment
 ```
 
+**Run it on a server (VPS):** `docker compose up -d` (gateway + proactive cron daemon), or
+bare-metal via `./install.sh` + systemd. Add scheduled work with `chimera cron add`. Full
+guide: **[docs/deploy.md](docs/deploy.md)**.
+
 ## Commands
 
 ```bash
