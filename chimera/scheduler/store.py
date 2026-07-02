@@ -14,21 +14,42 @@ class CronStore:
     def __init__(self, path: Path) -> None:
         self.path = Path(path)
         self._jobs: dict[str, CronJob] = {}
+        self._mtime: float | None = None
         self.load()
 
     def load(self) -> None:
         self._jobs = {}
         if not self.path.exists():
+            self._mtime = None
             return
+        self._mtime = self.path.stat().st_mtime
         raw = json.loads(self.path.read_text(encoding="utf-8") or "[]")
         for item in raw:
             job = CronJob.model_validate(item)
             self._jobs[job.id] = job
 
+    def reload_if_changed(self) -> bool:
+        """Reload from disk if the file changed since the last load or save.
+
+        Lets a long-lived daemon pick up jobs that another process (e.g. ``chimera cron
+        add`` in a separate shell/container) wrote to the same file, without a restart.
+        Returns ``True`` when a reload happened. Our own :meth:`save` refreshes the tracked
+        mtime, so the daemon never reloads on account of its own writes.
+        """
+        try:
+            mtime = self.path.stat().st_mtime if self.path.exists() else None
+        except OSError:
+            return False
+        if mtime != self._mtime:
+            self.load()
+            return True
+        return False
+
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         data = [job.model_dump() for job in self._jobs.values()]
         self.path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        self._mtime = self.path.stat().st_mtime
 
     def add(self, job: CronJob) -> None:
         self._jobs[job.id] = job

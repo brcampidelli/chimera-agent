@@ -470,8 +470,11 @@ def _start_cron_daemon(
     backend: SupportsComplete, model: str | None, max_steps: int, workspace: Path, tick: int
 ) -> Any:
     """Start the cron daemon in a background thread; return its stop event."""
+    import json
+    import time
+
     from chimera.core import Agent, AgentConfig
-    from chimera.scheduler import CronDaemon, Scheduler, make_agent_dispatch
+    from chimera.scheduler import CronDaemon, CronJob, Scheduler, make_agent_dispatch
     from chimera.tools import default_registry
 
     scheduler = Scheduler(_cron_store())
@@ -480,7 +483,23 @@ def _start_cron_daemon(
         agent = Agent(backend, default_registry(workspace), AgentConfig(model=model, max_steps=max_steps))
         return agent.run(task).answer
 
-    daemon = CronDaemon(scheduler, make_agent_dispatch(run_task), tick_seconds=tick)
+    results_path = get_settings().home / "scheduler" / "cron_results.jsonl"
+
+    def deliver(job: CronJob, answer: str) -> None:
+        """Durable sink: append every cron result so nothing is silently lost."""
+        results_path.parent.mkdir(parents=True, exist_ok=True)
+        record = {
+            "at": time.time(),
+            "id": job.id,
+            "name": job.name,
+            "action": job.action,
+            "deliver_to": job.deliver_to,
+            "answer": answer,
+        }
+        with results_path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+    daemon = CronDaemon(scheduler, make_agent_dispatch(run_task, deliver), tick_seconds=tick)
     _thread, stop = daemon.start()
     jobs = len(scheduler.store.list())
     console.print(f"[dim]cron daemon on (tick {tick}s, {jobs} job(s) scheduled)[/dim]")

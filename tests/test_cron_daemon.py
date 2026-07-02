@@ -74,3 +74,40 @@ def test_start_thread_runs_then_stops(tmp_path: Path) -> None:
     stop.set()
     thread.join(timeout=2)
     assert not thread.is_alive()
+
+
+def test_tick_reloads_jobs_added_out_of_process(tmp_path: Path) -> None:
+    path = tmp_path / "cron.json"
+    fired: list[str] = []
+    daemon = CronDaemon(Scheduler(CronStore(path)), lambda job: fired.append(job.name))
+    assert daemon.tick(now=60) == []  # daemon starts with no jobs
+
+    # A *separate* process (its own store on the same file) schedules a cron.
+    Scheduler(CronStore(path)).schedule_cron("report", "* * * * *", "daily report", now=0)
+
+    # Without a restart, the daemon picks it up on the next tick and fires it.
+    assert [j.name for j in daemon.tick(now=60)] == ["report"]
+    assert fired == ["report"]
+
+
+def test_dispatch_retries_delivery_then_confirms(tmp_path: Path) -> None:
+    job = _scheduler(tmp_path).schedule_cron("j", "* * * * *", "do X", now=0)
+    attempts = {"n": 0}
+
+    def flaky(_job: object, _ans: str) -> None:
+        attempts["n"] += 1
+        if attempts["n"] < 2:
+            raise RuntimeError("transient delivery failure")
+
+    make_agent_dispatch(lambda task: "ok", flaky, delivery_retries=2)(job)
+    assert attempts["n"] == 2  # failed once, then succeeded
+
+
+def test_dispatch_survives_permanent_delivery_failure(tmp_path: Path) -> None:
+    job = _scheduler(tmp_path).schedule_cron("j", "* * * * *", "do X", now=0)
+
+    def always_fails(_job: object, _ans: str) -> None:
+        raise RuntimeError("sink down")
+
+    # Must not raise — a broken sink cannot take the daemon down.
+    make_agent_dispatch(lambda task: "ok", always_fails, delivery_retries=1)(job)

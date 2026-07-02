@@ -27,4 +27,6 @@ class CronJob(BaseModel):
     enabled: bool = True
     next_run: float | None = None
     last_run: float | None = None
+    deliver_to: str | None = None
+    """Optional delivery target for the job's result (e.g. a chat conversation id)."""
     metadata: dict[str, Any] = Field(default_factory=dict)

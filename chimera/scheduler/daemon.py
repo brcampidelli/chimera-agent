@@ -25,18 +25,38 @@ Dispatch = Callable[[CronJob], None]
 def make_agent_dispatch(
     run_task: Callable[[str], str],
     on_result: Callable[[CronJob, str], None] | None = None,
+    *,
+    delivery_retries: int = 2,
 ) -> Dispatch:
     """Build a dispatch that runs a job's ``action`` through ``run_task`` (task -> answer).
 
     ``on_result`` (optional) receives ``(job, answer)`` — e.g. to deliver the result to a
-    chat platform. Generic and side-effect-light so it's easy to test and to wire.
+    chat platform or a durable sink. Delivery is *confirmed*: it is retried up to
+    ``delivery_retries`` extra times and every attempt is logged, so a cron result is never
+    silently lost the way a fire-and-forget log line would be. Generic and side-effect-light
+    so it's easy to test and to wire.
     """
 
     def dispatch(job: CronJob) -> None:
         answer = run_task(job.action)
         _log.info("cron '%s' ran -> %s", job.name, (answer or "").replace("\n", " ")[:200])
-        if on_result is not None:
-            on_result(job, answer)
+        if on_result is None:
+            return
+        last_exc: Exception | None = None
+        for attempt in range(1, delivery_retries + 2):
+            try:
+                on_result(job, answer)
+                _log.info("cron '%s' result delivered (attempt %d)", job.name, attempt)
+                return
+            except Exception as exc:  # noqa: BLE001 — retry, then give up loudly
+                last_exc = exc
+                _log.warning("cron '%s' delivery attempt %d failed: %s", job.name, attempt, exc)
+        _log.error(
+            "cron '%s' delivery failed after %d attempt(s): %s",
+            job.name,
+            delivery_retries + 1,
+            last_exc,
+        )
 
     return dispatch
 
@@ -60,7 +80,15 @@ class CronDaemon:
         self._sleep = sleep
 
     def tick(self, now: float | None = None) -> list[CronJob]:
-        """One scheduler tick: dispatch every job due at ``now`` (defaults to the real clock)."""
+        """One scheduler tick: dispatch every job due at ``now`` (defaults to the real clock).
+
+        Reloads the job store first so crons added out-of-process (``chimera cron add`` in
+        another shell/container) take effect without restarting the daemon.
+        """
+        try:
+            self.scheduler.store.reload_if_changed()
+        except Exception as exc:  # noqa: BLE001 — a bad reload must not skip the tick
+            _log.warning("cron store reload failed: %s", exc)
         return self.scheduler.run_due(self._clock() if now is None else now, self.dispatch)
 
     def run_forever(self, *, stop: threading.Event | None = None) -> None:
