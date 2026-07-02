@@ -256,6 +256,12 @@ uv run chimera fuse "Compare REST vs gRPC for a mobile backend." --show-panel
 
 Fusion is ~2-3× the cost of a single call, so reserve it for hard reasoning.
 
+> **Pick reliable panel models.** Fusion only pays off if every panel member actually
+> answers. Avoid OpenRouter `:free` model slugs in `CHIMERA_FUSION_PANEL` — they
+> rate-limit (HTTP 429) under real load, and the panel silently shrinks to whatever paid
+> model is left. A cheap, reliable trio: `openrouter/deepseek/deepseek-chat`,
+> `openrouter/openai/gpt-4o-mini`, `openrouter/meta-llama/llama-3.3-70b-instruct`.
+
 ### `solve` — Tier-2 autonomous (plan + verify-or-revert)
 
 Plans the task, executes with the agent loop, then **verifies with an
