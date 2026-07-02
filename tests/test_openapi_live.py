@@ -21,12 +21,24 @@ BASE_URL = "https://httpbin.org"
 
 
 def _fetch_spec(tmp_path: Path) -> dict:
+    """Fetch httpbin's spec, skipping (not failing) if the public API is having a bad day.
+
+    httpbin.org is a real third party — occasionally down, rate-limited, or serving a
+    non-JSON error page. A flaky dependency must not red the build, so we skip instead.
+    """
     import httpx
 
-    text = httpx.get(SPEC_URL, timeout=20.0).text
+    try:
+        resp = httpx.get(SPEC_URL, timeout=20.0)
+        resp.raise_for_status()
+    except httpx.HTTPError as exc:
+        pytest.skip(f"httpbin.org unreachable: {exc}")
     spec_path = tmp_path / "httpbin.openapi.json"
-    spec_path.write_text(text, encoding="utf-8")
-    return load_spec(spec_path)
+    spec_path.write_text(resp.text, encoding="utf-8")
+    try:
+        return load_spec(spec_path)
+    except ValueError as exc:  # includes json.JSONDecodeError — a non-JSON error page
+        pytest.skip(f"httpbin.org returned a non-JSON spec: {exc}")
 
 
 def test_import_real_openapi_and_register_tools(tmp_path: Path) -> None:
@@ -60,4 +72,6 @@ def test_call_a_generated_tool_live(tmp_path: Path) -> None:
     assert chosen is not None, "no zero-parameter GET operation found in the spec"
 
     result = chosen.run()  # a real HTTP request to httpbin
+    if result.startswith(("[502]", "[503]", "[504]", "error:")):
+        pytest.skip(f"httpbin.org transient upstream error: {result[:80]}")
     assert result.startswith("[200]"), result[:200]
