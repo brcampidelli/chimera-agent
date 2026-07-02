@@ -51,6 +51,38 @@ def test_run_shell_echo(tmp_path: Path) -> None:
     assert "[exit 0]" in out
 
 
+class _RecordingSandbox:
+    """Captures the (timeout, cwd) a shell call resolves to, without running anything."""
+
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    def run(self, command: str, *, timeout: int = 60, cwd: Path | None = None):  # type: ignore[no-untyped-def]
+        from chimera.sandbox.base import SandboxResult
+
+        self.calls.append({"command": command, "timeout": timeout, "cwd": cwd})
+        return SandboxResult(exit_code=0, stdout="ok")
+
+
+def test_run_shell_cwd_runs_in_subdir(tmp_path: Path) -> None:
+    (tmp_path / "sub").mkdir()
+    sandbox = _RecordingSandbox()
+    RunShellTool(tmp_path, sandbox=sandbox).run(command="ls", cwd="sub")
+    assert sandbox.calls[0]["cwd"] == (tmp_path / "sub").resolve()
+
+
+def test_run_shell_cwd_escape_is_blocked(tmp_path: Path) -> None:
+    out = RunShellTool(tmp_path).run(command="echo hi", cwd="../..")
+    assert out.startswith("error:")
+    assert "escapes the workspace" in out
+
+
+def test_run_shell_timeout_is_capped(tmp_path: Path) -> None:
+    sandbox = _RecordingSandbox()
+    RunShellTool(tmp_path, sandbox=sandbox, max_timeout=120).run(command="sleep 1", timeout=99999)
+    assert sandbox.calls[0]["timeout"] == 120  # clamped to the configured ceiling
+
+
 def test_http_get_mocked(monkeypatch: pytest.MonkeyPatch) -> None:
     import httpx
 
