@@ -390,8 +390,14 @@ def serve(
     telegram: bool = typer.Option(False, "--telegram", help="Serve on Telegram (needs CHIMERA_TELEGRAM_BOT_TOKEN)."),
     slack: bool = typer.Option(False, "--slack", help="Serve on Slack (needs CHIMERA_SLACK_BOT_TOKEN + CHIMERA_SLACK_APP_TOKEN + the 'messaging' extra)."),
     signal: bool = typer.Option(False, "--signal", help="Serve on Signal via a signal-cli-rest-api bridge (CHIMERA_SIGNAL_API_URL + CHIMERA_SIGNAL_NUMBER)."),
+    cron: bool = typer.Option(False, "--cron", help="Also run the cron daemon: fire scheduled jobs on the real clock (proactivity)."),
+    cron_tick: int = typer.Option(30, "--cron-tick", help="Seconds between cron scheduler ticks."),
 ) -> None:
-    """Run the messaging gateway on HTTP, Discord, Telegram, Slack or Signal. Requires a key."""
+    """Run the messaging gateway on HTTP, Discord, Telegram, Slack or Signal. Requires a key.
+
+    Add ``--cron`` to also fire scheduled jobs on a real clock — turning the reactive gateway
+    into an agent that acts on time (the daemon that makes proactivity real).
+    """
     from chimera.core import Agent, AgentConfig
     from chimera.interface import ChatSession
     from chimera.providers import LLMGateway
@@ -411,6 +417,7 @@ def serve(
         backend = RoutedBackend(llm, FusionEngine(llm))
 
     workspace_path = Path(workspace)
+    cron_stop = _start_cron_daemon(backend, model, max_steps, workspace_path, cron_tick) if cron else None
     shared_memory = None if no_memory else _memory_manager()
     shared_graph = _recall_graph(shared_memory)
     shared_profile = shared_memory.profile() if shared_memory is not None else ""
@@ -455,6 +462,29 @@ def serve(
         console.print("\n[dim]stopped[/dim]")
     finally:
         server.shutdown()
+        if cron_stop is not None:
+            cron_stop.set()
+
+
+def _start_cron_daemon(
+    backend: SupportsComplete, model: str | None, max_steps: int, workspace: Path, tick: int
+) -> Any:
+    """Start the cron daemon in a background thread; return its stop event."""
+    from chimera.core import Agent, AgentConfig
+    from chimera.scheduler import CronDaemon, Scheduler, make_agent_dispatch
+    from chimera.tools import default_registry
+
+    scheduler = Scheduler(_cron_store())
+
+    def run_task(task: str) -> str:
+        agent = Agent(backend, default_registry(workspace), AgentConfig(model=model, max_steps=max_steps))
+        return agent.run(task).answer
+
+    daemon = CronDaemon(scheduler, make_agent_dispatch(run_task), tick_seconds=tick)
+    _thread, stop = daemon.start()
+    jobs = len(scheduler.store.list())
+    console.print(f"[dim]cron daemon on (tick {tick}s, {jobs} job(s) scheduled)[/dim]")
+    return stop
 
 
 def _messaging_adapter(settings: Settings, platform: str) -> Any:
