@@ -1,5 +1,8 @@
 blank_issues_enabled: true
 contact_links:
+  - name: Questions & ideas
+    url: https://github.com/brcampidelli/chimera-agent/discussions
+    about: Ask a question, share what you built, or float an idea in Discussions.
   - name: Security vulnerability
     url: https://github.com/brcampidelli/chimera-agent/security/advisories/new
     about: Please report security issues privately (see SECURITY.md), not as public issues.
