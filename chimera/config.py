@@ -129,6 +129,12 @@ class Settings(BaseSettings):
     skill_cards: bool = Field(default=False, validation_alias="CHIMERA_SKILL_CARDS")
     skill_cards_k: int = Field(default=3, validation_alias="CHIMERA_SKILL_CARDS_K")
 
+    # --- Compact tool schemas at advertise-time (Improvement #5a): strip annotation
+    # noise and trim parameter prose from the `tools=` payload re-sent every ReAct step.
+    # Semantics preserved (name/type/required/enum kept). Off by default; the win is
+    # largest with verbose MCP/OpenAPI toolsets — measure with `chimera schema-bench`. ---
+    compact_schemas: bool = Field(default=False, validation_alias="CHIMERA_COMPACT_SCHEMAS")
+
     # --- Messaging bot tokens (only needed for the matching `chimera serve --<platform>`) ---
     discord_bot_token: str | None = Field(default=None, validation_alias="CHIMERA_DISCORD_BOT_TOKEN")
     telegram_bot_token: str | None = Field(default=None, validation_alias="CHIMERA_TELEGRAM_BOT_TOKEN")

@@ -314,6 +314,29 @@ The bench reports accuracy with vs without cards, the token delta, the card hit-
 accuracy split by hit/miss, with a PASS verdict when card accuracy stays within 1pp of the
 no-cards baseline.
 
+### Compact tool schemas (experimental)
+
+Tool schemas — especially those imported from MCP servers or OpenAPI specs — carry
+annotation noise (examples, titles, defaults, multi-sentence parameter prose, nested
+request bodies) that is re-sent to the model on **every** ReAct step. With
+`CHIMERA_COMPACT_SCHEMAS=on`, that noise is stripped and parameter descriptions trimmed
+at advertise-time, **without** touching anything that affects a call (the function name
+and description, and every schema's `type` / `properties` / `required` / `enum` are
+preserved). The canonical schemas are untouched — only the copy sent to the model shrinks.
+
+The saving is largest on verbose MCP/OpenAPI toolsets and compounds across every step;
+native tools are already terse, so their reduction is small. Measure your toolset first
+(no model calls — it just counts tokens):
+
+```bash
+uv run chimera schema-bench --demo                   # synthetic verbose tools, to see the effect
+uv run chimera schema-bench --openapi ./openapi.json # your real spec's tools
+```
+
+Off by default. Because compaction only removes annotation noise (never structure), the
+only risk is the model having slightly less prose to pick a tool by — so it stays
+conservative, and you should confirm tool-call behaviour on your workload before enabling.
+
 ### `solve` — Tier-2 autonomous (plan + verify-or-revert)
 
 Plans the task, executes with the agent loop, then **verifies with an

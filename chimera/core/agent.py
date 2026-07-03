@@ -29,6 +29,12 @@ DEFAULT_SYSTEM_PROMPT = (
 )
 
 
+def _default_compact_schemas() -> bool:
+    from chimera.config import get_settings
+
+    return get_settings().compact_schemas
+
+
 @dataclass
 class AgentConfig:
     """Tunable behaviour for an :class:`Agent` run."""
@@ -37,6 +43,9 @@ class AgentConfig:
     max_steps: int = 8
     temperature: float = 0.2
     system_prompt: str = DEFAULT_SYSTEM_PROMPT
+    # Defaults from CHIMERA_COMPACT_SCHEMAS so every construction site inherits the env
+    # setting; still overridable explicitly per Agent.
+    compact_schemas: bool = field(default_factory=_default_compact_schemas)
 
 
 @dataclass
@@ -68,7 +77,7 @@ class Agent:
             {"role": "system", "content": self.config.system_prompt},
             {"role": "user", "content": task},
         ]
-        tool_schema = self.tools.to_openai_schema() or None
+        tool_schema = self.tools.to_openai_schema(compact=self.config.compact_schemas) or None
         tool_calls_made = 0
 
         for step in range(1, self.config.max_steps + 1):

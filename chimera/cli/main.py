@@ -792,6 +792,60 @@ def skillcard_bench(
     )
 
 
+@app.command(name="schema-bench")
+def schema_bench(
+    openapi: str = typer.Option(
+        None, "--openapi", help="Path or URL to an OpenAPI spec to include (its tools are verbose)."
+    ),
+    demo: bool = typer.Option(
+        False, "--demo", help="Include a couple of synthetic verbose tools to show the effect."
+    ),
+    model: str = typer.Option(None, "--model", "-m", help="Tokenizer model (default: your default)."),
+) -> None:
+    """Measure tool-schema token cost, full vs compacted (advertise-time). No model calls."""
+    from chimera.eval.schema_ab import demo_bloated_schemas, run_schema_ab
+    from chimera.integrations.openapi import tools_from_openapi
+    from chimera.tools import default_registry
+
+    settings = get_settings()
+    schemas: list[dict[str, Any]] = default_registry(Path(".")).to_openai_schema()
+    if demo:
+        schemas += demo_bloated_schemas()
+    if openapi:
+        import json
+
+        if openapi.startswith(("http://", "https://")):
+            import httpx
+
+            text = httpx.get(openapi, timeout=30.0).text
+        else:
+            text = Path(openapi).read_text(encoding="utf-8")
+        try:
+            spec = json.loads(text)
+        except json.JSONDecodeError:
+            import yaml
+
+            spec = yaml.safe_load(text)
+        schemas += [tool.to_openai_schema() for tool in tools_from_openapi(spec)]
+
+    report = run_schema_ab(schemas, model=model or settings.default_model)
+    table = Table(title=f"tool-schema compaction ({len(report.rows)} tools)")
+    table.add_column("tool")
+    table.add_column("full tok", justify="right")
+    table.add_column("compact tok", justify="right")
+    table.add_column("saved", justify="right")
+    for row in report.rows:
+        saved = row.full_tokens - row.compact_tokens
+        pct = f"{saved / row.full_tokens * 100:.0f}%" if row.full_tokens else "0%"
+        table.add_row(row.tool, str(row.full_tokens), str(row.compact_tokens), f"{saved} ({pct})")
+    console.print(table)
+    s = report.summary()
+    console.print(
+        f"[dim]full {int(s['full_tokens'])} tok → compact {int(s['compact_tokens'])} tok · "
+        f"reduction {s['reduction_pct']}% across {int(s['tools'])} tools[/dim]"
+    )
+
+
 @app.command()
 def solve(
     task: str = typer.Argument(..., help="The task to solve autonomously."),
