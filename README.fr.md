@@ -12,6 +12,7 @@
 [![Checked with mypy](https://img.shields.io/badge/mypy-strict-2a6db2.svg)](https://mypy-lang.org/)
 [![Linted with Ruff](https://img.shields.io/badge/lint-ruff-261230.svg)](https://github.com/astral-sh/ruff)
 [![Discord](https://img.shields.io/badge/Discord-rejoindre-5865F2.svg?logo=discord&logoColor=white)](https://discord.gg/ACvBbrmguV)
+[![Reddit](https://img.shields.io/badge/Reddit-r%2FChimeraAgent-FF4500.svg?logo=reddit&logoColor=white)](https://www.reddit.com/r/ChimeraAgent/)
 ![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)
 [![Donate](https://img.shields.io/badge/Donate-Stripe-635BFF.svg?logo=stripe&logoColor=white)](https://donate.stripe.com/9B63cofM491m4SBfe177O00)
 
@@ -233,6 +234,8 @@ Vous avez trouvé un problème de sécurité ? Voir [SECURITY.md](SECURITY.md).
 ## Communauté
 
 Une question, une idée, ou l'envie de contribuer ? **[Rejoignez-nous sur Discord](https://discord.gg/ACvBbrmguV)** — tout le monde est le bienvenu.
+
+Plutôt Reddit ? Suivez **[r/ChimeraAgent](https://www.reddit.com/r/ChimeraAgent/)** pour les nouveautés et les discussions.
 
 ## Soutenir le projet
 

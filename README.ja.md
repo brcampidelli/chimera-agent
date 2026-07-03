@@ -12,6 +12,7 @@
 [![Checked with mypy](https://img.shields.io/badge/mypy-strict-2a6db2.svg)](https://mypy-lang.org/)
 [![Linted with Ruff](https://img.shields.io/badge/lint-ruff-261230.svg)](https://github.com/astral-sh/ruff)
 [![Discord](https://img.shields.io/badge/Discord-join-5865F2.svg?logo=discord&logoColor=white)](https://discord.gg/ACvBbrmguV)
+[![Reddit](https://img.shields.io/badge/Reddit-r%2FChimeraAgent-FF4500.svg?logo=reddit&logoColor=white)](https://www.reddit.com/r/ChimeraAgent/)
 ![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)
 [![Donate](https://img.shields.io/badge/Donate-Stripe-635BFF.svg?logo=stripe&logoColor=white)](https://donate.stripe.com/9B63cofM491m4SBfe177O00)
 
@@ -226,6 +227,8 @@ uv run pytest -q         # テストスイート
 ## コミュニティ
 
 質問、アイデア、あるいは貢献したいことがありますか？ **[Discord に参加してください](https://discord.gg/ACvBbrmguV)** —— どなたでも歓迎します。
+
+Reddit 派ですか？ アップデートやディスカッションは **[r/ChimeraAgent](https://www.reddit.com/r/ChimeraAgent/)** で。
 
 ## プロジェクトを支援する
 
