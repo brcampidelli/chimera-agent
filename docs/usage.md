@@ -258,17 +258,25 @@ Fusion is ~2-3× the cost of a single call, so reserve it for hard reasoning. `f
 also prints the per-stage token cost (panel / judge / synth) so you can see where a
 run's tokens actually go.
 
-**Selective fusion (opt-in, saves tokens).** Set `CHIMERA_FUSION_MODE=selective` (or pass
-`--selective`) to probe the first `CHIMERA_FUSION_PROBE_K` panel models (default 2) and,
-when their answers agree closely, skip the rest of the panel *and* the judge — synthesizing
-straight from the agreeing answers. The agreement check is a cheap local text comparison
-(no extra model call), so a *disagreeing* turn costs exactly the same as full fusion while
-an *agreeing* turn is cheaper. Tune the bar with `CHIMERA_FUSION_AGREEMENT` (0–1, default
-0.8). Off by default; measure the accuracy/token trade-off on your workload with
-`chimera fusion-bench` before turning it on globally.
+**Selective fusion (ON by default, saves tokens).** The engine probes the first
+`CHIMERA_FUSION_PROBE_K` panel models (default 2) and, when their answers agree closely,
+skips the rest of the panel *and* the judge — synthesizing straight from the agreeing
+answers. The agreement check is a cheap local text comparison (no extra model call), so a
+*disagreeing* turn escalates to the full pipeline and costs exactly the same as full fusion,
+while an *agreeing* turn is cheaper. Tune the bar with `CHIMERA_FUSION_AGREEMENT` (0–1,
+default 0.8), or set `CHIMERA_FUSION_MODE=full` (or pass `--full`) to always run the whole
+panel + judge.
+
+Why it is the default: across 3 runs of `chimera fusion-bench --tasks hard` (a paid
+3-model panel) it cut tokens **~20–28%** and was correct on **every** turn it actually
+short-circuited (16/16). Overall accuracy wobbled 0 to −8.3pp between runs, but that
+variance lands entirely in the *escalated* bucket — where selective runs the identical
+pipeline to full — so it is model nondeterminism, not a cost of early-stopping. Run the
+bench on your own workload to see the trade-off for your panel and tasks:
 
 ```bash
-uv run chimera fuse "What is 12 * 12?" --selective --show-panel   # likely early-stops
+uv run chimera fuse "What is 12 * 12?" --show-panel   # likely early-stops
+uv run chimera fusion-bench --tasks hard              # full vs selective, tokens + accuracy
 ```
 
 > **Pick reliable panel models.** Fusion only pays off if every panel member actually
