@@ -13,6 +13,7 @@ import re
 from collections.abc import Callable
 from typing import Any
 
+from chimera.evolution.edit_diagnostic import classify_edit
 from chimera.evolution.learned_skill import LearnedSkill, SkillKind
 from chimera.governance.validator import SkillValidator
 from chimera.providers.gateway import Message, SupportsComplete
@@ -179,10 +180,15 @@ class SkillEvolver:
         ).content
         data = _parse_json(raw)
         if data and "prompt_template" in data:
+            new_template = str(data["prompt_template"])
+            # Telemetry label only (EvoPolicyGym): did this refinement change the mechanism
+            # or just tweak constants? Meaningful only for code-bearing templates; prose
+            # templates report 'unknown'. Never used as an accept/reject gate.
+            _log.debug("refine %s edit class: %s", skill.name, classify_edit(skill.prompt_template, new_template))
             return LearnedSkill(
                 name=skill.name,
                 description=skill.description,
-                prompt_template=str(data["prompt_template"]),
+                prompt_template=new_template,
                 version=_bump(skill.version),
                 backend=self.backend,
                 model=self.model,
