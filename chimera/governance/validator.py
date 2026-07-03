@@ -38,15 +38,29 @@ class SkillValidator:
             reasons.append("name must be snake_case (2-41 chars, start with a letter)")
 
         template = str(data.get("prompt_template") or "")
-        if not template.strip():
+        do = str(data.get("do") or "")
+        check = str(data.get("check") or "")
+        # An advisory card (an anti-pattern lesson, or any card with no executable
+        # template) is retrieval-only: it needs Do + Check instead of a template.
+        is_advisory = data.get("kind") == "anti_pattern" or (not template.strip() and do.strip())
+        if is_advisory:
+            if not do.strip():
+                reasons.append("advisory card missing Do")
+            if not check.strip():
+                reasons.append("advisory card missing Check")
+        elif not template.strip():
             reasons.append("prompt_template is empty")
-        elif len(template) > _MAX_TEMPLATE_CHARS:
+        if len(template) > _MAX_TEMPLATE_CHARS:
             reasons.append(f"prompt_template exceeds {_MAX_TEMPLATE_CHARS} chars")
 
-        lowered = template.lower()
+        # Scan the template AND every card field for forbidden phrases.
+        scan = " ".join(
+            str(data.get(field) or "")
+            for field in ("prompt_template", "trigger", "do", "avoid", "check", "risk")
+        ).lower()
         for phrase in _FORBIDDEN_PHRASES:
-            if phrase in lowered:
-                reasons.append(f"forbidden phrase in template: {phrase!r}")
+            if phrase in scan:
+                reasons.append(f"forbidden phrase: {phrase!r}")
 
         if not str(data.get("description") or "").strip():
             reasons.append("description is empty")

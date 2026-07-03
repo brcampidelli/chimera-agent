@@ -14,6 +14,12 @@ PROPOSAL = (
     '{"name": "summarize_text", "description": "summarize text", '
     '"prompt_template": "Summarize {text}."}'
 )
+ANTI_PATTERN = (
+    '{"name": "off_by_one", "description": "fencepost error in loop bounds", '
+    '"trigger": "iterating with an index", "do": "iterate 0..n-1", '
+    '"avoid": "iterating 0..n", "check": "index never equals the length", '
+    '"risk": "empty collections", "triggers": ["loop", "index", "bound"]}'
+)
 
 
 class ScriptedBackend:
@@ -67,3 +73,27 @@ def test_existing_skill_is_not_duplicated(tmp_path: Path) -> None:
     # a second proposal of the same name is skipped
     assert _auto(ScriptedBackend([PROPOSAL, "out"]), store).maybe_evolve("t", "s", 2) is None
     assert len(store) == 1
+
+
+def test_evolves_anti_pattern_card_on_recurring_failure(tmp_path: Path) -> None:
+    store = SkillStore(tmp_path / "s.json")
+    auto = _auto(ScriptedBackend([ANTI_PATTERN]), store, validator=SkillValidator())
+    card = auto.maybe_evolve_failure("loop task", "off by one again", prior_failures=2)
+    assert card is not None and card.kind == "anti_pattern" and card.name == "off_by_one"
+    assert card.do and card.check  # the corrective content the injection will surface
+    assert "off_by_one" in store
+
+
+def test_no_anti_pattern_below_recurrence(tmp_path: Path) -> None:
+    store = SkillStore(tmp_path / "s.json")
+    auto = _auto(ScriptedBackend([ANTI_PATTERN]), store)
+    assert auto.maybe_evolve_failure("t", "d", prior_failures=1) is None
+    assert len(store) == 0  # a one-off failure does not spawn a card
+
+
+def test_anti_pattern_missing_check_is_discarded(tmp_path: Path) -> None:
+    store = SkillStore(tmp_path / "s.json")
+    no_check = '{"name": "x_bad", "description": "d", "do": "something", "avoid": "y"}'
+    auto = _auto(ScriptedBackend([no_check]), store, validator=SkillValidator())
+    assert auto.maybe_evolve_failure("t", "d", prior_failures=2) is None
+    assert len(store) == 0  # TRS rule: an anti-pattern card needs Do + Check

@@ -64,6 +64,44 @@ def test_evolver_proposes_skill() -> None:
     assert "{name}" in skill.prompt_template
 
 
+_CARD_PROPOSAL = (
+    '{"name": "greet_person", "description": "greet", "prompt_template": "Greet {name}.", '
+    '"trigger": "meeting someone", "do": "say hi by name", "avoid": "being cold", '
+    '"check": "the name is included", "risk": "wrong name", "triggers": ["greet", "hello"]}'
+)
+
+
+def test_propose_populates_card_fields() -> None:
+    skill = SkillEvolver(RoutingBackend(proposal=_CARD_PROPOSAL)).propose("greet", "hi")
+    assert skill is not None
+    assert skill.do == "say hi by name"
+    assert skill.check == "the name is included"
+    assert skill.triggers == ["greet", "hello"]
+    assert skill.kind == "pattern"
+
+
+class _FixedBackend:
+    """Returns the same content for any call (routing by system prompt not needed here)."""
+
+    def __init__(self, content: str) -> None:
+        self.content = content
+
+    def complete(self, messages: list[Any], **kwargs: Any) -> CompletionResult:
+        return CompletionResult(content=self.content, model="fake")
+
+
+def test_propose_failure_card_is_anti_pattern() -> None:
+    anti = (
+        '{"name": "off_by_one", "description": "fencepost", "do": "iterate 0..n-1", '
+        '"avoid": "0..n", "check": "index < length", "triggers": ["loop"]}'
+    )
+    card = SkillEvolver(_FixedBackend(anti)).propose_failure_card("loop", "off by one")
+    assert card is not None
+    assert card.kind == "anti_pattern"
+    assert card.prompt_template == ""  # advisory: not executable
+    assert card.do and card.check
+
+
 def test_evolve_keeps_passing_skill() -> None:
     evolver = SkillEvolver(RoutingBackend(skill_output="OUTPUT"))
     kept = evolver.evolve(

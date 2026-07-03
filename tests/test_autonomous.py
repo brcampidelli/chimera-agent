@@ -336,6 +336,35 @@ def test_auto_evolver_not_fired_on_failure(tmp_path: Path) -> None:
     assert evolver.calls == []  # no skill evolution from unverified work
 
 
+class RecordingFailureEvolver(RecordingEvolver):
+    def __init__(self) -> None:
+        super().__init__()
+        self.failure_calls: list[tuple[str, str, int]] = []
+
+    def maybe_evolve_failure(self, task: str, detail: str, prior_failures: int) -> object:
+        self.failure_calls.append((task, detail, prior_failures))
+        return None
+
+
+def test_anti_pattern_evolver_fired_on_recurring_failure(tmp_path: Path) -> None:
+    buf = ExperienceBuffer(tmp_path / "exp.json")
+    buf.record("flaky task", "failure", "")
+    buf.record("flaky task", "failure", "")  # 2 prior failures
+    evolver = RecordingFailureEvolver()
+    auto = AutonomousAgent(
+        FakeWorker(workspace=tmp_path, filename="x.txt"),
+        verifier=FailVerifier(),
+        guard=WorkspaceGuard(tmp_path),
+        experience=buf,
+        auto_evolver=evolver,
+        config=AutonomousConfig(max_attempts=1, use_planner=False),
+    )
+    auto.run("flaky task")
+    assert len(evolver.failure_calls) == 1
+    assert evolver.failure_calls[0][2] == 2  # prior failures counted before this run
+    assert evolver.calls == []  # the success path was not fired
+
+
 def test_plan_is_attached() -> None:
     auto = AutonomousAgent(
         FakeWorker(),

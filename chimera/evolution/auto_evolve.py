@@ -66,6 +66,31 @@ class AutoSkillEvolver:
             return self._evolve_collective(task, solution)
         return self._evolve_single(task, solution)
 
+    def maybe_evolve_failure(
+        self, task: str, detail: str, prior_failures: int
+    ) -> LearnedSkill | None:
+        """Distill a RECURRING failure into an advisory anti-pattern card.
+
+        Gated on recurrence (so a one-off failure doesn't spawn a card) and on the
+        governance validator. There is no executable smoke test — an anti-pattern card is
+        advisory (injected into reasoning, never run), so a bad card can only mislead, not
+        act, and the verify-or-revert loop still decides success.
+        """
+        if prior_failures < self.min_recurrences:
+            return None
+        card = self.evolver.propose_failure_card(task, detail)
+        if card is None:
+            return None
+        if card.name in self.store:
+            _log.debug("anti-pattern card %s already exists; skipping", card.name)
+            return None
+        if self.validator is not None and not self.validator.validate(card.to_dict()).accepted:
+            _log.debug("rejected anti-pattern card %s (failed validation)", card.name)
+            return None
+        self.store.add(card)
+        _log.debug("kept anti-pattern card %s", card.name)
+        return card
+
     def _evolve_single(self, task: str, solution: str) -> LearnedSkill | None:
         candidate = self.evolver.propose(task, solution)
         if candidate is None:

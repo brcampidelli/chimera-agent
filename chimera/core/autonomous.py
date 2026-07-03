@@ -120,9 +120,11 @@ class AutonomousAgent:
         # decides success, so a misleading lesson can't corrupt the workspace.
         lessons = self._recall_lessons(task)
         context = "\n\n".join(part for part in (spine, lessons) if part)
-        # how many times this task pattern has already succeeded (before this run) —
-        # the recurrence signal that gates auto-skill-evolution
+        # how many times this task pattern has already succeeded / failed (before this
+        # run) — the recurrence signals that gate auto-skill-evolution (a pattern card on
+        # recurring success, an anti-pattern card on recurring failure)
         prior_successes = self._count_prior_successes(task)
+        prior_failures = self._count_prior_failures(task)
         plan = (
             self.planner.plan(task, context=context)
             if self.planner and self.config.use_planner
@@ -183,6 +185,14 @@ class AutonomousAgent:
             if hint:
                 feedback = f"{feedback}\n\n{hint}" if feedback else hint
 
+        # The run ultimately failed: if this failure pattern recurs, distill an advisory
+        # anti-pattern card so future attempts are warned. Guarded — the capability is
+        # optional, so an evolver that only learns from successes is left untouched.
+        if self.auto_evolver is not None:
+            evolve_failure = getattr(self.auto_evolver, "maybe_evolve_failure", None)
+            if callable(evolve_failure):
+                evolve_failure(task, feedback, prior_failures)
+
         last = attempts[-1].answer if attempts else ""
         return AutonomousResult(answer=last, success=False, attempts=attempts, plan=plan)
 
@@ -195,6 +205,11 @@ class AutonomousAgent:
         if self.experience is None:
             return 0
         return sum(1 for exp in self.experience.relevant(task, k=25) if exp.outcome == "success")
+
+    def _count_prior_failures(self, task: str) -> int:
+        if self.experience is None:
+            return 0
+        return sum(1 for exp in self.experience.relevant(task, k=25) if exp.outcome == "failure")
 
     def _remember_success(self, task: str, answer: str) -> None:
         """On a verified success, curate one deduped long-term memory fact.
