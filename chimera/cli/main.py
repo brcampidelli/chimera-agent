@@ -969,6 +969,7 @@ def solve(
                         if fuse and len(settings.fusion_panel) >= 2
                         else None
                     ),
+                    accept_mode=settings.skill_accept_mode,
                 )
             ),
             cards=(

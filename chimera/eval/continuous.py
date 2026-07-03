@@ -16,6 +16,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Protocol
 
+from chimera.eval.anytime import Z95, proportion_diff_ci
 from chimera.providers.gateway import Message, SupportsComplete
 
 
@@ -75,6 +76,35 @@ class EvolutionReport:
         first, second = self.half_rates()
         return first - second
 
+    def _halves(self) -> tuple[list[TaskOutcome], list[TaskOutcome]]:
+        mid = self.total // 2
+        return self.outcomes[:mid], self.outcomes[mid:]
+
+    def degradation_ci(self, z: float = Z95) -> tuple[float, float]:
+        """Confidence interval on the degradation (first-half minus second-half pass rate).
+
+        A point ``degradation`` of 0.2 on a short chain is usually noise; this band says
+        how much of it is real. A lower bound > 0 means the second half is significantly
+        worse — an anytime-honest degradation signal instead of a bare subtraction.
+        """
+        first, second = self._halves()
+        if not first or not second:
+            return (0.0, 0.0)
+        s1 = sum(1 for o in first if o.passed)
+        s2 = sum(1 for o in second if o.passed)
+        return proportion_diff_ci(s1, len(first), s2, len(second), z)
+
+    def degraded_significantly(self, z: float = Z95, min_n: int = 8) -> bool | None:
+        """True if degradation is statistically significant; None if the sample is too small.
+
+        Guarded by ``min_n`` per half — below it the interval is uselessly wide, so we
+        return None ('cannot say') rather than a false negative.
+        """
+        first, second = self._halves()
+        if len(first) < min_n or len(second) < min_n:
+            return None
+        return self.degradation_ci(z)[0] > 0.0
+
     @property
     def longest_pass_streak(self) -> int:
         best = current = 0
@@ -85,12 +115,18 @@ class EvolutionReport:
 
     def summary(self) -> dict[str, float]:
         first, second = self.half_rates()
+        ci_low, ci_high = self.degradation_ci()
+        sig = self.degraded_significantly()
         return {
             "total": float(self.total),
             "pass_rate": round(self.pass_rate, 3),
             "first_half": round(first, 3),
             "second_half": round(second, 3),
             "degradation": round(self.degradation, 3),
+            "degradation_ci_low": round(ci_low, 3),
+            "degradation_ci_high": round(ci_high, 3),
+            # 1.0 = significantly degraded, 0.0 = not, -1.0 = sample too small to say
+            "degraded_significant": 1.0 if sig else (0.0 if sig is False else -1.0),
             "longest_streak": float(self.longest_pass_streak),
         }
 

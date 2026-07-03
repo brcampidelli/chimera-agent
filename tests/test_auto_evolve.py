@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from chimera.evolution import AutoSkillEvolver, SkillEvolver, SkillStore
+from chimera.evolution import AutoSkillEvolver, LearnedSkill, SkillEvolver, SkillStore
 from chimera.governance.validator import SkillValidator
 from chimera.providers import CompletionResult
 
@@ -97,3 +97,46 @@ def test_anti_pattern_missing_check_is_discarded(tmp_path: Path) -> None:
     auto = _auto(ScriptedBackend([no_check]), store, validator=SkillValidator())
     assert auto.maybe_evolve_failure("t", "d", prior_failures=2) is None
     assert len(store) == 0  # TRS rule: an anti-pattern card needs Do + Check
+
+
+class FakeCollective:
+    """A collective evolver stub with a fixed candidate and a fixed (passed, n) transfer."""
+
+    def __init__(self, candidate: LearnedSkill, counts: tuple[int, int]) -> None:
+        self.candidate = candidate
+        self.counts = counts
+
+    def propose_collective(self, task: str, solution: str) -> list[LearnedSkill]:
+        return [self.candidate]
+
+    def transfer_counts(self, skill: Any, test_input: Any, check: Any) -> tuple[int, int]:
+        return self.counts
+
+    def transferability(self, skill: Any, test_input: Any, check: Any) -> float:
+        passed, n = self.counts
+        return passed / n if n else 0.0
+
+
+def _collective_auto(counts: tuple[int, int], mode: str, store: SkillStore) -> AutoSkillEvolver:
+    candidate = LearnedSkill(name="lucky_skill", description="d", prompt_template="do {x}")
+    return AutoSkillEvolver(
+        SkillEvolver(ScriptedBackend([])),
+        store,
+        collective=FakeCollective(candidate, counts),  # type: ignore[arg-type]
+        min_recurrences=2,
+        accept_mode=mode,
+    )
+
+
+def test_point_mode_accepts_lucky_two_of_three(tmp_path: Path) -> None:
+    store = SkillStore(tmp_path / "s.json")
+    # frac 2/3 = 0.67 >= 0.5 -> accepted under the raw point estimate
+    assert _collective_auto((2, 3), "point", store).maybe_evolve("t", "s", 2) is not None
+    assert "lucky_skill" in store
+
+
+def test_wilson_mode_rejects_lucky_two_of_three(tmp_path: Path) -> None:
+    store = SkillStore(tmp_path / "s.json")
+    # Wilson lower bound of 2/3 is ~0.21 < 0.5 -> rejected as small-sample luck
+    assert _collective_auto((2, 3), "wilson", store).maybe_evolve("t", "s", 2) is None
+    assert len(store) == 0

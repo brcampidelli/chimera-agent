@@ -129,6 +129,12 @@ class Settings(BaseSettings):
     skill_cards: bool = Field(default=False, validation_alias="CHIMERA_SKILL_CARDS")
     skill_cards_k: int = Field(default=3, validation_alias="CHIMERA_SKILL_CARDS_K")
 
+    # --- How the collective skill-accept gate scores cross-model transfer: "point" (the
+    # raw pass fraction, default) or "wilson" (the lower Wilson confidence bound, so a
+    # lucky small-sample pass no longer clears the threshold). "wilson" is strict on tiny
+    # panels — use it with panels >= ~5, or lower CHIMERA_SKILL_MIN_TRANSFER. ---
+    skill_accept_mode: str = Field(default="point", validation_alias="CHIMERA_SKILL_ACCEPT_MODE")
+
     # --- Compact tool schemas at advertise-time (Improvement #5a): strip annotation
     # noise and trim parameter prose from the `tools=` payload re-sent every ReAct step.
     # Semantics preserved (name/type/required/enum kept). Off by default; the win is

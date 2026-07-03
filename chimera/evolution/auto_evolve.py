@@ -19,6 +19,7 @@ from __future__ import annotations
 import string
 from typing import TYPE_CHECKING
 
+from chimera.eval.anytime import wilson_lower
 from chimera.evolution.evolver import SkillEvolver
 from chimera.evolution.learned_skill import LearnedSkill
 from chimera.evolution.skill_store import SkillStore
@@ -47,6 +48,7 @@ class AutoSkillEvolver:
         min_recurrences: int = 2,
         collective: CollectiveSkillEvolver | None = None,
         min_transfer: float = 0.5,
+        accept_mode: str = "point",
     ) -> None:
         self.evolver = evolver
         self.store = store
@@ -57,6 +59,9 @@ class AutoSkillEvolver:
         # single-model proposal. Falls back to single-model when unset.
         self.collective = collective
         self.min_transfer = min_transfer
+        # "point" (raw pass fraction) or "wilson" (lower confidence bound on the
+        # fraction) — the honesty upgrade that stops a lucky small-sample pass counting.
+        self.accept_mode = accept_mode
 
     def maybe_evolve(self, task: str, solution: str, prior_successes: int) -> LearnedSkill | None:
         """Return the kept skill, or None if not recurring / rejected / untested."""
@@ -124,18 +129,29 @@ class AutoSkillEvolver:
         assert self.collective is not None
         best: LearnedSkill | None = None
         best_score = -1.0
+        best_frac = 0.0
         for candidate in self.collective.propose_collective(task, solution):
             if candidate.name in self.store:
                 continue
             if self.validator is not None and not self.validator.validate(candidate.to_dict()).accepted:
                 continue
             test_input = {field: task for field in _placeholders(candidate.prompt_template)}
-            score = self.collective.transferability(candidate, test_input, lambda out: bool(out.strip()))
+            passed, n = self.collective.transfer_counts(
+                candidate, test_input, lambda out: bool(out.strip())
+            )
+            frac = passed / n if n else 0.0
+            # "wilson" gates on the lower confidence bound, so a 2/3 fluke (frac 0.67 but
+            # bound ~0.21) no longer clears a 0.5 threshold; "point" is the raw fraction.
+            score = wilson_lower(passed, n) if self.accept_mode == "wilson" else frac
+            _log.debug(
+                "collective candidate %s: %d/%d (frac=%.2f gate=%.2f mode=%s)",
+                candidate.name, passed, n, frac, score, self.accept_mode,
+            )
             if score > best_score:
-                best, best_score = candidate, score
+                best, best_score, best_frac = candidate, score, frac
         if best is None or best_score < self.min_transfer:
-            _log.debug("no transferable auto-skill kept (best=%.2f)", best_score)
+            _log.debug("no transferable auto-skill kept (best gate=%.2f)", best_score)
             return None
         self.store.add(best)
-        _log.debug("kept collective auto-skill %s (transfer=%.2f)", best.name, best_score)
+        _log.debug("kept collective auto-skill %s (frac=%.2f gate=%.2f)", best.name, best_frac, best_score)
         return best

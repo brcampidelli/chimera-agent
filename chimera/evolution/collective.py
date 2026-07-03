@@ -45,19 +45,26 @@ class CollectiveSkillEvolver:
                 candidates.append(skill)
         return candidates
 
-    def transferability(
+    def transfer_counts(
         self, skill: LearnedSkill, test_input: dict[str, str], check: Callable[[str], bool]
-    ) -> float:
-        """Fraction of panel models on which the skill runs and passes its check."""
+    ) -> tuple[int, int]:
+        """(passed, n): how many panel models the skill runs+passes on, out of the panel."""
         if not self.panel_models:
-            return 0.0
+            return (0, 0)
         passed = 0
         for model in self.panel_models:
             variant = LearnedSkill.from_dict(skill.to_dict(), backend=self.backend, model=model)
             result = variant.execute(**test_input)
             if result.ok and check(result.output):
                 passed += 1
-        return passed / len(self.panel_models)
+        return passed, len(self.panel_models)
+
+    def transferability(
+        self, skill: LearnedSkill, test_input: dict[str, str], check: Callable[[str], bool]
+    ) -> float:
+        """Fraction of panel models on which the skill runs and passes its check."""
+        passed, n = self.transfer_counts(skill, test_input, check)
+        return passed / n if n else 0.0
 
     def evolve_collective(
         self,

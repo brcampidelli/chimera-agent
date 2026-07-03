@@ -425,6 +425,15 @@ uv run chimera bench --chain --limit 6   # stateful chain (error propagation)
 uv run chimera bench --fuse              # use fusion as the solver
 ```
 
+The report also carries a **statistically honest** degradation flag: rather than trusting
+a bare first-minus-second-half subtraction (on a short chain a 0.2 swing is usually
+noise), `degraded_significant` is only `1.0` when a Wilson confidence interval on the
+drop excludes zero, `-1.0` when the sample is too small to say, and `0.0` otherwise —
+plus the `degradation_ci_low/high` bounds. Separately, `CHIMERA_SKILL_ACCEPT_MODE=wilson`
+gates the cross-model skill-accept decision on the *lower* confidence bound of the
+transfer rate (so a lucky 2-of-3 pass no longer counts); default `point` keeps the raw
+rate, since the Wilson bound is strict on tiny panels.
+
 ### `memory` — curated long-term memory
 
 ```bash
