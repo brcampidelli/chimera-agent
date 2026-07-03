@@ -9,6 +9,7 @@ from chimera.fusion.engine import (
     FusionEngine,
     FusionTrace,
     PanelResponse,
+    StageUsage,
 )
 from chimera.fusion.router import RoutedBackend, RoutingPolicy
 
@@ -17,6 +18,7 @@ __all__ = [
     "FusionConfig",
     "FusionTrace",
     "PanelResponse",
+    "StageUsage",
     "RoutedBackend",
     "RoutingPolicy",
 ]

@@ -41,6 +41,43 @@ def test_fusion_complete_returns_final() -> None:
     assert result.model == "fusion"
 
 
+class TokenBackend:
+    """Backend that reports token usage, to exercise per-stage telemetry (#4)."""
+
+    def complete(self, messages: list[Any], *, model: str | None = None, **kwargs: Any) -> CompletionResult:
+        if model == "judge":
+            return CompletionResult(content="JUDGE", model="judge", prompt_tokens=10, completion_tokens=5)
+        if model == "synth":
+            return CompletionResult(content="FINAL", model="synth", prompt_tokens=8, completion_tokens=4)
+        return CompletionResult(
+            content=f"panel:{model}", model=str(model), prompt_tokens=6, completion_tokens=3
+        )
+
+
+def test_fusion_captures_stage_tokens() -> None:
+    trace = FusionEngine(TokenBackend(), CONFIG).run([{"role": "user", "content": "hi"}])
+    assert len(trace.usage) == 4  # 2 panel + judge + synth
+    assert trace.prompt_tokens() == 6 + 6 + 10 + 8
+    assert trace.completion_tokens() == 3 + 3 + 5 + 4
+    assert trace.total_tokens() == (6 + 6 + 10 + 8) + (3 + 3 + 5 + 4)
+    assert trace.by_stage()["panel"] == (12, 6)
+
+
+def test_fusion_complete_propagates_tokens() -> None:
+    result = FusionEngine(TokenBackend(), CONFIG).complete([{"role": "user", "content": "hi"}])
+    assert result.content == "FINAL" and result.model == "fusion"
+    assert result.prompt_tokens == 6 + 6 + 10 + 8
+    assert result.completion_tokens == 3 + 3 + 5 + 4
+
+
+def test_fusion_usage_none_safe() -> None:
+    # A backend that reports no usage (the default fake) must not fabricate zeros.
+    trace = FusionEngine(FakeBackend(), CONFIG).run([{"role": "user", "content": "hi"}])
+    assert trace.total_tokens() is None
+    result = FusionEngine(FakeBackend(), CONFIG).complete([{"role": "user", "content": "hi"}])
+    assert result.prompt_tokens is None and result.completion_tokens is None
+
+
 def test_fusion_tolerates_one_panel_failure() -> None:
     trace = FusionEngine(FakeBackend({"m2"}), CONFIG).run([{"role": "user", "content": "hi"}])
     errored = [r for r in trace.panel if r.error]

@@ -652,14 +652,25 @@ def fuse(
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
+    total = trace.total_tokens()
     if show_panel:
         for response in trace.panel:
             body = response.error or response.content
             console.print(Panel(body, title=f"panel: {response.model}", title_align="left"))
         console.print(Panel(trace.judge_analysis, title="judge", title_align="left"))
         console.print(Panel(trace.final, title="[bold green]final[/bold green]", title_align="left"))
+        if total is not None:
+            by = trace.by_stage()
+            rows = "  ".join(
+                f"{stage}={by[stage][0]}/{by[stage][1]}"
+                for stage in ("panel", "judge", "synth")
+                if stage in by
+            )
+            console.print(f"[dim]tokens in/out — {rows}  ·  total {total}[/dim]")
     else:
         console.print(trace.final)
+        if total is not None:
+            console.print(f"[dim]fusion total tokens: {total}[/dim]")
 
 
 @app.command()

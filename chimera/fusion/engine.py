@@ -14,9 +14,10 @@ tool-calling — fusion is for hard reasoning/synthesis; tool turns stay single-
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, field
+from typing import Any, Literal
 
 from chimera.config import get_settings
 from chimera.providers.gateway import CompletionResult, Message, MessageLike, SupportsComplete
@@ -38,6 +39,12 @@ _SYNTH_SYSTEM = (
 )
 
 
+def _sum_opt(values: Iterable[int | None]) -> int | None:
+    """Sum the reported values; ``None`` if none were reported (never fabricate 0)."""
+    reported = [v for v in values if v is not None]
+    return sum(reported) if reported else None
+
+
 @dataclass
 class PanelResponse:
     """One panel model's answer (or its error)."""
@@ -45,6 +52,18 @@ class PanelResponse:
     model: str
     content: str = ""
     error: str | None = None
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+
+
+@dataclass
+class StageUsage:
+    """Token usage for one fusion stage (a panel model, the judge, or the synthesizer)."""
+
+    stage: Literal["panel", "judge", "synth"]
+    model: str
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
 
 
 @dataclass
@@ -54,9 +73,33 @@ class FusionTrace:
     panel: list[PanelResponse]
     judge_analysis: str
     final: str
+    usage: list[StageUsage] = field(default_factory=list)
 
     def successful_panel(self) -> list[PanelResponse]:
         return [r for r in self.panel if r.error is None]
+
+    def prompt_tokens(self) -> int | None:
+        """Total input tokens across stages, or ``None`` if no stage reported usage."""
+        return _sum_opt(u.prompt_tokens for u in self.usage)
+
+    def completion_tokens(self) -> int | None:
+        """Total output tokens across stages, or ``None`` if no stage reported usage."""
+        return _sum_opt(u.completion_tokens for u in self.usage)
+
+    def total_tokens(self) -> int | None:
+        """Prompt + completion tokens, or ``None`` if usage was never reported."""
+        p, c = self.prompt_tokens(), self.completion_tokens()
+        if p is None and c is None:
+            return None
+        return (p or 0) + (c or 0)
+
+    def by_stage(self) -> dict[str, tuple[int, int]]:
+        """Aggregate ``(prompt, completion)`` tokens per stage name."""
+        agg: dict[str, tuple[int, int]] = {}
+        for u in self.usage:
+            p, c = agg.get(u.stage, (0, 0))
+            agg[u.stage] = (p + (u.prompt_tokens or 0), c + (u.completion_tokens or 0))
+        return agg
 
 
 @dataclass
@@ -96,9 +139,16 @@ class FusionEngine:
     def run(self, messages: list[MessageLike]) -> FusionTrace:
         _log.debug("fusion engaged: %d-model panel -> judge -> synthesizer", len(self.config.panel))
         panel = self._run_panel(messages)
-        judge_analysis = self._run_judge(messages, panel)
-        final = self._run_synth(messages, judge_analysis)
-        return FusionTrace(panel=panel, judge_analysis=judge_analysis, final=final)
+        judge = self._run_judge(messages, panel)
+        synth = self._run_synth(messages, judge.content)
+        trace = FusionTrace(
+            panel=panel,
+            judge_analysis=judge.content,
+            final=synth.content,
+            usage=self._collect_usage(panel, judge, synth),
+        )
+        self._log_usage(trace)
+        return trace
 
     # -- SupportsComplete --------------------------------------------------
     def complete(
@@ -118,40 +168,56 @@ class FusionEngine:
         if tools:
             _log.debug("fusion ignores %d tool schema(s); use a single model for tools", len(tools))
         trace = self.run(messages)
-        return CompletionResult(content=trace.final, model="fusion")
+        return CompletionResult(
+            content=trace.final,
+            model="fusion",
+            prompt_tokens=trace.prompt_tokens(),
+            completion_tokens=trace.completion_tokens(),
+        )
 
     # -- stages ------------------------------------------------------------
-    def _run_panel(self, messages: list[MessageLike]) -> list[PanelResponse]:
+    def _run_panel(
+        self, messages: list[MessageLike], models: list[str] | None = None
+    ) -> list[PanelResponse]:
+        panel_models = models if models is not None else self.config.panel
+
         def call(model: str) -> PanelResponse:
             try:
                 result = self.backend.complete(
                     messages, model=model, temperature=self.config.temperature
                 )
-                return PanelResponse(model=model, content=result.content)
+                return PanelResponse(
+                    model=model,
+                    content=result.content,
+                    prompt_tokens=result.prompt_tokens,
+                    completion_tokens=result.completion_tokens,
+                )
             except Exception as exc:  # one model failing must not sink the panel
                 _log.warning("panel model %s failed: %s", model, exc)
                 return PanelResponse(model=model, error=str(exc))
 
-        workers = max(1, min(self.config.max_workers, len(self.config.panel)))
+        workers = max(1, min(self.config.max_workers, len(panel_models)))
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            return list(pool.map(call, self.config.panel))
+            return list(pool.map(call, panel_models))
 
-    def _run_judge(self, messages: list[MessageLike], panel: list[PanelResponse]) -> str:
+    def _run_judge(
+        self, messages: list[MessageLike], panel: list[PanelResponse]
+    ) -> CompletionResult:
         answers = "\n\n".join(
             f"--- Answer {i} (model {r.model}) ---\n{r.content}"
             for i, r in enumerate(panel, 1)
             if r.error is None
         )
         if not answers:
-            return "No panel answers were produced."
+            return CompletionResult(content="No panel answers were produced.", model=self.config.judge)
         user = f"Task and context:\n{_conversation_text(messages)}\n\nCandidate answers:\n{answers}"
         return self.backend.complete(
             [Message(role="system", content=_JUDGE_SYSTEM), Message(role="user", content=user)],
             model=self.config.judge,
             temperature=0.1,
-        ).content
+        )
 
-    def _run_synth(self, messages: list[MessageLike], judge_analysis: str) -> str:
+    def _run_synth(self, messages: list[MessageLike], judge_analysis: str) -> CompletionResult:
         user = (
             f"Original task and context:\n{_conversation_text(messages)}\n\n"
             f"Judge's analysis:\n{judge_analysis}"
@@ -160,4 +226,32 @@ class FusionEngine:
             [Message(role="system", content=_SYNTH_SYSTEM), Message(role="user", content=user)],
             model=self.config.synthesizer,
             temperature=self.config.temperature,
-        ).content
+        )
+
+    # -- telemetry ---------------------------------------------------------
+    def _collect_usage(
+        self, panel: list[PanelResponse], judge: CompletionResult, synth: CompletionResult
+    ) -> list[StageUsage]:
+        usage: list[StageUsage] = [
+            StageUsage("panel", r.model, r.prompt_tokens, r.completion_tokens)
+            for r in panel
+            if r.error is None
+        ]
+        usage.append(StageUsage("judge", judge.model, judge.prompt_tokens, judge.completion_tokens))
+        usage.append(StageUsage("synth", synth.model, synth.prompt_tokens, synth.completion_tokens))
+        return usage
+
+    def _log_usage(self, trace: FusionTrace) -> None:
+        by = trace.by_stage()
+
+        def fmt(stage: str) -> str:
+            p, c = by.get(stage, (0, 0))
+            return f"{p}/{c}"
+
+        _log.info(
+            "fusion tokens (in/out) panel=%s judge=%s synth=%s total=%s",
+            fmt("panel"),
+            fmt("judge"),
+            fmt("synth"),
+            trace.total_tokens(),
+        )
