@@ -297,7 +297,12 @@ before, learned skills were stored and never read back.
 
 Off by default: injecting cards adds prompt tokens, and TRS's *token* savings come from
 shortening long reasoning traces, so on short-answer tasks the upside is accuracy, not
-cost. Measure the trade-off on a suite with a ground-truth check before enabling:
+cost. This is not hypothetical — on the `hard` short-answer suite (paid deepseek-v3.1),
+`skillcard-bench` measured cards costing **+290% tokens** and **−8pp accuracy** vs no
+cards: with a near-ceiling model and no long trace to shorten, generic cards are pure
+overhead that can distract. Enable cards for **long-reasoning** workloads (math/coding
+with lengthy traces) where the token math flips, and always measure your own trade-off
+first with a ground-truth check:
 
 ```bash
 uv run chimera skillcard-bench --tasks hard          # demo cards vs no cards
