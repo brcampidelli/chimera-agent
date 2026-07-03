@@ -684,6 +684,52 @@ def fuse(
             console.print(f"[dim]fusion total tokens: {total}{note}[/dim]")
 
 
+@app.command(name="fusion-bench")
+def fusion_bench(
+    tasks: str = typer.Option("hard", "--tasks", help="Task suite: hard | demo."),
+) -> None:
+    """A/B the fusion engine: full vs selective (tokens + accuracy). Calls real models."""
+    from chimera.eval.continuous import demo_tasks
+    from chimera.eval.fusion_ab import run_fusion_ab
+    from chimera.eval.hard import hard_tasks
+    from chimera.providers import LLMGateway, MissingCredentialsError
+
+    suite = hard_tasks() if tasks == "hard" else demo_tasks()
+    try:
+        report = run_fusion_ab(LLMGateway(), suite)
+    except MissingCredentialsError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title=f"fusion A/B — {tasks} ({len(report.rows)} tasks)")
+    table.add_column("task")
+    table.add_column("full", justify="center")
+    table.add_column("selective", justify="center")
+    table.add_column("early-stop", justify="center")
+    table.add_column("full tok", justify="right")
+    table.add_column("sel tok", justify="right")
+    for row in report.rows:
+        table.add_row(
+            row.task_id,
+            "[green]ok[/green]" if row.full_ok else "[red]x[/red]",
+            "[green]ok[/green]" if row.selective_ok else "[red]x[/red]",
+            "yes" if row.early_stopped else "",
+            str(row.full_tokens if row.full_tokens is not None else "-"),
+            str(row.selective_tokens if row.selective_tokens is not None else "-"),
+        )
+    console.print(table)
+    summary = report.summary()
+    for key, value in summary.items():
+        console.print(f"[dim]{key}[/dim]: {value}")
+    delta = summary.get("accuracy_delta_pp", 0.0)
+    verdict = "PASS" if delta >= -1.0 else "REGRESSION"
+    color = "green" if verdict == "PASS" else "red"
+    console.print(
+        f"\nverdict: [{color}]{verdict}[/{color}] "
+        f"(selective accuracy within 1pp of full: {delta:+.1f}pp)"
+    )
+
+
 @app.command()
 def solve(
     task: str = typer.Argument(..., help="The task to solve autonomously."),
