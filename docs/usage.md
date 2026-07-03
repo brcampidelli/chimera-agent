@@ -434,6 +434,22 @@ gates the cross-model skill-accept decision on the *lower* confidence bound of t
 transfer rate (so a lucky 2-of-3 pass no longer counts); default `point` keeps the raw
 rate, since the Wilson bound is strict on tiny panels.
 
+### `sandbox-bench` — state + side-effect grading
+
+The text benches grade the model's *answer*; this one grades what the agent **did**. Each
+task runs in an isolated sandbox dir, and the harness diffs the final file state against
+the goal (any path allowed, outcome-style) **and** separately counts *harmful side effects*
+— mutations outside the task's declared allowed set. So an agent that produces the right
+result while clobbering an unrelated file is caught, not scored as a clean pass.
+
+```bash
+uv run chimera sandbox-bench            # runs the demo stateful tasks (real models + file tools)
+```
+
+Reports `pass_rate` and `side_effect_rate`. It ships the *methodology* (a `StatefulTask`
+with `goal_check` + `allowed` mutation set), not a large task suite — author tasks for your
+own tools. The existing text-graders stay correct for pure-Q&A work.
+
 ### `memory` — curated long-term memory
 
 ```bash

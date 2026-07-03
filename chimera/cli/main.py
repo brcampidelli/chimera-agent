@@ -846,6 +846,50 @@ def schema_bench(
     )
 
 
+@app.command(name="sandbox-bench")
+def sandbox_bench(
+    workspace: str = typer.Option(".sandbox-bench", "--workspace", "-w", help="Dir to run sandboxed tasks in."),
+    model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
+    max_steps: int = typer.Option(8, "--max-steps", help="Max tool-calling steps per task."),
+) -> None:
+    """State-based bench: grade the final workspace state + count harmful side effects.
+
+    Unlike the text benches, this measures what the agent DID (files it changed), and flags
+    mutations outside each task's allowed set. Uses real models + file tools.
+    """
+    from chimera.core import Agent, AgentConfig
+    from chimera.eval.sandbox import StatefulRunner, demo_stateful_tasks, run_stateful
+    from chimera.providers import LLMGateway
+    from chimera.tools import default_registry
+
+    settings = get_settings()
+    if not settings.has_any_key():
+        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+        raise typer.Exit(code=1)
+    gateway = LLMGateway()
+
+    def factory(ws: Path) -> StatefulRunner:
+        return Agent(gateway, default_registry(ws), AgentConfig(model=model, max_steps=max_steps))
+
+    report = run_stateful(factory, demo_stateful_tasks(), Path(workspace))
+    table = Table(title="sandbox bench (final-state grading + side effects)")
+    table.add_column("task")
+    table.add_column("goal", justify="center")
+    table.add_column("harmful side effects")
+    for outcome in report.outcomes:
+        table.add_row(
+            outcome.id,
+            "[green]met[/green]" if outcome.passed else "[red]missed[/red]",
+            ", ".join(outcome.side_effects) if outcome.side_effects else "[dim]none[/dim]",
+        )
+    console.print(table)
+    summary = report.summary()
+    console.print(
+        f"[dim]pass rate {summary['pass_rate']} · side-effect rate "
+        f"{summary['side_effect_rate']} across {int(summary['tasks'])} tasks[/dim]"
+    )
+
+
 @app.command()
 def solve(
     task: str = typer.Argument(..., help="The task to solve autonomously."),
