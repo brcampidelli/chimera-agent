@@ -88,6 +88,17 @@ class Settings(BaseSettings):
         default=_DEFAULT_JUDGE, validation_alias="CHIMERA_FUSION_SYNTHESIZER"
     )
 
+    # --- Selective fusion (opt-in): run a probe of the first `fusion_probe_k` panel
+    # models; if they agree closely (a cheap local text-similarity check, no extra model
+    # call), skip the rest of the panel AND the judge and synthesize from the agreeing
+    # answers; otherwise escalate to the full panel -> judge -> synthesizer. Disagreement
+    # therefore costs the same as full fusion; agreement is cheaper. Off by default. ---
+    fusion_mode: str = Field(default="full", validation_alias="CHIMERA_FUSION_MODE")
+    fusion_probe_k: int = Field(default=2, validation_alias="CHIMERA_FUSION_PROBE_K")
+    fusion_agreement_threshold: float = Field(
+        default=0.8, validation_alias="CHIMERA_FUSION_AGREEMENT"
+    )
+
     # --- Behaviour ---
     log_level: str = Field(default="INFO", validation_alias="CHIMERA_LOG_LEVEL")
     home: Path = Field(default=Path(".chimera"), validation_alias="CHIMERA_HOME")

@@ -640,13 +640,20 @@ def _webhook_handler(gateway: MessageGateway) -> Any:
 def fuse(
     prompt: str = typer.Argument(..., help="The prompt to run through the fusion engine."),
     show_panel: bool = typer.Option(False, "--show-panel", help="Show panel answers + judge analysis."),
+    selective: bool | None = typer.Option(
+        None, "--selective/--full", help="Override selective fusion (default: from settings)."
+    ),
 ) -> None:
     """Run a prompt through the LLM-Fusion engine (panel -> judge -> synthesizer)."""
-    from chimera.fusion import FusionEngine
+    from chimera.fusion import FusionConfig, FusionEngine
     from chimera.providers import LLMGateway, Message, MissingCredentialsError
 
+    config = FusionConfig.from_settings()
+    if selective is not None:
+        config.mode = "selective" if selective else "full"
+
     try:
-        engine = FusionEngine(LLMGateway())
+        engine = FusionEngine(LLMGateway(), config)
         trace = engine.run([Message(role="user", content=prompt)])
     except MissingCredentialsError as exc:
         console.print(f"[red]{exc}[/red]")
@@ -657,7 +664,10 @@ def fuse(
         for response in trace.panel:
             body = response.error or response.content
             console.print(Panel(body, title=f"panel: {response.model}", title_align="left"))
-        console.print(Panel(trace.judge_analysis, title="judge", title_align="left"))
+        if trace.early_stopped:
+            console.print("[dim]probe models agreed — skipped the rest of the panel + judge[/dim]")
+        else:
+            console.print(Panel(trace.judge_analysis, title="judge", title_align="left"))
         console.print(Panel(trace.final, title="[bold green]final[/bold green]", title_align="left"))
         if total is not None:
             by = trace.by_stage()
@@ -670,7 +680,8 @@ def fuse(
     else:
         console.print(trace.final)
         if total is not None:
-            console.print(f"[dim]fusion total tokens: {total}[/dim]")
+            note = " (early-stopped)" if trace.early_stopped else ""
+            console.print(f"[dim]fusion total tokens: {total}{note}[/dim]")
 
 
 @app.command()

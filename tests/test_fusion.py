@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from chimera.fusion import FusionConfig, FusionEngine, RoutedBackend, RoutingPolicy
+from chimera.fusion import FusionConfig, FusionEngine, PanelResponse, RoutedBackend, RoutingPolicy
 from chimera.providers import CompletionResult
 
 CONFIG = FusionConfig(panel=["m1", "m2"], judge="judge", synthesizer="synth")
@@ -90,6 +90,69 @@ def test_fusion_all_panel_fail() -> None:
     trace = FusionEngine(FakeBackend({"m1", "m2"}), CONFIG).run([{"role": "user", "content": "hi"}])
     assert "No panel answers" in trace.judge_analysis
     assert trace.final == "FINAL"
+
+
+SELECTIVE = FusionConfig(
+    panel=["m1", "m2", "m3"], judge="judge", synthesizer="synth", mode="selective", probe_k=2
+)
+
+
+class ScriptedBackend:
+    """Returns a fixed answer per model, and records which models were called."""
+
+    def __init__(self, answers: dict[str, str]) -> None:
+        self.answers = answers
+        self.calls: list[str | None] = []
+
+    def complete(self, messages: list[Any], *, model: str | None = None, **kwargs: Any) -> CompletionResult:
+        self.calls.append(model)
+        if model == "synth":
+            return CompletionResult(content="FINAL", model="synth")
+        if model == "judge":
+            return CompletionResult(content="JUDGE", model="judge")
+        return CompletionResult(content=self.answers.get(str(model), f"ans:{model}"), model=str(model))
+
+
+def test_selective_early_stops_on_agreement() -> None:
+    # m1 and m2 give the same answer -> probe agrees -> skip m3 and the judge.
+    backend = ScriptedBackend({"m1": "the answer is 42", "m2": "the answer is 42"})
+    trace = FusionEngine(backend, SELECTIVE).run([{"role": "user", "content": "q"}])
+    assert trace.early_stopped is True
+    assert "m3" not in backend.calls  # remaining panel skipped
+    assert "judge" not in backend.calls  # judge skipped
+    assert trace.final == "FINAL"
+    assert len(trace.successful_panel()) == 2
+
+
+def test_selective_escalates_on_disagreement() -> None:
+    # m1 and m2 disagree -> escalate: run m3, the judge, and synth (== full pipeline).
+    backend = ScriptedBackend(
+        {"m1": "the answer is 42", "m2": "completely different unrelated text here"}
+    )
+    trace = FusionEngine(backend, SELECTIVE).run([{"role": "user", "content": "q"}])
+    assert trace.early_stopped is False
+    assert "m3" in backend.calls and "judge" in backend.calls
+    assert trace.judge_analysis == "JUDGE"
+    assert trace.final == "FINAL"
+    assert len(trace.panel) == 3
+
+
+def test_selective_agreement_signal() -> None:
+    engine = FusionEngine(ScriptedBackend({}), SELECTIVE)
+    same = [PanelResponse(model="a", content="hello world"), PanelResponse(model="b", content="Hello   world")]
+    diff = [PanelResponse(model="a", content="hello world"), PanelResponse(model="b", content="xyz abc")]
+    assert engine._agree(same) is True
+    assert engine._agree(diff) is False
+
+
+def test_full_mode_is_unchanged_by_selective_code() -> None:
+    # A full-mode run must call every panel model, the judge, and synth.
+    backend = ScriptedBackend({"m1": "a", "m2": "a", "m3": "a"})
+    trace = FusionEngine(
+        backend, FusionConfig(panel=["m1", "m2", "m3"], judge="judge", synthesizer="synth")
+    ).run([{"role": "user", "content": "q"}])
+    assert trace.early_stopped is False
+    assert {"m1", "m2", "m3", "judge", "synth"} <= set(backend.calls)
 
 
 class StubBackend:

@@ -254,7 +254,22 @@ uv run chimera fuse "Name three concrete ways to prevent SQL injection in Python
 uv run chimera fuse "Compare REST vs gRPC for a mobile backend." --show-panel
 ```
 
-Fusion is ~2-3× the cost of a single call, so reserve it for hard reasoning.
+Fusion is ~2-3× the cost of a single call, so reserve it for hard reasoning. `fuse`
+also prints the per-stage token cost (panel / judge / synth) so you can see where a
+run's tokens actually go.
+
+**Selective fusion (opt-in, saves tokens).** Set `CHIMERA_FUSION_MODE=selective` (or pass
+`--selective`) to probe the first `CHIMERA_FUSION_PROBE_K` panel models (default 2) and,
+when their answers agree closely, skip the rest of the panel *and* the judge — synthesizing
+straight from the agreeing answers. The agreement check is a cheap local text comparison
+(no extra model call), so a *disagreeing* turn costs exactly the same as full fusion while
+an *agreeing* turn is cheaper. Tune the bar with `CHIMERA_FUSION_AGREEMENT` (0–1, default
+0.8). Off by default; measure the accuracy/token trade-off on your workload with
+`chimera fusion-bench` before turning it on globally.
+
+```bash
+uv run chimera fuse "What is 12 * 12?" --selective --show-panel   # likely early-stops
+```
 
 > **Pick reliable panel models.** Fusion only pays off if every panel member actually
 > answers. Avoid OpenRouter `:free` model slugs in `CHIMERA_FUSION_PANEL` — they

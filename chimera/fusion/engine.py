@@ -14,6 +14,7 @@ tool-calling — fusion is for hard reasoning/synthesis; tool turns stay single-
 
 from __future__ import annotations
 
+import difflib
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -37,12 +38,22 @@ _SYNTH_SYSTEM = (
     "Resolve contradictions, fold in unique insights, and avoid the blind spots. "
     "Answer the task directly; do not mention the panel or the judge."
 )
+_SYNTH_AGREED_SYSTEM = (
+    "You are a synthesizer. Several independent answers to the task agree closely. "
+    "Using the original task and those answers, write the single best final answer. "
+    "Answer the task directly; do not mention that there were multiple answers."
+)
 
 
 def _sum_opt(values: Iterable[int | None]) -> int | None:
     """Sum the reported values; ``None`` if none were reported (never fabricate 0)."""
     reported = [v for v in values if v is not None]
     return sum(reported) if reported else None
+
+
+def _normalize_ws(text: str) -> str:
+    """Lowercase and collapse whitespace, for a lexical similarity comparison."""
+    return " ".join(text.split()).lower()
 
 
 @dataclass
@@ -74,6 +85,7 @@ class FusionTrace:
     judge_analysis: str
     final: str
     usage: list[StageUsage] = field(default_factory=list)
+    early_stopped: bool = False  # selective mode: probe agreed, panel+judge short-circuited
 
     def successful_panel(self) -> list[PanelResponse]:
         return [r for r in self.panel if r.error is None]
@@ -111,11 +123,24 @@ class FusionConfig:
     synthesizer: str
     max_workers: int = 4
     temperature: float = 0.3
+    mode: Literal["full", "selective"] = "full"
+    probe_k: int = 2
+    agreement_threshold: float = 0.8
 
     @classmethod
     def from_settings(cls) -> FusionConfig:
         s = get_settings()
-        return cls(panel=list(s.fusion_panel), judge=s.fusion_judge, synthesizer=s.fusion_synthesizer)
+        mode: Literal["full", "selective"] = (
+            "selective" if s.fusion_mode == "selective" else "full"
+        )
+        return cls(
+            panel=list(s.fusion_panel),
+            judge=s.fusion_judge,
+            synthesizer=s.fusion_synthesizer,
+            mode=mode,
+            probe_k=s.fusion_probe_k,
+            agreement_threshold=s.fusion_agreement_threshold,
+        )
 
 
 def _conversation_text(messages: list[MessageLike]) -> str:
@@ -137,6 +162,11 @@ class FusionEngine:
         self.config = config or FusionConfig.from_settings()
 
     def run(self, messages: list[MessageLike]) -> FusionTrace:
+        if self.config.mode == "selective" and len(self.config.panel) >= 2:
+            return self._run_selective(messages)
+        return self._run_full(messages)
+
+    def _run_full(self, messages: list[MessageLike]) -> FusionTrace:
         _log.debug("fusion engaged: %d-model panel -> judge -> synthesizer", len(self.config.panel))
         panel = self._run_panel(messages)
         judge = self._run_judge(messages, panel)
@@ -149,6 +179,52 @@ class FusionEngine:
         )
         self._log_usage(trace)
         return trace
+
+    def _run_selective(self, messages: list[MessageLike]) -> FusionTrace:
+        """Probe a few models first; short-circuit on agreement, else escalate to full.
+
+        Agreement is a cheap local text-similarity check (no extra model call), so a
+        disagreeing turn costs exactly the same as full fusion while an agreeing turn
+        skips the rest of the panel and the judge. The synthesis step is always kept —
+        it is where the lift comes from.
+        """
+        k = max(2, min(self.config.probe_k, len(self.config.panel)))
+        probe = self._run_panel(messages, self.config.panel[:k])
+        ok = [r for r in probe if r.error is None]
+        if len(ok) >= 2 and self._agree(ok):
+            _log.debug("fusion early-stop: %d probe models agreed", len(ok))
+            synth = self._run_synth_agreed(messages, ok)
+            trace = FusionTrace(
+                panel=probe,
+                judge_analysis="",
+                final=synth.content,
+                usage=self._collect_usage(probe, None, synth),
+                early_stopped=True,
+            )
+            self._log_usage(trace)
+            return trace
+        rest = self._run_panel(messages, self.config.panel[k:])
+        panel = probe + rest
+        judge = self._run_judge(messages, panel)
+        synth = self._run_synth(messages, judge.content)
+        trace = FusionTrace(
+            panel=panel,
+            judge_analysis=judge.content,
+            final=synth.content,
+            usage=self._collect_usage(panel, judge, synth),
+        )
+        self._log_usage(trace)
+        return trace
+
+    def _agree(self, responses: list[PanelResponse]) -> bool:
+        """True when every pair of probe answers is at least ``agreement_threshold`` similar."""
+        texts = [_normalize_ws(r.content) for r in responses]
+        ratios = [
+            difflib.SequenceMatcher(None, a, b).ratio()
+            for i, a in enumerate(texts)
+            for b in texts[i + 1 :]
+        ]
+        return bool(ratios) and min(ratios) >= self.config.agreement_threshold
 
     # -- SupportsComplete --------------------------------------------------
     def complete(
@@ -228,16 +304,39 @@ class FusionEngine:
             temperature=self.config.temperature,
         )
 
+    def _run_synth_agreed(
+        self, messages: list[MessageLike], answers: list[PanelResponse]
+    ) -> CompletionResult:
+        """Synthesize directly from agreeing probe answers (no judge step)."""
+        joined = "\n\n".join(
+            f"--- Answer {i} (model {r.model}) ---\n{r.content}" for i, r in enumerate(answers, 1)
+        )
+        user = (
+            f"Original task and context:\n{_conversation_text(messages)}\n\n"
+            f"Agreeing answers:\n{joined}"
+        )
+        return self.backend.complete(
+            [Message(role="system", content=_SYNTH_AGREED_SYSTEM), Message(role="user", content=user)],
+            model=self.config.synthesizer,
+            temperature=self.config.temperature,
+        )
+
     # -- telemetry ---------------------------------------------------------
     def _collect_usage(
-        self, panel: list[PanelResponse], judge: CompletionResult, synth: CompletionResult
+        self,
+        panel: list[PanelResponse],
+        judge: CompletionResult | None,
+        synth: CompletionResult,
     ) -> list[StageUsage]:
         usage: list[StageUsage] = [
             StageUsage("panel", r.model, r.prompt_tokens, r.completion_tokens)
             for r in panel
             if r.error is None
         ]
-        usage.append(StageUsage("judge", judge.model, judge.prompt_tokens, judge.completion_tokens))
+        if judge is not None:
+            usage.append(
+                StageUsage("judge", judge.model, judge.prompt_tokens, judge.completion_tokens)
+            )
         usage.append(StageUsage("synth", synth.model, synth.prompt_tokens, synth.completion_tokens))
         return usage
 
