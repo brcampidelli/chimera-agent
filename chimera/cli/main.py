@@ -730,6 +730,68 @@ def fusion_bench(
     )
 
 
+@app.command(name="skillcard-bench")
+def skillcard_bench(
+    tasks: str = typer.Option("hard", "--tasks", help="Task suite: hard | demo."),
+    k: int = typer.Option(3, "--k", help="How many cards to retrieve per task."),
+    use_store: bool = typer.Option(
+        False, "--use-store", help="Bench your own learned cards (skills.json) instead of the demo set."
+    ),
+) -> None:
+    """A/B reasoning with vs without injected TRS skill cards. Calls real models."""
+    from chimera.eval.continuous import demo_tasks
+    from chimera.eval.hard import hard_tasks
+    from chimera.eval.skillcard_ab import demo_cards, run_skillcard_ab
+    from chimera.evolution import SkillStore
+    from chimera.providers import LLMGateway, MissingCredentialsError
+
+    settings = get_settings()
+    suite = hard_tasks() if tasks == "hard" else demo_tasks()
+    if use_store:
+        cards = [c for c in SkillStore(settings.home / "skills.json").skills() if c.has_card()]
+        if not cards:
+            console.print("[red]No cards with content in skills.json — run some solves first, "
+                          "or drop --use-store to bench the demo set.[/red]")
+            raise typer.Exit(code=1)
+    else:
+        cards = demo_cards()
+
+    try:
+        report = run_skillcard_ab(LLMGateway(), suite, cards, k=k)
+    except MissingCredentialsError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title=f"skill-card A/B — {tasks} ({len(report.rows)} tasks, {len(cards)} cards)")
+    table.add_column("task")
+    table.add_column("no cards", justify="center")
+    table.add_column("with cards", justify="center")
+    table.add_column("hit", justify="center")
+    table.add_column("base tok", justify="right")
+    table.add_column("card tok", justify="right")
+    for row in report.rows:
+        table.add_row(
+            row.task_id,
+            "[green]ok[/green]" if row.base_ok else "[red]x[/red]",
+            "[green]ok[/green]" if row.card_ok else "[red]x[/red]",
+            "yes" if row.hit else "",
+            str(row.base_tokens if row.base_tokens is not None else "-"),
+            str(row.card_tokens if row.card_tokens is not None else "-"),
+        )
+    console.print(table)
+    summary = report.summary()
+    for key, value in summary.items():
+        console.print(f"[dim]{key}[/dim]: {value}")
+    delta = summary.get("accuracy_delta_pp", 0.0)
+    verdict = "PASS" if delta >= -1.0 else "REGRESSION"
+    color = "green" if verdict == "PASS" else "red"
+    console.print(
+        f"\nverdict: [{color}]{verdict}[/{color}] "
+        f"(card accuracy within 1pp of no-cards: {delta:+.1f}pp; "
+        f"token delta {summary.get('token_delta_pct', 0.0):+.1f}%)"
+    )
+
+
 @app.command()
 def solve(
     task: str = typer.Argument(..., help="The task to solve autonomously."),

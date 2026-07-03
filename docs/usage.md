@@ -285,6 +285,30 @@ uv run chimera fusion-bench --tasks hard              # full vs selective, token
 > model is left. A cheap, reliable trio: `openrouter/deepseek/deepseek-chat`,
 > `openrouter/openai/gpt-4o-mini`, `openrouter/meta-llama/llama-3.3-70b-instruct`.
 
+### Skill cards (TRS reasoning cards, experimental)
+
+The agent distils what it learns into **reasoning cards** — the five fields
+Trigger / Do / Avoid / Check / Risk (plus retrieval keywords) — from both successes
+(a *pattern* card) and recurring failures (an advisory *anti-pattern* card). When
+`CHIMERA_SKILL_CARDS=on`, `solve` retrieves the top-k relevant cards (BM25 over
+name + description + triggers) and injects them into the worker's reasoning context, so
+the agent reuses what worked and avoids known failure modes. This closes the loop —
+before, learned skills were stored and never read back.
+
+Off by default: injecting cards adds prompt tokens, and TRS's *token* savings come from
+shortening long reasoning traces, so on short-answer tasks the upside is accuracy, not
+cost. Measure the trade-off on a suite with a ground-truth check before enabling:
+
+```bash
+uv run chimera skillcard-bench --tasks hard          # demo cards vs no cards
+uv run chimera skillcard-bench --use-store --tasks hard   # bench your own learned cards
+export CHIMERA_SKILL_CARDS=on CHIMERA_SKILL_CARDS_K=3      # enable, once it earns its place
+```
+
+The bench reports accuracy with vs without cards, the token delta, the card hit-rate, and
+accuracy split by hit/miss, with a PASS verdict when card accuracy stays within 1pp of the
+no-cards baseline.
+
 ### `solve` — Tier-2 autonomous (plan + verify-or-revert)
 
 Plans the task, executes with the agent loop, then **verifies with an
