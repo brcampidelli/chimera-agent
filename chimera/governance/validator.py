@@ -31,13 +31,13 @@ class ValidationResult:
 class SkillValidator:
     """Validates a learned-skill proposal before it is kept."""
 
-    def validate(self, data: dict[str, str]) -> ValidationResult:
+    def validate(self, data: dict[str, object]) -> ValidationResult:
         reasons: list[str] = []
-        name = data.get("name", "")
+        name = str(data.get("name") or "")
         if not _SKILL_NAME.fullmatch(name):
             reasons.append("name must be snake_case (2-41 chars, start with a letter)")
 
-        template = data.get("prompt_template", "")
+        template = str(data.get("prompt_template") or "")
         if not template.strip():
             reasons.append("prompt_template is empty")
         elif len(template) > _MAX_TEMPLATE_CHARS:
@@ -48,7 +48,7 @@ class SkillValidator:
             if phrase in lowered:
                 reasons.append(f"forbidden phrase in template: {phrase!r}")
 
-        if not data.get("description", "").strip():
+        if not str(data.get("description") or "").strip():
             reasons.append("description is empty")
 
         return ValidationResult(accepted=not reasons, reasons=reasons)

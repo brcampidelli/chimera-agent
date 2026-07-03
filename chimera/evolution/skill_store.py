@@ -14,7 +14,7 @@ class SkillStore:
 
     def __init__(self, path: Path) -> None:
         self.path = Path(path)
-        self._dicts: dict[str, dict[str, str]] = {}
+        self._dicts: dict[str, dict[str, object]] = {}
         self.load()
 
     def load(self) -> None:
@@ -23,7 +23,7 @@ class SkillStore:
             return
         raw = json.loads(self.path.read_text(encoding="utf-8") or "[]")
         for item in raw:
-            self._dicts[item["name"]] = item
+            self._dicts[str(item["name"])] = item
 
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
