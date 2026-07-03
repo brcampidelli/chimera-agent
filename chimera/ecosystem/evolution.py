@@ -34,6 +34,9 @@ class CurationConfig:
     min_margin: float = 0.0  # DPO: require chosen.reward - rejected.reward > this
     min_steps: int = 0  # long-horizon: keep only traces with >= this many tool-calling steps
     max_per_prompt: int = 0  # diversity: cap SFT examples per unique task (0 = unlimited)
+    # SkillCoach process filter: keep only traces whose step-following score >= this, so a
+    # lucky-but-sloppy success (wrong/failed tool steps) is not trained on. 0.0 = off.
+    min_process: float = 0.0
 
 
 def curate_sft(trajectories: list[Trajectory], config: CurationConfig | None = None) -> list[dict[str, Any]]:
@@ -49,6 +52,8 @@ def curate_sft(trajectories: list[Trajectory], config: CurationConfig | None = N
         if item.outcome != "success" or item.reward < cfg.min_reward:
             continue
         if item.steps < cfg.min_steps:  # long-horizon recipe
+            continue
+        if item.process_score() < cfg.min_process:  # SkillCoach process-quality filter
             continue
         prompt = item.prompt.strip()
         if cfg.max_per_prompt and per_prompt.get(prompt, 0) >= cfg.max_per_prompt:
@@ -75,7 +80,11 @@ def curate_dpo(trajectories: list[Trajectory], config: CurationConfig | None = N
     best: dict[str, Trajectory] = {}
     worst: dict[str, Trajectory] = {}
     for item in trajectories:
-        if item.outcome == "success" and (item.prompt not in best or item.reward > best[item.prompt].reward):
+        if (
+            item.outcome == "success"
+            and item.process_score() >= cfg.min_process
+            and (item.prompt not in best or item.reward > best[item.prompt].reward)
+        ):
             best[item.prompt] = item
         elif item.outcome == "failure" and (item.prompt not in worst or item.reward < worst[item.prompt].reward):
             worst[item.prompt] = item

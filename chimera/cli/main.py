@@ -1780,6 +1780,9 @@ def evolve_export(
     min_margin: float = typer.Option(0.0, "--min-margin", help="DPO: min reward margin chosen − rejected."),
     min_steps: int = typer.Option(0, "--min-steps", help="Recipe: keep only traces with >= N steps."),
     diverse: bool = typer.Option(False, "--diverse", help="Recipe: at most one SFT example per task."),
+    min_process: float = typer.Option(
+        None, "--min-process", help="Keep only traces whose step-following score >= this (SkillCoach)."
+    ),
 ) -> None:
     """Export a curated SFT or DPO dataset from trajectories."""
     from chimera.ecosystem import CurationConfig, curate_dpo, curate_sft, write_jsonl
@@ -1793,6 +1796,7 @@ def evolve_export(
         min_margin=min_margin,
         min_steps=min_steps,
         max_per_prompt=1 if diverse else 0,
+        min_process=min_process if min_process is not None else get_settings().sft_min_process,
     )
     items = _collector(traj).all()
     rows = curate_sft(items, config) if fmt == "sft" else curate_dpo(items, config)

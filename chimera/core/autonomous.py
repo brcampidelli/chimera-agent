@@ -26,6 +26,7 @@ from chimera.core.planner import Plan, Planner
 from chimera.core.spine import assemble_spine
 from chimera.core.supervisor import Manager
 from chimera.core.verify import Verifier
+from chimera.ecosystem.events import events_from_transcript
 from chimera.ecosystem.trajectory import TrajectoryCollector
 from chimera.evolution.experience import ExperienceBuffer, Outcome, format_lessons
 from chimera.telemetry import get_logger
@@ -175,9 +176,17 @@ class AutonomousAgent:
                 self.experience.record(task, outcome, detail=(fb or vout)[:500])
             if self.trajectories is not None:
                 # Each attempt is a (task -> answer) trajectory; multiple attempts on
-                # one task give success/failure pairs — the raw signal for DPO.
+                # one task give success/failure pairs — the raw signal for DPO. The
+                # per-step tool events feed the SkillCoach process-quality filter.
                 self.trajectories.record(
-                    task, answer, outcome=outcome, reward=1.0 if ok else 0.0, steps=agent_result.steps
+                    task,
+                    answer,
+                    outcome=outcome,
+                    reward=1.0 if ok else 0.0,
+                    steps=agent_result.steps,
+                    events=events_from_transcript(
+                        [m for m in agent_result.transcript if isinstance(m, dict)]
+                    ),
                 )
 
             if ok:

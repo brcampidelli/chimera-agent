@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 Outcome = Literal["success", "failure", "unknown"]
 
@@ -24,6 +24,13 @@ class Trajectory(BaseModel):
     outcome: Outcome = "unknown"
     reward: float = 0.0
     steps: int = 0  # tool-calling steps — a long-horizon signal for data curation
+    events: list[dict[str, Any]] = Field(default_factory=list)  # per-tool-step {tool, ok}
+
+    def process_score(self) -> float:
+        """Step-following process signal in [0, 1] — the SkillCoach data-quality filter."""
+        from chimera.ecosystem.events import step_following_score
+
+        return step_following_score(self.events)
 
 
 class TrajectoryCollector:
@@ -50,6 +57,7 @@ class TrajectoryCollector:
         outcome: Outcome = "unknown",
         reward: float = 0.0,
         steps: int = 0,
+        events: list[dict[str, Any]] | None = None,
     ) -> Trajectory:
         item = Trajectory(
             seq=len(self._items),
@@ -58,6 +66,7 @@ class TrajectoryCollector:
             outcome=outcome,
             reward=reward,
             steps=steps,
+            events=list(events or []),
         )
         self._items.append(item)
         self.path.parent.mkdir(parents=True, exist_ok=True)

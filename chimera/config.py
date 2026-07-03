@@ -135,6 +135,11 @@ class Settings(BaseSettings):
     # panels — use it with panels >= ~5, or lower CHIMERA_SKILL_MIN_TRANSFER. ---
     skill_accept_mode: str = Field(default="point", validation_alias="CHIMERA_SKILL_ACCEPT_MODE")
 
+    # --- SkillCoach process filter for `chimera evolve export`: keep only trajectories
+    # whose step-following score >= this (so a lucky success with failed tool steps is not
+    # trained on). 0.0 = off (default). ---
+    sft_min_process: float = Field(default=0.0, validation_alias="CHIMERA_SFT_MIN_PROCESS")
+
     # --- Compact tool schemas at advertise-time (Improvement #5a): strip annotation
     # noise and trim parameter prose from the `tools=` payload re-sent every ReAct step.
     # Semantics preserved (name/type/required/enum kept). Off by default; the win is

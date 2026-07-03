@@ -565,9 +565,14 @@ chimera evolve recipe --out ./recipe --format dpo  # train.py + README + require
 chimera evolve tune --rounds 2                  # self-optimize the agent spec (no weights changed)
 ```
 
-`export` accepts two recipe knobs: `--min-steps N` keeps only long-horizon traces and
+`export` accepts recipe knobs: `--min-steps N` keeps only long-horizon traces,
 `--diverse` keeps at most one example per task (task diversity is the curation
-bottleneck). `evolve tune` is different from training — it runs a **meta-search** over the
+bottleneck), and `--min-process P` (SkillCoach) keeps only traces whose *step-following*
+score ≥ P — the fraction of tool steps that produced a successful, visible result — so a
+lucky success that thrashed through failed tool calls isn't trained on. The per-step
+events behind that score are captured automatically on every `solve` run; the filter is
+off by default (`CHIMERA_SFT_MIN_PROCESS` sets a global default). `evolve tune` is
+different from training — it runs a **meta-search** over the
 agent *spec* (model, system prompt, step budget, panel, memory depth), scoring each
 candidate on the daily scenarios and keeping an edit only on **non-regression**. It calls
 models but never changes weights, so it is safe to run anytime.
