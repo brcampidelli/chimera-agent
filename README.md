@@ -28,7 +28,7 @@ its own work, and keeps only what actually works.
 > **Free and open-source (Apache-2.0), in early but active development.** It already works end to
 > end: chat with it, let it finish tasks on its own, run it as a bot on your favourite messaging app,
 > deploy it on a server so it works 24/7, and watch it learn from what it does. It's **alpha** — solid
-> and heavily tested (460+ automated tests, strict type-checking and linting on every change), but not
+> and heavily tested (530+ automated tests, strict type-checking and linting on every change), but not
 > yet battle-hardened in production.
 
 ---
@@ -50,7 +50,7 @@ it. Here's what makes it special, in plain terms:
 ## Features
 
 ### 🧠 Thinking & doing
-- **Blend several models into one answer** (`chimera fuse`) — a panel of models, a judge that surfaces where they agree, disagree, or miss something, and a synthesizer that writes the final answer. A smart router only spends this extra effort on hard problems.
+- **Blend several models into one answer** (`chimera fuse`) — a panel of models, a judge that surfaces where they agree, disagree, or miss something, and a synthesizer that writes the final answer. A smart router only spends this extra effort on hard problems, and when the first models already agree it stops early — measured at **~20–28% fewer tokens with no loss of accuracy** on our benchmarks.
 - **Finish tasks on its own** (`chimera solve`) — it plans, acts with tools, then **verifies and reverts**: it runs your check (e.g. tests) and keeps the change only if it passes, otherwise undoes it and retries. Optionally works on an isolated copy of your project so nothing is touched until it's proven.
 - **Teams of specialists** (`chimera crew`, `chimera crew-isolated`) — several role-focused agents split one job. In isolated mode each works on its **own private copy in parallel**; safe edits are merged, clashes are flagged instead of silently overwritten, and a bad worker's changes can be rejected by a per-worker test. A supervisor can fold everyone's work into one unified report.
 - **Delegate and explore** — any agent can hand a self-contained subtask to a fresh **sub-agent** that reports back only the result, keeping the main context clean. The **Context Explorer** (`chimera explore`) finds the right files and lines in a codebase and returns a short answer instead of dumping everything.
@@ -155,6 +155,7 @@ chimera kanban add/board/run                   # a task board that dispatches wo
 chimera workflow flow.yaml                     # run a repeatable automation described in a file
 chimera migrate <source> <dir> --apply         # import settings, skills, and memory from another agent tool
 chimera evolve status / tune / recipe          # optional: self-optimize; prepare data to fine-tune a model
+chimera fusion-bench / skillcard-bench / schema-bench / sandbox-bench   # honest A/B benchmarks: measure cost, quality & side effects before trusting a feature
 chimera pet new --name Chimi                   # adopt a small virtual companion :)
 ```
 

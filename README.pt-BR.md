@@ -29,7 +29,7 @@ realmente funciona.
 > **Gratuito e open-source (Apache-2.0), em desenvolvimento inicial mas ativo.** Ele já funciona de
 > ponta a ponta: converse com ele, deixe que conclua tarefas sozinho, rode-o como um bot no seu app
 > de mensagens favorito, publique-o em um servidor para que trabalhe 24/7 e veja-o aprender com o
-> que faz. É **alpha** — sólido e bastante testado (mais de 460 testes automatizados, checagem de
+> que faz. É **alpha** — sólido e bastante testado (mais de 530 testes automatizados, checagem de
 > tipos e lint rigorosos em cada mudança), mas ainda não endurecido em produção pesada.
 
 ---
@@ -52,7 +52,7 @@ em termos simples:
 ## Recursos
 
 ### 🧠 Pensar & fazer
-- **Combine vários modelos em uma resposta** (`chimera fuse`) — um painel de modelos, um juiz que revela onde eles concordam, discordam ou deixam algo passar, e um sintetizador que escreve a resposta final. Um roteador inteligente só gasta esse esforço extra em problemas difíceis.
+- **Combine vários modelos em uma resposta** (`chimera fuse`) — um painel de modelos, um juiz que revela onde eles concordam, discordam ou deixam algo passar, e um sintetizador que escreve a resposta final. Um roteador inteligente só gasta esse esforço extra em problemas difíceis, e quando os primeiros modelos já concordam ele para mais cedo — medido em ~20–28% menos tokens sem perda de precisão em nossos benchmarks.
 - **Conclua tarefas sozinho** (`chimera solve`) — ele planeja, age com ferramentas e então **verifica e reverte**: roda a sua checagem (por exemplo, testes) e só mantém a mudança se ela passar, senão desfaz e tenta de novo. Opcionalmente trabalha em uma cópia isolada do seu projeto, para que nada seja tocado até estar comprovado.
 - **Times de especialistas** (`chimera crew`, `chimera crew-isolated`) — vários agentes com papéis específicos dividem uma tarefa. No modo isolado, cada um trabalha em sua **própria cópia privada em paralelo**; edições seguras são mescladas, conflitos são sinalizados em vez de sobrescritos em silêncio, e as mudanças de um worker ruim podem ser rejeitadas por um teste próprio dele. Um supervisor pode juntar o trabalho de todos em um relatório unificado.
 - **Delegar e explorar** — qualquer agente pode passar uma subtarefa autocontida para um **subagente** novo, que devolve apenas o resultado, mantendo limpo o contexto principal. O **Explorador de Contexto** (`chimera explore`) encontra os arquivos e as linhas certas em uma base de código e retorna uma resposta curta em vez de despejar tudo.
@@ -157,6 +157,7 @@ chimera kanban add/board/run                   # um quadro de tarefas que despac
 chimera workflow flow.yaml                     # roda uma automação repetível descrita em um arquivo
 chimera migrate <source> <dir> --apply         # importa config, skills e memória de outra ferramenta de agente
 chimera evolve status / tune / recipe          # opcional: auto-otimizar; preparar dados para fine-tune de um modelo
+chimera fusion-bench / skillcard-bench / schema-bench / sandbox-bench   # benchmarks A/B honestos: mede custo, qualidade e efeitos colaterais antes de confiar em um recurso
 chimera pet new --name Chimi                   # adote um pequeno companheiro virtual :)
 ```
 

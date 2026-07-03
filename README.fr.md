@@ -30,7 +30,7 @@ vérifie son propre travail et ne garde que ce qui fonctionne vraiment.
 > bout en bout : discutez avec lui, laissez-le terminer des tâches tout seul, faites-le tourner comme
 > un bot sur votre application de messagerie préférée, déployez-le sur un serveur pour qu'il travaille
 > 24h/24, et regardez-le apprendre de ce qu'il fait. C'est une version **alpha** — solide et
-> abondamment testée (plus de 460 tests automatisés, vérification de types stricte et lint à chaque
+> abondamment testée (plus de 530 tests automatisés, vérification de types stricte et lint à chaque
 > changement), mais pas encore éprouvée en production.
 
 ---
@@ -53,7 +53,7 @@ simples :
 ## Fonctionnalités
 
 ### 🧠 Penser et agir
-- **Combiner plusieurs modèles en une seule réponse** (`chimera fuse`) — un panel de modèles, un juge qui fait ressortir où ils sont d'accord, en désaccord, ou passent à côté de quelque chose, et un synthétiseur qui rédige la réponse finale. Un routeur intelligent ne consacre cet effort supplémentaire qu'aux problèmes difficiles.
+- **Combiner plusieurs modèles en une seule réponse** (`chimera fuse`) — un panel de modèles, un juge qui fait ressortir où ils sont d'accord, en désaccord, ou passent à côté de quelque chose, et un synthétiseur qui rédige la réponse finale. Un routeur intelligent ne consacre cet effort supplémentaire qu'aux problèmes difficiles, et lorsque les premiers modèles sont déjà d'accord il s'arrête plus tôt — mesuré à environ ~20–28 % de tokens en moins sans perte de précision sur nos benchmarks.
 - **Terminer des tâches tout seul** (`chimera solve`) — il planifie, agit avec des outils, puis **vérifie et annule** : il lance votre contrôle (par ex. les tests) et ne garde le changement que s'il passe, sinon il l'annule et réessaie. Il peut, en option, travailler sur une copie isolée de votre projet pour que rien ne soit touché tant que ce n'est pas éprouvé.
 - **Des équipes de spécialistes** (`chimera crew`, `chimera crew-isolated`) — plusieurs agents concentrés sur un rôle se partagent une même tâche. En mode isolé, chacun travaille sur sa **propre copie privée en parallèle** ; les modifications sûres sont fusionnées, les conflits sont signalés au lieu d'être écrasés en silence, et les changements d'un mauvais worker peuvent être rejetés par un test propre à chaque worker. Un superviseur peut regrouper le travail de tous en un seul rapport unifié.
 - **Déléguer et explorer** — n'importe quel agent peut confier une sous-tâche autonome à un nouveau **sous-agent** qui ne renvoie que le résultat, gardant le contexte principal propre. Le **Context Explorer** (`chimera explore`) trouve les bons fichiers et les bonnes lignes dans une base de code et renvoie une réponse courte au lieu de tout déverser.
@@ -158,6 +158,7 @@ chimera kanban add/board/run                   # un tableau de tâches qui distr
 chimera workflow flow.yaml                     # exécuter une automatisation répétable décrite dans un fichier
 chimera migrate <source> <dir> --apply         # importer réglages, compétences et mémoire depuis un autre outil d'agent
 chimera evolve status / tune / recipe          # optionnel : s'auto-optimiser ; préparer les données pour affiner un modèle
+chimera fusion-bench / skillcard-bench / schema-bench / sandbox-bench   # benchmarks A/B honnêtes : mesurer coût, qualité et effets de bord avant de faire confiance à une fonctionnalité
 chimera pet new --name Chimi                   # adopter un petit compagnon virtuel :)
 ```
 
