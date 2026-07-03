@@ -48,9 +48,18 @@ class ToolRegistry:
     def tools(self) -> list[Tool]:
         return list(self._tools.values())
 
-    def to_openai_schema(self) -> list[dict[str, Any]]:
-        """Schemas for all tools, to advertise to a model."""
-        return [tool.to_openai_schema() for tool in self._tools.values()]
+    def to_openai_schema(self, *, compact: bool = False) -> list[dict[str, Any]]:
+        """Schemas for all tools, to advertise to a model.
+
+        With ``compact=True``, annotation noise is stripped and parameter prose trimmed
+        at advertise-time (semantics preserved) to cut the tokens re-sent every step.
+        """
+        schemas = [tool.to_openai_schema() for tool in self._tools.values()]
+        if compact:
+            from chimera.tools.schema_compact import compact_schemas
+
+            return compact_schemas(schemas)
+        return schemas
 
     def run(self, name: str, **kwargs: Any) -> str:
         """Look up and execute a tool by name."""
