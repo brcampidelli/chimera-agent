@@ -6,6 +6,7 @@ continuous-evolution degradation. The buffer ships in M3; the full engine in M4.
 
 from chimera.evolution.attribution import Fault, attribute, localize_fault, qualify
 from chimera.evolution.auto_evolve import AutoSkillEvolver
+from chimera.evolution.card_retrieval import CardIndex, CardRetriever, cards_context_block
 from chimera.evolution.collective import CollectiveSkillEvolver
 from chimera.evolution.evolver import SkillEvolver
 from chimera.evolution.experience import Experience, ExperienceBuffer, format_lessons
@@ -21,6 +22,9 @@ __all__ = [
     "SkillStore",
     "SkillEvolver",
     "AutoSkillEvolver",
+    "CardIndex",
+    "CardRetriever",
+    "cards_context_block",
     "CollectiveSkillEvolver",
     "SkillNudge",
     "detect_skill_nudges",

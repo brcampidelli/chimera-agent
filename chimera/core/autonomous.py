@@ -55,6 +55,12 @@ class SupportsAutoEvolve(Protocol):
     def maybe_evolve(self, task: str, solution: str, prior_successes: int) -> object: ...
 
 
+class SupportsCardContext(Protocol):
+    """Retrieves TRS skill-card context relevant to a task (a CardRetriever)."""
+
+    def card_context(self, task: str) -> str: ...
+
+
 @dataclass
 class AutonomousConfig:
     max_attempts: int = 3
@@ -97,6 +103,7 @@ class AutonomousAgent:
         trajectories: TrajectoryCollector | None = None,
         memory: SupportsRemember | None = None,
         auto_evolver: SupportsAutoEvolve | None = None,
+        cards: SupportsCardContext | None = None,
         spine_workspace: Path | None = None,
         config: AutonomousConfig | None = None,
     ) -> None:
@@ -109,6 +116,7 @@ class AutonomousAgent:
         self.trajectories = trajectories
         self.memory = memory
         self.auto_evolver = auto_evolver
+        self.cards = cards
         self.spine_workspace = spine_workspace
         self.config = config or AutonomousConfig()
 
@@ -119,7 +127,11 @@ class AutonomousAgent:
         # repeating past failure modes. Advisory only — verify-or-revert below still
         # decides success, so a misleading lesson can't corrupt the workspace.
         lessons = self._recall_lessons(task)
-        context = "\n\n".join(part for part in (spine, lessons) if part)
+        # Retrieved TRS skill cards (Improvement #1): distilled Do/Avoid/Check hints from
+        # past runs, injected so the worker/planner reuse what worked and avoid known
+        # failure modes. Advisory only — verify-or-revert still decides success.
+        card_ctx = self.cards.card_context(task) if self.cards is not None else ""
+        context = "\n\n".join(part for part in (spine, lessons, card_ctx) if part)
         # how many times this task pattern has already succeeded / failed (before this
         # run) — the recurrence signals that gate auto-skill-evolution (a pattern card on
         # recurring success, an anti-pattern card on recurring failure)

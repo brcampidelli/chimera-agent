@@ -122,6 +122,13 @@ class Settings(BaseSettings):
     # cheap/tool turns single-model and only fuses deep or error-sensitive ones. ---
     auto_fuse: bool = Field(default=False, validation_alias="CHIMERA_AUTO_FUSE")
 
+    # --- TRS skill cards (Improvement #1): retrieve learned reasoning cards (BM25 over
+    # name+description+triggers) and inject the top-k into the worker's reasoning context.
+    # Off by default (an experiment — injection can raise cost if retrieval misfires);
+    # measure with `chimera skillcard-bench` before enabling. ---
+    skill_cards: bool = Field(default=False, validation_alias="CHIMERA_SKILL_CARDS")
+    skill_cards_k: int = Field(default=3, validation_alias="CHIMERA_SKILL_CARDS_K")
+
     # --- Messaging bot tokens (only needed for the matching `chimera serve --<platform>`) ---
     discord_bot_token: str | None = Field(default=None, validation_alias="CHIMERA_DISCORD_BOT_TOKEN")
     telegram_bot_token: str | None = Field(default=None, validation_alias="CHIMERA_TELEGRAM_BOT_TOKEN")

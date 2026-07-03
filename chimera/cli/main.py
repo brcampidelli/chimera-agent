@@ -777,6 +777,7 @@ def solve(
     from chimera.ecosystem import TrajectoryCollector
     from chimera.evolution import (
         AutoSkillEvolver,
+        CardRetriever,
         CollectiveSkillEvolver,
         ExperienceBuffer,
         SkillEvolver,
@@ -853,6 +854,11 @@ def solve(
                         else None
                     ),
                 )
+            ),
+            cards=(
+                CardRetriever(SkillStore(settings.home / "skills.json"), k=settings.skill_cards_k)
+                if settings.skill_cards
+                else None
             ),
             spine_workspace=ws,
             config=AutonomousConfig(
