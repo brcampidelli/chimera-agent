@@ -245,3 +245,56 @@ def test_routed_simple_turn_single() -> None:
     single, fusion = StubBackend("single"), StubBackend("fusion")
     rb = RoutedBackend(single, fusion, RoutingPolicy(mode="never"))
     assert rb.complete([{"role": "user", "content": "x"}]).content == "single"
+
+
+def test_escalates_single_to_fusion_when_check_fails() -> None:
+    # Issue #3: a turn priced as single whose result fails the check re-escalates to fusion.
+    single, fusion = StubBackend("single"), StubBackend("fusion")
+    rb = RoutedBackend(
+        single, fusion, RoutingPolicy(mode="never"), escalate_on_fail=lambda r: False
+    )
+    assert rb.complete([{"role": "user", "content": "x"}]).content == "fusion"
+    assert single.called and fusion.called
+
+
+def test_no_escalation_when_check_passes() -> None:
+    single, fusion = StubBackend("single"), StubBackend("fusion")
+    rb = RoutedBackend(
+        single, fusion, RoutingPolicy(mode="never"), escalate_on_fail=lambda r: True
+    )
+    assert rb.complete([{"role": "user", "content": "x"}]).content == "single"
+    assert single.called and not fusion.called
+
+
+def test_no_escalation_without_verifier() -> None:
+    single, fusion = StubBackend("single"), StubBackend("fusion")
+    rb = RoutedBackend(single, fusion, RoutingPolicy(mode="never"))  # no verifier -> unchanged
+    assert rb.complete([{"role": "user", "content": "x"}]).content == "single"
+    assert not fusion.called
+
+
+def test_fused_turn_never_consults_escalation_verifier() -> None:
+    # When the turn is already fused, the single->fusion escalation check must not run.
+    calls: list[CompletionResult] = []
+
+    def verify(r: CompletionResult) -> bool:
+        calls.append(r)
+        return False
+
+    single, fusion = StubBackend("single"), StubBackend("fusion")
+    rb = RoutedBackend(single, fusion, RoutingPolicy(mode="always"), escalate_on_fail=verify)
+    assert rb.complete([{"role": "user", "content": "x"}]).content == "fusion"
+    assert calls == []  # the verifier only guards the single path
+
+
+def test_tool_turn_skips_escalation_verifier() -> None:
+    calls: list[CompletionResult] = []
+
+    def verify(r: CompletionResult) -> bool:
+        calls.append(r)
+        return False
+
+    single, fusion = StubBackend("single"), StubBackend("fusion")
+    rb = RoutedBackend(single, fusion, RoutingPolicy(mode="always"), escalate_on_fail=verify)
+    result = rb.complete([{"role": "user", "content": "x"}], tools=[{"type": "function"}])
+    assert result.content == "single" and not fusion.called and calls == []

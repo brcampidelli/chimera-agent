@@ -11,7 +11,7 @@ from chimera.fusion.engine import (
     PanelResponse,
     StageUsage,
 )
-from chimera.fusion.router import RoutedBackend, RoutingPolicy
+from chimera.fusion.router import EscalationVerifier, RoutedBackend, RoutingPolicy
 
 __all__ = [
     "FusionEngine",
@@ -21,4 +21,5 @@ __all__ = [
     "StageUsage",
     "RoutedBackend",
     "RoutingPolicy",
+    "EscalationVerifier",
 ]

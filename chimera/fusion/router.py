@@ -7,11 +7,17 @@ error-sensitive ones** — exact computations/transformations where a single wro
 ruins the answer (arithmetic, counting, digit ops). Those short tasks used to slip
 through the length/keyword gate and route to a single model, which is exactly where a
 lone model's slip corrupts a long chain; fusing them closes that hole. Forced via mode.
+
+The router prices a turn *up front*, but a task that looked easy can turn out hard. An
+optional ``escalate_on_fail`` verifier closes that gap: when a check on the single-model
+result fails, the turn re-escalates to fusion instead of being accepted — difficulty read
+from the review surface, not only predicted (issue #3). Opt-in; no verifier = unchanged.
 """
 
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -21,6 +27,9 @@ from chimera.telemetry import get_logger
 _log = get_logger("fusion.router")
 
 Mode = Literal["auto", "always", "never"]
+
+# A check on a single-model result: True = acceptable, False = re-escalate this turn to fusion.
+EscalationVerifier = Callable[[CompletionResult], bool]
 
 # Deep-reasoning intent, in the project's main languages (en/pt/es/de/fr/zh/ja).
 _DEFAULT_KEYWORDS = (
@@ -124,10 +133,14 @@ class RoutedBackend:
         single: SupportsComplete,
         fusion: SupportsComplete,
         policy: RoutingPolicy | None = None,
+        *,
+        escalate_on_fail: EscalationVerifier | None = None,
     ) -> None:
         self.single = single
         self.fusion = fusion
         self.policy = policy or RoutingPolicy()
+        # Optional: re-escalate a single-model turn to fusion when its result fails this check.
+        self.escalate_on_fail = escalate_on_fail
 
     def complete(
         self,
@@ -147,6 +160,12 @@ class RoutedBackend:
         if self.policy.should_fuse(messages):
             _log.debug("routing turn to fusion")
             return self.fusion.complete(messages, temperature=temperature)
-        return self.single.complete(
+        result = self.single.complete(
             messages, model=model, temperature=temperature, max_tokens=max_tokens
         )
+        # Observed difficulty (issue #3): a turn priced as single may still be hard. If a
+        # check on its result fails, re-escalate this turn to fusion rather than accept it.
+        if self.escalate_on_fail is not None and not self.escalate_on_fail(result):
+            _log.debug("single result failed verification; re-escalating turn to fusion")
+            return self.fusion.complete(messages, temperature=temperature)
+        return result
