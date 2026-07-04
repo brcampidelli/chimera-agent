@@ -44,14 +44,14 @@ it. Here's what makes it special, in plain terms:
 - 🧠 **Many minds, one answer.** For tough questions, Chimera asks several models the same thing, lets one model compare their answers, and has a final model write the best combined response — so you get something more balanced and less likely to be wrong than any single model alone. (It does this only when it's worth it, to stay fast and cheap.)
 - 🚀 **It does the work, not just talk.** Give it a goal. It breaks it down, uses tools, edits files, runs the tests, and **keeps a change only if it passes**. If something breaks, it undoes it and tries again — so it doesn't leave a mess behind.
 - 🧬 **It gets better the more you use it.** It remembers your preferences and important facts across conversations, and quietly turns tasks it repeats into reusable skills. It's built to keep improving instead of slowly getting worse over long runs — a problem that quietly degrades many agents.
-- 🛡️ **Safe by design.** Every risky action passes a safety check first, anything destructive asks for confirmation, and it can run untrusted code inside a locked-down sandbox.
+- 🛡️ **Safe by design.** Every risky action passes a safety check first, anything destructive asks for confirmation, and untrusted code can run in a locked-down, network-off container. (Those checks are a cheap first filter, not the real boundary — the sandbox is; and container isolation is opt-in. See [SECURITY.md](SECURITY.md).)
 - 🔌 **Any model, runs anywhere.** Use big hosted models or your own local ones through a single interface — on your laptop or a $5 server, around the clock.
 - 🧩 **Truly yours.** Open-source, no lock-in, no vendor account required. You run it, you own it, you can change anything.
 
 ## Features
 
 ### 🧠 Thinking & doing
-- **Blend several models into one answer** (`chimera fuse`) — a panel of models, a judge that surfaces where they agree, disagree, or miss something, and a synthesizer that writes the final answer. A smart router only spends this extra effort on hard problems, and when the first models already agree it stops early — measured at **~20–28% fewer tokens with no loss of accuracy** on our benchmarks.
+- **Blend several models into one answer** (`chimera fuse`) — a panel of models, a judge that surfaces where they agree, disagree, or miss something, and a synthesizer that writes the final answer. A smart router only spends this extra effort on hard problems, and when the first models already agree it stops early — measured at **~20–28% fewer tokens with no loss of accuracy** on our benchmarks. (Fusion / mixture-of-agents itself isn't unique — you'll find it in OpenRouter and other tools; the difference here is it's wired into the agent loop behind that cost-aware router and measured, not a model you pick.)
 - **Finish tasks on its own** (`chimera solve`) — it plans, acts with tools, then **verifies and reverts**: it runs your check (e.g. tests) and keeps the change only if it passes, otherwise undoes it and retries. Optionally works on an isolated copy of your project so nothing is touched until it's proven.
 - **Teams of specialists** (`chimera crew`, `chimera crew-isolated`) — several role-focused agents split one job. In isolated mode each works on its **own private copy in parallel**; safe edits are merged, clashes are flagged instead of silently overwritten, and a bad worker's changes can be rejected by a per-worker test. A supervisor can fold everyone's work into one unified report.
 - **Delegate and explore** — any agent can hand a self-contained subtask to a fresh **sub-agent** that reports back only the result, keeping the main context clean. The **Context Explorer** (`chimera explore`) finds the right files and lines in a codebase and returns a short answer instead of dumping everything.
@@ -70,7 +70,7 @@ it. Here's what makes it special, in plain terms:
 ### 🚀 Run anywhere, safely
 - **Any model, one interface** — hosted models or your own local ones, with automatic fallback if one is down and rotation across multiple keys.
 - **One-command server deploy** — run it with Docker (or bare-metal) so it stays up and restarts on reboot. See **[docs/deploy.md](docs/deploy.md)**.
-- **Safety kernel** — a check on every action (allow / warn / block / ask), a sandbox for untrusted code, and a full audit log of what it did.
+- **Safety kernel** — a check on every action (allow / warn / block / ask), an **opt-in** network-isolated container for untrusted code (`CHIMERA_SANDBOX=docker`; the default local runner is *not* isolated), and a full audit log of what it did.
 
 ## Quickstart
 

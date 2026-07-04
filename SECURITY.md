@@ -30,12 +30,17 @@ environment** when you grant autonomy:
 
 - **Governance kernel** — every governed tool call is evaluated allow/warn/block/review;
   known-dangerous signatures (`rm -rf /`, disk wipes, fork bombs, `curl | sh`, force pushes,
-  secret material) are blocked or escalated. Enable with `--guard`.
+  secret material) are blocked or escalated. Enable with `--guard`. **These are shell-signature
+  matches — a cheap first filter, not the security boundary.** An agent can sidestep them (e.g.
+  by doing the same thing from a Python script); the real containment is the sandbox below.
 - **Static validator** — self-authored skills must pass a static check (the constrained
   edit surface) before they are kept; learned skills are prompt templates, not executable code.
 - **Verify-or-revert** — autonomous changes are snapshotted and reverted if verification fails.
 - **Human-in-the-loop** — agent-proposed crons are created **disabled**, pending approval.
 - **Audit log** — governance decisions and evolution changes are recorded.
 
-Treat secrets as server-only, run untrusted tasks in a sandbox/container, and review the
-audit log when granting broad autonomy.
+Treat secrets as server-only. **The default `local` sandbox is not isolated** — for untrusted
+or autonomous work run with `CHIMERA_SANDBOX=docker` (ephemeral, network-off by default),
+ideally in a throwaway account or VM rather than your main one. A container still isn't a full
+VM: for hostile input, prefer stronger isolation (microVM/gVisor). Review the audit log when
+granting broad autonomy.
