@@ -39,6 +39,15 @@ environment** when you grant autonomy:
   the agent cannot invoke, or be talked into invoking, what it was not given. Subagents
   inherit the grant. (h/t u/zoharel on r/AI_Agents — capabilities should be explicitly
   allowed per session.)
+- **Capability ledger + taint tracking** (`--taint`) — records a per-run ledger of what was
+  fetched, written, read and executed (a replayable JSONL), marks web/external content as
+  **tainted**, propagates that taint into files it flows into, and escalates to **review** when
+  an action *executes or self-modifies on tainted input* (the "downloaded X, then ran X" flow a
+  memoryless lexical rule misses). **Honest limits:** this is heuristic reference/verbatim-flow
+  taint, not true dataflow — a model laundering the content (paraphrase, re-encode) defeats it;
+  it is sequence-aware *review* and observability, never a hard block, and it does **not** solve
+  the data-vs-instructions problem. The sandbox is still the containment boundary. (h/t
+  u/Dependent_Policy1307, u/Far-Stable2591, u/zoharel on r/AI_Agents.)
 - **Static validator** — self-authored skills must pass a static check (the constrained
   edit surface) before they are kept; learned skills are prompt templates, not executable code.
 - **Verify-or-revert** — autonomous changes are snapshotted and reverted if verification fails.

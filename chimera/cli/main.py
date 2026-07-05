@@ -945,6 +945,9 @@ def solve(
     deny_tools: str = typer.Option(
         None, "--deny-tools", help="Per-session denylist: drop these tools (comma-separated)."
     ),
+    taint: bool = typer.Option(
+        False, "--taint", help="Track a capability ledger + review execution of tainted input."
+    ),
     collect: bool = typer.Option(
         True, "--collect/--no-collect", help="Record trajectories for opt-in model evolution."
     ),
@@ -1023,7 +1026,7 @@ def solve(
         # (explorer/subagents) are added, so subagents inherit the same allowlist.
         from chimera.governance import AuditLog
 
-        allow_audit = AuditLog(settings.home / "audit.jsonl") if guard else None
+        allow_audit = AuditLog(settings.home / "audit.jsonl") if (guard or taint) else None
         registry = _apply_tool_allowlist(
             registry, allow=allow_tools, deny=deny_tools, settings=settings, audit=allow_audit
         )
@@ -1043,6 +1046,14 @@ def solve(
             registry = govern_registry(
                 registry, TrustKernel(audit=AuditLog(settings.home / "audit.jsonl"))
             )
+        ledger = None
+        if taint:
+            # Outermost wrapper (issues #2/#5): sees the same calls the kernel does, records the
+            # capability ledger, and escalates execution/self-mod on tainted input to review.
+            from chimera.governance import TaintLedger, ledger_registry
+
+            ledger = TaintLedger()
+            registry = ledger_registry(registry, ledger, audit=allow_audit)
         worker = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
         escalate_worker = (
             Agent(escalate_backend, registry, AgentConfig(model=model, max_steps=max_steps))
@@ -1087,7 +1098,17 @@ def solve(
                 max_attempts=max_attempts, use_planner=not no_plan, use_manager=not no_manager
             ),
         )
-        return auto.run(task)
+        outcome = auto.run(task)
+        if ledger is not None:
+            ledger.dump(settings.home / "ledger.jsonl")
+            summary = ledger.capability_summary()
+            console.print(
+                f"[dim]capability ledger: {summary['events']} events, "
+                f"{len(summary['tainted_writes'])} tainted write(s), "
+                f"{len(summary['escalations'])} taint escalation(s) "
+                f"-> {settings.home / 'ledger.jsonl'}[/dim]"
+            )
+        return outcome
 
     try:
         if isolate:
