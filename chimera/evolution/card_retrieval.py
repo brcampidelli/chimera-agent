@@ -89,11 +89,26 @@ class CardRetriever:
     def __init__(self, store: SkillStore, *, k: int = 3) -> None:
         self.store = store
         self.k = k
+        self.last_retrieved: list[str] = []
 
     def card_context(self, task: str) -> str:
         # Only ACTIVE skills are retrievable: a pending (possibly poisoned) skill must
         # not influence reasoning until a human approves it.
         cards = self.store.skills(status="active")
         if not cards:
+            self.last_retrieved = []
             return ""
-        return cards_context_block(CardIndex(cards).search(task, k=self.k))
+        hits = CardIndex(cards).search(task, k=self.k)
+        self.last_retrieved = [card.name for card in hits]
+        return cards_context_block(hits)
+
+    def record_outcome(self, success: bool) -> None:
+        """Credit the run's outcome to the cards that were injected into it.
+
+        Per-skill telemetry (uses / successes) is what makes retirement a measured
+        decision instead of a guess — a skill that is retrieved often but never moves
+        outcomes surfaces in ``chimera skills-stats``.
+        """
+        for name in self.last_retrieved:
+            self.store.record_use(name, success=success)
+        self.last_retrieved = []

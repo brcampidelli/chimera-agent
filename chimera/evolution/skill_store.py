@@ -9,6 +9,11 @@ from chimera.evolution.learned_skill import LearnedSkill
 from chimera.providers.gateway import SupportsComplete
 
 
+def _as_int(value: object) -> int:
+    """Coerce a JSON-loaded counter to int (missing/odd values count as 0)."""
+    return value if isinstance(value, int) else 0
+
+
 class SkillStore:
     """A JSON-file store of learned skills (deduped by name)."""
 
@@ -30,8 +35,58 @@ class SkillStore:
         self.path.write_text(json.dumps(list(self._dicts.values()), indent=2), encoding="utf-8")
 
     def add(self, skill: LearnedSkill) -> None:
-        self._dicts[skill.name] = skill.to_dict()
+        entry = skill.to_dict()
+        # Usage counters are store-level state (not part of the skill definition):
+        # re-adding/refining a skill must not wipe its measured track record.
+        previous = self._dicts.get(skill.name)
+        if previous is not None:
+            entry["uses"] = previous.get("uses", 0)
+            entry["successes"] = previous.get("successes", 0)
+        self._dicts[skill.name] = entry
         self.save()
+
+    def record_use(self, name: str, *, success: bool) -> None:
+        """Count one retrieval-into-a-run for a skill and whether that run succeeded."""
+        entry = self._dicts.get(name)
+        if entry is None:
+            return
+        entry["uses"] = _as_int(entry.get("uses")) + 1
+        if success:
+            entry["successes"] = _as_int(entry.get("successes")) + 1
+        self.save()
+
+    def stats(self) -> list[dict[str, object]]:
+        """Per-skill usage stats: name, status, provenance, uses, successes, rate."""
+        rows: list[dict[str, object]] = []
+        for entry in self._dicts.values():
+            uses = _as_int(entry.get("uses"))
+            successes = _as_int(entry.get("successes"))
+            rows.append(
+                {
+                    "name": entry.get("name", ""),
+                    "kind": entry.get("kind", "pattern"),
+                    "status": entry.get("status", "active"),
+                    "provenance": entry.get("provenance", "clean"),
+                    "uses": uses,
+                    "successes": successes,
+                    "rate": round(successes / uses, 3) if uses else None,
+                }
+            )
+        return rows
+
+    def retirement_candidates(self, *, min_uses: int = 5, max_rate: float = 1 / 3) -> list[str]:
+        """Skills with enough uses and a low win rate — SIGNALED for pruning, never deleted.
+
+        Feeds the anti-stagnation loop: a skill that keeps being retrieved but doesn't
+        move outcomes is the first candidate to retire or rewrite.
+        """
+        names: list[str] = []
+        for row in self.stats():
+            uses = _as_int(row["uses"])
+            rate = row["rate"]
+            if uses >= min_uses and isinstance(rate, float) and rate <= max_rate:
+                names.append(str(row["name"]))
+        return names
 
     def names(self) -> list[str]:
         return list(self._dicts)

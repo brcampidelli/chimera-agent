@@ -1372,6 +1372,40 @@ def skills_pending() -> None:
     console.print("[dim]Approve with: chimera skills-approve <name>[/dim]")
 
 
+@app.command("skills-stats")
+def skills_stats() -> None:
+    """Per-skill usage stats (uses, successes, win rate) + retirement candidates."""
+    from chimera.evolution import SkillStore
+
+    store = SkillStore(get_settings().home / "skills.json")
+    rows = store.stats()
+    if not rows:
+        console.print("[dim]No learned skills yet.[/dim]")
+        return
+    retire = set(store.retirement_candidates())
+    table = Table(title="Learned skill stats", show_header=True, header_style="bold")
+    for column in ("Skill", "Kind", "Status", "Provenance", "Uses", "Wins", "Rate", ""):
+        table.add_column(column)
+    for row in rows:
+        rate = row["rate"]
+        table.add_row(
+            str(row["name"]),
+            str(row["kind"]),
+            str(row["status"]),
+            str(row["provenance"]),
+            str(row["uses"]),
+            str(row["successes"]),
+            "-" if rate is None else f"{rate:.0%}",
+            "[yellow]retire?[/yellow]" if row["name"] in retire else "",
+        )
+    console.print(table)
+    if retire:
+        console.print(
+            "[dim]'retire?' = used often with a low win rate — a prune/rewrite candidate. "
+            "Nothing is deleted automatically.[/dim]"
+        )
+
+
 @app.command("skills-approve")
 def skills_approve(
     name: str = typer.Argument(..., help="Name of the pending skill to activate."),

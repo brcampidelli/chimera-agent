@@ -228,6 +228,7 @@ class AutonomousAgent:
                     self.auto_evolver.maybe_evolve(
                         task, answer, prior_successes, tainted=run_tainted
                     )
+                self._record_card_outcome(True)
                 return AutonomousResult(answer=answer, success=True, attempts=attempts, plan=plan)
 
             feedback = fb or (
@@ -259,8 +260,15 @@ class AutonomousAgent:
                 run_tainted = self.taint.run_tainted() if self.taint is not None else False
                 evolve_failure(task, feedback, prior_failures, tainted=run_tainted)
 
+        self._record_card_outcome(False)
         last = attempts[-1].answer if attempts else ""
         return AutonomousResult(answer=last, success=False, attempts=attempts, plan=plan)
+
+    def _record_card_outcome(self, success: bool) -> None:
+        """Credit the run's outcome to the injected skill cards (per-skill telemetry)."""
+        recorder = getattr(self.cards, "record_outcome", None)
+        if callable(recorder):
+            recorder(success)
 
     def _recall_lessons(self, task: str) -> str:
         if self.experience is None:
