@@ -98,3 +98,24 @@ def test_unknown_source_raises(tmp_path: Path) -> None:
 
 def test_available_sources() -> None:
     assert set(available_sources()) == {"hermes", "openclaw"}
+
+
+def test_memory_candidates_resolving_to_same_file_deduped(tmp_path: Path) -> None:
+    """Two candidate names hitting the SAME file (case-insensitive FS) list it once."""
+    from chimera.migration.base import DirectoryImporter
+
+    class TwoNameImporter(DirectoryImporter):
+        source = "twoname"
+        config_files = ()
+        skills_dirs = ()
+        # "./MEMORY.md" resolves to the same file as "MEMORY.md" on every platform,
+        # mimicking the Windows/macOS MEMORY.md-vs-memory.md collision portably.
+        memory_candidates = ("MEMORY.md", "./MEMORY.md")
+        model_keys = ()
+
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / "MEMORY.md").write_text("- one fact\n", encoding="utf-8")
+    importer = TwoNameImporter(home)
+    assert importer.scan().memory_files == ["MEMORY.md"]  # listed once, not twice
+    assert len(importer.memory_items()) == 1  # parsed once, not twice

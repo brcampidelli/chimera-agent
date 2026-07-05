@@ -147,11 +147,18 @@ class DirectoryImporter(Importer):
         return sources
 
     def _memory_files(self) -> list[str]:
+        # Dedup by resolved path: on case-insensitive filesystems (Windows/macOS) two
+        # candidates like "MEMORY.md" and "memory.md" hit the SAME file — without this
+        # the preview lists it twice and apply parses its items twice.
         found: list[str] = []
+        seen: set[str] = set()
         for name in self.memory_candidates:
             candidate = self.home / name
             if candidate.exists():
-                found.append(name)
+                real = str(candidate.resolve())
+                if real not in seen:
+                    seen.add(real)
+                    found.append(name)
         return found
 
     def memory_items(self) -> list[MemoryItem]:
