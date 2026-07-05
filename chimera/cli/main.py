@@ -69,6 +69,33 @@ app = typer.Typer(
 )
 console = Console()
 
+
+def _apply_tool_allowlist(
+    registry: Any,
+    *,
+    allow: str | None,
+    deny: str | None,
+    settings: Settings,
+    audit: Any | None = None,
+) -> Any:
+    """Filter a registry by the per-session tool allowlist (CLI option over env).
+
+    A ``--allow-tools``/``--deny-tools`` CLI value wins over the ``CHIMERA_TOOL_*``
+    env lists; an empty allowlist means "no restriction". Returns the registry
+    unchanged when nothing is restricted, so the common path stays a no-op.
+    """
+    from chimera.governance import restrict_registry
+
+    def _csv(value: str) -> list[str]:
+        return [item.strip() for item in value.split(",") if item.strip()]
+
+    allow_names = _csv(allow) if allow is not None else (settings.tool_allowlist or None)
+    deny_names = _csv(deny) if deny is not None else list(settings.tool_denylist)
+    if allow_names is None and not deny_names:
+        return registry
+    return restrict_registry(registry, allow=allow_names, deny=deny_names, audit=audit)
+
+
 # Module-level so the list-typed default isn't a call-in-default (ruff B008).
 _IMAGE_OPTION = typer.Option(
     None, "--image", help="Attach an image (path or URL); repeatable. Needs a vision model."
@@ -227,6 +254,12 @@ def agent(
     workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root for tools."),
     fuse: bool = typer.Option(False, "--fuse", help="Route deep-reasoning turns through fusion."),
     guard: bool = typer.Option(False, "--guard", help="Gate tool calls through the governance kernel."),
+    allow_tools: str = typer.Option(
+        None, "--allow-tools", help="Per-session allowlist: only these tools (comma-separated)."
+    ),
+    deny_tools: str = typer.Option(
+        None, "--deny-tools", help="Per-session denylist: drop these tools (comma-separated)."
+    ),
 ) -> None:
     """Run the ReAct agent loop with native tools. Requires a provider key."""
     from chimera.core import Agent, AgentConfig
@@ -241,6 +274,9 @@ def agent(
 
             backend = RoutedBackend(gateway, FusionEngine(gateway))
         registry = default_registry(Path(workspace))
+        registry = _apply_tool_allowlist(
+            registry, allow=allow_tools, deny=deny_tools, settings=get_settings()
+        )
         if guard:
             from chimera.governance import AuditLog, TrustKernel, govern_registry
 
@@ -903,6 +939,12 @@ def solve(
     rubric: bool = typer.Option(False, "--rubric", help="Manager reviews via the cascade rubric."),
     fuse: bool = typer.Option(False, "--fuse", help="Route deep-reasoning turns through fusion."),
     guard: bool = typer.Option(False, "--guard", help="Gate tool calls through the governance kernel."),
+    allow_tools: str = typer.Option(
+        None, "--allow-tools", help="Per-session allowlist: only these tools (comma-separated)."
+    ),
+    deny_tools: str = typer.Option(
+        None, "--deny-tools", help="Per-session denylist: drop these tools (comma-separated)."
+    ),
     collect: bool = typer.Option(
         True, "--collect/--no-collect", help="Record trajectories for opt-in model evolution."
     ),
@@ -977,6 +1019,14 @@ def solve(
 
     def _run_solve(ws: Path) -> AutonomousResult:
         registry = default_registry(ws)
+        # Per-session grant first (issue #4): scope the native tools before the meta-tools
+        # (explorer/subagents) are added, so subagents inherit the same allowlist.
+        from chimera.governance import AuditLog
+
+        allow_audit = AuditLog(settings.home / "audit.jsonl") if guard else None
+        registry = _apply_tool_allowlist(
+            registry, allow=allow_tools, deny=deny_tools, settings=settings, audit=allow_audit
+        )
         if explorer:
             from chimera.core import ExploreRepositoryTool
 
@@ -988,7 +1038,7 @@ def solve(
             # The subagent draws from the tools registered so far (minus spawn itself).
             registry.register(SubAgentTool(gateway, registry, model=model, max_turns=max_steps))
         if guard:
-            from chimera.governance import AuditLog, TrustKernel, govern_registry
+            from chimera.governance import TrustKernel, govern_registry
 
             registry = govern_registry(
                 registry, TrustKernel(audit=AuditLog(settings.home / "audit.jsonl"))

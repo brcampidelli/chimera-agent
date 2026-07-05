@@ -185,6 +185,11 @@ class Settings(BaseSettings):
     # Optional OCI runtime for the docker sandbox (e.g. runsc = gVisor); empty = daemon default.
     sandbox_runtime: str = Field(default="", validation_alias="CHIMERA_SANDBOX_RUNTIME")
 
+    # Per-session tool allowlist/denylist (names). Empty allowlist = no restriction (all
+    # tools); a non-empty allowlist grants only those. Denylist removes even if allowed.
+    tool_allowlist: list[str] = Field(default_factory=list, validation_alias="CHIMERA_TOOL_ALLOWLIST")
+    tool_denylist: list[str] = Field(default_factory=list, validation_alias="CHIMERA_TOOL_DENYLIST")
+
     @field_validator(
         "fusion_panel",
         "fallback_models",
@@ -193,6 +198,8 @@ class Settings(BaseSettings):
         "anthropic_keys",
         "gemini_keys",
         "deepseek_keys",
+        "tool_allowlist",
+        "tool_denylist",
         mode="before",
     )
     @classmethod

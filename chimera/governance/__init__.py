@@ -11,6 +11,7 @@ from chimera.governance.actors import (
     FourActorGovernance,
     GovernanceDecision,
 )
+from chimera.governance.allowlist import restrict_registry
 from chimera.governance.audit import AuditLog
 from chimera.governance.drift import (
     DriftReport,
@@ -38,6 +39,7 @@ __all__ = [
     "AuditLog",
     "GovernedTool",
     "govern_registry",
+    "restrict_registry",
     "SkillValidator",
     "ScheduleValidator",
     "ValidationResult",

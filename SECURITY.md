@@ -33,6 +33,12 @@ environment** when you grant autonomy:
   secret material) are blocked or escalated. Enable with `--guard`. **These are shell-signature
   matches — a cheap first filter, not the security boundary.** An agent can sidestep them (e.g.
   by doing the same thing from a Python script); the real containment is the sandbox below.
+- **Per-session tool allowlist** — grant a session only the tools it needs with
+  `--allow-tools`/`--deny-tools` (or `CHIMERA_TOOL_ALLOWLIST`/`CHIMERA_TOOL_DENYLIST`). An
+  un-granted tool is **dropped from the registry**, so it never reaches the model's schema —
+  the agent cannot invoke, or be talked into invoking, what it was not given. Subagents
+  inherit the grant. (h/t u/zoharel on r/AI_Agents — capabilities should be explicitly
+  allowed per session.)
 - **Static validator** — self-authored skills must pass a static check (the constrained
   edit surface) before they are kept; learned skills are prompt templates, not executable code.
 - **Verify-or-revert** — autonomous changes are snapshotted and reverted if verification fails.
