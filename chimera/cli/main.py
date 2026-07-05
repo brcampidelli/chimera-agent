@@ -956,14 +956,19 @@ def solve(
     gateway = LLMGateway()
     backend: SupportsComplete = gateway
     planner_backend: SupportsComplete = gateway
+    escalate_backend: SupportsComplete | None = None
     # --fuse (explicit) or CHIMERA_AUTO_FUSE (production default) both route the worker
     # through the cost-aware router, so deep/error-sensitive turns fuse and cheap/tool
     # turns stay single-model.
     if fuse or settings.auto_fuse:
-        from chimera.fusion import FusionEngine, RoutedBackend
+        from chimera.fusion import FusionEngine, RoutedBackend, RoutingPolicy
 
         engine = FusionEngine(gateway)
         backend = RoutedBackend(gateway, engine)
+        # Observed-difficulty escalation (issue #3): a fusion-forced backend for retrying a
+        # task that already failed verification — "the review surface is where the difficulty
+        # signal lives". The AutonomousAgent uses it only after an attempt fails.
+        escalate_backend = RoutedBackend(gateway, engine, RoutingPolicy(mode="always"))
         # Planning is a deep, tool-free reasoning turn — exactly where fusion pays off —
         # so an explicit --fuse routes the plan through fusion directly. Auto-fuse keeps
         # planning single unless asked, to bound cost.
@@ -989,8 +994,14 @@ def solve(
                 registry, TrustKernel(audit=AuditLog(settings.home / "audit.jsonl"))
             )
         worker = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
+        escalate_worker = (
+            Agent(escalate_backend, registry, AgentConfig(model=model, max_steps=max_steps))
+            if escalate_backend is not None
+            else None
+        )
         auto = AutonomousAgent(
             worker,
+            escalate_worker=escalate_worker,
             planner=None if no_plan else Planner(planner_backend, model),
             manager=None if no_manager else Manager(gateway, model, use_rubric=rubric),
             verifier=CommandVerifier(verify, ws) if verify else None,

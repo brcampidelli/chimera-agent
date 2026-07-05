@@ -50,6 +50,44 @@ class FailVerifier:
         return VerificationResult(False, "always fails")
 
 
+def test_retry_escalates_to_fusion_worker() -> None:
+    # Issue #3: once an attempt fails verification, the retry runs on the escalate worker.
+    cheap, fused = FakeWorker("cheap"), FakeWorker("fused")
+    auto = AutonomousAgent(
+        cheap,
+        escalate_worker=fused,
+        verifier=FlakyVerifier(fail_times=1),  # attempt 1 fails, attempt 2 passes
+        config=AutonomousConfig(max_attempts=2, use_planner=False, use_manager=False),
+    )
+    result = auto.run("do the thing")
+    assert result.success and result.answer == "fused"
+    assert cheap.runs == 1 and fused.runs == 1
+
+
+def test_first_attempt_uses_cheap_worker_not_escalate() -> None:
+    cheap, fused = FakeWorker("cheap"), FakeWorker("fused")
+    auto = AutonomousAgent(
+        cheap,
+        escalate_worker=fused,
+        verifier=FlakyVerifier(fail_times=0),  # attempt 1 already passes
+        config=AutonomousConfig(max_attempts=2, use_planner=False, use_manager=False),
+    )
+    result = auto.run("easy")
+    assert result.success and result.answer == "cheap"
+    assert cheap.runs == 1 and fused.runs == 0  # never escalated
+
+
+def test_no_escalate_worker_retries_same_worker() -> None:
+    cheap = FakeWorker("cheap")
+    auto = AutonomousAgent(
+        cheap,  # no escalate_worker -> retries reuse the same worker
+        verifier=FlakyVerifier(fail_times=1),
+        config=AutonomousConfig(max_attempts=2, use_planner=False, use_manager=False),
+    )
+    result = auto.run("thing")
+    assert result.success and cheap.runs == 2
+
+
 class ScriptedBackend:
     def __init__(self, contents: list[str]) -> None:
         self._contents = list(contents)

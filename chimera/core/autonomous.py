@@ -7,7 +7,9 @@ Ties the pieces together into a single-task autonomous loop:
 3. snapshot the workspace, then **execute** with the Worker (the agent loop)
 4. a **Manager** reviews the result (generate-vs-verify)
 5. **verify** with executable evidence; on failure (or rejection) **revert** to the
-   snapshot and retry with feedback, up to a budget
+   snapshot and retry with feedback, up to a budget — and, when an escalate worker is
+   given, run the retry on it (issue #3): once an attempt fails the task has *proven*
+   hard, so the retry pays for fusion. Difficulty read from the review surface.
 6. record the attempt in the **experience buffer**
 
 Every dependency is injectable, so the whole loop is testable without a network.
@@ -96,6 +98,7 @@ class AutonomousAgent:
         self,
         worker: Worker,
         *,
+        escalate_worker: Worker | None = None,
         planner: Planner | None = None,
         manager: Manager | None = None,
         verifier: Verifier | None = None,
@@ -109,6 +112,7 @@ class AutonomousAgent:
         config: AutonomousConfig | None = None,
     ) -> None:
         self.worker = worker
+        self.escalate_worker = escalate_worker
         self.planner = planner
         self.manager = manager
         self.verifier = verifier
@@ -149,7 +153,17 @@ class AutonomousAgent:
         for index in range(1, self.config.max_attempts + 1):
             snapshot = self.guard.snapshot() if self.guard else None
             prompt = self._compose(task, plan, context, feedback)
-            agent_result = self.worker.run(prompt)
+            # Observed difficulty (issue #3): the first attempt uses the cost-aware worker;
+            # once an attempt has failed (index > 1) the task has proven hard, so retries run
+            # on the escalated fusion worker when one is given. Falls back to the same worker.
+            worker = (
+                self.escalate_worker
+                if index > 1 and self.escalate_worker is not None
+                else self.worker
+            )
+            if worker is self.escalate_worker:
+                _log.debug("attempt %d: task proved hard, escalating retry to fusion worker", index)
+            agent_result = worker.run(prompt)
             answer = agent_result.answer
 
             # Executable evidence is ground truth: when a verifier is present it
