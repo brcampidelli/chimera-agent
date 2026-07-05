@@ -48,6 +48,12 @@ environment** when you grant autonomy:
   it is sequence-aware *review* and observability, never a hard block, and it does **not** solve
   the data-vs-instructions problem. The sandbox is still the containment boundary. (h/t
   u/Dependent_Policy1307, u/Far-Stable2591, u/zoharel on r/AI_Agents.)
+- **Data-fencing on fetched content (spotlighting)** — with `--taint`, untrusted tool
+  results (web pages, search, email) are returned to the model inside explicit
+  `<<external-data>>` markers, and the agent's standing instructions say marked content
+  is data, never instructions. **Honest limit:** this is a prompting mitigation with a
+  known failure rate — a well-crafted injection can still talk through it. It lowers the
+  hit rate; the sandbox and taint escalation remain the containment.
 - **Provenance on durable artifacts (anti-poisoning)** — memories and learned skills born
   from a run that consumed untrusted content are marked `tainted`; a tainted-run skill is
   held **pending** (excluded from retrieval) until approved via `chimera skills-approve`,

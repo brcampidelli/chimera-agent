@@ -28,7 +28,13 @@ from chimera.governance.ledger import (
     TaintLedger,
     assess_action,
 )
-from chimera.governance.ledger_tool import LedgeredTool, ledger_registry
+from chimera.governance.ledger_tool import (
+    FENCE_CLOSE,
+    FENCE_OPEN,
+    LedgeredTool,
+    fence,
+    ledger_registry,
+)
 from chimera.governance.policy import Decision, Rule, RuleSet, Verdict
 from chimera.governance.precedent import PrecedentStore
 from chimera.governance.validator import (
@@ -53,6 +59,9 @@ __all__ = [
     "assess_action",
     "LedgeredTool",
     "ledger_registry",
+    "fence",
+    "FENCE_OPEN",
+    "FENCE_CLOSE",
     "SkillValidator",
     "ScheduleValidator",
     "ValidationResult",

@@ -186,3 +186,44 @@ def test_ledger_registry_wraps_every_tool() -> None:
 def test_assessment_dataclass_defaults() -> None:
     a = SequenceAssessment(False, Decision.ALLOW)
     assert a.tainted_refs == [] and a.reason == ""
+
+
+# --- data-fencing (spotlighting) on fetched content (A2) -------------------------------
+
+
+def test_fetch_result_is_fenced() -> None:
+    from chimera.governance import FENCE_CLOSE, FENCE_OPEN
+
+    led = TaintLedger()
+    out = LedgeredTool(FakeTool("http_get", result="page body"), led).run(url="https://x.test/")
+    assert out.startswith(FENCE_OPEN) and out.rstrip().endswith(FENCE_CLOSE)
+    assert "page body" in out
+
+
+def test_fence_records_raw_content_for_flow_detection() -> None:
+    # The ledger must taint the RAW body, so a later verbatim flow still matches even
+    # though the model saw the fenced version.
+    led = TaintLedger()
+    body = "a sufficiently long malicious payload snippet for flow matching purposes"
+    LedgeredTool(FakeTool("http_get", result=body), led).run(url="https://x.test/")
+    event = led.record_write("/tmp/drop.sh", content=body)
+    assert event.tainted
+
+
+def test_non_fetch_tools_are_not_fenced() -> None:
+    led = TaintLedger()
+    out = LedgeredTool(FakeTool("run_shell", result="ok output"), led).run(command="echo hi")
+    assert out == "ok output"
+
+
+def test_empty_fetch_result_not_fenced() -> None:
+    led = TaintLedger()
+    out = LedgeredTool(FakeTool("http_get", result="  "), led).run(url="https://x.test/")
+    assert out == "  "
+
+
+def test_fence_helper_wraps_content() -> None:
+    from chimera.governance import FENCE_CLOSE, FENCE_OPEN, fence
+
+    wrapped = fence("hello")
+    assert wrapped == f"{FENCE_OPEN}\nhello\n{FENCE_CLOSE}"
