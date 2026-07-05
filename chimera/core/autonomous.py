@@ -31,6 +31,7 @@ from chimera.core.verify import Verifier
 from chimera.ecosystem.events import events_from_transcript
 from chimera.ecosystem.trajectory import TrajectoryCollector
 from chimera.evolution.experience import ExperienceBuffer, Outcome, format_lessons
+from chimera.evolution.stagnation import StagnationDetector
 from chimera.telemetry import get_logger
 
 _log = get_logger("core.autonomous")
@@ -99,6 +100,7 @@ class AutonomousAgent:
         worker: Worker,
         *,
         escalate_worker: Worker | None = None,
+        stagnation: StagnationDetector | None = None,
         planner: Planner | None = None,
         manager: Manager | None = None,
         verifier: Verifier | None = None,
@@ -113,6 +115,7 @@ class AutonomousAgent:
     ) -> None:
         self.worker = worker
         self.escalate_worker = escalate_worker
+        self.stagnation = stagnation
         self.planner = planner
         self.manager = manager
         self.verifier = verifier
@@ -219,6 +222,16 @@ class AutonomousAgent:
             hint = self._fault_hint(agent_result)
             if hint:
                 feedback = f"{feedback}\n\n{hint}" if feedback else hint
+
+            # Anti-stagnation (crowding-score analog, arXiv 2606.29717): when successive
+            # attempts keep failing the *same* way, refining is a local optimum — fold in a
+            # pivot instruction so the next attempt tries a fundamentally different approach.
+            # Advisory only; the escalated worker still supplies the stronger model.
+            if self.stagnation is not None:
+                self.stagnation.record_signature(hint or vout or feedback)
+                if self.stagnation.assess().stagnant:
+                    _log.debug("attempt %d: stagnation detected; injecting pivot advice", index)
+                    feedback = f"{feedback}\n\n{self.stagnation.advice()}"
 
         # The run ultimately failed: if this failure pattern recurs, distill an advisory
         # anti-pattern card so future attempts are warned. Guarded — the capability is

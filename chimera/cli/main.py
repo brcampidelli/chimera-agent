@@ -1060,9 +1060,13 @@ def solve(
             if escalate_backend is not None
             else None
         )
+        from chimera.evolution import StagnationDetector
+
         auto = AutonomousAgent(
             worker,
             escalate_worker=escalate_worker,
+            # Pivot the retry when attempts keep failing the same way (short budget → window 2).
+            stagnation=StagnationDetector(window=2),
             planner=None if no_plan else Planner(planner_backend, model),
             manager=None if no_manager else Manager(gateway, model, use_rubric=rubric),
             verifier=CommandVerifier(verify, ws) if verify else None,

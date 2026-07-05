@@ -14,6 +14,12 @@ from chimera.evolution.experience import Experience, ExperienceBuffer, format_le
 from chimera.evolution.learned_skill import LearnedSkill
 from chimera.evolution.skill_nudges import SkillNudge, detect_skill_nudges
 from chimera.evolution.skill_store import SkillStore
+from chimera.evolution.stagnation import (
+    StagnationDetector,
+    StagnationReport,
+    mean_pairwise_correlation,
+    pearson,
+)
 
 __all__ = [
     "Experience",
@@ -36,4 +42,8 @@ __all__ = [
     "localize_fault",
     "attribute",
     "qualify",
+    "StagnationDetector",
+    "StagnationReport",
+    "pearson",
+    "mean_pairwise_correlation",
 ]
