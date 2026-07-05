@@ -64,7 +64,7 @@ it. Here's what makes it special, in plain terms:
 ### 🔌 Connect & automate
 - **Talk to it anywhere** — a terminal chat, a full-screen terminal app, or as a bot on **Discord, Telegram, Slack, Signal, and WhatsApp**. There's also a simple HTTP endpoint.
 - **Scheduling & proactivity** — give it recurring jobs in plain language ("every morning, summarize the news"). With the built-in scheduler running, it **acts on time**, not only when you message it.
-- **Tools & integrations** — read and write files, run shell commands, browse the web, and run code safely in a sandbox. Connect almost any web service (through its API) or external tool, and import your setup from other agent tools you already use.
+- **Tools & integrations** — read and write files, run shell commands, browse the web, and run code safely in a sandbox. Connect almost any web service (through its API) or external tool — including any **MCP server** ([guide + runnable example](docs/mcp.md)) — and import your setup from other agent tools you already use.
 - **Batteries included** — web search, image generation, text-to-speech, email, calendar, code execution, and more, ready to switch on.
 
 ### 🚀 Run anywhere, safely
