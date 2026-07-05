@@ -6,13 +6,16 @@ key proof that Chimera resists the EvoClaw problem.
 
 from chimera.eval.chained import ChainStep, demo_chain, run_chain
 from chimera.eval.continuous import (
+    CostingSolver,
     EvalTask,
     EvolutionReport,
+    RoundedEvolutionReport,
     SingleModelSolver,
     Solver,
     TaskOutcome,
     demo_tasks,
     run_continuous,
+    run_evolution,
 )
 from chimera.eval.evoclaw import (
     EvoComparison,
@@ -43,8 +46,11 @@ __all__ = [
     "EvolutionReport",
     "TaskOutcome",
     "Solver",
+    "CostingSolver",
     "SingleModelSolver",
+    "RoundedEvolutionReport",
     "run_continuous",
+    "run_evolution",
     "demo_tasks",
     "ChainStep",
     "run_chain",

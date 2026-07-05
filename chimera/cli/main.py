@@ -2048,6 +2048,9 @@ def bench(
     fuse: bool = typer.Option(False, "--fuse", help="Use the fusion engine as the solver."),
     chain: bool = typer.Option(False, "--chain", help="Run the stateful chained benchmark (error propagation)."),
     hard: bool = typer.Option(False, "--hard", help="Use the hard suite (traps / propagating chain)."),
+    rounds: int = typer.Option(
+        1, "--rounds", help="Re-run the suite N times; report stagnation + cost trend across rounds."
+    ),
 ) -> None:
     """Run the continuous-evolution benchmark on a demo task set. Requires a key."""
     from chimera.eval import (
@@ -2058,6 +2061,7 @@ def bench(
         hard_tasks,
         run_chain,
         run_continuous,
+        run_evolution,
     )
     from chimera.eval.hard import HARD_CHAIN_START
     from chimera.providers import LLMGateway
@@ -2078,6 +2082,7 @@ def bench(
         backend = FusionEngine(gateway)
 
     solver = SingleModelSolver(backend, model)
+    report: Any  # EvolutionReport | ChainReport | RoundedEvolutionReport — all have .summary()
     if chain:
         steps = hard_chain() if hard else demo_chain(limit or 8)
         start = HARD_CHAIN_START if hard else "0"
@@ -2087,14 +2092,15 @@ def bench(
         tasks = hard_tasks() if hard else demo_tasks()
         if limit > 0:
             tasks = tasks[:limit]
-        report = run_continuous(
-            solver,
-            tasks,
-            on_task=lambda o: console.print(
-                f"  {'[green]PASS[/green]' if o.passed else '[red]FAIL[/red]'} {o.id}"
-            ),
+        on_task = lambda o: console.print(  # noqa: E731
+            f"  {'[green]PASS[/green]' if o.passed else '[red]FAIL[/red]'} {o.id}"
         )
-        title = "Continuous-evolution benchmark"
+        if rounds > 1:
+            report = run_evolution(solver, tasks, rounds=rounds, on_task=on_task)
+            title = f"Continuous-evolution benchmark ({rounds} rounds: stagnation + cost)"
+        else:
+            report = run_continuous(solver, tasks, on_task=on_task)
+            title = "Continuous-evolution benchmark"
 
     summary = report.summary()
     table = Table(title=title, show_header=False, title_style="bold")
