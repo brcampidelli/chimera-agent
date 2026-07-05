@@ -1,0 +1,34 @@
+# Email triage — a real consumer workflow.
+#
+# Run with:   chimera workflow examples/email_triage/triage.yaml -w ./triage_workspace
+# Requires:   CHIMERA_IMAP_HOST / _USER / _PASSWORD in your .env (see README.md here)
+#
+# Step 1 reads your recent inbox with the read_email tool and writes a classified
+# triage report; step 2 turns it into a short digest you can read in ten seconds.
+# Everything is READ-ONLY against your mailbox: nothing is deleted, moved or sent.
+name: email-triage
+steps:
+  - name: triage
+    uses: solve
+    with:
+      task: >
+        Use the read_email tool to fetch the 10 most recent emails. Classify each
+        one as URGENT (needs a reply today), PERSONAL, NEWSLETTER, or COLD-SALES
+        (unsolicited outreach). Write the result to triage_report.md as a markdown
+        table with columns: From, Subject, Category, Why (one short clause).
+        If the read_email tool returns an error, write the error into
+        triage_report.md instead and stop.
+      verify: "python -c \"import pathlib; assert pathlib.Path('triage_report.md').read_text().strip()\""
+      max_attempts: 2
+    repeat: 2
+    until: success
+
+  - name: digest
+    uses: solve
+    when: prev_succeeded
+    with:
+      task: >
+        Read triage_report.md and write digest.md: at most 5 lines. Line 1: counts
+        per category. Then one line per URGENT email (sender + what they need).
+        If there are no urgent emails, say so in one line.
+      verify: "python -c \"import pathlib; assert pathlib.Path('digest.md').read_text().strip()\""

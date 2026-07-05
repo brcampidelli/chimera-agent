@@ -109,6 +109,14 @@ docker compose up -d      # gateway + scheduler; restarts automatically
 ```
 Full guide (Docker or systemd, scheduling, backups, security): **[docs/deploy.md](docs/deploy.md)**.
 
+**5. Do something real in 5 minutes: email triage.** Point Chimera at your inbox and get a
+ten-second digest — read-only, classify URGENT / PERSONAL / NEWSLETTER / COLD-SALES, and
+optionally schedule it every morning:
+```bash
+uv run chimera workflow examples/email_triage/triage.yaml -w ./triage_workspace
+```
+Setup + daily scheduling + honest caveats: **[examples/email_triage/README.md](examples/email_triage/README.md)**.
+
 ## How it works
 
 Give Chimera a task; it plans, thinks (blending models when the problem is hard), acts with tools,
