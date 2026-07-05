@@ -91,7 +91,9 @@ class CardRetriever:
         self.k = k
 
     def card_context(self, task: str) -> str:
-        cards = self.store.skills()
+        # Only ACTIVE skills are retrievable: a pending (possibly poisoned) skill must
+        # not influence reasoning until a human approves it.
+        cards = self.store.skills(status="active")
         if not cards:
             return ""
         return cards_context_block(CardIndex(cards).search(task, k=self.k))

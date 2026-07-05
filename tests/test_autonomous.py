@@ -305,7 +305,9 @@ class RecordingMemory:
     def __init__(self) -> None:
         self.saved: list[tuple[str, str | None]] = []
 
-    def remember(self, content: str, *, key: str | None = None) -> object:
+    def remember(
+        self, content: str, *, key: str | None = None, provenance: str = "clean"
+    ) -> object:
         self.saved.append((content, key))
         return ("ADD", None)
 
@@ -340,7 +342,9 @@ class RecordingEvolver:
     def __init__(self) -> None:
         self.calls: list[tuple[str, str, int]] = []
 
-    def maybe_evolve(self, task: str, solution: str, prior_successes: int) -> object:
+    def maybe_evolve(
+        self, task: str, solution: str, prior_successes: int, *, tainted: bool = False
+    ) -> object:
         self.calls.append((task, solution, prior_successes))
         return None
 
@@ -379,7 +383,9 @@ class RecordingFailureEvolver(RecordingEvolver):
         super().__init__()
         self.failure_calls: list[tuple[str, str, int]] = []
 
-    def maybe_evolve_failure(self, task: str, detail: str, prior_failures: int) -> object:
+    def maybe_evolve_failure(
+        self, task: str, detail: str, prior_failures: int, *, tainted: bool = False
+    ) -> object:
         self.failure_calls.append((task, detail, prior_failures))
         return None
 

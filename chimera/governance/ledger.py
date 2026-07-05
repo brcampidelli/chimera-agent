@@ -147,6 +147,15 @@ class TaintLedger:
 
     # --- taint queries ---------------------------------------------------------------
 
+    def run_tainted(self) -> bool:
+        """True if this run has consumed ANY untrusted content (a tainted event exists).
+
+        Coarse by design: it gates *provenance* of durable artifacts (memories, learned
+        skills) produced during the run — the "Zombie Agents" self-reinforcing-injection
+        surface — not per-action policy, which stays with :func:`assess_action`.
+        """
+        return any(event.tainted for event in self.events)
+
     def is_tainted(self, ref: str) -> bool:
         return bool(ref) and ref.strip() in self._tainted
 

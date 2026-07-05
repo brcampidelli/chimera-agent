@@ -28,6 +28,7 @@ from chimera.telemetry import get_logger
 
 if TYPE_CHECKING:
     from chimera.evolution.collective import CollectiveSkillEvolver
+    from chimera.governance.audit import AuditLog
 
 _log = get_logger("evolution.auto")
 
@@ -49,10 +50,12 @@ class AutoSkillEvolver:
         collective: CollectiveSkillEvolver | None = None,
         min_transfer: float = 0.5,
         accept_mode: str = "point",
+        audit: AuditLog | None = None,
     ) -> None:
         self.evolver = evolver
         self.store = store
         self.validator = validator
+        self.audit = audit
         self.min_recurrences = min_recurrences
         # When a fusion panel is available, prefer a candidate proposed across the
         # panel and kept by cross-model transferability (OpenClaw-Skill) over a
@@ -63,16 +66,37 @@ class AutoSkillEvolver:
         # fraction) — the honesty upgrade that stops a lucky small-sample pass counting.
         self.accept_mode = accept_mode
 
-    def maybe_evolve(self, task: str, solution: str, prior_successes: int) -> LearnedSkill | None:
+    def _mark_and_store(self, skill: LearnedSkill, *, tainted: bool) -> LearnedSkill:
+        """Store a skill with anti-poisoning provenance (Zombie Agents defense).
+
+        A skill distilled during a run that consumed untrusted content is marked
+        ``tainted`` and held ``pending`` — it never enters retrieval until a human
+        approves it (`chimera skills-approve`). Clean runs store active as before.
+        """
+        if tainted:
+            skill.provenance = "tainted"
+            skill.status = "pending"
+            _log.debug("skill %s held PENDING (tainted-run provenance)", skill.name)
+            if self.audit is not None:
+                self.audit.record(
+                    "taint_provenance",
+                    {"artifact": "skill", "name": skill.name, "action": "held_pending"},
+                )
+        self.store.add(skill)
+        return skill
+
+    def maybe_evolve(
+        self, task: str, solution: str, prior_successes: int, *, tainted: bool = False
+    ) -> LearnedSkill | None:
         """Return the kept skill, or None if not recurring / rejected / untested."""
         if prior_successes < self.min_recurrences:
             return None  # not recurring enough yet
         if self.collective is not None:
-            return self._evolve_collective(task, solution)
-        return self._evolve_single(task, solution)
+            return self._evolve_collective(task, solution, tainted=tainted)
+        return self._evolve_single(task, solution, tainted=tainted)
 
     def maybe_evolve_failure(
-        self, task: str, detail: str, prior_failures: int
+        self, task: str, detail: str, prior_failures: int, *, tainted: bool = False
     ) -> LearnedSkill | None:
         """Distill a RECURRING failure into an advisory anti-pattern card.
 
@@ -92,11 +116,13 @@ class AutoSkillEvolver:
         if self.validator is not None and not self.validator.validate(card.to_dict()).accepted:
             _log.debug("rejected anti-pattern card %s (failed validation)", card.name)
             return None
-        self.store.add(card)
+        self._mark_and_store(card, tainted=tainted)
         _log.debug("kept anti-pattern card %s", card.name)
         return card
 
-    def _evolve_single(self, task: str, solution: str) -> LearnedSkill | None:
+    def _evolve_single(
+        self, task: str, solution: str, *, tainted: bool = False
+    ) -> LearnedSkill | None:
         candidate = self.evolver.propose(task, solution)
         if candidate is None:
             return None
@@ -115,11 +141,13 @@ class AutoSkillEvolver:
             _log.debug("discarded auto-skill %s (failed smoke test)", candidate.name)
             return None
 
-        self.store.add(candidate)
+        self._mark_and_store(candidate, tainted=tainted)
         _log.debug("kept auto-skill %s", candidate.name)
         return candidate
 
-    def _evolve_collective(self, task: str, solution: str) -> LearnedSkill | None:
+    def _evolve_collective(
+        self, task: str, solution: str, *, tainted: bool = False
+    ) -> LearnedSkill | None:
         """Propose across the fusion panel; keep the most transferable validated skill.
 
         Cross-model transferability is the executable gate here — it subsumes the
@@ -152,6 +180,6 @@ class AutoSkillEvolver:
         if best is None or best_score < self.min_transfer:
             _log.debug("no transferable auto-skill kept (best gate=%.2f)", best_score)
             return None
-        self.store.add(best)
+        self._mark_and_store(best, tainted=tainted)
         _log.debug("kept collective auto-skill %s (frac=%.2f gate=%.2f)", best.name, best_frac, best_score)
         return best

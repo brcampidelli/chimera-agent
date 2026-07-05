@@ -48,6 +48,14 @@ environment** when you grant autonomy:
   it is sequence-aware *review* and observability, never a hard block, and it does **not** solve
   the data-vs-instructions problem. The sandbox is still the containment boundary. (h/t
   u/Dependent_Policy1307, u/Far-Stable2591, u/zoharel on r/AI_Agents.)
+- **Provenance on durable artifacts (anti-poisoning)** — memories and learned skills born
+  from a run that consumed untrusted content are marked `tainted`; a tainted-run skill is
+  held **pending** (excluded from retrieval) until approved via `chimera skills-approve`,
+  and tainted memories are labeled `[unverified]` on recall. This targets the
+  self-reinforcing-injection loop ("Zombie Agents"): a poisoned page must not silently
+  become a trusted skill or memory that hijacks future runs. **Honest limit:** provenance
+  is per-run and coarse — it flags *everything* born from a tainted run, and it cannot
+  detect poison that arrives through channels the ledger doesn't see.
 - **Static validator** — self-authored skills must pass a static check (the constrained
   edit surface) before they are kept; learned skills are prompt templates, not executable code.
 - **Verify-or-revert** — autonomous changes are snapshotted and reverted if verification fails.

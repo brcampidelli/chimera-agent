@@ -36,9 +36,15 @@ class MemoryManager:
         *,
         key: str | None = None,
         source: str = "chimera",
+        provenance: str = "clean",
     ) -> MemoryItem:
         item = MemoryItem(
-            id=uuid.uuid4().hex[:8], kind=kind, content=content, key=key, source=source
+            id=uuid.uuid4().hex[:8],
+            kind=kind,
+            content=content,
+            key=key,
+            source=source,
+            provenance=provenance,
         )
         self.store.add(item)
         return item
@@ -68,17 +74,25 @@ class MemoryManager:
         *,
         key: str | None = None,
         source: str = "chimera",
+        provenance: str = "clean",
     ) -> tuple[str, MemoryItem]:
         """ADD a new fact, UPDATE an existing one (same key), or NOOP a duplicate.
 
-        Returns the operation name and the resulting item.
+        Returns the operation name and the resulting item. ``provenance="tainted"``
+        marks a fact written during a run that consumed untrusted content; an UPDATE
+        from a tainted run also taints the stored item (poison must not launder itself
+        into a previously clean fact).
         """
         duplicate = self._find_duplicate(content, key)
         if duplicate is None:
-            return "ADD", self.add(content, kind, key=key, source=source)
+            return "ADD", self.add(content, kind, key=key, source=source, provenance=provenance)
         if _normalize(duplicate.content) == _normalize(content):
             return "NOOP", duplicate
-        return "UPDATE", self.update(duplicate.id, content)
+        updated = self.update(duplicate.id, content)
+        if provenance == "tainted":
+            updated.provenance = "tainted"
+            self.store.add(updated)
+        return "UPDATE", updated
 
     def merge(self, items: list[MemoryItem]) -> dict[str, int]:
         """Merge a batch, deduping against existing memory. Returns op counts."""
@@ -176,7 +190,13 @@ class MemoryManager:
         if not personas:
             return ""
         top = [item for _, item in rank(personas)][:max_items]
-        facts = "\n".join(f"- {item.content}" for item in top)
+        # Surface trust provenance on recall: a fact learned from untrusted content must
+        # not read as verified — the model is told, in-line, which facts to weigh less.
+        facts = "\n".join(
+            f"- {item.content}"
+            + (" [unverified: learned from untrusted content]" if item.provenance == "tainted" else "")
+            for item in top
+        )
         return f"What you know about the user:\n{facts}"
 
     def search(self, query: str, *, k: int = 5) -> list[MemoryItem]:

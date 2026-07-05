@@ -50,13 +50,23 @@ class Worker(Protocol):
 class SupportsRemember(Protocol):
     """Anything that can store a durable fact (a MemoryManager)."""
 
-    def remember(self, content: str, *, key: str | None = None) -> object: ...
+    def remember(
+        self, content: str, *, key: str | None = None, provenance: str = "clean"
+    ) -> object: ...
 
 
 class SupportsAutoEvolve(Protocol):
     """Turns a recurring success into a learned skill (an AutoSkillEvolver)."""
 
-    def maybe_evolve(self, task: str, solution: str, prior_successes: int) -> object: ...
+    def maybe_evolve(
+        self, task: str, solution: str, prior_successes: int, *, tainted: bool = False
+    ) -> object: ...
+
+
+class SupportsRunTainted(Protocol):
+    """Reports whether the current run consumed untrusted content (a TaintLedger)."""
+
+    def run_tainted(self) -> bool: ...
 
 
 class SupportsCardContext(Protocol):
@@ -101,6 +111,7 @@ class AutonomousAgent:
         *,
         escalate_worker: Worker | None = None,
         stagnation: StagnationDetector | None = None,
+        taint: SupportsRunTainted | None = None,
         planner: Planner | None = None,
         manager: Manager | None = None,
         verifier: Verifier | None = None,
@@ -116,6 +127,7 @@ class AutonomousAgent:
         self.worker = worker
         self.escalate_worker = escalate_worker
         self.stagnation = stagnation
+        self.taint = taint
         self.planner = planner
         self.manager = manager
         self.verifier = verifier
@@ -208,9 +220,14 @@ class AutonomousAgent:
 
             if ok:
                 _log.debug("task succeeded on attempt %d", index)
-                self._remember_success(task, answer)
+                # Anti-poisoning provenance (Zombie Agents): durable artifacts born from a
+                # run that consumed untrusted content are marked/held, never silently trusted.
+                run_tainted = self.taint.run_tainted() if self.taint is not None else False
+                self._remember_success(task, answer, tainted=run_tainted)
                 if self.auto_evolver is not None:
-                    self.auto_evolver.maybe_evolve(task, answer, prior_successes)
+                    self.auto_evolver.maybe_evolve(
+                        task, answer, prior_successes, tainted=run_tainted
+                    )
                 return AutonomousResult(answer=answer, success=True, attempts=attempts, plan=plan)
 
             feedback = fb or (
@@ -239,7 +256,8 @@ class AutonomousAgent:
         if self.auto_evolver is not None:
             evolve_failure = getattr(self.auto_evolver, "maybe_evolve_failure", None)
             if callable(evolve_failure):
-                evolve_failure(task, feedback, prior_failures)
+                run_tainted = self.taint.run_tainted() if self.taint is not None else False
+                evolve_failure(task, feedback, prior_failures, tainted=run_tainted)
 
         last = attempts[-1].answer if attempts else ""
         return AutonomousResult(answer=last, success=False, attempts=attempts, plan=plan)
@@ -259,18 +277,21 @@ class AutonomousAgent:
             return 0
         return sum(1 for exp in self.experience.relevant(task, k=25) if exp.outcome == "failure")
 
-    def _remember_success(self, task: str, answer: str) -> None:
+    def _remember_success(self, task: str, answer: str, *, tainted: bool = False) -> None:
         """On a verified success, curate one deduped long-term memory fact.
 
         Only verified successes reach here (the verify-or-revert gate), so failed
         or unverified work is never memorised. The MemoryManager dedups by key, so
         re-solving the same task UPDATEs the entry rather than bloating memory.
+        A tainted run's fact carries that provenance into the store.
         """
         if self.memory is None:
             return
         snippet = next((line.strip() for line in answer.splitlines() if line.strip()), "")[:160]
         fact = f"Accomplished: {task}" + (f" — {snippet}" if snippet else "")
-        self.memory.remember(fact, key=f"solve:{_slug(task)}")
+        self.memory.remember(
+            fact, key=f"solve:{_slug(task)}", provenance="tainted" if tainted else "clean"
+        )
 
     def _review(self, task: str, answer: str, context: str) -> tuple[bool, str]:
         if self.manager is None or not self.config.use_manager:

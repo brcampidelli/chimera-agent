@@ -1067,6 +1067,8 @@ def solve(
             escalate_worker=escalate_worker,
             # Pivot the retry when attempts keep failing the same way (short budget → window 2).
             stagnation=StagnationDetector(window=2),
+            # Provenance gate: artifacts born from a tainted run are marked/held pending.
+            taint=ledger,
             planner=None if no_plan else Planner(planner_backend, model),
             manager=None if no_manager else Manager(gateway, model, use_rubric=rubric),
             verifier=CommandVerifier(verify, ws) if verify else None,
@@ -1081,6 +1083,7 @@ def solve(
                     SkillEvolver(gateway, model),
                     SkillStore(settings.home / "skills.json"),
                     validator=SkillValidator(),
+                    audit=allow_audit,
                     # With fusion on and a real panel, evolve skills across the panel and
                     # keep the most transferable one (OpenClaw-Skill) instead of a
                     # single-model proposal.
@@ -1347,6 +1350,40 @@ def skills() -> None:
     for skill in registry.skills():
         table.add_row(skill.name, skill.version, skill.description)
     console.print(table)
+
+
+@app.command("skills-pending")
+def skills_pending() -> None:
+    """List learned skills held for review (e.g. distilled during a tainted run)."""
+    from chimera.evolution import SkillStore
+
+    store = SkillStore(get_settings().home / "skills.json")
+    pending = store.pending()
+    if not pending:
+        console.print("[green]No pending skills — nothing awaiting review.[/green]")
+        return
+    table = Table(title="Pending learned skills (review required)", header_style="bold")
+    table.add_column("Skill")
+    table.add_column("Provenance")
+    table.add_column("Description")
+    for skill in pending:
+        table.add_row(skill.name, skill.provenance, skill.description)
+    console.print(table)
+    console.print("[dim]Approve with: chimera skills-approve <name>[/dim]")
+
+
+@app.command("skills-approve")
+def skills_approve(
+    name: str = typer.Argument(..., help="Name of the pending skill to activate."),
+) -> None:
+    """Approve a pending learned skill after reviewing it (activates retrieval)."""
+    from chimera.evolution import SkillStore
+
+    store = SkillStore(get_settings().home / "skills.json")
+    if not store.approve(name):
+        console.print(f"[red]No skill named {name!r} in the store.[/red]")
+        raise typer.Exit(code=1)
+    console.print(f"[green]Approved[/green] {name} — now active and retrievable.")
 
 
 @app.command()

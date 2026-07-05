@@ -47,6 +47,29 @@ class SkillStore:
         return name in self._dicts
 
     def skills(
-        self, backend: SupportsComplete | None = None, model: str | None = None
+        self,
+        backend: SupportsComplete | None = None,
+        model: str | None = None,
+        *,
+        status: str | None = None,
     ) -> list[LearnedSkill]:
-        return [LearnedSkill.from_dict(d, backend=backend, model=model) for d in self._dicts.values()]
+        """All skills, or only those with the given ``status`` ("active" / "pending")."""
+        loaded = [
+            LearnedSkill.from_dict(d, backend=backend, model=model) for d in self._dicts.values()
+        ]
+        if status is None:
+            return loaded
+        return [skill for skill in loaded if skill.status == status]
+
+    def pending(self) -> list[LearnedSkill]:
+        """Skills held for human review (e.g. distilled during a tainted run)."""
+        return self.skills(status="pending")
+
+    def approve(self, name: str) -> bool:
+        """Activate a pending skill after human review. Returns False if unknown."""
+        entry = self._dicts.get(name)
+        if entry is None:
+            return False
+        entry["status"] = "active"
+        self.save()
+        return True

@@ -19,6 +19,8 @@ from chimera.skills.base import SkillResult
 from chimera.skills.llm_skill import LLMSkill
 
 SkillKind = Literal["pattern", "anti_pattern"]
+SkillStatus = Literal["active", "pending"]
+Provenance = Literal["clean", "tainted"]
 
 _LEARNED_SYSTEM = (
     "Follow the instruction exactly and output only the requested result, with no preamble."
@@ -43,6 +45,8 @@ class LearnedSkill(LLMSkill):
         risk: str = "",
         triggers: list[str] | None = None,
         kind: SkillKind = "pattern",
+        status: SkillStatus = "active",
+        provenance: Provenance = "clean",
         backend: SupportsComplete | None = None,
         model: str | None = None,
     ) -> None:
@@ -58,6 +62,11 @@ class LearnedSkill(LLMSkill):
         self.risk = risk
         self.triggers = list(triggers or [])
         self.kind = kind
+        # Anti-poisoning provenance: a skill distilled during a run that consumed
+        # untrusted content is "tainted" and held "pending" until a human approves it —
+        # a poisoned skill must not silently enter the retrieval loop (Zombie Agents).
+        self.status = status
+        self.provenance = provenance
 
     def run(self, **kwargs: Any) -> SkillResult:
         if not self.prompt_template:
@@ -96,6 +105,8 @@ class LearnedSkill(LLMSkill):
             "check": self.check,
             "risk": self.risk,
             "triggers": self.triggers,
+            "status": self.status,
+            "provenance": self.provenance,
         }
 
     @classmethod
@@ -109,6 +120,8 @@ class LearnedSkill(LLMSkill):
         raw_triggers = data.get("triggers", [])
         triggers = [str(t) for t in raw_triggers] if isinstance(raw_triggers, list) else []
         kind: SkillKind = "anti_pattern" if data.get("kind") == "anti_pattern" else "pattern"
+        status: SkillStatus = "pending" if data.get("status") == "pending" else "active"
+        provenance: Provenance = "tainted" if data.get("provenance") == "tainted" else "clean"
         return cls(
             name=str(data["name"]),
             description=str(data["description"]),
@@ -121,6 +134,8 @@ class LearnedSkill(LLMSkill):
             risk=str(data.get("risk", "")),
             triggers=triggers,
             kind=kind,
+            status=status,
+            provenance=provenance,
             backend=backend,
             model=model,
         )
