@@ -182,6 +182,8 @@ class Settings(BaseSettings):
     sandbox_image: str = Field(
         default="python:3.12-slim", validation_alias="CHIMERA_SANDBOX_IMAGE"
     )
+    # Optional OCI runtime for the docker sandbox (e.g. runsc = gVisor); empty = daemon default.
+    sandbox_runtime: str = Field(default="", validation_alias="CHIMERA_SANDBOX_RUNTIME")
 
     @field_validator(
         "fusion_panel",

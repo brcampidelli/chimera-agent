@@ -41,6 +41,16 @@ environment** when you grant autonomy:
 
 Treat secrets as server-only. **The default `local` sandbox is not isolated** — for untrusted
 or autonomous work run with `CHIMERA_SANDBOX=docker` (ephemeral, network-off by default),
-ideally in a throwaway account or VM rather than your main one. A container still isn't a full
-VM: for hostile input, prefer stronger isolation (microVM/gVisor). Review the audit log when
-granting broad autonomy.
+ideally in a throwaway account or VM rather than your main one.
+
+A plain container isn't a full VM: a container escape typically rides a host-kernel bug, so
+hostile input still has a path to local privilege escalation. To harden that boundary without
+paying for a full VM, set **`CHIMERA_SANDBOX_RUNTIME=runsc`** to run the docker sandbox under
+[gVisor](https://gvisor.dev/) — a userspace kernel that interposes between the container and the
+host, intercepting syscalls and shrinking the host-kernel attack surface. It's a drop-in OCI
+runtime (requires gVisor installed on the host) and the recommended hardened setup. The endgame
+above it is still a real microVM (Firecracker/QEMU/Kata) for genuinely adversarial workloads.
+(Thanks to u/zoharel on r/AI_Agents for pressing on the container-vs-VM gap and flagging gVisor
+as the pragmatic middle step.)
+
+Review the audit log when granting broad autonomy.

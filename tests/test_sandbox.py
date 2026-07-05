@@ -70,7 +70,36 @@ def test_docker_builds_isolated_run_command(monkeypatch: pytest.MonkeyPatch) -> 
     assert argv[:3] == ["docker", "run", "--rm"]
     assert "--network" in argv and "none" in argv  # network isolated by default
     assert "chimera-sandbox" in argv and "sh" in argv and "echo hi" in argv
+    assert "--runtime" not in argv  # daemon default (runc) unless configured
     assert result.exit_code == 0 and result.stdout == "out"
+
+
+def _capture_docker_argv(sandbox: DockerSandbox, monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    import chimera.sandbox.docker as docker_mod
+
+    monkeypatch.setattr(sandbox, "_available", True)  # skip the docker-version probe
+    captured: dict[str, Any] = {}
+
+    def fake_run(argv: list[str], **kwargs: Any) -> SimpleNamespace:
+        captured["argv"] = argv
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(docker_mod.subprocess, "run", fake_run)
+    sandbox.run("echo hi")
+    return captured["argv"]
+
+
+def test_docker_injects_gvisor_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
+    # gVisor (runsc) is a drop-in OCI runtime; it must land as a `--runtime runsc` flag.
+    argv = _capture_docker_argv(DockerSandbox(runtime="runsc"), monkeypatch)
+    assert "--runtime" in argv
+    assert argv[argv.index("--runtime") + 1] == "runsc"
+
+
+def test_docker_blank_runtime_is_omitted(monkeypatch: pytest.MonkeyPatch) -> None:
+    # A whitespace/empty runtime must not emit a dangling `--runtime` flag.
+    argv = _capture_docker_argv(DockerSandbox(runtime="  "), monkeypatch)
+    assert "--runtime" not in argv
 
 
 def test_get_sandbox_selects_backend(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -81,6 +110,15 @@ def test_get_sandbox_selects_backend(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CHIMERA_SANDBOX", "local")
     get_settings.cache_clear()
     assert isinstance(get_sandbox(), LocalSandbox)
+
+
+def test_get_sandbox_reads_runtime_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CHIMERA_SANDBOX", "docker")
+    monkeypatch.setenv("CHIMERA_SANDBOX_RUNTIME", "runsc")
+    get_settings.cache_clear()
+    sandbox = get_sandbox()
+    assert isinstance(sandbox, DockerSandbox)
+    assert sandbox.runtime == "runsc"
 
 
 # --- RunShellTool uses the sandbox seam ----------------------------------------------

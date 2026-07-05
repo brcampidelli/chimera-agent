@@ -5,7 +5,8 @@
   graceful fallback to local when Docker is absent.
 
 Select the backend with ``CHIMERA_SANDBOX=local|docker`` (image via
-``CHIMERA_SANDBOX_IMAGE``); :func:`get_sandbox` reads the settings.
+``CHIMERA_SANDBOX_IMAGE``, hardened OCI runtime via ``CHIMERA_SANDBOX_RUNTIME=runsc``
+for gVisor); :func:`get_sandbox` reads the settings.
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ def get_sandbox(settings: Settings | None = None) -> Sandbox:
 
     settings = settings or get_settings()
     if (settings.sandbox or "local").lower() == "docker":
-        return DockerSandbox(image=settings.sandbox_image)
+        return DockerSandbox(image=settings.sandbox_image, runtime=settings.sandbox_runtime)
     return LocalSandbox()
 
 

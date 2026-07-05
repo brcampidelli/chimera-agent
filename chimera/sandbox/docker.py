@@ -4,6 +4,11 @@ The workspace is bind-mounted at ``/workspace`` (writable) so file edits persist
 container root filesystem is discarded on exit (``--rm``), memory is capped, and the
 network is **disabled by default**. This is real isolation for agent-run commands.
 
+An optional OCI ``runtime`` (e.g. ``runsc`` for gVisor) can be set to harden the boundary:
+gVisor interposes a userspace kernel that intercepts the container's syscalls, shrinking
+the host-kernel attack surface a plain ``runc`` container leaves exposed — a drop-in step
+below a full microVM. Default is empty (the daemon's default runtime, ``runc``).
+
 When Docker is not available it degrades gracefully to a :class:`LocalSandbox`, so the
 agent keeps working (just without container isolation) instead of failing outright.
 """
@@ -27,11 +32,14 @@ class DockerSandbox:
         *,
         network: bool = False,
         memory: str = "512m",
+        runtime: str | None = None,
         fallback: Sandbox | None = None,
     ) -> None:
         self.image = image
         self.network = network
         self.memory = memory
+        # Optional OCI runtime (e.g. "runsc" for gVisor); empty/None uses the daemon default.
+        self.runtime = (runtime or "").strip() or None
         self.fallback: Sandbox = fallback or LocalSandbox()
         self._available: bool | None = None
 
@@ -55,6 +63,7 @@ class DockerSandbox:
             "docker", "run", "--rm",
             "--network", "bridge" if self.network else "none",
             "--memory", self.memory,
+            *(("--runtime", self.runtime) if self.runtime else ()),
             "-v", f"{workdir}:/workspace",
             "-w", "/workspace",
             self.image, "sh", "-c", command,
