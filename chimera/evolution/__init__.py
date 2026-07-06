@@ -22,6 +22,13 @@ from chimera.evolution.gepa import (
     optimize_template,
 )
 from chimera.evolution.learned_skill import LearnedSkill
+from chimera.evolution.playbook import (
+    BackendDeltaProposer,
+    Delta,
+    Playbook,
+    PlaybookCurator,
+    PlaybookItem,
+)
 from chimera.evolution.skill_nudges import SkillNudge, detect_skill_nudges
 from chimera.evolution.skill_store import SkillStore
 from chimera.evolution.stagnation import (
@@ -46,6 +53,11 @@ __all__ = [
     "BackendReflector",
     "optimize_template",
     "evolve_skill",
+    "Playbook",
+    "PlaybookItem",
+    "PlaybookCurator",
+    "BackendDeltaProposer",
+    "Delta",
     "AutoSkillEvolver",
     "CardIndex",
     "CardRetriever",

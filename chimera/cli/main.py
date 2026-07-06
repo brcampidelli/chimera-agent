@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from chimera.config import Settings
     from chimera.core import AgentEvent
     from chimera.ecosystem import TrajectoryCollector
+    from chimera.evolution import Playbook
     from chimera.kanban import KanbanBoard
     from chimera.memory import EmbedFn, MemoryGraph, MemoryManager
     from chimera.pet import Pet, PetStore
@@ -1191,6 +1192,9 @@ def solve(
     checklist: bool = typer.Option(
         False, "--checklist", help="Extract the task's atomic requirements and grade each attempt's coverage (catches dropped constraints)."
     ),
+    playbook: bool = typer.Option(
+        False, "--playbook", help="Inject the stored ACE strategy playbook into context, then curate it from this run's outcome (closed loop)."
+    ),
     agreement: int = typer.Option(
         1, "--agreement", help="With --fuse: sample K cheap answers per turn; escalate to fusion when they disagree (free confidence signal)."
     ),
@@ -1298,6 +1302,10 @@ def solve(
         if fuse:
             planner_backend = engine
 
+    # ACE playbook (--playbook): load the stored playbook once so it is injected into the run
+    # and curated back afterwards. Kept outside _run_solve so the worktree path doesn't shadow it.
+    stored_playbook = _load_playbook() if playbook else None
+
     def _run_solve(ws: Path) -> AutonomousResult:
         registry = default_registry(ws)
         # Per-session grant first (issue #4): scope the native tools before the meta-tools
@@ -1358,6 +1366,9 @@ def solve(
             # Independent strong verification (--strong-verify MODEL): a stronger judge grades
             # hard-turn (retried) results before they're accepted. Uses the same gateway, other model.
             strong_verifier=StrongVerifier(gateway, strong_verify) if strong_verify else None,
+            # ACE playbook (--playbook): inject accumulated, delta-curated strategy bullets as
+            # advisory context; the run is curated back into it afterwards (closed loop).
+            playbook=stored_playbook,
             # Dual-ledger re-plan (--replan): on a stall, rebuild the plan from accumulated
             # failure causes rather than just nudging. Needs the planner (so not with --no-plan).
             replan_on_stall=replan,
@@ -1439,6 +1450,25 @@ def solve(
     console.print(result.answer)
     status = "[green]success[/green]" if result.success else "[red]failed[/red]"
     console.print(f"[dim]{status} after {len(result.attempts)} attempt(s)[/dim]")
+
+    # Close the ACE loop: reflect on this run's outcome (success or failure) and curate the
+    # playbook with incremental deltas, so the next run starts from the improved guidance.
+    if stored_playbook is not None:
+        from chimera.evolution import BackendDeltaProposer, PlaybookCurator
+
+        verdict = "succeeded" if result.success else "failed"
+        outcome_text = (
+            f"The task {verdict} after {len(result.attempts)} attempt(s). "
+            f"Final answer: {result.answer[:500]}"
+        )
+        applied = PlaybookCurator(BackendDeltaProposer(gateway, model)).curate(
+            stored_playbook, task, outcome_text
+        )
+        _save_playbook(stored_playbook)
+        console.print(
+            f"[dim]playbook curated: {applied} delta(s) -> {len(stored_playbook.active())} active bullets[/dim]"
+        )
+
     if not result.success:
         raise typer.Exit(code=1)
 
@@ -1847,6 +1877,85 @@ def _expect_scorer(expect: str) -> Callable[[str], float]:
     """A simple substring grader: 1.0 if the expected text appears in the output, else 0.0."""
     needle = expect.strip()
     return lambda out: 1.0 if needle and needle in out else 0.0
+
+
+playbook_app = typer.Typer(
+    help="ACE strategy playbook — incremental, delta-curated guidance for the agent.",
+    no_args_is_help=True,
+)
+app.add_typer(playbook_app, name="playbook")
+
+
+def _playbook_path() -> Path:
+    return get_settings().home / "playbook.json"
+
+
+def _load_playbook() -> Playbook:
+    import json
+
+    from chimera.evolution import Playbook
+
+    path = _playbook_path()
+    if not path.exists():
+        return Playbook()
+    return Playbook.from_dict(json.loads(path.read_text(encoding="utf-8")))
+
+
+def _save_playbook(playbook: Playbook) -> None:
+    import json
+
+    path = _playbook_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(playbook.to_dict(), indent=2), encoding="utf-8")
+
+
+@playbook_app.command("show")
+def playbook_show() -> None:
+    """Print the current active playbook (top strategies by score)."""
+    text = _load_playbook().render(max_items=100)
+    console.print(text or "[dim]Playbook is empty — add bullets or curate from a run outcome.[/dim]")
+
+
+@playbook_app.command("add")
+def playbook_add(
+    content: str = typer.Argument(..., help="The strategy/pitfall bullet to add."),
+    section: str = typer.Option("strategy", "--section", help="strategy | pitfall | check."),
+) -> None:
+    """Manually add a bullet (a near-duplicate reinforces the existing one)."""
+    playbook = _load_playbook()
+    item = playbook.add(content, section=section)
+    if item is None:
+        console.print("[red]Empty content — nothing added.[/red]")
+        raise typer.Exit(code=1)
+    _save_playbook(playbook)
+    console.print(f"[green]Added[/green] {item.id}: {item.content}")
+
+
+@playbook_app.command("refine")
+def playbook_refine() -> None:
+    """Grow-and-refine: merge duplicate bullets and cap the size (deprecates the weakest)."""
+    playbook = _load_playbook()
+    before = len(playbook.active())
+    playbook.refine()
+    _save_playbook(playbook)
+    console.print(f"Active bullets: {before} -> {len(playbook.active())} after refine.")
+
+
+@playbook_app.command("curate")
+def playbook_curate(
+    task: str = typer.Option(..., "--task", help="The task the outcome is for."),
+    outcome: str = typer.Option(..., "--outcome", help="What happened (success/failure + details)."),
+    model: str = typer.Option(None, "--model", help="Model slug for the reflect+curate call."),
+) -> None:
+    """Reflect on a run outcome and apply incremental deltas (add/reinforce/deprecate)."""
+    from chimera.evolution import BackendDeltaProposer, PlaybookCurator
+    from chimera.providers import LLMGateway
+
+    playbook = _load_playbook()
+    curator = PlaybookCurator(BackendDeltaProposer(LLMGateway(), model))
+    applied = curator.curate(playbook, task, outcome)
+    _save_playbook(playbook)
+    console.print(f"[green]Applied {applied} delta(s)[/green] — {len(playbook.active())} active bullets.")
 
 
 @app.command()

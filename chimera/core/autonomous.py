@@ -42,6 +42,7 @@ from chimera.core.verify import Verifier
 from chimera.ecosystem.events import events_from_transcript
 from chimera.ecosystem.trajectory import TrajectoryCollector
 from chimera.evolution.experience import ExperienceBuffer, Outcome, format_lessons
+from chimera.evolution.playbook import Playbook
 from chimera.evolution.stagnation import StagnationDetector
 from chimera.telemetry import get_logger
 
@@ -129,6 +130,7 @@ class AutonomousAgent:
         repo_map: bool = False,
         checklist: RequirementChecklist | None = None,
         strong_verifier: StrongVerifier | None = None,
+        playbook: Playbook | None = None,
         contract: CompletionContract | None = None,
         taint: SupportsRunTainted | None = None,
         planner: Planner | None = None,
@@ -154,6 +156,7 @@ class AutonomousAgent:
         self.repo_map = repo_map
         self.checklist = checklist
         self.strong_verifier = strong_verifier
+        self.playbook = playbook
         self.contract = contract
         self.taint = taint
         self.planner = planner
@@ -197,7 +200,12 @@ class AutonomousAgent:
             digest = build_repo_map(self.spine_workspace)
             if digest:
                 repo_ctx = f"Repository map (file: top-level symbols):\n{digest}"
-        context = "\n\n".join(part for part in (spine, repo_ctx, lessons, card_ctx) if part)
+        # ACE playbook: accumulated, delta-curated strategy bullets, injected as advisory context
+        # so the worker/planner reuse what has worked across runs (grow-and-refine, anti-collapse).
+        playbook_ctx = self.playbook.render() if self.playbook is not None else ""
+        context = "\n\n".join(
+            part for part in (spine, repo_ctx, lessons, card_ctx, playbook_ctx) if part
+        )
         # how many times this task pattern has already succeeded / failed (before this
         # run) — the recurrence signals that gate auto-skill-evolution (a pattern card on
         # recurring success, an anti-pattern card on recurring failure)
