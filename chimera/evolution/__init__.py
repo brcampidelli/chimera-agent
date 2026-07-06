@@ -11,6 +11,16 @@ from chimera.evolution.collective import CollectiveSkillEvolver
 from chimera.evolution.edit_diagnostic import EditClass, classify_edit, topology_key
 from chimera.evolution.evolver import SkillEvolver
 from chimera.evolution.experience import Experience, ExperienceBuffer, format_lessons
+from chimera.evolution.gepa import (
+    BackendExecutor,
+    BackendReflector,
+    Candidate,
+    GEPAOptimizer,
+    GEPAResult,
+    TaskInstance,
+    evolve_skill,
+    optimize_template,
+)
 from chimera.evolution.learned_skill import LearnedSkill
 from chimera.evolution.skill_nudges import SkillNudge, detect_skill_nudges
 from chimera.evolution.skill_store import SkillStore
@@ -28,6 +38,14 @@ __all__ = [
     "LearnedSkill",
     "SkillStore",
     "SkillEvolver",
+    "GEPAOptimizer",
+    "GEPAResult",
+    "TaskInstance",
+    "Candidate",
+    "BackendExecutor",
+    "BackendReflector",
+    "optimize_template",
+    "evolve_skill",
     "AutoSkillEvolver",
     "CardIndex",
     "CardRetriever",

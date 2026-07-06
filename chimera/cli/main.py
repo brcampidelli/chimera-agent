@@ -1775,6 +1775,80 @@ def skills_retire(
     )
 
 
+@app.command("skills-evolve")
+def skills_evolve(
+    name: str = typer.Argument(..., help="Name of the learned skill whose prompt to GEPA-evolve."),
+    instances: str = typer.Option(
+        ..., "--instances", help="JSON file: a list of {\"input\": {...}, \"expect\": \"substring\"}."
+    ),
+    budget: int = typer.Option(20, "--budget", help="Rollout budget (evaluations across the search)."),
+    model: str = typer.Option(None, "--model", help="Model slug for the executor + reflector."),
+    apply: bool = typer.Option(False, "--apply", help="Save the improved skill (default: dry-run)."),
+) -> None:
+    """Reflectively evolve a skill's prompt template against graded instances (GEPA).
+
+    Each instance is a `{input, expect}` pair; the (simple, honest) scorer gives 1.0 when the
+    produced output contains the `expect` substring, else 0.0. GEPA reflects on a failing case to
+    rewrite the template and keeps a Pareto frontier of candidates. Dry-run by default: the
+    improved skill is only written back to the store with ``--apply``, and only if it beats the seed.
+    """
+    import json
+
+    from chimera.evolution import SkillStore, evolve_skill
+    from chimera.evolution.gepa import TaskInstance
+    from chimera.providers import LLMGateway
+
+    store = SkillStore(get_settings().home / "skills.json")
+    gateway = LLMGateway()
+    matches = [s for s in store.skills(gateway, model) if s.name == name]
+    if not matches:
+        console.print(f"[red]No skill named {name!r} in the store.[/red]")
+        raise typer.Exit(code=1)
+    skill = matches[0]
+    if not skill.prompt_template.strip():
+        console.print(f"[red]{name!r} is an advisory card with no prompt_template — nothing to evolve.[/red]")
+        raise typer.Exit(code=1)
+
+    try:
+        raw = json.loads(Path(instances).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        console.print(f"[red]Could not read instances file: {exc}[/red]")
+        raise typer.Exit(code=1) from exc
+    task_instances = [
+        TaskInstance(
+            input={str(k): str(v) for k, v in item.get("input", {}).items()},
+            scorer=_expect_scorer(str(item.get("expect", ""))),
+        )
+        for item in raw
+    ]
+    if not task_instances:
+        console.print("[red]The instances file is empty.[/red]")
+        raise typer.Exit(code=1)
+
+    improved, result = evolve_skill(gateway, skill, task_instances, model=model, budget=budget)
+    console.print(
+        f"GEPA on [bold]{name}[/bold]: seed {result.seed_mean:.0%} -> best {result.best_mean:.0%} "
+        f"across {len(task_instances)} instances in {result.rollouts} rollouts "
+        f"({len(result.candidates)} candidates)."
+    )
+    if not result.improved:
+        console.print("[yellow]No lift found — the seed template is kept (nothing adopted).[/yellow]")
+        return
+    console.print("[green]Improved template:[/green]")
+    console.print(f"[dim]{result.best_template}[/dim]")
+    if not apply:
+        console.print("[dim]Dry-run — re-run with --apply to save the improved skill to the store.[/dim]")
+        return
+    store.add(improved)
+    console.print(f"[green]Saved[/green] {name} v{improved.version} to the store.")
+
+
+def _expect_scorer(expect: str) -> Callable[[str], float]:
+    """A simple substring grader: 1.0 if the expected text appears in the output, else 0.0."""
+    needle = expect.strip()
+    return lambda out: 1.0 if needle and needle in out else 0.0
+
+
 @app.command()
 def migrate(
     source: str = typer.Argument(..., help="Source agent: hermes | openclaw."),
