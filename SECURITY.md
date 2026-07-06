@@ -57,6 +57,11 @@ environment** when you grant autonomy:
   *structured-extraction* shape ("pull the sender/price/date"); a task that genuinely needs
   reasoning over free-form untrusted prose still exposes the surface — that part of #5 is
   open.
+- **Taint-adaptive allowlist** — with `--taint`, once a run consumes untrusted content the
+  grant *narrows*: dangerous tools (`run_shell`, `execute_code`, `write_file`, `send_email`)
+  require approval for the rest of the run, even when the specific call has no tainted
+  reference. This is the coarse net for *laundered* flows — an injection paraphrased past
+  the per-action ref/flow matcher — trading some convenience for a smaller blast radius.
 - **Data-fencing on fetched content (spotlighting)** — with `--taint`, untrusted tool
   results (web pages, search, email) are returned to the model inside explicit
   `<<external-data>>` markers, and the agent's standing instructions say marked content

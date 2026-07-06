@@ -227,3 +227,53 @@ def test_fence_helper_wraps_content() -> None:
 
     wrapped = fence("hello")
     assert wrapped == f"{FENCE_OPEN}\nhello\n{FENCE_CLOSE}"
+
+
+# --- taint-adaptive allowlist (M9b) ---------------------------------------------------
+
+
+def test_dangerous_tool_narrowed_after_taint() -> None:
+    led = TaintLedger()
+    shell = LedgeredTool(FakeTool("run_shell", result="ran"), led, narrow_on_taint=True)
+    # Clean so far → runs normally.
+    assert shell.run(command="ls") == "ran"
+    # A fetch taints the run; now the same shell tool is gated regardless of its args.
+    LedgeredTool(FakeTool("http_get", result="body"), led, narrow_on_taint=True).run(url="https://e.test/")
+    out = shell.run(command="echo hi")  # no tainted ref in this command at all
+    assert out.startswith("[taint: needs review")
+
+
+def test_safe_tool_not_narrowed_after_taint() -> None:
+    led = TaintLedger()
+    LedgeredTool(FakeTool("http_get", result="body"), led, narrow_on_taint=True).run(url="https://e.test/")
+    read = LedgeredTool(FakeTool("read_file", result="contents"), led, narrow_on_taint=True)
+    assert read.run(path="/tmp/x") == "contents"  # read_file isn't dangerous → still allowed
+
+
+def test_narrowing_off_by_default() -> None:
+    led = TaintLedger()
+    LedgeredTool(FakeTool("http_get", result="body"), led).run(url="https://e.test/")
+    shell = LedgeredTool(FakeTool("run_shell", result="ran"), led)  # narrow_on_taint defaults False
+    assert shell.run(command="echo hi") == "ran"
+
+
+def test_narrowed_tool_runs_when_approved() -> None:
+    led = TaintLedger()
+    LedgeredTool(FakeTool("http_get", result="body"), led, narrow_on_taint=True).run(url="https://e.test/")
+    shell = LedgeredTool(
+        FakeTool("run_shell", result="ran"), led, narrow_on_taint=True, approve=lambda _a: True
+    )
+    assert shell.run(command="echo hi") == "ran"
+
+
+def test_narrowing_is_audited() -> None:
+    from pathlib import Path
+
+    led = TaintLedger()
+    audit = AuditLog(Path(__file__).parent / "__narrow_probe__.jsonl")
+    try:
+        LedgeredTool(FakeTool("http_get", result="b"), led, narrow_on_taint=True, audit=audit).run(url="https://e.test/")
+        LedgeredTool(FakeTool("write_file", result="w"), led, narrow_on_taint=True, audit=audit).run(path="/tmp/x", content="y")
+        assert any(e["type"] == "taint_narrowed" for e in audit.entries())
+    finally:
+        audit.path.unlink(missing_ok=True)

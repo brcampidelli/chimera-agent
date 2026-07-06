@@ -29,6 +29,7 @@ from chimera.governance.ledger import (
     _first,
     assess_action,
 )
+from chimera.governance.policy import Decision
 from chimera.tools.base import Tool
 from chimera.tools.registry import ToolRegistry
 
@@ -47,6 +48,14 @@ def fence(content: str) -> str:
     return f"{FENCE_OPEN}\n{content}\n{FENCE_CLOSE}"
 
 
+# Tools that get NARROWED once a run is tainted: high-consequence side effects that a
+# laundered injection (paraphrased past the ref/flow matcher) could still steer. The
+# grant shrinks for the rest of the run, catching what per-action assessment misses.
+DANGEROUS_WHEN_TAINTED = frozenset(
+    {"run_shell", "execute_code", "code_interpreter", "write_file", "send_email"}
+)
+
+
 class LedgeredTool(Tool):
     """A tool whose calls are logged to the ledger and reviewed for tainted-input execution."""
 
@@ -57,16 +66,35 @@ class LedgeredTool(Tool):
         *,
         approve: ApproveFn | None = None,
         audit: AuditLog | None = None,
+        narrow_on_taint: bool = False,
     ) -> None:
         self.inner = inner
         self.ledger = ledger
         self.approve = approve
         self.audit = audit
+        # Taint-adaptive allowlist (M9b): once the run is tainted, a dangerous tool is
+        # gated regardless of whether THIS call's args reference the tainted artifact —
+        # a coarse net for laundered flows the per-action ref/flow matcher can't see.
+        self.narrow_on_taint = narrow_on_taint
         self.name = inner.name
         self.description = inner.description
         self.parameters = inner.parameters
 
     def run(self, **kwargs: Any) -> str:
+        # 0. Taint-adaptive narrowing: a dangerous tool is off-limits once the run is
+        #    tainted (needs approval), even without a direct tainted reference.
+        if (
+            self.narrow_on_taint
+            and self.name in DANGEROUS_WHEN_TAINTED
+            and self.ledger.run_tainted()
+        ):
+            reason = f"{self.name} is restricted after this run consumed untrusted content"
+            if self.audit is not None:
+                self.audit.record("taint_narrowed", {"tool": self.name, "reason": reason})
+            approved = self.approve(SequenceAssessment(True, Decision.REVIEW, reason)) if self.approve else False
+            if not approved:
+                return f"[taint: needs review — {reason}]"
+
         # 1. Sequence-aware pre-check: does this action consume tainted input?
         assessment = assess_action(self.name, kwargs, self.ledger)
         if assessment.escalate:
@@ -111,9 +139,18 @@ def ledger_registry(
     *,
     approve: ApproveFn | None = None,
     audit: AuditLog | None = None,
+    narrow_on_taint: bool = False,
 ) -> ToolRegistry:
-    """Return a new registry with every tool wrapped in a :class:`LedgeredTool`."""
+    """Return a new registry with every tool wrapped in a :class:`LedgeredTool`.
+
+    ``narrow_on_taint`` enables the taint-adaptive allowlist: once the run is tainted,
+    dangerous tools (:data:`DANGEROUS_WHEN_TAINTED`) require approval for the rest of it.
+    """
     wrapped = ToolRegistry()
     for tool in registry.tools():
-        wrapped.register(LedgeredTool(tool, ledger, approve=approve, audit=audit))
+        wrapped.register(
+            LedgeredTool(
+                tool, ledger, approve=approve, audit=audit, narrow_on_taint=narrow_on_taint
+            )
+        )
     return wrapped

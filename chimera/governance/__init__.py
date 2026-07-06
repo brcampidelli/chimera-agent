@@ -29,6 +29,7 @@ from chimera.governance.ledger import (
     assess_action,
 )
 from chimera.governance.ledger_tool import (
+    DANGEROUS_WHEN_TAINTED,
     FENCE_CLOSE,
     FENCE_OPEN,
     LedgeredTool,
@@ -68,6 +69,7 @@ __all__ = [
     "fence",
     "FENCE_OPEN",
     "FENCE_CLOSE",
+    "DANGEROUS_WHEN_TAINTED",
     "QuarantinedReader",
     "QuarantineResult",
     "QuarantineTool",

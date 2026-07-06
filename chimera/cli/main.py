@@ -1053,7 +1053,11 @@ def solve(
             from chimera.governance import TaintLedger, ledger_registry
 
             ledger = TaintLedger()
-            registry = ledger_registry(registry, ledger, audit=allow_audit)
+            # narrow_on_taint: once the run consumes untrusted content, dangerous tools
+            # (shell/write/exec/email) require approval for the rest of the run (M9b).
+            registry = ledger_registry(
+                registry, ledger, audit=allow_audit, narrow_on_taint=True
+            )
         worker = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
         escalate_worker = (
             Agent(escalate_backend, registry, AgentConfig(model=model, max_steps=max_steps))
