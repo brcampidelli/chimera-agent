@@ -4,6 +4,7 @@ The differentiator. The lift comes from the synthesis step itself, not only from
 model diversity.
 """
 
+from chimera.fusion.consistency import SelfConsistency, majority
 from chimera.fusion.engine import (
     FusionConfig,
     FusionEngine,
@@ -22,4 +23,6 @@ __all__ = [
     "RoutedBackend",
     "RoutingPolicy",
     "EscalationVerifier",
+    "SelfConsistency",
+    "majority",
 ]

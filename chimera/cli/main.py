@@ -869,10 +869,31 @@ def fuse(
     selective: bool | None = typer.Option(
         None, "--selective/--full", help="Override selective fusion (default: from settings)."
     ),
+    best_of: int = typer.Option(
+        1, "--best-of", help="Cheap fusion: sample ONE model N times and take the consensus (self-consistency), instead of a multi-model panel."
+    ),
+    model: str = typer.Option(None, "--model", "-m", help="Model for --best-of self-consistency."),
 ) -> None:
     """Run a prompt through the LLM-Fusion engine (panel -> judge -> synthesizer)."""
     from chimera.fusion import FusionConfig, FusionEngine
     from chimera.providers import LLMGateway, Message, MissingCredentialsError
+
+    # --best-of N: self-consistency over a single model — cheaper than the full panel when you
+    # just want to stabilize one (weak) model rather than combine several.
+    if best_of >= 2:
+        from chimera.fusion import SelfConsistency
+
+        try:
+            sc = SelfConsistency(LLMGateway(), n=best_of, model=model)
+            result = sc.complete([Message(role="user", content=prompt)])
+        except MissingCredentialsError as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(code=1) from exc
+        console.print(result.content)
+        sc_total = (result.prompt_tokens or 0) + (result.completion_tokens or 0)
+        if sc_total:
+            console.print(f"[dim]self-consistency over {best_of} samples · total tokens: {sc_total}[/dim]")
+        return
 
     config = FusionConfig.from_settings()
     if selective is not None:
