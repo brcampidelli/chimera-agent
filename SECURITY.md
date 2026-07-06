@@ -48,6 +48,15 @@ environment** when you grant autonomy:
   it is sequence-aware *review* and observability, never a hard block, and it does **not** solve
   the data-vs-instructions problem. The sandbox is still the containment boundary. (h/t
   u/Dependent_Policy1307, u/Far-Stable2591, u/zoharel on r/AI_Agents.)
+- **Quarantined reader (dual-LLM / CaMeL)** — the structural answer to injection: untrusted
+  content is read by a *tool-less* model that can only emit schema-validated JSON
+  (`QuarantinedReader` / the `quarantine_extract` tool), and the privileged agent acts only
+  on those fields. Even a fully hijacked extractor can only produce *wrong field values* —
+  never a new instruction, tool call, or capability, because the output is bounded by the
+  Pydantic schema, not by the model's obedience. **Honest limit:** this only covers the
+  *structured-extraction* shape ("pull the sender/price/date"); a task that genuinely needs
+  reasoning over free-form untrusted prose still exposes the surface — that part of #5 is
+  open.
 - **Data-fencing on fetched content (spotlighting)** — with `--taint`, untrusted tool
   results (web pages, search, email) are returned to the model inside explicit
   `<<external-data>>` markers, and the agent's standing instructions say marked content

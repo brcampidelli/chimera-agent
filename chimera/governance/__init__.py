@@ -37,6 +37,12 @@ from chimera.governance.ledger_tool import (
 )
 from chimera.governance.policy import Decision, Rule, RuleSet, Verdict
 from chimera.governance.precedent import PrecedentStore
+from chimera.governance.quarantine import (
+    QuarantinedReader,
+    QuarantineResult,
+    QuarantineTool,
+    fields_schema,
+)
 from chimera.governance.validator import (
     ScheduleValidator,
     SkillValidator,
@@ -62,6 +68,10 @@ __all__ = [
     "fence",
     "FENCE_OPEN",
     "FENCE_CLOSE",
+    "QuarantinedReader",
+    "QuarantineResult",
+    "QuarantineTool",
+    "fields_schema",
     "SkillValidator",
     "ScheduleValidator",
     "ValidationResult",
