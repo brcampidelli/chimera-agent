@@ -41,3 +41,8 @@ site/
 
 # Local benchmark run outputs (harness + tasks are tracked; per-run results are not)
 bench/local_lift/results/
+
+# Terminal-Bench official runner: local venv, built wheel, run outputs (tracked: scripts only)
+bench/terminal_bench/.venv/
+bench/terminal_bench/dist/
+bench/terminal_bench/results/

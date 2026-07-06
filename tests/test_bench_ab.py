@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from chimera.eval.bench_ab import Arm, format_report
 from chimera.eval.bench_ab import compare as compare_ab
-from chimera.eval.terminal_bench import build_solve_command, command_string, make_chimera_tb_agent
+from chimera.eval.terminal_bench import (
+    build_container_command,
+    build_solve_command,
+    command_string,
+    container_bootstrap,
+    make_chimera_tb_agent,
+)
 
 # --- Arm stats --------------------------------------------------------------------------
 
@@ -77,3 +83,27 @@ def test_adapter_needs_the_extra() -> None:
 
     with pytest.raises(ImportError, match=r"chimera-agent\[bench\]"):
         make_chimera_tb_agent("some/model")
+
+
+def test_container_bootstrap_installs_the_wheel() -> None:
+    boot = container_bootstrap("/tmp/chimera_agent-0.4.0-py3-none-any.whl", workspace="/app")
+    assert "pip install" in boot and "chimera_agent-0.4.0" in boot
+    assert "mkdir -p /app" in boot
+    assert "python3 -m pip install" in boot  # fallback path present
+
+
+def test_build_container_command_installs_then_solves() -> None:
+    cmd = build_container_command(
+        "resolve the failing test", model="openrouter/free/x", wheel="/tmp/chimera.whl"
+    )
+    boot_end = cmd.index(" && chimera solve")
+    assert "pip install" in cmd[:boot_end]  # install comes first
+    assert "chimera solve 'resolve the failing test'" in cmd  # then the solve, instruction quoted
+    assert "--model openrouter/free/x" in cmd
+    assert "--verify" not in cmd  # a TB agent never sees the tests; Harbor grades after
+    assert "--repo-map" in cmd  # the scaffolding under test
+
+
+def test_build_container_command_quotes_dangerous_instruction() -> None:
+    cmd = build_container_command("go; rm -rf /", model="m", wheel="/tmp/w.whl")
+    assert "'go; rm -rf /'" in cmd  # instruction stays a single quoted arg, never interpolated

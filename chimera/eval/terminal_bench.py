@@ -47,6 +47,41 @@ def command_string(argv: list[str]) -> str:
     return " ".join(shlex.quote(a) for a in argv)
 
 
+def container_bootstrap(wheel: str, *, workspace: str = "/app") -> str:
+    """The prelude that makes `chimera` runnable INSIDE a Terminal-Bench task container.
+
+    Harbor task containers are minimal — they have no `chimera`. So the treatment agent, before it
+    can `chimera solve`, installs a self-built wheel that the run harness has placed in the container
+    at ``wheel`` (a container-side path). Tries pip, then `python3 -m pip` as a fallback. The install
+    is per-container and vanishes with it — nothing leaks into the host.
+    """
+    w = shlex.quote(wheel)
+    ws = shlex.quote(workspace)
+    return f"mkdir -p {ws} && (pip install --quiet --no-input {w} || python3 -m pip install --quiet --no-input {w})"
+
+
+def build_container_command(
+    instruction: str,
+    *,
+    model: str,
+    wheel: str,
+    workspace: str = "/app",
+    flags: tuple[str, ...] = _DEFAULT_FLAGS,
+    max_attempts: int = 3,
+) -> str:
+    """The single shell command the treatment agent runs in the task container: install + solve.
+
+    No ``--verify`` is added — a Terminal-Bench agent never sees the task's tests; Harbor grades
+    afterwards with them. So `chimera solve` attempts the instruction on its own and the benchmark's
+    own tests are the verdict.
+    """
+    boot = container_bootstrap(wheel, workspace=workspace)
+    solve = command_string(
+        build_solve_command(instruction, model=model, workspace=workspace, flags=flags, max_attempts=max_attempts)
+    )
+    return f"{boot} && {solve}"
+
+
 def _load_base_agent() -> Any:
     """Import terminal_bench's BaseAgent lazily; raise a friendly error if the extra is absent."""
     try:
@@ -59,11 +94,19 @@ def _load_base_agent() -> Any:
     return BaseAgent
 
 
-def make_chimera_tb_agent(model: str, *, flags: tuple[str, ...] = _DEFAULT_FLAGS) -> Any:
+def make_chimera_tb_agent(
+    model: str,
+    *,
+    flags: tuple[str, ...] = _DEFAULT_FLAGS,
+    wheel: str | None = None,
+    max_attempts: int = 3,
+) -> Any:
     """Build a ``ChimeraTBAgent`` class bound to a model (Harbor imports/instantiates it).
 
     Kept as a factory so the ``terminal_bench`` base class is only touched when actually running
-    the benchmark — the module stays importable (and testable) without the extra.
+    the benchmark — the module stays importable (and testable) without the extra. When ``wheel`` is
+    given (a container-side path to a self-built chimera wheel), the agent installs it before running
+    ``chimera solve`` — the only way the CLI exists inside a minimal task container.
     """
     base = _load_base_agent()
 
@@ -74,15 +117,27 @@ def make_chimera_tb_agent(model: str, *, flags: tuple[str, ...] = _DEFAULT_FLAGS
             super().__init__(*args, **kwargs)
             self._model = model
             self._flags = flags
+            self._wheel = wheel
+            self._max_attempts = max_attempts
 
         @staticmethod
         def name() -> str:
             return "chimera"
 
         def perform_task(self, instruction: str, session: Any, *args: Any, **kwargs: Any) -> Any:
-            argv = build_solve_command(instruction, model=self._model, flags=self._flags)
+            if self._wheel:
+                command = build_container_command(
+                    instruction, model=self._model, wheel=self._wheel,
+                    flags=self._flags, max_attempts=self._max_attempts,
+                )
+            else:
+                command = command_string(
+                    build_solve_command(
+                        instruction, model=self._model, flags=self._flags, max_attempts=self._max_attempts
+                    )
+                )
             # Harbor's session executes commands inside the task's container and grades with the
             # task's own tests afterward — we only issue the command.
-            return session.send_command(command_string(argv))
+            return session.send_command(command)
 
     return ChimeraTBAgent
