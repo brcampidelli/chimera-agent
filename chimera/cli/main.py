@@ -1194,6 +1194,9 @@ def solve(
     agreement: int = typer.Option(
         1, "--agreement", help="With --fuse: sample K cheap answers per turn; escalate to fusion when they disagree (free confidence signal)."
     ),
+    strong_verify: str = typer.Option(
+        None, "--strong-verify", help="Model slug of a stronger, independent judge that grades hard-turn (retried) results before accepting them."
+    ),
     replan: bool = typer.Option(
         False, "--replan", help="On a stall, rebuild the plan from accumulated failure causes (dual-ledger) instead of just nudging."
     ),
@@ -1228,6 +1231,7 @@ def solve(
         ProgressLedger,
         RequirementChecklist,
         RunCheckpointer,
+        StrongVerifier,
         WorkspaceGuard,
     )
     from chimera.core.autonomous import AutonomousResult
@@ -1351,6 +1355,9 @@ def solve(
             # Requirement checklist (--checklist): extract atomic requirements + grade coverage
             # per attempt, so a weak model can't silently drop a "must include / must not" clause.
             checklist=RequirementChecklist(gateway, model) if checklist else None,
+            # Independent strong verification (--strong-verify MODEL): a stronger judge grades
+            # hard-turn (retried) results before they're accepted. Uses the same gateway, other model.
+            strong_verifier=StrongVerifier(gateway, strong_verify) if strong_verify else None,
             # Dual-ledger re-plan (--replan): on a stall, rebuild the plan from accumulated
             # failure causes rather than just nudging. Needs the planner (so not with --no-plan).
             replan_on_stall=replan,

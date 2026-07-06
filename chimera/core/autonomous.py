@@ -36,6 +36,7 @@ from chimera.core.planner import Plan, Planner
 from chimera.core.repomap import build_repo_map
 from chimera.core.runstate import RunCheckpointer
 from chimera.core.spine import assemble_spine
+from chimera.core.strong_verify import StrongVerifier
 from chimera.core.supervisor import Manager
 from chimera.core.verify import Verifier
 from chimera.ecosystem.events import events_from_transcript
@@ -127,6 +128,7 @@ class AutonomousAgent:
         pause_on_taint: bool = False,
         repo_map: bool = False,
         checklist: RequirementChecklist | None = None,
+        strong_verifier: StrongVerifier | None = None,
         contract: CompletionContract | None = None,
         taint: SupportsRunTainted | None = None,
         planner: Planner | None = None,
@@ -151,6 +153,7 @@ class AutonomousAgent:
         self.pause_on_taint = pause_on_taint
         self.repo_map = repo_map
         self.checklist = checklist
+        self.strong_verifier = strong_verifier
         self.contract = contract
         self.taint = taint
         self.planner = planner
@@ -294,6 +297,20 @@ class AutonomousAgent:
                 if misses:
                     ok = False
                     detail = "Requirements not covered:\n" + "\n".join(f"- {m}" for m in misses)
+                    fb = f"{fb}\n\n{detail}" if fb else detail
+
+            # Independent strong verification (opt-in), gated to HARD turns only: a turn that
+            # needed a retry (index > 1) proved hard, so a stronger independent judge grading the
+            # result pays off — without the cost of verifying every easy pass or the
+            # self-enhancement bias of a model checking itself.
+            if ok and self.strong_verifier is not None and index > 1:
+                passed, score = self.strong_verifier.verify(task, answer)
+                if not passed:
+                    ok = False
+                    detail = (
+                        f"Independent verification scored this {score:.0%} (below the bar) — the "
+                        "result is likely wrong or incomplete. Reconsider and fix it."
+                    )
                     fb = f"{fb}\n\n{detail}" if fb else detail
 
             attempt = Attempt(index, answer, approved, verified, False, ok, fb, vout)

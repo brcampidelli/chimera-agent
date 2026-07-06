@@ -35,6 +35,7 @@ from chimera.core.planner import Plan, Planner
 from chimera.core.repomap import build_repo_map
 from chimera.core.runstate import RunCheckpointer
 from chimera.core.spine import assemble_spine
+from chimera.core.strong_verify import StrongVerifier
 from chimera.core.subagent import SubAgentTool
 from chimera.core.supervisor import Manager, Review
 from chimera.core.verify import (
@@ -68,6 +69,7 @@ __all__ = [
     "RunCheckpointer",
     "build_repo_map",
     "RequirementChecklist",
+    "StrongVerifier",
     "CompletionContract",
     "ContractResult",
     "parse_check",
