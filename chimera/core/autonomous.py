@@ -18,9 +18,9 @@ Every dependency is injectable, so the whole loop is testable without a network.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from chimera.core.agent import AgentResult
 from chimera.core.checkpoint import WorkspaceGuard
@@ -32,6 +32,7 @@ from chimera.core.events import result as _ev_result
 from chimera.core.events import status as _ev_status
 from chimera.core.ledger import ProgressLedger, TaskLedger
 from chimera.core.planner import Plan, Planner
+from chimera.core.runstate import RunCheckpointer
 from chimera.core.spine import assemble_spine
 from chimera.core.supervisor import Manager
 from chimera.core.verify import Verifier
@@ -133,6 +134,7 @@ class AutonomousAgent:
         cards: SupportsCardContext | None = None,
         spine_workspace: Path | None = None,
         on_event: EventSink | None = None,
+        checkpointer: RunCheckpointer | None = None,
         config: AutonomousConfig | None = None,
     ) -> None:
         self.worker = worker
@@ -153,6 +155,7 @@ class AutonomousAgent:
         self.cards = cards
         self.spine_workspace = spine_workspace
         self.on_event = on_event
+        self.checkpointer = checkpointer
         self.config = config or AutonomousConfig()
 
     def _emit(self, event: AgentEvent) -> None:
@@ -164,7 +167,7 @@ class AutonomousAgent:
         except Exception as exc:  # noqa: BLE001 — a broken sink must not fail the run
             _log.warning("event sink raised, dropping event: %s", exc)
 
-    def run(self, task: str) -> AutonomousResult:
+    def run(self, task: str, *, thread_id: str | None = None) -> AutonomousResult:
         spine = assemble_spine(self.spine_workspace, task) if self.spine_workspace else ""
         # Behavioural loop: fold lessons from PRIOR runs (recalled before this run
         # records anything) into the planner + worker context, so the agent avoids
@@ -195,10 +198,24 @@ class AutonomousAgent:
             else None
         )
 
-        self._emit(_ev_status("planning complete" if plan else "starting"))
         attempts: list[Attempt] = []
         feedback = ""
-        for index in range(1, self.config.max_attempts + 1):
+        start_index = 1
+        # Durable resume (LangGraph-style thread): if this thread has a live checkpoint, restore
+        # the loop state and continue from where the crash left off instead of starting over.
+        if self.checkpointer is not None and thread_id:
+            saved = self.checkpointer.load(thread_id)
+            if saved is not None:
+                task = str(saved.get("task", task))
+                attempts = [Attempt(**a) for a in saved.get("attempts", [])]
+                feedback = str(saved.get("feedback", ""))
+                start_index = int(saved.get("next_index", 1))
+                steps = saved.get("plan_steps")
+                plan = Plan(steps=list(steps), raw=str(saved.get("plan_raw", ""))) if steps is not None else None
+                self._emit(_ev_status(f"resumed thread {thread_id} at attempt {start_index}"))
+
+        self._emit(_ev_status("planning complete" if plan else "starting"))
+        for index in range(start_index, self.config.max_attempts + 1):
             self._emit(_ev_attempt(index, self.config.max_attempts))
             snapshot = self.guard.snapshot() if self.guard else None
             prompt = self._compose(task, plan, context, feedback)
@@ -277,6 +294,7 @@ class AutonomousAgent:
                         task, answer, prior_successes, tainted=run_tainted
                     )
                 self._record_card_outcome(True)
+                self._clear_checkpoint(thread_id)
                 self._emit(_ev_final(True, answer))
                 return AutonomousResult(answer=answer, success=True, attempts=attempts, plan=plan)
 
@@ -329,6 +347,11 @@ class AutonomousAgent:
                         _log.debug("attempt %d: stagnation detected; injecting pivot advice", index)
                         feedback = f"{feedback}\n\n{self.stagnation.advice()}"
 
+            # Durable checkpoint: this attempt failed, so persist the state to resume from the
+            # NEXT attempt if the process dies. (A successful attempt returns above and clears
+            # the thread, so only mid-run, still-failing state is ever checkpointed.)
+            self._save_checkpoint(thread_id, task, index + 1, feedback, plan, attempts)
+
         # The run ultimately failed: if this failure pattern recurs, distill an advisory
         # anti-pattern card so future attempts are warned. Guarded — the capability is
         # optional, so an evolver that only learns from successes is left untouched.
@@ -339,9 +362,36 @@ class AutonomousAgent:
                 evolve_failure(task, feedback, prior_failures, tainted=run_tainted)
 
         self._record_card_outcome(False)
+        self._clear_checkpoint(thread_id)  # exhausted the budget — a terminal state, not resumable
         last = attempts[-1].answer if attempts else ""
         self._emit(_ev_final(False, last))
         return AutonomousResult(answer=last, success=False, attempts=attempts, plan=plan)
+
+    def _save_checkpoint(
+        self,
+        thread_id: str | None,
+        task: str,
+        next_index: int,
+        feedback: str,
+        plan: Plan | None,
+        attempts: list[Attempt],
+    ) -> None:
+        """Persist resumable loop state for ``thread_id`` (no-op without a checkpointer/thread)."""
+        if self.checkpointer is None or not thread_id:
+            return
+        state: dict[str, Any] = {
+            "task": task,
+            "next_index": next_index,
+            "feedback": feedback,
+            "plan_steps": plan.steps if plan is not None else None,
+            "plan_raw": plan.raw if plan is not None else "",
+            "attempts": [asdict(a) for a in attempts],
+        }
+        self.checkpointer.save(thread_id, state)
+
+    def _clear_checkpoint(self, thread_id: str | None) -> None:
+        if self.checkpointer is not None and thread_id:
+            self.checkpointer.delete(thread_id)
 
     def _record_card_outcome(self, success: bool) -> None:
         """Credit the run's outcome to the injected skill cards (per-skill telemetry)."""

@@ -1168,6 +1168,9 @@ def solve(
     stream: bool = typer.Option(
         False, "--stream", help="Print live progress events (attempt/result/status) as the run proceeds."
     ),
+    thread: str = typer.Option(
+        None, "--thread", help="Checkpoint this run under a thread id; re-run with the same id to resume after a crash."
+    ),
 ) -> None:
     """Tier-2: autonomously solve a task with plan + verify-or-revert. Requires a key."""
     from chimera.core import (
@@ -1179,6 +1182,7 @@ def solve(
         Manager,
         Planner,
         ProgressLedger,
+        RunCheckpointer,
         WorkspaceGuard,
     )
     from chimera.core.autonomous import AutonomousResult
@@ -1323,11 +1327,13 @@ def solve(
             ),
             spine_workspace=ws,
             on_event=_stream_sink if stream else None,
+            # Durable execution (--thread): checkpoint the loop to SQLite so a crash can resume.
+            checkpointer=RunCheckpointer(settings.home / "runs.db") if thread else None,
             config=AutonomousConfig(
                 max_attempts=max_attempts, use_planner=not no_plan, use_manager=not no_manager
             ),
         )
-        outcome = auto.run(task)
+        outcome = auto.run(task, thread_id=thread)
         if ledger is not None:
             ledger.dump(settings.home / "ledger.jsonl")
             summary = ledger.capability_summary()
