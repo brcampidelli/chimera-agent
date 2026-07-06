@@ -19,6 +19,7 @@ from chimera.core.autonomous import (
     AutonomousResult,
     Worker,
 )
+from chimera.core.checklist import RequirementChecklist
 from chimera.core.checkpoint import FileSnapshot, WorkspaceGuard
 from chimera.core.contract import CompletionContract, ContractResult, parse_check
 from chimera.core.events import AgentEvent, EventKind, EventSink
@@ -66,6 +67,7 @@ __all__ = [
     "TaskLedger",
     "RunCheckpointer",
     "build_repo_map",
+    "RequirementChecklist",
     "CompletionContract",
     "ContractResult",
     "parse_check",

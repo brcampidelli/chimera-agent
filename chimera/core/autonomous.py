@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from chimera.core.agent import AgentResult
+from chimera.core.checklist import RequirementChecklist
 from chimera.core.checkpoint import WorkspaceGuard
 from chimera.core.contract import CompletionContract
 from chimera.core.events import AgentEvent, EventSink
@@ -125,6 +126,7 @@ class AutonomousAgent:
         replan_on_stall: bool = False,
         pause_on_taint: bool = False,
         repo_map: bool = False,
+        checklist: RequirementChecklist | None = None,
         contract: CompletionContract | None = None,
         taint: SupportsRunTainted | None = None,
         planner: Planner | None = None,
@@ -148,6 +150,7 @@ class AutonomousAgent:
         self.replan_on_stall = replan_on_stall
         self.pause_on_taint = pause_on_taint
         self.repo_map = repo_map
+        self.checklist = checklist
         self.contract = contract
         self.taint = taint
         self.planner = planner
@@ -210,6 +213,10 @@ class AutonomousAgent:
             if self.replan_on_stall and self.planner and self.config.use_planner
             else None
         )
+        # Requirement checklist (opt-in): extract the task's atomic requirements ONCE up front so
+        # every attempt is graded for coverage — catches the "must include / must not" constraints
+        # a weak model silently drops. Extraction is task-level and stable, so it's done once.
+        requirements = self.checklist.extract(task) if self.checklist is not None else []
 
         attempts: list[Attempt] = []
         feedback = ""
@@ -276,6 +283,17 @@ class AutonomousAgent:
                     detail = "Completion contract not met:\n" + "\n".join(
                         f"- {reason}" for reason in contract_result.failures
                     )
+                    fb = f"{fb}\n\n{detail}" if fb else detail
+
+            # Requirement-coverage gate (opt-in): grade the answer against the extracted
+            # requirements; unmet ones fail the attempt and are fed back for a targeted retry —
+            # the model must fix exactly the constraints it dropped. Complements the contract
+            # (artifacts) with coverage; degrades to no-misses on any grader error.
+            if ok and self.checklist is not None and requirements:
+                misses = self.checklist.grade(task, answer, requirements)
+                if misses:
+                    ok = False
+                    detail = "Requirements not covered:\n" + "\n".join(f"- {m}" for m in misses)
                     fb = f"{fb}\n\n{detail}" if fb else detail
 
             attempt = Attempt(index, answer, approved, verified, False, ok, fb, vout)

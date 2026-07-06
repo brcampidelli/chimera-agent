@@ -1183,6 +1183,9 @@ def solve(
     progress_ledger: bool = typer.Option(
         False, "--progress-ledger", help="After a failed attempt, run a structured self-check that steers the retry (helps weak models)."
     ),
+    checklist: bool = typer.Option(
+        False, "--checklist", help="Extract the task's atomic requirements and grade each attempt's coverage (catches dropped constraints)."
+    ),
     replan: bool = typer.Option(
         False, "--replan", help="On a stall, rebuild the plan from accumulated failure causes (dual-ledger) instead of just nudging."
     ),
@@ -1215,6 +1218,7 @@ def solve(
         Manager,
         Planner,
         ProgressLedger,
+        RequirementChecklist,
         RunCheckpointer,
         WorkspaceGuard,
     )
@@ -1334,6 +1338,9 @@ def solve(
             # Structured per-attempt self-check (Magentic-One): turns "it failed" into a concrete
             # next_focus for the retry — the lift for weak models. Opt-in via --progress-ledger.
             progress_ledger=ProgressLedger(gateway, model) if progress_ledger else None,
+            # Requirement checklist (--checklist): extract atomic requirements + grade coverage
+            # per attempt, so a weak model can't silently drop a "must include / must not" clause.
+            checklist=RequirementChecklist(gateway, model) if checklist else None,
             # Dual-ledger re-plan (--replan): on a stall, rebuild the plan from accumulated
             # failure causes rather than just nudging. Needs the planner (so not with --no-plan).
             replan_on_stall=replan,
