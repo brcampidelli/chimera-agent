@@ -271,3 +271,44 @@ def test_cron_learn_creates_confirmed_jobs(monkeypatch: pytest.MonkeyPatch, tmp_
         assert "back-up-the-database" in listed.stdout  # the confirmed job is now stored
     finally:
         get_settings.cache_clear()
+
+
+def test_init_writes_key_and_reports_ready(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (tmp_path / ".env.example").write_text("OPENROUTER_API_KEY=\n", encoding="utf-8")
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    get_settings.cache_clear()
+    result = runner.invoke(
+        app, ["init", "--yes", "--home", str(tmp_path), "--openrouter-key", "sk-or-test123"]
+    )
+    assert result.exit_code == 0
+    env = (tmp_path / ".env").read_text(encoding="utf-8")
+    assert "OPENROUTER_API_KEY=sk-or-test123" in env
+    assert "Ready" in result.stdout
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    get_settings.cache_clear()
+
+
+def test_init_creates_env_from_example(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (tmp_path / ".env.example").write_text("OPENROUTER_API_KEY=\nOPENAI_API_KEY=\n", encoding="utf-8")
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    get_settings.cache_clear()
+    result = runner.invoke(app, ["init", "--yes", "--home", str(tmp_path)])
+    assert result.exit_code == 0
+    assert (tmp_path / ".env").exists()
+    assert "One more step" in result.stdout  # no key given → guidance, not crash
+    get_settings.cache_clear()
+
+
+def test_init_does_not_clobber_existing_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (tmp_path / ".env").write_text("OPENROUTER_API_KEY=existing\nMY_CUSTOM=keepme\n", encoding="utf-8")
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    get_settings.cache_clear()
+    result = runner.invoke(
+        app, ["init", "--yes", "--home", str(tmp_path), "--openrouter-key", "sk-or-new"]
+    )
+    assert result.exit_code == 0
+    env = (tmp_path / ".env").read_text(encoding="utf-8")
+    assert "OPENROUTER_API_KEY=sk-or-new" in env  # key line replaced
+    assert "MY_CUSTOM=keepme" in env  # unrelated line preserved
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    get_settings.cache_clear()

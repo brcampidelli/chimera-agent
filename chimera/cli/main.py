@@ -70,6 +70,19 @@ app = typer.Typer(
 console = Console()
 
 
+def _set_env_var(path: Path, key: str, value: str) -> None:
+    """Set KEY=value in a .env file, replacing the line if present, appending otherwise."""
+    lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+    prefix = f"{key}="
+    for i, line in enumerate(lines):
+        if line.strip().startswith(prefix):
+            lines[i] = f"{key}={value}"
+            break
+    else:
+        lines.append(f"{key}={value}")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def _apply_tool_allowlist(
     registry: Any,
     *,
@@ -110,6 +123,73 @@ _CREW_WORKER_OPT = typer.Option(
 def version() -> None:
     """Show the Chimera version."""
     console.print(f"chimera [bold cyan]{__version__}[/bold cyan]")
+
+
+@app.command()
+def init(
+    openrouter_key: str = typer.Option(
+        None, "--openrouter-key", help="Your OpenRouter API key (sk-or-...); one key = 100+ models."
+    ),
+    model: str = typer.Option(None, "--model", help="Default model slug to set (optional)."),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Non-interactive: never prompt."),
+    home: str = typer.Option(None, "--home", help="Project dir for the .env (default: cwd)."),
+) -> None:
+    """First-run setup: create .env, set a provider key, and point you at a real example."""
+    import os
+
+    root = Path(home) if home else Path.cwd()
+    env_path = root / ".env"
+    example = root / ".env.example"
+
+    # 1. Ensure a .env exists — copy the example, never clobber an existing one.
+    if env_path.exists():
+        console.print(f".env already exists at [bold]{env_path}[/bold] — leaving it in place.")
+    elif example.exists():
+        env_path.write_text(example.read_text(encoding="utf-8"), encoding="utf-8")
+        console.print(f"[green]Created[/green] {env_path} from .env.example")
+    else:
+        env_path.write_text("# Chimera configuration\n", encoding="utf-8")
+        console.print(f"[green]Created[/green] {env_path}")
+
+    # 2. Provider key (flag wins; prompt only when interactive).
+    key = (openrouter_key or "").strip()
+    if not key and not yes:
+        console.print("Get a key at [bold]https://openrouter.ai/keys[/bold] (a free tier exists).")
+        key = typer.prompt(
+            "Paste your OpenRouter API key (leave blank to skip)", default="", show_default=False
+        ).strip()
+    if key:
+        _set_env_var(env_path, "OPENROUTER_API_KEY", key)
+        os.environ["OPENROUTER_API_KEY"] = key  # so the check below sees it immediately
+        console.print("[green]Set[/green] OPENROUTER_API_KEY in .env")
+    if model:
+        _set_env_var(env_path, "CHIMERA_DEFAULT_MODEL", model)
+        os.environ["CHIMERA_DEFAULT_MODEL"] = model
+        console.print(f"[green]Set[/green] CHIMERA_DEFAULT_MODEL={model}")
+
+    # 3. Verify + point at something real.
+    get_settings.cache_clear()
+    providers = get_settings().configured_providers()
+    if providers:
+        console.print(f"[green]Ready[/green] — providers configured: {', '.join(providers)}")
+        console.print(
+            Panel.fit(
+                "Try it now:\n"
+                "  [bold]chimera run[/bold] \"Explain what you can do in 3 bullets\"\n"
+                "  [bold]chimera workflow examples/email_triage/triage.yaml -w ./triage_workspace[/bold]"
+                "   (real: inbox → digest)\n"
+                "  [bold]chimera redteam[/bold]   (see the injection defenses' measured coverage)",
+                title="[green]You're set up[/green]",
+            )
+        )
+    else:
+        console.print(
+            Panel.fit(
+                f"No provider key yet. Add one to [bold]{env_path}[/bold] "
+                "(OPENROUTER_API_KEY=...) and run [bold]chimera doctor[/bold].",
+                title="[yellow]One more step[/yellow]",
+            )
+        )
 
 
 @app.command()
