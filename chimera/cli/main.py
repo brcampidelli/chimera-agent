@@ -508,11 +508,14 @@ def serve(
     signal: bool = typer.Option(False, "--signal", help="Serve on Signal via a signal-cli-rest-api bridge (CHIMERA_SIGNAL_API_URL + CHIMERA_SIGNAL_NUMBER)."),
     cron: bool = typer.Option(False, "--cron", help="Also run the cron daemon: fire scheduled jobs on the real clock (proactivity)."),
     cron_tick: int = typer.Option(30, "--cron-tick", help="Seconds between cron scheduler ticks."),
+    mcp: bool = typer.Option(False, "--mcp", help="Serve Chimera AS an MCP server over stdio (solve/fuse/memory as tools)."),
 ) -> None:
     """Run the messaging gateway on HTTP, Discord, Telegram, Slack or Signal. Requires a key.
 
     Add ``--cron`` to also fire scheduled jobs on a real clock — turning the reactive gateway
-    into an agent that acts on time (the daemon that makes proactivity real).
+    into an agent that acts on time (the daemon that makes proactivity real). Pass ``--mcp`` to
+    instead expose Chimera *as* an MCP server on stdio, so any MCP client (Claude Desktop, an
+    IDE, another agent) can call ``chimera_solve`` / ``chimera_fuse`` / ``chimera_memory_search``.
     """
     from chimera.core import Agent, AgentConfig
     from chimera.interface import ChatSession
@@ -533,6 +536,10 @@ def serve(
         backend = RoutedBackend(llm, FusionEngine(llm))
 
     workspace_path = Path(workspace)
+
+    if mcp:
+        _serve_mcp(backend, llm, model, max_steps, workspace_path, recall=not no_memory)
+        return
     cron_stop = _start_cron_daemon(backend, model, max_steps, workspace_path, cron_tick) if cron else None
     shared_memory = None if no_memory else _memory_manager()
     shared_graph = _recall_graph(shared_memory)
@@ -665,6 +672,57 @@ def _sender_registry(settings: Settings, primary: Any = None) -> Any:
 
         registry.register(WhatsAppSender(settings.whatsapp_access_token, settings.whatsapp_phone_number_id))
     return registry
+
+
+def _serve_mcp(
+    backend: SupportsComplete,
+    gateway: Any,  # LLMGateway (for the fusion engine)
+    model: str | None,
+    max_steps: int,
+    workspace_path: Path,
+    *,
+    recall: bool,
+) -> None:
+    """Expose Chimera as an MCP server on stdio: solve/fuse/memory-search become MCP tools.
+
+    stdio is the MCP wire, so nothing here may write to stdout — the notice goes to stderr.
+    """
+    import sys
+
+    from chimera.core import Agent, AgentConfig, AutonomousAgent, AutonomousConfig
+    from chimera.fusion import FusionEngine
+    from chimera.providers import Message
+    from chimera.server import ChimeraMCP
+    from chimera.tools import default_registry
+
+    def _solve(task: str) -> str:
+        registry = default_registry(workspace_path)
+        worker = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
+        auto = AutonomousAgent(
+            worker,
+            memory=_memory_manager() if recall else None,
+            config=AutonomousConfig(max_attempts=2, use_planner=False, use_manager=False),
+        )
+        return auto.run(task).answer or "(no answer)"
+
+    def _fuse(prompt: str) -> str:
+        return FusionEngine(gateway).run([Message(role="user", content=prompt)]).final
+
+    def _search(query: str, k: int) -> list[str]:
+        return [item.content for item in _memory_manager().search(query, k=k)]
+
+    bridge = ChimeraMCP(solve=_solve, fuse=_fuse, memory_search=_search)
+    print(
+        "chimera MCP server on stdio — tools: chimera_solve, chimera_fuse, chimera_memory_search",
+        file=sys.stderr,
+    )
+    try:
+        bridge.serve_stdio()
+    except ModuleNotFoundError as exc:
+        print(f"MCP SDK missing — install with: pip install 'chimera-agent[mcp]' ({exc})", file=sys.stderr)
+        raise typer.Exit(code=1) from exc
+    except KeyboardInterrupt:
+        print("stopped", file=sys.stderr)
 
 
 def _serve_platform(

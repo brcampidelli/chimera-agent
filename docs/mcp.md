@@ -71,6 +71,39 @@ MCP tools are ordinary `Tool` objects, so everything composes:
   as untrusted and prefer running with `--taint --guard` semantics when the server pulls
   external data.
 
+## Chimera *as* an MCP server
+
+The client above lets Chimera call other tools. The reverse also works: run Chimera **as**
+an MCP server so any MCP client — Claude Desktop, an IDE, another agent — can call the whole
+engine as three tools.
+
+```bash
+uv sync --extra mcp
+chimera serve --mcp        # speaks MCP over stdio
+```
+
+It exposes:
+
+| Tool | What it does |
+| --- | --- |
+| `chimera_solve` | Autonomously solve a task with plan + verify-or-revert; returns the answer. |
+| `chimera_fuse` | Answer a prompt through the LLM-Fusion engine (panel → judge → synthesizer). |
+| `chimera_memory_search` | Search Chimera's long-term memory and return the top facts. |
+
+Point an MCP client at it as a stdio server. For Claude Desktop, add to its config:
+
+```json
+{
+  "mcpServers": {
+    "chimera": { "command": "chimera", "args": ["serve", "--mcp"] }
+  }
+}
+```
+
+`--mcp` needs a provider key for `chimera_solve`/`chimera_fuse` (memory search works without
+one). Add `--fuse` to route the solver's deep turns through fusion, `--no-memory` to skip
+recall. Because stdio is the wire, all logs go to stderr — stdout carries only the protocol.
+
 ## Troubleshooting
 
 - `TimeoutError: MCP server ... did not become ready` — the command didn't start. Run the
