@@ -2530,6 +2530,71 @@ def evolve_recipe(
     console.print("[dim]Training is external + opt-in: run it on a GPU, review the result before use.[/dim]")
 
 
+def _read_results(path: str) -> list[bool]:
+    """Read a JSON pass/fail list (a bench run's per-trial results)."""
+    import json
+
+    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(raw, list):
+        raise ValueError(f"{path}: expected a JSON list of booleans")
+    return [bool(x) for x in raw]
+
+
+@evolve_app.command("rft")
+def evolve_rft(
+    baseline: str = typer.Option(..., "--baseline", help="JSON list of baseline bench pass/fail."),
+    candidate: str = typer.Option(..., "--candidate", help="JSON list of candidate bench pass/fail."),
+    traj: str = typer.Option(None, "--traj", help="Trajectory JSONL (default: <home>/trajectories.jsonl)."),
+    min_reward: float = typer.Option(0.5, "--min-reward", help="Rejection-sampling reward bar."),
+    min_examples: int = typer.Option(30, "--min-examples", help="Accepted examples needed to gate."),
+    top_k: int = typer.Option(0, "--top-k", help="Keep at most this many accepted per prompt (0 = all)."),
+    out: str = typer.Option(None, "--out", help="If promoted, write dataset + recipe here."),
+    force: bool = typer.Option(False, "--force", help="Export even if the round is not promoted."),
+) -> None:
+    """One rejection-sampling fine-tuning round, gated by an honest A/B on two bench result files.
+
+    Rejection-samples the collected trajectories (successes at/above the reward bar), then promotes
+    the round ONLY if the candidate beats the baseline with a confidence interval that excludes zero
+    — no lift, no promotion, no training on noise. Artifacts are withheld for an unpromoted round
+    unless ``--force``. Feed ``--baseline``/``--candidate`` the pass/fail lists two bench runs produce.
+    """
+    from chimera.ecosystem import RejectionSamplingLoop, StaticEvaluator
+
+    try:
+        baseline_passed = _read_results(baseline)
+        candidate_passed = _read_results(candidate)
+    except (OSError, ValueError) as exc:
+        console.print(f"[red]Could not read results: {exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    loop = RejectionSamplingLoop(
+        _collector(traj),
+        StaticEvaluator(baseline_passed, candidate_passed),
+        min_reward=min_reward,
+        min_examples=min_examples,
+        top_k_per_prompt=top_k,
+    )
+    result = loop.run()
+    console.print(
+        f"RFT round: {result.accepted_examples} accepted "
+        f"({result.accept_rate:.0%} accept rate), ready={result.ready}"
+    )
+    if result.ab is not None:
+        from chimera.eval.bench_ab import format_report
+
+        console.print(format_report(result.ab))
+    verdict = "[green]PROMOTED[/green]" if result.promoted else "[yellow]WITHHELD[/yellow]"
+    console.print(f"{verdict} — {result.reason}")
+    if out:
+        written = loop.export(result, Path(out), force=force)
+        if written:
+            for path in written:
+                console.print(f"[green]wrote[/green] {path}")
+            console.print("[dim]Training is external + opt-in: run on a GPU, review before use.[/dim]")
+        else:
+            console.print("[dim]Nothing written — round not promoted (use --force to override).[/dim]")
+
+
 @evolve_app.command("tune")
 def evolve_tune(
     rounds: int = typer.Option(2, "--rounds", help="Meta-search rounds."),

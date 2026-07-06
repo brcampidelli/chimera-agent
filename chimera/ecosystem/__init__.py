@@ -15,6 +15,15 @@ from chimera.ecosystem.evolution import (
     write_jsonl,
     write_recipe,
 )
+from chimera.ecosystem.loop import (
+    BenchEvaluator,
+    RejectionResult,
+    RejectionSamplingLoop,
+    RFTRound,
+    StaticEvaluator,
+    rejection_sample,
+    run_rft,
+)
 from chimera.ecosystem.meta_agent import AgentBlueprint, MetaAgent, MetaEvalReport
 from chimera.ecosystem.spec import (
     AgentSpec,
@@ -45,4 +54,11 @@ __all__ = [
     "curate_dpo",
     "write_jsonl",
     "write_recipe",
+    "rejection_sample",
+    "RejectionResult",
+    "RejectionSamplingLoop",
+    "RFTRound",
+    "BenchEvaluator",
+    "StaticEvaluator",
+    "run_rft",
 ]
