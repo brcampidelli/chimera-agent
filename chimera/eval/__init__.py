@@ -4,6 +4,8 @@ The continuous-evolution benchmark measures degradation over chained tasks — t
 key proof that Chimera resists the EvoClaw problem.
 """
 
+from chimera.eval.bench_ab import ABResult, Arm, format_report
+from chimera.eval.bench_ab import compare as compare_ab
 from chimera.eval.chained import ChainStep, demo_chain, run_chain
 from chimera.eval.continuous import (
     CostingSolver,
@@ -98,4 +100,8 @@ __all__ = [
     "run_memory_bench",
     "synthetic_facts_and_probes",
     "memory_sweep",
+    "Arm",
+    "ABResult",
+    "compare_ab",
+    "format_report",
 ]

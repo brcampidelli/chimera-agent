@@ -43,3 +43,4 @@ nav:
       - Security & safeguards: security.md
   - Understand:
       - Architecture: architecture.md
+      - Benchmarks (weak-model lift): benchmarks.md

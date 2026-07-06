@@ -2554,6 +2554,45 @@ def redteam() -> None:
         )
 
 
+@app.command("bench-compare")
+def bench_compare(
+    baseline: str = typer.Argument(..., help="JSON file of the baseline arm's per-task pass/fail (list of bools, or {task: bool})."),
+    treatment: str = typer.Argument(..., help="JSON file of the treatment arm's per-task pass/fail."),
+    baseline_name: str = typer.Option("baseline", "--baseline-name", help="Label for the baseline arm."),
+    treatment_name: str = typer.Option("chimera", "--treatment-name", help="Label for the treatment arm."),
+) -> None:
+    """Report the honest A/B delta (+95% CI) between two benchmark result files.
+
+    Feed it the pass/fail from two runs on the SAME task IDs (e.g. a terminal-bench free-model
+    baseline vs the same model driven by Chimera). Prints each arm's Wilson-bounded pass rate,
+    the delta, its Newcombe CI, and whether the difference is significant. This is the number
+    that proves (or doesn't) that the scaffolding lifts a weak model.
+    """
+    import json
+
+    from chimera.eval import compare_ab, format_report
+
+    def _load(path: str) -> list[bool]:
+        raw = json.loads(Path(path).read_text(encoding="utf-8"))
+        values = raw.values() if isinstance(raw, dict) else raw
+        return [bool(v) for v in values]
+
+    try:
+        base_passed, treat_passed = _load(baseline), _load(treatment)
+    except (OSError, json.JSONDecodeError) as exc:
+        console.print(f"[red]could not read results: {exc}[/red]")
+        raise typer.Exit(code=1) from exc
+    result = compare_ab(
+        base_passed, treat_passed, baseline_name=baseline_name, treatment_name=treatment_name
+    )
+    console.print(format_report(result))
+    if not result.significant:
+        console.print(
+            "[dim]not significant — a larger task subset / more seeds, or the feature genuinely "
+            "doesn't move the number. Report it honestly either way.[/dim]"
+        )
+
+
 @app.command("memory-bench")
 def memory_bench(
     sizes: str = typer.Option("50,200,1000", "--sizes", help="Comma-separated memory sizes to sweep."),

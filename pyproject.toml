@@ -63,6 +63,13 @@ documents = [
 browser = [
     "playwright>=1.40",
 ]
+# Standard-benchmark grounding: the terminal-bench harness for the honest weak-model-lift A/B.
+# Opt-in and heavy (Docker-based); the adapter gives an install hint when absent. The A/B stats
+# engine (chimera bench-compare) needs no extra. Marker: terminal-bench requires Python >=3.12,
+# so it's excluded on 3.11 rather than breaking resolution (the adapter hints to install it).
+bench = [
+    "terminal-bench>=0.2; python_version >= '3.12'",
+]
 # Build the documentation site (mkdocs-material). Only needed to render/deploy docs.
 docs = [
     "mkdocs-material>=9.5",
