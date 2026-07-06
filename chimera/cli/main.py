@@ -1186,6 +1186,9 @@ def solve(
     checklist: bool = typer.Option(
         False, "--checklist", help="Extract the task's atomic requirements and grade each attempt's coverage (catches dropped constraints)."
     ),
+    agreement: int = typer.Option(
+        1, "--agreement", help="With --fuse: sample K cheap answers per turn; escalate to fusion when they disagree (free confidence signal)."
+    ),
     replan: bool = typer.Option(
         False, "--replan", help="On a stall, rebuild the plan from accumulated failure causes (dual-ledger) instead of just nudging."
     ),
@@ -1273,7 +1276,9 @@ def solve(
         from chimera.fusion import FusionEngine, RoutedBackend, RoutingPolicy
 
         engine = FusionEngine(gateway)
-        backend = RoutedBackend(gateway, engine)
+        # --agreement K: sample K cheap answers per turn; disagreement escalates to fusion
+        # (a free confidence signal). K=1 (default) keeps the a-priori routing unchanged.
+        backend = RoutedBackend(gateway, engine, agreement_k=agreement)
         # Observed-difficulty escalation (issue #3): a fusion-forced backend for retrying a
         # task that already failed verification — "the review surface is where the difficulty
         # signal lives". The AutonomousAgent uses it only after an attempt fails.

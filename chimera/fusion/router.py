@@ -83,6 +83,12 @@ _ARITH_EXPR = re.compile(r"\d\s*[+\-*/×÷]\s*\d|\d\s*%")
 FuseReason = Literal["mode", "length", "keyword", "precision", "arithmetic", "none"]
 
 
+def _sum_tokens(results: list[CompletionResult], field_name: str) -> int | None:
+    """Sum a token field across sampled results (None if none reported)."""
+    values = [getattr(r, field_name) for r in results if getattr(r, field_name) is not None]
+    return sum(values) if values else None
+
+
 def _last_user_text(messages: list[MessageLike]) -> str:
     for message in reversed(messages):
         data = message.as_dict() if isinstance(message, Message) else message
@@ -135,12 +141,21 @@ class RoutedBackend:
         policy: RoutingPolicy | None = None,
         *,
         escalate_on_fail: EscalationVerifier | None = None,
+        agreement_k: int = 1,
+        agreement_threshold: float = 0.85,
+        agreement_temperature: float = 0.7,
     ) -> None:
         self.single = single
         self.fusion = fusion
         self.policy = policy or RoutingPolicy()
         # Optional: re-escalate a single-model turn to fusion when its result fails this check.
         self.escalate_on_fail = escalate_on_fail
+        # Agreement-based escalation (opt-in): sample K cheap answers; if they DISAGREE that's a
+        # free "this turn is uncertain/hard" signal (no logprobs, beats verbalized confidence), so
+        # escalate to fusion. If they agree, take the consensus cheaply. K<=1 disables it.
+        self.agreement_k = max(1, agreement_k)
+        self.agreement_threshold = agreement_threshold
+        self.agreement_temperature = agreement_temperature
 
     def complete(
         self,
@@ -160,12 +175,39 @@ class RoutedBackend:
         if self.policy.should_fuse(messages):
             _log.debug("routing turn to fusion")
             return self.fusion.complete(messages, temperature=temperature)
-        result = self.single.complete(
-            messages, model=model, temperature=temperature, max_tokens=max_tokens
-        )
+        # Agreement escalation: a turn priced as single but where cheap samples disagree is hard.
+        if self.agreement_k > 1:
+            result = self._agree_or_escalate(messages, model, max_tokens)
+        else:
+            result = self.single.complete(
+                messages, model=model, temperature=temperature, max_tokens=max_tokens
+            )
         # Observed difficulty (issue #3): a turn priced as single may still be hard. If a
         # check on its result fails, re-escalate this turn to fusion rather than accept it.
         if self.escalate_on_fail is not None and not self.escalate_on_fail(result):
             _log.debug("single result failed verification; re-escalating turn to fusion")
             return self.fusion.complete(messages, temperature=temperature)
         return result
+
+    def _agree_or_escalate(
+        self, messages: list[MessageLike], model: str | None, max_tokens: int | None
+    ) -> CompletionResult:
+        """Sample K cheap answers; return the consensus, or escalate to fusion on disagreement."""
+        from chimera.fusion.consistency import majority
+
+        samples = [
+            self.single.complete(
+                messages, model=model, temperature=self.agreement_temperature, max_tokens=max_tokens
+            )
+            for _ in range(self.agreement_k)
+        ]
+        winner = majority([s.content for s in samples], threshold=self.agreement_threshold)
+        if winner is None:
+            _log.debug("low agreement over %d samples; escalating turn to fusion", self.agreement_k)
+            return self.fusion.complete(messages, temperature=0.3)
+        return CompletionResult(
+            content=winner,
+            model="agreement",
+            prompt_tokens=_sum_tokens(samples, "prompt_tokens"),
+            completion_tokens=_sum_tokens(samples, "completion_tokens"),
+        )
