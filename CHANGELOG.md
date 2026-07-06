@@ -6,6 +6,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-06
+
+The M14 cycle — from *"lift a weak model"* to *"prove it on a standard benchmark, then close the
+loop so it keeps improving."* Four pillars: **proof** (a real measuring stick), **amplification**
+(more ways to lift a weak model), a **closed self-improvement loop**, and **graded outcomes**.
+
+Honest status: this ships the *measurement infrastructure* and the *capabilities*, not a published
+benchmark number. A local, Docker-free proxy A/B was built and run on a cheap model, but with a
+competent cheap model on small tasks the raw model already one-shots most of them (a ceiling
+effect) — the lift lives in the hard-task regime the official benchmarks occupy, which needs a
+Python 3.12 + Docker environment. The adapters below are wired and ready for exactly that.
+
+### Added
+- **Honest A/B engine** (`chimera bench-compare`) — the measuring stick every feature reports
+  against: per-arm Wilson-bounded pass rates, the delta, and a Newcombe 95% CI; "significant" only
+  when the CI excludes zero. Pure Python, no extra needed. Feed it two runs' pass/fail on the same
+  task IDs (e.g. a free-model baseline vs the same model driven by Chimera).
+- **Terminal-Bench adapter** (`chimera.eval.terminal_bench`) — a pure, unit-tested `chimera solve`
+  command builder plus a lazy `terminal_bench.BaseAgent` subclass for the Harbor harness; the
+  pass/fail verdict is the task's own tests, never self-reported. Opt-in `[bench]` extra.
+- **SWE-bench Verified-Mini adapter** (`chimera.eval.swe_bench`, `chimera swe-bench-compare`) — the
+  per-instance solve command + parsing of the official evaluation report, projected onto a shared
+  instance list so both arms are scored on identical instances; reuses the A/B engine. Dataset and
+  Docker harness stay opt-in and unbundled.
+- **Requirement checklist** (`solve --checklist`) — extracts a task's atomic requirements once, then
+  grades each attempt's coverage, catching the "must include / must not" constraints a weak model
+  silently drops. Degrades to neutral on any parse error.
+- **Agreement-based escalation** (`solve --fuse --agreement K`) — samples K cheap answers per turn
+  and escalates to fusion only when they disagree: a free confidence signal (semantic agreement,
+  no logprobs needed) that spends the expensive path only where the model is unsure.
+- **Verifier-based sample selection** (`chimera.fusion.verifier_select`) — Weaver-lite: an
+  independent judge scores N candidates and *picks* the best, rather than majority-voting; wired
+  into self-consistency.
+- **Independent strong verification** (`solve --strong-verify MODEL`) — a stronger, independent
+  judge grades the final answer, but only on hard (already-retried) turns — dodging both
+  self-enhancement bias and the cost of verifying every turn. A flaky judge fails open.
+- **GEPA prompt evolution** (`chimera.evolution.gepa`, `chimera skills-evolve`) — reflective,
+  Pareto-guided evolution of a skill's prompt: evaluate on a graded task set, reflect on a failing
+  rollout to propose an improvement, keep a Pareto frontier (not just best-on-average), adopt only
+  a measured lift. Native reimplementation, no external dependency.
+- **ACE delta-playbook** (`chimera.evolution.playbook`, `chimera playbook`, `solve --playbook`) — an
+  incremental strategy playbook edited only through deltas (add / reinforce / deprecate), never a
+  monolithic rewrite, so hard-won detail is never erased (anti context-collapse, guaranteed by the
+  code). Injected into the solve loop and curated from each run's outcome to close the loop.
+- **RFT loop** (`chimera.ecosystem.loop`, `chimera evolve rft`) — rejection-sampling fine-tuning
+  gated by the A/B bench: keep only successful high-reward runs, and promote a training round only
+  when a candidate beats the baseline with a CI that excludes zero. No lift, no promotion; training
+  stays external and opt-in.
+- **Authorable rubric grading** (`chimera.eval.rubric_grade`, `chimera rubric-grade`) — weighted,
+  task-authored criteria with a required-criterion veto, graded into a single outcome; `grade_batch`
+  turns graded answers into the boolean trials the A/B engine consumes.
+- **Local weak-model-lift harness** (`bench/local_lift/`) — a reproducible, Docker-free A/B over
+  pytest-graded coding tasks (ground truth validated against reference solutions), clearly labelled
+  as a local proxy, not the official leaderboards.
+
 ## [0.3.0] - 2026-07-06
 
 The M13 cycle — the coding, intelligence, resilience and interop leap, under one thesis:
