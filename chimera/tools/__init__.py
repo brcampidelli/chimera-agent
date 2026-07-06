@@ -2,6 +2,7 @@
 
 from chimera.tools.base import Tool
 from chimera.tools.builtin import EchoTool, default_registry
+from chimera.tools.edit import ApplyPatchTool, EditFileTool
 from chimera.tools.files import ListDirTool, ReadFileTool, WriteFileTool
 from chimera.tools.http import HttpGetTool
 from chimera.tools.registry import (
@@ -21,6 +22,8 @@ __all__ = [
     "EchoTool",
     "ReadFileTool",
     "WriteFileTool",
+    "EditFileTool",
+    "ApplyPatchTool",
     "ListDirTool",
     "GrepTool",
     "GlobTool",

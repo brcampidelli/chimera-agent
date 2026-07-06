@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from chimera.tools.base import Tool
+from chimera.tools.edit import ApplyPatchTool, EditFileTool
 from chimera.tools.files import ListDirTool, ReadFileTool, WriteFileTool
 from chimera.tools.http import HttpGetTool
 from chimera.tools.registry import ToolRegistry
@@ -43,6 +44,8 @@ def default_registry(workspace: Path | None = None) -> ToolRegistry:
     registry.register(EchoTool())
     registry.register(ReadFileTool(workspace))
     registry.register(WriteFileTool(workspace))
+    registry.register(EditFileTool(workspace))
+    registry.register(ApplyPatchTool(workspace))
     registry.register(ListDirTool(workspace))
     registry.register(GrepTool(workspace))
     registry.register(GlobTool(workspace))

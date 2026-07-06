@@ -52,7 +52,8 @@ def fence(content: str) -> str:
 # laundered injection (paraphrased past the ref/flow matcher) could still steer. The
 # grant shrinks for the rest of the run, catching what per-action assessment misses.
 DANGEROUS_WHEN_TAINTED = frozenset(
-    {"run_shell", "execute_code", "code_interpreter", "write_file", "send_email"}
+    {"run_shell", "execute_code", "code_interpreter", "write_file", "edit_file",
+     "apply_patch", "send_email"}
 )
 
 

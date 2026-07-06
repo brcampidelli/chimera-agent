@@ -40,7 +40,7 @@ FETCH_TOOLS = frozenset(
      "calendar_events"}
 )
 EXEC_TOOLS = frozenset({"run_shell", "execute_code", "code_interpreter"})
-WRITE_TOOLS = frozenset({"write_file"})
+WRITE_TOOLS = frozenset({"write_file", "edit_file", "apply_patch"})
 READ_TOOLS = frozenset({"read_file"})
 
 _URL_KEYS = ("url", "uri", "link")
