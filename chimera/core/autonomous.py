@@ -25,6 +25,11 @@ from typing import Protocol
 from chimera.core.agent import AgentResult
 from chimera.core.checkpoint import WorkspaceGuard
 from chimera.core.contract import CompletionContract
+from chimera.core.events import AgentEvent, EventSink
+from chimera.core.events import attempt as _ev_attempt
+from chimera.core.events import final as _ev_final
+from chimera.core.events import result as _ev_result
+from chimera.core.events import status as _ev_status
 from chimera.core.ledger import ProgressLedger
 from chimera.core.planner import Plan, Planner
 from chimera.core.spine import assemble_spine
@@ -126,6 +131,7 @@ class AutonomousAgent:
         auto_evolver: SupportsAutoEvolve | None = None,
         cards: SupportsCardContext | None = None,
         spine_workspace: Path | None = None,
+        on_event: EventSink | None = None,
         config: AutonomousConfig | None = None,
     ) -> None:
         self.worker = worker
@@ -144,7 +150,17 @@ class AutonomousAgent:
         self.auto_evolver = auto_evolver
         self.cards = cards
         self.spine_workspace = spine_workspace
+        self.on_event = on_event
         self.config = config or AutonomousConfig()
+
+    def _emit(self, event: AgentEvent) -> None:
+        """Deliver a progress event to the sink, if one is set (never breaks the loop)."""
+        if self.on_event is None:
+            return
+        try:
+            self.on_event(event)
+        except Exception as exc:  # noqa: BLE001 — a broken sink must not fail the run
+            _log.warning("event sink raised, dropping event: %s", exc)
 
     def run(self, task: str) -> AutonomousResult:
         spine = assemble_spine(self.spine_workspace, task) if self.spine_workspace else ""
@@ -169,9 +185,11 @@ class AutonomousAgent:
             else None
         )
 
+        self._emit(_ev_status("planning complete" if plan else "starting"))
         attempts: list[Attempt] = []
         feedback = ""
         for index in range(1, self.config.max_attempts + 1):
+            self._emit(_ev_attempt(index, self.config.max_attempts))
             snapshot = self.guard.snapshot() if self.guard else None
             prompt = self._compose(task, plan, context, feedback)
             # Observed difficulty (issue #3): the first attempt uses the cost-aware worker;
@@ -214,6 +232,7 @@ class AutonomousAgent:
                     fb = f"{fb}\n\n{detail}" if fb else detail
 
             attempt = Attempt(index, answer, approved, verified, False, ok, fb, vout)
+            self._emit(_ev_result(index, ok, detail=(fb or vout)[:200]))
             if not ok and snapshot is not None and self.guard is not None:
                 self.guard.restore(snapshot)
                 attempt.reverted = True
@@ -248,6 +267,7 @@ class AutonomousAgent:
                         task, answer, prior_successes, tainted=run_tainted
                     )
                 self._record_card_outcome(True)
+                self._emit(_ev_final(True, answer))
                 return AutonomousResult(answer=answer, success=True, attempts=attempts, plan=plan)
 
             feedback = fb or (
@@ -297,6 +317,7 @@ class AutonomousAgent:
 
         self._record_card_outcome(False)
         last = attempts[-1].answer if attempts else ""
+        self._emit(_ev_final(False, last))
         return AutonomousResult(answer=last, success=False, attempts=attempts, plan=plan)
 
     def _record_card_outcome(self, success: bool) -> None:

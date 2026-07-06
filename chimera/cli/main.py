@@ -36,6 +36,7 @@ from chimera.config import get_settings
 
 if TYPE_CHECKING:
     from chimera.config import Settings
+    from chimera.core import AgentEvent
     from chimera.ecosystem import TrajectoryCollector
     from chimera.kanban import KanbanBoard
     from chimera.memory import EmbedFn, MemoryGraph, MemoryManager
@@ -107,6 +108,16 @@ def _apply_tool_allowlist(
     if allow_names is None and not deny_names:
         return registry
     return restrict_registry(registry, allow=allow_names, deny=deny_names, audit=audit)
+
+
+def _stream_sink(event: AgentEvent) -> None:
+    """Print one live progress event during ``solve --stream`` (dim, one line each)."""
+    if event.kind == "final":
+        return  # the final answer is printed by the command itself
+    icon = {"status": "•", "attempt": "▸"}.get(event.kind, "•")
+    if event.kind == "result":
+        icon = "✓" if event.data.get("success") else "✗"
+    console.print(f"[dim]{icon} {event.text}[/dim]")
 
 
 # Module-level so the list-typed default isn't a call-in-default (ruff B008).
@@ -1151,6 +1162,9 @@ def solve(
     contract: str = typer.Option(
         None, "--contract", help="Machine-checkable success clauses, comma-separated: file_exists:PATH | file_contains:PATH:REGEX | answer_matches:REGEX."
     ),
+    stream: bool = typer.Option(
+        False, "--stream", help="Print live progress events (attempt/result/status) as the run proceeds."
+    ),
 ) -> None:
     """Tier-2: autonomously solve a task with plan + verify-or-revert. Requires a key."""
     from chimera.core import (
@@ -1302,6 +1316,7 @@ def solve(
                 else None
             ),
             spine_workspace=ws,
+            on_event=_stream_sink if stream else None,
             config=AutonomousConfig(
                 max_attempts=max_attempts, use_planner=not no_plan, use_manager=not no_manager
             ),

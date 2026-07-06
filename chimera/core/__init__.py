@@ -21,6 +21,7 @@ from chimera.core.autonomous import (
 )
 from chimera.core.checkpoint import FileSnapshot, WorkspaceGuard
 from chimera.core.contract import CompletionContract, ContractResult, parse_check
+from chimera.core.events import AgentEvent, EventKind, EventSink
 from chimera.core.explorer import (
     ContextExplorer,
     Evidence,
@@ -63,6 +64,9 @@ __all__ = [
     "CompletionContract",
     "ContractResult",
     "parse_check",
+    "AgentEvent",
+    "EventKind",
+    "EventSink",
     "Verifier",
     "VerificationResult",
     "CommandVerifier",

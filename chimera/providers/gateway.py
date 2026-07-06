@@ -16,6 +16,7 @@ import json
 import mimetypes
 import os
 import threading
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
@@ -314,6 +315,45 @@ class LLMGateway:
         messages.append(Message(role="user", content=prompt))
         return self.complete(messages, model=model).content
 
+    def stream(
+        self,
+        messages: list[MessageLike],
+        *,
+        model: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> Iterator[str]:
+        """Yield model output token-by-token (the raw streaming primitive).
+
+        The low-level seam the live terminal, messaging gateway and A2A ``message/stream``
+        endpoint build on. No fallback chain or cache — streaming is a single, direct call.
+        """
+        import litellm  # lazy: heavy import, keep CLI startup fast
+
+        resolved = self._resolve_model(model)
+        if not self.settings.has_any_key():
+            raise MissingCredentialsError(
+                "No provider key configured. Set one of "
+                f"{list(_KEY_ENV_VARS.values())} in your environment or .env."
+            )
+        call_kwargs = dict(self._provider_kwargs(), **kwargs)
+        keys = self._key_order(resolved.split("/", 1)[0])
+        if keys:
+            call_kwargs["api_key"] = keys[0]
+        response = litellm.completion(
+            model=resolved,
+            messages=_to_message_dicts(messages),
+            temperature=temperature,
+            max_tokens=max_tokens,
+            stream=True,
+            **call_kwargs,
+        )
+        for chunk in response:
+            text = _delta_text(chunk)
+            if text:
+                yield text
+
     def embed(self, texts: list[str], *, model: str | None = None) -> list[list[float]]:
         """Embed a batch of texts into vectors (one call), for semantic memory recall.
 
@@ -388,3 +428,12 @@ class LLMGateway:
                 ToolCall(id=getattr(call, "id", "") or "", name=fn.name, arguments=arguments)
             )
         return parsed or None
+
+
+def _delta_text(chunk: Any) -> str:
+    """Extract the incremental text from a streaming chunk, defensively (empty on any shape)."""
+    try:
+        delta = chunk.choices[0].delta
+        return str(delta.content or "")
+    except (AttributeError, IndexError, TypeError):
+        return ""
