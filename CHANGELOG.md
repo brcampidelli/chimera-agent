@@ -6,7 +6,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-07-06
+## [0.3.0] - 2026-07-06
+
+The M13 cycle — the coding, intelligence, resilience and interop leap, under one thesis:
+**make a weak/cheap model perform like a frontier one, with proof.** Panel fusion for combining
+strong models; everything below for lifting a single weak one.
+
+### Added
+- **Surgical code editing** — `edit_file` (exact, unique-anchored replace, optional replace_all)
+  and `apply_patch` (multiple SEARCH/REPLACE hunks applied atomically). The agent edits in place
+  instead of rewriting whole files; a missing/ambiguous anchor is refused, not guessed. Both are
+  WRITE + dangerous-when-tainted, so a poisoned run can't silently self-edit.
+- **`read_document`** — ingest PDF/DOCX/PPTX/XLSX/HTML/CSV/EPUB as Markdown via MarkItDown
+  (opt-in `[documents]` extra; an install hint instead of a failure when absent).
+- **Repo-map** (`solve --repo-map`) — a structural table of contents (one line per Python file
+  with its top-level symbols, via `ast`) folded into context, so the agent jumps to the right
+  file instead of exploring blind. Prunes noise, honors `.gitignore`, bounded by a char budget.
+- **Progress ledger** (`solve --progress-ledger`) — Magentic-One's inner loop: after a failed
+  attempt a structured self-check (complete? progressing? next?) injects a concrete next-focus
+  into the retry, so a weak model stops re-trying the same dead end. The verifier stays
+  authoritative; any parse error degrades to neutral.
+- **Completion contracts** (`solve --contract`) — declared, machine-checkable success clauses
+  (`file_exists`, `file_contains`, `answer_matches`) as an AND gate on top of verify-or-revert;
+  unmet clauses feed back so the next attempt fixes exactly what's missing. Catches the model
+  narrating success it didn't achieve.
+- **Dual-ledger re-plan** (`solve --replan`) — Magentic-One's outer loop: on a stall the
+  `TaskLedger` records *why* it's stuck and the planner rebuilds from that accumulated cause, so
+  the retry is fundamentally different, not the same plan reworded.
+- **Self-consistency / best-of-N** (`fuse --best-of N`) — cheap single-model fusion: sample one
+  model N times and take the consensus (or synthesize on a tie). Diversity from sampling, not
+  from multiple providers.
+- **Streaming** — `LLMGateway.stream()` token primitive + a typed `AgentEvent` vocabulary the
+  autonomous loop emits through an optional sink; `solve --stream` shows live progress.
+- **A2A `message/stream`** — the A2A server streams the task lifecycle over Server-Sent Events
+  (working → completed), so a LangGraph/CrewAI orchestrator sees progress without polling. The
+  agent card advertises `capabilities.streaming: true`.
+- **Durable execution** (`solve --thread <id>`) — the solve loop checkpoints to SQLite after
+  each failed attempt; a crash mid-run resumes from the last checkpoint on re-run, repeating no
+  verified work. Terminal states clear the checkpoint.
+- **Human-in-the-loop interrupt** (`solve --pause-on-taint`, `--approve`/`--deny <thread>`) — a
+  run that consumed untrusted content pauses for sign-off before finalizing; approve finalizes
+  the exact reviewed output (no re-run), deny drops it. The safety valve for the lethal trifecta.
+- **Browser navigation** (opt-in `[browser]` extra) — a stateful `browser` tool drives a real
+  Chromium via the accessibility tree (elements tagged with stable refs; click/type by ref, no
+  vision model). Page content is data-fenced and the tool is a fetch-tool, so browsing taints
+  the run.
+
+### Notes
+- New optional extras: `documents` (MarkItDown), `browser` (Playwright — also needs
+  `playwright install chromium`). The core install stays light.
 
 The security → adoption → intelligence → interop cycle: prompt-injection defenses with a
 **measured** attack-success rate, out-of-the-box setup, real consumer recipes, measurable
