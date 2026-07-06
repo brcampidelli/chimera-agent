@@ -137,3 +137,42 @@ Chimera is **alpha**. This deploys and runs, and the cron daemon makes it proact
 has **no production mileage** yet. Start with low-stakes crons, watch `logs`, and keep the
 governance guardrails (`--guard` on `solve`, `CHIMERA_SANDBOX=docker`) in mind for anything
 that touches real systems.
+
+## Publish the docs site (GitHub Pages)
+
+The site builds with `uv run --extra docs mkdocs build --strict`. To auto-deploy it on every
+docs change, enable GitHub Pages (Settings → Pages → Source: GitHub Actions) and add this
+workflow at `.github/workflows/docs.yml` (committing a workflow file needs a token with the
+`workflow` scope):
+
+```yaml
+name: docs
+on:
+  push:
+    branches: [main]
+    paths: ["docs/**", "mkdocs.yml", ".github/workflows/docs.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv run --extra docs mkdocs build --strict
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: site }
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: { name: github-pages, url: "${{ steps.deployment.outputs.page_url }}" }
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+```

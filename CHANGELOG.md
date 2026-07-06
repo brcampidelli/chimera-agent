@@ -6,7 +6,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-06
+
+The security & adoption cycle: prompt-injection defenses with a **measured** attack-success
+rate, out-of-the-box setup, and real consumer recipes.
+
 ### Added
+- **Prompt-injection defenses (measured, not asserted)** — a quarantined reader
+  (dual-LLM / CaMeL: a tool-less model extracts only schema-validated fields from untrusted
+  content), a taint-adaptive allowlist (dangerous tools narrow once a run is tainted),
+  data-fencing/spotlighting on fetched content, and taint **provenance** on memories and
+  learned skills (a skill distilled during a tainted run is held for review — the
+  "Zombie Agents" anti-poisoning defense). A red-team suite (`chimera redteam`) reports the
+  attack success rate with vs without defenses: **100% → ~14%** on the built-in corpus, and
+  it *names* the remaining leak (exfiltration via an allowed tool) instead of claiming 100%.
+- **`chimera init`** — one-command out-of-the-box setup: create `.env`, set a provider key,
+  verify, and point at a real example.
+- **Consumer recipes** — runnable `examples/`: `email_triage` (inbox → digest, read-only),
+  `research_brief` (topic → sourced brief), `repo_watchdog` (run tests → health report),
+  an examples index, and an MCP guide (`docs/mcp.md`) + `examples/mcp_github.py`.
+- **Anti-stagnation signal** for the solve/evolve loop (crowding-score analog) + a
+  multi-round continuous-evolution bench with **cost-drift** tracking (`chimera bench --rounds N`).
+- **Per-skill metrics** (`chimera skills-stats`) with a measured retirement signal.
+- **Router re-escalation** — a single-model turn that fails its check re-escalates to fusion.
+- **Task-oriented docs site** (mkdocs-material) + a GitHub Pages workflow.
+
+### Fixed
+- Migration: memory candidates resolving to the same file (case-insensitive filesystems)
+  are deduped rather than listed/parsed twice.
+
+### Added (M8 — daily-driver interfaces, first released here too)
 - **`IsolatedCrew`** (`chimera crew-isolated`) — composes the three subagent primitives into
   one: tool-using workers each tackle the SAME task in their OWN git worktree, in parallel.
   Non-conflicting edits merge back; a file two workers both changed is reported as a conflict,

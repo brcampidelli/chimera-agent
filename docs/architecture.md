@@ -1,7 +1,7 @@
 # Chimera — Architecture
 
 This document maps the codebase to the design and to the research it builds on. For the
-"why", see [VISION.md](../VISION.md).
+"why", see [VISION.md](https://github.com/brcampidelli/chimera-agent/blob/main/VISION.md).
 
 ## The reasoning core: LLM-Fusion
 

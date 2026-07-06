@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "chimera-agent"
-version = "0.1.0"
+version = "0.2.0"
 description = "An open-source, self-evolving AI agent whose reasoning core is an LLM-Fusion engine (panel -> judge -> synthesizer)."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -52,6 +52,10 @@ messaging = [
 # it stays opt-in; every other reference tool needs no extra.
 youtube = [
     "youtube-transcript-api>=0.6",
+]
+# Build the documentation site (mkdocs-material). Only needed to render/deploy docs.
+docs = [
+    "mkdocs-material>=9.5",
 ]
 # Opt-in model evolution (LoRA/SFT/DPO). Heavy + GPU-bound — never required by the
 # agent; install only to run a `chimera evolve recipe` training script.

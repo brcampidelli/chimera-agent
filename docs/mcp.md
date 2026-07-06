@@ -56,7 +56,7 @@ connector = connect_stdio(
 
 That's the whole integration: ~26 GitHub tools (search repos, read files, list issues,
 create PRs, ...) appear in the registry. Runnable end-to-end version:
-[`examples/mcp_github.py`](../examples/mcp_github.py).
+[`examples/mcp_github.py`](https://github.com/brcampidelli/chimera-agent/blob/main/examples/mcp_github.py).
 
 ## How it fits the safety layers
 

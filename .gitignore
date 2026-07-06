@@ -35,3 +35,6 @@ data/
 Thumbs.db
 .idea/
 .vscode/
+
+# mkdocs build output
+site/

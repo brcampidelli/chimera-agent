@@ -1,0 +1,45 @@
+site_name: Chimera
+site_description: An open-source, self-evolving AI agent with an LLM-fusion reasoning core.
+repo_url: https://github.com/brcampidelli/chimera-agent
+repo_name: brcampidelli/chimera-agent
+docs_dir: docs
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: teal
+      toggle:
+        icon: material/weather-night
+        name: Dark mode
+    - scheme: slate
+      primary: teal
+      toggle:
+        icon: material/weather-sunny
+        name: Light mode
+  features:
+    - navigation.instant
+    - navigation.sections
+    - content.code.copy
+    - toc.integrate
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Get started:
+      - Install & first run: usage.md
+  - Do something real:
+      - Recipes overview: recipes.md
+  - Connect:
+      - MCP servers: mcp.md
+  - Operate:
+      - Deploy (Docker / systemd): deploy.md
+      - Security & safeguards: security.md
+  - Understand:
+      - Architecture: architecture.md
