@@ -33,6 +33,31 @@ Chimera plugs in as the treatment agent via `chimera/eval/terminal_bench.py`
 scaffolding flags). Point Harbor at a pinned subset and a free model for each arm; see the
 [Harbor docs](https://www.tbench.ai/) for the exact `harbor run` invocation and `--agent-import-path`.
 
+## SWE-bench Verified-Mini (the second scoreboard)
+
+Terminal-Bench proves the thesis on CLI tasks; SWE-bench proves it on real GitHub bug-fixes — given
+a repo at a base commit and an issue, the agent must produce a patch that makes the instance's
+`FAIL_TO_PASS` tests pass while keeping `PASS_TO_PASS` green. "Verified" is the human-validated
+subset; "Mini" is a small curated slice for a cheap, fast A/B.
+
+The adapter (`chimera.eval.swe_bench`) is honest about its boundary: the pure parts — the per-
+instance `chimera solve` invocation (treatment arm) and the parsing of the official evaluation
+report — live here and are unit-tested; the dataset and the Docker evaluation harness are **opt-in
+and not bundled**, and the pass/fail verdict comes from SWE-bench's own tests, never self-reported.
+
+```bash
+# 1. Curate a JSONL slice (one instance object per line): instance_id, repo, base_commit,
+#    problem_statement, and (optionally) test_cmd. build_solve_command turns each into a
+#    `chimera solve <issue> --verify <test_cmd> --repo-map --progress-ledger --replan --checklist`.
+# 2. Run both arms through the official SWE-bench harness (model-only vs model+Chimera) on the
+#    SAME instance ids, producing two evaluation reports.
+# 3. Score the honest A/B:
+chimera swe-bench-compare model_only_report.json chimera_report.json --instances mini.jsonl
+```
+
+Both reports are projected onto the shared instance list (a missing id counts as unresolved), so
+the two arms are always compared on identical instances — then the same Newcombe-CI verdict applies.
+
 ## Scoring the A/B (no benchmark needed)
 
 Once each arm has produced per-task pass/fail, the stats are one command — this needs **no

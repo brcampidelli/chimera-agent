@@ -64,6 +64,16 @@ from chimera.eval.rubric_grade import (
 )
 from chimera.eval.scenarios import Scenario, daily_scenarios, run_scenarios
 from chimera.eval.spec_tuning import scenario_scorer
+from chimera.eval.swe_bench import (
+    SWEInstance,
+    compare_arms,
+    load_instances,
+    parse_report,
+    report_to_trials,
+)
+from chimera.eval.swe_bench import (
+    build_solve_command as swe_build_solve_command,
+)
 
 __all__ = [
     "EvalTask",
@@ -118,4 +128,10 @@ __all__ = [
     "RubricGrader",
     "model_grader",
     "grade_batch",
+    "SWEInstance",
+    "load_instances",
+    "swe_build_solve_command",
+    "parse_report",
+    "report_to_trials",
+    "compare_arms",
 ]

@@ -2909,6 +2909,43 @@ def bench_compare(
         )
 
 
+@app.command("swe-bench-compare")
+def swe_bench_compare(
+    baseline: str = typer.Argument(..., help="SWE-bench evaluation report JSON for the model-only arm."),
+    treatment: str = typer.Argument(..., help="SWE-bench evaluation report JSON for the model+Chimera arm."),
+    instances: str = typer.Option(..., "--instances", help="JSONL of the instances both arms ran (fixes the id set)."),
+) -> None:
+    """Honest A/B over two SWE-bench Verified-Mini reports on the SAME instance ids.
+
+    Reads the official evaluation reports (``resolved_ids`` or a per-instance map) for a free model
+    alone vs the same model driven by Chimera, projects both onto the shared instance list (a missing
+    id counts as unresolved), and prints the delta + 95% CI. This is the second standard scoreboard
+    for the weak-model-lift thesis; the pass/fail comes from SWE-bench's tests, never self-reported.
+    """
+    import json
+
+    from chimera.eval import compare_arms, format_report, load_instances
+
+    try:
+        ids = [inst.instance_id for inst in load_instances(Path(instances))]
+        baseline_report = json.loads(Path(baseline).read_text(encoding="utf-8"))
+        treatment_report = json.loads(Path(treatment).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, KeyError) as exc:
+        console.print(f"[red]could not read inputs: {exc}[/red]")
+        raise typer.Exit(code=1) from exc
+    if not ids:
+        console.print("[red]The instances file is empty.[/red]")
+        raise typer.Exit(code=1)
+    result = compare_arms(baseline_report, treatment_report, ids)
+    console.print(f"[dim]{len(ids)} instances[/dim]")
+    console.print(format_report(result))
+    if not result.significant:
+        console.print(
+            "[dim]not significant — a larger slice / more instances, or the scaffolding genuinely "
+            "doesn't move SWE-bench. Report it honestly either way.[/dim]"
+        )
+
+
 @app.command("memory-bench")
 def memory_bench(
     sizes: str = typer.Option("50,200,1000", "--sizes", help="Comma-separated memory sizes to sweep."),
