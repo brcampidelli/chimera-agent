@@ -38,3 +38,6 @@ Thumbs.db
 
 # mkdocs build output
 site/
+
+# Local benchmark run outputs (harness + tasks are tracked; per-run results are not)
+bench/local_lift/results/
