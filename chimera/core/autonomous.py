@@ -32,6 +32,7 @@ from chimera.core.events import result as _ev_result
 from chimera.core.events import status as _ev_status
 from chimera.core.ledger import ProgressLedger, TaskLedger
 from chimera.core.planner import Plan, Planner
+from chimera.core.repomap import build_repo_map
 from chimera.core.runstate import RunCheckpointer
 from chimera.core.spine import assemble_spine
 from chimera.core.supervisor import Manager
@@ -123,6 +124,7 @@ class AutonomousAgent:
         progress_ledger: ProgressLedger | None = None,
         replan_on_stall: bool = False,
         pause_on_taint: bool = False,
+        repo_map: bool = False,
         contract: CompletionContract | None = None,
         taint: SupportsRunTainted | None = None,
         planner: Planner | None = None,
@@ -145,6 +147,7 @@ class AutonomousAgent:
         self.progress_ledger = progress_ledger
         self.replan_on_stall = replan_on_stall
         self.pause_on_taint = pause_on_taint
+        self.repo_map = repo_map
         self.contract = contract
         self.taint = taint
         self.planner = planner
@@ -181,7 +184,14 @@ class AutonomousAgent:
         # past runs, injected so the worker/planner reuse what worked and avoid known
         # failure modes. Advisory only — verify-or-revert still decides success.
         card_ctx = self.cards.card_context(task) if self.cards is not None else ""
-        context = "\n\n".join(part for part in (spine, lessons, card_ctx) if part)
+        # Repo-map: a structural table of contents of the workspace, so the worker jumps to the
+        # right file instead of exploring blind. Opt-in and bounded (see build_repo_map).
+        repo_ctx = ""
+        if self.repo_map and self.spine_workspace is not None:
+            digest = build_repo_map(self.spine_workspace)
+            if digest:
+                repo_ctx = f"Repository map (file: top-level symbols):\n{digest}"
+        context = "\n\n".join(part for part in (spine, repo_ctx, lessons, card_ctx) if part)
         # how many times this task pattern has already succeeded / failed (before this
         # run) — the recurrence signals that gate auto-skill-evolution (a pattern card on
         # recurring success, an anti-pattern card on recurring failure)

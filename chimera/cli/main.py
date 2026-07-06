@@ -1177,6 +1177,9 @@ def solve(
     subagents: bool = typer.Option(
         False, "--subagents", help="Give the agent spawn_subagent to delegate subtasks to isolated subagents."
     ),
+    repo_map: bool = typer.Option(
+        False, "--repo-map", help="Prepend a structural map of the workspace (files + top-level symbols) to the agent's context."
+    ),
     progress_ledger: bool = typer.Option(
         False, "--progress-ledger", help="After a failed attempt, run a structured self-check that steers the retry (helps weak models)."
     ),
@@ -1336,6 +1339,8 @@ def solve(
             replan_on_stall=replan,
             # HITL (--pause-on-taint): pause for approval before finalizing a tainted run.
             pause_on_taint=pause_on_taint,
+            # Repo-map (--repo-map): front-load a structural map of the workspace into context.
+            repo_map=repo_map,
             # Declared, machine-checkable success clauses (--contract): an AND gate on top of
             # verify-or-revert that catches the model claiming a result the artifacts don't show.
             contract=(

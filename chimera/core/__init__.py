@@ -31,6 +31,7 @@ from chimera.core.explorer import (
 )
 from chimera.core.ledger import ProgressAssessment, ProgressLedger, TaskLedger
 from chimera.core.planner import Plan, Planner
+from chimera.core.repomap import build_repo_map
 from chimera.core.runstate import RunCheckpointer
 from chimera.core.spine import assemble_spine
 from chimera.core.subagent import SubAgentTool
@@ -64,6 +65,7 @@ __all__ = [
     "ProgressAssessment",
     "TaskLedger",
     "RunCheckpointer",
+    "build_repo_map",
     "CompletionContract",
     "ContractResult",
     "parse_check",
