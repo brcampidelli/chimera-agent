@@ -19,7 +19,7 @@ from chimera.skills.base import SkillResult
 from chimera.skills.llm_skill import LLMSkill
 
 SkillKind = Literal["pattern", "anti_pattern"]
-SkillStatus = Literal["active", "pending"]
+SkillStatus = Literal["active", "pending", "retired"]
 Provenance = Literal["clean", "tainted"]
 
 _LEARNED_SYSTEM = (
@@ -120,7 +120,12 @@ class LearnedSkill(LLMSkill):
         raw_triggers = data.get("triggers", [])
         triggers = [str(t) for t in raw_triggers] if isinstance(raw_triggers, list) else []
         kind: SkillKind = "anti_pattern" if data.get("kind") == "anti_pattern" else "pattern"
-        status: SkillStatus = "pending" if data.get("status") == "pending" else "active"
+        raw_status = data.get("status")
+        status: SkillStatus = "active"
+        if raw_status == "pending":
+            status = "pending"
+        elif raw_status == "retired":
+            status = "retired"
         provenance: Provenance = "tainted" if data.get("provenance") == "tainted" else "clean"
         return cls(
             name=str(data["name"]),

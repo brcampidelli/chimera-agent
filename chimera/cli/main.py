@@ -1492,9 +1492,12 @@ def skills_stats() -> None:
 
 @app.command("skills-approve")
 def skills_approve(
-    name: str = typer.Argument(..., help="Name of the pending skill to activate."),
+    name: str = typer.Argument(..., help="Name of the pending or retired skill to activate."),
 ) -> None:
-    """Approve a pending learned skill after reviewing it (activates retrieval)."""
+    """Approve/reactivate a learned skill after review (activates retrieval).
+
+    Works for both a pending skill (held from a tainted run) and a retired one (un-retire).
+    """
     from chimera.evolution import SkillStore
 
     store = SkillStore(get_settings().home / "skills.json")
@@ -1502,6 +1505,50 @@ def skills_approve(
         console.print(f"[red]No skill named {name!r} in the store.[/red]")
         raise typer.Exit(code=1)
     console.print(f"[green]Approved[/green] {name} — now active and retrievable.")
+
+
+@app.command("skills-retire")
+def skills_retire(
+    name: str = typer.Argument(None, help="Skill to retire; omit to act on all candidates."),
+    apply: bool = typer.Option(False, "--apply", help="Actually retire (default: dry-run preview)."),
+    min_uses: int = typer.Option(5, "--min-uses", help="Only propose skills used at least this often."),
+    max_rate: float = typer.Option(
+        1 / 3, "--max-rate", help="Only propose skills whose win rate is at or below this."
+    ),
+) -> None:
+    """Propose retiring under-performing skills — review-gated, never a delete.
+
+    Retiring only flips status to 'retired' (excluded from retrieval, still inspectable and
+    reactivatable with ``skills-approve``). With no name, acts on the ``retirement_candidates``
+    signal (used often, low win rate). Dry-run by default; pass ``--apply`` to commit.
+    """
+    from chimera.evolution import SkillStore
+
+    store = SkillStore(get_settings().home / "skills.json")
+    if name is not None:
+        targets = [name] if name in store else []
+        if not targets:
+            console.print(f"[red]No skill named {name!r} in the store.[/red]")
+            raise typer.Exit(code=1)
+    else:
+        targets = store.retirement_candidates(min_uses=min_uses, max_rate=max_rate)
+        if not targets:
+            console.print("[dim]No retirement candidates — every skill is pulling its weight.[/dim]")
+            return
+
+    if not apply:
+        console.print("[bold]Would retire (review-gated, reversible):[/bold]")
+        for target in targets:
+            console.print(f"  • {target}")
+        console.print("[dim]Re-run with --apply to retire; reactivate later with skills-approve.[/dim]")
+        return
+
+    for target in targets:
+        store.retire(target)
+    console.print(
+        f"[green]Retired[/green] {len(targets)} skill(s) — excluded from retrieval, "
+        "reactivate with: chimera skills-approve <name>"
+    )
 
 
 @app.command()

@@ -121,10 +121,32 @@ class SkillStore:
         return self.skills(status="pending")
 
     def approve(self, name: str) -> bool:
-        """Activate a pending skill after human review. Returns False if unknown."""
+        """Activate a pending or retired skill after human review. Returns False if unknown.
+
+        The single "back to active" transition — used both to accept a skill held for review
+        (tainted-run provenance) and to un-retire one that was proposed for retirement.
+        """
         entry = self._dicts.get(name)
         if entry is None:
             return False
         entry["status"] = "active"
+        self.save()
+        return True
+
+    def retired(self) -> list[LearnedSkill]:
+        """Skills proposed for retirement (kept for review, never deleted)."""
+        return self.skills(status="retired")
+
+    def retire(self, name: str) -> bool:
+        """Mark a skill retired — excluded from retrieval, but kept for review/reactivation.
+
+        Retirement is proposed-with-review, not deletion: a retired skill stops being injected
+        as a card (retrieval takes only ``active``) yet stays inspectable and can be reactivated
+        with :meth:`approve`. Returns False if the skill is unknown.
+        """
+        entry = self._dicts.get(name)
+        if entry is None:
+            return False
+        entry["status"] = "retired"
         self.save()
         return True

@@ -78,6 +78,33 @@ def test_retriever_credits_outcome_to_retrieved_cards(tmp_path: Path) -> None:
     assert retriever.last_retrieved == []  # consumed — no double counting
 
 
+def test_retire_excludes_from_retrieval_but_keeps_skill(tmp_path: Path) -> None:
+    store = SkillStore(tmp_path / "skills.json")
+    store.add(_skill("stale"))
+    assert store.retire("stale") is True
+    assert store.retired()[0].name == "stale"
+    # Retrieval only takes active skills, so a retired one stops being injected...
+    retriever = CardRetriever(store, k=1)
+    assert "stale" not in retriever.card_context("apply stale please")
+    # ...but the skill is not deleted — it survives a reload as 'retired'.
+    assert SkillStore(tmp_path / "skills.json").skills(status="retired")[0].name == "stale"
+
+
+def test_approve_reactivates_a_retired_skill(tmp_path: Path) -> None:
+    store = SkillStore(tmp_path / "skills.json")
+    store.add(_skill("comeback"))
+    store.retire("comeback")
+    assert store.approve("comeback") is True  # un-retire
+    assert store.retired() == []
+    retriever = CardRetriever(store, k=1)
+    assert "comeback" in retriever.card_context("apply comeback please")
+
+
+def test_retire_unknown_skill_is_false(tmp_path: Path) -> None:
+    store = SkillStore(tmp_path / "skills.json")
+    assert store.retire("ghost") is False
+
+
 def test_autonomous_run_records_card_outcome(tmp_path: Path) -> None:
     from chimera.core.agent import AgentResult
     from chimera.core.autonomous import AutonomousAgent, AutonomousConfig
