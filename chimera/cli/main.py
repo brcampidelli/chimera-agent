@@ -1118,7 +1118,7 @@ def sandbox_bench(
 
 @app.command()
 def solve(
-    task: str = typer.Argument(..., help="The task to solve autonomously."),
+    task: str = typer.Argument(None, help="The task to solve autonomously (omit with --approve/--deny)."),
     verify: str = typer.Option(None, "--verify", help="Verification command (exit 0 == success)."),
     workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root."),
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
@@ -1171,6 +1171,15 @@ def solve(
     thread: str = typer.Option(
         None, "--thread", help="Checkpoint this run under a thread id; re-run with the same id to resume after a crash."
     ),
+    pause_on_taint: bool = typer.Option(
+        False, "--pause-on-taint", help="Pause for human approval before finalizing a run that consumed untrusted content (needs --thread)."
+    ),
+    approve: str = typer.Option(
+        None, "--approve", help="Approve and finalize a paused run by thread id (no task needed)."
+    ),
+    deny: str = typer.Option(
+        None, "--deny", help="Discard a paused run by thread id (no task needed)."
+    ),
 ) -> None:
     """Tier-2: autonomously solve a task with plan + verify-or-revert. Requires a key."""
     from chimera.core import (
@@ -1201,6 +1210,25 @@ def solve(
     from chimera.tools import default_registry
 
     settings = get_settings()
+
+    # Human-in-the-loop deny: drop a paused run without touching a model (no key needed).
+    if deny:
+        RunCheckpointer(settings.home / "runs.db").delete(deny)
+        console.print(f"[yellow]Discarded[/yellow] paused run {deny!r}.")
+        return
+    # Approve: mark the paused run approved and resume it (the run finalizes the reviewed answer).
+    if approve:
+        cp = RunCheckpointer(settings.home / "runs.db")
+        if not cp.approve(approve):
+            console.print(f"[red]No paused run awaiting approval for thread {approve!r}.[/red]")
+            raise typer.Exit(code=1)
+        saved = cp.load(approve)
+        task, thread = str((saved or {}).get("task", "")), approve
+        console.print(f"[green]Approved[/green] {approve!r} — finalizing.")
+    elif not task:
+        console.print("[red]Provide a task, or use --approve/--deny <thread>.[/red]")
+        raise typer.Exit(code=1)
+
     if not settings.has_any_key():
         console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
@@ -1285,6 +1313,8 @@ def solve(
             # Dual-ledger re-plan (--replan): on a stall, rebuild the plan from accumulated
             # failure causes rather than just nudging. Needs the planner (so not with --no-plan).
             replan_on_stall=replan,
+            # HITL (--pause-on-taint): pause for approval before finalizing a tainted run.
+            pause_on_taint=pause_on_taint,
             # Declared, machine-checkable success clauses (--contract): an AND gate on top of
             # verify-or-revert that catches the model claiming a result the artifacts don't show.
             contract=(

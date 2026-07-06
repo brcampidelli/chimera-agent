@@ -64,9 +64,22 @@ class RunCheckpointer:
         return loaded if isinstance(loaded, dict) else None
 
     def delete(self, thread_id: str) -> None:
-        """Drop the checkpoint for ``thread_id`` (called when the run completes)."""
+        """Drop the checkpoint for ``thread_id`` (called when the run completes or is denied)."""
         with self._conn() as conn:
             conn.execute("DELETE FROM run_state WHERE thread_id = ?", (thread_id,))
+
+    def approve(self, thread_id: str) -> bool:
+        """Mark a paused (awaiting-approval) run approved so a resume finalizes it.
+
+        Returns False if there's no checkpoint or it isn't awaiting approval.
+        """
+        state = self.load(thread_id)
+        if state is None or not state.get("awaiting_approval"):
+            return False
+        state["approved"] = True
+        state["awaiting_approval"] = False
+        self.save(thread_id, state)
+        return True
 
     def threads(self) -> list[str]:
         """All thread ids with a live checkpoint (resumable runs)."""

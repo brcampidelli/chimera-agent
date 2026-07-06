@@ -108,6 +108,7 @@ class AutonomousResult:
     success: bool
     attempts: list[Attempt] = field(default_factory=list)
     plan: Plan | None = None
+    paused: bool = False  # interrupted for human approval (see AutonomousAgent.pause_on_taint)
 
 
 class AutonomousAgent:
@@ -121,6 +122,7 @@ class AutonomousAgent:
         stagnation: StagnationDetector | None = None,
         progress_ledger: ProgressLedger | None = None,
         replan_on_stall: bool = False,
+        pause_on_taint: bool = False,
         contract: CompletionContract | None = None,
         taint: SupportsRunTainted | None = None,
         planner: Planner | None = None,
@@ -142,6 +144,7 @@ class AutonomousAgent:
         self.stagnation = stagnation
         self.progress_ledger = progress_ledger
         self.replan_on_stall = replan_on_stall
+        self.pause_on_taint = pause_on_taint
         self.contract = contract
         self.taint = taint
         self.planner = planner
@@ -208,6 +211,13 @@ class AutonomousAgent:
             if saved is not None:
                 task = str(saved.get("task", task))
                 attempts = [Attempt(**a) for a in saved.get("attempts", [])]
+                # Human approved a paused, tainted result: finalize the EXACT reviewed answer
+                # as-is (no re-run) — approval is of the specific output, not a re-execution.
+                if saved.get("approved") and saved.get("paused_answer") is not None:
+                    return self._finalize_success(
+                        task, str(saved["paused_answer"]), attempts, prior_successes, plan,
+                        thread_id, tainted=bool(saved.get("was_tainted", True)),
+                    )
                 feedback = str(saved.get("feedback", ""))
                 start_index = int(saved.get("next_index", 1))
                 steps = saved.get("plan_steps")
@@ -285,18 +295,22 @@ class AutonomousAgent:
 
             if ok:
                 _log.debug("task succeeded on attempt %d", index)
-                # Anti-poisoning provenance (Zombie Agents): durable artifacts born from a
-                # run that consumed untrusted content are marked/held, never silently trusted.
                 run_tainted = self.taint.run_tainted() if self.taint is not None else False
-                self._remember_success(task, answer, tainted=run_tainted)
-                if self.auto_evolver is not None:
-                    self.auto_evolver.maybe_evolve(
-                        task, answer, prior_successes, tainted=run_tainted
+                # Human-in-the-loop interrupt: a result produced under untrusted influence is
+                # not auto-accepted. Persist it and pause for sign-off (approve -> finalize,
+                # deny -> drop). The safety valve for the lethal trifecta.
+                if run_tainted and self.pause_on_taint:
+                    self._save_checkpoint(
+                        thread_id, task, index, feedback, plan, attempts,
+                        awaiting_approval=True, paused_answer=answer, was_tainted=True,
                     )
-                self._record_card_outcome(True)
-                self._clear_checkpoint(thread_id)
-                self._emit(_ev_final(True, answer))
-                return AutonomousResult(answer=answer, success=True, attempts=attempts, plan=plan)
+                    self._emit(_ev_status(f"paused for approval — tainted run (thread {thread_id})"))
+                    return AutonomousResult(
+                        answer=answer, success=False, attempts=attempts, plan=plan, paused=True
+                    )
+                return self._finalize_success(
+                    task, answer, attempts, prior_successes, plan, thread_id, tainted=run_tainted
+                )
 
             feedback = fb or (
                 f"Verification failed:\n{vout}" if vout else "The attempt did not pass verification."
@@ -367,6 +381,28 @@ class AutonomousAgent:
         self._emit(_ev_final(False, last))
         return AutonomousResult(answer=last, success=False, attempts=attempts, plan=plan)
 
+    def _finalize_success(
+        self,
+        task: str,
+        answer: str,
+        attempts: list[Attempt],
+        prior_successes: int,
+        plan: Plan | None,
+        thread_id: str | None,
+        *,
+        tainted: bool,
+    ) -> AutonomousResult:
+        """Commit a successful result: remember it, evolve a skill, clear the thread, return."""
+        # Anti-poisoning provenance (Zombie Agents): artifacts from a tainted run stay marked
+        # even after human approval — approval sanctions the action, not the content's trust.
+        self._remember_success(task, answer, tainted=tainted)
+        if self.auto_evolver is not None:
+            self.auto_evolver.maybe_evolve(task, answer, prior_successes, tainted=tainted)
+        self._record_card_outcome(True)
+        self._clear_checkpoint(thread_id)
+        self._emit(_ev_final(True, answer))
+        return AutonomousResult(answer=answer, success=True, attempts=attempts, plan=plan)
+
     def _save_checkpoint(
         self,
         thread_id: str | None,
@@ -375,6 +411,7 @@ class AutonomousAgent:
         feedback: str,
         plan: Plan | None,
         attempts: list[Attempt],
+        **extra: Any,
     ) -> None:
         """Persist resumable loop state for ``thread_id`` (no-op without a checkpointer/thread)."""
         if self.checkpointer is None or not thread_id:
@@ -386,6 +423,7 @@ class AutonomousAgent:
             "plan_steps": plan.steps if plan is not None else None,
             "plan_raw": plan.raw if plan is not None else "",
             "attempts": [asdict(a) for a in attempts],
+            **extra,
         }
         self.checkpointer.save(thread_id, state)
 
