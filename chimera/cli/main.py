@@ -38,7 +38,7 @@ if TYPE_CHECKING:
     from chimera.config import Settings
     from chimera.ecosystem import TrajectoryCollector
     from chimera.kanban import KanbanBoard
-    from chimera.memory import MemoryGraph, MemoryManager
+    from chimera.memory import EmbedFn, MemoryGraph, MemoryManager
     from chimera.pet import Pet, PetStore
     from chimera.providers import SupportsComplete
     from chimera.scheduler import CronStore
@@ -1814,13 +1814,24 @@ memory_app = typer.Typer(help="Curated long-term memory.", no_args_is_help=True)
 app.add_typer(memory_app, name="memory")
 
 
+def _semantic_embed() -> EmbedFn | None:
+    """The gateway embedder when semantic memory is on, else None (keyword recall)."""
+    settings = get_settings()
+    if not settings.semantic_memory:
+        return None
+    from chimera.providers import LLMGateway
+
+    return LLMGateway(settings).embed
+
+
 def _memory_manager() -> MemoryManager:
     from chimera.memory import MemoryManager, MemoryStore, SqliteMemoryStore
 
     settings = get_settings()
+    embed = _semantic_embed()
     if settings.memory_backend == "sqlite":
-        return MemoryManager(SqliteMemoryStore(settings.home / "memory.db"))
-    return MemoryManager(MemoryStore(settings.home / "memory.json"))
+        return MemoryManager(SqliteMemoryStore(settings.home / "memory.db"), embed=embed)
+    return MemoryManager(MemoryStore(settings.home / "memory.json"), embed=embed)
 
 
 def _learned_skill_labels(settings: Settings) -> list[str]:
@@ -2299,11 +2310,16 @@ def redteam() -> None:
 @app.command("memory-bench")
 def memory_bench(
     sizes: str = typer.Option("50,200,1000", "--sizes", help="Comma-separated memory sizes to sweep."),
+    semantic: bool = typer.Option(
+        False, "--semantic", help="Use embedding recall (needs an embeddings key) to measure the lift."
+    ),
 ) -> None:
-    """Measure recall@k as memory grows — lexical vs paraphrase (no key needed).
+    """Measure recall@k as memory grows — lexical vs paraphrase.
 
-    Surfaces the honest ceiling of keyword search: exact-token recall holds at scale, but
-    paraphrase recall collapses. That gap is what opt-in semantic retrieval is for.
+    Default (keyword search, no key needed) surfaces the honest ceiling: exact-token recall
+    holds at scale, but paraphrase recall collapses. Pass ``--semantic`` to re-run with the
+    embedding recall path and watch the paraphrase column lift — that delta is the whole
+    point of M11b.
     """
     import tempfile
 
@@ -2314,12 +2330,27 @@ def memory_bench(
     tmp = Path(tempfile.mkdtemp(prefix="chimera-membench-"))
     counter = {"n": 0}
 
+    embed = None
+    if semantic:
+        from chimera.providers import LLMGateway, MissingCredentialsError
+
+        settings = get_settings()
+        if not settings.has_any_key():
+            console.print("[red]--semantic needs a provider key with embeddings access.[/red]")
+            raise typer.Exit(1)
+        try:
+            embed = LLMGateway(settings).embed
+        except MissingCredentialsError as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1) from exc
+
     def factory() -> MemoryManager:
         counter["n"] += 1
-        return MemoryManager(MemoryStore(tmp / f"m{counter['n']}.json"))
+        return MemoryManager(MemoryStore(tmp / f"m{counter['n']}.json"), embed=embed)
 
+    mode = "semantic (embeddings)" if semantic else "keyword search"
     reports = memory_sweep(factory, size_list)
-    table = Table(title="Memory recall@k vs scale (keyword search)", header_style="bold")
+    table = Table(title=f"Memory recall@k vs scale ({mode})", header_style="bold")
     for col in ("facts", "recall@k", "lexical", "paraphrase"):
         table.add_column(col, justify="right")
     for report in reports:
@@ -2331,7 +2362,7 @@ def memory_bench(
     console.print(table)
     console.print(
         "[dim]Lexical recall holds at scale; paraphrase recall is the keyword ceiling — "
-        "opt-in semantic retrieval (embeddings) is what lifts it.[/dim]"
+        "opt-in semantic retrieval (embeddings) is what lifts it. Re-run with --semantic.[/dim]"
     )
 
 

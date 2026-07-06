@@ -111,6 +111,16 @@ class Settings(BaseSettings):
     # --- Long-term memory backend: json (default, zero-dep) or sqlite (FTS5 full-text) ---
     memory_backend: str = Field(default="json", validation_alias="CHIMERA_MEMORY_BACKEND")
 
+    # --- Opt-in semantic memory recall: embed facts + query and rank by cosine, so a
+    # paraphrase with no shared token still retrieves the right fact (the gap memory-bench
+    # exposes for pure keyword search). Off by default — needs an embeddings-capable key.
+    # On any embedder error, search falls back to the keyword/FTS path (never a hard fail). ---
+    semantic_memory: bool = Field(default=False, validation_alias="CHIMERA_SEMANTIC_MEMORY")
+    embed_model: str = Field(
+        default="openrouter/openai/text-embedding-3-small",
+        validation_alias="CHIMERA_EMBED_MODEL",
+    )
+
     # --- Opt-in: at the end of a chat session, if memory has grown past
     # `memory_budget`, consolidate near-duplicate facts with the model (bounded cost:
     # skipped entirely while memory is small). Off by default. ---

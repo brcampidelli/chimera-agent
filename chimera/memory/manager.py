@@ -12,6 +12,7 @@ import re
 import uuid
 
 from chimera.memory.models import MemoryItem, MemoryKind
+from chimera.memory.semantic import EmbedFn, SemanticIndex
 from chimera.memory.store import MemoryBackend
 from chimera.telemetry import get_logger
 
@@ -26,8 +27,12 @@ def _normalize(text: str) -> str:
 class MemoryManager:
     """Curates a :class:`MemoryStore`."""
 
-    def __init__(self, store: MemoryBackend) -> None:
+    def __init__(self, store: MemoryBackend, *, embed: EmbedFn | None = None) -> None:
         self.store = store
+        # Opt-in semantic recall: when an embedder is supplied, ``search`` ranks by cosine
+        # similarity (bridges paraphrases keyword search can't). Absent/failing embedder ->
+        # the keyword/FTS path always remains as a fallback.
+        self._semantic = SemanticIndex(embed) if embed is not None else None
 
     def add(
         self,
@@ -200,7 +205,20 @@ class MemoryManager:
         return f"What you know about the user:\n{facts}"
 
     def search(self, query: str, *, k: int = 5) -> list[MemoryItem]:
-        """Retrieve relevant memories — full-text if the backend supports it, else keyword."""
+        """Retrieve relevant memories.
+
+        Semantic ranking (opt-in, when an embedder is configured) first; on any embedder
+        failure or when semantic is off, fall through to full-text (if the backend supports
+        it) and finally to keyword overlap. The fallback is unconditional — recall must
+        never hard-fail because an embeddings endpoint is down.
+        """
+        if self._semantic is not None:
+            try:
+                hits = self._semantic.search(query, self.store.all(), k)
+                if hits:
+                    return hits
+            except Exception as exc:  # noqa: BLE001 — degrade to lexical, never fail recall
+                _log.warning("semantic recall failed, falling back to keyword: %s", exc)
         backend_search = getattr(self.store, "search", None)
         if callable(backend_search):  # e.g. the SQLite/FTS5 store
             result: list[MemoryItem] = backend_search(query, k=k)

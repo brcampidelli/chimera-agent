@@ -314,6 +314,31 @@ class LLMGateway:
         messages.append(Message(role="user", content=prompt))
         return self.complete(messages, model=model).content
 
+    def embed(self, texts: list[str], *, model: str | None = None) -> list[list[float]]:
+        """Embed a batch of texts into vectors (one call), for semantic memory recall.
+
+        Uses ``settings.embed_model`` unless overridden. Returns vectors in input order.
+        Raises :class:`MissingCredentialsError` if no key is configured — callers that want
+        graceful degradation (e.g. ``MemoryManager.search``) catch and fall back to keyword.
+        """
+        import litellm  # lazy: heavy import, keep CLI startup fast
+
+        if not texts:
+            return []
+        resolved = model or self.settings.embed_model
+        if not self.settings.has_any_key():
+            raise MissingCredentialsError(
+                "No provider key configured. Set one of "
+                f"{list(_KEY_ENV_VARS.values())} in your environment or .env."
+            )
+        call_kwargs = self._provider_kwargs()
+        provider = resolved.split("/", 1)[0]
+        keys = self._key_order(provider)
+        if keys:
+            call_kwargs["api_key"] = keys[0]
+        response = litellm.embedding(model=resolved, input=texts, **call_kwargs)
+        return [list(item["embedding"]) for item in response["data"]]
+
     @staticmethod
     def _normalize(response: Any, model: str) -> CompletionResult:
         content = ""
