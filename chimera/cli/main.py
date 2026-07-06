@@ -1159,6 +1159,9 @@ def solve(
     progress_ledger: bool = typer.Option(
         False, "--progress-ledger", help="After a failed attempt, run a structured self-check that steers the retry (helps weak models)."
     ),
+    replan: bool = typer.Option(
+        False, "--replan", help="On a stall, rebuild the plan from accumulated failure causes (dual-ledger) instead of just nudging."
+    ),
     contract: str = typer.Option(
         None, "--contract", help="Machine-checkable success clauses, comma-separated: file_exists:PATH | file_contains:PATH:REGEX | answer_matches:REGEX."
     ),
@@ -1275,6 +1278,9 @@ def solve(
             # Structured per-attempt self-check (Magentic-One): turns "it failed" into a concrete
             # next_focus for the retry — the lift for weak models. Opt-in via --progress-ledger.
             progress_ledger=ProgressLedger(gateway, model) if progress_ledger else None,
+            # Dual-ledger re-plan (--replan): on a stall, rebuild the plan from accumulated
+            # failure causes rather than just nudging. Needs the planner (so not with --no-plan).
+            replan_on_stall=replan,
             # Declared, machine-checkable success clauses (--contract): an AND gate on top of
             # verify-or-revert that catches the model claiming a result the artifacts don't show.
             contract=(

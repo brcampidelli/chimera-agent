@@ -29,7 +29,7 @@ from chimera.core.explorer import (
     ExplorerResult,
     parse_evidence,
 )
-from chimera.core.ledger import ProgressAssessment, ProgressLedger
+from chimera.core.ledger import ProgressAssessment, ProgressLedger, TaskLedger
 from chimera.core.planner import Plan, Planner
 from chimera.core.spine import assemble_spine
 from chimera.core.subagent import SubAgentTool
@@ -61,6 +61,7 @@ __all__ = [
     "FileSnapshot",
     "ProgressLedger",
     "ProgressAssessment",
+    "TaskLedger",
     "CompletionContract",
     "ContractResult",
     "parse_check",

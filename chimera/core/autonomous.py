@@ -30,7 +30,7 @@ from chimera.core.events import attempt as _ev_attempt
 from chimera.core.events import final as _ev_final
 from chimera.core.events import result as _ev_result
 from chimera.core.events import status as _ev_status
-from chimera.core.ledger import ProgressLedger
+from chimera.core.ledger import ProgressLedger, TaskLedger
 from chimera.core.planner import Plan, Planner
 from chimera.core.spine import assemble_spine
 from chimera.core.supervisor import Manager
@@ -119,6 +119,7 @@ class AutonomousAgent:
         escalate_worker: Worker | None = None,
         stagnation: StagnationDetector | None = None,
         progress_ledger: ProgressLedger | None = None,
+        replan_on_stall: bool = False,
         contract: CompletionContract | None = None,
         taint: SupportsRunTainted | None = None,
         planner: Planner | None = None,
@@ -138,6 +139,7 @@ class AutonomousAgent:
         self.escalate_worker = escalate_worker
         self.stagnation = stagnation
         self.progress_ledger = progress_ledger
+        self.replan_on_stall = replan_on_stall
         self.contract = contract
         self.taint = taint
         self.planner = planner
@@ -182,6 +184,14 @@ class AutonomousAgent:
         plan = (
             self.planner.plan(task, context=context)
             if self.planner and self.config.use_planner
+            else None
+        )
+        # Outer-loop ledger (Magentic-One): accumulates *why* attempts fail so a re-plan on
+        # stall is smarter than the first plan. Only when re-planning is enabled and there's a
+        # planner to re-run — otherwise the stall path keeps the cheap advisory pivot.
+        task_ledger = (
+            TaskLedger(task=task)
+            if self.replan_on_stall and self.planner and self.config.use_planner
             else None
         )
 
@@ -303,8 +313,21 @@ class AutonomousAgent:
             if self.stagnation is not None:
                 self.stagnation.record_signature(hint or vout or feedback)
                 if self.stagnation.assess().stagnant:
-                    _log.debug("attempt %d: stagnation detected; injecting pivot advice", index)
-                    feedback = f"{feedback}\n\n{self.stagnation.advice()}"
+                    if task_ledger is not None and self.planner is not None:
+                        # Dual-ledger re-plan: record WHY it's stuck, then rebuild the plan with
+                        # that accumulated cause so the retry is fundamentally different — not the
+                        # same plan reworded. Strictly stronger than the advisory pivot.
+                        task_ledger.add_guess((hint or vout or feedback)[:200])
+                        task_ledger.note_replan()
+                        plan = self.planner.plan(
+                            task, context="\n\n".join(p for p in (context, task_ledger.context()) if p)
+                        )
+                        feedback = f"{feedback}\n\nRe-planned after repeated failure. {task_ledger.summary()}"
+                        self._emit(_ev_status(f"re-planned after stall {task_ledger.summary()}"))
+                        _log.debug("attempt %d: stall -> dual-ledger re-plan", index)
+                    else:
+                        _log.debug("attempt %d: stagnation detected; injecting pivot advice", index)
+                        feedback = f"{feedback}\n\n{self.stagnation.advice()}"
 
         # The run ultimately failed: if this failure pattern recurs, distill an advisory
         # anti-pattern card so future attempts are warned. Guarded — the capability is

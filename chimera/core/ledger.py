@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import dataclass, field
 
 from pydantic import BaseModel, ValidationError
 
@@ -27,6 +28,46 @@ from chimera.providers.gateway import Message, SupportsComplete
 from chimera.telemetry import get_logger
 
 _log = get_logger("core.ledger")
+
+
+@dataclass
+class TaskLedger:
+    """The outer-loop ledger (Magentic-One): facts + accumulated guesses about *why* it fails.
+
+    The progress ledger (inner loop) steers a single retry; the task ledger is what makes a
+    *re-plan* smarter than the first plan. On a stall it records a guess about the failure
+    cause, and that accumulated cause is fed to the planner so the new plan avoids the dead end
+    instead of re-deriving it. Pure state — the orchestration lives in the autonomous loop.
+    """
+
+    task: str
+    facts: list[str] = field(default_factory=list)
+    guesses: list[str] = field(default_factory=list)
+    replans: int = 0
+
+    def add_guess(self, guess: str) -> None:
+        """Record a (deduped) hypothesis about why recent attempts failed."""
+        guess = guess.strip()
+        if guess and guess not in self.guesses:
+            self.guesses.append(guess)
+
+    def note_replan(self) -> None:
+        self.replans += 1
+
+    def context(self) -> str:
+        """Render facts + failure guesses as planner context (empty string if nothing yet)."""
+        parts: list[str] = []
+        if self.facts:
+            parts.append("Known facts:\n" + "\n".join(f"- {fact}" for fact in self.facts))
+        if self.guesses:
+            parts.append(
+                "Why earlier attempts failed (do NOT repeat these):\n"
+                + "\n".join(f"- {guess}" for guess in self.guesses)
+            )
+        return "\n\n".join(parts)
+
+    def summary(self) -> str:
+        return f"(re-plan #{self.replans}; {len(self.guesses)} failure cause(s) accounted for)"
 _FENCE = re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$", re.IGNORECASE)
 
 _LEDGER_SYSTEM = (
