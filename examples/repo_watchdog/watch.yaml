@@ -1,0 +1,22 @@
+# Repo watchdog — run the test suite, report health, flag failures.
+#
+# Run with:  chimera workflow examples/repo_watchdog/watch.yaml -w /path/to/your/repo
+# The workspace (-w) IS the repo to watch. Read-only except for the watchdog.md report.
+#
+# The agent runs the tests itself (via run_shell) so it sees the real output, then writes
+# a short health report naming any failing tests.
+name: repo-watchdog
+steps:
+  - name: check
+    uses: solve
+    with:
+      task: >
+        You are a repo health watchdog. Use the run_shell tool to run the test suite with
+        `python -m pytest -q` (fall back to `pytest -q`). Read the output, then write
+        watchdog.md: line 1 = PASS or FAIL with the passed/failed counts; if anything
+        failed, list up to 5 failing test names; last line = one concrete next step.
+        Do not edit any source files — only run tests and write watchdog.md.
+      verify: "python -c \"import pathlib; t=pathlib.Path('watchdog.md').read_text().upper(); assert 'PASS' in t or 'FAIL' in t\""
+      max_attempts: 2
+    repeat: 2
+    until: success

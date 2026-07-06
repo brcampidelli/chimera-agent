@@ -1,0 +1,29 @@
+# Daily research brief — a topic in, a sourced digest out.
+#
+# Run with:  chimera workflow examples/research_brief/brief.yaml -w ./brief_workspace
+# Uses arxiv_search (always on). web_search also fires if CHIMERA_TAVILY_API_KEY is set.
+#
+# Edit the topic below, or schedule it daily (see README.md) to wake up to a brief.
+name: research-brief
+steps:
+  - name: gather
+    uses: solve
+    with:
+      task: >
+        Research the topic "small language models on-device 2026". Use the arxiv_search
+        tool (and web_search if available) to find 5 recent, concrete developments.
+        Write brief.md as markdown: a 1-line intro, then 5 bullets, each with the finding
+        and a source (paper id or URL). Prefer specific results over vague claims.
+      verify: "python -c \"import pathlib; t=pathlib.Path('brief.md').read_text(); assert t.count('-') >= 5\""
+      max_attempts: 2
+    repeat: 2
+    until: success
+
+  - name: digest
+    uses: solve
+    when: prev_succeeded
+    with:
+      task: >
+        Read brief.md and write digest.md: 3 lines max — the single most important
+        development, why it matters, and one thing to watch next.
+      verify: "python -c \"import pathlib; assert pathlib.Path('digest.md').read_text().strip()\""
