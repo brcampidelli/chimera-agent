@@ -107,6 +107,11 @@ def make_server(
         def _respond(self, method: str) -> None:
             length = int(self.headers.get("Content-Length", 0) or 0)
             body = self.rfile.read(length) if length else b""
+            # A2A message/stream is Server-Sent Events — it can't go through the pure `handle`
+            # (which returns one body), so stream it directly off the A2AServer's iterator.
+            if method == "POST" and a2a is not None and self._is_a2a_stream(body):
+                self._respond_sse(a2a[0].stream(json.loads(body or b"{}")))
+                return
             status, payload = handle(
                 gateway, method, self.path, body, webhooks=webhooks, whatsapp=whatsapp, a2a=a2a
             )
@@ -119,6 +124,25 @@ def make_server(
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)
+
+        def _is_a2a_stream(self, body: bytes) -> bool:
+            if urlparse(self.path).path != "/a2a":
+                return False
+            try:
+                request = json.loads(body or b"{}")
+            except json.JSONDecodeError:
+                return False
+            return isinstance(request, dict) and request.get("method") == "message/stream"
+
+        def _respond_sse(self, events: Any) -> None:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "keep-alive")
+            self.end_headers()
+            for event in events:
+                self.wfile.write(f"data: {json.dumps(event)}\n\n".encode())
+                self.wfile.flush()
 
         def do_GET(self) -> None:  # noqa: N802 — http.server's required name
             self._respond("GET")

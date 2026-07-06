@@ -120,14 +120,17 @@ chimera serve --a2a                    # HTTP gateway + A2A endpoint
 | Route | Purpose |
 | --- | --- |
 | `GET /.well-known/agent.json` | The Agent Card — identity + advertised skills (solve, fuse). |
-| `POST /a2a` | JSON-RPC 2.0 task lifecycle: `message/send`, `tasks/get`, `tasks/cancel`. |
+| `POST /a2a` | JSON-RPC 2.0 task lifecycle: `message/send`, `message/stream`, `tasks/get`, `tasks/cancel`. |
 
 A client sends `message/send` with a text part; Chimera runs the autonomous agent and returns
-a `completed` (or `failed`) task carrying the answer as an agent message.
+a `completed` (or `failed`) task carrying the answer as an agent message. Or it sends
+`message/stream` and gets a **Server-Sent Events** stream: the task in `working` state first,
+then the `completed`/`failed` task once the run finishes — so an orchestrator sees progress
+without polling. The agent card advertises `capabilities.streaming: true`.
 
-**Scope, honestly:** this is the *synchronous* core of A2A — agent card + the three core
-methods. Streaming (`message/stream`) and push notifications aren't implemented yet; a caller
-polls `tasks/get`. That's enough to be reached by an A2A client and hand back a completed task.
+**Scope, honestly:** the stream currently emits two events (working → final), not per-step
+token deltas, and push notifications aren't implemented. That's a conformant, pollable-free
+stream — enough to be a first-class streamable node in a LangGraph/CrewAI app.
 
 ## Troubleshooting
 

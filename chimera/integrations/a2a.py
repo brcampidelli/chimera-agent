@@ -16,7 +16,7 @@ client and hand back a completed task.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -84,7 +84,7 @@ def chimera_agent_card(url: str, *, version: str, name: str = "Chimera") -> dict
         "description": "A self-evolving agent with governance and LLM-Fusion. Evolves, measurably.",
         "url": url,
         "version": version,
-        "capabilities": {"streaming": False, "pushNotifications": False},
+        "capabilities": {"streaming": True, "pushNotifications": False},
         "defaultInputModes": ["text/plain"],
         "defaultOutputModes": ["text/plain"],
         "skills": [skill.to_dict() for skill in skills],
@@ -145,7 +145,8 @@ class A2AServer:
         self._solve = solve
         self._tasks: dict[str, A2ATask] = {}
 
-    def message_send(self, params: dict[str, Any]) -> dict[str, Any]:
+    def _new_task(self, params: dict[str, Any]) -> tuple[A2ATask, str]:
+        """Validate the message and register a fresh working task. Raises ValueError if empty."""
         message = params.get("message")
         if not isinstance(message, dict):
             raise ValueError("params.message is required")
@@ -156,9 +157,13 @@ class A2AServer:
             id=uuid.uuid4().hex,
             context_id=str(params.get("contextId") or uuid.uuid4().hex),
             history=[message],
+            state="working",
         )
         self._tasks[task.id] = task
-        task.state = "working"
+        return task, text
+
+    def _run_into(self, task: A2ATask, text: str) -> None:
+        """Run solve synchronously and fold the result (or failure) into ``task``."""
         try:
             answer = self._solve(text)
         except Exception as exc:  # noqa: BLE001 — a failed run is a failed task, not a crash
@@ -169,7 +174,32 @@ class A2AServer:
             task.result_message = _agent_message(answer)
         if task.result_message is not None:
             task.history.append(task.result_message)
+
+    def message_send(self, params: dict[str, Any]) -> dict[str, Any]:
+        task, text = self._new_task(params)
+        self._run_into(task, text)
         return task.to_dict()
+
+    def stream(self, request: dict[str, Any]) -> Iterator[dict[str, Any]]:
+        """JSON-RPC ``message/stream``: yield SSE payloads (working task -> final task).
+
+        A minimal but conformant stream: the caller receives the task in ``working`` state
+        immediately, then the completed/failed task once solve returns. Each payload is a full
+        JSON-RPC response carrying the request id, so an A2A client tracks it by ``taskId``.
+        """
+        req_id = request.get("id")
+        params = request.get("params") or {}
+        if not isinstance(params, dict):
+            yield self._error(req_id, _JSONRPC_INVALID_PARAMS, "params must be an object")
+            return
+        try:
+            task, text = self._new_task(params)
+        except ValueError as exc:
+            yield self._error(req_id, _JSONRPC_INVALID_PARAMS, str(exc))
+            return
+        yield {"jsonrpc": "2.0", "id": req_id, "result": task.to_dict()}  # initial: working
+        self._run_into(task, text)
+        yield {"jsonrpc": "2.0", "id": req_id, "result": task.to_dict()}  # final: completed/failed
 
     def tasks_get(self, params: dict[str, Any]) -> dict[str, Any]:
         task = self._tasks.get(str(params.get("id", "")))
