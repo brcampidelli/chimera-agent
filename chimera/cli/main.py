@@ -872,6 +872,9 @@ def fuse(
     best_of: int = typer.Option(
         1, "--best-of", help="Cheap fusion: sample ONE model N times and take the consensus (self-consistency), instead of a multi-model panel."
     ),
+    verify_select: bool = typer.Option(
+        False, "--verify-select", help="With --best-of: pick the best sample by a verifier score instead of majority vote (Weaver-lite)."
+    ),
     model: str = typer.Option(None, "--model", "-m", help="Model for --best-of self-consistency."),
 ) -> None:
     """Run a prompt through the LLM-Fusion engine (panel -> judge -> synthesizer)."""
@@ -881,10 +884,12 @@ def fuse(
     # --best-of N: self-consistency over a single model — cheaper than the full panel when you
     # just want to stabilize one (weak) model rather than combine several.
     if best_of >= 2:
-        from chimera.fusion import SelfConsistency
+        from chimera.fusion import SelfConsistency, VerifierSelector, llm_scorer
 
         try:
-            sc = SelfConsistency(LLMGateway(), n=best_of, model=model)
+            gw = LLMGateway()
+            selector = VerifierSelector([llm_scorer(gw, model)]) if verify_select else None
+            sc = SelfConsistency(gw, n=best_of, model=model, selector=selector)
             result = sc.complete([Message(role="user", content=prompt)])
         except MissingCredentialsError as exc:
             console.print(f"[red]{exc}[/red]")

@@ -30,6 +30,15 @@ _SYNTH_SYSTEM = (
 )
 
 
+def _last_user_text(messages: list[MessageLike]) -> str:
+    """The last user message's text — the 'task' a verifier scores candidates against."""
+    for message in reversed(messages):
+        data = message.as_dict() if isinstance(message, Message) else message
+        if data.get("role") == "user":
+            return str(data.get("content", ""))
+    return ""
+
+
 def _cluster(answers: list[str], threshold: float) -> list[list[int]]:
     """Greedily group answer indices by text similarity (>= ``threshold`` to a cluster head)."""
     norms = [_normalize_ws(a) for a in answers]
@@ -75,12 +84,16 @@ class SelfConsistency:
         temperature: float = 0.8,
         model: str | None = None,
         threshold: float = 0.85,
+        selector: Any = None,
     ) -> None:
         self.backend = backend
         self.n = max(1, n)
         self.temperature = temperature
         self.model = model
         self.threshold = threshold
+        # Optional VerifierSelector: when set, pick the best of N by a verifier score instead of
+        # by majority agreement (Weaver-lite — verification lifts a weak generator past voting).
+        self.selector = selector
 
     def complete(
         self,
@@ -105,6 +118,11 @@ class SelfConsistency:
             for _ in range(self.n)
         ]
         answers = [s.content for s in samples]
+        # Verifier selection (Weaver-lite): pick the best-scored candidate rather than the most
+        # agreed-on one — verification lifts a weak generator past what it merely agrees with.
+        if self.selector is not None:
+            chosen_answer = self.selector.select(_last_user_text(messages), answers).answer
+            return self._result(chosen_answer, samples)
         winner = majority(answers, threshold=self.threshold)
         if winner is not None:
             return self._result(winner, samples)

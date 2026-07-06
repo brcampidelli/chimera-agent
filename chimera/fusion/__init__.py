@@ -13,6 +13,7 @@ from chimera.fusion.engine import (
     StageUsage,
 )
 from chimera.fusion.router import EscalationVerifier, RoutedBackend, RoutingPolicy
+from chimera.fusion.verifier_select import Scorer, Selection, VerifierSelector, llm_scorer
 
 __all__ = [
     "FusionEngine",
@@ -25,4 +26,8 @@ __all__ = [
     "EscalationVerifier",
     "SelfConsistency",
     "majority",
+    "VerifierSelector",
+    "Selection",
+    "Scorer",
+    "llm_scorer",
 ]
