@@ -54,10 +54,12 @@ def default_registry(workspace: Path | None = None) -> ToolRegistry:
 
     # Always-on reference tools (no credential needed).
     from chimera.tools.code import CodeInterpreterTool, ExecuteCodeTool
+    from chimera.tools.documents import ReadDocumentTool
     from chimera.tools.research import ArxivSearchTool, YouTubeTranscriptTool
 
     registry.register(ExecuteCodeTool(workspace, get_sandbox()))
     registry.register(CodeInterpreterTool())
+    registry.register(ReadDocumentTool(workspace))
     registry.register(ArxivSearchTool())
     registry.register(YouTubeTranscriptTool())
 

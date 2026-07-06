@@ -34,6 +34,19 @@ except the report.
 chimera workflow examples/repo_watchdog/watch.yaml -w /path/to/your/repo
 ```
 
+## Reading documents (PDF, DOCX, XLSX…)
+
+The agent reads plain text out of the box. For real documents — PDF, Word, PowerPoint, Excel,
+HTML, CSV, EPUB — install the optional extra and it gains a `read_document` tool that converts
+any of them to Markdown:
+
+```bash
+uv sync --extra documents      # or: pip install 'chimera-agent[documents]'
+```
+
+Then point a task at a file: *"Summarize report.pdf into 5 bullets."* Without the extra,
+`read_document` returns a one-line install hint instead of failing.
+
 ## Schedule any of them
 
 Every recipe can run on a cron and deliver to chat:

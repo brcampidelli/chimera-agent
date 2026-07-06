@@ -41,7 +41,7 @@ FETCH_TOOLS = frozenset(
 )
 EXEC_TOOLS = frozenset({"run_shell", "execute_code", "code_interpreter"})
 WRITE_TOOLS = frozenset({"write_file", "edit_file", "apply_patch"})
-READ_TOOLS = frozenset({"read_file"})
+READ_TOOLS = frozenset({"read_file", "read_document"})
 
 _URL_KEYS = ("url", "uri", "link")
 _QUERY_KEYS = ("query", "q", "search")

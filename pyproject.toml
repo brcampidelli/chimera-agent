@@ -53,6 +53,11 @@ messaging = [
 youtube = [
     "youtube-transcript-api>=0.6",
 ]
+# Document ingestion for the read_document tool: any-format -> Markdown via MarkItDown.
+# Opt-in so the core stays light; the tool gives an install hint when this isn't present.
+documents = [
+    "markitdown[docx,pptx,xlsx,pdf]>=0.1",
+]
 # Build the documentation site (mkdocs-material). Only needed to render/deploy docs.
 docs = [
     "mkdocs-material>=9.5",
