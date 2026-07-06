@@ -4,6 +4,12 @@ Lets the agent reach many platforms (via MCP) and register arbitrary REST APIs
 as tools.
 """
 
+from chimera.integrations.a2a import (
+    A2AServer,
+    A2ATask,
+    AgentSkill,
+    chimera_agent_card,
+)
 from chimera.integrations.connectors import Connector, ConnectorRegistry
 from chimera.integrations.mcp_client import (
     MCPConnector,
@@ -41,4 +47,8 @@ __all__ = [
     "MCPToolSpec",
     "StdioMCPSession",
     "connect_stdio",
+    "A2AServer",
+    "A2ATask",
+    "AgentSkill",
+    "chimera_agent_card",
 ]

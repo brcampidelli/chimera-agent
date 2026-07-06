@@ -104,6 +104,31 @@ Point an MCP client at it as a stdio server. For Claude Desktop, add to its conf
 one). Add `--fuse` to route the solver's deep turns through fusion, `--no-memory` to skip
 recall. Because stdio is the wire, all logs go to stderr — stdout carries only the protocol.
 
+## Speaking A2A (agent → agent)
+
+MCP connects agents to *tools*; **A2A** (Agent2Agent, Linux Foundation) connects agents to
+*each other* — it's native in LangGraph, CrewAI, and AutoGen. Chimera speaks it too, so a
+LangGraph/CrewAI orchestrator can delegate a task to Chimera and get a completed result back.
+
+```bash
+chimera a2a-card                       # print the Agent Card JSON
+chimera serve --a2a                    # HTTP gateway + A2A endpoint
+```
+
+`serve --a2a` adds two routes to the HTTP server:
+
+| Route | Purpose |
+| --- | --- |
+| `GET /.well-known/agent.json` | The Agent Card — identity + advertised skills (solve, fuse). |
+| `POST /a2a` | JSON-RPC 2.0 task lifecycle: `message/send`, `tasks/get`, `tasks/cancel`. |
+
+A client sends `message/send` with a text part; Chimera runs the autonomous agent and returns
+a `completed` (or `failed`) task carrying the answer as an agent message.
+
+**Scope, honestly:** this is the *synchronous* core of A2A — agent card + the three core
+methods. Streaming (`message/stream`) and push notifications aren't implemented yet; a caller
+polls `tasks/get`. That's enough to be reached by an A2A client and hand back a completed task.
+
 ## Troubleshooting
 
 - `TimeoutError: MCP server ... did not become ready` — the command didn't start. Run the

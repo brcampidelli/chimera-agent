@@ -509,6 +509,7 @@ def serve(
     cron: bool = typer.Option(False, "--cron", help="Also run the cron daemon: fire scheduled jobs on the real clock (proactivity)."),
     cron_tick: int = typer.Option(30, "--cron-tick", help="Seconds between cron scheduler ticks."),
     mcp: bool = typer.Option(False, "--mcp", help="Serve Chimera AS an MCP server over stdio (solve/fuse/memory as tools)."),
+    a2a: bool = typer.Option(False, "--a2a", help="Also expose an A2A endpoint on HTTP (agent card + task lifecycle)."),
 ) -> None:
     """Run the messaging gateway on HTTP, Discord, Telegram, Slack or Signal. Requires a key.
 
@@ -570,14 +571,17 @@ def serve(
         return ChatSession(runner, memory=shared_memory, graph=shared_graph, profile=shared_profile)
 
     message_gateway = MessageGateway(factory)
+    a2a_pair = _build_a2a(backend, model, max_steps, workspace_path, host, port) if a2a else None
     server = make_server(
         message_gateway, host, port,
         webhooks=_webhook_handler(message_gateway),
         whatsapp=_whatsapp_webhook(settings, message_gateway),
+        a2a=a2a_pair,
     )
+    a2a_note = "  [dim]· A2A: GET /.well-known/agent.json, POST /a2a[/dim]" if a2a else ""
     console.print(
         f"[bold]Chimera gateway[/bold] on http://{host}:{port}  "
-        "[dim](POST /chat, POST /webhook/<hook>, GET /health). Ctrl+C to stop.[/dim]"
+        f"[dim](POST /chat, POST /webhook/<hook>, GET /health). Ctrl+C to stop.[/dim]{a2a_note}"
     )
     try:
         server.serve_forever()
@@ -723,6 +727,43 @@ def _serve_mcp(
         raise typer.Exit(code=1) from exc
     except KeyboardInterrupt:
         print("stopped", file=sys.stderr)
+
+
+def _build_a2a(
+    backend: SupportsComplete,
+    model: str | None,
+    max_steps: int,
+    workspace_path: Path,
+    host: str,
+    port: int,
+) -> tuple[Any, dict[str, Any]]:
+    """Build the (A2AServer, agent_card) pair whose ``solve`` runs the autonomous agent."""
+    from chimera.core import Agent, AgentConfig, AutonomousAgent, AutonomousConfig
+    from chimera.integrations import A2AServer, chimera_agent_card
+    from chimera.tools import default_registry
+
+    def _solve(task: str) -> str:
+        registry = default_registry(workspace_path)
+        worker = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
+        auto = AutonomousAgent(
+            worker, config=AutonomousConfig(max_attempts=2, use_planner=False, use_manager=False)
+        )
+        return auto.run(task).answer or "(no answer)"
+
+    url = f"http://{host}:{port}/a2a"
+    return A2AServer(_solve), chimera_agent_card(url, version=__version__)
+
+
+@app.command("a2a-card")
+def a2a_card(
+    url: str = typer.Option("http://127.0.0.1:8765/a2a", "--url", help="The A2A endpoint URL to advertise."),
+) -> None:
+    """Print Chimera's A2A Agent Card JSON (serve it at /.well-known/agent.json)."""
+    import json as _json
+
+    from chimera.integrations import chimera_agent_card
+
+    console.print_json(_json.dumps(chimera_agent_card(url, version=__version__)))
 
 
 def _serve_platform(

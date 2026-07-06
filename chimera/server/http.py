@@ -27,11 +27,24 @@ def handle(
     *,
     webhooks: WebhookHandler | None = None,
     whatsapp: Any = None,
+    a2a: Any = None,  # (A2AServer, agent_card dict) — exposes A2A when provided
 ) -> tuple[int, dict[str, Any] | str]:
     """Pure request handler returning ``(status, body)`` — body is a dict (JSON) or a str (text)."""
     route = urlparse(path).path
     if method == "GET" and route == "/health":
         return 200, {"status": "ok", "active_chats": gateway.active_chats}
+    if a2a is not None:
+        server, card = a2a
+        if method == "GET" and route in ("/.well-known/agent.json", "/.well-known/agent-card.json"):
+            return 200, card
+        if method == "POST" and route == "/a2a":
+            try:
+                request = json.loads(body or b"{}")
+            except json.JSONDecodeError:
+                return 400, {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "parse error"}}
+            if not isinstance(request, dict):
+                return 400, {"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "invalid request"}}
+            return 200, server.dispatch(request)
     if whatsapp is not None and route == "/whatsapp":
         if method == "GET":  # Meta subscription verification: echo the challenge as plain text
             params = {key: values[0] for key, values in parse_qs(urlparse(path).query).items()}
@@ -86,6 +99,7 @@ def make_server(
     *,
     webhooks: WebhookHandler | None = None,
     whatsapp: Any = None,
+    a2a: Any = None,
 ) -> ThreadingHTTPServer:
     """Build (but don't start) an HTTP server wrapping ``gateway`` (and optional webhooks)."""
 
@@ -93,7 +107,9 @@ def make_server(
         def _respond(self, method: str) -> None:
             length = int(self.headers.get("Content-Length", 0) or 0)
             body = self.rfile.read(length) if length else b""
-            status, payload = handle(gateway, method, self.path, body, webhooks=webhooks, whatsapp=whatsapp)
+            status, payload = handle(
+                gateway, method, self.path, body, webhooks=webhooks, whatsapp=whatsapp, a2a=a2a
+            )
             if isinstance(payload, str):  # plain text (e.g. the WhatsApp verification challenge)
                 data, content_type = payload.encode("utf-8"), "text/plain"
             else:
