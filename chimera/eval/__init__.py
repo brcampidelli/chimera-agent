@@ -38,6 +38,13 @@ from chimera.eval.injection import (
     default_attacks,
     run_redteam,
 )
+from chimera.eval.memory_bench import (
+    MemoryProbe,
+    RecallReport,
+    run_memory_bench,
+    synthetic_facts_and_probes,
+)
+from chimera.eval.memory_bench import sweep as memory_sweep
 from chimera.eval.rubric import (
     Dimension,
     RubricResult,
@@ -86,4 +93,9 @@ __all__ = [
     "RedTeamReport",
     "default_attacks",
     "run_redteam",
+    "MemoryProbe",
+    "RecallReport",
+    "run_memory_bench",
+    "synthetic_facts_and_probes",
+    "memory_sweep",
 ]

@@ -2296,6 +2296,45 @@ def redteam() -> None:
         )
 
 
+@app.command("memory-bench")
+def memory_bench(
+    sizes: str = typer.Option("50,200,1000", "--sizes", help="Comma-separated memory sizes to sweep."),
+) -> None:
+    """Measure recall@k as memory grows — lexical vs paraphrase (no key needed).
+
+    Surfaces the honest ceiling of keyword search: exact-token recall holds at scale, but
+    paraphrase recall collapses. That gap is what opt-in semantic retrieval is for.
+    """
+    import tempfile
+
+    from chimera.eval import memory_sweep
+    from chimera.memory import MemoryManager, MemoryStore
+
+    size_list = [int(s) for s in sizes.split(",") if s.strip().isdigit()] or [50, 200, 1000]
+    tmp = Path(tempfile.mkdtemp(prefix="chimera-membench-"))
+    counter = {"n": 0}
+
+    def factory() -> MemoryManager:
+        counter["n"] += 1
+        return MemoryManager(MemoryStore(tmp / f"m{counter['n']}.json"))
+
+    reports = memory_sweep(factory, size_list)
+    table = Table(title="Memory recall@k vs scale (keyword search)", header_style="bold")
+    for col in ("facts", "recall@k", "lexical", "paraphrase"):
+        table.add_column(col, justify="right")
+    for report in reports:
+        s = report.summary()
+        table.add_row(
+            str(int(s["n_facts"])), f"{s['recall@k']:.2f}",
+            f"{s['recall@k_lexical']:.2f}", f"{s['recall@k_paraphrase']:.2f}",
+        )
+    console.print(table)
+    console.print(
+        "[dim]Lexical recall holds at scale; paraphrase recall is the keyword ceiling — "
+        "opt-in semantic retrieval (embeddings) is what lifts it.[/dim]"
+    )
+
+
 @app.command()
 def evoclaw(
     length: int = typer.Option(12, "--length", help="Number of chained steps."),
