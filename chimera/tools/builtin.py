@@ -91,4 +91,12 @@ def default_registry(workspace: Path | None = None) -> ToolRegistry:
         from chimera.tools.calendar import CalendarEventsTool
 
         registry.register(CalendarEventsTool())
+    # Browser is heavy (Playwright + a Chromium binary), so it lights up only when the extra is
+    # installed — advertising a non-functional tool would just waste the model's turns.
+    import importlib.util
+
+    if importlib.util.find_spec("playwright") is not None:
+        from chimera.tools.browser import BrowserTool
+
+        registry.register(BrowserTool())
     return registry

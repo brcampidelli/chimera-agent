@@ -1,6 +1,7 @@
 """Native tools — primitive, hand-written capabilities the agent can invoke."""
 
 from chimera.tools.base import Tool
+from chimera.tools.browser import BrowserTool, Element, render_elements
 from chimera.tools.builtin import EchoTool, default_registry
 from chimera.tools.documents import ReadDocumentTool
 from chimera.tools.edit import ApplyPatchTool, EditFileTool
@@ -26,6 +27,9 @@ __all__ = [
     "EditFileTool",
     "ApplyPatchTool",
     "ReadDocumentTool",
+    "BrowserTool",
+    "Element",
+    "render_elements",
     "ListDirTool",
     "GrepTool",
     "GlobTool",

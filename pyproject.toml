@@ -58,6 +58,11 @@ youtube = [
 documents = [
     "markitdown[docx,pptx,xlsx,pdf]>=0.1",
 ]
+# Web navigation for the browser tool (accessibility-tree driving). Heavy: also needs a Chromium
+# binary (`playwright install chromium`). Opt-in; the tool gives an install hint when absent.
+browser = [
+    "playwright>=1.40",
+]
 # Build the documentation site (mkdocs-material). Only needed to render/deploy docs.
 docs = [
     "mkdocs-material>=9.5",

@@ -47,6 +47,21 @@ uv sync --extra documents      # or: pip install 'chimera-agent[documents]'
 Then point a task at a file: *"Summarize report.pdf into 5 bullets."* Without the extra,
 `read_document` returns a one-line install hint instead of failing.
 
+## Browsing the web (navigate + act)
+
+For tasks that need the agent to *act* on a page — open it, read it, click, type — install the
+browser extra and it gains a `browser` tool that drives a real Chromium via the page's
+accessibility tree (roles + names, not pixels):
+
+```bash
+uv sync --extra browser        # or: pip install 'chimera-agent[browser]'
+playwright install chromium    # one-time: fetch the browser binary
+```
+
+Page content is **untrusted**: every result is data-fenced and the tool taints the run, so
+prefer `solve --taint --guard` when browsing and pull structured fields through the quarantined
+reader rather than acting on raw page text. Without the extra, `browser` returns an install hint.
+
 ## Schedule any of them
 
 Every recipe can run on a cron and deliver to chat:
