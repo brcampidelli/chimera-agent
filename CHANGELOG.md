@@ -8,8 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [0.2.0] - 2026-07-06
 
-The security & adoption cycle: prompt-injection defenses with a **measured** attack-success
-rate, out-of-the-box setup, and real consumer recipes.
+The security → adoption → intelligence → interop cycle: prompt-injection defenses with a
+**measured** attack-success rate, out-of-the-box setup, real consumer recipes, measurable
+memory & skills, and speaking the two winning agent protocols (MCP + A2A).
 
 ### Added
 - **Prompt-injection defenses (measured, not asserted)** — a quarantined reader
@@ -30,6 +31,24 @@ rate, out-of-the-box setup, and real consumer recipes.
 - **Per-skill metrics** (`chimera skills-stats`) with a measured retirement signal.
 - **Router re-escalation** — a single-model turn that fails its check re-escalates to fusion.
 - **Task-oriented docs site** (mkdocs-material) + a GitHub Pages workflow.
+- **Memory-bench** (`chimera memory-bench`) — measures recall@k as memory grows, split into
+  lexical vs paraphrase probes. Surfaces the honest keyword ceiling: exact-token recall holds
+  at 1.00 even at 1000 facts, but paraphrase recall is 0.00 (no shared token to match).
+- **Opt-in semantic memory recall** — `SemanticIndex` embeds facts + query and ranks by cosine
+  so a paraphrase (`"physician"`) retrieves a fact about a `"doctor"`. Injected embedder
+  (`LLMGateway.embed`), `CHIMERA_SEMANTIC_MEMORY` / `CHIMERA_EMBED_MODEL`; any embedder error
+  falls back to the FTS/keyword path. `chimera memory-bench --semantic` measures the lift
+  (paraphrase recall 0.00 → ~1.00 in-test).
+- **Skill retirement** — a new `retired` status excludes an under-performing skill from
+  retrieval while keeping it inspectable and reactivatable. `chimera skills-retire` acts on the
+  retirement signal, proposed-with-review (dry-run by default, `--apply` to commit), never a delete.
+- **Chimera as an MCP server** (`chimera serve --mcp`) — exposes `chimera_solve`, `chimera_fuse`,
+  and `chimera_memory_search` as MCP tools over stdio, so any MCP client (Claude Desktop, an IDE,
+  another agent) can call the whole engine as tools.
+- **A2A adapter** (`chimera a2a-card`, `chimera serve --a2a`) — an Agent Card at
+  `/.well-known/agent.json` + a JSON-RPC task lifecycle (`message/send`, `tasks/get`,
+  `tasks/cancel`) at `POST /a2a`, so a LangGraph/CrewAI/AutoGen orchestrator can delegate a task
+  to Chimera. Synchronous core (streaming/push not yet implemented).
 
 ### Fixed
 - Migration: memory candidates resolving to the same file (case-insensitive filesystems)
