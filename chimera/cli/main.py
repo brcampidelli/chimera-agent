@@ -1145,6 +1145,9 @@ def solve(
     subagents: bool = typer.Option(
         False, "--subagents", help="Give the agent spawn_subagent to delegate subtasks to isolated subagents."
     ),
+    progress_ledger: bool = typer.Option(
+        False, "--progress-ledger", help="After a failed attempt, run a structured self-check that steers the retry (helps weak models)."
+    ),
 ) -> None:
     """Tier-2: autonomously solve a task with plan + verify-or-revert. Requires a key."""
     from chimera.core import (
@@ -1154,6 +1157,7 @@ def solve(
         AutonomousConfig,
         Manager,
         Planner,
+        ProgressLedger,
         WorkspaceGuard,
     )
     from chimera.core.autonomous import AutonomousResult
@@ -1250,6 +1254,9 @@ def solve(
             escalate_worker=escalate_worker,
             # Pivot the retry when attempts keep failing the same way (short budget → window 2).
             stagnation=StagnationDetector(window=2),
+            # Structured per-attempt self-check (Magentic-One): turns "it failed" into a concrete
+            # next_focus for the retry — the lift for weak models. Opt-in via --progress-ledger.
+            progress_ledger=ProgressLedger(gateway, model) if progress_ledger else None,
             # Provenance gate: artifacts born from a tainted run are marked/held pending.
             taint=ledger,
             planner=None if no_plan else Planner(planner_backend, model),

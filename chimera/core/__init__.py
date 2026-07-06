@@ -27,6 +27,7 @@ from chimera.core.explorer import (
     ExplorerResult,
     parse_evidence,
 )
+from chimera.core.ledger import ProgressAssessment, ProgressLedger
 from chimera.core.planner import Plan, Planner
 from chimera.core.spine import assemble_spine
 from chimera.core.subagent import SubAgentTool
@@ -56,6 +57,8 @@ __all__ = [
     "Review",
     "WorkspaceGuard",
     "FileSnapshot",
+    "ProgressLedger",
+    "ProgressAssessment",
     "Verifier",
     "VerificationResult",
     "CommandVerifier",

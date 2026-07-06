@@ -24,6 +24,7 @@ from typing import Protocol
 
 from chimera.core.agent import AgentResult
 from chimera.core.checkpoint import WorkspaceGuard
+from chimera.core.ledger import ProgressLedger
 from chimera.core.planner import Plan, Planner
 from chimera.core.spine import assemble_spine
 from chimera.core.supervisor import Manager
@@ -111,6 +112,7 @@ class AutonomousAgent:
         *,
         escalate_worker: Worker | None = None,
         stagnation: StagnationDetector | None = None,
+        progress_ledger: ProgressLedger | None = None,
         taint: SupportsRunTainted | None = None,
         planner: Planner | None = None,
         manager: Manager | None = None,
@@ -127,6 +129,7 @@ class AutonomousAgent:
         self.worker = worker
         self.escalate_worker = escalate_worker
         self.stagnation = stagnation
+        self.progress_ledger = progress_ledger
         self.taint = taint
         self.planner = planner
         self.manager = manager
@@ -240,6 +243,22 @@ class AutonomousAgent:
             hint = self._fault_hint(agent_result)
             if hint:
                 feedback = f"{feedback}\n\n{hint}" if feedback else hint
+
+            # Progress ledger (Magentic-One inner loop): a structured self-check turns the
+            # generic "it failed" into a concrete instruction for the next attempt — what
+            # lifts a weak model that would otherwise re-try the same dead end. Advisory:
+            # the verifier already decided this attempt failed, so we use only next_focus
+            # (and progressing, which feeds stagnation below), never the ledger's 'complete'.
+            if self.progress_ledger is not None:
+                assessment = self.progress_ledger.assess(
+                    task, answer, feedback, attempt=index, max_attempts=self.config.max_attempts
+                )
+                if assessment.next_focus:
+                    feedback = f"{feedback}\n\nNext, focus on: {assessment.next_focus}"
+                if not assessment.progressing and self.stagnation is not None:
+                    # An explicit "not progressing" is a first-class stall signal for the
+                    # anti-stagnation detector, on top of the failure-signature heuristic.
+                    self.stagnation.record_signature("progress-ledger: not progressing")
 
             # Anti-stagnation (crowding-score analog, arXiv 2606.29717): when successive
             # attempts keep failing the *same* way, refining is a local optimum — fold in a
