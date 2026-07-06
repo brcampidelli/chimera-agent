@@ -54,6 +54,14 @@ from chimera.eval.rubric import (
     evaluate_cascade,
     model_judge,
 )
+from chimera.eval.rubric_grade import (
+    Criterion,
+    GradedOutcome,
+    Rubric,
+    RubricGrader,
+    grade_batch,
+    model_grader,
+)
 from chimera.eval.scenarios import Scenario, daily_scenarios, run_scenarios
 from chimera.eval.spec_tuning import scenario_scorer
 
@@ -104,4 +112,10 @@ __all__ = [
     "ABResult",
     "compare_ab",
     "format_report",
+    "Criterion",
+    "Rubric",
+    "GradedOutcome",
+    "RubricGrader",
+    "model_grader",
+    "grade_batch",
 ]

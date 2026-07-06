@@ -1958,6 +1958,50 @@ def playbook_curate(
     console.print(f"[green]Applied {applied} delta(s)[/green] — {len(playbook.active())} active bullets.")
 
 
+@app.command("rubric-grade")
+def rubric_grade(
+    rubric_file: str = typer.Option(..., "--rubric", help="JSON rubric: {criteria:[{text,weight,required}], pass_threshold, required_gate}."),
+    task: str = typer.Option(..., "--task", help="The task the answer is for."),
+    answer: str = typer.Option(None, "--answer", help="The answer text (or use --answer-file)."),
+    answer_file: str = typer.Option(None, "--answer-file", help="Read the answer from this file."),
+    model: str = typer.Option(None, "--model", help="Model slug for the grader."),
+) -> None:
+    """Grade an answer against an authorable rubric — weighted criteria with a required-criterion veto.
+
+    Produces a per-criterion breakdown, a single weighted score, and a pass/fail verdict. A required
+    criterion that falls below the gate vetoes the outcome regardless of the weighted score.
+    """
+    import json
+
+    from chimera.eval import Rubric, model_grader
+    from chimera.providers import LLMGateway
+
+    try:
+        rubric = Rubric.from_dict(json.loads(Path(rubric_file).read_text(encoding="utf-8")))
+    except (OSError, json.JSONDecodeError, KeyError) as exc:
+        console.print(f"[red]Could not read rubric: {exc}[/red]")
+        raise typer.Exit(code=1) from exc
+    if answer_file:
+        answer = Path(answer_file).read_text(encoding="utf-8")
+    if not answer:
+        console.print("[red]Provide --answer or --answer-file.[/red]")
+        raise typer.Exit(code=1)
+
+    outcome = model_grader(LLMGateway(), model).grade(task, answer, rubric)
+    table = Table(title="Rubric grade", show_header=True, header_style="bold")
+    table.add_column("Criterion")
+    table.add_column("Score", justify="right")
+    for criterion in rubric.criteria:
+        score = outcome.scores.get(criterion.text, 0.0)
+        flag = " [red](required)[/red]" if criterion.required else ""
+        table.add_row(f"{criterion.text}{flag}", f"{score:.2f}")
+    console.print(table)
+    verdict = "[green]PASS[/green]" if outcome.passed else "[red]FAIL[/red]"
+    console.print(f"weighted {outcome.weighted:.0%} vs threshold {rubric.pass_threshold:.0%} -> {verdict}")
+    if outcome.failed_required:
+        console.print(f"[red]vetoed by required criteria:[/red] {', '.join(outcome.failed_required)}")
+
+
 @app.command()
 def migrate(
     source: str = typer.Argument(..., help="Source agent: hermes | openclaw."),
