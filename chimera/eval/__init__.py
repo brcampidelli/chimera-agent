@@ -31,6 +31,13 @@ from chimera.eval.hard import (
     hard_chain,
     hard_tasks,
 )
+from chimera.eval.injection import (
+    AttackOutcome,
+    InjectionAttack,
+    RedTeamReport,
+    default_attacks,
+    run_redteam,
+)
 from chimera.eval.rubric import (
     Dimension,
     RubricResult,
@@ -74,4 +81,9 @@ __all__ = [
     "hard_chain",
     "HARD_CHAIN_START",
     "HARD_CHAIN_OPS",
+    "InjectionAttack",
+    "AttackOutcome",
+    "RedTeamReport",
+    "default_attacks",
+    "run_redteam",
 ]

@@ -28,6 +28,15 @@ We aim to acknowledge reports within a few days and to coordinate a fix and disc
 Chimera ships defense-in-depth, but **none of these replace running it in an isolated
 environment** when you grant autonomy:
 
+> **Measured, not asserted.** `chimera redteam` runs a corpus of injection attacks (a
+> malicious page/email trying to steer the agent into a harmful tool call) through the
+> governance stack. On the built-in corpus, the taint layer cuts the **attack success
+> rate from 100% to ~14%** (blocks destructive shell, backdoor writes, self-modification,
+> and email exfiltration; the remaining leak is exfiltration through an *allowed* tool like
+> `http_get`, which it names rather than hides). This measures whether an already-injected
+> agent's harmful action is *stopped* — not whether the model can be injected at all, which
+> is the harder, still-open half of #5.
+
 - **Governance kernel** — every governed tool call is evaluated allow/warn/block/review;
   known-dangerous signatures (`rm -rf /`, disk wipes, fork bombs, `curl | sh`, force pushes,
   secret material) are blocked or escalated. Enable with `--guard`. **These are shell-signature

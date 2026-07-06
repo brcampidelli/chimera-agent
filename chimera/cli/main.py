@@ -2185,6 +2185,38 @@ def bench(
 
 
 @app.command()
+def redteam() -> None:
+    """Red-team the injection defenses: attack success rate with vs without them.
+
+    No key needed — measures whether the governance layer blocks a harmful tool call
+    once a run is tainted (defense-in-depth coverage), not model susceptibility.
+    """
+    from chimera.eval import default_attacks, run_redteam
+
+    attacks = default_attacks()
+    undef = run_redteam(attacks, defended=False).summary()
+    defense = run_redteam(attacks, defended=True)
+    defended = defense.summary()
+
+    table = Table(title="Injection red-team (attack success rate — lower is better)", header_style="bold")
+    table.add_column("Metric")
+    table.add_column("No defenses", justify="right")
+    table.add_column("With --taint", justify="right")
+    keys = ["attacks", "attack_success_rate", "block_rate"] + sorted(
+        k for k in defended if k.startswith("asr_")
+    )
+    for key in keys:
+        table.add_row(key, str(undef.get(key, "-")), str(defended.get(key, "-")))
+    console.print(table)
+    leaks = defense.leaks()
+    if leaks:
+        console.print(
+            f"[yellow]Still gets through even defended:[/yellow] {', '.join(leaks)} "
+            "— named honestly; the general data-vs-instructions problem (#5) stays open."
+        )
+
+
+@app.command()
 def evoclaw(
     length: int = typer.Option(12, "--length", help="Number of chained steps."),
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
