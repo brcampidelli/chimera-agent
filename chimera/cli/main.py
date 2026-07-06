@@ -1148,6 +1148,9 @@ def solve(
     progress_ledger: bool = typer.Option(
         False, "--progress-ledger", help="After a failed attempt, run a structured self-check that steers the retry (helps weak models)."
     ),
+    contract: str = typer.Option(
+        None, "--contract", help="Machine-checkable success clauses, comma-separated: file_exists:PATH | file_contains:PATH:REGEX | answer_matches:REGEX."
+    ),
 ) -> None:
     """Tier-2: autonomously solve a task with plan + verify-or-revert. Requires a key."""
     from chimera.core import (
@@ -1155,6 +1158,7 @@ def solve(
         AgentConfig,
         AutonomousAgent,
         AutonomousConfig,
+        CompletionContract,
         Manager,
         Planner,
         ProgressLedger,
@@ -1257,6 +1261,13 @@ def solve(
             # Structured per-attempt self-check (Magentic-One): turns "it failed" into a concrete
             # next_focus for the retry — the lift for weak models. Opt-in via --progress-ledger.
             progress_ledger=ProgressLedger(gateway, model) if progress_ledger else None,
+            # Declared, machine-checkable success clauses (--contract): an AND gate on top of
+            # verify-or-revert that catches the model claiming a result the artifacts don't show.
+            contract=(
+                CompletionContract.from_specs([c.strip() for c in contract.split(",")], ws)
+                if contract
+                else None
+            ),
             # Provenance gate: artifacts born from a tainted run are marked/held pending.
             taint=ledger,
             planner=None if no_plan else Planner(planner_backend, model),

@@ -20,6 +20,7 @@ from chimera.core.autonomous import (
     Worker,
 )
 from chimera.core.checkpoint import FileSnapshot, WorkspaceGuard
+from chimera.core.contract import CompletionContract, ContractResult, parse_check
 from chimera.core.explorer import (
     ContextExplorer,
     Evidence,
@@ -59,6 +60,9 @@ __all__ = [
     "FileSnapshot",
     "ProgressLedger",
     "ProgressAssessment",
+    "CompletionContract",
+    "ContractResult",
+    "parse_check",
     "Verifier",
     "VerificationResult",
     "CommandVerifier",

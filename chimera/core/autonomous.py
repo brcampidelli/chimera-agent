@@ -24,6 +24,7 @@ from typing import Protocol
 
 from chimera.core.agent import AgentResult
 from chimera.core.checkpoint import WorkspaceGuard
+from chimera.core.contract import CompletionContract
 from chimera.core.ledger import ProgressLedger
 from chimera.core.planner import Plan, Planner
 from chimera.core.spine import assemble_spine
@@ -113,6 +114,7 @@ class AutonomousAgent:
         escalate_worker: Worker | None = None,
         stagnation: StagnationDetector | None = None,
         progress_ledger: ProgressLedger | None = None,
+        contract: CompletionContract | None = None,
         taint: SupportsRunTainted | None = None,
         planner: Planner | None = None,
         manager: Manager | None = None,
@@ -130,6 +132,7 @@ class AutonomousAgent:
         self.escalate_worker = escalate_worker
         self.stagnation = stagnation
         self.progress_ledger = progress_ledger
+        self.contract = contract
         self.taint = taint
         self.planner = planner
         self.manager = manager
@@ -196,6 +199,19 @@ class AutonomousAgent:
             else:
                 approved, fb = self._review(task, answer, context)
                 ok = approved
+
+            # Completion contract (Hermes): a declared, machine-checkable AND gate. Even a
+            # verified/approved attempt fails if the contract isn't met — and the unmet
+            # clauses are fed back so the next attempt fixes exactly what's missing. Catches
+            # the model narrating success it didn't achieve.
+            if ok and self.contract is not None and self.contract:
+                contract_result = self.contract.evaluate(answer)
+                if not contract_result.satisfied:
+                    ok = False
+                    detail = "Completion contract not met:\n" + "\n".join(
+                        f"- {reason}" for reason in contract_result.failures
+                    )
+                    fb = f"{fb}\n\n{detail}" if fb else detail
 
             attempt = Attempt(index, answer, approved, verified, False, ok, fb, vout)
             if not ok and snapshot is not None and self.guard is not None:
