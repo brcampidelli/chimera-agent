@@ -13,10 +13,41 @@ BENCH_MODEL=openrouter/meta-llama/llama-3.1-8b-instruct BENCH_TIMEOUT=200 \
   python bench/local_lift/run_paired.py            # all 6 tasks, paired
 ```
 
-Validated end-to-end (2026-07-07) on a single task: `word_wrap` — raw-model 0% (failed one-shot) vs
-chimera 100% (the loop recovered it), 1 discordant pair; with n=1 the CI is `[-58.7%, +100%]`, so it
-is correctly reported **not significant** — one pair is no evidence. The full 6-task paired run is
-the deliberate C1 measurement.
+### Recorded 6-task paired run (2026-07-07, `llama-3.1-8b-instruct`, 200s/arm)
+
+| task | raw-model (1-shot) | chimera (loop) | |
+|---|---|---|---|
+| roman_validate | ❌ | ❌ | |
+| config_parse | ❌ | ❌ | |
+| path_get | ❌ | ❌ | |
+| eval_expr | ❌ | ❌ | |
+| word_wrap | ❌ | ✅ | **recovered** |
+| fix_percentile | ❌ | ❌ | |
+
+```
+raw-model        0.0%  (6 paired trials)
+chimera         16.7%
+paired delta    +16.7%   95% CI [-9.8%, +16.7%]
+discordant       chimera +1 / raw-model +0
+verdict          NOT significant (CI includes 0)
+```
+
+**The headline is the method, not the number.** The paired CI is **`[-9.8%, +16.7%]` (width ~26pp)** —
+about **3× tighter** than the unpaired Newcombe CI on the comparable earlier run
+(`[-29.5%, +55.8%]`, width ~85pp). The B1 pairing did exactly what it promised: conditioning out the
+five tasks both arms agree on removes the agreement noise the unpaired interval still pays for.
+
+**Why it is still not significant: too few discordant pairs, not a wide interval.** This run the 8B
+was weak enough to fail *all six* tasks one-shot (0/6 raw), and the loop recovered only one
+(`word_wrap`) — so there is exactly **one** discordant pair, and one win cannot exclude zero at 95%.
+The lift is real and positive (chimera got something, raw got nothing) but n=1 discordant pair is no
+proof. Reported plainly.
+
+**What this says about the regime.** The competent model (`deepseek-chat-v3.1`) ceiling'd at 6/6 (no
+headroom); this 8B floored at ~0–1/6 (almost no discordant signal). Significance needs a *goldilocks*
+model — weak enough to fail several one-shot, capable enough that the loop recovers several — or many
+more tasks. The pipeline and the tighter paired statistic are proven; the significant number waits on
+the right regime (the official hard-task benchmarks) or a bigger n than a $5 key affords.
 
 ---
 
