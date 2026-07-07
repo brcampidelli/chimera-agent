@@ -24,6 +24,13 @@ from pydantic import BaseModel, Field
 
 from chimera.config import Settings, get_settings
 from chimera.providers.cache import CompletionCache
+from chimera.providers.failover import (
+    CredentialPool,
+    FailoverReason,
+    RecoveryAction,
+    action_for,
+    classify,
+)
 from chimera.telemetry import get_logger
 
 _log = get_logger("providers.gateway")
@@ -158,6 +165,8 @@ class LLMGateway:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
         self._rotators: dict[str, _KeyRotator] = {}
+        # M15-C2: per-credential cooldown pool — a rate-limited/revoked key is rested, not hammered.
+        self._cred_pool = CredentialPool()
         self.cache: CompletionCache | None = (
             CompletionCache(self.settings.home / "cache" / "completions.json")
             if self.settings.cache
@@ -196,7 +205,10 @@ class LLMGateway:
         if rotator is None:
             rotator = _KeyRotator(self.settings.credential_pool(provider))
             self._rotators[provider] = rotator
-        return rotator.order()
+        order = rotator.order()
+        # Skip keys still cooling down from a recent failure; if ALL are cooling, try them anyway
+        # (a stale cooldown must never leave the gateway with zero keys and a hard failure).
+        return self._cred_pool.available(order) or order
 
     def complete(
         self,
@@ -244,6 +256,7 @@ class LLMGateway:
         for candidate in self._model_candidates(resolved):
             provider = candidate.split("/", 1)[0]
             api_keys: tuple[str | None, ...] = tuple(self._key_order(provider)) or (None,)
+            next_model = False
             for api_key in api_keys:
                 call_kwargs: dict[str, Any] = dict(extra, **kwargs)
                 if api_key:
@@ -258,6 +271,8 @@ class LLMGateway:
                         tools=tools,
                         **call_kwargs,
                     )
+                    if api_key:
+                        self._cred_pool.reset(api_key)  # a working key clears its cooldown
                     result = self._normalize(response, candidate)
                     if cache_key is not None and self.cache is not None and result.tool_calls is None:
                         self.cache.put(
@@ -270,9 +285,23 @@ class LLMGateway:
                             },
                         )
                     return result
-                except Exception as exc:  # noqa: BLE001 — try next key, then next model
+                except Exception as exc:  # noqa: BLE001 — classify, then recover per the taxonomy
                     last_exc = exc
-                    _log.warning("model %s failed: %s", candidate, exc)
+                    reason = classify(exc)
+                    action = action_for(reason)
+                    if api_key and reason in (FailoverReason.AUTH, FailoverReason.RATE_LIMIT,
+                                              FailoverReason.OVERLOADED, FailoverReason.TIMEOUT,
+                                              FailoverReason.UNKNOWN):
+                        self._cred_pool.penalize(api_key, reason)  # rest this credential
+                    _log.warning("model %s failed (%s -> %s): %s", candidate, reason.value, action.value, exc)
+                    if action is RecoveryAction.ABORT:
+                        raise  # context-overflow / content-policy: another key/model won't help
+                    if action is RecoveryAction.FALLBACK_MODEL:
+                        next_model = True
+                        break  # skip the remaining keys, go straight to the next model
+                    # ROTATE_KEY: fall through to the next credential
+            if next_model:
+                continue
         assert last_exc is not None  # there is always at least one (candidate, key) attempt
         raise last_exc
 
