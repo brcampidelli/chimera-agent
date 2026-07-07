@@ -28,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `fusion-receipts <jsonl>` summarizes an honest cost×quality curve (fusion rate, mean/total cost,
   dollars per passing answer). Tokens are measured, dollars estimated at list price; an unknown model
   prices to `unknown`, never a silent "free". See `docs/fusion-receipts.md`.
+- **Checkpoint fork + paired A/B (M15-B1).** `RunCheckpointer.fork(src, dst)` branches a run's
+  captured state so two policies can replay from the identical state (LangGraph "fork from a
+  checkpoint"). `chimera/eval/paired.py` adds a paired (McNemar) comparison with a Wilson interval on
+  the discordant pairs — a *tighter* CI than the unpaired Newcombe on the same data, so a real lift
+  can reach significance at a smaller n. `bench-compare --paired` reports it; `run_paired_experiment`
+  encodes "restore the forked state before each arm".
 
 ## [0.4.1] - 2026-07-07
 
