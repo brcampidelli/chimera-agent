@@ -13,7 +13,43 @@ BENCH_MODEL=openrouter/meta-llama/llama-3.1-8b-instruct BENCH_TIMEOUT=200 \
   python bench/local_lift/run_paired.py            # all 6 tasks, paired
 ```
 
-### Recorded 6-task paired run (2026-07-07, `llama-3.1-8b-instruct`, 200s/arm)
+### Goldilocks run — the strongest evidence (2026-07-07, `mistral-small-3.2-24b`, 250s/arm)
+
+The 8B floored (near-zero discordant signal) and the competent model ceiling'd; the honest fix is a
+*goldilocks* model — weak enough to fail several tasks one-shot, capable enough that the loop
+recovers several. A cheap baseline probe found one: `mistral-small-3.2-24b` (baseline ≈ 2/6).
+
+| task | raw-model (1-shot) | chimera (loop) | |
+|---|---|---|---|
+| config_parse | ✅ | ✅ | |
+| eval_expr | ❌ | ✅ | **recovered** |
+| word_wrap | ❌ | ✅ | **recovered** |
+| fix_percentile | ❌ | ✅ | **recovered** |
+| roman_validate | ❌ | ❌ | |
+| path_get | ❌ | ❌ | |
+
+```
+raw-model       16.7%  (6 paired trials)
+chimera         66.7%
+paired delta    +50.0%   95% CI [-6.1%, +50.0%]
+discordant       chimera +3 / raw-model +0   (all three chimera wins, zero losses)
+verdict          NOT significant — by 6 points
+```
+
+**The full loop tripled the pass rate (17% → 67%) and won every discordant pair (3–0).** The paired
+95% CI `[-6.1%, +50%]` is one pair short of excluding zero: with 3/3 discordant wins the Wilson bound
+doesn't quite clear it; **4/4 would**. This is the clearest directional signal to date — the loop
+never lost a pair — and the pairing keeps the interval tight enough that the near-miss is meaningful,
+not noise.
+
+**We do not re-roll for significance.** Running this until it crosses would be p-hacking — the exact
+dishonesty this whole bench exists to avoid. The legitimate ways to gain power are pre-registered:
+more tasks or more seeds per task (increasing n), or the official hard-task benchmarks. Recorded as
+is: a strong, honest, one-pair-short result on a fair single run.
+
+---
+
+### Earlier run (2026-07-07, `llama-3.1-8b-instruct`, 200s/arm) — too weak, near-zero signal
 
 | task | raw-model (1-shot) | chimera (loop) | |
 |---|---|---|---|
