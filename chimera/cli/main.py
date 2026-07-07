@@ -1802,6 +1802,48 @@ def skills_approve(
     console.print(f"[green]Approved[/green] {name} — now active and retrievable.")
 
 
+@app.command("skills-export")
+def skills_export(
+    name: str = typer.Argument(..., help="Name of the learned skill to export."),
+    out: str = typer.Option(None, "--out", "-o", help="Write to this path (default: <name>/SKILL.md)."),
+) -> None:
+    """Export a learned skill to the open SKILL.md format (portable to the agent-skills ecosystem)."""
+    from chimera.evolution import SkillStore
+    from chimera.skills.skill_md import from_learned, render_skill_md
+
+    store = SkillStore(get_settings().home / "skills.json")
+    skill = store.get(name)
+    if skill is None:
+        console.print(f"[red]No skill named {name!r} in the store.[/red]")
+        raise typer.Exit(code=1)
+    md = render_skill_md(from_learned(skill))
+    target = Path(out) if out else Path(name) / "SKILL.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(md, encoding="utf-8")
+    console.print(f"[green]exported[/green] {name} -> {target}")
+
+
+@app.command("skills-import")
+def skills_import(
+    path: str = typer.Argument(..., help="Path to a SKILL.md (or a skill directory containing one)."),
+) -> None:
+    """Import a SKILL.md into the store. A tainted-provenance skill is held pending for review."""
+    from chimera.evolution import SkillStore
+    from chimera.skills.skill_md import parse_skill_md, to_learned
+
+    src = Path(path)
+    if src.is_dir():
+        src = src / "SKILL.md"
+    if not src.exists():
+        console.print(f"[red]No SKILL.md at {src}.[/red]")
+        raise typer.Exit(code=1)
+    skill = to_learned(parse_skill_md(src.read_text(encoding="utf-8")))
+    store = SkillStore(get_settings().home / "skills.json")
+    store.add(skill)
+    note = " [yellow](held pending — tainted provenance)[/yellow]" if skill.status == "pending" else ""
+    console.print(f"[green]imported[/green] {skill.name}{note}")
+
+
 @app.command("skills-retire")
 def skills_retire(
     name: str = typer.Argument(None, help="Skill to retire; omit to act on all candidates."),
