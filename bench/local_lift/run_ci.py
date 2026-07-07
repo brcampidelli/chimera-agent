@@ -28,8 +28,16 @@ from tasks import TASKS  # noqa: E402
 _MODEL = os.environ.get("BENCH_MODEL", "openrouter/deepseek/deepseek-chat-v3.1:free")
 _TIMEOUT = int(os.environ.get("BENCH_TIMEOUT", "360"))
 _ONLY = {t.strip() for t in os.environ.get("BENCH_TASKS", "").split(",") if t.strip()}
-_FLAGS = ["--repo-map", "--progress-ledger", "--checklist", "--replan", "--max-attempts", "3",
-          "--no-remember", "--no-collect", "--no-evolve-skills"]
+_ARM = os.environ.get("BENCH_ARM", "chimera")
+_HYGIENE = ["--no-remember", "--no-collect", "--no-evolve-skills"]
+# Two arms for an honest A/B on the SAME model+tasks — the only variable is Chimera's scaffolding:
+#   baseline = the raw model, one shot, no plan/manager/scaffolding (still --verify-graded)
+#   chimera  = the full solve loop: plan + verify-or-revert + the M14 scaffolding
+_ARMS = {
+    "baseline": ["--no-plan", "--no-manager", "--max-attempts", "1", *_HYGIENE],
+    "chimera": ["--repo-map", "--progress-ledger", "--checklist", "--replan", "--max-attempts", "3", *_HYGIENE],
+}
+_FLAGS = _ARMS.get(_ARM, _ARMS["chimera"])
 
 
 def _setup(task: dict, root: Path) -> Path:
@@ -68,7 +76,7 @@ def _solve(task: dict, ws: Path) -> tuple[int, str]:
 
 def main() -> None:
     tasks = [t for t in TASKS if not _ONLY or t["id"] in _ONLY]
-    print(f"model={_MODEL} tasks={len(tasks)} timeout={_TIMEOUT}s", flush=True)
+    print(f"arm={_ARM} model={_MODEL} tasks={len(tasks)} timeout={_TIMEOUT}s", flush=True)
     rows: list[dict] = []
     root = Path(tempfile.mkdtemp(prefix="chimbench-"))
     try:
@@ -89,15 +97,21 @@ def main() -> None:
     n = len(rows)
     npass = sum(1 for r in rows if r["passed"])
     rate = npass / n if n else 0.0
-    print(f"\n=== pass-rate: {npass}/{n} = {rate:.0%} (model {_MODEL}) ===", flush=True)
+    print(f"\n=== [{_ARM}] pass-rate: {npass}/{n} = {rate:.0%} (model {_MODEL}) ===", flush=True)
 
     out = HERE / "results"
     out.mkdir(exist_ok=True)
-    (out / "ci.json").write_text(json.dumps({"model": _MODEL, "pass": npass, "total": n, "rows": rows}, indent=2), encoding="utf-8")
+    # Per-arm file (ci-baseline.json / ci-chimera.json) so a two-arm A/B doesn't overwrite itself;
+    # also a flat pass/fail list per arm, ready for `chimera bench-compare`.
+    payload = {"arm": _ARM, "model": _MODEL, "pass": npass, "total": n, "rows": rows}
+    (out / f"ci-{_ARM}.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    (out / f"trials-{_ARM}.json").write_text(
+        json.dumps([bool(r["passed"]) for r in rows]), encoding="utf-8"
+    )
 
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:
-        lines = [f"### Chimera quality gauge — `{_MODEL}`", "", f"**Pass-rate: {npass}/{n} = {rate:.0%}**", "",
+        lines = [f"### Chimera quality gauge — `{_ARM}` on `{_MODEL}`", "", f"**Pass-rate: {npass}/{n} = {rate:.0%}**", "",
                  "| task | result | time | solve exit |", "|---|---|---|---|"]
         lines += [f"| {r['task']} | {'✅' if r['passed'] else '❌'} | {r['seconds']}s | {r['solve_exit']} |" for r in rows]
         Path(summary).write_text("\n".join(lines) + "\n", encoding="utf-8")
