@@ -6,6 +6,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-07-07
+
+A reliability-and-speed patch for the headline feature (`chimera solve`), plus the honest
+weak-model A/B harness that measures it. All changes were driven by running Chimera on the
+official Terminal-Bench harness and inspecting where a weak model actually stalled.
+
+### Fixed
+- **The agent now *executes* the fix instead of narrating it.** `solve` used to accept any
+  text-only reply as "done", so the worker would investigate, find the fix, and *describe* it
+  ("you can run `git merge …`") without doing it. The system prompt now demands execution and a
+  single nudge (`insist_on_action`) re-prompts an unexecuted plan to actually run. This is the
+  core "does the feature work" fix.
+- **No more 60s hangs on interactive commands.** Sandbox commands ran with an inherited stdin and
+  no non-interactive environment, so `git commit` (opens an editor), credential prompts, `apt`, and
+  `read` blocked until their timeout — one stall at a time, eating a whole step budget. Commands now
+  run with stdin closed and `GIT_EDITOR=true`, `GIT_TERMINAL_PROMPT=0`, `PAGER=cat`,
+  `DEBIAN_FRONTEND=noninteractive`, `CI=1`.
+
+### Changed
+- The requirement checklist is now injected into the worker's **first** attempt (it used to only
+  grade coverage *after* a failure), so multi-part tasks aim at every requirement from the start.
+- Retry feedback now includes the **concrete failing test output**, not just the manager's note —
+  the most actionable signal for the next attempt.
+
+### Performance
+- `solve` skips the redundant LLM coverage grade when an executable verifier (e.g. `pytest`) has
+  already passed — the verifier is stricter ground truth. Measured ~30% less wall-clock on a cheap
+  model (dominated by call latency), and runs finish cleanly instead of timing out.
+
+### Added
+- An honest, Docker-free weak-model-lift A/B (`bench/local_lift`): a `baseline` arm (raw model,
+  one shot) vs the full Chimera loop on the same model + tasks, graded by each task's own `pytest`
+  and scored with `chimera bench-compare` (Wilson + Newcombe CI). A recorded run and its honest
+  (not-yet-significant) verdict are in `bench/local_lift/RESULTS.md`.
+- A working Terminal-Bench installed-agent (`bench/terminal_bench`) that installs Chimera into the
+  task container from an offline wheelhouse and runs `solve` — proven end-to-end on the official
+  harness.
+
 ## [0.4.0] - 2026-07-06
 
 The M14 cycle — from *"lift a weak model"* to *"prove it on a standard benchmark, then close the
