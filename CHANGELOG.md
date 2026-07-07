@@ -34,6 +34,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   the discordant pairs — a *tighter* CI than the unpaired Newcombe on the same data, so a real lift
   can reach significance at a smaller n. `bench-compare --paired` reports it; `run_paired_experiment`
   encodes "restore the forked state before each arm".
+- **SKILL.md interop + progressive disclosure (M15-A2).** `chimera/skills/skill_md.py` parses/renders
+  the open Agent Skills `SKILL.md` format (round-trips losslessly with `LearnedSkill`), with L1/L2/L3
+  progressive disclosure (metadata → instructions → resources) as a token-cost lever, and
+  provenance/taint carried in the frontmatter — a tainted skill is held `pending` on import. CLI:
+  `skills-export` / `skills-import`.
+- **Idempotency guard + memory sanitization (M15-A5).** Side-effecting tools
+  (`send_email`/`http_post`/…) run at most once per identical call within a run, so a retry can't
+  fire a duplicate email/payment; the recalled/evolved artifacts injected into context (lessons,
+  skill cards, playbook) are control-token-stripped so a tainted memory can't spoof an instruction.
 
 ## [0.4.1] - 2026-07-07
 
