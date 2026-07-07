@@ -44,6 +44,11 @@ from chimera.governance.quarantine import (
     QuarantineTool,
     fields_schema,
 )
+from chimera.governance.sanitize import (
+    has_control_tokens,
+    sanitize_untrusted,
+    strip_leaked_control_tokens,
+)
 from chimera.governance.validator import (
     ScheduleValidator,
     SkillValidator,
@@ -70,6 +75,9 @@ __all__ = [
     "FENCE_OPEN",
     "FENCE_CLOSE",
     "DANGEROUS_WHEN_TAINTED",
+    "sanitize_untrusted",
+    "strip_leaked_control_tokens",
+    "has_control_tokens",
     "QuarantinedReader",
     "QuarantineResult",
     "QuarantineTool",

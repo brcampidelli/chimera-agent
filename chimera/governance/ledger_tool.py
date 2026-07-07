@@ -30,6 +30,7 @@ from chimera.governance.ledger import (
     assess_action,
 )
 from chimera.governance.policy import Decision
+from chimera.governance.sanitize import sanitize_untrusted
 from chimera.tools.base import Tool
 from chimera.tools.registry import ToolRegistry
 
@@ -118,7 +119,9 @@ class LedgeredTool(Tool):
         result = self.inner.run(**kwargs)
         self._record_effect(kwargs, result)  # ledger sees the RAW content (taint snippets)
         if self.name in FETCH_TOOLS and result.strip():
-            return fence(result)  # the model sees untrusted content behind the data fence
+            # M15-A3: defang chat-template/control tokens BEFORE fencing, so untrusted content
+            # can't spoof a system/user turn or a tool call to break out of the data fence.
+            return fence(sanitize_untrusted(result))
         return result
 
     def _record_effect(self, args: Mapping[str, Any], result: str) -> None:

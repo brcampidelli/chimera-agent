@@ -486,6 +486,13 @@ class AutonomousAgent:
         tainted: bool,
     ) -> AutonomousResult:
         """Commit a successful result: remember it, evolve a skill, clear the thread, return."""
+        # M15-A3: on a tainted run only, strip any chat-template/control tokens the model may have
+        # echoed from untrusted content — outbound leak defense. Gated on ``tainted`` so a clean run
+        # that legitimately discusses such tokens (a coding answer) is never mangled.
+        if tainted:
+            from chimera.governance.sanitize import strip_leaked_control_tokens
+
+            answer = strip_leaked_control_tokens(answer)
         # Anti-poisoning provenance (Zombie Agents): artifacts from a tainted run stay marked
         # even after human approval — approval sanctions the action, not the content's trust.
         self._remember_success(task, answer, tainted=tainted)
