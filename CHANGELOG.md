@@ -6,6 +6,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-07
+
+The **M15 "Proved and Governed"** cycle — built from a real reverse-engineering study of five
+competitors (OpenClaw, Hermes, nanobot, CrewAI, LangGraph). Their code shares the same three gaps,
+which are exactly Chimera's bets: **fitness-signaled evolution, architectural security, and honest
+benchmarks**. This release doubles down on all three, stealing the best idea from each rival and
+adding the honesty layer none of them have.
+
+Highlights: diff-gated evolution (never trust a self-reported success), per-advisor **fusion cost
+receipts** ("selective fusion with receipts"), a **checkpoint fork + paired A/B** that measurably
+tightens the confidence interval, SKILL.md interop, control-token stripping + idempotency guards,
+a tool-loop circuit breaker, a typed HITL {accept, edit, respond, ignore} envelope, failed→passed
+correction distillation, a maturity scorecard, an error→recovery taxonomy with credential cooldowns,
+a scored memory-promotion gate, and `doctor --fix`. A recorded weak-model paired run on a
+"goldilocks" model shows the full loop tripling the pass rate (17%→67%, 3–0 on discordant pairs),
+reported honestly (one pair short of significance — no p-hacking). 1020 tests, ruff + mypy strict.
+
 ### Added
 - **Diff-gate for evolution (M15-A1).** An evolution/training target is now certified by the run's
   *real working-tree diff*, not the model's claim of success (nanobot "Dream" discipline).
@@ -53,6 +70,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Maturity scorecard (M15-B5).** `chimera maturity` scores 7 surfaces × coverage-IDs, each proven
   by a real test (machine-derived; a renamed test shows as a gap). Doubles as a per-surface objective
   for the evolution loop (`Scorecard.weakest()`). The repo scores 37/37 = GA today.
+- **Paired weak-model bench runner (M15-C1).** `bench/local_lift/run_paired.py` runs baseline vs the
+  full loop from the identical restored state per task and reports the paired verdict; a recorded
+  goldilocks run (mistral-small-24b) shows the loop tripling the pass rate, one pair short of
+  significance — recorded honestly. See `bench/local_lift/RESULTS.md`.
+- **Error→recovery taxonomy + credential cooldowns (M15-C2).** `chimera/providers/failover.py`
+  classifies a completion error and maps it to rotate-key / fallback-model / abort; a `CredentialPool`
+  rests a rate-limited or revoked key for a TTL instead of hammering it. Wired into the gateway's
+  fallback loop — abort short-circuits instead of trying every key and model first.
+- **Dreaming promotion gate (M15-C3).** `chimera/memory/dreaming.py` promotes a recall to durable
+  memory only when it clears weighted thresholds (min score, recall count, distinct queries, recency
+  half-life, age) — derived from measured usage counters, never from an LLM's say-so.
+- **`doctor --fix` (M15-D1).** Auto-repairs safe setup issues (creates the state dir, scaffolds a
+  `.env` from `.env.example`) — never writes a secret, never clobbers an existing `.env`.
 
 ## [0.4.1] - 2026-07-07
 
