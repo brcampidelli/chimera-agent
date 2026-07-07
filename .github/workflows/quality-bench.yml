@@ -1,0 +1,39 @@
+name: quality-bench
+
+# A quality gauge, not a build gate: runs `chimera solve` on the local pytest-graded task set with a
+# cheap/free model and reports the pass-rate (does a change move the number?). Manual-trigger only so
+# it never spends API on a routine push — add a `schedule:` block if you want it periodic.
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "OpenRouter model slug (use a free one to avoid cost)"
+        default: "openrouter/deepseek/deepseek-chat-v3.1:free"
+      timeout:
+        description: "Per-solve timeout in seconds"
+        default: "300"
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - name: Install (with dev extras for pytest)
+        run: uv sync --extra dev
+      - name: Run the quality gauge
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          BENCH_MODEL: ${{ github.event.inputs.model }}
+          BENCH_TIMEOUT: ${{ github.event.inputs.timeout }}
+        run: uv run --no-sync python bench/local_lift/run_ci.py
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-bench-results
+          path: bench/local_lift/results/ci.json
+          if-no-files-found: ignore
