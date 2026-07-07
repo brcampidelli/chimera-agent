@@ -98,3 +98,38 @@ def test_no_checklist_is_unaffected() -> None:
         worker, config=AutonomousConfig(max_attempts=1, use_planner=False, use_manager=False)
     )
     assert agent.run("t").success is True and worker.runs == 1
+
+
+class _PromptRecordingWorker:
+    """Captures the composed prompt it receives, so we can assert what reached the worker."""
+
+    def __init__(self) -> None:
+        self.prompts: list[str] = []
+
+    def run(self, task: str) -> AgentResult:
+        self.prompts.append(task)
+        return AgentResult(answer="did it", steps=1, transcript=[], stopped_reason="done")
+
+
+class _TwoReqChecklist:
+    def extract(self, task: str) -> list[Requirement]:
+        return [Requirement(text="support lowercase input"), Requirement(text="raise on empty")]
+
+    def grade(self, task: str, answer: str, requirements: list[Requirement]) -> list[str]:
+        return []  # everything covered, so the run succeeds on attempt 1
+
+
+def test_requirements_reach_the_worker_on_the_first_attempt() -> None:
+    # Quality fix: the extracted requirements are injected into context up front, so the worker
+    # targets every constraint from attempt 1 (not only after a failed coverage grade on retry).
+    worker = _PromptRecordingWorker()
+    agent = AutonomousAgent(
+        worker,
+        checklist=_TwoReqChecklist(),  # type: ignore[arg-type]
+        config=AutonomousConfig(max_attempts=1, use_planner=False, use_manager=False),
+    )
+    agent.run("parse the numeral")
+    first_prompt = worker.prompts[0]
+    assert "support lowercase input" in first_prompt
+    assert "raise on empty" in first_prompt
+    assert "must satisfy ALL" in first_prompt  # framed as an up-front acceptance checklist

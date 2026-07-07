@@ -53,6 +53,22 @@ def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:80]
 
 
+def _format_requirements(requirements: list[Any]) -> str:
+    """Render extracted requirements as an up-front acceptance checklist for the worker's context.
+
+    Putting the requirements in front of the worker on attempt 1 (not just feeding back the dropped
+    ones after a failed coverage grade) makes it target every constraint from the start — the main
+    reason a weak model silently drops a 'must include / must not' clause.
+    """
+    if not requirements:
+        return ""
+    lines = "\n".join(f"- [{r.kind}] {r.text}" for r in requirements)
+    return (
+        "Requirements — your solution must satisfy ALL of these; verify each before finishing:\n"
+        f"{lines}"
+    )
+
+
 class Worker(Protocol):
     """Anything that can execute a task and return a result (the agent loop)."""
 
@@ -203,8 +219,16 @@ class AutonomousAgent:
         # ACE playbook: accumulated, delta-curated strategy bullets, injected as advisory context
         # so the worker/planner reuse what has worked across runs (grow-and-refine, anti-collapse).
         playbook_ctx = self.playbook.render() if self.playbook is not None else ""
+        # Requirement checklist (opt-in): extract the task's atomic requirements ONCE up front and
+        # inject them into context, so the worker targets every requirement from the FIRST attempt
+        # (not just discovers the dropped ones via a failed coverage grade on retry). Extraction is
+        # task-level and stable, so it's done once here and reused by the coverage gate below.
+        requirements = self.checklist.extract(task) if self.checklist is not None else []
+        requirements_ctx = _format_requirements(requirements)
         context = "\n\n".join(
-            part for part in (spine, repo_ctx, lessons, card_ctx, playbook_ctx) if part
+            part
+            for part in (spine, repo_ctx, lessons, card_ctx, playbook_ctx, requirements_ctx)
+            if part
         )
         # how many times this task pattern has already succeeded / failed (before this
         # run) — the recurrence signals that gate auto-skill-evolution (a pattern card on
@@ -224,11 +248,6 @@ class AutonomousAgent:
             if self.replan_on_stall and self.planner and self.config.use_planner
             else None
         )
-        # Requirement checklist (opt-in): extract the task's atomic requirements ONCE up front so
-        # every attempt is graded for coverage — catches the "must include / must not" constraints
-        # a weak model silently drops. Extraction is task-level and stable, so it's done once.
-        requirements = self.checklist.extract(task) if self.checklist is not None else []
-
         attempts: list[Attempt] = []
         feedback = ""
         start_index = 1
