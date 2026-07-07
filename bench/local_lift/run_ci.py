@@ -26,7 +26,7 @@ sys.path.insert(0, str(HERE))
 from tasks import TASKS  # noqa: E402
 
 _MODEL = os.environ.get("BENCH_MODEL", "openrouter/deepseek/deepseek-chat-v3.1:free")
-_TIMEOUT = int(os.environ.get("BENCH_TIMEOUT", "300"))
+_TIMEOUT = int(os.environ.get("BENCH_TIMEOUT", "360"))
 _ONLY = {t.strip() for t in os.environ.get("BENCH_TASKS", "").split(",") if t.strip()}
 _FLAGS = ["--repo-map", "--progress-ledger", "--checklist", "--replan", "--max-attempts", "3",
           "--no-remember", "--no-collect", "--no-evolve-skills"]

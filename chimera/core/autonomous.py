@@ -319,7 +319,12 @@ class AutonomousAgent:
             # requirements; unmet ones fail the attempt and are fed back for a targeted retry —
             # the model must fix exactly the constraints it dropped. Complements the contract
             # (artifacts) with coverage; degrades to no-misses on any grader error.
-            if ok and self.checklist is not None and requirements:
+            # Skipped when an executable verifier is present: the tests are stricter ground truth and
+            # already passed here, so an extra LLM coverage grade is a wasted (slow) model call on the
+            # happy path. The checklist is a proxy verifier for when you have no tests, not a second
+            # opinion on top of them. (Requirements are still injected up front, so the worker targets
+            # them from attempt 1 regardless.)
+            if ok and self.checklist is not None and requirements and self.verifier is None:
                 misses = self.checklist.grade(task, answer, requirements)
                 if misses:
                     ok = False

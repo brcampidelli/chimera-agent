@@ -119,6 +119,50 @@ class _TwoReqChecklist:
         return []  # everything covered, so the run succeeds on attempt 1
 
 
+class _GradeCountingChecklist:
+    def __init__(self) -> None:
+        self.grades = 0
+
+    def extract(self, task: str) -> list[Requirement]:
+        return [Requirement(text="do the thing")]
+
+    def grade(self, task: str, answer: str, requirements: list[Requirement]) -> list[str]:
+        self.grades += 1
+        return []
+
+
+class _PassingVerifier:
+    def verify(self) -> object:
+        from chimera.core.verify import VerificationResult
+
+        return VerificationResult(passed=True, output="")
+
+
+def test_coverage_grade_is_skipped_when_a_verifier_passes() -> None:
+    # Speed fix: the executable verifier is stricter ground truth, so the extra LLM coverage grade is
+    # a wasted slow model call on the happy path. Requirements are still injected up front.
+    checklist = _GradeCountingChecklist()
+    agent = AutonomousAgent(
+        _OkWorker(),
+        checklist=checklist,  # type: ignore[arg-type]
+        verifier=_PassingVerifier(),  # type: ignore[arg-type]
+        config=AutonomousConfig(max_attempts=1, use_planner=False, use_manager=False),
+    )
+    assert agent.run("t").success is True
+    assert checklist.grades == 0  # verifier passed -> no redundant LLM coverage grade
+
+
+def test_coverage_grade_still_runs_without_a_verifier() -> None:
+    checklist = _GradeCountingChecklist()
+    agent = AutonomousAgent(
+        _OkWorker(),
+        checklist=checklist,  # type: ignore[arg-type]
+        config=AutonomousConfig(max_attempts=1, use_planner=False, use_manager=False),
+    )
+    agent.run("t")
+    assert checklist.grades == 1  # no executable verifier -> the checklist is the proxy check
+
+
 def test_requirements_reach_the_worker_on_the_first_attempt() -> None:
     # Quality fix: the extracted requirements are injected into context up front, so the worker
     # targets every constraint from attempt 1 (not only after a failed coverage grade on retry).
