@@ -347,6 +347,16 @@ class AutonomousAgent:
 
             attempt = Attempt(index, answer, approved, verified, False, ok, fb, vout)
             self._emit(_ev_result(index, ok, detail=(fb or vout)[:200]))
+            # Diff-gate (nanobot "Dream"): certify what the attempt *actually* changed from the
+            # real workspace snapshot, BEFORE any revert — the machine truth, not the model's claim.
+            diff_productive: bool | None = None
+            diff_summary: str | None = None
+            if snapshot is not None and self.guard is not None:
+                from chimera.evolution.diff_gate import diff_snapshots
+
+                pdiff = diff_snapshots(snapshot, self.guard.snapshot())
+                diff_productive = pdiff.is_productive
+                diff_summary = pdiff.audit_summary()
             if not ok and snapshot is not None and self.guard is not None:
                 self.guard.restore(snapshot)
                 attempt.reverted = True
@@ -368,6 +378,8 @@ class AutonomousAgent:
                     events=events_from_transcript(
                         [m for m in agent_result.transcript if isinstance(m, dict)]
                     ),
+                    diff_productive=diff_productive,
+                    diff_summary=diff_summary,
                 )
 
             if ok:

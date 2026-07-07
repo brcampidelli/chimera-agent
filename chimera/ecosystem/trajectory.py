@@ -25,6 +25,11 @@ class Trajectory(BaseModel):
     reward: float = 0.0
     steps: int = 0  # tool-calling steps — a long-horizon signal for data curation
     events: list[dict[str, Any]] = Field(default_factory=list)  # per-tool-step {tool, ok}
+    # Diff-gate (nanobot "Dream"): did the run actually change the workspace? None = untracked
+    # (no guard/workspace), True/False = certified by the real snapshot diff. ``diff_summary`` is
+    # machine-derived (files +/-), so it — not the model's narrative — is the honest audit record.
+    diff_productive: bool | None = None
+    diff_summary: str | None = None
 
     def process_score(self) -> float:
         """Step-following process signal in [0, 1] — the SkillCoach data-quality filter."""
@@ -58,6 +63,8 @@ class TrajectoryCollector:
         reward: float = 0.0,
         steps: int = 0,
         events: list[dict[str, Any]] | None = None,
+        diff_productive: bool | None = None,
+        diff_summary: str | None = None,
     ) -> Trajectory:
         item = Trajectory(
             seq=len(self._items),
@@ -67,6 +74,8 @@ class TrajectoryCollector:
             reward=reward,
             steps=steps,
             events=list(events or []),
+            diff_productive=diff_productive,
+            diff_summary=diff_summary,
         )
         self._items.append(item)
         self.path.parent.mkdir(parents=True, exist_ok=True)

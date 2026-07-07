@@ -48,6 +48,7 @@ def rejection_sample(
     min_reward: float = 0.5,
     min_process: float = 0.0,
     top_k_per_prompt: int = 0,
+    require_productive_diff: bool = False,
 ) -> RejectionResult:
     """Accept only successful, high-reward, clean-process runs (top-k per prompt when set).
 
@@ -55,12 +56,20 @@ def rejection_sample(
     reward at or above the bar and a process score at or above the filter (no lucky-but-sloppy
     successes). ``top_k_per_prompt`` keeps only the best few per unique task, so an easy prompt
     with many passes does not swamp the dataset.
+
+    ``require_productive_diff`` (nanobot "Dream") is the diff-gate: for a file-editing regime, only
+    keep runs whose *real working-tree diff* changed something (``diff_productive is True``) — a
+    self-reported "success" that touched nothing is not a training target. Left off by default so
+    answer-only successes (Q&A, analysis) are not wrongly rejected; turn it on for coding/edit runs
+    where a productive diff is the honest evidence of the work.
     """
     per_prompt_count: dict[str, int] = {}
     accepted: list[Trajectory] = []
     for item in sorted(trajectories, key=lambda t: -t.reward):
         if item.outcome != "success" or item.reward < min_reward or item.process_score() < min_process:
             continue
+        if require_productive_diff and item.diff_productive is not True:
+            continue  # unverified-by-diff success: don't train on a claim with no artifact behind it
         prompt = item.prompt.strip()
         if top_k_per_prompt and per_prompt_count.get(prompt, 0) >= top_k_per_prompt:
             continue
@@ -122,6 +131,7 @@ class RejectionSamplingLoop:
         min_examples: int = 30,
         min_process: float = 0.0,
         top_k_per_prompt: int = 0,
+        require_productive_diff: bool = False,
     ) -> None:
         self.collector = collector
         self.evaluator = evaluator
@@ -129,6 +139,7 @@ class RejectionSamplingLoop:
         self.min_examples = min_examples
         self.min_process = min_process
         self.top_k_per_prompt = top_k_per_prompt
+        self.require_productive_diff = require_productive_diff
 
     def run(self) -> RFTRound:
         """Rejection-sample, check readiness, then apply the A/B bench gate. Never trains."""
@@ -137,6 +148,7 @@ class RejectionSamplingLoop:
             min_reward=self.min_reward,
             min_process=self.min_process,
             top_k_per_prompt=self.top_k_per_prompt,
+            require_productive_diff=self.require_productive_diff,
         )
         n = len(rs.accepted)
         if n < self.min_examples:
@@ -203,6 +215,7 @@ def run_rft(
     min_examples: int = 30,
     min_process: float = 0.0,
     top_k_per_prompt: int = 0,
+    require_productive_diff: bool = False,
 ) -> RFTRound:
     """Convenience: run one RFT round against two pre-computed bench result lists."""
     loop = RejectionSamplingLoop(
@@ -212,5 +225,6 @@ def run_rft(
         min_examples=min_examples,
         min_process=min_process,
         top_k_per_prompt=top_k_per_prompt,
+        require_productive_diff=require_productive_diff,
     )
     return loop.run()
