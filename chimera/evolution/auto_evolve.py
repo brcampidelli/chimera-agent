@@ -120,6 +120,29 @@ class AutoSkillEvolver:
         _log.debug("kept anti-pattern card %s", card.name)
         return card
 
+    def maybe_distill_correction(
+        self, task: str, failed: str, passed: str, *, tainted: bool = False
+    ) -> LearnedSkill | None:
+        """Distill a VERIFIED failed→passed correction into an anti-pattern card (M15-B4).
+
+        Unlike ``maybe_evolve_failure`` (heuristic, recurrence-gated), this fires on a single
+        transition because it is grounded in a *verified* fix — the eval turned fail into pass, so
+        the diff between the two attempts is a real correction, not a guess. Gated on the governance
+        validator; a card distilled during a tainted run is held pending like any other artifact.
+        """
+        card = self.evolver.distill_correction(task, failed, passed)
+        if card is None:
+            return None
+        if card.name in self.store:
+            _log.debug("correction card %s already exists; skipping", card.name)
+            return None
+        if self.validator is not None and not self.validator.validate(card.to_dict()).accepted:
+            _log.debug("rejected correction card %s (failed validation)", card.name)
+            return None
+        self._mark_and_store(card, tainted=tainted)
+        _log.debug("kept correction card %s", card.name)
+        return card
+
     def _evolve_single(
         self, task: str, solution: str, *, tainted: bool = False
     ) -> LearnedSkill | None:

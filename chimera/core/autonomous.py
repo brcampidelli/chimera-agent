@@ -90,6 +90,10 @@ class SupportsAutoEvolve(Protocol):
         self, task: str, solution: str, prior_successes: int, *, tainted: bool = False
     ) -> object: ...
 
+    def maybe_distill_correction(
+        self, task: str, failed: str, passed: str, *, tainted: bool = False
+    ) -> object: ...
+
 
 class SupportsRunTainted(Protocol):
     """Reports whether the current run consumed untrusted content (a TaintLedger)."""
@@ -515,6 +519,13 @@ class AutonomousAgent:
         self._remember_success(task, answer, tainted=tainted)
         if self.auto_evolver is not None:
             self.auto_evolver.maybe_evolve(task, answer, prior_successes, tainted=tainted)
+            # M15-B4: if the run FAILED before it passed, distill the verified failed→passed
+            # correction into an anti-pattern card — the eval, not a human, supplies the signal.
+            last_failed = next((a for a in reversed(attempts) if not a.success), None)
+            if last_failed is not None and last_failed.answer.strip():
+                self.auto_evolver.maybe_distill_correction(
+                    task, last_failed.answer, answer, tainted=tainted
+                )
         self._record_card_outcome(True)
         self._clear_checkpoint(thread_id)
         self._emit(_ev_final(True, answer))

@@ -44,6 +44,16 @@ _REFINE_SYSTEM = (
     "Improve a skill's prompt_template given examples of how it failed. Reply with ONLY "
     'a JSON object: {"prompt_template": "the improved template"}.'
 )
+_DISTILL_SYSTEM = (
+    "You are given a task, a FAILED attempt, and a later PASSED attempt at the SAME task. Extract "
+    "the SPECIFIC correction that turned the failure into a success, as a reusable anti-pattern "
+    "reasoning card. Reply with ONLY a JSON object with keys: "
+    '"name" (snake_case), "description" (one line naming the fix), '
+    '"trigger" (the situation where the mistake happens), "do" (the corrective step that fixed it), '
+    '"avoid" (the specific mistake the failed attempt made), "check" (how to verify the fix), '
+    '"risk" (when the mistake tends to recur), "triggers" (JSON list of 5-15 retrieval keywords). '
+    "Do NOT include a prompt_template, instance-specific constants, or full code."
+)
 _JSON = re.compile(r"\{.*\}", re.DOTALL)
 
 
@@ -133,6 +143,31 @@ class SkillEvolver:
         card = self._build_skill(data, kind="anti_pattern")
         if not (card.do.strip() and card.check.strip()):
             _log.debug("discarded anti-pattern card %s (missing Do/Check)", card.name)
+            return None
+        return card
+
+    def distill_correction(
+        self, task: str, failed: str, passed: str
+    ) -> LearnedSkill | None:
+        """Distill the fix that turned a FAILED attempt into a PASSED one into an anti-pattern card.
+
+        This is CrewAI's ``train()`` distillation mechanic with the human replaced by the eval: the
+        (failed, passed) pair is a *verified* correction (the tests said so), so no human feedback is
+        needed. Returns an advisory card (no template) carrying both Do (the fix) and Check, or None.
+        """
+        user = f"Task:\n{task}\n\nFAILED attempt:\n{failed}\n\nPASSED attempt:\n{passed}"
+        raw = self.backend.complete(
+            [Message(role="system", content=_DISTILL_SYSTEM), Message(role="user", content=user)],
+            model=self.model,
+            temperature=0.2,
+        ).content
+        data = _parse_json(raw)
+        if not data or not all(k in data for k in ("name", "description")):
+            _log.debug("correction distillation could not be parsed")
+            return None
+        card = self._build_skill(data, kind="anti_pattern")
+        if not (card.do.strip() and card.check.strip()):
+            _log.debug("discarded correction card %s (missing Do/Check)", card.name)
             return None
         return card
 
