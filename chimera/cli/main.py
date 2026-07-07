@@ -1344,9 +1344,12 @@ def solve(
             registry = ledger_registry(
                 registry, ledger, audit=allow_audit, narrow_on_taint=True
             )
-        worker = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
+        # insist_on_action: solve is autonomous task completion, so a described-but-unexecuted plan
+        # is pushed back to actually run — the fix for the worker narrating instead of acting.
+        _worker_cfg = AgentConfig(model=model, max_steps=max_steps, insist_on_action=True)
+        worker = Agent(backend, registry, _worker_cfg)
         escalate_worker = (
-            Agent(escalate_backend, registry, AgentConfig(model=model, max_steps=max_steps))
+            Agent(escalate_backend, registry, _worker_cfg)
             if escalate_backend is not None
             else None
         )

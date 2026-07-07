@@ -92,12 +92,20 @@ class ChimeraInstalledAgent(AbstractInstalledAgent):
         return super().perform_task(instruction, session, logging_dir)  # type: ignore[arg-type]
 
     def _run_agent_commands(self, instruction: str) -> list[TerminalCommand]:
-        # Redirect chimera's rich/textual output to a file so it never corrupts the tmux pane TB
-        # uses to detect completion; finite timeout so a slow/hung solve is cut, not blocking forever.
+        # Make completion detectable by TB's tmux pane-watcher:
+        #   TERM=dumb NO_COLOR=1   -> rich/textual emit no cursor/ANSI control that scrambles the pane
+        #   > /tmp/csolve.log 2>&1 -> chimera's output goes to a file, leaving the pane clean
+        #   timeout N              -> a hard shell-level cap even if TB's own detection lags
+        #   stty sane; echo DONE   -> recover the terminal and print a clean line so the prompt returns
+        timeout_s = int(_SOLVE_TIMEOUT)
         cmd = (
+            f"TERM=dumb NO_COLOR=1 timeout {timeout_s} "
             f"chimera solve {shlex.quote(instruction)} "
-            f"--workspace . --model {self._model_name} {_FLAGS} > /tmp/csolve.log 2>&1"
+            f"--workspace . --model {self._model_name} {_FLAGS} > /tmp/csolve.log 2>&1; "
+            f"stty sane 2>/dev/null; echo CHIMERA_SOLVE_DONE"
         )
         return [
-            TerminalCommand(command=cmd, block=True, max_timeout_sec=_SOLVE_TIMEOUT, append_enter=True)
+            TerminalCommand(
+                command=cmd, block=True, max_timeout_sec=_SOLVE_TIMEOUT + 30, append_enter=True
+            )
         ]

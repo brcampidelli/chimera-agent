@@ -31,6 +31,61 @@ class ScriptedBackend:
         return CompletionResult(content=self.final, model="fake")
 
 
+def test_looks_like_unexecuted_plan_heuristic() -> None:
+    from chimera.core.agent import _looks_like_unexecuted_plan
+
+    assert _looks_like_unexecuted_plan("You can run:\n```bash\ngit merge x\n```") is True
+    assert _looks_like_unexecuted_plan("To fix this, run git checkout main") is True  # advisory phrase
+    assert _looks_like_unexecuted_plan("you should run the migration") is True
+    assert _looks_like_unexecuted_plan("I applied the merge; the change is now on master.") is False
+    assert _looks_like_unexecuted_plan("The bug is in line 5. I fixed it and tests pass.") is False
+
+
+def test_insist_on_action_pushes_back_a_described_plan() -> None:
+    # Narration first (a code block, no tool call), then the model acts, then reports done.
+    backend = ScriptedBackend(
+        [
+            CompletionResult(content="You can run:\n```bash\ngit merge x\n```", model="fake"),
+            CompletionResult(
+                content="", model="fake",
+                tool_calls=[ToolCall(id="c1", name="echo", arguments={"text": "did it"})],
+            ),
+            CompletionResult(content="Done — the merge is applied.", model="fake"),
+        ]
+    )
+    agent = Agent(backend, _echo_registry(), AgentConfig(insist_on_action=True))
+    result = agent.run("merge the lost commit")
+    assert result.answer == "Done — the merge is applied."
+    assert result.tool_calls_made == 1  # the nudge made it actually act
+    assert any("did not carry it out" in str(m.get("content", "")) for m in result.transcript if isinstance(m, dict))
+
+
+def test_insist_off_by_default_accepts_narration() -> None:
+    backend = ScriptedBackend([CompletionResult(content="You can run:\n```\nfoo\n```", model="fake")])
+    result = Agent(backend, _echo_registry()).run("do a thing")  # insist_on_action defaults False
+    assert result.answer.startswith("You can run")  # returned as-is, no nudge
+
+
+def test_insist_accepts_a_completion_report() -> None:
+    # A real "I did it" report (no code block, no advisory phrasing) is accepted, not nudged.
+    backend = ScriptedBackend([CompletionResult(content="I created hello.py and it passes.", model="fake")])
+    result = Agent(backend, _echo_registry(), AgentConfig(insist_on_action=True)).run("make hello.py")
+    assert result.answer == "I created hello.py and it passes."
+    assert result.steps == 1  # accepted on the first response, no nudge round
+
+
+def test_insist_nudges_at_most_once() -> None:
+    # Two narrations in a row: after one nudge the second is accepted (no infinite loop).
+    backend = ScriptedBackend(
+        [
+            CompletionResult(content="```\nplan a\n```", model="fake"),
+            CompletionResult(content="```\nplan b\n```", model="fake"),
+        ]
+    )
+    result = Agent(backend, _echo_registry(), AgentConfig(insist_on_action=True)).run("act")
+    assert result.answer == "```\nplan b\n```"  # second narration accepted; loop did not hang
+
+
 def test_agent_runs_tool_then_finalizes() -> None:
     backend = ScriptedBackend(
         [
