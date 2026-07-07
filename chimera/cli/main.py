@@ -1255,10 +1255,22 @@ def solve(
         False, "--pause-on-taint", help="Pause for human approval before finalizing a run that consumed untrusted content (needs --thread)."
     ),
     approve: str = typer.Option(
-        None, "--approve", help="Approve and finalize a paused run by thread id (no task needed)."
+        None, "--approve", help="HITL accept: finalize a paused run as-is, by thread id (no task needed)."
     ),
     deny: str = typer.Option(
-        None, "--deny", help="Discard a paused run by thread id (no task needed)."
+        None, "--deny", help="HITL ignore: discard a paused run by thread id (no task needed)."
+    ),
+    respond: str = typer.Option(
+        None, "--respond", help="HITL respond: resume a paused run by thread id with --feedback guidance."
+    ),
+    feedback_text: str = typer.Option(
+        None, "--feedback", help="Guidance for --respond (fed back so the run tries again)."
+    ),
+    edit: str = typer.Option(
+        None, "--edit", help="HITL edit: finalize a paused run with the corrected --answer, by thread id."
+    ),
+    answer_text: str = typer.Option(
+        None, "--answer", help="The human-corrected answer for --edit."
     ),
 ) -> None:
     """Tier-2: autonomously solve a task with plan + verify-or-revert. Requires a key."""
@@ -1293,22 +1305,29 @@ def solve(
 
     settings = get_settings()
 
-    # Human-in-the-loop deny: drop a paused run without touching a model (no key needed).
+    # Human-in-the-loop envelope (LangGraph {accept, edit, respond, ignore}) over the taint-pause.
+    # 'ignore' (deny) drops the run without touching a model (no key needed).
     if deny:
         RunCheckpointer(settings.home / "runs.db").delete(deny)
         console.print(f"[yellow]Discarded[/yellow] paused run {deny!r}.")
         return
-    # Approve: mark the paused run approved and resume it (the run finalizes the reviewed answer).
-    if approve:
+    if approve or respond or edit:
         cp = RunCheckpointer(settings.home / "runs.db")
-        if not cp.approve(approve):
-            console.print(f"[red]No paused run awaiting approval for thread {approve!r}.[/red]")
+        thread = approve or respond or edit
+        if approve:
+            ok, verb = cp.respond(thread, "accept"), "Approved"
+        elif edit:
+            ok, verb = cp.respond(thread, "edit", answer=answer_text), "Edited"
+        else:
+            ok, verb = cp.respond(thread, "respond", feedback=feedback_text), "Responding to"
+        if not ok:
+            console.print(f"[red]No paused run awaiting approval for thread {thread!r}.[/red]")
             raise typer.Exit(code=1)
-        saved = cp.load(approve)
-        task, thread = str((saved or {}).get("task", "")), approve
-        console.print(f"[green]Approved[/green] {approve!r} — finalizing.")
+        saved = cp.load(thread)
+        task = str((saved or {}).get("task", ""))
+        console.print(f"[green]{verb}[/green] {thread!r} — {'resuming' if respond else 'finalizing'}.")
     elif not task:
-        console.print("[red]Provide a task, or use --approve/--deny <thread>.[/red]")
+        console.print("[red]Provide a task, or use --approve/--deny/--respond/--edit <thread>.[/red]")
         raise typer.Exit(code=1)
 
     if not settings.has_any_key():

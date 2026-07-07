@@ -23,6 +23,9 @@ from chimera.telemetry import get_logger
 
 _log = get_logger("core.runstate")
 
+# The typed human-in-the-loop actions (LangGraph HumanInterrupt envelope).
+_HITL_ACTIONS = frozenset({"accept", "edit", "respond", "ignore"})
+
 
 class RunCheckpointer:
     """A thread-keyed store of JSON run state, backed by SQLite."""
@@ -68,18 +71,53 @@ class RunCheckpointer:
         with self._conn() as conn:
             conn.execute("DELETE FROM run_state WHERE thread_id = ?", (thread_id,))
 
-    def approve(self, thread_id: str) -> bool:
-        """Mark a paused (awaiting-approval) run approved so a resume finalizes it.
+    def respond(
+        self,
+        thread_id: str,
+        action: str,
+        *,
+        answer: str | None = None,
+        feedback: str | None = None,
+    ) -> bool:
+        """Resolve a paused (awaiting-approval) run with a typed HITL action (LangGraph envelope).
 
-        Returns False if there's no checkpoint or it isn't awaiting approval.
+        The four actions mirror LangGraph's ``HumanInterrupt`` schema, mapped onto the taint-pause:
+
+        - ``accept``  — sanction the paused answer as-is; the resume finalizes it.
+        - ``edit``    — finalize a human-CORRECTED answer instead (pass ``answer``).
+        - ``respond`` — don't finalize; inject ``feedback`` and RESUME the loop for another attempt.
+        - ``ignore``  — reject; the tainted result is not sanctioned and the run ends denied.
+
+        Returns False if there is no checkpoint, it isn't awaiting approval, or the action is unknown.
         """
+        if action not in _HITL_ACTIONS:
+            return False
         state = self.load(thread_id)
         if state is None or not state.get("awaiting_approval"):
             return False
-        state["approved"] = True
         state["awaiting_approval"] = False
+        state["hitl_action"] = action
+        if action == "accept":
+            state["approved"] = True
+        elif action == "edit":
+            state["approved"] = True
+            if answer is not None:
+                state["paused_answer"] = answer  # finalize the human-edited output, not the model's
+        elif action == "respond":
+            state["approved"] = False
+            state["paused_answer"] = None  # don't finalize — resume the loop with the guidance
+            if feedback:
+                prior = str(state.get("feedback", ""))
+                state["feedback"] = f"{prior}\n\n{feedback}".strip()
+        else:  # ignore
+            state["approved"] = False
+            state["denied"] = True
         self.save(thread_id, state)
         return True
+
+    def approve(self, thread_id: str) -> bool:
+        """Back-compat shim: approve == the ``accept`` HITL action."""
+        return self.respond(thread_id, "accept")
 
     def threads(self) -> list[str]:
         """All thread ids with a live checkpoint (resumable runs)."""

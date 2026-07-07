@@ -267,8 +267,16 @@ class AutonomousAgent:
             if saved is not None:
                 task = str(saved.get("task", task))
                 attempts = [Attempt(**a) for a in saved.get("attempts", [])]
-                # Human approved a paused, tainted result: finalize the EXACT reviewed answer
-                # as-is (no re-run) — approval is of the specific output, not a re-execution.
+                # HITL 'ignore' (deny): the tainted result was NOT sanctioned — end the run denied,
+                # never finalizing the flagged answer, and clear the thread.
+                if saved.get("denied"):
+                    self._clear_checkpoint(thread_id)
+                    self._emit(_ev_final(False, ""))
+                    return AutonomousResult(
+                        answer="", success=False, attempts=attempts, plan=plan
+                    )
+                # HITL 'accept'/'edit': finalize the EXACT reviewed answer as-is (no re-run) —
+                # approval is of the specific output (edited or not), not a re-execution.
                 if saved.get("approved") and saved.get("paused_answer") is not None:
                     return self._finalize_success(
                         task, str(saved["paused_answer"]), attempts, prior_successes, plan,
