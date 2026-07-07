@@ -961,6 +961,17 @@ def fuse(
             console.print(f"[green]receipt appended[/green] {receipt}")
 
 
+@app.command(name="maturity")
+def maturity(
+    tests_dir: str = typer.Option("tests", "--tests", help="Path to the tests directory (the evidence base)."),
+) -> None:
+    """Render the maturity scorecard: surfaces × coverage-IDs proven by real tests."""
+    from chimera.eval.maturity import format_scorecard, score_repo
+
+    card = score_repo(Path(tests_dir))
+    console.print(format_scorecard(card))
+
+
 @app.command(name="fusion-receipts")
 def fusion_receipts(
     path: str = typer.Argument(..., help="JSONL of receipts written by `fuse --receipt`."),
