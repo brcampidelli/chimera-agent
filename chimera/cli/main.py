@@ -877,6 +877,12 @@ def fuse(
         False, "--verify-select", help="With --best-of: pick the best sample by a verifier score instead of majority vote (Weaver-lite)."
     ),
     model: str = typer.Option(None, "--model", "-m", help="Model for --best-of self-consistency."),
+    show_cost: bool = typer.Option(
+        False, "--show-cost", help="Print the itemized receipt: per-advisor cost at each model's rate."
+    ),
+    receipt: str = typer.Option(
+        None, "--receipt", help="Append the run's cost receipt to this JSONL (for cost×quality analysis)."
+    ),
 ) -> None:
     """Run a prompt through the LLM-Fusion engine (panel -> judge -> synthesizer)."""
     from chimera.fusion import FusionConfig, FusionEngine
@@ -935,6 +941,38 @@ def fuse(
         if total is not None:
             note = " (early-stopped)" if trace.early_stopped else ""
             console.print(f"[dim]fusion total tokens: {total}{note}[/dim]")
+
+    # M15-B3 "receipts": price each stage at its own model rate, show and/or persist it.
+    if show_cost or receipt:
+        from chimera.fusion import append_receipt, receipt_from_trace
+
+        rcpt = receipt_from_trace(trace)
+        if show_cost:
+            for stage in rcpt.stages:
+                usd = f"${stage.usd:.6f}" if stage.usd is not None else "unknown"
+                console.print(
+                    f"[dim]{stage.stage:<6} {stage.model:<34} "
+                    f"{(stage.prompt_tokens or 0)}/{(stage.completion_tokens or 0)} tok  {usd}[/dim]"
+                )
+            total_usd = f"${rcpt.total_usd:.6f}" if rcpt.total_usd is not None else "unknown (some model unpriced)"
+            console.print(f"[bold]receipt total: {total_usd}[/bold]  [dim]({rcpt.total_tokens} tokens)[/dim]")
+        if receipt:
+            append_receipt(Path(receipt), rcpt)
+            console.print(f"[green]receipt appended[/green] {receipt}")
+
+
+@app.command(name="fusion-receipts")
+def fusion_receipts(
+    path: str = typer.Argument(..., help="JSONL of receipts written by `fuse --receipt`."),
+) -> None:
+    """Summarize persisted fusion receipts into an honest cost×quality curve."""
+    from chimera.fusion import format_summary, load_receipts, summarize
+
+    receipts = load_receipts(Path(path))
+    if not receipts:
+        console.print(f"[yellow]no receipts in {path}[/yellow]")
+        return
+    console.print(format_summary(summarize(receipts)))
 
 
 @app.command(name="fusion-bench")

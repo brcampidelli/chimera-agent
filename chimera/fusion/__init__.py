@@ -12,6 +12,18 @@ from chimera.fusion.engine import (
     PanelResponse,
     StageUsage,
 )
+from chimera.fusion.receipts import (
+    FusionReceipt,
+    ModelPrice,
+    StageCost,
+    append_receipt,
+    format_summary,
+    load_receipts,
+    receipt_from_trace,
+    resolve_price,
+    set_price,
+    summarize,
+)
 from chimera.fusion.router import EscalationVerifier, RoutedBackend, RoutingPolicy
 from chimera.fusion.verifier_select import Scorer, Selection, VerifierSelector, llm_scorer
 
@@ -21,6 +33,16 @@ __all__ = [
     "FusionTrace",
     "PanelResponse",
     "StageUsage",
+    "FusionReceipt",
+    "ModelPrice",
+    "StageCost",
+    "receipt_from_trace",
+    "append_receipt",
+    "load_receipts",
+    "summarize",
+    "format_summary",
+    "resolve_price",
+    "set_price",
     "RoutedBackend",
     "RoutingPolicy",
     "EscalationVerifier",
