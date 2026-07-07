@@ -85,27 +85,36 @@ class ChimeraInstalledAgent(AbstractInstalledAgent):
         return Path(name)
 
     def perform_task(self, instruction: str, session: object, logging_dir: object = None) -> object:
-        # Deliver the wheelhouse tarball before the base copies + runs the install script.
+        # Run everything through the container's blocking `exec_run` (a direct docker exec), NOT the
+        # tmux session. TB's tmux path signals completion by appending `; tmux wait -S done` and
+        # watching the pane — fragile for a long, output-heavy command like `chimera solve` (the
+        # pane state confuses the signal). `exec_run` returns exactly when the command finishes, with
+        # its exit code, so there is no completion-detection to get wrong. Grading is unaffected: the
+        # tests run against the same container's filesystem afterwards.
+        from terminal_bench.agents.base_agent import AgentResult
+
+        container = session.container  # type: ignore[attr-defined]
+        env = self._env
+
         session.copy_to_container(  # type: ignore[attr-defined]
             Path(_TAR), container_dir="/installed-agent", container_filename="wheelhouse.tar"
         )
-        return super().perform_task(instruction, session, logging_dir)  # type: ignore[arg-type]
+        install_rc, _ = container.exec_run(["bash", "-lc", _INSTALL], environment=env)
+        if install_rc != 0:
+            from terminal_bench.agents.failure_mode import FailureMode
+
+            return AgentResult(failure_mode=FailureMode.AGENT_INSTALLATION_FAILED)
+
+        # stdin from /dev/null + output to a file so chimera never touches the terminal; a shell-level
+        # `timeout` bounds it even though exec_run is already synchronous.
+        solve = (
+            f"timeout {int(_SOLVE_TIMEOUT)} chimera solve {shlex.quote(instruction)} "
+            f"--workspace . --model {self._model_name} {_FLAGS} < /dev/null > /tmp/csolve.log 2>&1"
+        )
+        container.exec_run(["bash", "-lc", solve], environment=env)
+        return AgentResult(total_input_tokens=0, total_output_tokens=0)
 
     def _run_agent_commands(self, instruction: str) -> list[TerminalCommand]:
-        # Make completion detectable by TB's tmux pane-watcher:
-        #   TERM=dumb NO_COLOR=1   -> rich/textual emit no cursor/ANSI control that scrambles the pane
-        #   > /tmp/csolve.log 2>&1 -> chimera's output goes to a file, leaving the pane clean
-        #   timeout N              -> a hard shell-level cap even if TB's own detection lags
-        #   stty sane; echo DONE   -> recover the terminal and print a clean line so the prompt returns
-        timeout_s = int(_SOLVE_TIMEOUT)
-        cmd = (
-            f"TERM=dumb NO_COLOR=1 timeout {timeout_s} "
-            f"chimera solve {shlex.quote(instruction)} "
-            f"--workspace . --model {self._model_name} {_FLAGS} > /tmp/csolve.log 2>&1; "
-            f"stty sane 2>/dev/null; echo CHIMERA_SOLVE_DONE"
-        )
-        return [
-            TerminalCommand(
-                command=cmd, block=True, max_timeout_sec=_SOLVE_TIMEOUT + 30, append_enter=True
-            )
-        ]
+        # Not used — perform_task drives chimera via container.exec_run (see above). Kept because the
+        # AbstractInstalledAgent ABC requires it.
+        return []
