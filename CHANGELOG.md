@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Diff-gate for evolution (M15-A1).** An evolution/training target is now certified by the run's
+  *real working-tree diff*, not the model's claim of success (nanobot "Dream" discipline).
+  `chimera/evolution/diff_gate.py` classifies two workspace snapshots into added/removed/modified
+  (ignoring whitespace-only churn and touched-empty files) and emits a machine-derived audit
+  summary. The autonomous loop records `diff_productive`/`diff_summary` on each trajectory, and
+  rejection sampling gains an opt-in `require_productive_diff` that drops "successes" which changed
+  nothing — closing the #1 gap the M15 competitive study found across all five rivals (evolution
+  with no fitness/verification signal).
+
 ## [0.4.1] - 2026-07-07
 
 A reliability-and-speed patch for the headline feature (`chimera solve`), plus the honest
