@@ -23,6 +23,9 @@ official Terminal-Bench harness and inspecting where a weak model actually stall
   `read` blocked until their timeout — one stall at a time, eating a whole step budget. Commands now
   run with stdin closed and `GIT_EDITOR=true`, `GIT_TERMINAL_PROMPT=0`, `PAGER=cat`,
   `DEBIAN_FRONTEND=noninteractive`, `CI=1`.
+- `chimera version` (and `doctor` / the A2A card) reported a hardcoded `__version__` that had
+  drifted to `0.3.0`. It now reads from the installed package metadata, so it can never drift from
+  the release again.
 
 ### Changed
 - The requirement checklist is now injected into the worker's **first** attempt (it used to only
