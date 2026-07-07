@@ -78,11 +78,11 @@ class ChimeraInstalledAgent(AbstractInstalledAgent):
 
     @property
     def _install_agent_script_path(self) -> Path:
-        f = tempfile.NamedTemporaryFile(mode="w", suffix=".sh", delete=False)
-        f.write(_INSTALL)
-        f.close()
-        os.chmod(f.name, 0o755)
-        return Path(f.name)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sh", delete=False) as f:
+            f.write(_INSTALL)
+            name = f.name
+        os.chmod(name, 0o755)
+        return Path(name)
 
     def perform_task(self, instruction: str, session: object, logging_dir: object = None) -> object:
         # Deliver the wheelhouse tarball before the base copies + runs the install script.
