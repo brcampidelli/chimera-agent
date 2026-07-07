@@ -19,7 +19,7 @@ import subprocess
 from pathlib import Path
 
 from chimera.sandbox.base import Sandbox, SandboxResult
-from chimera.sandbox.local import LocalSandbox
+from chimera.sandbox.local import _NONINTERACTIVE_ENV, LocalSandbox
 from chimera.telemetry import get_logger
 
 _log = get_logger("sandbox.docker")
@@ -59,17 +59,24 @@ class DockerSandbox:
             return self.fallback.run(command, timeout=timeout, cwd=cwd)
 
         workdir = (Path(cwd) if cwd else Path.cwd()).resolve()
+        # No `-i`/`-t`: the container's stdin stays closed (a read gets EOF, never hangs) and there
+        # is no TTY (git won't page). The non-interactive env is passed in too, so editors/credential
+        # prompts never block — the same anti-hang guarantee as the local sandbox.
+        env_args = [arg for k, v in _NONINTERACTIVE_ENV.items() for arg in ("-e", f"{k}={v}")]
         argv = [
             "docker", "run", "--rm",
             "--network", "bridge" if self.network else "none",
             "--memory", self.memory,
             *(("--runtime", self.runtime) if self.runtime else ()),
+            *env_args,
             "-v", f"{workdir}:/workspace",
             "-w", "/workspace",
             self.image, "sh", "-c", command,
         ]
         try:
-            proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout + 15)
+            proc = subprocess.run(
+                argv, capture_output=True, text=True, timeout=timeout + 15, stdin=subprocess.DEVNULL
+            )
         except subprocess.TimeoutExpired:
             return SandboxResult(
                 exit_code=124, stderr=f"command timed out after {timeout}s", timed_out=True

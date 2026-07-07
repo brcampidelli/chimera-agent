@@ -31,6 +31,28 @@ def test_local_sandbox_times_out() -> None:
     assert result.timed_out is True
 
 
+def test_local_sandbox_closes_stdin_so_reads_do_not_hang() -> None:
+    # A command that reads stdin gets EOF immediately (stdin=DEVNULL), instead of blocking on input
+    # the agent will never provide and burning the whole timeout. The anti-hang correctness fix.
+    result = LocalSandbox().run('python -c "import sys; sys.stdin.read()"', timeout=5)
+    assert result.timed_out is False
+    assert result.exit_code == 0
+
+
+def test_local_sandbox_runs_non_interactively() -> None:
+    # The non-interactive env is applied, so git never opens an editor/pager or prompts.
+    result = LocalSandbox().run('python -c "import os;print(os.environ[\'GIT_EDITOR\'])"')
+    assert "true" in result.stdout
+    result = LocalSandbox().run('python -c "import os;print(os.environ[\'GIT_TERMINAL_PROMPT\'])"')
+    assert "0" in result.stdout
+
+
+def test_docker_run_is_non_interactive(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The docker sandbox passes the non-interactive env and closes stdin too.
+    argv = _capture_docker_argv(DockerSandbox(image="chimera-sandbox"), monkeypatch)
+    assert "-e" in argv and "GIT_TERMINAL_PROMPT=0" in argv and "GIT_EDITOR=true" in argv
+
+
 # --- DockerSandbox (no real Docker) --------------------------------------------------
 
 
