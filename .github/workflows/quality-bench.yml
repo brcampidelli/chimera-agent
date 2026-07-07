@@ -7,8 +7,8 @@ on:
   workflow_dispatch:
     inputs:
       model:
-        description: "OpenRouter model slug (use a free one to avoid cost)"
-        default: "openrouter/deepseek/deepseek-chat-v3.1:free"
+        description: "OpenRouter model slug (a free one to avoid cost)"
+        default: "openrouter/qwen/qwen3-coder:free"
       timeout:
         description: "Per-solve timeout in seconds"
         default: "300"
