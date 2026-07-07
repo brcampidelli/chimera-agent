@@ -124,9 +124,19 @@ def main() -> None:
     print(f"paired experiment · model={_MODEL} · tasks={len(tasks)} · timeout={_TIMEOUT}s/arm", flush=True)
     root = Path(tempfile.mkdtemp(prefix="chimpaired-"))
     try:
-        result, _rows = run_paired(tasks, solve=_real_solve, grade=_real_grade, root=root)
+        result, rows = run_paired(tasks, solve=_real_solve, grade=_real_grade, root=root)
     finally:
         shutil.rmtree(root, ignore_errors=True)
+
+    # Per-task outcome (baseline vs chimera), printed and persisted for the record.
+    by_task: dict[str, dict[str, bool]] = {}
+    for row in rows:
+        by_task.setdefault(str(row["task"]), {})[str(row["arm"])] = bool(row["passed"])
+    print("", flush=True)
+    for tid, arms in by_task.items():
+        b, c = arms.get("baseline"), arms.get("chimera")
+        mark = "  RECOVERED" if b is False and c is True else ""
+        print(f"  {tid:<16} raw={'PASS' if b else 'fail'}  chimera={'PASS' if c else 'fail'}{mark}", flush=True)
 
     # Reconstruct the aligned per-arm lists from the paired counts is lossy; instead re-derive from
     # the result object which already holds a/b/c/d. Print the paired verdict (the point of C1)…
@@ -143,7 +153,10 @@ def main() -> None:
 
     out = HERE / "results"
     out.mkdir(exist_ok=True)
-    (out / "paired.json").write_text(json.dumps(result.summary(), indent=2), encoding="utf-8")
+    (out / "paired.json").write_text(
+        json.dumps({"model": _MODEL, "summary": result.summary(), "by_task": by_task}, indent=2),
+        encoding="utf-8",
+    )
 
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:
