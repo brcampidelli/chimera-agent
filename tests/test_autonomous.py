@@ -50,6 +50,41 @@ class FailVerifier:
         return VerificationResult(False, "always fails")
 
 
+class _FeedbackManager:
+    """A manager that rejects with prose feedback (so we can check it doesn't shadow the test output)."""
+
+    def review(self, task: str, answer: str, context: str) -> Any:
+        from chimera.core.supervisor import Review
+
+        return Review(approved=False, feedback="manager: handle the empty case")
+
+
+class _PromptRecorder:
+    def __init__(self) -> None:
+        self.prompts: list[str] = []
+
+    def run(self, task: str) -> AgentResult:
+        self.prompts.append(task)
+        return AgentResult(answer="attempt", steps=1, stopped_reason="final")
+
+
+def test_retry_prompt_carries_both_manager_note_and_test_output() -> None:
+    # Quality fix: on a verify failure, the concrete test output (the actual assert that broke) must
+    # reach the retry's prompt ALONGSIDE the manager's prose — not be shadowed by it.
+    worker = _PromptRecorder()
+    auto = AutonomousAgent(
+        worker,
+        verifier=FlakyVerifier(fail_times=1),  # attempt 1 fails with output "tests failed"
+        manager=_FeedbackManager(),  # type: ignore[arg-type]
+        config=AutonomousConfig(max_attempts=2, use_planner=False, use_manager=True),
+    )
+    result = auto.run("do the task")
+    assert result.success is True
+    retry_prompt = worker.prompts[1]  # what the second attempt actually received
+    assert "tests failed" in retry_prompt  # the concrete verification output survived
+    assert "manager: handle the empty case" in retry_prompt  # and the manager's note too
+
+
 def test_retry_escalates_to_fusion_worker() -> None:
     # Issue #3: once an attempt fails verification, the retry runs on the escalate worker.
     cheap, fused = FakeWorker("cheap"), FakeWorker("fused")

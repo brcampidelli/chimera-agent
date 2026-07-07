@@ -384,8 +384,12 @@ class AutonomousAgent:
                     task, answer, attempts, prior_successes, plan, thread_id, tainted=run_tainted
                 )
 
-            feedback = fb or (
-                f"Verification failed:\n{vout}" if vout else "The attempt did not pass verification."
+            # Always surface the concrete verification output (the failing test/assert) on the
+            # retry — it is the single most actionable signal for fixing the exact defect — ALONGSIDE
+            # any manager feedback, rather than letting the manager's prose shadow it.
+            _verify_fb = f"Verification failed:\n{vout}" if vout else ""
+            feedback = "\n\n".join(p for p in (fb, _verify_fb) if p) or (
+                "The attempt did not pass verification."
             )
             # Step-level failure attribution (SkillAdaptor): if a tool step errored,
             # point the retry at the FIRST faulty step instead of letting one early
