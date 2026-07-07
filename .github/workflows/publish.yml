@@ -1,0 +1,35 @@
+name: Publish to PyPI
+
+# Publishes the package to PyPI using OIDC Trusted Publishing — there is NO API
+# token stored in the repo or entered by anyone. PyPI verifies the workflow's
+# short-lived OIDC identity instead. One-time setup on PyPI (pending publisher):
+#   https://pypi.org/manage/account/publishing/
+#   Owner: brcampidelli · Repo: chimera-agent · Workflow: publish.yml · Env: (blank)
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  pypi-publish:
+    name: Build and publish to PyPI
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # mint the OIDC token PyPI checks — this is the whole point
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build wheel + sdist
+        run: uv build
+
+      - name: Publish to PyPI (Trusted Publishing — no token)
+        uses: pypa/gh-action-pypi-publish@release/v1
