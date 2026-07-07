@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Tool-loop circuit breaker (M15-A4).** The agent loop stops a run that is physically spinning —
   identical-repeat, A-B-A-B ping-pong, or no-progress polling — instead of grinding to `max_steps`.
   Opt-out via `AgentConfig.detect_tool_loops`; conservative thresholds leave genuine runs untouched.
+- **Fusion receipts (M15-B3).** Every fusion run can be priced into an itemized receipt — each
+  advisor, the judge, and the synthesizer at its own model's rate — the substance behind "selective
+  fusion with receipts". `fuse --show-cost` prints it, `fuse --receipt <jsonl>` persists it, and
+  `fusion-receipts <jsonl>` summarizes an honest cost×quality curve (fusion rate, mean/total cost,
+  dollars per passing answer). Tokens are measured, dollars estimated at list price; an unknown model
+  prices to `unknown`, never a silent "free". See `docs/fusion-receipts.md`.
 
 ## [0.4.1] - 2026-07-07
 
