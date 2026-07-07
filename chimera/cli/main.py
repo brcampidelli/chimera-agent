@@ -204,10 +204,40 @@ def init(
         )
 
 
+def _doctor_fixes(settings: Any, *, cwd: Path | None = None) -> list[str]:
+    """Perform safe, secret-free setup repairs (OpenClaw `doctor --fix`). Returns what it did.
+
+    Never writes a secret — a missing provider key is reported, never invented. The safe repairs are
+    creating the state dir and scaffolding a ``.env`` from ``.env.example`` for the user to fill in.
+    """
+    import shutil
+
+    root = cwd or Path.cwd()
+    done: list[str] = []
+    home = Path(settings.home)
+    if not home.exists():
+        home.mkdir(parents=True, exist_ok=True)
+        done.append(f"created state dir {home}")
+    env, example = root / ".env", root / ".env.example"
+    if not env.exists() and example.exists():
+        shutil.copyfile(example, env)
+        done.append(f"scaffolded {env} from .env.example — set a provider key in it")
+    return done
+
+
 @app.command()
-def doctor() -> None:
-    """Check the environment and configuration."""
+def doctor(
+    fix: bool = typer.Option(False, "--fix", help="Auto-repair safe setup issues (state dir, .env scaffold)."),
+) -> None:
+    """Check the environment and configuration. With --fix, repair safe setup issues."""
     settings = get_settings()
+
+    if fix:
+        for note in _doctor_fixes(settings):
+            console.print(f"[green]fixed[/green] {note}")
+        get_settings.cache_clear()
+        settings = get_settings()
+
     providers = settings.configured_providers()
 
     table = Table(title="Chimera doctor", show_header=False, title_style="bold")
