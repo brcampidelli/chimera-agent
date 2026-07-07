@@ -225,6 +225,15 @@ class AutonomousAgent:
         # task-level and stable, so it's done once here and reused by the coverage gate below.
         requirements = self.checklist.extract(task) if self.checklist is not None else []
         requirements_ctx = _format_requirements(requirements)
+        # M15-A5: sanitize the RECALLED / EVOLVED artifacts (lessons, skill cards, playbook) before
+        # injecting them — a memory or skill distilled during a tainted run could carry chat-template
+        # control tokens that try to spoof an instruction turn. The current-run parts (spine, repo,
+        # requirements) are the user's own workspace/task and are left intact.
+        from chimera.governance.sanitize import sanitize_untrusted
+
+        lessons = sanitize_untrusted(lessons)
+        card_ctx = sanitize_untrusted(card_ctx)
+        playbook_ctx = sanitize_untrusted(playbook_ctx)
         context = "\n\n".join(
             part
             for part in (spine, repo_ctx, lessons, card_ctx, playbook_ctx, requirements_ctx)

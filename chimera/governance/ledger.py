@@ -42,6 +42,13 @@ FETCH_TOOLS = frozenset(
 EXEC_TOOLS = frozenset({"run_shell", "execute_code", "code_interpreter"})
 WRITE_TOOLS = frozenset({"write_file", "edit_file", "apply_patch"})
 READ_TOOLS = frozenset({"read_file", "read_document"})
+# Non-idempotent external side effects: firing the SAME call twice does real double harm
+# (a duplicate email/message/payment). A retry loop must not re-execute these — see the
+# idempotency guard in LedgeredTool (M15-A5). File writes are excluded: rewriting the same
+# content is harmless, and they are already covered by verify-or-revert.
+SIDE_EFFECT_TOOLS = frozenset(
+    {"send_email", "send_message", "http_post", "post_webhook", "create_issue", "send_sms"}
+)
 
 _URL_KEYS = ("url", "uri", "link")
 _QUERY_KEYS = ("query", "q", "search")

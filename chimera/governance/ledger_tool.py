@@ -23,6 +23,7 @@ from chimera.governance.ledger import (
     EXEC_TOOLS,
     FETCH_TOOLS,
     READ_TOOLS,
+    SIDE_EFFECT_TOOLS,
     WRITE_TOOLS,
     SequenceAssessment,
     TaintLedger,
@@ -47,6 +48,18 @@ FENCE_CLOSE = "<<end-external-data>>"
 def fence(content: str) -> str:
     """Wrap untrusted content in the data-fence markers."""
     return f"{FENCE_OPEN}\n{content}\n{FENCE_CLOSE}"
+
+
+def _idempotency_key(name: str, args: Mapping[str, Any]) -> str:
+    """A stable key for a side-effecting call — same tool + same args = same key."""
+    import hashlib
+    import json
+
+    try:
+        payload = json.dumps(args, sort_keys=True, default=str)
+    except (TypeError, ValueError):
+        payload = repr(sorted(args.items()))
+    return hashlib.sha256(f"{name}\x00{payload}".encode()).hexdigest()
 
 
 # Tools that get NARROWED once a run is tainted: high-consequence side effects that a
@@ -78,6 +91,9 @@ class LedgeredTool(Tool):
         # gated regardless of whether THIS call's args reference the tainted artifact —
         # a coarse net for laundered flows the per-action ref/flow matcher can't see.
         self.narrow_on_taint = narrow_on_taint
+        # Idempotency (M15-A5): remember the result of each side-effecting call keyed by (name,args),
+        # so a retry loop re-issuing the SAME send/post does not fire it twice.
+        self._idempotency_cache: dict[str, str] = {}
         self.name = inner.name
         self.description = inner.description
         self.parameters = inner.parameters
@@ -115,8 +131,21 @@ class LedgeredTool(Tool):
             if not approved:
                 return f"[taint: needs review — {assessment.reason}]"
 
+        # 1b. Idempotency guard (M15-A5): a non-idempotent external side effect (send/post) is run
+        #     at most once per identical (name, args). A retry re-issuing the same call gets the
+        #     cached result instead of firing a duplicate email / message / payment.
+        idem_key: str | None = None
+        if self.name in SIDE_EFFECT_TOOLS:
+            idem_key = _idempotency_key(self.name, kwargs)
+            if idem_key in self._idempotency_cache:
+                if self.audit is not None:
+                    self.audit.record("idempotent_skip", {"tool": self.name})
+                return f"[idempotent: {self.name} already executed with these args; not repeated]"
+
         # 2. Run the real tool, then record its effect for later steps to reason about.
         result = self.inner.run(**kwargs)
+        if idem_key is not None:
+            self._idempotency_cache[idem_key] = result
         self._record_effect(kwargs, result)  # ledger sees the RAW content (taint snippets)
         if self.name in FETCH_TOOLS and result.strip():
             # M15-A3: defang chat-template/control tokens BEFORE fencing, so untrusted content
