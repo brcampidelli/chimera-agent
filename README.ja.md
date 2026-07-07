@@ -6,6 +6,7 @@
 
 **多くの知性で考え、そして日々賢くなっていく、オープンソースの AI エージェント。**
 
+[![PyPI](https://img.shields.io/pypi/v/chimera-agent.svg?color=blue&label=PyPI)](https://pypi.org/project/chimera-agent/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![CI](https://github.com/brcampidelli/chimera-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/brcampidelli/chimera-agent/actions/workflows/ci.yml)
@@ -75,7 +76,11 @@ Chimera を特別にしているものを、平易な言葉で説明します。
 
 **Python 3.11+** と [uv](https://docs.astral.sh/uv/)（高速な Python インストーラ）が必要です。
 
-**1. インストール**
+**1. インストール** — PyPI から：
+```bash
+pip install chimera-agent
+```
+これで `chimera` コマンドが使えます。（以下の例では、ソースからのチェックアウト向けに `uv run chimera` を使っています。pip でインストールした場合は `chimera …` だけで実行できます。）Chimera 自体を開発する場合は、リポジトリをクローンしてください：
 ```bash
 git clone https://github.com/brcampidelli/chimera-agent.git
 cd chimera-agent

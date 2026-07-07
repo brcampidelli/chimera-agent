@@ -6,6 +6,7 @@
 
 **L'agent IA open-source qui pense avec plusieurs cerveaux — et s'améliore chaque jour.**
 
+[![PyPI](https://img.shields.io/pypi/v/chimera-agent.svg?color=blue&label=PyPI)](https://pypi.org/project/chimera-agent/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![CI](https://github.com/brcampidelli/chimera-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/brcampidelli/chimera-agent/actions/workflows/ci.yml)
@@ -79,7 +80,12 @@ simples :
 
 Vous avez besoin de **Python 3.11+** et de [uv](https://docs.astral.sh/uv/) (un installateur Python rapide).
 
-**1. Installer**
+**1. Installer** — depuis PyPI :
+```bash
+pip install chimera-agent
+```
+Vous obtenez la commande `chimera`. (Les exemples ci-dessous utilisent `uv run chimera` pour une
+copie du dépôt — avec pip install, lancez simplement `chimera …`.) Pour contribuer à Chimera lui-même, clonez le dépôt :
 ```bash
 git clone https://github.com/brcampidelli/chimera-agent.git
 cd chimera-agent

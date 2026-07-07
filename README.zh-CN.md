@@ -6,6 +6,7 @@
 
 **用众多智慧一起思考的开源 AI 智能体 —— 而且每天都在变得更好。**
 
+[![PyPI](https://img.shields.io/pypi/v/chimera-agent.svg?color=blue&label=PyPI)](https://pypi.org/project/chimera-agent/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![CI](https://github.com/brcampidelli/chimera-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/brcampidelli/chimera-agent/actions/workflows/ci.yml)
@@ -73,7 +74,11 @@
 
 你需要 **Python 3.11+** 和 [uv](https://docs.astral.sh/uv/)（一个快速的 Python 安装器）。
 
-**1. 安装**
+**1. 安装** — 从 PyPI：
+```bash
+pip install chimera-agent
+```
+这样就能使用 `chimera` 命令。（下面的示例用 `uv run chimera` 是针对从源码检出的情况——用 pip 安装后，直接运行 `chimera …` 即可。）若要参与 Chimera 本身的开发，请克隆仓库：
 ```bash
 git clone https://github.com/brcampidelli/chimera-agent.git
 cd chimera-agent
