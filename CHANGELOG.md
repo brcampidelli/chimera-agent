@@ -43,6 +43,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   (`send_email`/`http_post`/…) run at most once per identical call within a run, so a retry can't
   fire a duplicate email/payment; the recalled/evolved artifacts injected into context (lessons,
   skill cards, playbook) are control-token-stripped so a tainted memory can't spoof an instruction.
+- **HITL {accept, edit, respond, ignore} envelope (M15-B2).** The taint-pause's binary approve/deny
+  becomes a typed resolution: accept (finalize as-is), edit (finalize a corrected answer), respond
+  (inject feedback and resume), ignore (deny). `RunCheckpointer.respond()`; CLI `solve --respond
+  <thread> --feedback …` / `--edit <thread> --answer …`.
+- **Failed→passed correction distillation (M15-B4).** When a task fails then passes, the verified
+  (failed, passed) pair is distilled into an anti-pattern skill card — CrewAI's `train()` mechanic
+  with the eval replacing the human. `SkillEvolver.distill_correction`, wired into the solve loop.
+- **Maturity scorecard (M15-B5).** `chimera maturity` scores 7 surfaces × coverage-IDs, each proven
+  by a real test (machine-derived; a renamed test shows as a gap). Doubles as a per-surface objective
+  for the evolution loop (`Scorecard.weakest()`). The repo scores 37/37 = GA today.
 
 ## [0.4.1] - 2026-07-07
 
