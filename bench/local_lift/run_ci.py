@@ -51,7 +51,7 @@ def _pytest_passes(task: dict, ws: Path) -> bool:
     return proc.returncode == 0
 
 
-def _solve(task: dict, ws: Path) -> int:
+def _solve(task: dict, ws: Path) -> tuple[int, str]:
     verify = f'"{sys.executable}" -m pytest -q {task["test"]}'
     argv = ["chimera", "solve", task["prompt"], "--workspace", str(ws), "--model", _MODEL,
             "--verify", verify, *_FLAGS]
@@ -60,9 +60,10 @@ def _solve(task: dict, ws: Path) -> int:
             argv, capture_output=True, text=True, encoding="utf-8", errors="replace",
             timeout=_TIMEOUT, check=False,
         )
-        return proc.returncode
+        tail = ((proc.stdout or "") + (proc.stderr or "")).strip().replace("\n", " ")[-160:]
+        return proc.returncode, tail
     except subprocess.TimeoutExpired:
-        return 124
+        return 124, "solve timed out"
 
 
 def main() -> None:
@@ -74,11 +75,14 @@ def main() -> None:
         for task in tasks:
             ws = _setup(task, root)
             t0 = time.time()
-            exit_code = _solve(task, ws)
+            exit_code, tail = _solve(task, ws)
             passed = _pytest_passes(task, ws)
             dt = round(time.time() - t0, 1)
             rows.append({"task": task["id"], "passed": passed, "solve_exit": exit_code, "seconds": dt})
-            print(f"  {task['id']:<18} {'PASS' if passed else 'fail'}  ({dt:.0f}s, exit={exit_code})", flush=True)
+            # On a fast failure, surface the solve tail — it's usually a model/provider error (e.g. a
+            # 429 rate-limit on a free model), not a real quality miss. Diagnostic, not decorative.
+            note = "" if passed else f"  «{tail}»"
+            print(f"  {task['id']:<18} {'PASS' if passed else 'fail'}  ({dt:.0f}s, exit={exit_code}){note}", flush=True)
     finally:
         shutil.rmtree(root, ignore_errors=True)
 
