@@ -16,6 +16,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Any
 
+from chimera.core.tool_loop import ToolLoopDetector
 from chimera.providers.gateway import CompletionResult, MessageLike, SupportsComplete
 from chimera.telemetry import get_logger
 from chimera.tools.registry import ToolNotFoundError, ToolRegistry
@@ -79,6 +80,10 @@ class AgentConfig:
     # Defaults from CHIMERA_COMPACT_SCHEMAS so every construction site inherits the env
     # setting; still overridable explicitly per Agent.
     compact_schemas: bool = field(default_factory=_default_compact_schemas)
+    # Tool-loop circuit breaker (M15-A4): stop a run that is physically spinning (identical
+    # repeats / ping-pong / no-progress polling) instead of grinding to max_steps. Conservative
+    # thresholds, so a genuine multi-step run is untouched.
+    detect_tool_loops: bool = True
 
 
 @dataclass
@@ -113,6 +118,7 @@ class Agent:
         tool_schema = self.tools.to_openai_schema(compact=self.config.compact_schemas) or None
         tool_calls_made = 0
         nudged = False
+        loop_detector = ToolLoopDetector() if self.config.detect_tool_loops else None
 
         for step in range(1, self.config.max_steps + 1):
             result = self.backend.complete(
@@ -144,11 +150,39 @@ class Agent:
                 )
 
             messages.append(self._assistant_tool_message(result))
+            tripped: str | None = None
             for call in result.tool_calls:
                 tool_calls_made += 1
                 observation = self._run_tool(call.name, call.arguments)
                 messages.append(
                     {"role": "tool", "tool_call_id": call.id, "content": observation}
+                )
+                if loop_detector is not None:
+                    verdict = loop_detector.record(call.name, call.arguments, observation)
+                    if verdict.tripped:
+                        tripped = verdict.reason
+                        break
+            if tripped is not None:
+                # Physically spinning: stop burning budget. Ask once, no tools, for a final answer
+                # with what it has — better than grinding to max_steps on a stuck loop.
+                _log.debug("tool-loop breaker tripped: %s", tripped)
+                nudge = (
+                    f"Stop — you are repeating the same action ({tripped}). Do not call more tools. "
+                    "Give your best final answer now with what you already have."
+                )
+                final = self.backend.complete(
+                    [*messages, {"role": "user", "content": nudge}],
+                    model=self.config.model,
+                    temperature=self.config.temperature,
+                    tools=None,
+                )
+                messages.append({"role": "assistant", "content": final.content})
+                return AgentResult(
+                    answer=final.content,
+                    steps=step,
+                    stopped_reason="tool_loop",
+                    transcript=messages,
+                    tool_calls_made=tool_calls_made,
                 )
 
         # Budget exhausted: ask once more, without tools, for a final answer.
