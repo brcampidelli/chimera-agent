@@ -1,5 +1,26 @@
 # Weak-model-lift A/B — recorded run (raw one-shot vs the full Chimera loop)
 
+## Paired runner (M15-C1)
+
+`run_paired.py` runs both arms from the **identical restored workspace** per task (the M15-B1
+fork/paired discipline) and reports the **paired (McNemar/Wilson)** verdict — a tighter CI than the
+unpaired Newcombe, so a real lift can clear zero at the small n a disposable key affords. Verdict is
+still the tests' word (pytest re-run independently), never solve's self-report.
+
+```bash
+# needs a cheap tool-capable model key in OPENROUTER_API_KEY
+BENCH_MODEL=openrouter/meta-llama/llama-3.1-8b-instruct BENCH_TIMEOUT=200 \
+  python bench/local_lift/run_paired.py            # all 6 tasks, paired
+```
+
+Validated end-to-end (2026-07-07) on a single task: `word_wrap` — raw-model 0% (failed one-shot) vs
+chimera 100% (the loop recovered it), 1 discordant pair; with n=1 the CI is `[-58.7%, +100%]`, so it
+is correctly reported **not significant** — one pair is no evidence. The full 6-task paired run is
+the deliberate C1 measurement.
+
+---
+
+
 This is a durable record of one honest A/B run of the local weak-model-lift bench. Unlike
 `README.md` (which documents the `run_ab.py` design where the *only* variable is the M14 flags),
 this run used **`run_ci.py`**, whose two arms answer the headline thesis question directly:
