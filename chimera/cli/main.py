@@ -2917,6 +2917,9 @@ def bench_compare(
     treatment: str = typer.Argument(..., help="JSON file of the treatment arm's per-task pass/fail."),
     baseline_name: str = typer.Option("baseline", "--baseline-name", help="Label for the baseline arm."),
     treatment_name: str = typer.Option("chimera", "--treatment-name", help="Label for the treatment arm."),
+    paired: bool = typer.Option(
+        False, "--paired", help="Paired (McNemar) test: item i in both files is the SAME task replayed from an identical forked state — a tighter CI."
+    ),
 ) -> None:
     """Report the honest A/B delta (+95% CI) between two benchmark result files.
 
@@ -2924,10 +2927,12 @@ def bench_compare(
     baseline vs the same model driven by Chimera). Prints each arm's Wilson-bounded pass rate,
     the delta, its Newcombe CI, and whether the difference is significant. This is the number
     that proves (or doesn't) that the scaffolding lifts a weak model.
+
+    With --paired, the two lists are treated as *aligned pairs* (each index is one task replayed
+    from an identical forked checkpoint), and the tighter McNemar/Wilson interval is reported —
+    the payoff of running both arms from the same forked state.
     """
     import json
-
-    from chimera.eval import compare_ab, format_report
 
     def _load(path: str) -> list[bool]:
         raw = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -2939,6 +2944,22 @@ def bench_compare(
     except (OSError, json.JSONDecodeError) as exc:
         console.print(f"[red]could not read results: {exc}[/red]")
         raise typer.Exit(code=1) from exc
+
+    if paired:
+        from chimera.eval.paired import compare_paired
+        from chimera.eval.paired import format_report as format_paired
+
+        if len(base_passed) != len(treat_passed):
+            console.print("[red]--paired needs two equal-length, aligned lists (same tasks, same order).[/red]")
+            raise typer.Exit(code=1)
+        presult = compare_paired(
+            base_passed, treat_passed, baseline_name=baseline_name, treatment_name=treatment_name
+        )
+        console.print(format_paired(presult))
+        return
+
+    from chimera.eval import compare_ab, format_report
+
     result = compare_ab(
         base_passed, treat_passed, baseline_name=baseline_name, treatment_name=treatment_name
     )

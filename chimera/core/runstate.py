@@ -86,3 +86,21 @@ class RunCheckpointer:
         with self._conn() as conn:
             rows = conn.execute("SELECT thread_id FROM run_state ORDER BY thread_id").fetchall()
         return [row[0] for row in rows]
+
+    def fork(self, src_thread: str, dst_thread: str, *, overwrite: bool = False) -> bool:
+        """Branch a checkpoint: copy ``src_thread``'s state onto a new ``dst_thread`` (LangGraph fork).
+
+        The point of a fork is a *paired experiment*: replay two policies (baseline vs candidate)
+        from the identical captured state, so the only variable is the policy and the A/B is paired
+        (see :mod:`chimera.eval.paired`). Returns False if the source is missing, or the destination
+        already exists and ``overwrite`` is False.
+        """
+        state = self.load(src_thread)
+        if state is None:
+            return False
+        if not overwrite and self.load(dst_thread) is not None:
+            _log.debug("fork target %s already exists; refusing (overwrite=False)", dst_thread)
+            return False
+        self.save(dst_thread, state)
+        _log.debug("forked checkpoint %s -> %s", src_thread, dst_thread)
+        return True
