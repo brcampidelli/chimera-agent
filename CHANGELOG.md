@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   rejection sampling gains an opt-in `require_productive_diff` that drops "successes" which changed
   nothing — closing the #1 gap the M15 competitive study found across all five rivals (evolution
   with no fitness/verification signal).
+- **Control-token stripping for untrusted content (M15-A3).** On top of the existing data-fence,
+  the fetch path now defangs the chat-template families a page/document can embed to spoof a
+  system/user turn or a tool call (`<|im_start|>`, `[INST]`, `<<SYS>>`, `<s>`, `<tool_call>`) with a
+  visible placeholder; a tainted run also strips leaked control tokens from its finalized answer.
+- **Tool-loop circuit breaker (M15-A4).** The agent loop stops a run that is physically spinning —
+  identical-repeat, A-B-A-B ping-pong, or no-progress polling — instead of grinding to `max_steps`.
+  Opt-out via `AgentConfig.detect_tool_loops`; conservative thresholds leave genuine runs untouched.
 
 ## [0.4.1] - 2026-07-07
 
