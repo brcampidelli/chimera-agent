@@ -31,6 +31,7 @@ from chimera.providers.failover import (
     action_for,
     classify,
 )
+from chimera.providers.prompt_cache import apply_cache_control
 from chimera.telemetry import get_logger
 
 _log = get_logger("providers.gateway")
@@ -265,11 +266,14 @@ class LLMGateway:
                 call_kwargs: dict[str, Any] = dict(extra, **kwargs)
                 if api_key:
                     call_kwargs["api_key"] = api_key
+                call_messages = message_dicts
+                if self.settings.prompt_cache:
+                    call_messages = apply_cache_control(message_dicts, candidate)
                 try:
                     _log.debug("completion model=%s msgs=%d", candidate, len(messages))
                     response = litellm.completion(
                         model=candidate,
-                        messages=message_dicts,
+                        messages=call_messages,
                         temperature=temperature,
                         max_tokens=max_tokens,
                         tools=tools,

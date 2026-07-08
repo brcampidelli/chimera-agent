@@ -42,10 +42,28 @@ class TokenBudget:
         self.max_tokens = max_tokens
         self._spent = 0
         self._estimated = False
+        self._cache_read = 0
+        self._cache_write = 0
 
     @property
     def spent(self) -> int:
         return self._spent
+
+    @property
+    def cache_read(self) -> int:
+        """Prompt-cache HIT tokens accumulated across this delegation (billed cheap)."""
+        return self._cache_read
+
+    @property
+    def cache_write(self) -> int:
+        """Prompt-cache WRITE tokens accumulated across this delegation."""
+        return self._cache_write
+
+    def note_cache(self, read: int | None, write: int | None) -> None:
+        """Record provider-reported cache tokens (subset of the prompt tokens already
+        counted in ``spent`` — kept separately so receipts can price the real dollars)."""
+        self._cache_read += read or 0
+        self._cache_write += write or 0
 
     @property
     def remaining(self) -> int:
@@ -144,6 +162,7 @@ class BudgetedBackend:
             result.completion_tokens,
             text_fallback=prompt_text + (result.content or ""),
         )
+        self.budget.note_cache(result.cache_read_tokens, result.cache_write_tokens)
         return result
 
 

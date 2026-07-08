@@ -6,6 +6,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Prompt caching, used and measured (M17).** `prompt_cache` (opt-in) marks the stable
+  system prefix with a provider cache breakpoint so the single agent and worker fleet
+  reuse it at the cache read rate; the gateway captures `cache_read`/`cache_write` tokens
+  and threads them through the token budget into delegation receipts, turning the
+  token-economy "dollar caveat" into continuous measurement. Providers that cache
+  automatically (OpenAI, DeepSeek) are left untouched. Honest status: verified the
+  capture path on DeepSeek (`cache_read` 0→5 on a repeat), but a live OpenRouter→Anthropic
+  probe did **not** surface caching (litellm's OpenAI-compat routing doesn't forward
+  Anthropic content-block `cache_control`) — documented as a known limitation; the native
+  `anthropic/…` provider is the path that populates it.
+- **Curve-driven delegation gate.** `count_sources()` — 2+ distinct sources + read intent
+  routes to the hierarchy (the measured (D−1)/D guaranteed-gain region) and skips the
+  crude profitability veto.
+- **Companion suite, 3 axes + robustness + a caching dollar model.** `bench/hierarchy_sweep`
+  now sweeps D / S (doc size) / Q (turns); real runs confirm the (D−1)/D law across
+  D=2..5; `chimera/eval/cache_cost.py` models how caching narrows (and can invert) the
+  dollar win; `make_hetero_task` proves the law is size-distribution-agnostic.
+
+### Fixed
+- Hierarchy code-review pass: verification is now enforced (a rejected worker result
+  can't reach synthesis); budget honesty for partial provider usage; `_conflicting`
+  matches its contract; concurrent-worker robustness; thread-safe `CompletionCache`.
+
 ## [0.6.0] - 2026-07-08
 
 The **M16 "Hierarchy & Second Brain"** cycle — vendor-agnostic hierarchical orchestration with

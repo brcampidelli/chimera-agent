@@ -132,6 +132,11 @@ class Settings(BaseSettings):
 
     # --- Exact-match completion cache for tool-free turns (HORIZON prompt caching) ---
     cache: bool = Field(default=False, validation_alias="CHIMERA_CACHE")
+    prompt_cache: bool = Field(default=False, validation_alias="CHIMERA_PROMPT_CACHE")
+    """Opt-in: mark the stable system prefix with a provider cache breakpoint so the
+    single agent / worker fleet reuse it at the cache read rate. Providers that cache
+    automatically (OpenAI, DeepSeek) are left untouched; only breakpoint-requiring
+    families (Anthropic/Claude) get an explicit cache_control marker."""
 
     # --- Long-term memory backend: json (default, zero-dep) or sqlite (FTS5 full-text) ---
     memory_backend: str = Field(default="json", validation_alias="CHIMERA_MEMORY_BACKEND")

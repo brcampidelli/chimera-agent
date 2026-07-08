@@ -384,6 +384,8 @@ class HierarchicalOrchestrator:
             counterfactual_tokens=gate.inline_est_tokens,
             counterfactual_model=self.top_model,
             profitable_estimate=gate.profitable,
+            cache_read_tokens=budget.cache_read or None,
+            cache_write_tokens=budget.cache_write or None,
         )
         if not verified:
             return None, receipt

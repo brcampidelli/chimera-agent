@@ -47,6 +47,10 @@ class DelegationReceipt(BaseModel):
     usd: float | None = None
     tokens_estimated: bool = False
     """True when any token count came from the chars/4 fallback, not the provider."""
+    cache_read_tokens: int | None = None
+    """Prompt-cache HIT tokens the provider billed cheap (M17). None = unknown/none."""
+    cache_write_tokens: int | None = None
+    """Prompt-cache WRITE tokens (M17). None = unknown/none."""
     # --- pxpipe salvage: the counterfactual, same row, so savings are measured ---
     counterfactual_tokens: int | None = None
     """Estimated tokens had the orchestrator done this work inline (no delegation)."""
@@ -131,6 +135,8 @@ def make_receipt(
     counterfactual_tokens: int | None = None,
     counterfactual_model: str | None = None,
     profitable_estimate: bool | None = None,
+    cache_read_tokens: int | None = None,
+    cache_write_tokens: int | None = None,
 ) -> DelegationReceipt:
     """Assemble a priced receipt; the counterfactual is priced at the top model's rate."""
     counterfactual_usd: float | None = None
@@ -150,6 +156,8 @@ def make_receipt(
         counterfactual_tokens=counterfactual_tokens,
         counterfactual_usd=counterfactual_usd,
         profitable_estimate=profitable_estimate,
+        cache_read_tokens=cache_read_tokens,
+        cache_write_tokens=cache_write_tokens,
     )
 
 
