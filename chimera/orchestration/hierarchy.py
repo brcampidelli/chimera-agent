@@ -178,7 +178,13 @@ class HierarchicalOrchestrator:
         specs = self.decompose(task)
         if not specs:
             return self._fallback(task, shape, reason="decomposition failed")
+        return self.run_prepared(task, specs, shape=shape)
 
+    def run_prepared(
+        self, task: str, specs: list[TaskSpec], *, shape: TaskShape = "parallel_read"
+    ) -> HierarchyResult:
+        """Run with a caller-supplied decomposition (recipes know their own split —
+        no top-model decompose call is spent)."""
         envelopes, receipts = self._dispatch(specs)
         if not envelopes:
             return self._fallback(task, shape, reason="all delegations failed")

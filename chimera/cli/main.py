@@ -1516,6 +1516,67 @@ def orchestrate(
 
 
 @app.command()
+def brief(
+    recipe: str = typer.Option(
+        "examples/morning_brief/brief.yaml", "--recipe", help="Brief recipe (YAML with topics)."
+    ),
+    out: str = typer.Option(None, "--out", help="Write the digest to this file (default: print only)."),
+    max_workers: int = typer.Option(4, "--max-workers", help="Parallel research workers."),
+) -> None:
+    """Morning brief: parallel topic research through the hierarchy, one synthesized digest.
+
+    The recipe IS the decomposition (no top-model decompose call). Delegation
+    receipts land in <home>/delegations.jsonl — `chimera delegations` shows what
+    the brief cost vs the inline counterfactual, measured.
+    """
+    from chimera.fusion import FusionEngine
+    from chimera.orchestration.artifacts import ArtifactStore
+    from chimera.orchestration.brief import brief_task, load_brief, specs_from_brief
+    from chimera.orchestration.hierarchy import HierarchicalOrchestrator, HierarchyConfig
+    from chimera.providers import LLMGateway, MissingCredentialsError
+
+    settings = get_settings()
+    if not settings.has_any_key():
+        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+        raise typer.Exit(code=1)
+    try:
+        loaded = load_brief(Path(recipe))
+    except (ValueError, OSError) as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    ladder = settings.tier_ladder()
+    gateway = LLMGateway()
+    orchestrator = HierarchicalOrchestrator(
+        gateway,
+        weak_model=ladder.weak,
+        mid_model=ladder.mid,
+        top_model=ladder.top,
+        store=ArtifactStore(Path(settings.home) / "artifacts"),
+        fusion=FusionEngine(gateway),
+        receipts_path=Path(settings.home) / "delegations.jsonl",
+        config=HierarchyConfig(max_workers=max_workers),
+    )
+    specs = specs_from_brief(loaded, max_tokens=settings.delegation_budget)
+    console.print(f"[dim]{loaded.name}: {len(specs)} topic(s) in parallel on {ladder.mid}[/dim]")
+    try:
+        result = orchestrator.run_prepared(brief_task(loaded), specs)
+    except MissingCredentialsError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    console.print(Panel.fit(result.answer, title=loaded.name))
+    if out:
+        Path(out).write_text(result.answer + "\n", encoding="utf-8")
+        console.print(f"[green]Written[/green] {out}")
+    tokens = f"{result.total_tokens} tokens" if result.total_tokens is not None else "tokens unknown"
+    line = f"[dim]{tokens} measured"
+    if result.counterfactual_tokens:
+        line += f" · inline counterfactual ≈ {result.counterfactual_tokens} tokens"
+    console.print(line + " · details: chimera delegations[/dim]")
+
+
+@app.command()
 def delegations(
     path: str = typer.Option(None, "--path", help="Receipts file (default: <home>/delegations.jsonl)."),
 ) -> None:

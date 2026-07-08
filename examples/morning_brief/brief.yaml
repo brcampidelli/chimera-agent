@@ -1,0 +1,21 @@
+# Morning brief — topics in, one synthesized digest out, via the hierarchy.
+#
+# Run:       chimera brief
+# Custom:    chimera brief --recipe path/to/your.yaml --out brief.md
+#
+# Each topic becomes ONE parallel worker (mid tier) under a token budget and a
+# contract; the top tier only synthesizes. No decompose call is spent — this
+# file IS the decomposition. Costs land in `chimera delegations`, measured
+# against the inline counterfactual.
+
+name: morning-brief
+topics:
+  - "open-source AI agent frameworks: notable releases and security incidents this week"
+  - "small/cheap LLMs (7B-70B class): new models and benchmark results this week"
+  - "LLM inference pricing changes across providers (OpenRouter, DeepSeek, Google, OpenAI)"
+output_format: >-
+  3-5 concise bullets, each with the concrete finding and its source (URL or
+  paper id). Recent items only; say "nothing significant found" honestly if so.
+synthesis: >-
+  a morning brief: one short headline line per topic, then a single 'Worth
+  watching' line with the most important cross-topic development.
