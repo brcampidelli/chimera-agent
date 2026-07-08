@@ -14,16 +14,24 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 from pathlib import Path
 from typing import Any
 
 
 class CompletionCache:
-    """A JSON-file cache of completions keyed by the request hash."""
+    """A JSON-file cache of completions keyed by the request hash.
+
+    Thread-safe: the hierarchy dispatch and the fusion panel both call the shared
+    gateway (hence this cache) from multiple threads. A lock guards the dict and the
+    file, and writes are atomic (tmp + replace) so an interrupted write can't truncate
+    the cache file.
+    """
 
     def __init__(self, path: Path) -> None:
         self.path = Path(path)
         self._data: dict[str, dict[str, Any]] = {}
+        self._lock = threading.Lock()
         self._load()
 
     def _load(self) -> None:
@@ -36,7 +44,9 @@ class CompletionCache:
 
     def _save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(self._data, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp = self.path.with_suffix(self.path.suffix + ".tmp")
+        tmp.write_text(json.dumps(self._data, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(self.path)  # atomic — never leaves a half-written cache file
 
     @staticmethod
     def key(
@@ -59,11 +69,13 @@ class CompletionCache:
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
     def get(self, key: str) -> dict[str, Any] | None:
-        return self._data.get(key)
+        with self._lock:
+            return self._data.get(key)
 
     def put(self, key: str, value: dict[str, Any]) -> None:
-        self._data[key] = value
-        self._save()
+        with self._lock:
+            self._data[key] = value
+            self._save()
 
     def __len__(self) -> int:
         return len(self._data)

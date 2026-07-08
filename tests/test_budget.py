@@ -16,6 +16,7 @@ from chimera.orchestration.budget import (
     BudgetExceeded,
     EffortPolicy,
     TokenBudget,
+    estimate_tokens,
 )
 from chimera.providers.gateway import CompletionResult, MessageLike
 
@@ -106,6 +107,15 @@ def test_missing_usage_falls_back_to_estimate_and_flags() -> None:
     assert budget.estimated is True  # and it is flagged, permanently
     wrapped.complete([{"role": "user", "content": "y"}])
     assert budget.estimated is True
+
+
+def test_partial_usage_counts_as_estimated_not_measured() -> None:
+    """A provider reporting only one side (prompt=1200, completion=None) must NOT pass
+    as exactly measured — it flags estimated and uses the chars/4 fallback."""
+    budget = TokenBudget(max_tokens=100_000)
+    budget.consume(1_200, None, text_fallback="x" * 800)
+    assert budget.estimated is True
+    assert budget.spent == estimate_tokens("x" * 800)  # ~200, not the partial 1200
 
 
 def test_budget_validates_positive() -> None:

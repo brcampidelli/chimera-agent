@@ -67,12 +67,14 @@ class TokenBudget:
         *,
         text_fallback: str = "",
     ) -> None:
-        """Record spend. Missing provider usage -> chars/4 on ``text_fallback``."""
-        if prompt_tokens is None and completion_tokens is None:
+        """Record spend. If EITHER side of provider usage is missing, the count can't
+        be trusted as measured -> fall back to chars/4 on ``text_fallback`` and flag
+        estimated (a partial ``prompt=1200, completion=None`` must not pass as exact)."""
+        if prompt_tokens is None or completion_tokens is None:
             self._spent += estimate_tokens(text_fallback)
             self._estimated = True
         else:
-            self._spent += (prompt_tokens or 0) + (completion_tokens or 0)
+            self._spent += prompt_tokens + completion_tokens
 
 
 class BudgetedBackend:

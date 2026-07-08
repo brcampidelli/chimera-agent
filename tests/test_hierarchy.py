@@ -179,6 +179,52 @@ def test_bad_decomposition_repairs_once_then_falls_back(tmp_path: Path) -> None:
     assert len(decompose_calls) == 2  # exactly ONE repair retry
 
 
+def test_unverified_envelope_is_dropped_not_synthesized(tmp_path: Path) -> None:
+    """A result the verifier rejects (even after the re-ask) must NOT reach synthesis —
+    it is dropped, but still audited via a receipt. Guards the M16-A5 contract."""
+    from chimera.orchestration.envelope_verify import VerifyOutcome
+
+    class FailingVerifier:
+        def verify(self, spec: Any, envelope: Any) -> VerifyOutcome:
+            return VerifyOutcome(passed=False, stage="criteria", detail="does not match")
+
+    backend = FakeBackend()
+    store = ArtifactStore(tmp_path / "artifacts")
+    orchestrator = HierarchicalOrchestrator(
+        backend, weak_model=WEAK, mid_model=MID, top_model=TOP,
+        store=store, verifier=FailingVerifier(),  # type: ignore[arg-type]
+        receipts_path=tmp_path / "delegations.jsonl",
+    )
+    result = orchestrator.run(_READ_TASK)
+    # No unverified envelope reaches synthesis; with ALL workers rejected the
+    # orchestrator recovers via the single-agent fallback rather than shipping nothing.
+    assert result.envelopes == []
+    assert result.fell_back is True
+    assert result.answer == "single-agent answer"
+    # The rejected worker attempts AND the fallback are all audited.
+    persisted = load_delegations(tmp_path / "delegations.jsonl")
+    assert [r.tier for r in persisted] == ["mid", "mid", "top"]
+
+
+def test_conflicting_requires_both_overlap_and_a_marker(tmp_path: Path) -> None:
+    """_conflicting must not fire on a lone 'however' with no shared topic (false
+    positive -> wasted fusion), and must fire on same-topic disagreement."""
+    from chimera.orchestration.hierarchy import _conflicting
+    from chimera.orchestration.spec import ResultEnvelope
+
+    unrelated = [
+        ResultEnvelope(task_id="a", status="ok", summary="Revenue however grew in Europe markets"),
+        ResultEnvelope(task_id="b", status="ok", summary="Penguins waddle across Antarctic tundra"),
+    ]
+    assert _conflicting(unrelated) is False
+
+    same_topic = [
+        ResultEnvelope(task_id="c", status="ok", summary="The revenue figure grew twelve percent overall"),
+        ResultEnvelope(task_id="d", status="ok", summary="However the revenue figure fell twelve percent instead"),
+    ]
+    assert _conflicting(same_topic) is True
+
+
 def test_worker_count_capped_by_effort_policy(tmp_path: Path) -> None:
     many = json.dumps(
         [{"objective": f"part {i}", "output_format": "", "boundaries": ""} for i in range(9)]

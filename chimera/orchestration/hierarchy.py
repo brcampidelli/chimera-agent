@@ -290,29 +290,41 @@ class HierarchicalOrchestrator:
             backend,
             max_steps=spec.effort.max_steps,
         )
+        # Recorded on the receipt for audit; the ENFORCING gate is the whole-task one
+        # in run() (Guard 2). Per-subtask inline execution is future work.
         gate = estimate_profitability(spec, orchestrator_context_chars=24_000)
         try:
             raw = worker.act(spec.render())
         except BudgetExceeded:
             raw = ""
+        except Exception as exc:  # noqa: BLE001 -- a provider error must not nuke the batch
+            _log.warning("worker %s failed: %s", spec.task_id, exc)
+            raw = ""
         envelope = build_envelope(
             spec, raw, self.store,
             status="ok" if raw.strip() else "failed",
-            gaps=[] if raw.strip() else ["worker hit its token budget before answering"],
+            gaps=[] if raw.strip() else ["worker produced no output (budget or provider error)"],
         )
-        outcome = self.verifier.verify(spec, envelope)
-        if not outcome.passed and raw.strip():
-            # One bounded re-ask with the verifier's objection folded in.
-            try:
-                raw2 = worker.act(
-                    spec.render()
-                    + f"\n\n## Verifier objection (fix this)\n{outcome.detail}"
-                )
-                candidate = build_envelope(spec, raw2, self.store)
-                if self.verifier.verify(spec, candidate).passed:
-                    envelope = candidate
-            except BudgetExceeded:
-                pass
+        # A result is trustworthy input to the synthesizer ONLY if it passes
+        # verification. If the bounded re-ask also fails, the envelope is dropped
+        # (audited via the receipt) rather than folded in as an unverified claim.
+        verified = False
+        if raw.strip():
+            outcome = self.verifier.verify(spec, envelope)
+            verified = outcome.passed
+            if not verified:
+                # One bounded re-ask with the verifier's objection folded in.
+                try:
+                    raw2 = worker.act(
+                        spec.render()
+                        + f"\n\n## Verifier objection (fix this)\n{outcome.detail}"
+                    )
+                    candidate = build_envelope(spec, raw2, self.store)
+                    if self.verifier.verify(spec, candidate).passed:
+                        envelope = candidate
+                        verified = True
+                except Exception as exc:  # noqa: BLE001 -- re-ask is best-effort
+                    _log.debug("re-ask for %s failed: %s", spec.task_id, exc)
         # The budget already sums prompt+completion per call; the receipt keeps the
         # total under prompt_tokens (split is meaningless post-aggregation) and the
         # estimated flag says whether any of it came from the chars/4 fallback.
@@ -327,7 +339,7 @@ class HierarchicalOrchestrator:
             counterfactual_model=self.top_model,
             profitable_estimate=gate.profitable,
         )
-        if envelope.status == "failed":
+        if not verified:
             return None, receipt
         return envelope, receipt
 
@@ -400,12 +412,30 @@ class HierarchicalOrchestrator:
 def _conflicting(envelopes: list[ResultEnvelope]) -> bool:
     """Cheap lexical disagreement check between worker summaries (no model call).
 
-    Pairwise token-set overlap; low overlap across DIFFERENT subtasks is normal,
-    so this only reports conflict when two envelopes share the same task focus
-    (high overlap of long tokens) yet contain contradiction markers, or when any
-    envelope self-reports gaps AND another overlaps it. Conservative on purpose:
-    fusion is the expensive path.
+    Two signals must BOTH hold for a pair (conservative — fusion is the expensive
+    path): (a) a contradiction marker or a self-reported gap in at least one of the
+    two summaries, AND (b) real term overlap between them (Jaccard >= 0.25), so
+    they're discussing the same thing and a disagreement is meaningful rather than
+    two unrelated subtasks. A genuine contradiction carrying none of the markers
+    cannot be caught without a model call — that is the honest lexical ceiling.
     """
+    if len(envelopes) < 2:
+        return False
     markers = ("however", "contradict", "instead", "disagree", "but the", "not the")
-    lowers = [env.summary.lower() for env in envelopes]
-    return any(any(m in text for m in markers) for text in lowers)
+
+    def terms(text: str) -> set[str]:
+        return set(re.findall(r"[a-z0-9]{4,}", text.lower()))
+
+    term_sets = [terms(env.summary) for env in envelopes]
+    flagged = [
+        any(m in env.summary.lower() for m in markers) or bool(env.gaps)
+        for env in envelopes
+    ]
+    for i in range(len(envelopes)):
+        for j in range(i + 1, len(envelopes)):
+            a, b = term_sets[i], term_sets[j]
+            if not a or not b:
+                continue
+            if len(a & b) / len(a | b) >= 0.25 and (flagged[i] or flagged[j]):
+                return True
+    return False
