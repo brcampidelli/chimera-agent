@@ -745,6 +745,153 @@ def chat(
 
 
 @app.command()
+def assist(
+    model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
+    max_steps: int = typer.Option(6, "--max-steps", help="Max tool-calling steps per message."),
+    workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root for tools."),
+    no_memory: bool = typer.Option(False, "--no-memory", help="Don't recall long-term memory."),
+    no_cascade: bool = typer.Option(
+        False, "--no-cascade", help="Disable tiered routing (single default model instead)."
+    ),
+) -> None:
+    """Your daily-driver assistant: cheap by default, escalates when it must.
+
+    Assist = chat with the second-brain defaults ON: the tier cascade routes
+    chit-chat to cheap models and escalates hard asks; your persistent profile
+    (chimera profile) is the stable preamble; memory, nudges and end-of-session
+    consolidation are active. On exit it prints the session cost receipt —
+    tier distribution + measured tokens — so 'cheap by default' is a number.
+    """
+    import time as _time
+
+    from chimera.core import Agent, AgentConfig
+    from chimera.fusion.route_log import format_route_summary, load_routes, summarize_routes
+    from chimera.interface import ChatSession
+    from chimera.providers import LLMGateway, MissingCredentialsError
+    from chimera.tools import default_registry
+
+    settings = get_settings()
+    if not settings.has_any_key():
+        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+        raise typer.Exit(code=1)
+
+    session_start = _time.time()
+    routes_path = Path(settings.home) / "routes.jsonl"
+    gateway = LLMGateway()
+    backend: SupportsComplete = gateway if no_cascade else _cascade_backend(gateway, settings)
+    agent = Agent(backend, default_registry(Path(workspace)), AgentConfig(model=model, max_steps=max_steps))
+    # Second-brain defaults: memory + graph + profile preamble always on (unless opted out).
+    mem = None if no_memory else _memory_manager()
+    session = ChatSession(
+        agent, memory=mem, graph=_recall_graph(mem), profile=_session_profile(mem)
+    )
+    skill_names = _learned_skill_labels(settings)
+
+    def _session_receipt() -> None:
+        records = [r for r in load_routes(routes_path) if r.ts >= session_start]
+        if records:
+            console.print(
+                Panel.fit(format_route_summary(summarize_routes(records)), title="session receipt")
+            )
+
+    ladder = settings.tier_ladder()
+    console.print(
+        "[bold]Chimera assist[/bold] — your right-hand, cheap by default. "
+        f"[dim]tiers: {ladder.weak.split('/')[-1]} → {ladder.mid.split('/')[-1]} → fusion "
+        f"(entry: {ladder.entry})[/dim]\n"
+        "[cyan]/task <hard ask>[/cyan] full-power route, [cyan]/profile <kind>: <fact>[/cyan] remember, "
+        "[cyan]/reset[/cyan] clear, [cyan]/exit[/cyan] quit."
+    )
+    nudged: set[str] = set()
+    skill_nudged: set[str] = set()
+    while True:
+        try:
+            message = console.input("[bold green]you ›[/bold green] ").strip()
+        except (EOFError, KeyboardInterrupt):
+            console.print("\n[dim]bye[/dim]")
+            _maybe_autoconsolidate(mem, settings)
+            _session_receipt()
+            break
+        if not message:
+            continue
+        if message in ("/exit", "/quit", "/q"):
+            console.print("[dim]bye[/dim]")
+            _maybe_autoconsolidate(mem, settings)
+            _session_receipt()
+            break
+        if message == "/reset":
+            session.reset()
+            console.print("[dim]context cleared[/dim]")
+            continue
+        if message.startswith("/profile"):
+            # "/profile preference: answer in PT-BR" (kinds: preference|project|context|name)
+            from chimera.interface.profile import load_profile, profile_path, save_profile
+
+            body = message[len("/profile") :].strip()
+            kind, sep, value = body.partition(":")
+            if not sep or not value.strip():
+                console.print("[dim]usage: /profile <preference|project|context|name>: <fact>[/dim]")
+                continue
+            path = profile_path(settings.home)
+            stored = load_profile(path)
+            if kind.strip().lower() == "name":
+                stored.name, changed = value.strip(), True
+            else:
+                changed = stored.add(kind.strip(), value.strip())
+            if changed:
+                save_profile(path, stored)
+                session.profile = _session_profile(mem)  # takes effect next turn
+                console.print(f"[green]stored[/green] {kind.strip()}: {value.strip()}")
+            else:
+                console.print("[yellow]not stored (unknown kind or duplicate)[/yellow]")
+            continue
+        if message.startswith("/task"):
+            # Full-power route for a hard ask: fusion-forced, one shot, no cascade climb.
+            task_text = message[len("/task") :].strip()
+            if not task_text:
+                console.print("[dim]usage: /task <the hard ask>[/dim]")
+                continue
+            from chimera.fusion import FusionEngine
+
+            try:
+                with console.status("[dim]full-power (fusion)…[/dim]"):
+                    fused = FusionEngine(gateway).complete(
+                        [{"role": "user", "content": task_text}]
+                    )
+                console.print(f"[bold magenta]chimera ›[/bold magenta] {fused.content}")
+            except Exception as exc:  # noqa: BLE001 — keep the REPL alive
+                console.print(f"[red]error: {exc}[/red]")
+            continue
+        if message.startswith("/model"):
+            slug = message[len("/model") :].strip() or None
+            ok = session.set_model(slug)
+            console.print(
+                f"[dim]model → {slug or 'default'}[/dim]" if ok else "[red]can't switch model[/red]"
+            )
+            continue
+        try:
+            with console.status("[dim]thinking…[/dim]"):
+                reply = session.send(message)
+        except MissingCredentialsError as exc:
+            console.print(f"[red]{exc}[/red]")
+            break
+        except Exception as exc:  # noqa: BLE001 — keep the REPL alive on transient errors
+            console.print(f"[red]error: {exc}[/red]")
+            continue
+        console.print(f"[bold magenta]chimera ›[/bold magenta] {reply}")
+        if mem is not None:
+            recent = [turn.user for turn in session.turns[-4:]]
+            for fact in mem.nudges(recent):
+                if fact not in nudged:
+                    nudged.add(fact)
+                    console.print(
+                        f"[dim]💡 remember this? [/dim][yellow]{fact}[/yellow]"
+                        f"[dim] → /profile preference: {fact}[/dim]"
+                    )
+        _emit_skill_nudges(session, skill_names, skill_nudged)
+
+
+@app.command()
 def tui(
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
     max_steps: int = typer.Option(6, "--max-steps", help="Max tool-calling steps per message."),
