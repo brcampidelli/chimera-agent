@@ -1452,6 +1452,86 @@ def fusion_bench(
     )
 
 
+@app.command()
+def orchestrate(
+    task: str = typer.Argument(..., help="The task (read-heavy multi-part tasks benefit most)."),
+    max_workers: int = typer.Option(4, "--max-workers", help="Parallel worker cap."),
+    budget: int = typer.Option(None, "--budget", help="Token budget per delegation (default: settings)."),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show classification + decomposition + estimate; zero worker spend."
+    ),
+) -> None:
+    """Hierarchical run: top model decomposes/synthesizes, budgeted mid workers execute.
+
+    Write-shaped and trivial tasks FALL BACK to the single-agent path by design
+    (the evidence says multi-agent loses there); the fallback is logged with its
+    counterfactual so `chimera delegations` shows the decision.
+    """
+    from chimera.fusion import FusionEngine
+    from chimera.orchestration.artifacts import ArtifactStore
+    from chimera.orchestration.budget import EffortPolicy
+    from chimera.orchestration.hierarchy import HierarchicalOrchestrator, HierarchyConfig
+    from chimera.providers import LLMGateway, MissingCredentialsError
+
+    settings = get_settings()
+    if not settings.has_any_key():
+        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+        raise typer.Exit(code=1)
+    ladder = settings.tier_ladder()
+    per_delegation = budget or settings.delegation_budget
+    gateway = LLMGateway()
+    orchestrator = HierarchicalOrchestrator(
+        gateway,
+        weak_model=ladder.weak,
+        mid_model=ladder.mid,
+        top_model=ladder.top,
+        store=ArtifactStore(Path(settings.home) / "artifacts"),
+        fusion=FusionEngine(gateway),
+        receipts_path=Path(settings.home) / "delegations.jsonl",
+        config=HierarchyConfig(
+            max_workers=max_workers,
+            effort=EffortPolicy(complex_budget=per_delegation),
+        ),
+    )
+    try:
+        if dry_run:
+            plan = orchestrator.dry_run(task)
+            for key, value in plan.items():
+                console.print(f"[dim]{key}[/dim]: {value}")
+            return
+        result = orchestrator.run(task)
+    except MissingCredentialsError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    console.print(result.answer)
+    tag = "[yellow]fell back to single-agent[/yellow]" if result.fell_back else (
+        f"[green]{len(result.envelopes)} worker(s)[/green]"
+    )
+    tokens = f"{result.total_tokens} tokens" if result.total_tokens is not None else "tokens unknown"
+    line = f"\n[dim]shape={result.shape} · {tag} · {tokens}"
+    if result.counterfactual_tokens:
+        line += f" · counterfactual inline ≈ {result.counterfactual_tokens} tokens"
+    console.print(line + "[/dim]")
+
+
+@app.command()
+def delegations(
+    path: str = typer.Option(None, "--path", help="Receipts file (default: <home>/delegations.jsonl)."),
+) -> None:
+    """Measured vs counterfactual across delegations — what the hierarchy actually saved."""
+    from chimera.orchestration.receipts import (
+        format_delegation_summary,
+        load_delegations,
+        summarize_delegations,
+    )
+
+    settings = get_settings()
+    receipts_path = Path(path) if path else Path(settings.home) / "delegations.jsonl"
+    receipts = load_delegations(receipts_path)
+    console.print(format_delegation_summary(summarize_delegations(receipts)))
+
+
 @app.command(name="cascade-bench")
 def cascade_bench(
     tasks: str = typer.Option("hard", "--tasks", help="Task suite: hard | demo."),
