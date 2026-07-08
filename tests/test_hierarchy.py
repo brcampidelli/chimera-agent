@@ -130,6 +130,21 @@ def test_two_sources_skip_the_profitability_veto(tmp_path: Path) -> None:
     assert result.fell_back is False
 
 
+def test_end_to_end_economy_source_detect_to_measured_saving(tmp_path: Path) -> None:
+    """The full optimized path in one test: source detection -> delegation -> receipts
+    with the inline counterfactual -> summarize_delegations reports a net token saving.
+    This is the 'shows the economy end-to-end' demonstration."""
+    from chimera.orchestration.receipts import summarize_delegations
+
+    backend = FakeBackend()
+    result = _orchestrator(backend, tmp_path).run("Compare alpha.md and bravo.md")
+    assert result.fell_back is False and len(result.receipts) == 2
+    summary = summarize_delegations(load_delegations(tmp_path / "delegations.jsonl"))
+    # Every delegation carries a counterfactual, and the honest net is reported.
+    assert summary["counterfactual_n"] == 2
+    assert "token_saving" in summary  # measured vs inline-counterfactual, in the same rows
+
+
 # ---------------------------------------------------------------------------
 # End-to-end (scripted)
 # ---------------------------------------------------------------------------

@@ -49,3 +49,20 @@ Notes:
   vendors freely (`chimera models set mid <slug>`).
 - Free-tier models often report no token usage; those rows are flagged as
   estimated (chars/4) in the receipts, never silently mixed with measured ones.
+
+## When the hierarchy actually engages (and when it shouldn't)
+
+`chimera orchestrate` (and this brief) only fan out where the measured curve says
+it pays — **2+ distinct sources + read intent**, the guaranteed-gain region where
+token saving = (D−1)/D (50% at 2 docs, 67% at 3, 75% at 4 — see
+[`bench/hierarchy_sweep`](../../bench/hierarchy_sweep/README.md)). One source, or a
+write/coding task, falls back to a single agent — fanning out there only adds
+overhead. The classifier detects distinct sources deterministically (files, URLs,
+`doc A`/`report B`), so even a terse "compare a.md and b.md" routes correctly.
+
+**The dollar asterisk:** those savings are *token* counts. If your provider does
+prompt caching, the single-agent baseline's repeated context is billed at ~0.1×, so
+the *dollar* win is smaller — and over a long chat it can invert. Chimera captures
+`cache_read`/`cache_write` tokens from provider usage and ships a
+[model that quantifies this](../../bench/hierarchy_sweep/cache_cost.py); run
+`python bench/hierarchy_sweep/cache_cost.py` to see the token-vs-dollar gap.
