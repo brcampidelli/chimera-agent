@@ -28,28 +28,49 @@ Each trend is locked by an offline unit test (char-cost backend) in
 ## Result — D axis, 2026-07-08, deepseek-chat-v3.1
 
 | D | baseline tokens | scoped tokens | reduction | (D−1)/D |
+| D | baseline | scoped | reduction | (D−1)/D |
 |---|---|---|---|---|
-| 2 | 17,608 | 8,800 | **+50.0%** | 50.0% |
-| 3 | 39,487 | 13,187 | **+66.6%** | 66.7% |
+| 2 | 17,555 | 8,800 | **+49.9%** | 50.0% |
+| 3 | 39,651 | 13,188 | **+66.7%** | 66.7% |
+| 4 | 69,955 | 17,604 | **+74.8%** | 75.0% |
+| 5 | 109,220 | 21,992 | **+79.9%** | 80.0% |
 
-**The law holds to <0.1%.** D=4 and D=5 did not complete — the capped OpenRouter key hit
-its total spend limit (403) mid-run. They're left for a future run with headroom; the
-offline unit test (`tests/test_hierarchy_multistep.py::test_sweep_reduction_scales_with_doc_count`)
-already proves the trend continues monotonically to D=5 under a char-cost model.
+**The (D−1)/D law holds across all four points to <0.2%.** (`results/d.json`)
+
+## Result — S axis (doc size, fixed D=3, Q=3), 2026-07-08
+
+| S (filler reps) | baseline | scoped | reduction |
+|---|---|---|---|
+| 4 | 4,464 | 1,524 | +65.9% |
+| 10 | 10,261 | 3,469 | +66.2% |
+| 20 | 19,965 | 6,726 | +66.3% |
+| 40 | 39,465 | 13,189 | +66.6% |
+| 80 | 78,261 | 26,154 | +66.6% |
+
+The win rises with doc size (65.9% → 66.6%) toward the (D−1)/D = 66.7% limit as the fixed
+per-call framing tax shrinks — and, as predicted, **does not invert**: this multi-turn
+baseline always carries D× the docs. (`results/s.json`)
+
+## Result — Q axis (turns, fixed D=3), 2026-07-08
+
+| Q (turns) | baseline | scoped | reduction |
+|---|---|---|---|
+| 2 | 26,278 | 8,791 | +66.5% |
+| 3 | 39,483 | 13,200 | +66.6% |
+| 4 | 52,719 | 17,582 | +66.6% |
+| 6 | 79,351 | 26,379 | +66.8% |
+
+**Flat at (D−1)/D across Q** — the win is stable as the conversation lengthens (both arms
+scale ~linearly in Q). Confirms it's a robust property, not an artifact of a short chat.
+(`results/q.json`)
 
 ### Honest reading
 
-The measured `(D−1)/D` fit confirms the mechanism precisely: the hierarchy's token
-economy is a **context-isolation** effect — the single agent re-sends all D documents
-on every turn, the scoped workers each read one. The more documents in play, the larger
-the win. This is the same effect the single-shot bench lacked (D docs, but only ONE turn,
-so nothing to re-send → the fan-out overhead lost). Two benches, one curve, one honest
-mechanism. Caveat unchanged: prompt caching narrows the DOLLAR gap; we measure tokens.
-
-### S and Q axes — offline-proven, real run pending
-
-The S and Q sweeps ship with their offline trend tests green; the real-model runs are
-pending a key with spend headroom (the capped key hit its limit mid-run). Expected shape,
-from the model and the offline tests: S rises from a smaller win at tiny docs toward
-(D−1)/D as docs grow (never inverting); Q stays flat near (D−1)/D. Fill these in with the
-measured rows once a fresh key is in `.env`.
+All three axes match their registered predictions on real runs. The `(D−1)/D` fit confirms
+the mechanism precisely: the hierarchy's token economy is a **context-isolation** effect —
+the single agent re-sends all D documents on every turn, the scoped workers each read one.
+The win scales with D (more docs = bigger win), rises with doc size toward the same limit,
+and holds flat across conversation length. This is the same effect the single-shot bench
+lacked (D docs, but ONE turn → nothing to re-send → the fan-out overhead lost). Three axes,
+one curve, one honest mechanism. Caveat unchanged: prompt caching narrows the DOLLAR gap; we
+measure tokens.

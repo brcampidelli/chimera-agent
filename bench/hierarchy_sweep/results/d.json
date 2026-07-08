@@ -1,0 +1,42 @@
+{
+  "model": "openrouter/deepseek/deepseek-chat-v3.1",
+  "axis": "D",
+  "rows": [
+    {
+      "axis": "D",
+      "point": 2,
+      "baseline_tokens": 17555,
+      "scoped_tokens": 8800,
+      "reduction": 0.4987,
+      "baseline_passed": true,
+      "scoped_passed": true
+    },
+    {
+      "axis": "D",
+      "point": 3,
+      "baseline_tokens": 39651,
+      "scoped_tokens": 13188,
+      "reduction": 0.6674,
+      "baseline_passed": true,
+      "scoped_passed": true
+    },
+    {
+      "axis": "D",
+      "point": 4,
+      "baseline_tokens": 69955,
+      "scoped_tokens": 17604,
+      "reduction": 0.7484,
+      "baseline_passed": true,
+      "scoped_passed": true
+    },
+    {
+      "axis": "D",
+      "point": 5,
+      "baseline_tokens": 109220,
+      "scoped_tokens": 21992,
+      "reduction": 0.7986,
+      "baseline_passed": true,
+      "scoped_passed": true
+    }
+  ]
+}
