@@ -6,6 +6,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+The **M16 "Hierarchy & Second Brain"** cycle — vendor-agnostic hierarchical orchestration with
+token economy, plus the first daily-driver assistant features on top of it. Grounded in three
+studies (Anthropic orchestrator-worker, FrugalGPT/RouteLLM tier routing, MAST failure taxonomy)
+and one rejected idea (pxpipe's image-arbitrage — kept only its measurement discipline). Every
+model role (weak/mid/top) accepts any LiteLLM/OpenRouter slug from any vendor; the user pins models
+or picks a cost mode (`cheap|balanced|premium|auto`, auto entering at the mid tier).
+
+### Added
+- **Model tiers + cost modes + multi-vendor catalog (M16-A1).** `weak_model`/`mid_model`/
+  `orchestrator_model` (vendor-agnostic) + `cost_mode` in `Settings`; `chimera/providers/catalog.py`
+  curates suggestions across DeepSeek/GLM/Kimi/OpenAI/Google/Anthropic/Qwen/Meta/Mistral as DATA
+  (slug + approx price + tool-calling notes). `resolve_tiers`: explicit pin > cost mode > default.
+  CLI: `chimera models` (ladder + catalog + `set <role> <slug|mode>`); `chimera init` asks the mode.
+- **Delegation contract (M16-A1).** `orchestration/spec.py`: `TaskSpec` down (objective/format/
+  schema/boundaries/effort), `ResultEnvelope` up (bounded summary + artifact refs + gaps — never a
+  transcript); `validate_envelope` free schema gate.
+- **Artifact store + envelope compaction (M16-A2).** Content-addressed per-run store; `build_envelope`
+  spills bulk to disk and returns a distilled summary + refs (small results untaxed). Measured: parent
+  receives ≤15% of raw chars on bulky transcripts, full fidelity retained.
+- **Delegation receipts + profitability gate (M16-A3).** Measured tokens/cost per delegation WITH the
+  inline counterfactual in the same row; `estimate_profitability` stops unprofitable delegations;
+  `:free` slugs price as measured-zero. `chimera delegations` reports net saving (or OVERSPENT).
+- **Harness-enforced token budgets (M16-A4).** `TokenBudget`/`BudgetedBackend` (hard/soft/count-only)
+  + `EffortPolicy`; a runaway backend provably halts under budget. chars/4 fallback always flagged.
+- **Three-gate envelope verifier (M16-A5).** schema (free) → acceptance criteria (deterministic) →
+  probabilistic spot-check that pulls the raw artifact into the VERIFIER's context only.
+- **FrugalGPT cascade (M16-A6).** `CascadeBackend`: weak→gate→mid→gate→fusion (tool turns → mid;
+  policy-flagged turns skip weak; auto enters at mid). `route_log` persists every decision (prompt as
+  hash only) as future router training data. `--cascade` on chat/solve; `chimera cascade-bench` (4 arms).
+- **HierarchicalOrchestrator (M16-A7).** Deterministic shape classifier (write/simple → single-agent
+  fallback, audited); top-model decompose (JSON, one repair) → parallel budgeted mid workers under
+  contract (byte-identical cached system prefix, no mid-task model rotation) → verifier → synthesis
+  over summaries only (fusion only on conflict). `chimera orchestrate [--dry-run]` + `delegations`.
+- **Hierarchy paired A/B (M16-A8).** `eval/hierarchy_ab.py` + `bench/hierarchy/`: single-agent vs
+  orchestrator-worker on the same model, paired McNemar/Wilson on quality, measured totals on tokens
+  (no cost-significance claims), predictions registered before running, negative control asserted.
+- **Persistent user profile (M16-B1).** Byte-stable cacheable preamble (`interface/profile.py`);
+  `chimera profile show|set|forget`; wired into chat/tui/assist.
+- **`chimera assist` (M16-B2).** Daily-driver on the cascade: cheap by default, `/task` full-power
+  lane, `/profile` mid-conversation, memory+nudges+consolidation on, per-session cost receipt on exit.
+- **Morning brief (M16-B3).** `chimera brief` — one budgeted worker per topic in parallel, top-tier
+  synthesis; `examples/morning_brief/` with scheduling recipes + honest-cost section.
+
 ## [0.5.0] - 2026-07-07
 
 The **M15 "Proved and Governed"** cycle — built from a real reverse-engineering study of five
