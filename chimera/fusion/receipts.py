@@ -39,6 +39,11 @@ class ModelPrice:
 # Matched by substring against a normalized model id, longest/most-specific pattern first. Override
 # or extend with set_price(); an unmatched model yields an unknown (None) cost rather than a guess.
 _PRICES: list[tuple[str, ModelPrice]] = [
+    # ":free" first: any OpenRouter free-tier slug prices as measured-zero, and must win
+    # over its paid family substring (e.g. "llama-3.3-70b-instruct:free" vs "llama-3.3-70b").
+    (":free", ModelPrice(0.0, 0.0)),
+    ("deepseek-r1", ModelPrice(0.55, 2.19)),
+    ("deepseek-reasoner", ModelPrice(0.55, 2.19)),
     ("claude-sonnet", ModelPrice(3.0, 15.0)),
     ("claude-haiku", ModelPrice(0.80, 4.0)),
     ("gpt-4o-mini", ModelPrice(0.15, 0.60)),
