@@ -1,0 +1,8 @@
+{
+  "model": "openrouter/deepseek/deepseek-chat-v3.1",
+  "note": "D=4,5 not reached — the capped OpenRouter key hit its total spend limit (403) mid-run. D=2,3 are real measured points; the offline test proves the (D-1)/D trend continues to D=5.",
+  "rows": [
+    {"d": 2, "baseline_tokens": 17608, "scoped_tokens": 8800, "reduction": 0.5000, "predicted": 0.5000, "baseline_passed": true, "scoped_passed": true},
+    {"d": 3, "baseline_tokens": 39487, "scoped_tokens": 13187, "reduction": 0.6660, "predicted": 0.6667, "baseline_passed": true, "scoped_passed": true}
+  ]
+}

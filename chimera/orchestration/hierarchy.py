@@ -114,6 +114,14 @@ class HierarchyConfig:
     worker_max_steps: int = 6
     effort: EffortPolicy = field(default_factory=EffortPolicy)
     spot_rate: float = 0.2
+    inline_below_spec_tokens: int = 0
+    """Per-subtask gate (opt-in; 0 = off). A subtask whose rendered spec is smaller
+    than this is answered INLINE by the trusted top model in one call — skipping the
+    worker spawn + verification round-trip whose ~fixed framing would otherwise
+    dominate a trivial task's cost. Heuristic: the hierarchy's real token win is a
+    WHOLE-TASK context-isolation effect (synthesis over 2k summaries, not full docs);
+    this only trims the dispatch overhead on subtasks too small to benefit from it,
+    and a subtask's output size can't be known before running, so keep it conservative."""
 
 
 @dataclass
@@ -283,6 +291,13 @@ class HierarchicalOrchestrator:
         return envelopes, receipts
 
     def _run_one(self, spec: TaskSpec) -> tuple[ResultEnvelope | None, DelegationReceipt | None]:
+        # Per-subtask gate: a trivially small spec is cheaper answered inline by the
+        # trusted top model than delegated through the worker+verify machinery.
+        if (
+            self.config.inline_below_spec_tokens
+            and estimate_tokens(spec.render()) < self.config.inline_below_spec_tokens
+        ):
+            return self._run_inline_subtask(spec)
         budget = TokenBudget(spec.effort.max_tokens)
         backend = BudgetedBackend(self.gateway, budget, mode="hard")
         worker = RoleAgent(
@@ -342,6 +357,39 @@ class HierarchicalOrchestrator:
         if not verified:
             return None, receipt
         return envelope, receipt
+
+    def _run_inline_subtask(
+        self, spec: TaskSpec
+    ) -> tuple[ResultEnvelope | None, DelegationReceipt | None]:
+        """Trivial subtask handled by the trusted top model directly — no worker, no
+        verification (the top tier is the same one that synthesizes). The receipt is
+        tier='top' with the delegation counterfactual, so `chimera delegations` shows
+        the inline decision was audited, not hidden."""
+        gate = estimate_profitability(spec, orchestrator_context_chars=24_000)
+        result = self.gateway.complete(
+            [Message(role="system", content=WORKER_SYSTEM),
+             Message(role="user", content=spec.render())],
+            model=self.top_model,
+        )
+        raw = result.content or ""
+        tokens = (result.prompt_tokens or 0) + (result.completion_tokens or 0)
+        estimated = tokens == 0
+        if estimated:
+            tokens = estimate_tokens(spec.render() + raw)
+        receipt = make_receipt(
+            spec,
+            tier="top",
+            model=self.top_model,
+            prompt_tokens=tokens,
+            completion_tokens=0,
+            tokens_estimated=estimated,
+            counterfactual_tokens=gate.delegate_est_tokens,  # what delegating would have cost
+            counterfactual_model=self.mid_model,
+            profitable_estimate=gate.profitable,
+        )
+        if not raw.strip():
+            return None, receipt
+        return build_envelope(spec, raw, self.store, status="ok"), receipt
 
     def _synthesize(self, task: str, envelopes: list[ResultEnvelope]) -> tuple[str, int]:
         """Top model over SUMMARIES ONLY; fusion only on real conflict (Self-MoA rule)."""

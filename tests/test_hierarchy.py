@@ -206,6 +206,25 @@ def test_unverified_envelope_is_dropped_not_synthesized(tmp_path: Path) -> None:
     assert [r.tier for r in persisted] == ["mid", "mid", "top"]
 
 
+def test_trivial_subtask_runs_inline_skipping_worker(tmp_path: Path) -> None:
+    """With the per-subtask gate on, a tiny spec is answered inline by the TOP model
+    in one call — no mid-worker spawn, no verification round-trip."""
+    backend = FakeBackend()
+    orchestrator = _orchestrator(backend, tmp_path, inline_below_spec_tokens=100_000)
+    result = orchestrator.run(_READ_TASK)
+    assert result.fell_back is False
+    assert len(result.envelopes) == 2
+    # No subtask went to a MID worker; both were handled inline by the TOP model.
+    mid_worker_calls = [c for c in backend.calls if c["system"] == WORKER_SYSTEM and c["model"] == MID]
+    top_inline_calls = [c for c in backend.calls if c["system"] == WORKER_SYSTEM and c["model"] == TOP]
+    assert mid_worker_calls == []
+    assert len(top_inline_calls) == 2
+    # Audited as top-tier delegations with the (delegate) counterfactual recorded.
+    persisted = load_delegations(tmp_path / "delegations.jsonl")
+    assert [r.tier for r in persisted] == ["top", "top"]
+    assert all(r.counterfactual_tokens for r in persisted)
+
+
 def test_conflicting_requires_both_overlap_and_a_marker(tmp_path: Path) -> None:
     """_conflicting must not fire on a lone 'however' with no shared topic (false
     positive -> wasted fusion), and must fire on same-topic disagreement."""

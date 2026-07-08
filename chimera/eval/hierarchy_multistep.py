@@ -214,3 +214,26 @@ def multistep_tasks() -> list[MultiStepTask]:
         )
         tasks.append(MultiStepTask(id=task_id, docs=rendered, steps=step_objs))
     return tasks
+
+
+# Digit-free doc names so _needle locks onto the FACT's number, not the filename.
+_PHONETIC = ("alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel")
+
+
+def make_sweep_task(num_docs: int) -> MultiStepTask:
+    """A D-parameterized task: ``num_docs`` large docs, one sub-question per doc.
+
+    The token crossover sweep varies exactly this D. A single agent re-sends all D
+    docs on every turn (~D * per-turn); scoped workers read one doc each — so the
+    isolation win should scale like (D-1)/D. This generator is the sweep's x-axis.
+    """
+    if not 1 <= num_docs <= len(_PHONETIC):
+        raise ValueError(f"num_docs must be in 1..{len(_PHONETIC)}")
+    docs: dict[str, str] = {}
+    steps: list[Step] = []
+    for i in range(num_docs):
+        name = f"{_PHONETIC[i]}.md"
+        fact = f"The {_PHONETIC[i]} report records {100 + i * 7} units"
+        docs[name] = _big_doc(name, [fact])
+        steps.append(Step(question=f"What does {name} record?", doc=name, needle=_needle(fact)))
+    return MultiStepTask(id=f"sweep-d{num_docs}", docs=docs, steps=tuple(steps))
