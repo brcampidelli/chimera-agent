@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-08
+
 The **M16 "Hierarchy & Second Brain"** cycle — vendor-agnostic hierarchical orchestration with
 token economy, plus the first daily-driver assistant features on top of it. Grounded in three
 studies (Anthropic orchestrator-worker, FrugalGPT/RouteLLM tier routing, MAST failure taxonomy)
@@ -48,6 +50,28 @@ or picks a cost mode (`cheap|balanced|premium|auto`, auto entering at the mid ti
   lane, `/profile` mid-conversation, memory+nudges+consolidation on, per-session cost receipt on exit.
 - **Morning brief (M16-B3).** `chimera brief` — one budgeted worker per topic in parallel, top-tier
   synthesis; `examples/morning_brief/` with scheduling recipes + honest-cost section.
+
+### Measured (real runs, predictions registered before running, both wins AND losses published)
+- **Fusion costs 11× for the same answer.** `bench/cascade` (12 reasoning tasks, deepseek mid):
+  mid tier 100% at 846 tokens; full fusion also 100% — for 9,526 tokens. The measured justification
+  for reserving fusion behind the cascade (which hit ~mid quality at ~1/12 of fusion's tokens).
+- **Orchestration's token economy is regime-specific — and we published the losing run.**
+  `bench/hierarchy` (single-shot, small docs): the hierarchy cost **+47% MORE** tokens (prediction
+  of ≥30% reduction FAILED, reported plainly). `bench/hierarchy_multistep` (multi-step, large docs):
+  it cost **−66.5% FEWER** tokens at identical 100% quality. Together: fan-out only pays when a single
+  agent would re-send large context across many steps — which is exactly what `chimera orchestrate`
+  gates for.
+
+### Fixed (post-merge code review of the cycle)
+- **Envelope verification was computed but not enforced** — a verifier-rejected worker result could
+  reach synthesis if the bounded re-ask also failed. Now a result is folded in ONLY if it passes
+  verification; if all workers are rejected the orchestrator recovers via the single-agent fallback.
+- **Budget honesty:** partial provider usage (`prompt=1200, completion=None`) was counted as exact;
+  now any missing side triggers the chars/4 fallback and the `estimated` flag.
+- `_conflicting` now matches its contract (pairwise term overlap AND a marker) — no false-positive
+  fusion on a lone "however", no false-negative on real same-topic disagreement.
+- Worker provider errors no longer abort the whole batch or lose siblings' receipts; `CompletionCache`
+  is thread-safe with atomic writes (the hierarchy dispatches workers concurrently).
 
 ## [0.5.0] - 2026-07-07
 
