@@ -4,7 +4,8 @@
 
 # Chimera
 
-**El agente de IA open-source que piensa con muchas mentes — y mejora cada día.**
+**El agente auto-evolutivo gobernado — probado y gobernado.**<br/>
+<sub>Piensa con muchas mentes, hace el trabajo solo, aprende solo lo comprobado y es seguro por arquitectura.</sub>
 
 [![PyPI](https://img.shields.io/pypi/v/chimera-agent.svg?color=blue&label=PyPI)](https://pypi.org/project/chimera-agent/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
@@ -31,7 +32,7 @@ de verdad funciona.
 > **Gratis y open-source (Apache-2.0), en desarrollo temprano pero activo.** Ya funciona de principio
 > a fin: conversa con él, deja que complete tareas por su cuenta, ejecútalo como un bot en tu app de
 > mensajería favorita, despliégalo en un servidor para que trabaje 24/7 y míralo aprender de lo que
-> hace. Está en **alpha** — sólido y probado a fondo (más de 530 tests automatizados, verificación de
+> hace. Está en **alpha** — sólido y probado a fondo (más de 1000 tests automatizados, verificación de
 > tipos estricta y linting en cada cambio), pero todavía no curtido en producción.
 
 ---

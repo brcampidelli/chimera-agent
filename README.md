@@ -4,7 +4,8 @@
 
 # Chimera
 
-**The open-source AI agent that thinks with many minds — and gets better every day.**
+**The governed, self-evolving agent — proved and governed.**<br/>
+<sub>Thinks with many minds, does real work on its own, learns only what's proven, and is safe by architecture.</sub>
 
 [![PyPI](https://img.shields.io/pypi/v/chimera-agent.svg?color=blue&label=PyPI)](https://pypi.org/project/chimera-agent/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
@@ -30,8 +31,8 @@ its own work, and keeps only what actually works.
 > **Free and open-source (Apache-2.0), in early but active development.** It already works end to
 > end: chat with it, let it finish tasks on its own, run it as a bot on your favourite messaging app,
 > deploy it on a server so it works 24/7, and watch it learn from what it does. It's **alpha** — solid
-> and heavily tested (530+ automated tests, strict type-checking and linting on every change), but not
-> yet battle-hardened in production.
+> and heavily tested (**1000+ automated tests**, strict type-checking and linting on every change), but
+> not yet battle-hardened in production.
 
 ---
 
@@ -48,6 +49,18 @@ it. Here's what makes it special, in plain terms:
 - 🛡️ **Safe by design.** Every risky action passes a safety check first, anything destructive asks for confirmation, and untrusted code can run in a locked-down, network-off container. (Those checks are a cheap first filter, not the real boundary — the sandbox is; and container isolation is opt-in. See [SECURITY.md](SECURITY.md).)
 - 🔌 **Any model, runs anywhere.** Use big hosted models or your own local ones through a single interface — on your laptop or a $5 server, around the clock.
 - 🧩 **Truly yours.** Open-source, no lock-in, no vendor account required. You run it, you own it, you can change anything.
+
+## How Chimera compares
+
+Chimera doesn't try to out-*channel* the giant agent projects. It bets on the three things a real
+reverse-engineering study of five leaders (OpenClaw, Hermes, nanobot, CrewAI, LangGraph) found they
+**all leave open** — and makes them its core:
+
+- 🧬 **Self-evolution with a fitness signal.** The others "learn" by appending whatever happened, or by human pull requests — nothing measures whether a learned change actually helped. Chimera keeps a change **only when a verified result proves it did**: the evolution step is gated on the real working-tree diff and an honest A/B, never the model's say-so.
+- 🛡️ **Security by architecture.** Prompt injection is now widely considered *unpatchable*; the popular agents mitigate at the app layer or declare it out of scope (one shipped 135k publicly-exposed instances and a marketplace ~12% full of malicious skills). Chimera tracks taint provenance end-to-end, strips control tokens from untrusted content, narrows tool access on a tainted run, guards side-effecting retries, and runs untrusted code in an opt-in locked-down container.
+- 📊 **Honest, published benchmarks.** ~20% of a popular leaderboard's "solved" cases are actually wrong. Chimera reports every number with a confidence interval — **including the runs where it didn't win** — and never re-rolls for significance. A recorded paired run shows the full loop **tripling a weak model's pass rate (17% → 67%)**, reported one pair short of significance, honestly.
+
+**In one line: the governed, self-evolving agent — proved and governed.** It's alpha, and it says so.
 
 ## Features
 

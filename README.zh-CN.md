@@ -4,7 +4,8 @@
 
 # Chimera
 
-**用众多智慧一起思考的开源 AI 智能体 —— 而且每天都在变得更好。**
+**受治理的自我进化智能体 —— 经过验证，受到治理。**<br/>
+<sub>用众多智慧思考，自主完成工作，只学习经过验证的东西，并且从架构上保证安全。</sub>
 
 [![PyPI](https://img.shields.io/pypi/v/chimera-agent.svg?color=blue&label=PyPI)](https://pypi.org/project/chimera-agent/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
@@ -28,7 +29,7 @@
 
 > **免费且开源（Apache-2.0），处于早期但活跃的开发阶段。** 它已经能端到端地工作：和它聊天、让它自己完成任务、
 > 把它当作机器人跑在你喜欢的聊天软件上、部署到服务器让它 24/7 运行，并看着它从自己的行动中学习。它目前是
-> **alpha 版** —— 扎实且经过大量测试（530+ 项自动化测试，每次改动都做严格的类型检查和代码风格检查），但还没有
+> **alpha 版** —— 扎实且经过大量测试（1000+ 项自动化测试，每次改动都做严格的类型检查和代码风格检查），但还没有
 > 在生产环境中千锤百炼。
 
 ---

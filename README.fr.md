@@ -4,7 +4,8 @@
 
 # Chimera
 
-**L'agent IA open-source qui pense avec plusieurs cerveaux — et s'améliore chaque jour.**
+**L'agent auto-évolutif gouverné — prouvé et gouverné.**<br/>
+<sub>Pense avec plusieurs cerveaux, fait le travail seul, n'apprend que ce qui est prouvé, et est sûr par conception.</sub>
 
 [![PyPI](https://img.shields.io/pypi/v/chimera-agent.svg?color=blue&label=PyPI)](https://pypi.org/project/chimera-agent/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
@@ -32,7 +33,7 @@ vérifie son propre travail et ne garde que ce qui fonctionne vraiment.
 > bout en bout : discutez avec lui, laissez-le terminer des tâches tout seul, faites-le tourner comme
 > un bot sur votre application de messagerie préférée, déployez-le sur un serveur pour qu'il travaille
 > 24h/24, et regardez-le apprendre de ce qu'il fait. C'est une version **alpha** — solide et
-> abondamment testée (plus de 530 tests automatisés, vérification de types stricte et lint à chaque
+> abondamment testée (plus de 1000 tests automatisés, vérification de types stricte et lint à chaque
 > changement), mais pas encore éprouvée en production.
 
 ---

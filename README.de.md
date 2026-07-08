@@ -4,7 +4,8 @@
 
 # Chimera
 
-**Der quelloffene KI-Agent, der mit vielen Köpfen denkt — und jeden Tag besser wird.**
+**Der kontrollierte, sich selbst weiterentwickelnde Agent — bewiesen und kontrolliert.**<br/>
+<sub>Denkt mit vielen Köpfen, erledigt die Arbeit selbst, lernt nur Bewiesenes und ist sicher durch Architektur.</sub>
 
 [![PyPI](https://img.shields.io/pypi/v/chimera-agent.svg?color=blue&label=PyPI)](https://pypi.org/project/chimera-agent/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
@@ -32,7 +33,7 @@ wirklich funktioniert.
 > bereits von Anfang bis Ende: chatte mit ihm, lass es Aufgaben eigenständig erledigen, betreibe es
 > als Bot in deiner Lieblings-Messaging-App, stelle es auf einem Server bereit, damit es rund um die
 > Uhr arbeitet, und beobachte, wie es aus seinem Tun lernt. Es ist **Alpha** — solide und ausgiebig
-> getestet (530+ automatisierte Tests, strikte Typprüfung und Linting bei jeder Änderung), aber im
+> getestet (1000+ automatisierte Tests, strikte Typprüfung und Linting bei jeder Änderung), aber im
 > Produktivbetrieb noch nicht kampferprobt.
 
 ---
