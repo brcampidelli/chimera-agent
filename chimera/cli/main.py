@@ -179,6 +179,28 @@ def init(
         os.environ["CHIMERA_DEFAULT_MODEL"] = model
         console.print(f"[green]Set[/green] CHIMERA_DEFAULT_MODEL={model}")
 
+    # 2b. Cost mode: how the weak/mid/top tier ladder is filled unless the user pins
+    # models per role (`chimera models set ...`). Vendor-agnostic — any slug, any role.
+    if not yes:
+        console.print(
+            "Cost mode for the model tiers: [bold]cheap[/bold] (free-first), "
+            "[bold]balanced[/bold] (economic), [bold]premium[/bold] (frontier), "
+            "[bold]auto[/bold] (prioritizes the mid tier)."
+        )
+        mode = typer.prompt(
+            "Cost mode [cheap/balanced/premium/auto]", default="auto"
+        ).strip().lower()
+        if mode in ("cheap", "balanced", "premium", "auto"):
+            if mode != "auto":
+                _set_env_var(env_path, "CHIMERA_COST_MODE", mode)
+                os.environ["CHIMERA_COST_MODE"] = mode
+            console.print(
+                f"[green]Cost mode:[/green] {mode} — tune per role anytime with "
+                "[bold]chimera models set <weak|mid|top> <slug>[/bold] (any vendor)."
+            )
+        else:
+            console.print(f"[yellow]Unknown mode {mode!r} — keeping 'auto'.[/yellow]")
+
     # 3. Verify + point at something real.
     get_settings.cache_clear()
     providers = get_settings().configured_providers()
@@ -266,18 +288,133 @@ def doctor(
         raise typer.Exit(code=1)
 
 
-@app.command()
-def models() -> None:
-    """Show the default model and the fusion panel/judge/synthesizer."""
+models_app = typer.Typer(
+    help="Model assignment: tier ladder (weak/mid/top), cost mode, and the multi-vendor catalog.",
+    invoke_without_command=True,
+)
+
+
+def _render_models() -> None:
+    """The active model assignment: tier ladder + cost mode + fusion roles."""
     settings = get_settings()
+    ladder = settings.tier_ladder()
     table = Table(title="Models", show_header=True, header_style="bold")
     table.add_column("Role")
     table.add_column("Model(s)")
+    pinned = {
+        "weak": bool(settings.weak_model),
+        "mid": bool(settings.mid_model),
+        "top": bool(settings.orchestrator_model),
+    }
+
+    def _mark(tier: str, slug: str) -> str:
+        origin = "pinned" if pinned[tier] else f"cost_mode={settings.cost_mode}"
+        entry = "  ← entry" if ladder.entry == tier else ""
+        return f"{slug}  [dim]({origin}){entry}[/dim]"
+
     table.add_row("default (Tier 1)", settings.default_model)
+    table.add_row("tier: weak", _mark("weak", ladder.weak))
+    table.add_row("tier: mid", _mark("mid", ladder.mid))
+    table.add_row("tier: top (orchestrator)", _mark("top", ladder.top))
     table.add_row("fusion panel", "\n".join(settings.fusion_panel))
     table.add_row("fusion judge", settings.fusion_judge)
     table.add_row("fusion synthesizer", settings.fusion_synthesizer)
     console.print(table)
+    console.print(
+        "[dim]Any LiteLLM/OpenRouter slug fits any role — pin with "
+        "`chimera models set <weak|mid|top> <slug>`, browse with `chimera models catalog`, "
+        "or pick a mode with `chimera models set mode <cheap|balanced|premium|auto>`.[/dim]"
+    )
+
+
+@models_app.callback(invoke_without_command=True)
+def models_main(ctx: typer.Context) -> None:
+    """Show the active model assignment (tier ladder, cost mode, fusion roles)."""
+    if ctx.invoked_subcommand is None:
+        _render_models()
+
+
+@models_app.command("catalog")
+def models_catalog(
+    tier: str = typer.Option(None, "--tier", help="Filter: weak, mid, or top."),
+    vendor: str = typer.Option(None, "--vendor", help="Filter by vendor substring."),
+) -> None:
+    """Browse the curated multi-vendor catalog (suggestions — any slug works)."""
+    from chimera.providers.catalog import entries
+
+    tier_arg = tier if tier in ("weak", "mid", "top") else None
+    if tier and tier_arg is None:
+        console.print(f"[red]Unknown tier {tier!r}[/red] — use weak, mid, or top.")
+        raise typer.Exit(code=1)
+    found = entries(tier=tier_arg, vendor=vendor)  # type: ignore[arg-type]
+    table = Table(title="Model catalog (data — verify prices before trusting)", header_style="bold")
+    table.add_column("Tier")
+    table.add_column("Model")
+    table.add_column("Vendor")
+    table.add_column("$/1M in→out")
+    table.add_column("Tools")
+    table.add_column("Ctx")
+    table.add_column("Notes")
+    for e in found:
+        if e.input_per_m is None:
+            price = "[dim]unknown[/dim]"
+        elif e.input_per_m == 0.0 and e.output_per_m == 0.0:
+            price = "[green]free[/green]"
+        else:
+            price = f"{e.input_per_m:g} → {e.output_per_m:g}"
+        table.add_row(
+            e.tier, e.slug, e.vendor, price, "yes" if e.tools else "no", f"{e.context_k}k", e.notes
+        )
+    console.print(table)
+    console.print(
+        "[dim]The catalog is curated data, not a restriction — any LiteLLM/OpenRouter "
+        "slug can occupy any role.[/dim]"
+    )
+
+
+_MODELS_ROLE_ENV = {
+    "weak": "CHIMERA_WEAK_MODEL",
+    "mid": "CHIMERA_MID_MODEL",
+    "top": "CHIMERA_ORCHESTRATOR_MODEL",
+    "orchestrator": "CHIMERA_ORCHESTRATOR_MODEL",
+    "mode": "CHIMERA_COST_MODE",
+}
+
+
+@models_app.command("set")
+def models_set(
+    role: str = typer.Argument(..., help="weak | mid | top (alias: orchestrator) | mode"),
+    value: str = typer.Argument(
+        ..., help="A model slug (any vendor), 'auto' to unpin, or a cost mode for 'mode'."
+    ),
+) -> None:
+    """Pin a tier to a model (or set the cost mode). Explicit pins always beat the mode."""
+    import os
+
+    from chimera.providers.catalog import COST_MODES
+
+    key = _MODELS_ROLE_ENV.get(role.lower())
+    if key is None:
+        console.print(f"[red]Unknown role {role!r}[/red] — use weak, mid, top, or mode.")
+        raise typer.Exit(code=1)
+    if role.lower() == "mode" and value not in COST_MODES:
+        console.print(
+            f"[red]Unknown cost mode {value!r}[/red] — use cheap, balanced, premium, or auto."
+        )
+        raise typer.Exit(code=1)
+    env_value = "" if value.lower() == "auto" and role.lower() != "mode" else value
+    _set_env_var(Path.cwd() / ".env", key, env_value)
+    if env_value:
+        os.environ[key] = env_value
+    else:
+        os.environ.pop(key, None)
+    get_settings.cache_clear()
+    shown = env_value or "auto (cost mode decides)"
+    console.print(f"[green]Set[/green] {key}={shown}")
+    _render_models()
+
+
+app.add_typer(models_app, name="models")
 
 
 @app.command()

@@ -30,10 +30,20 @@ from chimera.orchestration.lifecycle import (
     lifecycle_crew,
 )
 from chimera.orchestration.roles import Role, RoleAgent
+from chimera.orchestration.spec import (
+    EffortBudget,
+    ResultEnvelope,
+    TaskSpec,
+    validate_envelope,
+)
 
 __all__ = [
     "Role",
     "RoleAgent",
+    "TaskSpec",
+    "ResultEnvelope",
+    "EffortBudget",
+    "validate_envelope",
     "AgentMessage",
     "consolidate",
     "render",

@@ -9,10 +9,13 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+if TYPE_CHECKING:
+    from chimera.providers.catalog import TierLadder
 
 _DEFAULT_PANEL = [
     "openrouter/anthropic/claude-opus-4-8",
@@ -70,6 +73,28 @@ class Settings(BaseSettings):
     default_model: str = Field(
         default="openrouter/openai/gpt-5.5", validation_alias="CHIMERA_DEFAULT_MODEL"
     )
+
+    # --- Model tiers (M16): weak -> mid -> top, vendor-agnostic. Any LiteLLM/OpenRouter
+    # slug can occupy any role. Empty string = "let cost_mode decide" (see
+    # chimera/providers/catalog.py); a non-empty value is an explicit user choice and
+    # ALWAYS wins over the mode. ---
+    weak_model: str = Field(default="", validation_alias="CHIMERA_WEAK_MODEL")
+    mid_model: str = Field(default="", validation_alias="CHIMERA_MID_MODEL")
+    orchestrator_model: str = Field(default="", validation_alias="CHIMERA_ORCHESTRATOR_MODEL")
+
+    # --- Cost mode: how the tier ladder is filled when models aren't pinned.
+    # "cheap" = weak-first aggressive; "balanced" = economic defaults; "premium" =
+    # frontier everywhere; "auto" (default) = prioritizes the MID tier as the entry
+    # point and lets the cascade climb/descend from there. ---
+    cost_mode: str = Field(default="auto", validation_alias="CHIMERA_COST_MODE")
+
+    # --- Cascade routing (M16-A6): weak -> gate -> mid -> gate -> fusion. Off by
+    # default; `--cascade` on solve/chat or CHIMERA_CASCADE=1 enables. ---
+    cascade: bool = Field(default=False, validation_alias="CHIMERA_CASCADE")
+
+    # --- Per-delegation token budget for hierarchical orchestration (M16-A4),
+    # enforced by the harness (BudgetedBackend), not by prompt instructions. ---
+    delegation_budget: int = Field(default=8000, validation_alias="CHIMERA_DELEGATION_BUDGET")
 
     # --- Custom endpoint for self-hosted/OpenAI-compatible servers (Ollama, vLLM) ---
     api_base: str | None = Field(default=None, validation_alias="CHIMERA_API_BASE")
@@ -218,6 +243,12 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
+
+    def tier_ladder(self) -> TierLadder:
+        """The resolved weak/mid/top model ladder (explicit override > cost_mode)."""
+        from chimera.providers.catalog import resolve_tiers
+
+        return resolve_tiers(self)
 
     def credential_pool(self, provider: str) -> list[str]:
         """Only the explicit multi-key pool (``CHIMERA_<PROVIDER>_KEYS``), [] if unset.
