@@ -111,6 +111,25 @@ def _apply_tool_allowlist(
     return restrict_registry(registry, allow=allow_names, deny=deny_names, audit=audit)
 
 
+def _cascade_backend(gateway: SupportsComplete, settings: Any) -> SupportsComplete:
+    """Build the FrugalGPT cascade (weak -> gate -> mid -> gate -> fusion) over the tier ladder.
+
+    Route decisions are appended to ``<home>/routes.jsonl`` (hash+tokens only, never prompt
+    text) — the per-session cost receipt and the future router's training data.
+    """
+    from chimera.fusion import FusionEngine
+    from chimera.fusion.cascade import CascadeBackend, CascadeConfig
+
+    ladder = settings.tier_ladder()
+    config = CascadeConfig(
+        weak=ladder.weak,
+        mid=ladder.mid,
+        entry=ladder.entry,
+        log_path=Path(settings.home) / "routes.jsonl",
+    )
+    return CascadeBackend(gateway, FusionEngine(gateway), config)
+
+
 def _stream_sink(event: AgentEvent) -> None:
     """Print one live progress event during ``solve --stream`` (dim, one line each)."""
     if event.kind == "final":
@@ -560,6 +579,9 @@ def chat(
     max_steps: int = typer.Option(6, "--max-steps", help="Max tool-calling steps per message."),
     workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root for tools."),
     fuse: bool = typer.Option(False, "--fuse", help="Route deep-reasoning turns through fusion."),
+    cascade: bool = typer.Option(
+        False, "--cascade", help="Tiered routing: weak -> gate -> mid -> gate -> fusion (cheap by default)."
+    ),
     no_memory: bool = typer.Option(False, "--no-memory", help="Don't recall long-term memory."),
 ) -> None:
     """Interactive multi-turn chat — your terminal right-hand. Requires a key."""
@@ -575,7 +597,9 @@ def chat(
 
     gateway = LLMGateway()
     backend: SupportsComplete = gateway
-    if fuse:
+    if cascade or settings.cascade:
+        backend = _cascade_backend(gateway, settings)
+    elif fuse:
         from chimera.fusion import FusionEngine, RoutedBackend
 
         backend = RoutedBackend(gateway, FusionEngine(gateway))
@@ -1199,6 +1223,59 @@ def fusion_bench(
     )
 
 
+@app.command(name="cascade-bench")
+def cascade_bench(
+    tasks: str = typer.Option("hard", "--tasks", help="Task suite: hard | demo."),
+) -> None:
+    """Four-arm bench: weak-only vs mid-only vs cascade vs fusion. Calls real models.
+
+    Published criterion (stated up front): cascade >= mid-only pass rate at materially
+    lower tokens-per-pass. The number reported is whatever is measured.
+    """
+    from chimera.eval.cascade_bench import ARMS, run_cascade_bench
+    from chimera.eval.continuous import demo_tasks
+    from chimera.eval.hard import hard_tasks
+    from chimera.fusion import FusionEngine
+    from chimera.providers import LLMGateway, MissingCredentialsError
+
+    settings = get_settings()
+    ladder = settings.tier_ladder()
+    suite = hard_tasks() if tasks == "hard" else demo_tasks()
+    gateway = LLMGateway()
+    try:
+        report = run_cascade_bench(
+            gateway, FusionEngine(gateway), suite,
+            weak=ladder.weak, mid=ladder.mid, entry=ladder.entry,
+        )
+    except MissingCredentialsError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title=f"cascade bench — {tasks} ({len(report.rows)} tasks)")
+    table.add_column("task")
+    for arm in ARMS:
+        table.add_column(arm, justify="center")
+        table.add_column("tok", justify="right")
+    for row in report.rows:
+        cells: list[str] = [row.task_id]
+        for arm in ARMS:
+            cells.append("[green]ok[/green]" if row.ok.get(arm) else "[red]x[/red]")
+            tok = row.tokens.get(arm)
+            cells.append(str(tok) if tok is not None else "-")
+        table.add_row(*cells)
+    console.print(table)
+    summary = report.summary()
+    for key, value in summary.items():
+        console.print(f"[dim]{key}[/dim]: {value}")
+    cascade_obj = summary.get("cascade_pass_rate")
+    mid_obj = summary.get("mid_pass_rate")
+    cascade_rate = cascade_obj if isinstance(cascade_obj, int | float) else 0.0
+    mid_rate = mid_obj if isinstance(mid_obj, int | float) else 0.0
+    verdict = "PASS" if cascade_rate >= mid_rate else "BELOW MID"
+    color = "green" if verdict == "PASS" else "red"
+    console.print(f"\nverdict: [{color}]{verdict}[/{color}] (cascade {cascade_rate:.0%} vs mid {mid_rate:.0%})")
+
+
 @app.command(name="skillcard-bench")
 def skillcard_bench(
     tasks: str = typer.Option("hard", "--tasks", help="Task suite: hard | demo."),
@@ -1371,6 +1448,9 @@ def solve(
     no_manager: bool = typer.Option(False, "--no-manager", help="Skip Manager review."),
     rubric: bool = typer.Option(False, "--rubric", help="Manager reviews via the cascade rubric."),
     fuse: bool = typer.Option(False, "--fuse", help="Route deep-reasoning turns through fusion."),
+    cascade: bool = typer.Option(
+        False, "--cascade", help="Tiered routing: weak -> gate -> mid -> gate -> fusion (cheap by default)."
+    ),
     guard: bool = typer.Option(False, "--guard", help="Gate tool calls through the governance kernel."),
     allow_tools: str = typer.Option(
         None, "--allow-tools", help="Per-session allowlist: only these tools (comma-separated)."
@@ -1517,10 +1597,17 @@ def solve(
     backend: SupportsComplete = gateway
     planner_backend: SupportsComplete = gateway
     escalate_backend: SupportsComplete | None = None
+    # --cascade (or CHIMERA_CASCADE): tiered routing weak -> gate -> mid -> gate -> fusion.
+    # Takes precedence over --fuse (the cascade already has fusion as its top rung).
+    if cascade or settings.cascade:
+        backend = _cascade_backend(gateway, settings)
+        from chimera.fusion import FusionEngine, RoutedBackend, RoutingPolicy
+
+        escalate_backend = RoutedBackend(gateway, FusionEngine(gateway), RoutingPolicy(mode="always"))
     # --fuse (explicit) or CHIMERA_AUTO_FUSE (production default) both route the worker
     # through the cost-aware router, so deep/error-sensitive turns fuse and cheap/tool
     # turns stay single-model.
-    if fuse or settings.auto_fuse:
+    elif fuse or settings.auto_fuse:
         from chimera.fusion import FusionEngine, RoutedBackend, RoutingPolicy
 
         engine = FusionEngine(gateway)
