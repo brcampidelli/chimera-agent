@@ -37,3 +37,41 @@ def test_no_caching_makes_dollar_equal_token() -> None:
 def test_format_table_is_honest_about_being_a_model() -> None:
     text = format_table([compare_under_caching(3)], model=CacheModel())
     assert "a MODEL, not measured" in text
+
+
+def test_measured_dollar_bridge_prices_cache_at_its_multiplier() -> None:
+    from chimera.eval.cache_cost import dollar_cost, measured_dollar_reduction
+
+    # Single agent: docs mostly cache-read after turn 1; scoped: cold input.
+    base = dollar_cost(regular_input=1_000, cache_read=9_000, output=200,
+                       input_per_m=3.0, output_per_m=15.0)
+    scoped = dollar_cost(regular_input=6_000, cache_read=0, output=200,
+                         input_per_m=3.0, output_per_m=15.0)
+    # 9k cache-read tokens are billed at 0.1x -> baseline input is cheap.
+    assert base < scoped  # caching flipped it: the single agent is cheaper in dollars
+    assert measured_dollar_reduction(base, scoped) < 0.0
+
+
+def test_gateway_extracts_cache_tokens_both_shapes() -> None:
+    from chimera.providers.gateway import LLMGateway
+
+    class AnthropicUsage:
+        cache_read_input_tokens = 800
+        cache_creation_input_tokens = 1_200
+
+    read, write = LLMGateway._extract_cache_tokens(AnthropicUsage())
+    assert (read, write) == (800, 1_200)
+
+    class OpenAIDetails:
+        cached_tokens = 500
+
+    class OpenAIUsage:
+        prompt_tokens_details = OpenAIDetails()
+
+    read2, write2 = LLMGateway._extract_cache_tokens(OpenAIUsage())
+    assert (read2, write2) == (500, None)
+
+    class NoCache:
+        pass
+
+    assert LLMGateway._extract_cache_tokens(NoCache()) == (None, None)

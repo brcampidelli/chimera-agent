@@ -79,6 +79,35 @@ def compare_under_caching(
     )
 
 
+def dollar_cost(
+    *,
+    regular_input: int,
+    output: int,
+    input_per_m: float,
+    output_per_m: float,
+    cache_read: int = 0,
+    cache_write: int = 0,
+    model: CacheModel | None = None,
+) -> float:
+    """MEASURED dollar cost from a real usage breakdown (cache tokens billed at their
+    multipliers). This is the bridge that turns the analytic model into a measurement
+    when the provider actually reports cache accounting (see gateway ``cache_*_tokens``)."""
+    model = model or CacheModel()
+    input_cost = (
+        regular_input
+        + cache_read * model.read_mult
+        + cache_write * model.write_mult
+    ) / 1_000_000 * input_per_m
+    return round(input_cost + output / 1_000_000 * output_per_m, 6)
+
+
+def measured_dollar_reduction(baseline_cost: float, scoped_cost: float) -> float:
+    """Real dollar saving from two measured :func:`dollar_cost` values (1 - scoped/base)."""
+    if baseline_cost <= 0:
+        return 0.0
+    return round(1.0 - scoped_cost / baseline_cost, 4)
+
+
 def format_table(comparisons: list[CostComparison], *, model: CacheModel) -> str:
     """Render the token-vs-dollar comparison as a compact table."""
     lines = [

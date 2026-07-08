@@ -92,6 +92,10 @@ class CompletionResult(BaseModel):
     tool_calls: list[ToolCall] | None = None
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
+    cache_read_tokens: int | None = None
+    """Prompt-cache HITS the provider reported (billed at the read rate). None = unknown."""
+    cache_write_tokens: int | None = None
+    """Prompt-cache WRITES the provider reported (billed at the write rate). None = unknown."""
     raw: dict[str, Any] | None = Field(default=None, repr=False)
 
 
@@ -420,17 +424,37 @@ class LLMGateway:
             tool_calls = LLMGateway._parse_tool_calls(message)
         except (AttributeError, IndexError, TypeError):
             _log.warning("could not extract content from response for model=%s", model)
+        cache_read_tokens: int | None = None
+        cache_write_tokens: int | None = None
         usage = getattr(response, "usage", None)
         if usage is not None:
             prompt_tokens = getattr(usage, "prompt_tokens", None)
             completion_tokens = getattr(usage, "completion_tokens", None)
+            cache_read_tokens, cache_write_tokens = LLMGateway._extract_cache_tokens(usage)
         return CompletionResult(
             content=content,
             model=model,
             tool_calls=tool_calls,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
+            cache_read_tokens=cache_read_tokens,
+            cache_write_tokens=cache_write_tokens,
         )
+
+    @staticmethod
+    def _extract_cache_tokens(usage: Any) -> tuple[int | None, int | None]:
+        """Read prompt-cache accounting across provider shapes (Anthropic + OpenAI-style)."""
+        # Anthropic (via litellm): cache_read_input_tokens / cache_creation_input_tokens.
+        read = getattr(usage, "cache_read_input_tokens", None)
+        write = getattr(usage, "cache_creation_input_tokens", None)
+        # OpenAI-style: prompt_tokens_details.cached_tokens (read only, no write line).
+        if read is None:
+            details = getattr(usage, "prompt_tokens_details", None)
+            if details is not None:
+                read = getattr(details, "cached_tokens", None)
+                if read is None and isinstance(details, dict):
+                    read = details.get("cached_tokens")
+        return read, write
 
     @staticmethod
     def _parse_tool_calls(message: Any) -> list[ToolCall] | None:
