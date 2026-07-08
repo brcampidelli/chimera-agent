@@ -111,6 +111,20 @@ def _apply_tool_allowlist(
     return restrict_registry(registry, allow=allow_names, deny=deny_names, audit=audit)
 
 
+def _session_profile(mem: Any) -> str:
+    """The chat/assist preamble: stable user profile first, volatile memory facts after.
+
+    Byte-stable for the same profile (the cacheable prefix); memory-derived facts go
+    in a separated volatile section so they never break the stable prefix.
+    """
+    from chimera.interface.profile import load_profile, profile_path, render_profile
+
+    settings = get_settings()
+    stored = load_profile(profile_path(settings.home))
+    memory_part = mem.profile() if mem is not None else ""
+    return render_profile(stored, memory_part)
+
+
 def _cascade_backend(gateway: SupportsComplete, settings: Any) -> SupportsComplete:
     """Build the FrugalGPT cascade (weak -> gate -> mid -> gate -> fusion) over the tier ladder.
 
@@ -436,6 +450,74 @@ def models_set(
 app.add_typer(models_app, name="models")
 
 
+profile_app = typer.Typer(help="Persistent user profile — the assistant's stable, cacheable preamble.")
+
+
+@profile_app.command("show")
+def profile_show() -> None:
+    """Show the stored profile and the exact preamble sessions will receive."""
+    from chimera.interface.profile import load_profile, profile_path, render_profile
+
+    settings = get_settings()
+    stored = load_profile(profile_path(settings.home))
+    if stored.is_empty():
+        console.print(
+            "[dim]No profile yet — add facts with "
+            "`chimera profile set <preference|project|context> \"...\"` "
+            "or `chimera profile set name \"...\"`.[/dim]"
+        )
+        return
+    console.print(Panel.fit(render_profile(stored), title="session preamble (stable prefix)"))
+
+
+@profile_app.command("set")
+def profile_set(
+    kind: str = typer.Argument(..., help="name | preference | project | context"),
+    value: str = typer.Argument(..., help="The fact to store."),
+) -> None:
+    """Add a profile fact (name replaces; the list kinds append with dedup)."""
+    from chimera.interface.profile import load_profile, profile_path, save_profile
+
+    settings = get_settings()
+    path = profile_path(settings.home)
+    stored = load_profile(path)
+    if kind.lower() == "name":
+        stored.name = value.strip()
+        changed = True
+    else:
+        changed = stored.add(kind, value)
+    if not changed:
+        console.print(f"[yellow]Nothing stored[/yellow] — unknown kind {kind!r} or duplicate value.")
+        raise typer.Exit(code=1)
+    save_profile(path, stored)
+    console.print(f"[green]Stored[/green] {kind.lower()}: {value.strip()}")
+
+
+@profile_app.command("forget")
+def profile_forget(
+    value: str = typer.Argument(..., help="The exact fact to remove (or 'name' to clear the name)."),
+) -> None:
+    """Remove a stored fact."""
+    from chimera.interface.profile import load_profile, profile_path, save_profile
+
+    settings = get_settings()
+    path = profile_path(settings.home)
+    stored = load_profile(path)
+    if value.strip().lower() == "name" and stored.name:
+        stored.name = ""
+        removed = True
+    else:
+        removed = stored.forget(value)
+    if not removed:
+        console.print(f"[yellow]Not found:[/yellow] {value!r}")
+        raise typer.Exit(code=1)
+    save_profile(path, stored)
+    console.print(f"[green]Forgot[/green] {value.strip()!r}")
+
+
+app.add_typer(profile_app, name="profile")
+
+
 @app.command()
 def features() -> None:
     """Show optional capabilities and what each needs (a key or a dependency)."""
@@ -606,7 +688,7 @@ def chat(
     agent = Agent(backend, default_registry(Path(workspace)), AgentConfig(model=model, max_steps=max_steps))
     mem = None if no_memory else _memory_manager()
     session = ChatSession(
-        agent, memory=mem, graph=_recall_graph(mem), profile=mem.profile() if mem is not None else ""
+        agent, memory=mem, graph=_recall_graph(mem), profile=_session_profile(mem)
     )
     skill_names = _learned_skill_labels(settings)
 
@@ -691,7 +773,7 @@ def tui(
     agent = Agent(backend, default_registry(Path(workspace)), AgentConfig(model=model, max_steps=max_steps))
     mem = None if no_memory else _memory_manager()
     session = ChatSession(
-        agent, memory=mem, graph=_recall_graph(mem), profile=mem.profile() if mem is not None else ""
+        agent, memory=mem, graph=_recall_graph(mem), profile=_session_profile(mem)
     )
     ChimeraTUI(session, model_label=model or settings.default_model).run()
 
