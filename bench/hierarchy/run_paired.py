@@ -36,6 +36,10 @@ _ONLY = {t.strip() for t in os.environ.get("BENCH_TASKS", "").split(",") if t.st
 
 
 def main() -> None:
+    # The paired report prints a Δ; make Windows' cp1252 console tolerate it.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
+
     from chimera.eval.hierarchy_ab import ArmOutcome, format_token_report, run_hierarchy_ab
     from chimera.eval.paired import format_report
     from chimera.orchestration.artifacts import ArtifactStore
