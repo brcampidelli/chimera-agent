@@ -107,6 +107,44 @@ def test_make_sweep_task_shape() -> None:
     assert all(any(ch.isdigit() for ch in s.needle) for s in task.steps)
 
 
+def _char_complete(messages):  # type: ignore[no-untyped-def]
+    return ("matched", sum(len(x["content"]) for x in messages) // 4)
+
+
+def test_S_axis_win_rises_with_doc_size_toward_the_limit() -> None:
+    """Doc-size axis: at tiny docs the fixed per-call framing (system prompts,
+    questions) is a bigger slice, so the scoped win is smaller; as docs grow the
+    framing tax shrinks and the win rises toward the (D-1)/D limit. In this
+    multi-turn design the win does NOT invert (baseline always carries D x the docs);
+    the true loss regime is the separate single-shot bench (fan-out + synthesis)."""
+    reductions = {}
+    for reps in (1, 4, 20, 80):
+        task = make_sweep_task(3, filler_reps=reps)
+        base = run_baseline(task, _char_complete)
+        scoped = run_scoped(task, _char_complete)
+        reductions[reps] = 1 - scoped.tokens / base.tokens
+    # Monotonically rising with doc size, approaching (3-1)/3 = 0.667 at large S.
+    assert reductions[1] < reductions[4] < reductions[20] < reductions[80]
+    assert reductions[80] > 0.66
+    # The framing tax is a real, measurable drag at tiny docs (smaller win).
+    assert reductions[1] < reductions[80]
+
+
+def test_Q_axis_win_is_roughly_flat() -> None:
+    """Conversation-length axis: both arms scale ~linearly in Q, so the win holds
+    roughly constant at (D-1)/D as sessions get long (a stability check)."""
+    vals = []
+    for q in (2, 3, 6, 9):
+        task = make_sweep_task(3, num_steps=q)
+        assert len(task.steps) == q
+        base = run_baseline(task, _char_complete)
+        scoped = run_scoped(task, _char_complete)
+        vals.append(1 - scoped.tokens / base.tokens)
+    # All near 0.667, and the spread across Q is small (flat, not a lever).
+    assert all(0.55 < v < 0.75 for v in vals), vals
+    assert max(vals) - min(vals) < 0.12
+
+
 def test_grading_requires_all_needles() -> None:
     task = multistep_tasks()[1]
 

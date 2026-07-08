@@ -114,18 +114,20 @@ def run_scoped(task: MultiStepTask, complete: Complete) -> ArmRun:
 
 # --- deterministic large-doc corpus (no randomness; replay-safe) ---------------------
 
-# ~5-6k chars each: big enough that re-sending it every turn is the dominant cost.
-_BIG_FILLER = (
+_FILLER_UNIT = (
     "Background. This section records process notes, historical context, tooling "
     "decisions and review commentary that a careful reader must skip past to find the "
     "operative facts. It is deliberately verbose and repetitive so that the document "
     "carries real weight when it is re-sent on every conversational turn.\n"
-) * 40
+)
+#: Default doc size (~5-6k chars): big enough that re-sending it every turn dominates.
+_DEFAULT_FILLER_REPS = 40
 
 
-def _big_doc(title: str, facts: list[str]) -> str:
+def _big_doc(title: str, facts: list[str], filler_reps: int = _DEFAULT_FILLER_REPS) -> str:
     body = "\n".join(f"- {fact}" for fact in facts)
-    return f"# {title}\n\n{_BIG_FILLER}\n## Key items\n{body}\n\n{_BIG_FILLER}"
+    filler = _FILLER_UNIT * filler_reps
+    return f"# {title}\n\n{filler}\n## Key items\n{body}\n\n{filler}"
 
 
 def _needle(fact: str) -> str:
@@ -220,20 +222,37 @@ def multistep_tasks() -> list[MultiStepTask]:
 _PHONETIC = ("alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel")
 
 
-def make_sweep_task(num_docs: int) -> MultiStepTask:
-    """A D-parameterized task: ``num_docs`` large docs, one sub-question per doc.
+def make_sweep_task(
+    num_docs: int,
+    *,
+    filler_reps: int = _DEFAULT_FILLER_REPS,
+    num_steps: int | None = None,
+) -> MultiStepTask:
+    """A task parameterized on THREE independent crossover axes:
 
-    The token crossover sweep varies exactly this D. A single agent re-sends all D
-    docs on every turn (~D * per-turn); scoped workers read one doc each — so the
-    isolation win should scale like (D-1)/D. This generator is the sweep's x-axis.
+    - **D** (``num_docs``): how many docs a single agent must juggle. The isolation
+      win scales like (D-1)/D — every turn re-sends all D docs; workers read one each.
+    - **S** (``filler_reps``): document size. At tiny S the fixed per-call framing
+      (system prompts, questions) is a bigger slice, shrinking the win; at large S the
+      doc dominates and the win approaches (D-1)/D. The win rises with S but does not
+      invert here — the true loss regime is the single-shot bench (fan-out + synthesis).
+    - **Q** (``num_steps``): conversation length. Sub-questions cycle over the docs to
+      reach Q turns (default Q = D). Both arms scale ~linearly in Q, so the win is
+      roughly flat in Q — a stability check, not a lever.
     """
     if not 1 <= num_docs <= len(_PHONETIC):
         raise ValueError(f"num_docs must be in 1..{len(_PHONETIC)}")
+    if filler_reps < 1:
+        raise ValueError("filler_reps must be >= 1")
     docs: dict[str, str] = {}
-    steps: list[Step] = []
+    base_steps: list[Step] = []
     for i in range(num_docs):
         name = f"{_PHONETIC[i]}.md"
         fact = f"The {_PHONETIC[i]} report records {100 + i * 7} units"
-        docs[name] = _big_doc(name, [fact])
-        steps.append(Step(question=f"What does {name} record?", doc=name, needle=_needle(fact)))
-    return MultiStepTask(id=f"sweep-d{num_docs}", docs=docs, steps=tuple(steps))
+        docs[name] = _big_doc(name, [fact], filler_reps)
+        base_steps.append(Step(question=f"What does {name} record?", doc=name, needle=_needle(fact)))
+    q = num_steps if num_steps is not None else num_docs
+    if q < 1:
+        raise ValueError("num_steps must be >= 1")
+    steps = tuple(base_steps[i % num_docs] for i in range(q))
+    return MultiStepTask(id=f"sweep-d{num_docs}-r{filler_reps}-q{q}", docs=docs, steps=steps)
