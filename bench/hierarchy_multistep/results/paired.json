@@ -1,0 +1,47 @@
+{
+  "model": "openrouter/deepseek/deepseek-chat-v3.1",
+  "task_ids": [
+    "regions",
+    "vendors",
+    "policies",
+    "contracts",
+    "limits",
+    "teams"
+  ],
+  "summary": {
+    "n": 6,
+    "baseline_rate": 1.0,
+    "treatment_rate": 1.0,
+    "delta": 0.0,
+    "discordant": {
+      "baseline_only": 0,
+      "treatment_only": 0
+    },
+    "diff_ci": [
+      0.0,
+      0.0
+    ],
+    "significant": false,
+    "baseline_total_tokens": 236373,
+    "treatment_total_tokens": 79181,
+    "baseline_median_tokens": 39386.0,
+    "treatment_median_tokens": 13194.5,
+    "token_reduction": 0.665
+  },
+  "baseline_tokens": [
+    39392,
+    39511,
+    39349,
+    39329,
+    39380,
+    39412
+  ],
+  "treatment_tokens": [
+    13202,
+    13217,
+    13191,
+    13192,
+    13197,
+    13182
+  ]
+}
