@@ -28,10 +28,21 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
-# complete(messages) -> (text, tokens): the single seam both arms call. Tokens is the
-# measured (prompt+completion) count for that one call; the arms sum it across calls.
-Complete = Callable[[list[dict[str, str]]], tuple[str, int]]
+# complete(messages) -> (text, tokens[, cache_read, cache_write]): the single seam both
+# arms call. Tokens is the measured (prompt+completion) count for one call; the optional
+# 3rd/4th elements are provider-reported cache tokens (M17) so the arms can report a
+# MEASURED dollar cost, not just a token count. A plain (text, tokens) 2-tuple still works.
+Complete = Callable[[list[dict[str, str]]], tuple[Any, ...]]
+
+
+def _unpack(res: tuple[Any, ...]) -> tuple[str, int, int, int]:
+    """Tolerate (text, tokens) and (text, tokens, cache_read, cache_write)."""
+    text, tokens = res[0], res[1]
+    cache_read = res[2] if len(res) > 2 else 0
+    cache_write = res[3] if len(res) > 3 else 0
+    return text, tokens, cache_read or 0, cache_write or 0
 
 
 @dataclass(frozen=True)
@@ -62,6 +73,10 @@ class ArmRun:
 
     passed: bool
     tokens: int
+    cache_read: int = 0
+    """Provider-reported cache HIT tokens across the arm (billed at the read rate)."""
+    cache_write: int = 0
+    """Provider-reported cache WRITE tokens across the arm."""
 
 
 _SYS_BASE = (
@@ -86,30 +101,34 @@ def run_baseline(task: MultiStepTask, complete: Complete) -> ArmRun:
         {"role": "assistant", "content": "Understood. Ask your questions."},
     ]
     answers: list[str] = []
-    total = 0
+    total = cread = cwrite = 0
     for step in task.steps:
         messages.append({"role": "user", "content": step.question})
-        text, tokens = complete(messages)
+        text, tokens, cr, cw = _unpack(complete(messages))
         total += tokens
+        cread += cr
+        cwrite += cw
         messages.append({"role": "assistant", "content": text})
         answers.append(text)
-    return ArmRun(passed=task.check(answers), tokens=total)
+    return ArmRun(passed=task.check(answers), tokens=total, cache_read=cread, cache_write=cwrite)
 
 
 def run_scoped(task: MultiStepTask, complete: Complete) -> ArmRun:
     """Hierarchy: each sub-question sees ONLY its own document — no cross-doc carry."""
     answers: list[str] = []
-    total = 0
+    total = cread = cwrite = 0
     for step in task.steps:
         doc = task.docs[step.doc]
         messages = [
             {"role": "system", "content": _SYS_WORKER},
             {"role": "user", "content": f"### {step.doc}\n{doc}\n\nQuestion: {step.question}"},
         ]
-        text, tokens = complete(messages)
+        text, tokens, cr, cw = _unpack(complete(messages))
         total += tokens
+        cread += cr
+        cwrite += cw
         answers.append(text)
-    return ArmRun(passed=task.check(answers), tokens=total)
+    return ArmRun(passed=task.check(answers), tokens=total, cache_read=cread, cache_write=cwrite)
 
 
 # --- deterministic large-doc corpus (no randomness; replay-safe) ---------------------

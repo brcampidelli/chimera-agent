@@ -53,3 +53,22 @@ provider is smaller than 66.5% — the tokens are saved (latency, context-window
 pressure, and non-cached providers all benefit fully), but a cache-aware cost model
 narrows the billing gap. We measure tokens and say this plainly; we do not claim a
 dollar figure we did not measure.
+
+## Measured dollar (M18) — 2026-07-08, deepseek via OpenRouter, 3-task cache probe
+
+The runner now captures provider cache tokens and prices cache reads at 0.1x to report a
+**measured** dollar reduction next to the token one:
+
+| | token reduction | measured $ reduction | baseline cache_read | scoped cache_read |
+|---|---|---|---|---|
+| deepseek (OpenRouter, multi-turn) | +66.5% | **+66.5%** | 0 | 39 |
+
+**Honest finding:** the caching that the [analytic model](cache_cost.py) warns can erode the
+dollar win **did not materialize on this route** — the single-context baseline, which
+re-sends the docs every turn, reported **zero** cache reads via OpenRouter→DeepSeek (and an
+M17 probe on OpenRouter→Anthropic also surfaced no caching). So on the routes we can
+actually test, **the token win WAS the dollar win** (66.5% ≈ 66.5%). The dollar-erosion
+caveat stands as a warning for providers/routes that cache aggressively (native Anthropic,
+OpenAI on long stable prefixes) — but we don't claim it where we couldn't reproduce it. The
+measurement machinery is live, so the moment a native-caching endpoint is wired, the receipts
+report the real dollar number continuously.

@@ -46,14 +46,24 @@ def main() -> None:
         tokens = (result.prompt_tokens or 0) + (result.completion_tokens or 0)
         if tokens == 0:
             tokens = estimate_tokens("".join(m["content"] for m in messages) + (result.content or ""))
-        return (result.content or "", tokens)
+        # M17/M18: carry provider cache tokens so the arms can report a MEASURED dollar cost.
+        return (result.content or "", tokens, result.cache_read_tokens or 0, result.cache_write_tokens or 0)
+
+    cache = {"base_cr": 0, "base_cw": 0, "scoped_cr": 0, "scoped_cw": 0,
+             "base_reg": 0, "scoped_reg": 0}
 
     def baseline(task):  # type: ignore[no-untyped-def]
         run = run_baseline(task, complete)
+        cache["base_cr"] += run.cache_read
+        cache["base_cw"] += run.cache_write
+        cache["base_reg"] += run.tokens - run.cache_read  # non-cached input+output
         return ArmOutcome(passed=run.passed, tokens=run.tokens)
 
     def treatment(task):  # type: ignore[no-untyped-def]
         run = run_scoped(task, complete)
+        cache["scoped_cr"] += run.cache_read
+        cache["scoped_cw"] += run.cache_write
+        cache["scoped_reg"] += run.tokens - run.cache_read
         return ArmOutcome(passed=run.passed, tokens=run.tokens)
 
     report = run_hierarchy_ab(
@@ -68,8 +78,27 @@ def main() -> None:
     print(format_report(report.paired))
     print()
     print(format_token_report(report))
-    print("\nnote: token counts are real; a provider with prompt caching bills the")
-    print("baseline's repeated doc prefix at ~0.1x, so the DOLLAR gap is narrower.")
+
+    # M18: if the provider reported cache tokens, report the MEASURED dollar reduction
+    # (not just the analytic model) by pricing cache reads at 0.1x the model's input rate.
+    from chimera.eval.cache_cost import dollar_cost, measured_dollar_reduction
+    from chimera.fusion.receipts import resolve_price
+
+    price = resolve_price(_MODEL)
+    total_cr = cache["base_cr"] + cache["scoped_cr"]
+    if price is not None and total_cr > 0:
+        base_usd = dollar_cost(regular_input=cache["base_reg"], output=0, cache_read=cache["base_cr"],
+                               input_per_m=price.input_per_m, output_per_m=price.output_per_m)
+        scoped_usd = dollar_cost(regular_input=cache["scoped_reg"], output=0, cache_read=cache["scoped_cr"],
+                                 input_per_m=price.input_per_m, output_per_m=price.output_per_m)
+        print(f"\nMEASURED cache: baseline read={cache['base_cr']} write={cache['base_cw']} | "
+              f"scoped read={cache['scoped_cr']} write={cache['scoped_cw']}")
+        print(f"MEASURED dollar reduction (cache priced at 0.1x): "
+              f"{measured_dollar_reduction(base_usd, scoped_usd):+.1%}  "
+              f"(token reduction was {report.summary().get('token_reduction')})")
+    else:
+        print(f"\nno cache tokens reported by {_MODEL} (cache_read total={total_cr}) — "
+              "dollar == token here; caching narrows it only where the provider caches.")
 
     out = HERE / "results"
     out.mkdir(exist_ok=True)
