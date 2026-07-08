@@ -256,3 +256,25 @@ def make_sweep_task(
         raise ValueError("num_steps must be >= 1")
     steps = tuple(base_steps[i % num_docs] for i in range(q))
     return MultiStepTask(id=f"sweep-d{num_docs}-r{filler_reps}-q{q}", docs=docs, steps=steps)
+
+
+def make_hetero_task(sizes: list[int]) -> MultiStepTask:
+    """Robustness variant: D docs of DIFFERENT sizes (one sub-question per doc).
+
+    The isolation law is size-distribution-agnostic for one-question-per-doc: a single
+    agent re-sends ALL docs every turn (Σsizes × D turns) while scoped workers each read
+    one doc (Σsizes total), so the saving stays ≈ (D-1)/D no matter how unequal the docs
+    are. This generator lets a test prove that the win doesn't depend on uniform docs.
+    """
+    if not 1 <= len(sizes) <= len(_PHONETIC):
+        raise ValueError(f"need 1..{len(_PHONETIC)} sizes")
+    docs: dict[str, str] = {}
+    steps: list[Step] = []
+    for i, reps in enumerate(sizes):
+        if reps < 1:
+            raise ValueError("each size must be >= 1")
+        name = f"{_PHONETIC[i]}.md"
+        fact = f"The {_PHONETIC[i]} report records {100 + i * 7} units"
+        docs[name] = _big_doc(name, [fact], reps)
+        steps.append(Step(question=f"What does {name} record?", doc=name, needle=_needle(fact)))
+    return MultiStepTask(id=f"hetero-{'-'.join(map(str, sizes))}", docs=docs, steps=tuple(steps))

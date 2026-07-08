@@ -88,18 +88,42 @@ _READ_MARKERS = (
 )
 _MULTIPART = re.compile(r"\b(and|e|,|;)\b", re.IGNORECASE)
 
+# Distinct-source detectors (deterministic). Two or more sources + read intent is the
+# measured guaranteed-gain region: bench/hierarchy_sweep shows a single agent re-sends
+# ALL D docs every turn while scoped workers read one each, so the token saving is
+# (D-1)/D — measured 49.9% / 66.7% / 74.8% / 79.9% at D=2..5 on deepseek. Below D=2
+# there is nothing to isolate and fan-out only adds overhead (bench/hierarchy: +47%).
+_FILE_REF = re.compile(r"\b[\w-]+\.(?:md|txt|pdf|csv|tsv|json|ya?ml|docx?|html?|log|rst|ipynb)\b", re.I)
+_DOC_REF = re.compile(r"\b(?:doc(?:ument)?|file|source|report|section|chapter)\s+[A-Z0-9][\w-]*", re.I)
+_URL_REF = re.compile(r"https?://\S+")
+
+
+def count_sources(task: str) -> int:
+    """Count DISTINCT document-like sources named in the task (files, doc/source X,
+    URLs). Deterministic, no LLM. Two or more => the multi-doc isolation regime where
+    the hierarchy's token win is guaranteed by the sweep (see the constants above)."""
+    hits: set[str] = set()
+    for pattern in (_FILE_REF, _DOC_REF, _URL_REF):
+        hits.update(m.group(0).lower() for m in pattern.finditer(task))
+    return len(hits)
+
 
 def classify_task(task: str) -> TaskShape:
     """DETERMINISTIC task-shape heuristic — never an LLM call (anti-scope rule).
 
     write-intent -> sequential_write; short single-question -> simple; read-heavy
-    multi-part -> parallel_read. Biased toward falling back: the single-agent
-    path is always correct, the hierarchy is an optimization.
+    multi-part -> parallel_read. Biased toward falling back: the single-agent path is
+    always correct, the hierarchy is an optimization. TWO OR MORE distinct sources +
+    read intent short-circuits to parallel_read even from terse phrasing — that's the
+    measured guaranteed-gain region (the (D-1)/D sweep), so we don't want a length/part
+    heuristic to miss it.
     """
     low = task.lower()
     if any(marker in low for marker in _WRITE_MARKERS):
         return "sequential_write"
     is_read = any(marker in low for marker in _READ_MARKERS)
+    if is_read and count_sources(task) >= 2:
+        return "parallel_read"
     parts = len(_MULTIPART.findall(task))
     if is_read and (parts >= 2 or len(task) >= 200):
         return "parallel_read"
@@ -176,12 +200,19 @@ class HierarchicalOrchestrator:
             return self._fallback(task, shape, reason=f"shape={shape}")
 
         # Guard 2 — global profitability: don't delegate when inline is cheaper.
-        probe = TaskSpec(task_id="probe", objective=task)
-        estimate = estimate_profitability(
-            probe, orchestrator_context_chars=len(task) * 8 + 24_000
-        )
-        if not estimate.profitable:
-            return self._fallback(task, shape, reason="unprofitable estimate")
+        # EXCEPTION: 2+ distinct sources is the measured guaranteed-gain region — the
+        # (D-1)/D sweep proves isolation wins there — so the crude blank-context estimate
+        # is not allowed to veto it.
+        sources = count_sources(task)
+        if sources < 2:
+            probe = TaskSpec(task_id="probe", objective=task)
+            estimate = estimate_profitability(
+                probe, orchestrator_context_chars=len(task) * 8 + 24_000
+            )
+            if not estimate.profitable:
+                return self._fallback(task, shape, reason="unprofitable estimate")
+        else:
+            _log.debug("%d distinct sources -> guaranteed-gain region, skipping profit veto", sources)
 
         specs = self.decompose(task)
         if not specs:

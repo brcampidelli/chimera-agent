@@ -62,6 +62,39 @@ reverse-engineering study of five leaders (OpenClaw, Hermes, nanobot, CrewAI, La
 
 **In one line: the governed, self-evolving agent — proved and governed.** It's alpha, and it says so.
 
+## Token economy — measured, not claimed
+
+Two "more models = better" instincts, stress-tested on real runs (predictions registered
+*before* each run, wins **and** losses published — see [`bench/`](bench/)):
+
+**Fusion is reserved, not default.** On a 12-task reasoning suite the mid tier alone scored
+100% at 846 tokens; full fusion also scored 100% — for **9,526 tokens (~11×)**. So fusion sits
+behind a cheap→gate→mid→fusion cascade that escalates only when a free gate fails, reaching
+~mid quality at ~1/12 of fusion's cost.
+
+**Hierarchical orchestration wins only where it should — and by a law we can write down.**
+`chimera orchestrate` splits a task across scoped workers instead of one big context. A single
+agent re-sends every document on every turn; scoped workers read each once. So the token saving
+scales as **(D−1)/D** in the number of documents D — confirmed on real runs to <0.2%:
+
+| documents (D) | measured token saving | (D−1)/D |
+|---|---|---|
+| 2 | 49.9% | 50% |
+| 3 | 66.7% | 66.7% |
+| 4 | 74.8% | 75% |
+| 5 | 79.9% | 80% |
+
+The saving holds flat as the conversation lengthens and rises with document size toward the same
+limit ([full sweep, 3 axes](bench/hierarchy_sweep/README.md)). And where it *doesn't* pay — a
+single-shot task with one turn — the classifier detects that and **falls back to a single agent**
+(that run cost +47% more tokens; we published it too).
+
+**The honest asterisk.** These are *token* counts. With prompt caching a provider bills the single
+agent's repeated documents at ~0.1×, so the *dollar* win is smaller — and past a few turns it can
+**invert** (independent workers re-pay cold context the single agent caches). We ship the
+[model that quantifies this](bench/hierarchy_sweep/cache_cost.py) rather than quietly claiming the
+token number as a dollar number.
+
 ## Features
 
 ### 🧠 Thinking & doing

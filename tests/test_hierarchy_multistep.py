@@ -9,6 +9,7 @@ re-sends every large document on every turn.
 from __future__ import annotations
 
 from chimera.eval.hierarchy_multistep import (
+    make_hetero_task,
     make_sweep_task,
     multistep_tasks,
     run_baseline,
@@ -143,6 +144,17 @@ def test_Q_axis_win_is_roughly_flat() -> None:
     # All near 0.667, and the spread across Q is small (flat, not a lever).
     assert all(0.55 < v < 0.75 for v in vals), vals
     assert max(vals) - min(vals) < 0.12
+
+
+def test_hetero_docs_do_not_break_the_law() -> None:
+    """Robustness: with unequal doc sizes (one question per doc) the saving still
+    tracks (D-1)/D — the isolation win is size-distribution-agnostic."""
+    task = make_hetero_task([4, 40, 80])  # D=3, very unequal
+    assert len(task.docs) == 3
+    base = run_baseline(task, _char_complete)
+    scoped = run_scoped(task, _char_complete)
+    reduction = 1 - scoped.tokens / base.tokens
+    assert abs(reduction - (3 - 1) / 3) < 0.06  # ~0.667 regardless of the skew
 
 
 def test_grading_requires_all_needles() -> None:

@@ -101,10 +101,33 @@ def _orchestrator(
         ("What is the capital of France?", "simple"),
         ("hi", "simple"),
         ("Research the history of Rome", "simple"),  # read intent but single-part & short
+        # 2+ distinct sources + read intent -> guaranteed-gain region, even terse:
+        ("Compare a.md and b.md", "parallel_read"),
+        ("Summarize doc A and doc B", "parallel_read"),
+        ("Read report.pdf", "simple"),  # ONE source -> nothing to isolate
     ],
 )
 def test_classifier_table(task: str, expected: str) -> None:
     assert classify_task(task) == expected
+
+
+def test_count_sources_counts_distinct_refs() -> None:
+    from chimera.orchestration.hierarchy import count_sources
+
+    assert count_sources("compare a.md and b.md") == 2
+    assert count_sources("read a.md, a.md again, and b.md") == 2  # distinct only
+    assert count_sources("summarize doc A and document B") == 2
+    assert count_sources("check https://x.com/1 and https://y.com/2") == 2
+    assert count_sources("what is 2+2") == 0
+
+
+def test_two_sources_skip_the_profitability_veto(tmp_path: Path) -> None:
+    """A terse 2-source read task must delegate (guaranteed-gain region), not be
+    vetoed by the crude blank-context profitability estimate."""
+    backend = FakeBackend()
+    result = _orchestrator(backend, tmp_path).run("Compare alpha.md and bravo.md")
+    assert result.shape == "parallel_read"
+    assert result.fell_back is False
 
 
 # ---------------------------------------------------------------------------
