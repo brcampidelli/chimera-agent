@@ -6,6 +6,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-07-09
+
+Scraping polish (deterministic CSS extraction + resumable crawl) and a new **speech-to-text** tool —
+the symmetric partner to image-gen + TTS. Also an honest scope note: Chimera *orchestrates* models
+(Whisper/Stable Diffusion/PyTorch/OpenCV are called or run in the code sandbox), it does not reimplement
+them.
+
+### Added
+- **Deterministic CSS-selector extraction before the LLM.** `extract` accepts `selectors` (field → CSS,
+  e.g. `{"price": ".price", "link": "a.more::attr(href)"}`): for a known page template those fields are
+  pulled with BeautifulSoup — free, exact, no LLM — and the safe quarantined LLM fills only what a
+  selector missed (the crawl4ai cheapest-tool-first idea). Reuses the `bs4` that ships with the
+  `documents` extra; falls back to the LLM path when absent. `chimera/scrape/extract.py::extract_by_css`.
+- **Resumable crawl.** `crawl` checkpoints its frontier + visited set to disk after every page (atomic
+  write) and appends pages to a `.jsonl` sidecar, so a crawl interrupted at page N resumes from N+1
+  (`resume=true` by default; `limit` is the total target across resumes). State auto-clears when the
+  crawl completes. `chimera/scrape/crawl.py`.
+- **`transcribe_audio` tool — speech-to-text.** Chimera *orchestrates* Whisper (it doesn't train an ASR
+  model): local **faster-whisper** when the new `stt` extra is installed (offline/private), else the
+  hosted OpenAI Whisper API. Fills the obvious gap next to the existing image-generation and
+  text-to-speech tools. `chimera/tools/media.py`; in `READ_TOOLS`.
+
 ## [0.10.0] - 2026-07-09
 
 Phase 2 of the web verb set: whole-site **`map`** and **`crawl`**, completing the

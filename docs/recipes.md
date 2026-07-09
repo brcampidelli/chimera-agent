@@ -110,7 +110,9 @@ Two built-in tools turn any page into clean, LLM-ready data — no extra to inst
   output is schema-validated — so **instructions hidden in the page can't hijack the agent**. That is
   the safety guarantee Firecrawl/ScrapeGraphAI don't give you: a hostile page can at worst return a
   wrong value, never a new instruction. Large pages are chunked and merged, stopping early once every
-  field is filled to cap cost.
+  field is filled to cap cost. For a **known page template**, pass `selectors` (field → CSS, e.g.
+  `{"price": ".price", "link": "a.more::attr(href)"}`) and those fields are extracted **deterministically
+  — free, no LLM** — with the safe LLM used only for fields a selector didn't fill.
 
 ```bash
 uv run chimera run "scrape https://news.ycombinator.com and summarize the top 5 stories"
@@ -123,7 +125,9 @@ For whole sites there are two more verbs:
   links). Optional `search` keyword filter. Run this to scope a site before crawling it.
 - **`crawl`** — follow links from a seed URL and return each page's clean Markdown. Bounded by `limit`
   and `max_depth`, same-domain by default, and **robots.txt-aware** (it obeys `Disallow` and
-  `Crawl-delay`). `include`/`exclude` are URL glob patterns.
+  `Crawl-delay`). `include`/`exclude` are URL glob patterns. Long crawls are **resumable**: the frontier
+  is checkpointed to disk after every page, so a crawl interrupted at page N continues from N+1 on the
+  next run (`resume=true` by default).
 
 ```bash
 uv run chimera run "map https://docs.example.com then crawl the /guide section (max 20 pages) and summarize it"
@@ -133,6 +137,25 @@ Everything is data-fenced and taints the run (it's untrusted web content), so `s
 is the safe way to act on it. The optional Firecrawl fallback is used *only* when the built-in engine
 can't fetch a page and the key is set — Chimera scrapes the great majority of the web itself, with no
 external service.
+
+## Audio: speech-to-text (transcribe)
+
+Chimera can turn speech into text — the symmetric partner to its image-generation and text-to-speech
+tools. It **orchestrates a Whisper model** (it doesn't train one): the `transcribe_audio` tool uses
+local **faster-whisper** if you install the `stt` extra (offline/private), otherwise the hosted OpenAI
+Whisper API (needs an OpenAI key):
+
+```bash
+uv sync --extra stt      # optional: local, offline transcription (heavier — downloads a model)
+uv run chimera run "transcribe meeting.m4a and give me 5 bullet-point action items"
+```
+
+> A note on scope, in the honest spirit of this project: Chimera is an **agent**, not a model. It can
+> *use* speech-to-text, image generation, computer vision, or classic ML — by calling an API or running
+> a library in its code sandbox — but it does not (and cannot sensibly) *reimplement* Whisper, Stable
+> Diffusion, PyTorch, or OpenCV. For data science / ML, the `execute_code` sandbox already lets the
+> agent write and run Python against scikit-learn, pandas, OpenCV, etc. Orchestration multiplies the
+> agent; reimplementation would only produce a slower copy.
 
 ## Schedule any of them
 

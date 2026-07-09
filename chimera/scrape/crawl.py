@@ -12,10 +12,13 @@ whole crawl is unit-tested with fakes — no network.
 
 from __future__ import annotations
 
+import contextlib
 import fnmatch
+import json
 import re
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from urllib.parse import urljoin, urlparse
 from urllib.robotparser import RobotFileParser
 
@@ -92,9 +95,34 @@ class CrawledPage:
 
 @dataclass
 class CrawlResult:
-    pages: list[CrawledPage] = field(default_factory=list)
+    pages: list[CrawledPage] = field(default_factory=list)  # pages fetched THIS run
     stopped_reason: str = "done"
     skipped_robots: int = 0
+    resumed_from: int = 0  # pages already collected by a previous run (state resume)
+
+    @property
+    def total(self) -> int:
+        return self.resumed_from + len(self.pages)
+
+
+def _load_state(state_path: Path) -> tuple[set[str], list[tuple[str, int]], int]:
+    """Return (visited, frontier, prior_page_count) from a saved crawl, or empty on any problem."""
+    try:
+        st = json.loads(state_path.read_text(encoding="utf-8"))
+        visited = {str(u) for u in st.get("visited", [])}
+        frontier = [(str(u), int(d)) for u, d in st.get("frontier", [])]
+        pages_path = state_path.with_suffix(".jsonl")
+        prior = sum(1 for _ in pages_path.open(encoding="utf-8")) if pages_path.exists() else 0
+        return visited, frontier, prior
+    except Exception:  # noqa: BLE001 — a corrupt/absent state file just means "start fresh"
+        return set(), [], 0
+
+
+def _save_state(state_path: Path, visited: set[str], frontier: list[tuple[str, int]]) -> None:
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = state_path.with_suffix(".tmp")
+    tmp.write_text(json.dumps({"visited": sorted(visited), "frontier": frontier}), encoding="utf-8")
+    tmp.replace(state_path)  # atomic — a crash mid-write never corrupts the resume point
 
 
 def crawl_site(
@@ -107,12 +135,33 @@ def crawl_site(
     same_domain: bool = True,
     respect_robots: bool = True,
     delay: float | None = None,
+    state_path: Path | None = None,
+    resume: bool = True,
     settings: Settings | None = None,
 ) -> CrawlResult:
-    """BFS-crawl from ``seed``, fetching each page's clean Markdown, within the given bounds."""
+    """BFS-crawl from ``seed``, fetching each page's clean Markdown, within the given bounds.
+
+    If ``state_path`` is given, the frontier + visited set are checkpointed to disk after every page
+    and pages are appended to a ``.jsonl`` sidecar, so a crawl interrupted at page N resumes from N+1
+    (``resume=True``) instead of re-fetching. ``limit`` is the *total* page target across resumes.
+    """
     settings = settings or get_settings()
     include = include or []
     exclude = exclude or []
+    pages_path = state_path.with_suffix(".jsonl") if state_path else None
+
+    result = CrawlResult()
+    visited: set[str] = set()
+    frontier: list[tuple[str, int]] = [(seed, 0)]
+    if state_path and resume and state_path.exists():
+        visited, frontier, result.resumed_from = _load_state(state_path)
+        if not frontier:  # a completed crawl — nothing left to do
+            result.stopped_reason = "already complete"
+            return result
+    elif state_path and not resume:
+        for path in (state_path, pages_path):
+            if path is not None:
+                path.unlink(missing_ok=True)  # fresh start
 
     robots: RobotFileParser | None = None
     if respect_robots:
@@ -123,12 +172,8 @@ def crawl_site(
             delay = float(cd) if cd is not None else 0.0
     delay = delay or 0.0
 
-    result = CrawlResult()
-    visited: set[str] = set()
-    frontier: list[tuple[str, int]] = [(seed, 0)]
-
     while frontier:
-        if len(result.pages) >= limit:
+        if result.total >= limit:
             result.stopped_reason = f"reached page limit ({limit})"
             break
         current, depth = frontier.pop(0)
@@ -147,14 +192,25 @@ def crawl_site(
             continue
 
         page = fetch_page(current, render="http", settings=settings)
-        result.pages.append(CrawledPage(current, page.title, page.markdown, depth))
+        crawled = CrawledPage(current, page.title, page.markdown, depth)
+        result.pages.append(crawled)
+        if pages_path is not None:
+            pages_path.parent.mkdir(parents=True, exist_ok=True)
+            with pages_path.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps({"url": crawled.url, "title": crawled.title,
+                                     "depth": crawled.depth, "markdown": crawled.markdown}) + "\n")
 
         if depth < max_depth:
             for link in page.links:
                 target = urljoin(current, link).split("#", 1)[0]
                 if target not in visited:
                     frontier.append((target, depth + 1))
+        if state_path is not None:
+            _save_state(state_path, visited, frontier)
         if delay:
             time.sleep(delay)
 
+    if state_path is not None and not frontier:
+        with contextlib.suppress(Exception):  # crawl finished — clear the resume checkpoint
+            state_path.unlink(missing_ok=True)
     return result

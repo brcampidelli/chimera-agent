@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "chimera-agent"
-version = "0.10.0"
+version = "0.11.0"
 description = "An open-source, self-evolving AI agent whose reasoning core is an LLM-Fusion engine (panel -> judge -> synthesizer)."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -56,6 +56,12 @@ messaging = [
 # it stays opt-in; every other reference tool needs no extra.
 youtube = [
     "youtube-transcript-api>=0.6",
+]
+# Local speech-to-text for the transcribe_audio tool (offline/private). Heavy: pulls CTranslate2 +
+# downloads a Whisper model on first use. Opt-in — without it, transcribe_audio uses the OpenAI
+# Whisper API (needs an OpenAI key). Chimera orchestrates Whisper; it does not train an ASR model.
+stt = [
+    "faster-whisper>=1.0",
 ]
 # Document ingestion for the read_document tool: any-format -> Markdown via MarkItDown.
 # Opt-in so the core stays light; the tool gives an install hint when this isn't present.

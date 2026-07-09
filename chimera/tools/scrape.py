@@ -8,13 +8,16 @@ quarantined reader, so instructions hidden in the page can't hijack the agent. B
 
 from __future__ import annotations
 
+import hashlib
 import json
+from pathlib import Path
 from typing import Any
 
+from chimera.config import get_settings
 from chimera.governance.ledger_tool import fence
 from chimera.providers.gateway import SupportsComplete
 from chimera.scrape.crawl import crawl_site, map_site
-from chimera.scrape.extract import extract_structured
+from chimera.scrape.extract import extract_by_css, extract_structured
 from chimera.scrape.fetch import fetch_page
 from chimera.tools.base import Tool
 
@@ -83,6 +86,12 @@ class ExtractTool(Tool):
                 "items": {"type": "string"},
                 "description": "Field names to extract, e.g. ['title', 'price', 'author'].",
             },
+            "selectors": {
+                "type": "object",
+                "description": "Optional per-field CSS selectors for a known page template (free, no LLM), "
+                "e.g. {'price': '.price', 'link': 'a.more::attr(href)'}. Needs a url. Fields without a "
+                "selector (or whose selector finds nothing) fall back to the safe LLM extractor.",
+            },
         },
         "required": ["fields"],
     }
@@ -100,25 +109,47 @@ class ExtractTool(Tool):
 
     def run(self, **kwargs: Any) -> str:
         raw_fields = kwargs.get("fields") or []
-        fields = [str(f) for f in raw_fields] if isinstance(raw_fields, list) else []
-        if not any(f.strip() for f in fields):
-            return "error: extract needs a non-empty 'fields' list"
+        fields = [str(f).strip() for f in raw_fields if str(f).strip()] if isinstance(raw_fields, list) else []
+        selectors_in = kwargs.get("selectors") if isinstance(kwargs.get("selectors"), dict) else {}
+        selectors = {str(k): str(v) for k, v in (selectors_in or {}).items()}
+        all_fields = list(dict.fromkeys(fields + list(selectors)))
+        if not all_fields:
+            return "error: extract needs 'fields' or 'selectors'"
         url = str(kwargs.get("url", "")).strip()
         content = str(kwargs.get("content", ""))
+        html = ""
         if url:
             try:
-                content = fetch_page(url, render="auto").markdown
+                page = fetch_page(url, render="auto")
             except Exception as exc:  # noqa: BLE001
                 return f"error: extract could not fetch {url}: {exc}"
-        if not content.strip():
+            content, html = page.markdown, page.html
+        if not content.strip() and not html.strip():
             return "error: extract needs a url or content"
-        try:
-            result = extract_structured(content, fields, self._get_backend(), model=self._model)
-        except Exception as exc:  # noqa: BLE001 — an LLM/credential failure is a tool error
-            return f"error: extract failed: {exc}"
-        if not result.ok:
-            return fence(f"[extract: {result.error}]")
-        return fence(json.dumps(result.data))
+
+        data: dict[str, Any] = {name: None for name in all_fields}
+        # 1) deterministic CSS selectors first (free, exact) when we have HTML
+        if selectors and html:
+            css = extract_by_css(html, selectors)
+            if css:
+                for name, value in css.items():
+                    data[name] = value
+        # 2) the safe quarantined LLM for whatever CSS didn't fill
+        missing = [name for name in all_fields if data[name] is None]
+        if missing:
+            if not content.strip():
+                content = html  # nothing to feed the LLM but the raw HTML
+            try:
+                result = extract_structured(content, missing, self._get_backend(), model=self._model)
+            except Exception as exc:  # noqa: BLE001 — an LLM/credential failure is a tool error
+                return f"error: extract failed: {exc}"
+            if result.ok:
+                for name in missing:
+                    if result.data.get(name) is not None:
+                        data[name] = result.data[name]
+            elif all(data[name] is None for name in all_fields):
+                return fence(f"[extract: {result.error}]")
+        return fence(json.dumps(data))
 
 
 class MapTool(Tool):
@@ -170,6 +201,7 @@ class CrawlTool(Tool):
             "exclude": {"type": "array", "items": {"type": "string"}, "description": "Skip URLs matching these globs."},
             "same_domain": {"type": "boolean", "description": "Stay on the seed's domain (default true)."},
             "respect_robots": {"type": "boolean", "description": "Obey robots.txt (default true)."},
+            "resume": {"type": "boolean", "description": "Resume a prior interrupted crawl of the same seed (default true)."},
         },
         "required": ["url"],
     }
@@ -178,26 +210,39 @@ class CrawlTool(Tool):
     def _list(value: Any) -> list[str]:
         return [str(v) for v in value if str(v).strip()] if isinstance(value, list) else []
 
+    @staticmethod
+    def _state_path(url: str, limit: int, max_depth: int, include: list[str], exclude: list[str]) -> Path:
+        key = json.dumps([url, limit, max_depth, sorted(include), sorted(exclude)], sort_keys=True)
+        digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
+        return get_settings().home / "crawl_state" / f"{digest}.json"
+
     def run(self, **kwargs: Any) -> str:
         url = str(kwargs.get("url", "")).strip()
         if not url:
             return "error: crawl needs a url"
+        limit = int(kwargs.get("limit") or 20)
+        max_depth = int(kwargs.get("max_depth") if kwargs.get("max_depth") is not None else 2)
+        include = self._list(kwargs.get("include"))
+        exclude = self._list(kwargs.get("exclude"))
         try:
             result = crawl_site(
                 url,
-                limit=int(kwargs.get("limit") or 20),
-                max_depth=int(kwargs.get("max_depth") if kwargs.get("max_depth") is not None else 2),
-                include=self._list(kwargs.get("include")),
-                exclude=self._list(kwargs.get("exclude")),
+                limit=limit,
+                max_depth=max_depth,
+                include=include,
+                exclude=exclude,
                 same_domain=kwargs.get("same_domain", True) is not False,
                 respect_robots=kwargs.get("respect_robots", True) is not False,
+                state_path=self._state_path(url, limit, max_depth, include, exclude),
+                resume=kwargs.get("resume", True) is not False,
             )
         except Exception as exc:  # noqa: BLE001
             return f"error: crawl failed: {exc}"
         head = (
-            f"crawled {len(result.pages)} page(s) (stopped: {result.stopped_reason}"
+            f"crawled {len(result.pages)} new page(s)"
+            + (f" (resumed from {result.resumed_from}; {result.total} total)" if result.resumed_from else "")
+            + f" — stopped: {result.stopped_reason}"
             + (f"; skipped {result.skipped_robots} by robots.txt" if result.skipped_robots else "")
-            + ")"
         )
         parts = [head]
         used = len(head)

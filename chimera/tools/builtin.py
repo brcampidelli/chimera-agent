@@ -88,6 +88,13 @@ def default_registry(workspace: Path | None = None) -> ToolRegistry:
         from chimera.tools.media import TextToSpeechTool
 
         registry.register(TextToSpeechTool())
+    # Speech-to-text lights up with local faster-whisper (the `stt` extra) OR an OpenAI key.
+    import importlib.util
+
+    if importlib.util.find_spec("faster_whisper") is not None or settings.key_pool("openai"):
+        from chimera.tools.media import TranscribeAudioTool
+
+        registry.register(TranscribeAudioTool(workspace))
     if settings.smtp_host and settings.smtp_user and settings.smtp_password:
         from chimera.tools.email import SendEmailTool
 

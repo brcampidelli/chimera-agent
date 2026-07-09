@@ -13,9 +13,11 @@ from typing import Any
 
 from chimera.config import get_settings
 from chimera.tools.base import Tool
+from chimera.tools.workspace import resolve_in_workspace
 
 _OPENAI_IMAGES = "https://api.openai.com/v1/images/generations"
 _ELEVEN_TTS = "https://api.elevenlabs.io/v1/text-to-speech"
+_OPENAI_TRANSCRIBE = "https://api.openai.com/v1/audio/transcriptions"
 
 
 class ImageGenTool(Tool):
@@ -111,3 +113,81 @@ class TextToSpeechTool(Tool):
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_bytes(data)
         return f"saved audio ({len(data)} bytes) to {out}"
+
+
+def _transcribe_faster_whisper(path: str, language: str | None) -> str | None:
+    """Local speech-to-text via faster-whisper (the `stt` extra). None if it isn't installed."""
+    try:
+        from faster_whisper import WhisperModel
+    except ImportError:
+        return None
+    import os
+
+    model = WhisperModel(os.environ.get("CHIMERA_WHISPER_MODEL", "base"))
+    segments, _info = model.transcribe(path, language=language)
+    return " ".join(seg.text.strip() for seg in segments).strip()
+
+
+def _transcribe_openai(path: str, key: str, language: str | None) -> str:
+    """Hosted speech-to-text via the OpenAI Whisper API (leanest path — no GPU, no weights)."""
+    import httpx
+
+    with open(path, "rb") as fh:
+        data: dict[str, str] = {"model": "whisper-1"}
+        if language:
+            data["language"] = language
+        resp = httpx.post(
+            _OPENAI_TRANSCRIBE,
+            headers={"Authorization": f"Bearer {key}"},
+            files={"file": (Path(path).name, fh, "application/octet-stream")},
+            data=data,
+            timeout=300.0,
+        )
+    resp.raise_for_status()
+    return str(resp.json().get("text", ""))
+
+
+class TranscribeAudioTool(Tool):
+    """Speech-to-text — the symmetric partner to image-gen + TTS. Chimera *orchestrates* a Whisper
+    model (it doesn't train one): local faster-whisper if the `stt` extra is installed, else the
+    hosted OpenAI Whisper API. Wave/mp3/m4a etc."""
+
+    name = "transcribe_audio"
+    description = (
+        "Transcribe an audio file to text (speech-to-text). Args: path (audio file: wav/mp3/m4a/…); "
+        "optional language (e.g. 'en', 'pt'). Uses local faster-whisper if installed, else the OpenAI "
+        "Whisper API."
+    )
+    parameters = {
+        "type": "object",
+        "properties": {
+            "path": {"type": "string", "description": "Audio file path (relative to the workspace)."},
+            "language": {"type": "string", "description": "Optional language hint, e.g. 'en', 'pt'."},
+        },
+        "required": ["path"],
+    }
+
+    def __init__(self, workspace: Path | None = None) -> None:
+        self.workspace = (workspace or Path.cwd()).resolve()
+
+    def run(self, **kwargs: Any) -> str:
+        rel = str(kwargs.get("path", "")).strip()
+        if not rel:
+            return "error: transcribe_audio needs a 'path'"
+        path = resolve_in_workspace(self.workspace, rel)
+        if not path.is_file():
+            return f"error: audio file not found: {rel}"
+        language = str(kwargs.get("language", "")).strip() or None
+        try:
+            text = _transcribe_faster_whisper(str(path), language)  # local first (offline/private)
+            if text is None:  # no stt extra -> hosted Whisper
+                keys = get_settings().key_pool("openai")
+                if not keys:
+                    return (
+                        "error: transcription needs the 'stt' extra (pip install 'chimera-agent[stt]') "
+                        "or an OpenAI key (CHIMERA_OPENAI_KEYS)"
+                    )
+                text = _transcribe_openai(str(path), keys[0], language)
+        except Exception as exc:  # noqa: BLE001 — a bad file / API error is a tool error, not a crash
+            return f"error: transcription failed: {exc}"
+        return text or "(no speech detected)"

@@ -41,7 +41,7 @@ FETCH_TOOLS = frozenset(
 )
 EXEC_TOOLS = frozenset({"run_shell", "execute_code", "code_interpreter"})
 WRITE_TOOLS = frozenset({"write_file", "edit_file", "apply_patch"})
-READ_TOOLS = frozenset({"read_file", "read_document"})
+READ_TOOLS = frozenset({"read_file", "read_document", "transcribe_audio"})
 # Non-idempotent external side effects: firing the SAME call twice does real double harm
 # (a duplicate email/message/payment). A retry loop must not re-execute these — see the
 # idempotency guard in LedgeredTool (M15-A5). File writes are excluded: rewriting the same

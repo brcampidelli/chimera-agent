@@ -32,6 +32,7 @@ class FetchResult:
     links: list[str] = field(default_factory=list)
     source: str = "http"  # which backend produced it: http | browser | firecrawl
     status: int | None = None
+    html: str = ""  # raw HTML (http/browser paths only) — for deterministic CSS-selector extraction
 
 
 def _http_fetch(url: str, timeout: float = 20.0) -> tuple[int, str]:
@@ -74,6 +75,7 @@ def _from_html(url: str, html: str, source: str, status: int | None = None) -> F
         links=extract_links(html, url),
         source=source,
         status=status,
+        html=html,
     )
 
 

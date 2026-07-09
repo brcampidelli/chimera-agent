@@ -12,6 +12,7 @@ merge (first non-null wins per field), short-circuiting once every field is fill
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -21,6 +22,39 @@ from chimera.server.gateway import chunk_text
 
 _MAX_CHARS_PER_CHUNK = 12_000
 _MAX_CHUNKS = 6  # cost cap: never spend more than this many quarantined calls on one extraction
+_ATTR = re.compile(r"^(.*?)::attr\(([^)]+)\)\s*$")  # "a.link::attr(href)" -> (selector, attribute)
+
+
+def extract_by_css(html: str, selectors: dict[str, str]) -> dict[str, Any] | None:
+    """Deterministic, LLM-free extraction: run each field's CSS selector over the HTML.
+
+    The crawl4ai insight — for a known page template, a CSS selector is free, repeatable and exact, so
+    try it *before* paying for an LLM. Selectors take ``field: "css"`` (text of the first match) or
+    ``field: "css::attr(name)"`` (an attribute). Returns ``None`` if BeautifulSoup isn't installed (the
+    caller then uses the quarantined LLM path); a field with no match maps to ``None``.
+    """
+    try:
+        from bs4 import BeautifulSoup  # ships with the `documents` extra (markitdown)
+    except ImportError:
+        return None
+    soup = BeautifulSoup(html, "html.parser")
+    out: dict[str, Any] = {}
+    for name, raw in selectors.items():
+        attr_match = _ATTR.match(raw.strip())
+        selector = attr_match.group(1).strip() if attr_match else raw.strip()
+        try:
+            node = soup.select_one(selector)
+        except Exception:  # noqa: BLE001 — a bad selector yields no value, not a crash
+            out[name] = None
+            continue
+        if node is None:
+            out[name] = None
+        elif attr_match:
+            value = node.get(attr_match.group(2))
+            out[name] = str(value) if value is not None else None
+        else:
+            out[name] = node.get_text(strip=True) or None
+    return out
 
 
 @dataclass

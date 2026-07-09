@@ -13,7 +13,7 @@ from chimera.scrape import clean
 from chimera.scrape import crawl as crawl_mod
 from chimera.scrape import fetch as fetch_mod
 from chimera.scrape.crawl import crawl_site, map_site
-from chimera.scrape.extract import extract_structured
+from chimera.scrape.extract import extract_by_css, extract_structured
 from chimera.scrape.fetch import FetchResult, fetch_page
 from chimera.tools.scrape import CrawlTool, ExtractTool, MapTool, ScrapeTool
 
@@ -204,3 +204,42 @@ def test_map_and_crawl_tools(monkeypatch: pytest.MonkeyPatch) -> None:
     crawl_out = CrawlTool().run(url="https://s.com/", respect_robots=False)
     assert FENCE_OPEN in crawl_out and "crawled" in crawl_out and "s.com/a1" in crawl_out
     assert "map" in FETCH_TOOLS and "crawl" in FETCH_TOOLS
+
+
+# --- resumable crawl ---------------------------------------------------------------------
+
+
+def test_crawl_resumes_from_saved_state(monkeypatch: pytest.MonkeyPatch, tmp_path: object) -> None:
+    monkeypatch.setattr(crawl_mod, "fetch_page", _fake_fetch_page)
+    sp = tmp_path / "state.json"  # type: ignore[operator]
+    r1 = crawl_site("https://s.com/", limit=2, state_path=sp, respect_robots=False)
+    assert len(r1.pages) == 2 and sp.exists()  # interrupted at the limit, checkpoint written
+    r2 = crawl_site("https://s.com/", limit=4, state_path=sp, resume=True, respect_robots=False)
+    assert r2.resumed_from == 2 and r2.total == 4 and len(r2.pages) == 2  # picked up, didn't re-fetch
+
+
+def test_crawl_clears_state_when_complete(monkeypatch: pytest.MonkeyPatch, tmp_path: object) -> None:
+    monkeypatch.setattr(crawl_mod, "fetch_page", _fake_fetch_page)
+    sp = tmp_path / "s2.json"  # type: ignore[operator]
+    res = crawl_site("https://s.com/", limit=100, state_path=sp, respect_robots=False)
+    assert len(res.pages) == 4 and res.stopped_reason == "done" and not sp.exists()
+
+
+# --- deterministic CSS-selector extraction (before the LLM) ------------------------------
+
+
+def test_extract_by_css_text_and_attr() -> None:
+    pytest.importorskip("bs4")  # ships with the documents extra
+    html = '<div class="price">9.99</div><a class="more" href="/x">go</a>'
+    got = extract_by_css(html, {"price": ".price", "link": "a.more::attr(href)", "missing": ".nope"})
+    assert got == {"price": "9.99", "link": "/x", "missing": None}
+
+
+def test_extract_tool_css_first_skips_the_llm(monkeypatch: pytest.MonkeyPatch) -> None:
+    pytest.importorskip("bs4")
+    # Enough body text that the fetch cascade doesn't escalate off the (patched) HTTP result.
+    html = '<h1 class="t">Title</h1><span class="p">42</span><p>' + "filler body text. " * 30 + "</p>"
+    monkeypatch.setattr(fetch_mod, "_http_fetch", lambda url, timeout=20.0: (200, html))
+    backend = _FakeBackend([])  # must never be called — CSS fills everything
+    out = ExtractTool(backend=backend).run(url="https://x.com", fields=[], selectors={"title": ".t", "price": ".p"})
+    assert '"title": "Title"' in out and '"price": "42"' in out and backend.calls == 0
