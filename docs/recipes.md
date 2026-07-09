@@ -157,6 +157,46 @@ uv run chimera run "transcribe meeting.m4a and give me 5 bullet-point action ite
 > agent write and run Python against scikit-learn, pandas, OpenCV, etc. Orchestration multiplies the
 > agent; reimplementation would only produce a slower copy.
 
+## Download a video or its audio
+
+The `download_media` tool pulls a video (or just its audio) from YouTube and 1000+ other sites into
+the workspace. It wraps **yt-dlp** (actively maintained, handles the cipher/format/age-gate churn that
+sinks single-site scrapers like pytube). Opt-in; audio extraction also needs `ffmpeg` on PATH:
+
+```bash
+uv sync --extra media-dl
+uv run chimera run "download the audio of https://youtu.be/… then transcribe it and summarize"
+```
+
+Pairs naturally with `transcribe_audio` above: download → transcribe → summarize, all in one run.
+
+## Data analysis / ML (the `data_analysis` skill)
+
+Chimera doesn't reimplement scikit-learn — it **writes correct pandas/sklearn code and runs it** in the
+`execute_code` sandbox. The `data_analysis` skill names that capability: give it a task and a dataset
+and it emits a self-contained script (load → explore → model → evaluate) the agent then executes.
+
+```bash
+uv run chimera run "use the data_analysis skill: predict churn from customers.csv and report accuracy"
+```
+
+## Image generation (hosted or fully local)
+
+`generate_image` uses the OpenAI image API by default. For an **offline / private** setup, set
+`CHIMERA_IMAGE_BACKEND=local` and install the (heavy, GPU-bound) `imagegen-local` extra — Chimera then
+runs **FLUX.1-schnell** (Apache-2.0) via `diffusers` locally. `auto` (the default) uses local only when
+no OpenAI key is present.
+
+```bash
+uv sync --extra imagegen-local     # pulls torch + diffusers; downloads multi-GB weights on first use
+CHIMERA_IMAGE_BACKEND=local uv run chimera run "generate an image of a fox in a snowy forest"
+```
+
+> Same honest scope as above: Chimera *runs* a diffusion model here; it does not train one. Video
+> generation (e.g. CogVideo) is deliberately **not** built in — it's a heavyweight trained model, not
+> something an agent should carry in its base; reach for a hosted API if you ever need it. Computer
+> vision (OpenCV) needs no dedicated tool — the agent already does `import cv2` in the code sandbox.
+
 ## Schedule any of them
 
 Every recipe can run on a cron and deliver to chat:

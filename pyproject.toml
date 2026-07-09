@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "chimera-agent"
-version = "0.11.0"
+version = "0.12.0"
 description = "An open-source, self-evolving AI agent whose reasoning core is an LLM-Fusion engine (panel -> judge -> synthesizer)."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -62,6 +62,20 @@ youtube = [
 # Whisper API (needs an OpenAI key). Chimera orchestrates Whisper; it does not train an ASR model.
 stt = [
     "faster-whisper>=1.0",
+]
+# Media download for the download_media tool: yt-dlp (1000+ sites, actively maintained — the robust
+# alternative to pytube). Audio extraction also needs ffmpeg on PATH. Opt-in.
+media-dl = [
+    "yt-dlp>=2024.1",
+]
+# Local image generation for generate_image (CHIMERA_IMAGE_BACKEND=local). VERY heavy: pulls torch +
+# diffusers and downloads multi-GB model weights; needs a real GPU. Opt-in — the hosted OpenAI path is
+# the default. Chimera *runs* a diffusion model (FLUX.1-schnell, Apache-2.0); it does not train one.
+imagegen-local = [
+    "diffusers>=0.30",
+    "torch>=2.1",
+    "transformers>=4.40",
+    "accelerate>=0.30",
 ]
 # Document ingestion for the read_document tool: any-format -> Markdown via MarkItDown.
 # Opt-in so the core stays light; the tool gives an install hint when this isn't present.

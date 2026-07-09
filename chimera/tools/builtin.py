@@ -62,6 +62,9 @@ def default_registry(workspace: Path | None = None) -> ToolRegistry:
     registry.register(ReadDocumentTool(workspace))
     registry.register(ArxivSearchTool())
     registry.register(YouTubeTranscriptTool())
+    from chimera.tools.download import DownloadMediaTool
+
+    registry.register(DownloadMediaTool(workspace))
 
     # Web scraping + secure structured extraction (fetch->clean markdown; schema->JSON via quarantine)
     # + whole-site discovery (map/crawl, robots-aware).
@@ -80,10 +83,12 @@ def default_registry(workspace: Path | None = None) -> ToolRegistry:
         from chimera.tools.web import WebSearchTool
 
         registry.register(WebSearchTool())
-    if settings.key_pool("openai"):
+    import importlib.util
+
+    if settings.key_pool("openai") or importlib.util.find_spec("diffusers") is not None:
         from chimera.tools.media import ImageGenTool
 
-        registry.register(ImageGenTool())
+        registry.register(ImageGenTool())  # hosted (OpenAI key) or local (diffusers/imagegen-local)
     if settings.elevenlabs_api_key:
         from chimera.tools.media import TextToSpeechTool
 

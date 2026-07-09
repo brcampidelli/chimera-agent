@@ -144,6 +144,14 @@ class Settings(BaseSettings):
     # --- Browser tool: run Chromium headless (default) or headful for debugging. ---
     browser_headless: bool = Field(default=True, validation_alias="CHIMERA_BROWSER_HEADLESS")
 
+    # --- Image generation backend: 'auto' (hosted if an OpenAI key is set, else local diffusers),
+    # 'hosted' (OpenAI), or 'local' (run FLUX/SD via the imagegen-local extra — heavy, GPU). ---
+    image_backend: str = Field(default="auto", validation_alias="CHIMERA_IMAGE_BACKEND")
+    image_model_local: str = Field(
+        default="black-forest-labs/FLUX.1-schnell",  # Apache-2.0 weights — commercially safe
+        validation_alias="CHIMERA_IMAGE_MODEL_LOCAL",
+    )
+
     # --- Long-term memory backend: json (default, zero-dep) or sqlite (FTS5 full-text) ---
     memory_backend: str = Field(default="json", validation_alias="CHIMERA_MEMORY_BACKEND")
 

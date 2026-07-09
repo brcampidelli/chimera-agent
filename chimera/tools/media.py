@@ -20,6 +20,28 @@ _ELEVEN_TTS = "https://api.elevenlabs.io/v1/text-to-speech"
 _OPENAI_TRANSCRIBE = "https://api.openai.com/v1/audio/transcriptions"
 
 
+def _generate_local(prompt: str, out: Path, model: str, size: str) -> None:
+    """Generate an image locally with diffusers (the `imagegen-local` extra). Heavy: GPU + weights.
+
+    Uses the maintained `diffusers` library — not the model repos directly — with FLUX.1-schnell
+    (Apache-2.0) by default. Raises ImportError if the extra isn't installed (caller degrades).
+    Chimera *runs* a diffusion model here; it does not train one.
+    """
+    import torch
+    from diffusers import DiffusionPipeline
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    dtype = torch.bfloat16 if device == "cuda" else torch.float32
+    pipe = DiffusionPipeline.from_pretrained(model, torch_dtype=dtype).to(device)
+    try:
+        width, height = (int(part) for part in size.lower().split("x"))
+    except ValueError:
+        width = height = 1024
+    image = pipe(prompt, width=width, height=height).images[0]
+    out.parent.mkdir(parents=True, exist_ok=True)
+    image.save(out)
+
+
 class ImageGenTool(Tool):
     name = "generate_image"
     description = "Generate an image from a text prompt (OpenAI) and save it to a file; returns the path."
@@ -39,13 +61,28 @@ class ImageGenTool(Tool):
     def run(self, **kwargs: Any) -> str:
         import httpx  # lazy
 
-        keys = get_settings().key_pool("openai")
-        if not keys:
-            return "error: generate_image needs OPENAI_API_KEY (set it in .env)."
-        key = keys[0]
+        settings = get_settings()
         prompt = str(kwargs["prompt"])
         out = Path(str(kwargs.get("out") or "generated_image.png"))
         size = str(kwargs.get("size") or "1024x1024")
+        keys = settings.key_pool("openai")
+
+        # Backend: 'local' forces diffusers; 'auto' uses local only when there's no hosted key.
+        if settings.image_backend == "local" or (settings.image_backend == "auto" and not keys):
+            try:
+                _generate_local(prompt, out, settings.image_model_local, size)
+            except ImportError:
+                return (
+                    "error: local image generation needs the 'imagegen-local' extra "
+                    "(pip install 'chimera-agent[imagegen-local]') — a large GPU download"
+                )
+            except Exception as exc:  # noqa: BLE001 — a model/GPU failure is a tool error
+                return f"error: local image generation failed: {exc}"
+            return f"saved image to {out} (local: {settings.image_model_local})"
+
+        if not keys:
+            return "error: generate_image needs OPENAI_API_KEY (or set CHIMERA_IMAGE_BACKEND=local)."
+        key = keys[0]
         try:
             response = httpx.post(
                 _OPENAI_IMAGES,

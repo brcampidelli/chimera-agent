@@ -6,6 +6,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-07-09
+
+Rounds out the media + data capabilities, all in the honest "orchestrate, don't reimplement" spirit: a
+named data-analysis skill, a robust media downloader, and an optional fully-local image backend.
+
+### Added
+- **`data_analysis` skill.** Names the way an agent actually "does ML": given a task + dataset it writes
+  a self-contained pandas + scikit-learn script (load → explore → model → evaluate) that the agent runs
+  in the `execute_code` sandbox. Orchestration, not a reimplementation of sklearn.
+  `chimera/skills/builtin/data_skills.py`.
+- **`download_media` tool.** Download a video (or just its audio, mp3) from YouTube + 1000+ sites into
+  the workspace. Wraps **yt-dlp** — not pytube, which is single-site and perpetually breaks — so it
+  survives player/cipher/age-gate churn. Opt-in `media-dl` extra; audio extraction needs ffmpeg.
+  Pairs with `transcribe_audio` (download → transcribe → summarize). `chimera/tools/download.py`.
+- **Local image backend for `generate_image`.** Set `CHIMERA_IMAGE_BACKEND=local` (or leave `auto` with
+  no OpenAI key) to run **FLUX.1-schnell** (Apache-2.0) via `diffusers` fully offline — the opt-in,
+  GPU-heavy `imagegen-local` extra. The hosted OpenAI path stays the default. Chimera *runs* a diffusion
+  model; it does not train one. `chimera/tools/media.py`.
+
+### Notes
+- Honest scope (studied pytube / CogVideo / OpenCV): pytube → wrapped yt-dlp instead (more robust);
+  **CogVideo** (video generation) deliberately **not** vendored — a heavyweight trained model, hosted-API
+  territory if ever needed; **OpenCV** needs no dedicated tool — the agent already `import cv2`s in the
+  code sandbox.
+
 ## [0.11.0] - 2026-07-09
 
 Scraping polish (deterministic CSS extraction + resumable crawl) and a new **speech-to-text** tool —
