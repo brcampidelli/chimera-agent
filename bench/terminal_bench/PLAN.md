@@ -77,19 +77,16 @@ Phase-1 sample verdicts (honest mix): hello-world ✅, fix-permissions ✅, fix-
 Cost so far ≈ $1-2 (6 small probe runs). A per-container install-fail log (`chimera_install_fail.log`)
 and a solve log (`chimera_solve.log`) are now dropped into each task's run dir for diagnosis.
 
-## Phase 2 — the A/B number (~$10-15, N≈30-50 Terminal-Bench-Core tasks)
+## Phase 2 — DONE (2026-07-08): the A/B number, published
 
-Two arms, same model, on a fixed subset:
-- **baseline**: raw model, 1-shot (minimal agent).
-- **chimera**: the Phase-1 config.
-
-Report pass rate + tokens/cost per arm; verdict via `chimera bench-compare` (Wilson/Newcombe CI).
-Register the prediction in `bench/terminal_bench/RESULTS.md` BEFORE running. Respect each task's
-`max_agent_timeout_sec` (leaderboard-honest); if a `--global-agent-timeout` override is used, state
-it explicitly in RESULTS.
-
-Cost: deepseek ~$0.05-0.20/task chimera + ~$0.01 baseline -> N=40×2 ≈ $7-10, + Phase-1 ~$2 ≈ **$10-15**.
-Where: **WSL Ubuntu + Docker Desktop** (local; `~/tbench` already bootstrapped). Not the prod VPS.
+N=40, native per-task timeout, deepseek-chat-v3.1 both arms, pre-registered prediction (`a2535a4`),
+result computed with the project's own `chimera.eval.paired.compare_paired`. **Full write-up in
+`RESULTS.md`.** Headline: baseline 7.5% (3/40) vs chimera 2.5% (1/40), Δ −5.0pp, CI [−5.0%, +1.6%],
+**not significant** — the prediction's direction was wrong (chimera did not beat baseline on this
+single-attempt, N=40, broad-task slice). Published as measured, no re-run to chase significance. See
+RESULTS.md for the `hello-world` anomaly investigation and disclosed measurement gaps (no token/cost
+telemetry from this adapter; `--max-attempts 1` both arms means this doesn't test Chimera's retry-loop
+lift mechanism, which has a separate positive number in `bench/local_lift`).
 
 ## Environment note (resolved 2026-07-08)
 

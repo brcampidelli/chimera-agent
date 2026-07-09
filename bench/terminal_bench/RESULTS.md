@@ -60,6 +60,84 @@ most, per `bench/local_lift`). On this mix of many hard/infra tasks, single atte
 
 If the result contradicts this (e.g. a large or negative Δ), that is the finding and it stands.
 
-## Results
+## Results (2026-07-08, run complete)
 
-_(filled in after both arms complete — see below)_
+**The prediction was WRONG in direction.** Chimera's scaffold scored *lower* than the bare baseline
+on this run, not higher. Published as measured — no re-running to chase a different number (that
+would be exactly the p-hacking this project's honest-benchmark discipline exists to prevent).
+
+| arm | pass rate | 95% Wilson CI |
+|---|---|---|
+| baseline (bare, 1 attempt) | **7.5%** (3/40) | — |
+| chimera (repo-map+ledger+checklist, 1 attempt) | **2.5%** (1/40) | — |
+
+**Paired (McNemar/Wilson, via `chimera.eval.paired.compare_paired` — the project's own tool, no
+special-casing):**
+
+```
+baseline               7.5%  (40 paired trials)
+chimera                2.5%
+paired delta (Δ)       -5.0%  95% CI [-5.0%, +1.6%]
+discordant pairs       chimera +0 / baseline +2  (concordant carry no signal)
+verdict                not significant (CI includes 0)
+```
+
+- **37/40 both fail**, **1/40 both pass** (`fix-permissions`).
+- **2 discordant pairs, both favor baseline**: `fibonacci-server` (baseline passed, chimera got
+  `test_timeout`), `hello-world` (baseline passed, chimera failed).
+- **0 discordant pairs favor chimera.** The scaffold recovered nothing the baseline missed, on this
+  40-task run.
+- CI is wide and includes 0 — **not statistically significant** either direction, consistent with the
+  pre-registered expectation of a tight/underpowered N=40 middle. What was NOT predicted is which side
+  the point estimate landed on.
+
+### The `hello-world` anomaly — investigated, not resolved
+
+`hello-world` under the exact same model+flags graded **TRUE** in the Phase 1 probe (see PLAN.md) and
+**FALSE** here. The chimera-arm solve log for this run shows the model claiming full, correct
+completion ("✅ Created hello.txt ... ✅ Written 'Hello, world!' ... ✅ Verified... ✅ Confirmed no other
+files") immediately followed by Chimera's own scaffold reporting **"failed after 1 attempt(s)"** — i.e.
+Chimera's internal checklist/verifier disagreed with the model's own account, and Terminal-Bench's
+independent grading agreed with the internal failure, not the model's claim. Two explanations are
+consistent with the evidence and were NOT distinguished by this run:
+
+1. **LLM run-to-run variance** (temperature > 0, no fixed seed) — a plausibly-different completion
+   (e.g. a stray trailing space, extra file, or missing newline) on this attempt vs. the Phase 1 attempt.
+2. **Concurrency artifact** — this run used `--n-concurrent 5` (Phase 1 probes ran serially/low
+   concurrency); five simultaneous containers competing for host resources could shift timing enough to
+   change a trivial task's outcome (e.g. a build step racing a write).
+
+Not distinguished because doing so would require a repeated-seed, controlled-concurrency follow-up —
+exactly the kind of "run it again to explain away the loss" that the honest-benchmark discipline says
+not to do inline. Flagged here as an open question, not swept under the rug.
+
+### Known measurement gaps (disclosed)
+
+- **No token/cost telemetry from this adapter.** `ChimeraInstalledAgent.perform_task` always returns
+  `total_input_tokens=0, total_output_tokens=0` — TB's own usage fields are not wired to the actual
+  `chimera solve` process. No dollar-cost number is available from this run's results.json for either
+  arm (future work: parse chimera's own budget/receipt output from the solve log).
+- **N=40, single attempt, single model, single seed setting.** Both arms are near the floor for this
+  competent-but-not-frontier model on a broad, hard, general task mix (many require compilers, ML
+  runtimes, network access, or long multi-step infra work) — 37/40 both-fail leaves little
+  discriminating middle. This is consistent with the pre-registered expectation of low absolute pass
+  rates, just not with the predicted direction of the delta.
+- **`--max-attempts 1` both arms**: Chimera's retry lever (its most-measured lift mechanism in
+  `bench/local_lift`, where the goldilocks-model paired run showed +50pp) was deliberately held off
+  here to isolate the scaffold's single-shot contribution and fit the native timeout cleanly. This run
+  says nothing about Chimera's retry-loop lift — that already has a separate honest number
+  (`bench/local_lift/RESULTS.md`).
+
+### Honest verdict
+
+On this pre-registered, single-attempt, N=40 Terminal-Bench-core slice: **Chimera's repo-map + ledger +
+checklist scaffold did not outperform the bare model, and the point estimate favored the baseline (not
+significant).** This does not contradict the project's separate, positive finding that Chimera's
+**multi-attempt retry loop** lifts a goldilocks-weak model (`bench/local_lift`) — it tests a different
+mechanism (single-shot scaffolding context/structure vs. iterative retry-with-verification) on a
+different, harder, more heterogeneous task mix. Both numbers are published because both are true.
+
+**Next, if pursued:** (a) a controlled-concurrency, fixed-temperature repeat to settle the `hello-world`
+anomaly; (b) a multi-attempt (`--max-attempts 3`) A/B on this same Terminal-Bench slice, budget
+permitting, to test the mechanism that `bench/local_lift` already shows lift for, on the harder/broader
+official benchmark.

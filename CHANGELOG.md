@@ -35,6 +35,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Hierarchy code-review pass: verification is now enforced (a rejected worker result
   can't reach synthesis); budget honesty for partial provider usage; `_conflicting`
   matches its contract; concurrent-worker robustness; thread-safe `CompletionCache`.
+- **Terminal-Bench adapter: two integration bugs, each fixed on a real green pass.**
+  `bench/terminal_bench/chimera_installed_agent.py` now runs the solve in `/app` (TB's
+  client container works there and tests assert absolute `/app/...` paths — `exec_run`
+  previously defaulted to the image WORKDIR, so files landed where the grader never
+  looked), and install is a network-first bootstrap chain (PyPI → ensurepip →
+  urllib-fetched get-pip → `--break-system-packages` → offline wheelhouse) that
+  tolerates the harness's heterogeneous base images (no pip, PEP-668, no curl/wget).
+
+### Benchmarked (honest, published as measured)
+- **Official Terminal-Bench A/B, N=40, pre-registered.** `bench/terminal_bench/RESULTS.md`:
+  baseline (bare model, 1 attempt) 7.5% vs chimera (repo-map+ledger+checklist scaffold,
+  1 attempt) 2.5%, Δ −5.0pp, 95% CI [−5.0%, +1.6%], not significant. The pre-registered
+  prediction's *direction* was wrong — the scaffold did not beat the baseline on this
+  single-attempt run. Investigated (not resolved): a `hello-world` pass-to-fail flip vs.
+  the Phase-1 probe, consistent with LLM run-to-run variance or a concurrency artifact.
+  Disclosed gaps: no token/cost telemetry from this adapter; `--max-attempts 1` both arms
+  means this doesn't test Chimera's retry-loop lift mechanism (which has a separate,
+  positive paired result in `bench/local_lift/RESULTS.md`, +50pp on a goldilocks-weak
+  model). Published per the project's honest-benchmark discipline: register before
+  running, publish regardless of outcome, never re-run to chase significance.
 
 ## [0.6.0] - 2026-07-08
 
