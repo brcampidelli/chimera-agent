@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **Docker image bakes the browser so it launches in the container.** 0.8.0 makes Playwright a core
+  dependency, but on a slim base image the Chromium *system libraries* are missing, so the binary
+  downloads yet won't launch ("browser has been closed"). The `Dockerfile` now runs
+  `python3 -m playwright install --with-deps chromium` at build time — installing Chromium **and** its
+  OS libs — so `docker build` / `docker compose` users get a working browser out of the box (and skip
+  the ~150MB first-use download). Adds ~400MB to the image; comment the line out to opt out.
+
 ## [0.8.0] - 2026-07-09
 
 **The browser is now built in.** Playwright moved from an opt-in extra into the core dependencies, so

@@ -19,6 +19,14 @@ COPY . /app
 # Telegram/Signal are plain HTTP and need no extra; WhatsApp is a webhook.
 RUN uv pip install --system --no-cache '.[messaging,mcp]'
 
+# Bake the browser into the image so the `browser` tool works out of the box in the container.
+# Playwright is a core dependency, but pip only installs the Python package — the Chromium binary
+# AND its system libraries come from Playwright's own CLI. `--with-deps` installs both; the libs are
+# what a slim image lacks (without them Chromium downloads but won't launch). Doing this at build time
+# (instead of the tool's first-use auto-download) also avoids a ~150MB fetch on the first request.
+# Adds ~400MB to the image — the cost of a real browser. To skip it, comment this line out.
+RUN python3 -m playwright install --with-deps chromium
+
 # Persist agent state outside the image; mount a volume here.
 ENV CHIMERA_HOME=/data
 RUN mkdir -p /data
