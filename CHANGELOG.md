@@ -6,6 +6,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-07-09
+
+Integration-harmony pass. A full-repo audit (every tool, skill, CLI command, backend, and subsystem
+checked for wiring) found the system largely coherent — pluggable backends conform, the hierarchy
+orchestrator is wired end-to-end, the evolution loop's governance gate really fires, memory is read+
+written with a taint gate, all modules import — but surfaced two real disconnects, now fixed.
+
+### Fixed
+- **The built-in skill library is now actually reached by the agent loop.** The skills (`echo`,
+  `complete_code`, `fix_code`, `generate_script`, `data_analysis`, `data_visualization`) registered and
+  listed via `chimera skills`, but nothing at runtime consulted them — `Agent` was tool-only and the
+  `retrieve_relevant_skills` / `skills_context_block` helpers had zero callers. `Agent` now surfaces the
+  few most task-relevant built-in skills into the system prompt (opt-out via
+  `AgentConfig.inject_skill_context`), across every generic path at once. `chimera/core/agent.py`.
+- **Skill retrieval no longer matches on stopwords.** The keyword scorer shared "the"/"of"/etc. with
+  every skill description, so it surfaced irrelevant skills for any task (a geography question pulled the
+  data skills). Now filters stopwords + sub-3-char tokens, so a match means a shared *content* word — a
+  chart task surfaces `data_visualization`, a geography question surfaces nothing. `chimera/skills/retrieval.py`.
+- **`download_media` is now a governed FETCH tool.** It pulls untrusted content from the internet but
+  was in no governance set, so a downloaded file wasn't tainted and a later exec/read on it wouldn't
+  escalate under `--taint`. Added to `FETCH_TOOLS`. `chimera/governance/ledger.py`.
+
 ## [0.13.1] - 2026-07-09
 
 ### Added

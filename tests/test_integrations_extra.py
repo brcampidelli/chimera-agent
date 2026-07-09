@@ -82,6 +82,13 @@ def test_download_media_needs_url(tmp_path: Path) -> None:
     assert download.DownloadMediaTool(workspace=tmp_path).run().startswith("error:")
 
 
+def test_download_media_is_a_governed_fetch_tool() -> None:
+    # It pulls untrusted content from the internet -> the taint/fence envelope must cover it.
+    from chimera.governance.ledger import FETCH_TOOLS
+
+    assert "download_media" in FETCH_TOOLS
+
+
 # --- local image backend (diffusers) -----------------------------------------------------
 
 

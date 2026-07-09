@@ -14,14 +14,29 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from chimera.core.tool_loop import ToolLoopDetector
 from chimera.providers.gateway import CompletionResult, MessageLike, SupportsComplete
 from chimera.telemetry import get_logger
 from chimera.tools.registry import ToolNotFoundError, ToolRegistry
 
+if TYPE_CHECKING:
+    from chimera.skills.registry import SkillRegistry
+
 _log = get_logger("core.agent")
+
+# Cached builtin skill registry for context retrieval (name/description only — no backend, no network).
+_DEFAULT_SKILLS: SkillRegistry | None = None
+
+
+def _default_skill_registry() -> SkillRegistry:
+    global _DEFAULT_SKILLS
+    if _DEFAULT_SKILLS is None:
+        from chimera.skills import default_registry
+
+        _DEFAULT_SKILLS = default_registry()
+    return _DEFAULT_SKILLS
 
 DEFAULT_SYSTEM_PROMPT = (
     "You are Chimera, a capable autonomous agent. Your job is to DO the task, not to describe how "
@@ -84,6 +99,10 @@ class AgentConfig:
     # repeats / ping-pong / no-progress polling) instead of grinding to max_steps. Conservative
     # thresholds, so a genuine multi-step run is untouched.
     detect_tool_loops: bool = True
+    # Surface the few most task-relevant built-in skills (name + description) into the system prompt,
+    # so the model knows which learned procedures apply. Keyword-scored, so nothing is injected when
+    # nothing matches. This is what connects the built-in skill library to the running loop.
+    inject_skill_context: bool = True
 
 
 @dataclass
@@ -105,14 +124,35 @@ class Agent:
         backend: SupportsComplete,
         tools: ToolRegistry,
         config: AgentConfig | None = None,
+        skills: SkillRegistry | None = None,
     ) -> None:
         self.backend = backend
         self.tools = tools
         self.config = config or AgentConfig()
+        # The skill library surfaced as context. Defaults to the built-in registry (lazy, shared),
+        # so every construction site picks up skills without changes; pass an explicit one to override.
+        self.skills = skills
+
+    def _skill_context(self, task: str) -> str:
+        """Task-relevant built-in skills as a prompt block ("" when none match or on any error)."""
+        if not self.config.inject_skill_context:
+            return ""
+        try:
+            from chimera.skills import retrieve_relevant_skills, skills_context_block
+
+            registry = self.skills or _default_skill_registry()
+            return skills_context_block(retrieve_relevant_skills(registry, task))
+        except Exception as exc:  # skill retrieval must never break the loop
+            _log.debug("skill-context retrieval skipped: %s", exc)
+            return ""
 
     def run(self, task: str) -> AgentResult:
+        system_prompt = self.config.system_prompt
+        skill_block = self._skill_context(task)
+        if skill_block:
+            system_prompt = f"{system_prompt}\n\n{skill_block}"
         messages: list[MessageLike] = [
-            {"role": "system", "content": self.config.system_prompt},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": task},
         ]
         tool_schema = self.tools.to_openai_schema(compact=self.config.compact_schemas) or None

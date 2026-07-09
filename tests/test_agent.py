@@ -41,6 +41,37 @@ def test_looks_like_unexecuted_plan_heuristic() -> None:
     assert _looks_like_unexecuted_plan("The bug is in line 5. I fixed it and tests pass.") is False
 
 
+def _skill_registry_with_echo() -> Any:
+    from chimera.skills.builtin.echo_skill import EchoSkill
+    from chimera.skills.registry import SkillRegistry
+
+    reg = SkillRegistry()
+    reg.register(EchoSkill())
+    return reg
+
+
+def test_run_injects_relevant_skill_context() -> None:
+    # A task whose keywords match a skill's name/description gets that skill surfaced in the system prompt.
+    backend = ScriptedBackend([CompletionResult(content="done", model="fake")])
+    agent = Agent(backend, _echo_registry(), AgentConfig(), skills=_skill_registry_with_echo())
+    agent.run("please echo this message back to me")
+    system = backend.calls[0]["messages"][0]
+    assert system["role"] == "system"
+    assert "Relevant skills you can use:" in system["content"] and "echo" in system["content"]
+
+
+def test_skill_context_absent_when_no_match_or_disabled() -> None:
+    reg = _skill_registry_with_echo()
+    # No keyword overlap -> no block injected.
+    b1 = ScriptedBackend([CompletionResult(content="done", model="fake")])
+    Agent(b1, _echo_registry(), AgentConfig(), skills=reg).run("xyzzy plugh frobnicate quux")
+    assert "Relevant skills" not in b1.calls[0]["messages"][0]["content"]
+    # Explicitly disabled -> no block even with a matching skill.
+    b2 = ScriptedBackend([CompletionResult(content="done", model="fake")])
+    Agent(b2, _echo_registry(), AgentConfig(inject_skill_context=False), skills=reg).run("echo this")
+    assert "Relevant skills" not in b2.calls[0]["messages"][0]["content"]
+
+
 def test_insist_on_action_pushes_back_a_described_plan() -> None:
     # Narration first (a code block, no tool call), then the model acts, then reports done.
     backend = ScriptedBackend(

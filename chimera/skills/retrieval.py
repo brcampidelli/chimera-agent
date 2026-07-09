@@ -15,15 +15,29 @@ from chimera.skills.registry import SkillRegistry
 
 _TOKEN = re.compile(r"[a-z0-9]+")
 
+# Grammatical glue that would otherwise match every skill's description and surface irrelevant skills
+# for any task (e.g. "the"/"of" in a geography question). Filtered from both sides before scoring so
+# a match means a shared *content* word. Short tokens (<3 chars) are dropped too — same purpose.
+_STOPWORDS = frozenset(
+    {
+        "the", "and", "for", "with", "that", "this", "these", "those", "you", "your", "our", "she",
+        "him", "her", "his", "its", "are", "was", "were", "been", "being", "have", "has", "had",
+        "can", "could", "would", "should", "will", "shall", "may", "might", "must", "does", "did",
+        "what", "which", "who", "whom", "how", "when", "where", "why", "into", "from", "then",
+        "than", "them", "they", "their", "there", "here", "some", "any", "all", "each", "please",
+        "give", "get", "make", "want", "need", "use", "using", "about", "back", "now", "not",
+    }
+)
+
 
 def _tokenize(text: str) -> set[str]:
-    return set(_TOKEN.findall(text.lower()))
+    return {tok for tok in _TOKEN.findall(text.lower()) if len(tok) >= 3 and tok not in _STOPWORDS}
 
 
 def retrieve_relevant_skills(
     registry: SkillRegistry, query: str, *, k: int = 3
 ) -> list[Skill]:
-    """Return up to ``k`` skills whose name/description best match ``query``."""
+    """Return up to ``k`` skills whose name/description best match ``query`` on shared content words."""
     terms = _tokenize(query)
     if not terms:
         return []
