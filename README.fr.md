@@ -1,11 +1,11 @@
 <div align="center">
 
-<img src="assets/logo-wide.png" alt="Logo Chimera" width="460" />
+<img src="assets/logo-wide.png" alt="Chimera logo" width="460" />
 
 # Chimera
 
 **L'agent auto-évolutif gouverné — prouvé et gouverné.**<br/>
-<sub>Pense avec plusieurs cerveaux, fait le travail seul, n'apprend que ce qui est prouvé, et est sûr par conception.</sub>
+<sub>Pense avec plusieurs cerveaux, fait un vrai travail seul, n'apprend que ce qui est prouvé, et est sûr par conception.</sub>
 
 [![PyPI](https://img.shields.io/pypi/v/chimera-agent.svg?color=blue&label=PyPI)](https://pypi.org/project/chimera-agent/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
@@ -13,7 +13,7 @@
 [![CI](https://github.com/brcampidelli/chimera-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/brcampidelli/chimera-agent/actions/workflows/ci.yml)
 [![Checked with mypy](https://img.shields.io/badge/mypy-strict-2a6db2.svg)](https://mypy-lang.org/)
 [![Linted with Ruff](https://img.shields.io/badge/lint-ruff-261230.svg)](https://github.com/astral-sh/ruff)
-[![Discord](https://img.shields.io/badge/Discord-rejoindre-5865F2.svg?logo=discord&logoColor=white)](https://discord.gg/ACvBbrmguV)
+[![Discord](https://img.shields.io/badge/Discord-join-5865F2.svg?logo=discord&logoColor=white)](https://discord.gg/ACvBbrmguV)
 [![Reddit](https://img.shields.io/badge/Reddit-r%2FChimeraAgent-FF4500.svg?logo=reddit&logoColor=white)](https://www.reddit.com/r/ChimeraAgent/)
 ![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)
 [![Donate](https://img.shields.io/badge/Donate-Stripe-635BFF.svg?logo=stripe&logoColor=white)](https://donate.stripe.com/9B63cofM491m4SBfe177O00)
@@ -27,13 +27,13 @@ conversation se termine. **Chimera fait deux choses différemment :** pour les q
 il interroge **plusieurs** modèles d'IA en même temps et combine leurs réponses en un seul résultat
 plus solide, et il **se souvient et apprend** pour devenir de plus en plus utile à mesure que vous
 l'utilisez. Il ne fait pas que discuter — donnez-lui un objectif et il planifie, utilise des outils,
-vérifie son propre travail et ne garde que ce qui fonctionne vraiment.
+vérifie son propre travail, et ne garde que ce qui fonctionne vraiment.
 
 > **Gratuit et open-source (Apache-2.0), en développement précoce mais actif.** Il fonctionne déjà de
 > bout en bout : discutez avec lui, laissez-le terminer des tâches tout seul, faites-le tourner comme
 > un bot sur votre application de messagerie préférée, déployez-le sur un serveur pour qu'il travaille
 > 24h/24, et regardez-le apprendre de ce qu'il fait. C'est une version **alpha** — solide et
-> abondamment testée (plus de 1000 tests automatisés, vérification de types stricte et lint à chaque
+> abondamment testée (**plus de 1000 tests automatisés**, vérification de types stricte et lint à chaque
 > changement), mais pas encore éprouvée en production.
 
 ---
@@ -49,14 +49,63 @@ simples :
 - 🧠 **Plusieurs cerveaux, une seule réponse.** Pour les questions difficiles, Chimera pose la même question à plusieurs modèles, laisse un modèle comparer leurs réponses, et charge un modèle final de rédiger la meilleure réponse combinée — vous obtenez ainsi quelque chose de plus équilibré et moins susceptible d'être faux qu'un seul modèle seul. (Il ne le fait que lorsque ça en vaut la peine, pour rester rapide et économique.)
 - 🚀 **Il fait le travail, il ne se contente pas de parler.** Donnez-lui un objectif. Il le décompose, utilise des outils, modifie des fichiers, lance les tests, et **ne garde un changement que s'il passe**. Si quelque chose casse, il l'annule et réessaie — pour ne pas laisser de désordre derrière lui.
 - 🧬 **Il s'améliore à mesure que vous l'utilisez.** Il retient vos préférences et les faits importants d'une conversation à l'autre, et transforme discrètement les tâches qu'il répète en compétences réutilisables. Il est conçu pour continuer à s'améliorer au lieu de se dégrader lentement sur la durée — un problème qui ronge silencieusement beaucoup d'agents.
-- 🛡️ **Sûr par conception.** Chaque action risquée passe d'abord par une vérification de sécurité, tout ce qui est destructif demande une confirmation, et il peut exécuter du code non fiable à l'intérieur d'un bac à sable verrouillé. (Ces vérifications sont un premier filtre bon marché, pas la vraie frontière — le bac à sable l'est ; et l'isolation par conteneur est optionnelle. Voir [SECURITY.md](SECURITY.md).)
+- 🛡️ **Sûr par conception.** Chaque action risquée passe d'abord par une vérification de sécurité, tout ce qui est destructif demande une confirmation, et le code non fiable peut s'exécuter dans un conteneur verrouillé, sans réseau. (Ces vérifications sont un premier filtre bon marché, pas la vraie frontière — le bac à sable l'est ; et l'isolation par conteneur est optionnelle. Voir [SECURITY.md](SECURITY.md).)
 - 🔌 **N'importe quel modèle, tourne partout.** Utilisez de grands modèles hébergés ou vos propres modèles locaux via une interface unique — sur votre ordinateur portable ou un serveur à 5 $, 24h/24.
 - 🧩 **Vraiment à vous.** Open-source, sans verrouillage, sans compte fournisseur requis. Vous le faites tourner, il vous appartient, vous pouvez tout modifier.
+
+## Comment Chimera se compare
+
+Chimera ne cherche pas à surpasser les géants des projets d'agents sur *leur* terrain. Il mise sur les
+trois choses qu'une véritable étude de rétro-ingénierie de cinq leaders (OpenClaw, Hermes, nanobot,
+CrewAI, LangGraph) a trouvées qu'ils **laissent tous ouvertes** — et en fait son cœur :
+
+- 🧬 **Auto-évolution avec un signal de fitness.** Les autres « apprennent » en ajoutant tout ce qui s'est passé, ou par des pull requests humaines — rien ne mesure si un changement appris a réellement aidé. Chimera ne garde un changement **que lorsqu'un résultat vérifié prouve qu'il a aidé** : l'étape d'évolution est conditionnée au vrai diff de l'arbre de travail et à un A/B honnête, jamais à la parole du modèle. Preuve indépendante que ça compte : [EvoAgentBench (arXiv 2607.05202)](https://arxiv.org/abs/2607.05202) a mesuré que les méthodes d'encodage d'expérience *automatiques* et non conditionnées produisent régulièrement du **transfert négatif** — une méthode populaire a régressé de **−12,3 points** sur des tâches pour lesquelles elle n'était pas réglée. Le gate de Chimera exécute désormais aussi un **holdout de transfert** : un changement appris ne doit pas faire régresser une tranche disjointe, de même capacité, avant d'être promu — il ne peut donc pas simplement mémoriser sa propre évaluation.
+- 🛡️ **Sécurité par architecture.** L'injection de prompt est aujourd'hui largement considérée comme *impossible à corriger* ; les agents populaires l'atténuent au niveau applicatif ou la déclarent hors périmètre (l'un d'eux a livré 135 000 instances exposées publiquement et une marketplace remplie à ~12 % de compétences malveillantes). Chimera trace la provenance du taint de bout en bout, retire les tokens de contrôle du contenu non fiable, restreint l'accès aux outils lors d'une exécution taintée, protège les réessais à effet de bord, et exécute le code non fiable dans un conteneur verrouillé optionnel.
+- 📊 **Des benchmarks honnêtes et publiés.** ~20 % des cas « résolus » d'un classement populaire sont en réalité faux. Chimera rapporte chaque chiffre avec un intervalle de confiance — **y compris les exécutions où il n'a pas gagné** — et ne relance jamais pour obtenir la significativité. Une exécution appariée enregistrée montre la boucle complète **triplant le taux de réussite d'un modèle faible (17 % → 67 %)**, rapportée à une paire près de la significativité, honnêtement. Et sur le **Terminal-Bench officiel**, un A/B pré-enregistré N=40 a atterri sur un **plancher dominé par la variance, sans différence significative dans un sens ou l'autre** — publié tel quel ([`bench/terminal_bench/RESULTS.md`](bench/terminal_bench/RESULTS.md)), y compris **la rétractation d'une lecture intermédiaire erronée** une fois le bras de contrôle mesuré. Les résultats nuls et les auto-corrections sont publiés aussi ; c'est tout l'intérêt.
+
+**En une ligne : l'agent auto-évolutif gouverné — prouvé et gouverné.** C'est de l'alpha, et il le dit.
+
+## Économie de tokens — mesurée, pas revendiquée
+
+Deux intuitions du type « plus de modèles = mieux », mises à l'épreuve sur de vraies exécutions
+(prédictions enregistrées *avant* chaque exécution, victoires **et** défaites publiées —
+voir [`bench/`](bench/)) :
+
+**La fusion est réservée, pas par défaut.** Sur une suite de raisonnement de 12 tâches, le palier
+intermédiaire seul a obtenu 100 % pour 846 tokens ; la fusion complète a aussi obtenu 100 % — pour
+**9 526 tokens (~11×)**. La fusion se cache donc derrière une cascade cheap→gate→mid→fusion qui
+n'escalade que lorsqu'un gate gratuit échoue, atteignant une qualité ~intermédiaire à ~1/12 du coût
+de la fusion.
+
+**L'orchestration hiérarchique ne gagne que là où elle le doit — et selon une loi qu'on peut écrire.**
+`chimera orchestrate` répartit une tâche entre des workers cadrés au lieu d'un seul grand contexte. Un
+agent unique renvoie chaque document à chaque tour ; les workers cadrés lisent chacun une fois. Ainsi
+l'économie de tokens évolue en **(D−1)/D** selon le nombre de documents D — confirmé sur de vraies
+exécutions à moins de 0,2 % :
+
+| documents (D) | économie de tokens mesurée | (D−1)/D |
+|---|---|---|
+| 2 | 49.9% | 50% |
+| 3 | 66.7% | 66.7% |
+| 4 | 74.8% | 75% |
+| 5 | 79.9% | 80% |
+
+L'économie reste stable à mesure que la conversation s'allonge et augmente avec la taille des documents
+vers la même limite ([balayage complet, 3 axes](bench/hierarchy_sweep/README.md)). Et là où ça *ne* paie
+*pas* — une tâche en un seul coup avec un seul tour — le classifieur le détecte et **retombe sur un agent
+unique** (cette exécution a coûté +47 % de tokens en plus ; nous l'avons publiée aussi).
+
+**L'astérisque honnête.** Ce sont des décomptes de *tokens*. Avec le cache de prompt, un fournisseur
+facture les documents répétés de l'agent unique à ~0,1×, donc le gain en *dollars* est plus faible — et
+au-delà de quelques tours il peut **s'inverser** (les workers indépendants repaient le contexte froid que
+l'agent unique met en cache). Nous livrons le
+[modèle qui quantifie cela](bench/hierarchy_sweep/cache_cost.py) plutôt que de faire passer discrètement
+le chiffre de tokens pour un chiffre en dollars.
 
 ## Fonctionnalités
 
 ### 🧠 Penser et agir
-- **Combiner plusieurs modèles en une seule réponse** (`chimera fuse`) — un panel de modèles, un juge qui fait ressortir où ils sont d'accord, en désaccord, ou passent à côté de quelque chose, et un synthétiseur qui rédige la réponse finale. Un routeur intelligent ne consacre cet effort supplémentaire qu'aux problèmes difficiles, et lorsque les premiers modèles sont déjà d'accord il s'arrête plus tôt — mesuré à environ ~20–28 % de tokens en moins sans perte de précision sur nos benchmarks. (La fusion / mixture-of-agents en soi n'a rien d'unique — on la trouve dans OpenRouter et d'autres outils ; la différence ici, c'est qu'elle est intégrée à la boucle de l'agent, derrière ce routeur soucieux du coût, et mesurée, pas un modèle que l'on choisit.)
+- **Combiner plusieurs modèles en une seule réponse** (`chimera fuse`) — un panel de modèles, un juge qui fait ressortir où ils sont d'accord, en désaccord, ou passent à côté de quelque chose, et un synthétiseur qui rédige la réponse finale. Un routeur intelligent ne consacre cet effort supplémentaire qu'aux problèmes difficiles, et lorsque les premiers modèles sont déjà d'accord il s'arrête plus tôt — mesuré à environ **~20–28 % de tokens en moins sans perte de précision** sur nos benchmarks. (La fusion / mixture-of-agents en soi n'a rien d'unique — on la trouve dans OpenRouter et d'autres outils ; la différence ici, c'est qu'elle est intégrée à la boucle de l'agent, derrière ce routeur soucieux du coût, et mesurée, pas un modèle que l'on choisit.)
 - **Terminer des tâches tout seul** (`chimera solve`) — il planifie, agit avec des outils, puis **vérifie et annule** : il lance votre contrôle (par ex. les tests) et ne garde le changement que s'il passe, sinon il l'annule et réessaie. Il peut, en option, travailler sur une copie isolée de votre projet pour que rien ne soit touché tant que ce n'est pas éprouvé.
 - **Des équipes de spécialistes** (`chimera crew`, `chimera crew-isolated`) — plusieurs agents concentrés sur un rôle se partagent une même tâche. En mode isolé, chacun travaille sur sa **propre copie privée en parallèle** ; les modifications sûres sont fusionnées, les conflits sont signalés au lieu d'être écrasés en silence, et les changements d'un mauvais worker peuvent être rejetés par un test propre à chaque worker. Un superviseur peut regrouper le travail de tous en un seul rapport unifié.
 - **Déléguer et explorer** — n'importe quel agent peut confier une sous-tâche autonome à un nouveau **sous-agent** qui ne renvoie que le résultat, gardant le contexte principal propre. Le **Context Explorer** (`chimera explore`) trouve les bons fichiers et les bonnes lignes dans une base de code et renvoie une réponse courte au lieu de tout déverser.
@@ -69,7 +118,7 @@ simples :
 ### 🔌 Connecter et automatiser
 - **Parlez-lui n'importe où** — un chat en terminal, une application terminal plein écran, ou comme un bot sur **Discord, Telegram, Slack, Signal et WhatsApp**. Il y a aussi un point d'accès HTTP simple.
 - **Planification et proactivité** — confiez-lui des tâches récurrentes en langage courant (« chaque matin, résume les actualités »). Avec le planificateur intégré en marche, il **agit à l'heure**, et pas seulement quand vous lui écrivez.
-- **Outils et intégrations** — lire et écrire des fichiers, exécuter des commandes shell, naviguer sur le web, et exécuter du code en toute sécurité dans un bac à sable. Connectez presque n'importe quel service web (via son API) ou outil externe, et importez votre configuration depuis d'autres outils d'agent que vous utilisez déjà.
+- **Outils et intégrations** — lire et écrire des fichiers, exécuter des commandes shell, naviguer sur le web, et exécuter du code en toute sécurité dans un bac à sable. Connectez presque n'importe quel service web (via son API) ou outil externe — y compris n'importe quel **serveur MCP** ([guide + exemple exécutable](docs/mcp.md)) — et importez votre configuration depuis d'autres outils d'agent que vous utilisez déjà.
 - **Tout inclus** — recherche web, génération d'images, synthèse vocale, e-mail, calendrier, exécution de code, et plus encore, prêts à être activés.
 
 ### 🚀 Tourner partout, en toute sécurité
@@ -108,8 +157,8 @@ uv run chimera doctor
 **4. L'essayer**
 ```bash
 uv run chimera chat                         # ayez une conversation (il s'en souvient)
-uv run chimera run "Explique ce que tu sais faire en 3 puces"
-uv run chimera fuse "Quelle est la meilleure façon d'apprendre à cuisiner ?" --show-panel   # voir plusieurs modèles combinés
+uv run chimera run "Explain what you can do in 3 bullets"
+uv run chimera fuse "What's the best way to learn to cook?" --show-panel   # voir plusieurs modèles combinés
 uv run chimera solve "add a hello() function to app.py and a test for it" --verify "pytest -q"
 ```
 
@@ -118,6 +167,14 @@ uv run chimera solve "add a hello() function to app.py and a test for it" --veri
 docker compose up -d      # passerelle + planificateur ; redémarre automatiquement
 ```
 Guide complet (Docker ou systemd, planification, sauvegardes, sécurité) : **[docs/deploy.md](docs/deploy.md)**.
+
+**5. Faire quelque chose de concret en 5 minutes : le tri des e-mails.** Pointez Chimera sur votre boîte
+de réception et obtenez un résumé de dix secondes — en lecture seule, classant URGENT / PERSONAL /
+NEWSLETTER / COLD-SALES, et planifiable en option chaque matin :
+```bash
+uv run chimera workflow examples/email_triage/triage.yaml -w ./triage_workspace
+```
+Configuration + planification quotidienne + mises en garde honnêtes : **[examples/email_triage/README.md](examples/email_triage/README.md)**.
 
 ## Comment ça marche
 
@@ -246,7 +303,8 @@ Plutôt Reddit ? Suivez **[r/ChimeraAgent](https://www.reddit.com/r/ChimeraAgent
 
 ## Soutenir le projet
 
-Chimera est gratuit et open-source, développé au grand jour. S'il vous est utile, vous pouvez aider à financer son développement par un don — chaque contribution compte et est très appréciée. 💜
+Chimera est gratuit et open-source, développé au grand jour. S'il vous est utile, vous pouvez aider à
+financer son développement par un don unique — chaque contribution compte et est très appréciée. 💜
 
 **[💜 Faire un don via Stripe](https://donate.stripe.com/9B63cofM491m4SBfe177O00)**
 
