@@ -6,6 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-07-09
+
+Phase 2 of the web verb set: whole-site **`map`** and **`crawl`**, completing the
+`scrape / extract / map / crawl` quartet — all built in, robots-aware, no new dependency.
+
+### Added
+- **`map` tool — list a site's URLs cheaply.** Reads the sitemap (robots.txt `Sitemap:` lines + the
+  conventional `/sitemap.xml`, one index level deep), falling back to scanning the page's same-domain
+  links. Optional `search` keyword filter. `chimera/scrape/crawl.py::map_site`.
+- **`crawl` tool — BFS across a site.** Follows links from a seed URL and returns each page's clean
+  Markdown, bounded by `limit` + `max_depth`, same-domain by default, deduped, with `include`/`exclude`
+  URL glob patterns. **robots.txt-aware**: obeys `Disallow` and `Crawl-delay` by default (an ethical
+  posture per the IBM/robots analysis; opt out with `respect_robots=false`). Reuses the Phase-1
+  cost-aware fetch cascade. `chimera/scrape/crawl.py::crawl_site`. Both tools are in `FETCH_TOOLS`.
+
 ## [0.9.0] - 2026-07-09
 
 The **web scraping + safe structured extraction** release — an agent-native answer to

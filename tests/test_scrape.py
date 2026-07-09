@@ -10,10 +10,12 @@ import pytest
 from chimera.governance.ledger import FETCH_TOOLS
 from chimera.governance.ledger_tool import FENCE_OPEN
 from chimera.scrape import clean
+from chimera.scrape import crawl as crawl_mod
 from chimera.scrape import fetch as fetch_mod
+from chimera.scrape.crawl import crawl_site, map_site
 from chimera.scrape.extract import extract_structured
-from chimera.scrape.fetch import fetch_page
-from chimera.tools.scrape import ExtractTool, ScrapeTool
+from chimera.scrape.fetch import FetchResult, fetch_page
+from chimera.tools.scrape import CrawlTool, ExtractTool, MapTool, ScrapeTool
 
 _RICH_HTML = (
     "<html><head><title>Hello Page</title></head><body>"
@@ -125,3 +127,80 @@ def test_extract_tool_needs_fields() -> None:
 
 def test_scrape_and_extract_are_fetch_tools() -> None:
     assert "scrape" in FETCH_TOOLS and "extract" in FETCH_TOOLS
+
+
+# --- map + crawl (fakes) -----------------------------------------------------------------
+
+_SITE = {
+    "https://s.com/": ["/a", "/b", "https://other.com/x"],
+    "https://s.com/a": ["/a1"],
+    "https://s.com/b": [],
+    "https://s.com/a1": [],
+}
+
+
+def _fake_fetch_page(url: str, *, render: str = "auto", settings: object = None) -> FetchResult:
+    from urllib.parse import urljoin
+
+    links = [urljoin(url, ln) for ln in _SITE.get(url.rstrip("/") if url != "https://s.com/" else url, [])]
+    return FetchResult(url=url, markdown=f"content of {url}", title=f"T {url}", links=links, source="http")
+
+
+def test_map_reads_sitemap(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_text(u: str, timeout: float = 15.0) -> str:
+        if u.endswith("robots.txt"):
+            return "Sitemap: https://s.com/sitemap.xml"
+        if u.endswith("sitemap.xml"):
+            return "<urlset><url><loc>https://s.com/p1</loc></url><url><loc>https://s.com/p2</loc></url></urlset>"
+        return ""
+
+    monkeypatch.setattr(crawl_mod, "_fetch_text", fake_text)
+    urls = map_site("https://s.com/")
+    assert urls == ["https://s.com/p1", "https://s.com/p2"]
+    assert map_site("https://s.com/", search="p1") == ["https://s.com/p1"]
+
+
+def test_map_falls_back_to_links(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(crawl_mod, "_fetch_text", lambda u, timeout=15.0: "")
+    monkeypatch.setattr(crawl_mod, "fetch_page", _fake_fetch_page)
+    urls = map_site("https://s.com/")
+    assert "https://s.com/a" in urls and "https://other.com/x" not in urls  # same-domain only
+
+
+def test_crawl_bfs_respects_domain_depth_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(crawl_mod, "fetch_page", _fake_fetch_page)
+    res = crawl_site("https://s.com/", limit=10, max_depth=2, respect_robots=False)
+    urls = {p.url for p in res.pages}
+    assert "https://s.com/" in urls and "https://s.com/a" in urls and "https://s.com/a1" in urls
+    assert "https://other.com/x" not in urls  # off-domain skipped
+    assert len(res.pages) == 4  # no duplicates
+
+
+def test_crawl_page_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(crawl_mod, "fetch_page", _fake_fetch_page)
+    res = crawl_site("https://s.com/", limit=2, respect_robots=False)
+    assert len(res.pages) == 2 and "limit" in res.stopped_reason
+
+
+def test_crawl_respects_robots(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(crawl_mod, "fetch_page", _fake_fetch_page)
+    monkeypatch.setattr(crawl_mod, "_fetch_text", lambda u, timeout=15.0: "User-agent: *\nDisallow: /b")
+    res = crawl_site("https://s.com/", respect_robots=True)
+    urls = {p.url for p in res.pages}
+    assert "https://s.com/b" not in urls and res.skipped_robots >= 1
+
+
+def test_crawl_exclude_pattern(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(crawl_mod, "fetch_page", _fake_fetch_page)
+    res = crawl_site("https://s.com/", exclude=["*/a1"], respect_robots=False)
+    assert "https://s.com/a1" not in {p.url for p in res.pages}
+
+
+def test_map_and_crawl_tools(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(crawl_mod, "fetch_page", _fake_fetch_page)
+    monkeypatch.setattr(crawl_mod, "_fetch_text", lambda u, timeout=15.0: "")
+    map_out = MapTool().run(url="https://s.com/")
+    assert FENCE_OPEN in map_out and "https://s.com/a" in map_out
+    crawl_out = CrawlTool().run(url="https://s.com/", respect_robots=False)
+    assert FENCE_OPEN in crawl_out and "crawled" in crawl_out and "s.com/a1" in crawl_out
+    assert "map" in FETCH_TOOLS and "crawl" in FETCH_TOOLS

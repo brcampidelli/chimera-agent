@@ -63,11 +63,14 @@ def default_registry(workspace: Path | None = None) -> ToolRegistry:
     registry.register(ArxivSearchTool())
     registry.register(YouTubeTranscriptTool())
 
-    # Web scraping + secure structured extraction (fetch->clean markdown; schema->JSON via quarantine).
-    from chimera.tools.scrape import ExtractTool, ScrapeTool
+    # Web scraping + secure structured extraction (fetch->clean markdown; schema->JSON via quarantine)
+    # + whole-site discovery (map/crawl, robots-aware).
+    from chimera.tools.scrape import CrawlTool, ExtractTool, MapTool, ScrapeTool
 
     registry.register(ScrapeTool())
     registry.register(ExtractTool())
+    registry.register(MapTool())
+    registry.register(CrawlTool())
 
     # Key-gated optional tools light up when their credential is set.
     from chimera.config import get_settings

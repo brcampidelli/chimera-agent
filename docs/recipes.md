@@ -117,13 +117,22 @@ uv run chimera run "scrape https://news.ycombinator.com and summarize the top 5 
 uv run chimera run "extract the fields title, price, availability from https://example.com/product --taint"
 ```
 
+For whole sites there are two more verbs:
+
+- **`map`** — list a site's URLs cheaply (reads the sitemap when there is one, else scans the page's
+  links). Optional `search` keyword filter. Run this to scope a site before crawling it.
+- **`crawl`** — follow links from a seed URL and return each page's clean Markdown. Bounded by `limit`
+  and `max_depth`, same-domain by default, and **robots.txt-aware** (it obeys `Disallow` and
+  `Crawl-delay`). `include`/`exclude` are URL glob patterns.
+
+```bash
+uv run chimera run "map https://docs.example.com then crawl the /guide section (max 20 pages) and summarize it"
+```
+
 Everything is data-fenced and taints the run (it's untrusted web content), so `solve --taint --guard`
 is the safe way to act on it. The optional Firecrawl fallback is used *only* when the built-in engine
 can't fetch a page and the key is set — Chimera scrapes the great majority of the web itself, with no
 external service.
-
-> Roadmap: `map` (list a site's URLs) and `crawl` (follow links across a whole site, robots-aware and
-> resumable) are the next phase on top of this foundation.
 
 ## Schedule any of them
 

@@ -37,7 +37,7 @@ _log = get_logger("governance.ledger")
 # Tool-name → capability-kind classification. Overridable, but these are the built-ins.
 FETCH_TOOLS = frozenset(
     {"http_get", "fetch_url", "web_search", "arxiv_search", "youtube_transcript", "read_email",
-     "calendar_events", "browser", "scrape", "extract"}
+     "calendar_events", "browser", "scrape", "extract", "map", "crawl"}
 )
 EXEC_TOOLS = frozenset({"run_shell", "execute_code", "code_interpreter"})
 WRITE_TOOLS = frozenset({"write_file", "edit_file", "apply_patch"})
