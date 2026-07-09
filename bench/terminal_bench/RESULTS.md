@@ -221,4 +221,56 @@ environmental (missing tools/runtimes, wrong high-level approach) that retry doe
   unlike single-shot scaffold. If it does NOT (chimera ≤ baseline again), that's a strong honest signal
   that Chimera's loop doesn't transfer to this benchmark regime, and it stands.
 
-_(results below)_
+### Results (2026-07-09) — direction matched the prediction, but at the noise floor
+
+`--global-agent-timeout-sec 600`, `CHIMERA_SOLVE_TIMEOUT=550`, `--n-concurrent 2`, same 40-task slice.
+
+| arm | pass rate | passing tasks |
+|---|---|---|
+| baseline (1-shot) | **2.5%** (1/40) | `fix-permissions` |
+| chimera (3-attempt loop) | **5.0%** (2/40) | `fix-permissions`, `oom` |
+
+**Paired (`chimera.eval.paired.compare_paired`):**
+
+```
+baseline-1shot         2.5%  (40 paired trials)
+chimera-3attempt       5.0%
+paired delta (Δ)       +2.5%  95% CI [-1.5%, +2.5%]
+discordant pairs       chimera-3attempt +1 / baseline-1shot +0
+verdict                not significant (CI includes 0)
+```
+
+- **The prediction's direction was right this time**: chimera ≥ baseline, Δ +2.5pp, and it landed on
+  the *opposite* side of the Phase-2 point estimate (as pre-declared). The 3-attempt loop **recovered
+  `oom`** (baseline failed it 1-shot; the retry loop solved it) and **lost nothing** — 1 discordant
+  pair, favoring chimera, zero against.
+- **But it is NOT significant and it is at the noise floor** (1 vs 2 absolute passes). A single
+  discordant pair cannot exclude zero. Read honestly: this is *weak directional* evidence consistent
+  with the retry mechanism helping, **not** a demonstration of lift. One recovered task at N=40 is
+  exactly the magnitude that run-to-run variance produces (see below).
+
+### The floor is variance-dominated — a caution on all these small numbers
+
+Across the runs, the **baseline itself moved 7.5% → 2.5%** (Phase 2 at `--n-concurrent 5` passed
+`hello-world`+`fibonacci-server`+`fix-permissions`; here at `--n-concurrent 2` it passed only
+`fix-permissions`). Combined with the Follow-up-A finding that `hello-world` is only ~40% reliable and
+`fibonacci-server` flaky, the honest conclusion is that **at this pass-rate floor (1–3 of 40) the
+single-run number is dominated by run-to-run variance**, and neither Phase 2's −5pp nor Follow-up B's
++2.5pp is separable from noise at N=40. `fix-permissions` is the one task that passes reliably in every
+arm and every run; everything else near the floor flickers.
+
+### Overall honest read (all runs together)
+
+- On a competent-but-not-frontier model (deepseek-v3.1) over a broad, hard, heterogeneous
+  Terminal-Bench slice, **both Chimera and the bare model sit near the floor (2.5–7.5%)** — this task
+  mix is genuinely hard for a single model, single (or few) attempts.
+- **Single-shot scaffold** (Phase 2) did not help and, on trivial tasks, its verifier can *false-fail*
+  a correct solve (Follow-up A: `hello-world` 2/5 serial) — a real, if uncomfortable, cost.
+- **The retry loop** (Follow-up B) nudged the point estimate positive (recovered `oom`, lost nothing),
+  consistent with — but far from proving — the lift that `bench/local_lift` shows in the goldilocks
+  regime.
+- **The signal-bearing regime for Chimera's lift remains the goldilocks-weak-model paired run**
+  (`bench/local_lift/RESULTS.md`: 17%→67% on mistral-small-24b, 3-0 discordant). On this harder mix at
+  the floor, N=40 lacks the power to resolve a real effect from variance — a genuinely larger N (or a
+  weaker model with more headroom, or an easier slice with a discriminating middle) is what a
+  significant Terminal-Bench number would require. Not manufactured here.

@@ -88,6 +88,21 @@ RESULTS.md for the `hello-world` anomaly investigation and disclosed measurement
 telemetry from this adapter; `--max-attempts 1` both arms means this doesn't test Chimera's retry-loop
 lift mechanism, which has a separate positive number in `bench/local_lift`).
 
+## Follow-ups — DONE (2026-07-09), both in `RESULTS.md`
+
+- **A. Anomaly repeat (controlled concurrency).** `hello-world` 5× serial (`--n-concurrent 1`): 2/5 —
+  ~40% reliable even at zero contention → the Phase-2 flip was **intrinsic variance, not a concurrency
+  artifact**; the scaffold's checklist can false-fail a correct trivial solve. `fix-permissions` 5/5,
+  `fibonacci-server` 0/5.
+- **B. `--max-attempts 3` A/B (retry-loop mechanism).** Same 40 slice, disclosed budget override
+  `--global-agent-timeout-sec 600`, `--n-concurrent 2`. baseline-1shot 2.5% (1/40) vs chimera-3attempt
+  5.0% (2/40), Δ +2.5pp, CI [−1.5%, +2.5%], **not significant** — direction matched the pre-registered
+  prediction (opposite side of Phase 2), the loop **recovered `oom` and lost nothing**, but at 1-vs-2
+  passes it's the noise floor. Baseline itself moved 7.5%→2.5% between runs → **the floor is
+  variance-dominated**; neither delta is separable from noise at N=40. The signal-bearing regime for
+  Chimera's lift stays the goldilocks paired run in `bench/local_lift` (17%→67%). A significant
+  Terminal-Bench number needs larger N, a weaker model, or an easier discriminating slice.
+
 ## Environment note (resolved 2026-07-08)
 
 Docker Desktop was crash-looping (v4.66): each service failed to remove a stale AF_UNIX socket
