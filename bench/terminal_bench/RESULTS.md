@@ -141,3 +141,62 @@ different, harder, more heterogeneous task mix. Both numbers are published becau
 anomaly; (b) a multi-attempt (`--max-attempts 3`) A/B on this same Terminal-Bench slice, budget
 permitting, to test the mechanism that `bench/local_lift` already shows lift for, on the harder/broader
 official benchmark.
+
+---
+
+# Follow-up A — anomaly repeat (controlled concurrency, 2026-07-08)
+
+**Purpose:** distinguish the two explanations for the `hello-world` pass→fail flip: LLM run-to-run
+variance vs. a `--n-concurrent 5` resource-contention artifact.
+
+**Note on "fixed seed":** not truly achievable through this benchmark's install path — the container
+installs `chimera-agent` from PyPI, which runs at temperature 0.7 with no `seed` param forwarded to
+deepseek/OpenRouter. So instead of a single (non-deterministic anyway) temp-0 run, this measures the
+**intrinsic variance directly**: each task run **5× at `--n-concurrent 1`** (serial, zero contention),
+chimera arm (full scaffold, max-attempts 1).
+
+**Pre-declared reading (before running):**
+- If `hello-world` passes ~5/5 serial → the Phase-2 single failure is best explained by **concurrency
+  contention** (the −5pp is partly artifact of `--n-concurrent 5`).
+- If it passes only ~1–3/5 serial → it's **intrinsic temp-0.7 variance** (the scaffold's checklist
+  verifier sometimes false-fails a correct trivial solve), and the Phase-2 sample caught a genuine miss.
+
+_(results below)_
+
+---
+
+# Follow-up B — the `--max-attempts 3` A/B (mechanism test) — PRE-REGISTERED
+
+**Different mechanism from Phase 2.** Phase 2 held `--max-attempts 1` both arms to isolate the
+single-shot scaffold. This tests Chimera's **retry-with-verification loop** — the mechanism
+`bench/local_lift` already shows lift for (+50pp on a goldilocks-weak model). Same 40-task slice.
+
+### Arms
+
+| arm | flags | budget |
+|---|---|---|
+| **baseline** | `--max-attempts 1 --no-remember --no-collect --no-evolve-skills` (raw 1-shot) | — |
+| **chimera** | `--repo-map --progress-ledger --checklist --max-attempts 3 --no-remember --no-collect --no-evolve-skills` | up to 3 verify-or-revert attempts |
+
+- **Disclosed budget override (NON-leaderboard):** `--global-agent-timeout-sec 600` (CHIMERA_SOLVE_TIMEOUT
+  550) so the loop has room to actually run 3 attempts (~150–180s each). This is a *mechanism test*, not
+  a leaderboard number — stated explicitly. Both arms get the same 600s budget (baseline 1-shot won't use
+  it). Concurrency `--n-concurrent 2` (controlled, well below the Phase-2 5).
+
+### Prediction (registered 2026-07-08, before running)
+
+deepseek is competent (not goldilocks-weak), and on this hard/heterogeneous mix many failures are
+environmental (missing tools/runtimes, wrong high-level approach) that retry doesn't fix. But retry
+*should* recover a few tasks where attempt 1 was close.
+
+- **Direction:** chimera (3-attempt loop) **≥** baseline (1-shot) — the retry loop should not hurt and
+  may recover 1–3 both-fail tasks.
+- **Effect size:** small-to-moderate, **Δ ≈ +2 to +12pp**.
+- **Significance:** likely still **not significant** at N=40 (floor effect: most hard tasks stay failed
+  regardless of attempts).
+- **Contrast with Phase 2:** I explicitly expect this to land on the *opposite* side of the Phase-2
+  point estimate (which favored baseline) — because retry is the mechanism with prior positive evidence,
+  unlike single-shot scaffold. If it does NOT (chimera ≤ baseline again), that's a strong honest signal
+  that Chimera's loop doesn't transfer to this benchmark regime, and it stands.
+
+_(results below)_
