@@ -177,6 +177,7 @@ Chimera doesn't reimplement scikit-learn — it **writes correct pandas/sklearn 
 and it emits a self-contained script (load → explore → model → evaluate) the agent then executes.
 
 ```bash
+uv sync --extra data     # pandas + scikit-learn for the generated code
 uv run chimera run "use the data_analysis skill: predict churn from customers.csv and report accuracy"
 ```
 

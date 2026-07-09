@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "chimera-agent"
-version = "0.13.0"
+version = "0.13.1"
 description = "An open-source, self-evolving AI agent whose reasoning core is an LLM-Fusion engine (panel -> judge -> synthesizer)."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -76,6 +76,14 @@ imagegen-local = [
     "torch>=2.1",
     "transformers>=4.40",
     "accelerate>=0.30",
+]
+# Data-science libraries for the `data_analysis` skill's sandbox code (pandas + scikit-learn). Opt-in —
+# the skill writes code that imports these; without them the generated script degrades to a clear
+# ImportError. Chimera *uses* these libraries in the code sandbox; it never reimplements them.
+data = [
+    "pandas>=2.0",
+    "scikit-learn>=1.3",
+    "numpy>=1.24",
 ]
 # Charting libraries for the `data_visualization` skill's sandbox code (matplotlib/seaborn = static
 # PNG/SVG, plotly = interactive HTML). Opt-in — the skill writes code that imports these; without them

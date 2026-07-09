@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-07-09
+
+### Added
+- **`data` optional extra** (pandas + scikit-learn + numpy) — the install path for the `data_analysis`
+  skill's sandbox code, for parity with the new `viz` extra. Surfaced by a live end-to-end test:
+  `uv run chimera run "use data_analysis: …"` needs these importable in the sandbox; the extra makes
+  `pip install 'chimera-agent[data]'` the one-liner. (The skill already degraded to a clear ImportError
+  without them; this just names the dependency.)
+
 ## [0.13.0] - 2026-07-09
 
 Data visualization, the honest way. Studied plotly / bokeh / seaborn / altair / matplotlib — all are
