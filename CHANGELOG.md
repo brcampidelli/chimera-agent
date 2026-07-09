@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-07-09
+
 ### Fixed
 - **Docker image bakes the browser so it launches in the container.** 0.8.0 makes Playwright a core
   dependency, but on a slim base image the Chromium *system libraries* are missing, so the binary
