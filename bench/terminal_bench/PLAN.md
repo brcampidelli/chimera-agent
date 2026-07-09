@@ -4,7 +4,20 @@ Goal: publish a **cost × performance** number on a standard benchmark, with a C
 **A/B (baseline raw model vs Chimera loop, same model)** — matching the honest-benchmark
 discipline (register the prediction before running; publish even if Chimera loses).
 
-## Phase 0 — root-caused (2026-07-08)
+## Phase 0 — DONE (2026-07-08): the harness grades our agent
+
+Validated end-to-end on WSL Ubuntu + Docker Desktop (after unblocking a Docker Desktop
+crash — orphaned AF_UNIX sockets + the Inference/Model-Runner service; fixed by removing
+the sockets via WSL and setting `EnableDockerAI:false` in Docker's settings-store.json):
+
+- **oracle** on `fix-git`: **100% resolved** in 21s — harness + dataset + container + grading all work.
+- **chimera agent** on `fix-git` (deepseek, `--global-agent-timeout-sec 1100`): graded in **119s**,
+  `is_resolved: false`, **`failure_mode: "unset"`** — i.e. NO agent_timeout. The agent installs
+  (wheelhouse, offline), runs `chimera solve` via `container.exec_run`, finishes, and TB grades with
+  the task's own tests. `is_resolved: false` is the honest benchmark signal (deepseek didn't fix the
+  git conflict in that lean single-attempt), not a harness bug. **The blocker is gone.**
+
+## Phase 0 — root-cause reference
 
 The earlier `agent_timeout` is **not** a tmux end-detection bug. `ChimeraInstalledAgent.perform_task`
 already bypasses the fragile tmux completion signal by driving install + solve through the
@@ -27,7 +40,7 @@ cd ~/tbench
 .venv/bin/tb run \
   --agent-import-path chimera_installed_agent:ChimeraInstalledAgent \
   --dataset-path /tmp/tbx/tasks --task-id hello-world \
-  --global-agent-timeout 1800 \
+  --global-agent-timeout-sec 1800 \
   --output-path runs_val
 # expect: a graded trial (is_resolved true/false from the tests), NOT agent_timeout.
 ```
@@ -57,9 +70,14 @@ it explicitly in RESULTS.
 Cost: deepseek ~$0.05-0.20/task chimera + ~$0.01 baseline -> N=40×2 ≈ $7-10, + Phase-1 ~$2 ≈ **$10-15**.
 Where: **WSL Ubuntu + Docker Desktop** (local; `~/tbench` already bootstrapped). Not the prod VPS.
 
-## Current blocker
+## Environment note (resolved 2026-07-08)
 
-Docker Desktop must be **running with WSL integration enabled for the Ubuntu distro**
-(Settings → Resources → WSL Integration). As of this write it was stopped; starting it headlessly
-did not bring the engine up (likely an interactive Docker Desktop window). Once `wsl -e bash -lc
-"docker ps"` works, the validation command above runs in minutes at ~$0.
+Docker Desktop was crash-looping (v4.66): each service failed to remove a stale AF_UNIX socket
+("Não é possível o acesso ao arquivo … A sintaxe do nome do arquivo … está incorreta") — first the
+Inference/Model-Runner (`dockerInference`), then the Secrets Engine (`docker-secrets-engine/engine.sock`).
+Fix: remove the orphaned sockets **via WSL** (Windows tools can't delete dangling AF_UNIX sockets) —
+`wsl bash -c 'find /mnt/c/Users/<u>/AppData/Local/Docker /mnt/c/Users/<u>/AppData/Local/docker-secrets-engine -type s -delete'` —
+and set `"EnableDockerAI": false` in `%APPDATA%\Docker\settings-store.json` (the Model Runner is the
+crash source and we don't use it). After that Docker Desktop + WSL integration came up clean.
+
+If it recurs after a bad shutdown: kill Docker processes, delete the orphaned sockets via WSL, relaunch.

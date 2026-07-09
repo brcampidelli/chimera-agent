@@ -28,17 +28,20 @@ timeout is the harness's per-task ``max_agent_timeout_sec`` (each task's yaml), 
 ``asyncio.wait_for`` around ``perform_task`` (``harness.py`` ``_run_agent_with_timeout``). When the
 solve takes longer than that limit, TB records ``FailureMode.AGENT_TIMEOUT`` regardless of our own
 ``timeout 600``. Two honest ways forward:
-  - **validation** (prove the grading path works end-to-end): pass ``--global-agent-timeout <big>``
+  - **validation** (prove the grading path works end-to-end): pass ``--global-agent-timeout-sec <big>``
     to the ``tb run`` so the solve finishes and TB actually runs the task tests -> a real
     is_resolved verdict instead of agent_timeout.
   - **leaderboard-honest** (Phase 2): respect each task's ``max_agent_timeout_sec`` and report
     whatever the agent completes within it (a fast model or a lighter scaffold), OR document the
     ``--global-agent-timeout`` override transparently. Never silently inflate the budget.
 
-HONEST FINDING (N=1, fix-git, deepseek-chat-v3.1): the integration produces a real graded result;
-the scaffold's multi-step loop on a cheap model exceeded that task's agent timeout -> agent_timeout.
-The scaffolding cost dominates on a time-bounded benchmark with a weak model — same lesson as the
-local proxy + VPS runs. Fix per above: raise the agent timeout (validation) or go faster (Phase 2).
+VALIDATED (2026-07-08): oracle scored 100% on fix-git (harness works); the chimera agent then
+graded on fix-git in 119s with ``--global-agent-timeout-sec 1100`` -> ``is_resolved: false``,
+``failure_mode: "unset"`` (NO agent_timeout). So the grading path is confirmed end-to-end: the
+agent installs offline, runs ``chimera solve`` via ``exec_run``, finishes, and TB grades with the
+task's own tests. is_resolved=false is the honest benchmark signal (deepseek didn't fix that git
+conflict in a lean single attempt), not a harness bug. Next: Phase 1 (config that fits the per-task
+timeout) then Phase 2 (the A/B number). See PLAN.md.
 """
 from __future__ import annotations
 
