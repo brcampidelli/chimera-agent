@@ -101,7 +101,12 @@ def test_missing_action_args() -> None:
 
 
 def test_missing_extra_gives_install_hint() -> None:
-    # No driver injected AND playwright not installed -> friendly hint, not an ImportError.
+    # Tests the absent-extra path. When playwright IS installed, running the tool would launch a real
+    # browser (and leak its event loop into later async tests), so skip — the path can't apply here.
+    import importlib.util
+
+    if importlib.util.find_spec("playwright") is not None:
+        pytest.skip("browser extra installed — the install-hint path only applies when it's absent")
     tool = BrowserTool()
     out = tool.run(action="read")
     assert "chimera-agent[browser]" in out and out.startswith("error:")

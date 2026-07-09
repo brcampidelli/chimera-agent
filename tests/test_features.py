@@ -31,6 +31,10 @@ def test_web_search_ready_only_with_key(monkeypatch: pytest.MonkeyPatch) -> None
 
 
 def test_browser_reports_missing_dependency() -> None:
+    import importlib.util
+
+    if importlib.util.find_spec("playwright") is not None:
+        pytest.skip("browser extra installed — this checks the missing-dependency report")
     status = _by_name(Settings())["browser"]
     # playwright isn't installed in the test environment
     assert status.ready is False  # type: ignore[attr-defined]
