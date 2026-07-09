@@ -197,6 +197,38 @@ CHIMERA_IMAGE_BACKEND=local uv run chimera run "generate an image of a fox in a 
 > something an agent should carry in its base; reach for a hosted API if you ever need it. Computer
 > vision (OpenCV) needs no dedicated tool — the agent already does `import cv2` in the code sandbox.
 
+## Charts & data visualization
+
+Two complementary ways to make a chart — both honest about scope (Chimera *uses* plotting libraries; it
+doesn't reimplement matplotlib/plotly/bokeh):
+
+**1. The `data_visualization` skill — write chart code, run it in the sandbox.** Covers *everything*
+(custom/publication figures, 3D, anything): the skill emits a self-contained script using
+matplotlib/seaborn (static PNG/SVG) or plotly (interactive HTML), with the headless backend
+(`matplotlib.use("Agg")`) and save-to-workspace discipline baked in.
+
+```bash
+uv sync --extra viz     # matplotlib + seaborn + plotly for the generated code
+uv run chimera run "use data_visualization: line chart of revenue.csv over time, save revenue.png"
+```
+
+**2. The `render_chart` tool — a safe, declarative Vega-Lite spec.** A Vega-Lite spec is **inert JSON
+data, not code**: inspectable, schema-shaped, and re-renderable — a stronger governance story than
+executing generated code, for the standard charts Vega-Lite covers (bar/line/scatter/histogram/
+heatmap/faceted…). **HTML output needs no extra** (it embeds the spec + the Vega CDN); PNG/SVG use the
+optional `viz-vega` extra (`vl-convert-python`).
+
+```bash
+uv run chimera run "build a Vega-Lite bar chart of {A:5,B:8,C:3} and render_chart it to chart.html"
+uv sync --extra viz-vega   # optional: static PNG/SVG rendering (heavy — Rust+V8 binary)
+```
+
+> Honest scope: plotly wraps plotly.js, bokeh is ~half TypeScript, matplotlib's renderer is C++, and
+> seaborn is a thin layer over matplotlib — all frameworks an agent should *call*, not rewrite. The
+> code sandbox already imports them; the skill just names the capability and handles the headless
+> gotchas. Vega-Lite is the exception worth a dedicated tool because its artifact is safe declarative
+> data.
+
 ## Schedule any of them
 
 Every recipe can run on a cron and deliver to chat:

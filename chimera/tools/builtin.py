@@ -65,6 +65,9 @@ def default_registry(workspace: Path | None = None) -> ToolRegistry:
     from chimera.tools.download import DownloadMediaTool
 
     registry.register(DownloadMediaTool(workspace))
+    from chimera.tools.chart import RenderChartTool
+
+    registry.register(RenderChartTool(workspace))  # Vega-Lite spec -> HTML (dep-free) / PNG-SVG (viz-vega)
 
     # Web scraping + secure structured extraction (fetch->clean markdown; schema->JSON via quarantine)
     # + whole-site discovery (map/crawl, robots-aware).

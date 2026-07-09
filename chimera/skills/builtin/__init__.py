@@ -13,7 +13,7 @@ from chimera.skills.builtin.code_skills import (
     FixCodeSkill,
     GenerateScriptSkill,
 )
-from chimera.skills.builtin.data_skills import DataAnalysisSkill
+from chimera.skills.builtin.data_skills import DataAnalysisSkill, DataVisualizationSkill
 from chimera.skills.builtin.echo_skill import EchoSkill
 from chimera.skills.registry import SkillRegistry
 
@@ -30,11 +30,13 @@ def register_builtin_skills(
     registry.register(FixCodeSkill(backend, model))
     registry.register(GenerateScriptSkill(backend, model))
     registry.register(DataAnalysisSkill(backend, model))
+    registry.register(DataVisualizationSkill(backend, model))
 
 
 __all__ = [
     "CompleteCodeSkill",
     "DataAnalysisSkill",
+    "DataVisualizationSkill",
     "EchoSkill",
     "FixCodeSkill",
     "GenerateScriptSkill",

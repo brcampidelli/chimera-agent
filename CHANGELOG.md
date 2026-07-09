@@ -6,6 +6,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-07-09
+
+Data visualization, the honest way. Studied plotly / bokeh / seaborn / altair / matplotlib — all are
+frameworks or JS-backed renderers an agent should *call*, not reimplement (bokeh is ~half TypeScript,
+plotly wraps plotly.js, matplotlib's renderer is C++, seaborn wraps matplotlib). So Chimera gets two
+complementary capabilities, neither a reimplementation.
+
+### Added
+- **`data_visualization` skill.** Sibling of `data_analysis`: writes a self-contained chart script for
+  the `execute_code` sandbox — matplotlib/seaborn for static PNG/SVG, plotly for interactive HTML — with
+  the headless-backend gotcha (`matplotlib.use("Agg")` before pyplot) and save-to-workspace-then-print-
+  the-path discipline baked into its prompt. Covers arbitrary/custom charts. `chimera/skills/builtin/data_skills.py`.
+- **`render_chart` tool — declarative Vega-Lite → chart, safely.** Altair's insight applied to an agent:
+  a Vega-Lite spec is **inert, inspectable JSON data, not code** — a stronger governance story than
+  executing generated plotting code. Renders **HTML with zero extra deps** (embeds the spec + the Vega
+  CDN); **PNG/SVG** via the optional `viz-vega` extra (`vl-convert-python`). Shape-validated before
+  render. `chimera/tools/chart.py`.
+- Optional extras: **`viz`** (matplotlib + seaborn + plotly for the skill's sandbox code) and
+  **`viz-vega`** (vl-convert-python for static Vega-Lite rendering).
+
+### Notes
+- Honest scope, again: the code sandbox already imports matplotlib/plotly/seaborn — the skill just names
+  the capability and handles the headless discipline; it does not vendor or reimplement any of them.
+  Vega-Lite earns a dedicated tool only because its artifact is safe declarative data.
+
 ## [0.12.0] - 2026-07-09
 
 Rounds out the media + data capabilities, all in the honest "orchestrate, don't reimplement" spirit: a

@@ -11,7 +11,7 @@ from typing import Any
 
 import pytest
 
-from chimera.skills.builtin.data_skills import DataAnalysisSkill
+from chimera.skills.builtin.data_skills import DataAnalysisSkill, DataVisualizationSkill
 from chimera.tools import download, media
 
 
@@ -43,6 +43,20 @@ def test_data_analysis_skill_is_registered() -> None:
     reg = SkillRegistry()
     register_builtin_skills(reg, backend=_FakeBackend("x"))
     assert "data_analysis" in reg.names()
+    assert "data_visualization" in reg.names()
+
+
+# --- data-visualization skill ------------------------------------------------------------
+
+
+def test_data_visualization_skill_emits_code() -> None:
+    skill = DataVisualizationSkill(backend=_FakeBackend("import matplotlib\nmatplotlib.use('Agg')"))
+    res = skill.run(task="bar chart of sales by month", dataset="sales.csv", out="sales.png")
+    assert res.ok and "matplotlib" in res.output
+
+
+def test_data_visualization_skill_requires_task() -> None:
+    assert not DataVisualizationSkill(backend=_FakeBackend("x")).run().ok
 
 
 # --- media download (yt-dlp) -------------------------------------------------------------
