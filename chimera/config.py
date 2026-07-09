@@ -138,6 +138,9 @@ class Settings(BaseSettings):
     automatically (OpenAI, DeepSeek) are left untouched; only breakpoint-requiring
     families (Anthropic/Claude) get an explicit cache_control marker."""
 
+    # --- Browser tool: run Chromium headless (default) or headful for debugging. ---
+    browser_headless: bool = Field(default=True, validation_alias="CHIMERA_BROWSER_HEADLESS")
+
     # --- Long-term memory backend: json (default, zero-dep) or sqlite (FTS5 full-text) ---
     memory_backend: str = Field(default="json", validation_alias="CHIMERA_MEMORY_BACKEND")
 

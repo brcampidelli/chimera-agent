@@ -98,5 +98,5 @@ def default_registry(workspace: Path | None = None) -> ToolRegistry:
     if importlib.util.find_spec("playwright") is not None:
         from chimera.tools.browser import BrowserTool
 
-        registry.register(BrowserTool())
+        registry.register(BrowserTool(headless=settings.browser_headless))
     return registry

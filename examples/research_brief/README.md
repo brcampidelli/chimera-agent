@@ -21,10 +21,30 @@ chimera cron add "daily research brief" "0 7 * * *" \
 chimera serve   # the scheduler runs it and (with a bot configured) delivers the digest to chat
 ```
 
+## Read full pages, not just snippets
+
+`web_search` returns titles + snippets. Install the browser extra and the agent can open the top
+results and read their **full rendered text** (including JS-heavy pages) before writing the brief —
+much richer than snippets alone:
+
+```bash
+uv sync --extra browser --extra documents && playwright install chromium
+```
+
+Then ask it to `read_text` the top sources (add `--taint` since page content is untrusted):
+
+```bash
+chimera solve "Research 'small language models on-device 2026': web_search for sources, open the \
+  top 3 with the browser and read_text each, then write a 5-bullet sourced brief to brief.md" \
+  --taint --verify "test -s brief.md"
+```
+
 ## Honest notes
 
 - `arxiv_search` covers papers; broad web coverage needs `CHIMERA_TAVILY_API_KEY`. Without
   it the brief still runs, just narrower.
+- Reading full pages needs the `browser` (+ `documents` for clean Markdown) extra; without it the
+  agent falls back to search snippets.
 - "5 findings" is a target, not a guarantee — the verifier checks the brief is non-trivial,
   not that every bullet is gold. The digest names its top pick so you can judge fast.
 - Free models are fine here; a stronger model gives sharper synthesis.

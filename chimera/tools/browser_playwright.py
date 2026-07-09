@@ -79,6 +79,12 @@ class PlaywrightDriver:
         self._page.go_back(wait_until="domcontentloaded")
         return self._snapshot()
 
+    def page_html(self) -> str:
+        return str(self._page.content())  # the rendered DOM (post-JS), for HTML->Markdown
+
+    def page_text(self) -> str:
+        return str(self._page.inner_text("body"))  # visible text; fallback + basis for find
+
     def close(self) -> None:
         from contextlib import suppress
 

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import pytest
+
 from chimera.governance.ledger import FETCH_TOOLS
 from chimera.governance.ledger_tool import FENCE_CLOSE, FENCE_OPEN
+from chimera.tools import browser as browser_mod
 from chimera.tools.browser import BrowserTool, Element, render_elements
 
 
@@ -36,6 +39,14 @@ class _FakeDriver:
     def back(self) -> list[Element]:
         self.calls.append("back")
         return self._home
+
+    def page_html(self) -> str:
+        self.calls.append("page_html")
+        return "<html><body><h1>Docs</h1><p>Hello world body text.</p></body></html>"
+
+    def page_text(self) -> str:
+        self.calls.append("page_text")
+        return "Docs\nHello world body text.\nContact us at support@example.com."
 
     def close(self) -> None:
         self.calls.append("close")
@@ -94,6 +105,56 @@ def test_missing_extra_gives_install_hint() -> None:
     tool = BrowserTool()
     out = tool.run(action="read")
     assert "chimera-agent[browser]" in out and out.startswith("error:")
+
+
+# --- reading rendered text (read_text / find) -------------------------------------------
+
+
+def test_read_text_returns_markdown_when_extra_present(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(browser_mod, "_html_to_markdown", lambda html: "# Docs\n\nHello world body text.")
+    tool, driver = _tool()
+    out = tool.run(action="read_text")
+    assert "# Docs" in out and "Hello world body text." in out
+    assert FENCE_OPEN in out and out.rstrip().endswith(FENCE_CLOSE)  # untrusted -> fenced
+    assert "page_html" in driver.calls  # markdown path reads the rendered HTML
+
+
+def test_read_text_falls_back_to_plain_when_extra_absent(monkeypatch: pytest.MonkeyPatch) -> None:
+    # _html_to_markdown returns None when the 'documents' extra is missing -> use inner_text.
+    monkeypatch.setattr(browser_mod, "_html_to_markdown", lambda html: None)
+    tool, driver = _tool()
+    out = tool.run(action="read_text")
+    assert "Hello world body text." in out and FENCE_OPEN in out
+    assert "page_text" in driver.calls
+
+
+def test_read_text_with_url_navigates_first(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(browser_mod, "_html_to_markdown", lambda html: None)
+    tool, driver = _tool()
+    tool.run(action="read_text", url="https://example.com")
+    assert driver.calls[0] == "navigate:https://example.com"
+
+
+def test_find_returns_matching_lines() -> None:
+    tool, _ = _tool()
+    out = tool.run(action="find", query="support@example")
+    assert "support@example.com" in out and "match(es)" in out and FENCE_OPEN in out
+
+
+def test_find_reports_when_absent() -> None:
+    tool, _ = _tool()
+    out = tool.run(action="find", query="nonexistent-zzz")
+    assert "not found" in out and FENCE_OPEN in out
+
+
+def test_find_needs_a_query() -> None:
+    tool, _ = _tool()
+    assert tool.run(action="find").startswith("error:")
+
+
+def test_new_actions_are_advertised() -> None:
+    actions = BrowserTool.parameters["properties"]["action"]["enum"]
+    assert "read_text" in actions and "find" in actions
 
 
 # --- governance -------------------------------------------------------------------------

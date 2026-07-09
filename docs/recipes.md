@@ -47,20 +47,50 @@ uv sync --extra documents      # or: pip install 'chimera-agent[documents]'
 Then point a task at a file: *"Summarize report.pdf into 5 bullets."* Without the extra,
 `read_document` returns a one-line install hint instead of failing.
 
-## Browsing the web (navigate + act)
+## Browsing the web (navigate, read + act)
 
-For tasks that need the agent to *act* on a page — open it, read it, click, type — install the
-browser extra and it gains a `browser` tool that drives a real Chromium via the page's
-accessibility tree (roles + names, not pixels):
+For tasks that need the agent to *act on* or *read* a page — open it, read its content, click,
+type — install the browser extra and it gains a `browser` tool that drives a real Chromium (so it
+sees JavaScript-rendered pages the plain `http_get` can't):
 
 ```bash
-uv sync --extra browser        # or: pip install 'chimera-agent[browser]'
-playwright install chromium    # one-time: fetch the browser binary
+uv sync --extra browser --extra documents   # or: pip install 'chimera-agent[browser,documents]'
+playwright install chromium                  # one-time: fetch the browser binary
 ```
 
-Page content is **untrusted**: every result is data-fenced and the tool taints the run, so
-prefer `solve --taint --guard` when browsing and pull structured fields through the quarantined
-reader rather than acting on raw page text. Without the extra, `browser` returns an install hint.
+The `browser` tool has these actions:
+
+- **`navigate` / `read`** — open a URL and list the page's *interactive* elements as `[ref] role: name`
+  (links, buttons, fields), so the agent clicks/types by `ref`, not by pixel.
+- **`read_text`** — the page's **full rendered text**, for reading/researching an article, doc or
+  result. With the `documents` extra it's clean **Markdown** (headings, links, lists preserved via
+  MarkItDown); without it, the plain visible text. Pass an optional `url` to open + read in one step.
+- **`find`** — search the rendered text for a query and get back the matching lines.
+- **`click` / `type` / `back`** — drive the page by `ref`.
+
+`CHIMERA_BROWSER_HEADLESS=false` runs Chromium headful for debugging.
+
+Page content is **untrusted**: every result is data-fenced and the tool taints the run, so prefer
+`solve --taint --guard` when browsing and pull structured fields through the quarantined reader
+rather than acting on raw page text. Without the `browser` extra, `browser` returns an install hint;
+without `documents`, `read_text` still works — just as plain text instead of Markdown.
+
+## Researching a topic (search + read)
+
+Combine web search with the browser's `read_text` to research something and get a sourced brief —
+`web_search` (needs `CHIMERA_TAVILY_API_KEY`) finds the pages, `browser read_text` reads each one
+(including JS-heavy sites), and `deliver` writes the brief:
+
+```bash
+uv run chimera solve "Research 'on-device small language models 2026': web_search for sources, \
+  open the top 3 with the browser and read_text each, then write a 5-bullet sourced brief to brief.md" \
+  --taint --verify "test -s brief.md"
+```
+
+For a ready-made version with an executable check per step, see
+[`examples/research_brief`](../examples/research_brief/README.md) — it uses `arxiv_search` +
+`web_search` out of the box, and with the `browser` extra installed the agent can also `read_text`
+full pages instead of stopping at search snippets.
 
 ## Schedule any of them
 

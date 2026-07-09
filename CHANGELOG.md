@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Read the front-end, not just the back-end.** The `browser` tool (Playwright/Chromium)
+  gained two actions for *reading* a rendered page, beyond driving its interactive
+  elements: **`read_text`** returns the page's full rendered text — clean Markdown via
+  MarkItDown when the `documents` extra is present, plain visible text otherwise — with an
+  optional `url` to open+read in one step; **`find`** searches that rendered text for a
+  query. This closes the gap where the agent could navigate/click a page (accessibility
+  tree) but couldn't actually *read* an article/doc/result that raw `http_get` misses on
+  JS-heavy sites. Output stays data-fenced and taints the run (already in `FETCH_TOOLS`).
+  New `CHIMERA_BROWSER_HEADLESS` toggles headful Chromium for debugging. Reuses the
+  existing MarkItDown seam; no new dependency. Docs: `docs/recipes.md` (browsing + a
+  "Researching a topic: search + read" recipe) and `examples/research_brief`.
 - **Transfer-holdout promotion gate.** A self-evolution change (RFT round / GEPA / ACE / skill)
   must not regress a disjoint, same-capability holdout slice before it's promoted, not just win
   its tuned slice — closing a "memorized the eval" blind spot. `chimera/eval/transfer.py`
