@@ -161,7 +161,29 @@ chimera arm (full scaffold, max-attempts 1).
 - If it passes only ~1–3/5 serial → it's **intrinsic temp-0.7 variance** (the scaffold's checklist
   verifier sometimes false-fails a correct trivial solve), and the Phase-2 sample caught a genuine miss.
 
-_(results below)_
+### Results (2026-07-09) — intrinsic variance, NOT a concurrency artifact
+
+Chimera arm, full scaffold, `--n-concurrent 1` (serial), 5 attempts each:
+
+| task | passes | failure modes |
+|---|---|---|
+| `hello-world` | **2/5** | all `unset` (graded, not timeout) |
+| `fibonacci-server` | **0/5** | all `unset` |
+| `fix-permissions` | **5/5** | all `unset` |
+
+**Verdict: the second pre-declared branch.** `hello-world` is only **~40% reliable** under Chimera's
+scaffold **even at zero contention** — so the Phase-2 failure was **not** a `--n-concurrent 5` artifact;
+it's **intrinsic run-to-run variance**. The uncomfortable but honest reading: on a trivial task, the
+scaffold's own checklist/verifier layer sometimes **false-fails a correct solve** (the model creates
+`hello.txt` correctly, then the scaffold reports "failed after 1 attempt(s)" and TB's independent tests
+agree with the failure on that run). `fix-permissions` is rock-solid (5/5); `fibonacci-server` reliably
+fails under the scaffold (0/5 — the Phase-2 `test_timeout` was not a one-off).
+
+**Implication for Phase 2:** the −5pp is not measurement noise to explain away — it partly reflects a
+real effect: **on easy tasks the scaffold's overhead can hurt** (added variance + occasional
+false-fail) where the bare model just does the task. This makes the single-shot-scaffold arm's loss
+directionally *sensible*, not a fluke. It also sharpens why the retry-loop mechanism (Follow-up B) is
+the more interesting test — retry is where the scaffold is supposed to *earn back* its overhead.
 
 ---
 
