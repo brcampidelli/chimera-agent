@@ -107,9 +107,11 @@ consistent with the evidence and were NOT distinguished by this run:
    concurrency); five simultaneous containers competing for host resources could shift timing enough to
    change a trivial task's outcome (e.g. a build step racing a write).
 
-Not distinguished because doing so would require a repeated-seed, controlled-concurrency follow-up —
-exactly the kind of "run it again to explain away the loss" that the honest-benchmark discipline says
-not to do inline. Flagged here as an open question, not swept under the rug.
+Not distinguished by *this* run — flagged as an open question, not swept under the rug. **→ RESOLVED in
+Follow-up A (below):** a controlled both-arms serial repeat shows it's **intrinsic variance**, and that
+under control chimera actually passes `hello-world` **2/5 vs the bare model's 0/5** — so the Phase-2
+flip was single-sample noise, and the scaffold does *not* underperform the bare model on this task. Read
+the Phase-2 point estimate accordingly: noise, not a real scaffold cost.
 
 ### Known measurement gaps (disclosed)
 
@@ -130,12 +132,14 @@ not to do inline. Flagged here as an open question, not swept under the rug.
 
 ### Honest verdict
 
-On this pre-registered, single-attempt, N=40 Terminal-Bench-core slice: **Chimera's repo-map + ledger +
-checklist scaffold did not outperform the bare model, and the point estimate favored the baseline (not
-significant).** This does not contradict the project's separate, positive finding that Chimera's
-**multi-attempt retry loop** lifts a goldilocks-weak model (`bench/local_lift`) — it tests a different
-mechanism (single-shot scaffolding context/structure vs. iterative retry-with-verification) on a
-different, harder, more heterogeneous task mix. Both numbers are published because both are true.
+On this pre-registered, single-attempt, N=40 Terminal-Bench-core slice: **no significant difference
+between Chimera's scaffold and the bare model** (Δ −5.0pp, CI includes 0). The negative *point estimate*
+looked like a scaffold cost, but the controlled both-arms follow-up (A) shows it is **single-run
+sampling noise on flaky tasks** — under serial control the scaffold is ≥ the bare model on the very
+tasks that produced the discordant pairs. Neither a lift nor a loss is demonstrable at this N on this
+floor-dominated slice. This is independent of the project's separate, positive finding that Chimera's
+**multi-attempt retry loop** lifts a goldilocks-weak model (`bench/local_lift`) — a different mechanism
+on a different task mix. All numbers are published because all are true.
 
 **Next, if pursued:** (a) a controlled-concurrency, fixed-temperature repeat to settle the `hello-world`
 anomaly; (b) a multi-attempt (`--max-attempts 3`) A/B on this same Terminal-Bench slice, budget
@@ -161,29 +165,33 @@ chimera arm (full scaffold, max-attempts 1).
 - If it passes only ~1–3/5 serial → it's **intrinsic temp-0.7 variance** (the scaffold's checklist
   verifier sometimes false-fails a correct trivial solve), and the Phase-2 sample caught a genuine miss.
 
-### Results (2026-07-09) — intrinsic variance, NOT a concurrency artifact
+### Results (2026-07-09) — intrinsic variance, NOT a concurrency artifact — BOTH arms measured
 
-Chimera arm, full scaffold, `--n-concurrent 1` (serial), 5 attempts each:
+Each task run **5× serially** (`--n-concurrent 1`, zero contention), **both arms** (the chimera arm was
+run first; the baseline arm 5× serial was added afterward to make this a real paired comparison rather
+than a one-armed measurement):
 
-| task | passes | failure modes |
+| task | baseline (bare) | chimera (scaffold) |
 |---|---|---|
-| `hello-world` | **2/5** | all `unset` (graded, not timeout) |
-| `fibonacci-server` | **0/5** | all `unset` |
-| `fix-permissions` | **5/5** | all `unset` |
+| `hello-world` | **0/5** | **2/5** |
+| `fibonacci-server` | **0/5** | **0/5** |
+| `fix-permissions` | **5/5** | **5/5** |
 
-**Verdict: the second pre-declared branch.** `hello-world` is only **~40% reliable** under Chimera's
-scaffold **even at zero contention** — so the Phase-2 failure was **not** a `--n-concurrent 5` artifact;
-it's **intrinsic run-to-run variance**. The uncomfortable but honest reading: on a trivial task, the
-scaffold's own checklist/verifier layer sometimes **false-fails a correct solve** (the model creates
-`hello.txt` correctly, then the scaffold reports "failed after 1 attempt(s)" and TB's independent tests
-agree with the failure on that run). `fix-permissions` is rock-solid (5/5); `fibonacci-server` reliably
-fails under the scaffold (0/5 — the Phase-2 `test_timeout` was not a one-off).
+**Verdict: the Phase-2 discordant pairs were single-sample noise — and my first read of this run was
+wrong.** When only the chimera arm had been measured, `hello-world` at 2/5 looked like "the scaffold
+false-fails a correct trivial solve." **Measuring the baseline arm refutes that:** the bare model passes
+`hello-world` **0/5** serially — *worse* than the scaffold's 2/5. `hello-world` is intrinsically flaky
+for **both** arms (the strict requirement — exactly `Hello, world!\n`, and *no other files* — trips the
+model's non-determinism regardless of scaffolding). On these three tasks the controlled data is
+**chimera ≥ baseline everywhere** (2/5 vs 0/5, then two ties). The Phase-2 result where *baseline* beat
+*chimera* on `hello-world` (and `fibonacci-server`) does **not reproduce under control** — on
+`hello-world` it outright reverses.
 
-**Implication for Phase 2:** the −5pp is not measurement noise to explain away — it partly reflects a
-real effect: **on easy tasks the scaffold's overhead can hurt** (added variance + occasional
-false-fail) where the bare model just does the task. This makes the single-shot-scaffold arm's loss
-directionally *sensible*, not a fluke. It also sharpens why the retry-loop mechanism (Follow-up B) is
-the more interesting test — retry is where the scaffold is supposed to *earn back* its overhead.
+**Corrected implication for Phase 2:** the −5pp is **not** evidence the scaffold hurts (my earlier
+"scaffold overhead can hurt on easy tasks" was contradicted by the baseline arm and is retracted). It is
+**single-run sampling noise on flaky tasks**: Phase 2 happened to catch baseline's lucky `hello-world`
+pass and chimera's unlucky miss, at `--n-concurrent 5`. `fix-permissions` is the only task reliable in
+both arms; `fibonacci-server` reliably fails both.
 
 ---
 
@@ -264,8 +272,11 @@ arm and every run; everything else near the floor flickers.
 - On a competent-but-not-frontier model (deepseek-v3.1) over a broad, hard, heterogeneous
   Terminal-Bench slice, **both Chimera and the bare model sit near the floor (2.5–7.5%)** — this task
   mix is genuinely hard for a single model, single (or few) attempts.
-- **Single-shot scaffold** (Phase 2) did not help and, on trivial tasks, its verifier can *false-fail*
-  a correct solve (Follow-up A: `hello-world` 2/5 serial) — a real, if uncomfortable, cost.
+- **Single-shot scaffold** (Phase 2) showed **no significant effect either way**. The −5pp point
+  estimate was **single-run sampling noise**, not a real cost: the controlled both-arms serial repeat
+  (Follow-up A) shows chimera ≥ baseline on the exact tasks that drove the Phase-2 discordant pairs
+  (`hello-world` 2/5 vs 0/5). The scaffold did not help *and did not hurt* — it's dominated by variance
+  at this floor.
 - **The retry loop** (Follow-up B) nudged the point estimate positive (recovered `oom`, lost nothing),
   consistent with — but far from proving — the lift that `bench/local_lift` shows in the goldilocks
   regime.

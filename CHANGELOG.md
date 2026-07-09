@@ -55,16 +55,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   positive paired result in `bench/local_lift/RESULTS.md`, +50pp on a goldilocks-weak
   model). Published per the project's honest-benchmark discipline: register before
   running, publish regardless of outcome, never re-run to chase significance.
-- **Terminal-Bench follow-ups (pre-registered, `RESULTS.md`).** (A) Anomaly repeat:
-  `hello-world` run 5× serially is only 2/5 → the Phase-2 pass→fail flip is intrinsic
-  run-to-run variance (the scaffold's checklist can false-fail a correct trivial solve),
-  not a concurrency artifact. (B) `--max-attempts 3` A/B (retry-loop mechanism, same 40
-  slice, disclosed non-leaderboard timeout override): baseline 2.5% vs chimera 5.0%,
-  Δ +2.5pp, CI [−1.5%, +2.5%], not significant — direction matched the prediction (the
-  loop recovered `oom`, lost nothing) but at 1-vs-2 passes it's the noise floor. The
-  baseline itself moved 7.5%→2.5% between runs, so at this pass-rate floor N=40 is
-  variance-dominated and no delta is separable from noise; the signal-bearing regime for
-  Chimera's lift stays the goldilocks paired run in `bench/local_lift`.
+- **Terminal-Bench follow-ups (pre-registered, `RESULTS.md`).** (A) Anomaly repeat, BOTH
+  arms 5× serial: `hello-world` chimera 2/5 vs baseline **0/5**, `fibonacci-server` 0/5
+  both, `fix-permissions` 5/5 both → the Phase-2 pass→fail flip is intrinsic run-to-run
+  variance, and under control the scaffold is **≥** the bare model on the very tasks that
+  drove the discordant pairs (an earlier "the scaffold false-fails easy tasks" read, from
+  the one-armed measurement, was refuted by the baseline arm and retracted). (B)
+  `--max-attempts 3` A/B (retry-loop mechanism, same 40 slice, disclosed non-leaderboard
+  timeout override): baseline 2.5% vs chimera 5.0%, Δ +2.5pp, CI [−1.5%, +2.5%], not
+  significant — direction matched the prediction (the loop recovered `oom`, lost nothing)
+  but at 1-vs-2 passes it's the noise floor. The baseline itself moved 7.5%→2.5% between
+  runs, so at this pass-rate floor N=40 is variance-dominated and no delta (either sign) is
+  separable from noise; the signal-bearing regime for Chimera's lift stays the goldilocks
+  paired run in `bench/local_lift`.
 
 ## [0.6.0] - 2026-07-08
 
