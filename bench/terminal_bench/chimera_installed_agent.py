@@ -21,11 +21,24 @@ image, so cp313 linux). See README.md. Config via env:
   CHIMERA_TB_FLAGS          solve flags (default: the M14 scaffolding at max-attempts 1)
   CHIMERA_SOLVE_TIMEOUT     per-solve command timeout in seconds (default 600)
 
-HONEST FINDING (N=1, fix-git, deepseek-chat-v3.1): the integration produces a real graded result,
-but chimera's thorough multi-step loop on a cheap model exceeded the task timeout -> is_resolved
-false, failure_mode agent_timeout. The scaffolding's cost dominates on a time-bounded benchmark with
-a weak model — the same lesson the local proxy + VPS runs surfaced. A non-timeout number needs a
-larger per-task timeout (and hours of wall-clock + API for a full subset), or a faster model.
+ROOT CAUSE of the earlier ``agent_timeout`` (confirmed by reading the harness, 2026-07-08): it is
+**not** a tmux end-detection bug — ``perform_task`` below already bypasses the fragile tmux
+completion signal by driving everything through the container's synchronous ``exec_run``. The
+timeout is the harness's per-task ``max_agent_timeout_sec`` (each task's yaml), enforced by
+``asyncio.wait_for`` around ``perform_task`` (``harness.py`` ``_run_agent_with_timeout``). When the
+solve takes longer than that limit, TB records ``FailureMode.AGENT_TIMEOUT`` regardless of our own
+``timeout 600``. Two honest ways forward:
+  - **validation** (prove the grading path works end-to-end): pass ``--global-agent-timeout <big>``
+    to the ``tb run`` so the solve finishes and TB actually runs the task tests -> a real
+    is_resolved verdict instead of agent_timeout.
+  - **leaderboard-honest** (Phase 2): respect each task's ``max_agent_timeout_sec`` and report
+    whatever the agent completes within it (a fast model or a lighter scaffold), OR document the
+    ``--global-agent-timeout`` override transparently. Never silently inflate the budget.
+
+HONEST FINDING (N=1, fix-git, deepseek-chat-v3.1): the integration produces a real graded result;
+the scaffold's multi-step loop on a cheap model exceeded that task's agent timeout -> agent_timeout.
+The scaffolding cost dominates on a time-bounded benchmark with a weak model — same lesson as the
+local proxy + VPS runs. Fix per above: raise the agent timeout (validation) or go faster (Phase 2).
 """
 from __future__ import annotations
 
