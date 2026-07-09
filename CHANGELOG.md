@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-09
+
+The **front-end reading + honest-benchmark** release. The browser can now *read* rendered pages
+(clean Markdown), not just drive them; prompt caching is used and measured; a transfer-holdout gate
+guards self-evolution against negative transfer; delegation is routed by the measured (D−1)/D curve;
+and the official Terminal-Bench A/B is published as a pre-registered null — including a public
+self-correction once the control arm was measured. All additive; nothing breaking.
+
 ### Added
 - **Read the front-end, not just the back-end.** The `browser` tool (Playwright/Chromium)
   gained two actions for *reading* a rendered page, beyond driving its interactive
