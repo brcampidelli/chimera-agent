@@ -119,8 +119,8 @@ Dollar-Zahl auszugeben.
 ### 🔌 Verbinden & Automatisieren
 - **Sprich überall mit ihm** — ein Terminal-Chat, eine Vollbild-Terminal-App oder als Bot auf **Discord, Telegram, Slack, Signal und WhatsApp**. Es gibt außerdem einen einfachen HTTP-Endpunkt.
 - **Zeitplanung & Proaktivität** — gib ihm wiederkehrende Aufgaben in einfacher Sprache ("fasse jeden Morgen die Nachrichten zusammen"). Mit dem eingebauten Scheduler in Betrieb **handelt es pünktlich**, nicht nur, wenn du ihm schreibst.
-- **Werkzeuge & Integrationen** — Dateien lesen und schreiben, Shell-Befehle ausführen, im Web browsen und Code sicher in einer Sandbox ausführen. Verbinde nahezu jeden Webdienst (über seine API) oder ein externes Werkzeug — einschließlich jedes **MCP-Servers** ([Anleitung + lauffähiges Beispiel](docs/mcp.md)) — und importiere deine Einrichtung aus anderen Agenten-Werkzeugen, die du bereits nutzt.
-- **Alles inklusive** — Websuche, Bilderzeugung, Text-to-Speech, E-Mail, Kalender, Code-Ausführung und mehr, bereit zum Einschalten.
+- **Werkzeuge & Integrationen** — Dateien lesen und schreiben, Shell-Befehle ausführen, **vollständig gerenderte Webseiten lesen und ganze Websites scrapen oder crawlen** (mit injektionssicherer strukturierter Extraktion) und Code sicher in einer Sandbox ausführen. Verbinde nahezu jeden Webdienst (über seine API) oder ein externes Werkzeug — einschließlich jedes **MCP-Servers** ([Anleitung + lauffähiges Beispiel](docs/mcp.md)) — und importiere deine Einrichtung aus anderen Agenten-Werkzeugen, die du bereits nutzt.
+- **Alles inklusive** — Websuche, Bilderzeugung (gehostet **oder vollständig lokal**), **Speech-to-Text** und Text-to-Speech, **Medien-Download**, **Datenanalyse & Diagramme**, E-Mail, Kalender, Code-Ausführung und mehr, bereit zum Einschalten.
 
 ### 🚀 Überall laufen, sicher
 - **Jedes Modell, eine Schnittstelle** — gehostete Modelle oder deine eigenen lokalen, mit automatischem Fallback, falls eines ausfällt, und Rotation über mehrere Schlüssel.
@@ -179,9 +179,11 @@ Einrichtung + tägliche Zeitplanung + ehrliche Vorbehalte: **[examples/email_tri
 
 ## Wie es funktioniert
 
-Gib Chimera eine Aufgabe; es plant, denkt (verschmilzt Modelle, wenn das Problem schwer ist), handelt
-mit Werkzeugen, **überprüft seine eigene Arbeit und behält nur, was besteht**, und lernt dann aus dem
-Ergebnis — indem es Gedächtnis und neue Fähigkeiten in die nächste Aufgabe zurückspeist.
+Gib Chimera eine Aufgabe; es plant (und hebt die relevantesten eingebauten Fähigkeiten hervor), denkt
+(verschmilzt Modelle, wenn das Problem schwer ist), handelt mit Werkzeugen — liest und scrapt das Web,
+bearbeitet Dateien, erstellt Diagramme —, **überprüft seine eigene Arbeit und behält nur, was
+besteht**, und lernt dann aus dem Ergebnis — indem es Gedächtnis und neue Fähigkeiten in die nächste
+Aufgabe zurückspeist.
 
 ```mermaid
 flowchart TD
@@ -189,7 +191,7 @@ flowchart TD
     P --> Q{Ist es ein schweres Problem?}
     Q -- ja --> FUSION[Mehrere Modelle fragen<br/>· ein Richter vergleicht sie<br/>· ein Synthesizer schreibt die beste Antwort]
     Q -- nein --> ONE[Ein schnelles Modell nutzen]
-    FUSION --> ACT[Handeln: Werkzeuge, Dateien, das Web<br/>oder an Subagenten delegieren]
+    FUSION --> ACT[Handeln: Werkzeuge, Dateien, Web lesen & scrapen, Diagramme erstellen<br/>oder an Subagenten delegieren]
     ONE --> ACT
     ACT --> V{Hat es funktioniert?<br/>Tests / Prüfungen ausführen}
     V -- ja --> KEEP[Änderung behalten]
@@ -199,6 +201,7 @@ flowchart TD
     LEARN --> U
     MEM[(Langzeitgedächtnis)] -. erinnert .-> P
     LEARN -. schreibt .-> MEM
+    SKILLS[(Fähigkeitsbibliothek)] -. hebt relevante Fähigkeiten hervor .-> P
     GOV[[Sicherheitsprüfung bei jeder Aktion]] -. schützt .-> ACT
 ```
 

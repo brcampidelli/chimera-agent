@@ -111,8 +111,8 @@ token number as a dollar number.
 ### 🔌 Connect & automate
 - **Talk to it anywhere** — a terminal chat, a full-screen terminal app, or as a bot on **Discord, Telegram, Slack, Signal, and WhatsApp**. There's also a simple HTTP endpoint.
 - **Scheduling & proactivity** — give it recurring jobs in plain language ("every morning, summarize the news"). With the built-in scheduler running, it **acts on time**, not only when you message it.
-- **Tools & integrations** — read and write files, run shell commands, browse the web, and run code safely in a sandbox. Connect almost any web service (through its API) or external tool — including any **MCP server** ([guide + runnable example](docs/mcp.md)) — and import your setup from other agent tools you already use.
-- **Batteries included** — web search, image generation, text-to-speech, email, calendar, code execution, and more, ready to switch on.
+- **Tools & integrations** — read and write files, run shell commands, **read fully-rendered web pages and scrape or crawl whole sites** (with injection-safe structured extraction), and run code safely in a sandbox. Connect almost any web service (through its API) or external tool — including any **MCP server** ([guide + runnable example](docs/mcp.md)) — and import your setup from other agent tools you already use.
+- **Batteries included** — web search, image generation (hosted **or fully local**), **speech-to-text** and text-to-speech, **media download**, **data analysis & charts**, email, calendar, code execution, and more, ready to switch on.
 
 ### 🚀 Run anywhere, safely
 - **Any model, one interface** — hosted models or your own local ones, with automatic fallback if one is down and rotation across multiple keys.
@@ -171,9 +171,10 @@ Setup + daily scheduling + honest caveats: **[examples/email_triage/README.md](e
 
 ## How it works
 
-Give Chimera a task; it plans, thinks (blending models when the problem is hard), acts with tools,
-**checks its own work and keeps only what passes**, then learns from the result — feeding memory and
-new skills back into the next task.
+Give Chimera a task; it plans (surfacing the most relevant built-in skills), thinks (blending models
+when the problem is hard), acts with tools — reading and scraping the web, editing files, making
+charts — **checks its own work and keeps only what passes**, then learns from the result, feeding
+memory and new skills back into the next task.
 
 ```mermaid
 flowchart TD
@@ -181,7 +182,7 @@ flowchart TD
     P --> Q{Is it a hard problem?}
     Q -- yes --> FUSION[Ask several models<br/>· a judge compares them<br/>· a synthesizer writes the best answer]
     Q -- no --> ONE[Use one fast model]
-    FUSION --> ACT[Act: use tools, files, the web,<br/>or delegate to sub-agents]
+    FUSION --> ACT[Act: use tools, files, read & scrape the web,<br/>make charts, or delegate to sub-agents]
     ONE --> ACT
     ACT --> V{Did it work?<br/>run tests / checks}
     V -- yes --> KEEP[Keep the change]
@@ -191,6 +192,7 @@ flowchart TD
     LEARN --> U
     MEM[(Long-term memory)] -. recalls .-> P
     LEARN -. writes .-> MEM
+    SKILLS[(Skill library)] -. surfaces relevant skills .-> P
     GOV[[Safety check on every action]] -. guards .-> ACT
 ```
 

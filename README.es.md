@@ -116,8 +116,8 @@ silenciosamente el número de tokens como si fuera un número en dólares.
 ### 🔌 Conectar y automatizar
 - **Habla con él donde sea** — un chat de terminal, una app de terminal a pantalla completa, o como un bot en **Discord, Telegram, Slack, Signal y WhatsApp**. También hay un endpoint HTTP simple.
 - **Programación y proactividad** — dale tareas recurrentes en lenguaje natural ("cada mañana, resume las noticias"). Con el programador integrado en marcha, **actúa a tiempo**, no solo cuando le escribes.
-- **Herramientas e integraciones** — lee y escribe archivos, ejecuta comandos de shell, navega por la web y ejecuta código de forma segura en un sandbox. Conecta casi cualquier servicio web (a través de su API) o herramienta externa — incluido cualquier **servidor MCP** ([guía + ejemplo ejecutable](docs/mcp.md)) — e importa tu configuración desde otras herramientas de agentes que ya usas.
-- **Con las pilas incluidas** — búsqueda web, generación de imágenes, texto a voz, correo, calendario, ejecución de código y más, listos para activar.
+- **Herramientas e integraciones** — lee y escribe archivos, ejecuta comandos de shell, **lee páginas web totalmente renderizadas y hace scraping o rastrea sitios enteros** (con extracción estructurada a prueba de inyección), y ejecuta código de forma segura en un sandbox. Conecta casi cualquier servicio web (a través de su API) o herramienta externa — incluido cualquier **servidor MCP** ([guía + ejemplo ejecutable](docs/mcp.md)) — e importa tu configuración desde otras herramientas de agentes que ya usas.
+- **Con las pilas incluidas** — búsqueda web, generación de imágenes (alojada **o totalmente local**), **voz a texto** y texto a voz, **descarga de medios**, **análisis de datos y gráficos**, correo, calendario, ejecución de código y más, listos para activar.
 
 ### 🚀 Corre donde sea, con seguridad
 - **Cualquier modelo, una interfaz** — modelos alojados en la nube o los tuyos en local, con conmutación automática si uno está caído y rotación entre varias claves.
@@ -176,9 +176,11 @@ Configuración + programación diaria + advertencias honestas: **[examples/email
 
 ## Cómo funciona
 
-Dale a Chimera una tarea; planifica, piensa (combinando modelos cuando el problema es difícil), actúa
-con herramientas, **revisa su propio trabajo y conserva solo lo que pasa**, y luego aprende del
-resultado — realimentando la memoria y las nuevas skills en la siguiente tarea.
+Dale a Chimera una tarea; planifica (sacando a la luz las skills integradas más relevantes), piensa
+(combinando modelos cuando el problema es difícil), actúa con herramientas — leyendo y haciendo
+scraping de la web, editando archivos, creando gráficos — **revisa su propio trabajo y conserva solo
+lo que pasa**, y luego aprende del resultado, realimentando la memoria y las nuevas skills en la
+siguiente tarea.
 
 ```mermaid
 flowchart TD
@@ -186,7 +188,7 @@ flowchart TD
     P --> Q{¿Es un problema difícil?}
     Q -- sí --> FUSION[Pregunta a varios modelos<br/>· un juez los compara<br/>· un sintetizador redacta la mejor respuesta]
     Q -- no --> ONE[Usa un modelo rápido]
-    FUSION --> ACT[Actúa: usa herramientas, archivos, la web,<br/>o delega en subagentes]
+    FUSION --> ACT[Actúa: usa herramientas, archivos,<br/>lee y hace scraping de la web, crea gráficos,<br/>o delega en subagentes]
     ONE --> ACT
     ACT --> V{¿Funcionó?<br/>ejecuta tests / comprobaciones}
     V -- sí --> KEEP[Conserva el cambio]
@@ -196,6 +198,7 @@ flowchart TD
     LEARN --> U
     MEM[(Memoria a largo plazo)] -. recuerda .-> P
     LEARN -. escribe .-> MEM
+    SKILLS[(Biblioteca de skills)] -. saca a la luz skills relevantes .-> P
     GOV[[Verificación de seguridad en cada acción]] -. protege .-> ACT
 ```
 

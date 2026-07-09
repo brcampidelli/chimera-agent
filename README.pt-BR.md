@@ -114,8 +114,8 @@ sorrateiramente, apresentar o número de tokens como se fosse o número em dóla
 ### 🔌 Conectar & automatizar
 - **Fale com ele em qualquer lugar** — um chat no terminal, um app de tela cheia no terminal ou como um bot no **Discord, Telegram, Slack, Signal e WhatsApp**. Também há um endpoint HTTP simples.
 - **Agendamento & proatividade** — dê tarefas recorrentes em linguagem simples ("toda manhã, resuma as notícias"). Com o agendador embutido rodando, ele **age na hora certa**, não só quando você manda mensagem.
-- **Ferramentas & integrações** — ler e escrever arquivos, rodar comandos de shell, navegar na web e executar código com segurança em um sandbox. Conecte quase qualquer serviço web (pela API dele) ou ferramenta externa — incluindo qualquer **servidor MCP** ([guia + exemplo executável](docs/mcp.md)) — e importe sua configuração de outras ferramentas de agente que você já usa.
-- **Já vem com tudo** — busca na web, geração de imagens, texto para fala, e-mail, calendário, execução de código e mais, prontos para ativar.
+- **Ferramentas & integrações** — ler e escrever arquivos, rodar comandos de shell, **ler páginas web totalmente renderizadas e fazer scraping ou crawling de sites inteiros** (com extração estruturada à prova de injeção) e executar código com segurança em um sandbox. Conecte quase qualquer serviço web (pela API dele) ou ferramenta externa — incluindo qualquer **servidor MCP** ([guia + exemplo executável](docs/mcp.md)) — e importe sua configuração de outras ferramentas de agente que você já usa.
+- **Já vem com tudo** — busca na web, geração de imagens (hospedada **ou totalmente local**), **fala para texto** e texto para fala, **download de mídia**, **análise de dados & gráficos**, e-mail, calendário, execução de código e mais, prontos para ativar.
 
 ### 🚀 Rode em qualquer lugar, com segurança
 - **Qualquer modelo, uma interface** — modelos hospedados ou os seus próprios modelos locais, com fallback automático se um estiver fora do ar e rotação entre várias chaves.
@@ -174,9 +174,10 @@ Configuração + agendamento diário + ressalvas honestas: **[examples/email_tri
 
 ## Como funciona
 
-Dê uma tarefa ao Chimera; ele planeja, pensa (combinando modelos quando o problema é difícil), age
-com ferramentas, **confere o próprio trabalho e mantém só o que passa** e então aprende com o
-resultado — realimentando memória e novas skills na próxima tarefa.
+Dê uma tarefa ao Chimera; ele planeja (trazendo à tona as skills embutidas mais relevantes), pensa
+(combinando modelos quando o problema é difícil), age com ferramentas — lendo e fazendo scraping da
+web, editando arquivos, criando gráficos —, **confere o próprio trabalho e mantém só o que passa** e
+então aprende com o resultado — realimentando memória e novas skills na próxima tarefa.
 
 ```mermaid
 flowchart TD
@@ -184,7 +185,7 @@ flowchart TD
     P --> Q{É um problema difícil?}
     Q -- sim --> FUSION[Consultar vários modelos<br/>· um juiz os compara<br/>· um sintetizador escreve a melhor resposta]
     Q -- não --> ONE[Usar um modelo rápido]
-    FUSION --> ACT[Agir: usar ferramentas, arquivos, a web,<br/>ou delegar a subagentes]
+    FUSION --> ACT[Agir: usar ferramentas, arquivos,<br/>ler & fazer scraping da web, criar gráficos,<br/>ou delegar a subagentes]
     ONE --> ACT
     ACT --> V{Funcionou?<br/>rodar testes / checagens}
     V -- sim --> KEEP[Manter a mudança]
@@ -194,6 +195,7 @@ flowchart TD
     LEARN --> U
     MEM[(Memória de longo prazo)] -. relembra .-> P
     LEARN -. escreve .-> MEM
+    SKILLS[(Biblioteca de skills)] -. traz skills relevantes .-> P
     GOV[[Checagem de segurança em toda ação]] -. protege .-> ACT
 ```
 

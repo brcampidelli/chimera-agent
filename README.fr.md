@@ -118,8 +118,8 @@ le chiffre de tokens pour un chiffre en dollars.
 ### 🔌 Connecter et automatiser
 - **Parlez-lui n'importe où** — un chat en terminal, une application terminal plein écran, ou comme un bot sur **Discord, Telegram, Slack, Signal et WhatsApp**. Il y a aussi un point d'accès HTTP simple.
 - **Planification et proactivité** — confiez-lui des tâches récurrentes en langage courant (« chaque matin, résume les actualités »). Avec le planificateur intégré en marche, il **agit à l'heure**, et pas seulement quand vous lui écrivez.
-- **Outils et intégrations** — lire et écrire des fichiers, exécuter des commandes shell, naviguer sur le web, et exécuter du code en toute sécurité dans un bac à sable. Connectez presque n'importe quel service web (via son API) ou outil externe — y compris n'importe quel **serveur MCP** ([guide + exemple exécutable](docs/mcp.md)) — et importez votre configuration depuis d'autres outils d'agent que vous utilisez déjà.
-- **Tout inclus** — recherche web, génération d'images, synthèse vocale, e-mail, calendrier, exécution de code, et plus encore, prêts à être activés.
+- **Outils et intégrations** — lire et écrire des fichiers, exécuter des commandes shell, **lire des pages web entièrement rendues et extraire ou explorer des sites entiers** (avec une extraction structurée à l'abri des injections), et exécuter du code en toute sécurité dans un bac à sable. Connectez presque n'importe quel service web (via son API) ou outil externe — y compris n'importe quel **serveur MCP** ([guide + exemple exécutable](docs/mcp.md)) — et importez votre configuration depuis d'autres outils d'agent que vous utilisez déjà.
+- **Tout inclus** — recherche web, génération d'images (hébergée **ou entièrement locale**), **reconnaissance vocale** et synthèse vocale, **téléchargement de médias**, **analyse de données et graphiques**, e-mail, calendrier, exécution de code, et plus encore, prêts à être activés.
 
 ### 🚀 Tourner partout, en toute sécurité
 - **N'importe quel modèle, une seule interface** — modèles hébergés ou vos propres modèles locaux, avec bascule automatique si l'un est indisponible et rotation entre plusieurs clés.
@@ -178,9 +178,11 @@ Configuration + planification quotidienne + mises en garde honnêtes : **[exampl
 
 ## Comment ça marche
 
-Donnez une tâche à Chimera ; il planifie, réfléchit (en combinant des modèles quand le problème est
-difficile), agit avec des outils, **vérifie son propre travail et ne garde que ce qui passe**, puis
-apprend du résultat — réinjectant la mémoire et de nouvelles compétences dans la tâche suivante.
+Donnez une tâche à Chimera ; il planifie (en faisant ressortir les compétences intégrées les plus
+pertinentes), réfléchit (en combinant des modèles quand le problème est difficile), agit avec des
+outils — lire et extraire le web, modifier des fichiers, faire des graphiques —, **vérifie son propre
+travail et ne garde que ce qui passe**, puis apprend du résultat — réinjectant la mémoire et de
+nouvelles compétences dans la tâche suivante.
 
 ```mermaid
 flowchart TD
@@ -188,7 +190,7 @@ flowchart TD
     P --> Q{Est-ce un problème difficile ?}
     Q -- oui --> FUSION[Interroger plusieurs modèles<br/>· un juge les compare<br/>· un synthétiseur rédige la meilleure réponse]
     Q -- non --> ONE[Utiliser un seul modèle rapide]
-    FUSION --> ACT[Agir : outils, fichiers, le web,<br/>ou déléguer à des sous-agents]
+    FUSION --> ACT[Agir : outils, fichiers, lire et extraire le web,<br/>faire des graphiques, ou déléguer à des sous-agents]
     ONE --> ACT
     ACT --> V{A-t-il réussi ?<br/>lancer tests / contrôles}
     V -- oui --> KEEP[Garder le changement]
@@ -198,6 +200,7 @@ flowchart TD
     LEARN --> U
     MEM[(Mémoire à long terme)] -. rappelle .-> P
     LEARN -. écrit .-> MEM
+    SKILLS[(Bibliothèque de compétences)] -. fait ressortir les compétences pertinentes .-> P
     GOV[[Vérification de sécurité sur chaque action]] -. protège .-> ACT
 ```
 
