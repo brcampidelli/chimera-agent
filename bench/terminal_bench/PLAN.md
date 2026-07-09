@@ -45,16 +45,37 @@ cd ~/tbench
 # expect: a graded trial (is_resolved true/false from the tests), NOT agent_timeout.
 ```
 
-## Phase 1 — pick the config that FITS the per-task timeout (~$2, 2-3 tasks)
+## Phase 1 — DONE (2026-07-08): config locked, two integration bugs fixed on real greens
 
-Measure wall-clock/task per config; pick one that finishes within the task's own
-`max_agent_timeout_sec` while still scoring. `CHIMERA_TB_FLAGS` / `CHIMERA_TB_MODEL` env control it.
+The bet in the original table (that the deepseek full scaffold would time out) was **wrong** — the
+timeout was never the real blocker. Measured on real tasks (native per-task timeouts, no override):
 
-| config | env | bet |
-|---|---|---|
-| deepseek, full scaffold | `CHIMERA_TB_FLAGS="--repo-map --progress-ledger --checklist --max-attempts 1 ..."` | likely times out (latency ~14s/call) |
-| deepseek, bench-lite | drop `--progress-ledger`/`--checklist`, `--max-attempts 1` | fewer calls -> fits |
-| fast model | `CHIMERA_TB_MODEL=openrouter/google/gemini-2.x-flash` (low latency) | full loop fits |
+- **Timeout FITS natively.** deepseek + the lean scaffold graded fix-git in ~2-3 min, well under the
+  360s that 56/80 tasks allow. No `--global-agent-timeout` needed for the common case.
+- **Bug 1 — workdir (fixed).** The solve now `cd /app` first. TB's client container works in /app and
+  tests assert absolute `/app/...` paths (hello-world → `/app/hello.txt`); exec_run defaulted to the
+  image WORKDIR (`/`), so files landed where the grader never looked → false. **Fix → hello-world
+  is_resolved TRUE** (first real chimera pass on Terminal-Bench).
+- **Bug 2 — install portability (fixed).** Base images are heterogeneous: some ship pip, some a bare
+  `/usr/bin/python3` with no pip/ensurepip, some are PEP-668 externally-managed, some lack curl AND
+  wget. Install is now a bootstrap chain: **network PyPI first** (`chimera-agent` is public → resolves
+  the container's own ABI) via `python3 -m pip --break-system-packages`, bootstrapping pip through
+  ensurepip / a **urllib-fetched get-pip.py** when absent, then the offline cp313 wheelhouse as last
+  resort. **Fix → fix-permissions is_resolved TRUE** (was `agent_installation_failed`); csv-to-parquet
+  now installs+runs (false/unset = honest signal, no longer an install artifact).
+
+**Config locked for Phase 2:**
+| knob | value |
+|---|---|
+| model | `openrouter/deepseek/deepseek-chat-v3.1` |
+| timeout | native per-task (`CHIMERA_SOLVE_TIMEOUT=300`, no global override) |
+| flags | `--repo-map --progress-ledger --checklist --max-attempts 1 --no-remember --no-collect --no-evolve-skills` |
+| install | network-first + bootstrap chain + wheelhouse fallback |
+| workdir | `/app` |
+
+Phase-1 sample verdicts (honest mix): hello-world ✅, fix-permissions ✅, fix-git ✗, csv-to-parquet ✗.
+Cost so far ≈ $1-2 (6 small probe runs). A per-container install-fail log (`chimera_install_fail.log`)
+and a solve log (`chimera_solve.log`) are now dropped into each task's run dir for diagnosis.
 
 ## Phase 2 — the A/B number (~$10-15, N≈30-50 Terminal-Bench-Core tasks)
 

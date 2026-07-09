@@ -35,13 +35,25 @@ solve takes longer than that limit, TB records ``FailureMode.AGENT_TIMEOUT`` reg
     whatever the agent completes within it (a fast model or a lighter scaffold), OR document the
     ``--global-agent-timeout`` override transparently. Never silently inflate the budget.
 
-VALIDATED (2026-07-08): oracle scored 100% on fix-git (harness works); the chimera agent then
-graded on fix-git in 119s with ``--global-agent-timeout-sec 1100`` -> ``is_resolved: false``,
-``failure_mode: "unset"`` (NO agent_timeout). So the grading path is confirmed end-to-end: the
-agent installs offline, runs ``chimera solve`` via ``exec_run``, finishes, and TB grades with the
-task's own tests. is_resolved=false is the honest benchmark signal (deepseek didn't fix that git
-conflict in a lean single attempt), not a harness bug. Next: Phase 1 (config that fits the per-task
-timeout) then Phase 2 (the A/B number). See PLAN.md.
+VALIDATED (2026-07-08, Phase 0): oracle scored 100% on fix-git; the chimera agent graded on fix-git
+with ``--global-agent-timeout-sec 1100`` -> is_resolved false, failure_mode "unset" (no agent_timeout).
+
+PHASE 1 — config locked (2026-07-08). Two integration bugs found and fixed on real green passes:
+  1. **Workdir**: the solve now runs ``cd /app`` first. The TB client container's working dir is /app
+     and tests assert absolute paths under it (hello-world checks /app/hello.txt); exec_run defaulted
+     to the image WORKDIR (/), so the agent wrote files where the grader never looked -> false. Fixed
+     -> **hello-world is_resolved TRUE** (first real chimera pass).
+  2. **Install portability**: task base images are heterogeneous (some ship pip, some a bare
+     /usr/bin/python3 with no pip/ensurepip, some mark the env PEP-668 externally-managed, some lack
+     curl AND wget). Install is now a bootstrap chain — network PyPI first (``chimera-agent`` is
+     public; resolves the container's own ABI) via ``python3 -m pip`` with ``--break-system-packages``,
+     bootstrapping pip through ensurepip / a urllib-fetched get-pip.py when absent, then the offline
+     cp313 wheelhouse as the last resort. Fixed the ``agent_installation_failed`` on
+     fix-permissions/csv-to-parquet -> **fix-permissions is_resolved TRUE**.
+Config: model ``openrouter/deepseek/deepseek-chat-v3.1``, native per-task timeout (360s for 56/80),
+``CHIMERA_SOLVE_TIMEOUT=300``, the lean scaffold flags. Timeout FITS natively — no override needed.
+Real verdicts now flow (hello-world+fix-permissions PASS, fix-git+csv-to-parquet FAIL) — the honest
+mix Phase 2 measures at scale. Next: Phase 2 (baseline vs chimera A/B, N≈30-50). See PLAN.md.
 """
 from __future__ import annotations
 
@@ -64,13 +76,36 @@ _FLAGS = os.environ.get(
 )
 _SOLVE_TIMEOUT = float(os.environ.get("CHIMERA_SOLVE_TIMEOUT", "600"))
 
+# Install chimera into the task container. Prefer a NETWORK install from PyPI (chimera-agent is
+# public now) because it resolves the right wheels for THIS container's Python/ABI — the offline
+# cp313 wheelhouse fails on task images with a different Python. Fall back to the wheelhouse when
+# the container has no network (some tasks are offline).
 _INSTALL = """#!/bin/bash
-set -e
-echo CHIMERA_INSTALL_START
 mkdir -p /chimera/wh
-tar xf /installed-agent/wheelhouse.tar -C /chimera/wh
-pip install --no-index --find-links=/chimera/wh chimera-agent >/chimera/pip.log 2>&1
-echo CHIMERA_INSTALL_OK
+echo CHIMERA_INSTALL_START
+PY=$(command -v python3 || command -v python)
+L=/chimera/pip.log
+BSP=--break-system-packages  # PEP 668: task images mark the system env externally-managed; safe in a throwaway container
+# Ensure pip exists, then install. Task base images vary widely: some ship pip (hello-world), others
+# a bare /usr/bin/python3 with neither pip nor ensurepip (fix-permissions/csv-to-parquet: Debian
+# minimal — pip lives in the apt package python3-pip), and some lack curl AND wget entirely. Bootstrap
+# chain: pip module -> ensurepip -> get-pip.py fetched via python's own urllib (no curl/wget needed) ->
+# curl/wget as a last resort. `python3 -m pip` (module) not the `pip` wrapper (often absent from PATH).
+if ! $PY -m pip --version >$L 2>&1; then
+  $PY -m ensurepip --default-pip >>$L 2>&1 || \\
+  { $PY -c "import urllib.request as u;u.urlretrieve('https://bootstrap.pypa.io/get-pip.py','/chimera/get-pip.py')" >>$L 2>&1 || \\
+    curl -fsSL https://bootstrap.pypa.io/get-pip.py -o /chimera/get-pip.py 2>>$L || \\
+    wget -qO /chimera/get-pip.py https://bootstrap.pypa.io/get-pip.py 2>>$L; \\
+    $PY /chimera/get-pip.py $BSP >>$L 2>&1; } || true
+fi
+if $PY -m pip install $BSP --quiet chimera-agent >>$L 2>&1; then
+  echo CHIMERA_INSTALL_OK_NET
+else
+  echo "--- net install failed; falling back to offline wheelhouse ---" >>$L
+  tar xf /installed-agent/wheelhouse.tar -C /chimera/wh 2>>$L \\
+    && $PY -m pip install $BSP --no-index --find-links=/chimera/wh chimera-agent >>$L 2>&1 \\
+    && echo CHIMERA_INSTALL_OK_WH || { echo CHIMERA_INSTALL_FAILED; exit 1; }
+fi
 """
 
 
@@ -119,15 +154,46 @@ class ChimeraInstalledAgent(AbstractInstalledAgent):
         if install_rc != 0:
             from terminal_bench.agents.failure_mode import FailureMode
 
+            if logging_dir is not None:  # capture WHY install failed (no network + ABI-mismatched wheelhouse?)
+                try:
+                    _rc, out = container.exec_run(
+                        ["bash", "-lc", "cat /chimera/pip.log 2>/dev/null | tail -c 4000; "
+                         "echo; echo '---PY---'; python3 --version"],
+                        environment=env,
+                    )
+                    ld = Path(str(logging_dir))
+                    ld.mkdir(parents=True, exist_ok=True)
+                    (ld / "chimera_install_fail.log").write_bytes(
+                        out if isinstance(out, bytes) else str(out).encode("utf-8", "replace")
+                    )
+                except Exception:
+                    pass
             return AgentResult(failure_mode=FailureMode.AGENT_INSTALLATION_FAILED)
 
         # stdin from /dev/null + output to a file so chimera never touches the terminal; a shell-level
-        # `timeout` bounds it even though exec_run is already synchronous.
+        # `timeout` bounds it even though exec_run is already synchronous. CRITICAL: cd into /app first
+        # — the Terminal-Bench client container's working directory is /app, and the task tests check
+        # absolute paths under /app (e.g. hello-world asserts /app/hello.txt). exec_run defaults to the
+        # image WORKDIR (often /), so without this the agent writes files where the grader never looks.
         solve = (
-            f"timeout {int(_SOLVE_TIMEOUT)} chimera solve {shlex.quote(instruction)} "
+            f"cd /app 2>/dev/null; timeout {int(_SOLVE_TIMEOUT)} chimera solve {shlex.quote(instruction)} "
             f"--workspace . --model {self._model_name} {_FLAGS} < /dev/null > /tmp/csolve.log 2>&1"
         )
         container.exec_run(["bash", "-lc", solve], environment=env)
+
+        # Copy the solve log + pip log out to the host run dir so we can diagnose *why* a task scored
+        # 0 (the container is torn down after grading). Best-effort — never fail the run over logging.
+        if logging_dir is not None:
+            try:
+                dump = "cat /tmp/csolve.log 2>/dev/null | tail -c 12000; " \
+                    "echo; echo '---PIP---'; cat /chimera/pip.log 2>/dev/null | tail -c 3000"
+                _rc, out = container.exec_run(["bash", "-lc", dump], environment=env)
+                ld = Path(str(logging_dir))
+                ld.mkdir(parents=True, exist_ok=True)
+                data = out if isinstance(out, bytes) else str(out).encode("utf-8", "replace")
+                (ld / "chimera_solve.log").write_bytes(data)
+            except Exception:
+                pass
         return AgentResult(total_input_tokens=0, total_output_tokens=0)
 
     def _run_agent_commands(self, instruction: str) -> list[TerminalCommand]:
