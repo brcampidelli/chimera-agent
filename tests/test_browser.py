@@ -162,6 +162,48 @@ def test_new_actions_are_advertised() -> None:
     assert "read_text" in actions and "find" in actions
 
 
+# --- first-use Chromium auto-provisioning -----------------------------------------------
+
+
+def test_missing_binary_is_detected() -> None:
+    err = RuntimeError("Executable doesn't exist ... ╰─> Please run: playwright install")
+    assert browser_mod._missing_browser_binary(err)
+    assert not browser_mod._missing_browser_binary(RuntimeError("some other failure"))
+
+
+def test_auto_installs_chromium_on_first_use(monkeypatch: pytest.MonkeyPatch) -> None:
+    state = {"installed": False, "install_calls": 0}
+
+    def fake_new(headless: bool) -> _FakeDriver:
+        if not state["installed"]:
+            raise RuntimeError("Executable doesn't exist. Please run: playwright install")
+        return _FakeDriver()
+
+    def fake_install() -> None:
+        state["install_calls"] += 1
+        state["installed"] = True
+
+    monkeypatch.setattr(browser_mod, "_new_playwright_driver", fake_new)
+    monkeypatch.setattr(browser_mod, "_install_chromium", fake_install)
+    tool = BrowserTool()  # no injected driver -> exercises _ensure_driver
+    out = tool.run(action="read")
+    assert state["install_calls"] == 1  # fetched the browser exactly once
+    assert FENCE_OPEN in out  # then the driver worked
+
+
+def test_auto_install_can_be_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CHIMERA_BROWSER_AUTO_INSTALL", "0")
+    installs: list[int] = []
+    monkeypatch.setattr(
+        browser_mod, "_new_playwright_driver",
+        lambda headless: (_ for _ in ()).throw(RuntimeError("run: playwright install")),
+    )
+    monkeypatch.setattr(browser_mod, "_install_chromium", lambda: installs.append(1))
+    out = BrowserTool().run(action="read")
+    assert installs == []  # never auto-installed
+    assert out.startswith("error:")  # the failure is surfaced, not swallowed or crashing
+
+
 # --- governance -------------------------------------------------------------------------
 
 

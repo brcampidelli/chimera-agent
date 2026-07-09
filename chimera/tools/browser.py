@@ -28,10 +28,49 @@ from chimera.governance.ledger_tool import fence
 from chimera.tools.base import Tool
 
 _MAX_CHARS = 20_000
+# Playwright is a CORE dependency, so this only shows on a broken install (the package went missing).
 _INSTALL_HINT = (
-    "error: the browser tool needs an extra — install with: pip install 'chimera-agent[browser]' "
-    "then: playwright install chromium"
+    "error: the browser needs Playwright (a core dependency that appears to be missing) — "
+    "reinstall with: pip install --upgrade chimera-agent"
 )
+
+
+def _auto_install_enabled() -> bool:
+    """First-use Chromium auto-download is on by default; set CHIMERA_BROWSER_AUTO_INSTALL=0 to opt out."""
+    import os
+
+    return os.environ.get("CHIMERA_BROWSER_AUTO_INSTALL", "1").strip().lower() not in (
+        "0", "false", "no", "off",
+    )
+
+
+def _missing_browser_binary(exc: Exception) -> bool:
+    # Playwright's launch error tells you to run `playwright install` when the browser binary is absent.
+    return "playwright install" in str(exc).lower()
+
+
+def _install_chromium() -> None:
+    """Download the Chromium binary (~150MB), one-time, on first browser use.
+
+    pip/uv cannot ship the browser binary — Playwright fetches it via its own CLI. Rather than make
+    the user run `playwright install chromium` by hand, the browser tool does it automatically the
+    first time it's used, so a fresh install/clone 'just works'.
+    """
+    import subprocess
+    import sys
+
+    print(
+        "chimera: first browser use — downloading Chromium (~150MB, one-time)…",
+        file=sys.stderr,
+        flush=True,
+    )
+    subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
+
+
+def _new_playwright_driver(headless: bool) -> BrowserDriver:
+    from chimera.tools.browser_playwright import PlaywrightDriver  # imports playwright (a core dep)
+
+    return PlaywrightDriver(headless=headless)
 
 
 @dataclass
@@ -154,16 +193,22 @@ class BrowserTool(Tool):
         if self._driver is not None:
             return self._driver
         try:
-            from chimera.tools.browser_playwright import PlaywrightDriver
-
-            self._driver = PlaywrightDriver(headless=self._headless)  # constructing it imports playwright
+            self._driver = _new_playwright_driver(self._headless)  # constructing it imports playwright
         except ImportError:
-            return None
+            return None  # playwright package missing — a broken install (it's a core dependency)
+        except Exception as exc:  # noqa: BLE001 — most likely the Chromium binary isn't downloaded yet
+            if not (_missing_browser_binary(exc) and _auto_install_enabled()):
+                raise  # a real launch failure, or auto-install opted out -> surfaced by run()
+            _install_chromium()  # fetch the browser once…
+            self._driver = _new_playwright_driver(self._headless)  # …then retry
         return self._driver
 
     def run(self, **kwargs: Any) -> str:
         action = str(kwargs.get("action", "")).strip()
-        driver = self._ensure_driver()
+        try:
+            driver = self._ensure_driver()
+        except Exception as exc:  # noqa: BLE001 — driver bring-up failed (Chromium missing + auto-install off, etc.)
+            return f"error: browser unavailable: {exc}"
         if driver is None:
             return _INSTALL_HINT
         try:

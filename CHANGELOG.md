@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-09
+
+**The browser is now built in.** Playwright moved from an opt-in extra into the core dependencies, so
+every `pip install chimera-agent` (and every clone) ships the full web browser
+(navigate/click/type/read_text/find) — no extra to remember. pip can't ship Chromium itself, so the
+browser tool **auto-downloads the Chromium binary (~150MB) on first use** (one-time; opt out with
+`CHIMERA_BROWSER_AUTO_INSTALL=0` and run `playwright install chromium` yourself). The `[browser]` extra
+still resolves (now a no-op alias) for back-compat. `read_text` clean-Markdown still uses the optional
+`documents` extra, falling back to plain text without it.
+
 ## [0.7.0] - 2026-07-09
 
 The **front-end reading + honest-benchmark** release. The browser can now *read* rendered pages

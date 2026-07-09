@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "chimera-agent"
-version = "0.7.0"
+version = "0.8.0"
 description = "An open-source, self-evolving AI agent whose reasoning core is an LLM-Fusion engine (panel -> judge -> synthesizer)."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -36,6 +36,10 @@ dependencies = [
     "pyyaml>=6.0",
     "croniter>=2.0",
     "textual>=0.60",
+    # Full web browser (navigate/click/type/read_text/find) in the base, so anyone who installs or
+    # clones Chimera gets it out of the box. The Chromium binary itself is NOT shipped by pip — the
+    # browser tool auto-downloads it (~150MB) on first use (disable with CHIMERA_BROWSER_AUTO_INSTALL=0).
+    "playwright>=1.40",
 ]
 
 [project.optional-dependencies]
@@ -58,11 +62,10 @@ youtube = [
 documents = [
     "markitdown[docx,pptx,xlsx,pdf]>=0.1",
 ]
-# Web navigation for the browser tool (accessibility-tree driving). Heavy: also needs a Chromium
-# binary (`playwright install chromium`). Opt-in; the tool gives an install hint when absent.
-browser = [
-    "playwright>=1.40",
-]
+# Back-compat alias: the browser (playwright) is now a CORE dependency, so `pip install
+# 'chimera-agent[browser]'` still works but installs nothing extra. The Chromium binary is
+# auto-downloaded on first browser use.
+browser = []
 # Standard-benchmark grounding: the terminal-bench harness for the honest weak-model-lift A/B.
 # Opt-in and heavy (Docker-based); the adapter gives an install hint when absent. The A/B stats
 # engine (chimera bench-compare) needs no extra. Marker: terminal-bench requires Python >=3.12,

@@ -23,12 +23,13 @@ chimera serve   # the scheduler runs it and (with a bot configured) delivers the
 
 ## Read full pages, not just snippets
 
-`web_search` returns titles + snippets. Install the browser extra and the agent can open the top
+`web_search` returns titles + snippets. The built-in `browser` tool lets the agent open the top
 results and read their **full rendered text** (including JS-heavy pages) before writing the brief —
-much richer than snippets alone:
+much richer than snippets alone. The browser is built in; Chromium auto-downloads on first use. For
+clean Markdown (instead of plain text) from `read_text`, add the documents extra:
 
 ```bash
-uv sync --extra browser --extra documents && playwright install chromium
+uv sync --extra documents        # optional: clean Markdown from read_text
 ```
 
 Then ask it to `read_text` the top sources (add `--taint` since page content is untrusted):
@@ -43,8 +44,8 @@ chimera solve "Research 'small language models on-device 2026': web_search for s
 
 - `arxiv_search` covers papers; broad web coverage needs `CHIMERA_TAVILY_API_KEY`. Without
   it the brief still runs, just narrower.
-- Reading full pages needs the `browser` (+ `documents` for clean Markdown) extra; without it the
-  agent falls back to search snippets.
+- Reading full pages uses the built-in `browser` (add the `documents` extra for clean Markdown
+  instead of plain text); the Chromium binary auto-downloads on first use.
 - "5 findings" is a target, not a guarantee — the verifier checks the brief is non-trivial,
   not that every bullet is gold. The digest names its top pick so you can judge fast.
 - Free models are fine here; a stronger model gives sharper synthesis.

@@ -49,13 +49,16 @@ Then point a task at a file: *"Summarize report.pdf into 5 bullets."* Without th
 
 ## Browsing the web (navigate, read + act)
 
-For tasks that need the agent to *act on* or *read* a page — open it, read its content, click,
-type — install the browser extra and it gains a `browser` tool that drives a real Chromium (so it
-sees JavaScript-rendered pages the plain `http_get` can't):
+The `browser` tool is **built in** — it drives a real Chromium (so it sees JavaScript-rendered pages
+the plain `http_get` can't). Playwright ships with Chimera; the ~150MB Chromium binary is **downloaded
+automatically the first time you use the browser** (a one-time step pip can't do for you). No install
+step required:
 
 ```bash
-uv sync --extra browser --extra documents   # or: pip install 'chimera-agent[browser,documents]'
-playwright install chromium                  # one-time: fetch the browser binary
+# nothing to install — just use it. To turn the auto-download off and fetch it yourself:
+#   CHIMERA_BROWSER_AUTO_INSTALL=0  +  playwright install chromium
+# For clean Markdown out of read_text (instead of plain text), also add the documents extra:
+uv sync --extra documents        # or: pip install 'chimera-agent[documents]'
 ```
 
 The `browser` tool has these actions:
@@ -72,8 +75,8 @@ The `browser` tool has these actions:
 
 Page content is **untrusted**: every result is data-fenced and the tool taints the run, so prefer
 `solve --taint --guard` when browsing and pull structured fields through the quarantined reader
-rather than acting on raw page text. Without the `browser` extra, `browser` returns an install hint;
-without `documents`, `read_text` still works — just as plain text instead of Markdown.
+rather than acting on raw page text. Without the `documents` extra, `read_text` still works — just as
+plain text instead of Markdown.
 
 ## Researching a topic (search + read)
 
