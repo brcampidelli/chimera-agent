@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Transfer-holdout promotion gate.** A self-evolution change (RFT round / GEPA / ACE / skill)
+  must not regress a disjoint, same-capability holdout slice before it's promoted, not just win
+  its tuned slice — closing a "memorized the eval" blind spot. `chimera/eval/transfer.py`
+  (paired) + a holdout arm in the RFT loop (`baseline_holdout`/`candidate_holdout`, blocks on a
+  confident CI-negative regression). Motivated + cited: EvoAgentBench (arXiv 2607.05202) measured
+  ungated evolution producing negative transfer (GEPA −12.3).
 - **Prompt caching, used and measured (M17).** `prompt_cache` (opt-in) marks the stable
   system prefix with a provider cache breakpoint so the single agent and worker fleet
   reuse it at the cache read rate; the gateway captures `cache_read`/`cache_write` tokens

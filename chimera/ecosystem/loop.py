@@ -88,6 +88,10 @@ class RFTRound:
     promoted: bool
     reason: str
     ab: ABResult | None = None
+    ab_holdout: ABResult | None = None
+    """Transfer check on a disjoint same-capability holdout (EvoAgentBench 2607.05202): a
+    round that helps the tuned bench but REGRESSES the holdout is negative transfer -> withheld."""
+    transfer_measured: bool = False
     accepted: list[Trajectory] = field(default_factory=list, repr=False)
 
     def summary(self) -> dict[str, object]:
@@ -97,9 +101,12 @@ class RFTRound:
             "ready": self.ready,
             "promoted": self.promoted,
             "reason": self.reason,
+            "transfer_measured": self.transfer_measured,
         }
         if self.ab is not None:
             out["ab"] = self.ab.summary()
+        if self.ab_holdout is not None:
+            out["ab_holdout"] = self.ab_holdout.summary()
         return out
 
 
@@ -110,10 +117,26 @@ class BenchEvaluator(Protocol):
 
 
 class StaticEvaluator:
-    """A BenchEvaluator backed by pre-computed results (e.g. two terminal-bench runs)."""
+    """A BenchEvaluator backed by pre-computed results (e.g. two terminal-bench runs).
 
-    def __init__(self, baseline: list[bool], candidate: list[bool]) -> None:
-        self._arms = {"baseline": list(baseline), "candidate": list(candidate)}
+    Optional ``*_holdout`` arms carry a disjoint same-capability slice; supply them to make
+    the loop apply the transfer (non-regression) gate.
+    """
+
+    def __init__(
+        self,
+        baseline: list[bool],
+        candidate: list[bool],
+        *,
+        baseline_holdout: list[bool] | None = None,
+        candidate_holdout: list[bool] | None = None,
+    ) -> None:
+        self._arms = {
+            "baseline": list(baseline),
+            "candidate": list(candidate),
+            "baseline_holdout": list(baseline_holdout or []),
+            "candidate_holdout": list(candidate_holdout or []),
+        }
 
     def evaluate(self, arm: str) -> list[bool]:
         return list(self._arms.get(arm, []))
@@ -172,6 +195,22 @@ class RejectionSamplingLoop:
             if promoted
             else "no significant lift on the bench — round withheld (don't train on noise)"
         )
+        # Transfer gate (EvoAgentBench): a disjoint same-capability holdout must not regress,
+        # so we don't promote a change that memorized the tuned bench but hurts elsewhere.
+        hb, hc = self.evaluator.evaluate("baseline_holdout"), self.evaluator.evaluate("candidate_holdout")
+        ab_holdout: ABResult | None = None
+        transfer_measured = bool(hb and hc)
+        if transfer_measured:
+            ab_holdout = compare(hb, hc, baseline_name="baseline", treatment_name="candidate")
+            # Block only on a CONFIDENT regression — the difference CI lies ENTIRELY below zero
+            # (ABResult.significant is "confidently positive"; a regression is the mirror). Noise
+            # (a CI straddling zero) does not veto.
+            if ab_holdout.diff_ci[1] < 0.0:
+                promoted = False
+                reason = (
+                    f"NEGATIVE TRANSFER: won the tuned bench but significantly regressed the "
+                    f"same-capability holdout (Δ={ab_holdout.delta:+.1%}) — round withheld"
+                )
         _log.debug("rft round: %d accepted, promoted=%s (%s)", n, promoted, reason)
         return RFTRound(
             accepted_examples=n,
@@ -180,6 +219,8 @@ class RejectionSamplingLoop:
             promoted=promoted,
             reason=reason,
             ab=ab,
+            ab_holdout=ab_holdout,
+            transfer_measured=transfer_measured,
             accepted=rs.accepted,
         )
 

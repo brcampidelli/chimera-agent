@@ -101,6 +101,42 @@ def test_round_withheld_when_lift_not_significant(tmp_path: Path) -> None:
     assert "noise" in round_result.reason
 
 
+def test_transfer_holdout_blocks_negative_transfer(tmp_path: Path) -> None:
+    """A round that wins the tuned bench but significantly REGRESSES a same-capability
+    holdout is negative transfer (EvoAgentBench) — withheld despite the tuned win."""
+    collector = _collector_with(30, tmp_path)
+    loop = RejectionSamplingLoop(
+        collector,
+        StaticEvaluator(
+            [True] * 12 + [False] * 18, [True] * 28 + [False] * 2,  # tuned: clear win
+            baseline_holdout=[True] * 28 + [False] * 2,             # holdout: 93% ...
+            candidate_holdout=[True] * 10 + [False] * 20,           # ... -> 33%, big regression
+        ),
+        min_examples=30,
+    )
+    round_result = loop.run()
+    assert round_result.ready is True
+    assert round_result.transfer_measured is True
+    assert round_result.promoted is False
+    assert "NEGATIVE TRANSFER" in round_result.reason
+
+
+def test_transfer_holdout_promotes_when_it_generalizes(tmp_path: Path) -> None:
+    collector = _collector_with(30, tmp_path)
+    loop = RejectionSamplingLoop(
+        collector,
+        StaticEvaluator(
+            [True] * 12 + [False] * 18, [True] * 28 + [False] * 2,   # tuned: win
+            baseline_holdout=[True] * 15 + [False] * 15,             # holdout: parity, no regression
+            candidate_holdout=[True] * 16 + [False] * 14,
+        ),
+        min_examples=30,
+    )
+    round_result = loop.run()
+    assert round_result.transfer_measured is True
+    assert round_result.promoted is True
+
+
 # --- export gate -------------------------------------------------------------------------
 
 
