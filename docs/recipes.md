@@ -95,6 +95,36 @@ For a ready-made version with an executable check per step, see
 `web_search` out of the box, and with the `browser` extra installed the agent can also `read_text`
 full pages instead of stopping at search snippets.
 
+## Scraping & safe structured extraction
+
+Two built-in tools turn any page into clean, LLM-ready data — no extra to install:
+
+- **`scrape`** — fetch a URL and return clean **Markdown + metadata**. It walks a cost-aware cascade:
+  a plain HTTP GET first, escalating to the built-in **browser** (JS render) if the page comes back
+  empty, and — only if you set `FIRECRAWL_API_KEY` — falling back to **Firecrawl** for heavy anti-bot
+  pages. `render=http|browser|firecrawl` forces a specific backend; `include_links` also returns the
+  page's links.
+- **`extract`** — pull specific fields as **validated JSON**, safely. Give it a `url` (or `content`)
+  and a list of `fields` (e.g. `["title", "price", "author"]`) and it returns *only* those fields.
+  Crucially, it reads the page through Chimera's **quarantined reader** — a tool-less model whose
+  output is schema-validated — so **instructions hidden in the page can't hijack the agent**. That is
+  the safety guarantee Firecrawl/ScrapeGraphAI don't give you: a hostile page can at worst return a
+  wrong value, never a new instruction. Large pages are chunked and merged, stopping early once every
+  field is filled to cap cost.
+
+```bash
+uv run chimera run "scrape https://news.ycombinator.com and summarize the top 5 stories"
+uv run chimera run "extract the fields title, price, availability from https://example.com/product --taint"
+```
+
+Everything is data-fenced and taints the run (it's untrusted web content), so `solve --taint --guard`
+is the safe way to act on it. The optional Firecrawl fallback is used *only* when the built-in engine
+can't fetch a page and the key is set — Chimera scrapes the great majority of the web itself, with no
+external service.
+
+> Roadmap: `map` (list a site's URLs) and `crawl` (follow links across a whole site, robots-aware and
+> resumable) are the next phase on top of this foundation.
+
 ## Schedule any of them
 
 Every recipe can run on a cron and deliver to chat:

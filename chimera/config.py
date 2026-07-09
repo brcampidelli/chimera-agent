@@ -61,6 +61,9 @@ class Settings(BaseSettings):
 
     # --- Optional feature credentials (pre-set slots; set only what you use) ---
     tavily_api_key: str | None = Field(default=None, validation_alias="TAVILY_API_KEY")
+    # Optional Firecrawl fallback for the scrape/extract tools: used only for pages the built-in
+    # engine can't fetch (heavy anti-bot). Set FIRECRAWL_API_KEY to enable; unset = engine-only.
+    firecrawl_api_key: str | None = Field(default=None, validation_alias="FIRECRAWL_API_KEY")
     brave_api_key: str | None = Field(default=None, validation_alias="BRAVE_API_KEY")
     serpapi_key: str | None = Field(default=None, validation_alias="SERPAPI_API_KEY")
     x_bearer_token: str | None = Field(default=None, validation_alias="X_BEARER_TOKEN")

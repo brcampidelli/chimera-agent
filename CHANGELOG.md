@@ -6,6 +6,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-09
+
+The **web scraping + safe structured extraction** release — an agent-native answer to
+Firecrawl/crawl4ai/ScrapeGraphAI, built on what Chimera already ships (browser + MarkItDown + the
+quarantined reader), with no new dependency and no external service by default. Phase 1 of a
+`scrape / extract / map / crawl` verb set (map + crawl come next).
+
+### Added
+- **`scrape` tool — any page → clean Markdown + metadata.** A cost-aware fetch cascade
+  (`chimera/scrape/fetch.py`): plain HTTP first, escalate to the built-in browser (JS render) when the
+  result is empty, and — only if `FIRECRAWL_API_KEY` is set — fall back to Firecrawl for heavy anti-bot
+  pages. `render=http|browser|firecrawl` forces a backend; `include_links` returns the page's links.
+  Cleaning reuses the MarkItDown seam with a stdlib text fallback (`chimera/scrape/clean.py`).
+- **`extract` tool — schema → validated JSON, injection-safe.** Chimera's edge over other scrapers:
+  instead of feeding the page straight to the extraction LLM (which a page can prompt-inject), `extract`
+  routes through the **quarantined reader** (a tool-less, schema-validated model), so a hostile page can
+  at worst return a wrong value — never a new instruction or tool call. Large pages are chunked and
+  merged map-reduce style, short-circuiting once every field is filled to cap cost
+  (`chimera/scrape/extract.py`). Both tools are in `FETCH_TOOLS` (data-fenced, taint the run).
+- **Optional Firecrawl passthrough** (`chimera/scrape/firecrawl.py`, `FIRECRAWL_API_KEY`): used only for
+  pages the built-in engine can't fetch — an honest "use their infra only when needed", never a hard
+  dependency. Unset the key and it's never touched.
+
 ## [0.8.1] - 2026-07-09
 
 ### Fixed
