@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.16.2] - 2026-07-10
+
+**"Nothing shipped stays unreachable."** The final audit follow-up: the three eval modules that were
+reachable only from the external `bench/` scripts + tests now have honest CLI surface, so every
+implemented capability is usable from the `chimera` command.
+
 ### Added
 - **`chimera hierarchy-bench --multistep`** — the multi-step companion suite (a single growing context
   vs per-step scoped workers, over large docs), the regime where the hierarchy *actually* saves tokens
