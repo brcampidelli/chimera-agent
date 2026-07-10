@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **PROBE live wiring — record (arm, proxy, reward) per attempt (`solve --probe-log`)** — closes the loop
+  the v0.15.0 note flagged as "the natural follow-on." `ProbeLog` (`chimera/fusion/probe_log.py`) is an
+  append-only JSONL that the autonomous loop writes to when `--probe-log` is set: each verified attempt
+  records which **arm** ran (base worker vs escalated fusion worker), the cheap **proxy** (the manager
+  self-judgment, computed unconditionally in probe mode so the pair is unbiased even on a passing
+  attempt), and the expensive **reward** (the verified outcome). `chimera probe-select --from-log` then
+  reads the accumulated observations and reports the δ-confident best arm — deciding from measured
+  evidence whether escalation actually pays. Opt-in, best-effort (a telemetry write never fails a run),
+  and the manager stays feedback-only — the executable verifier remains ground truth.
+
 ## [0.15.0] - 2026-07-09
 
 **"Trustworthy Verifier & Write Security."** The M18 cycle, grounded in an 8-category arXiv sweep

@@ -1868,6 +1868,9 @@ def solve(
     write_region: str = typer.Option(
         None, "--write-region", help="Comma-separated globs the file-writers may touch (e.g. 'src/**,*.py'). A write outside is refused — blocks an injected instruction from rewriting an unrelated file."
     ),
+    probe_log: bool = typer.Option(
+        False, "--probe-log", help="Log (arm, proxy=manager-judgment, reward=verified) per attempt to <home>/probe.jsonl for PROBE best-arm selection (see `chimera probe-select --from-log`). Needs --verify + a manager."
+    ),
     playbook: bool = typer.Option(
         False, "--playbook", help="Inject the stored ACE strategy playbook into context, then curate it from this run's outcome (closed loop)."
     ),
@@ -1938,6 +1941,7 @@ def solve(
         SkillEvolver,
         SkillStore,
     )
+    from chimera.fusion.probe_log import ProbeLog as _ProbeLog
     from chimera.governance.validator import SkillValidator
     from chimera.providers import LLMGateway, MissingCredentialsError
     from chimera.tools import default_registry
@@ -2103,6 +2107,8 @@ def solve(
             planner=None if no_plan else Planner(planner_backend, model),
             manager=None if no_manager else Manager(gateway, model, use_rubric=rubric),
             verifier=CommandVerifier(verify, ws) if verify else None,
+            # PROBE (M18-5): record (arm, cheap manager proxy, verified reward) per attempt.
+            probe_log=_ProbeLog(settings.home / "probe.jsonl") if probe_log else None,
             guard=WorkspaceGuard(ws),
             experience=ExperienceBuffer(settings.home / "experience.json"),
             trajectories=TrajectoryCollector(settings.home / "trajectories.jsonl") if collect else None,
@@ -3673,7 +3679,8 @@ def redteam() -> None:
 
 @app.command("probe-select")
 def probe_select(
-    data: str = typer.Argument(..., help='JSON: {"arm": [[proxy, reward-or-null], ...], ...} — cheap proxy scores paired with expensive rewards (null = a cheap-only draw).'),
+    data: str = typer.Argument(None, help='JSON: {"arm": [[proxy, reward-or-null], ...], ...}. Omit when using --from-log.'),
+    from_log: str = typer.Option(None, "--from-log", help="Read observations from a ProbeLog JSONL (e.g. <home>/probe.jsonl written by `solve --probe-log`)."),
     delta: float = typer.Option(0.1, "--delta", help="Confidence level (smaller = stricter)."),
     min_reward: int = typer.Option(2, "--min-reward", help="Expensive rewards required per arm before deciding."),
 ) -> None:
@@ -3689,11 +3696,22 @@ def probe_select(
 
     from chimera.eval.probe import ProbeBestArm
 
-    raw = json.loads(Path(data).read_text(encoding="utf-8"))
-    arms = {
-        str(name): [(float(o[0]), None if o[1] is None else float(o[1])) for o in obs]
-        for name, obs in raw.items()
-    }
+    if from_log:
+        from chimera.fusion.probe_log import ProbeLog
+
+        arms = ProbeLog(Path(from_log)).observations()
+    elif data:
+        raw = json.loads(Path(data).read_text(encoding="utf-8"))
+        arms = {
+            str(name): [(float(o[0]), None if o[1] is None else float(o[1])) for o in obs]
+            for name, obs in raw.items()
+        }
+    else:
+        console.print("[red]Provide a JSON data file or --from-log <probe.jsonl>.[/red]")
+        raise typer.Exit(code=1)
+    if not arms:
+        console.print("[dim]No observations yet.[/dim]")
+        return
     decision = ProbeBestArm(delta=delta, min_reward=min_reward).select(arms)
     for e in decision.estimates:
         hw = "±∞" if e.half_width == float("inf") else f"±{e.half_width:.3f}"

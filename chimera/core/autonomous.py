@@ -20,7 +20,10 @@ from __future__ import annotations
 import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
+
+if TYPE_CHECKING:
+    from chimera.fusion.probe_log import ProbeLog
 
 from chimera.core.agent import AgentResult
 from chimera.core.checklist import RequirementChecklist
@@ -159,6 +162,7 @@ class AutonomousAgent:
         planner: Planner | None = None,
         manager: Manager | None = None,
         verifier: Verifier | None = None,
+        probe_log: ProbeLog | None = None,
         guard: WorkspaceGuard | None = None,
         experience: ExperienceBuffer | None = None,
         trajectories: TrajectoryCollector | None = None,
@@ -187,6 +191,7 @@ class AutonomousAgent:
         self.planner = planner
         self.manager = manager
         self.verifier = verifier
+        self.probe_log = probe_log
         self.guard = guard
         self.experience = experience
         self.trajectories = trajectories
@@ -332,12 +337,30 @@ class AutonomousAgent:
             # stops a strict reviewer from vetoing — and reverting — verified-correct
             # work just because it judged the narration rather than the artifact.
             verified, vout = self._verify()
+            # PROBE proxy (M18-5): in probe mode compute the cheap manager judgment even on a passing
+            # attempt, so the logged (proxy, reward) pair is unbiased; reused below → no extra call.
+            probe_proxy: bool | None = None
+            proxy_fb = ""
+            if self.probe_log is not None and self.manager is not None:
+                probe_proxy, proxy_fb = self._review(task, answer, context)
             if self.verifier is not None:
                 ok = verified
-                approved, fb = (True, "") if verified else self._review(task, answer, context)
+                if verified:
+                    approved, fb = True, ""
+                elif probe_proxy is not None:
+                    approved, fb = probe_proxy, proxy_fb
+                else:
+                    approved, fb = self._review(task, answer, context)
             else:
                 approved, fb = self._review(task, answer, context)
                 ok = approved
+            # Record the paired observation for PROBE: arm = which worker ran, proxy = the cheap
+            # manager verdict, reward = the verified outcome (only with a real verifier + manager).
+            if self.probe_log is not None and self.verifier is not None and probe_proxy is not None:
+                arm = "escalate" if worker is self.escalate_worker else "worker"
+                self.probe_log.record(
+                    arm=arm, proxy=1.0 if probe_proxy else 0.0, reward=1.0 if verified else 0.0
+                )
 
             # Completion contract (Hermes): a declared, machine-checkable AND gate. Even a
             # verified/approved attempt fails if the contract isn't met — and the unmet
