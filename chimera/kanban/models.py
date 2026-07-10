@@ -6,8 +6,11 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-Column = Literal["backlog", "doing", "review", "done"]
-COLUMNS: tuple[Column, ...] = ("backlog", "doing", "review", "done")
+# "blocked" (M19 Track B): a card whose declared dependencies are not yet satisfied. It sits out
+# of the ready queue until they are, then returns to "backlog". Additive — the generic dispatcher
+# only ever pulls "backlog", so blocked cards are simply never picked up until unblocked.
+Column = Literal["backlog", "doing", "review", "done", "blocked"]
+COLUMNS: tuple[Column, ...] = ("backlog", "doing", "review", "done", "blocked")
 
 
 class KanbanCard(BaseModel):

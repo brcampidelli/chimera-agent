@@ -29,6 +29,12 @@ from chimera.orchestration.lifecycle import (
     StageResult,
     lifecycle_crew,
 )
+from chimera.orchestration.project import (
+    ProjectConfig,
+    ProjectOrchestrator,
+    ProjectState,
+    SupportsSolveCard,
+)
 from chimera.orchestration.roles import Role, RoleAgent
 from chimera.orchestration.spec import (
     EffortBudget,
@@ -64,4 +70,8 @@ __all__ = [
     "IsolatedCrewResult",
     "IsolatedWorker",
     "WorkerOutcome",
+    "ProjectOrchestrator",
+    "ProjectState",
+    "ProjectConfig",
+    "SupportsSolveCard",
 ]

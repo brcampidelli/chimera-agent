@@ -3351,6 +3351,144 @@ def kanban_learn(
     console.print(f"added {created} card(s) of {len(proposals)} recurring task(s).")
 
 
+# --- project subcommands (M19 Track B) ----------------------------------------
+
+project_app = typer.Typer(
+    help="Run a project start-to-finish against a Spec (drift = acceptance authority).",
+    no_args_is_help=True,
+)
+app.add_typer(project_app, name="project")
+
+
+def _project_lane(workspace: str, model: str | None) -> Any:
+    from chimera.kanban.lanes import SolveLane
+
+    return SolveLane(workspace=Path(workspace), model=model)
+
+
+def _print_project(state: Any) -> None:
+    color = {"done": "green", "escalated": "red", "awaiting_approval": "yellow"}.get(
+        state.status, "cyan"
+    )
+    console.print(
+        f"[bold]{state.id}[/bold]  [{color}]{state.status}[/{color}]  "
+        f"iter {state.iterations}"
+    )
+    if state.note:
+        console.print(f"  [dim]{state.note}[/dim]")
+    if state.pending_card_id:
+        console.print(f"  [yellow]pending approval:[/yellow] card {state.pending_card_id}")
+
+
+@project_app.command("start")
+def project_start(
+    spec: str = typer.Argument(..., help="Spec YAML (the acceptance authority)."),
+    workspace: str = typer.Option(".", "--workspace", "-w", help="Project workspace root."),
+    model: str = typer.Option(None, "--model", "-m", help="Override the solve model."),
+    max_iterations: int = typer.Option(20, "--max-iterations", help="Hard rail on card runs."),
+    yes: bool = typer.Option(
+        False, "--yes", "-y", help="Skip the initial plan-approval pause (auto-approve)."
+    ),
+) -> None:
+    """Create a project from a spec and run it until it aligns or a rail stops it."""
+    from chimera.orchestration.project import ProjectConfig, ProjectOrchestrator
+
+    settings = get_settings()
+    proj = ProjectOrchestrator.start(
+        spec, workspace, home=settings.home, solve_card=_project_lane(workspace, model),
+        config=ProjectConfig(max_iterations=max_iterations, require_plan_approval=not yes),
+    )
+    console.print(f"[green]created[/green] project [bold]{proj.state.id}[/bold] from {spec}")
+    state = proj.run()
+    _print_project(state)
+    if state.status == "awaiting_approval" and not state.plan_approved:
+        console.print(
+            f"[dim]review the plan, then:[/dim] chimera project approve {state.id}"
+        )
+
+
+@project_app.command("status")
+def project_status(project_id: str = typer.Argument(..., help="Project id.")) -> None:
+    """Show a project's status and its board."""
+    from chimera.kanban import KanbanBoard
+    from chimera.orchestration.project import ProjectOrchestrator, ProjectState
+
+    pdir = ProjectOrchestrator.project_dir(get_settings().home, project_id)
+    if not (pdir / "project.json").exists():
+        console.print(f"[red]no project {project_id}[/red]")
+        raise typer.Exit(code=1)
+    state = ProjectState.load(pdir / "project.json")
+    _print_project(state)
+    board = KanbanBoard(Path(state.board_path))
+    from chimera.kanban import COLUMNS
+
+    for column in COLUMNS:
+        cards = board.cards(column)
+        if cards:
+            console.print(f"[bold]{column}[/bold] ([cyan]{len(cards)}[/cyan])")
+            for card in cards:
+                console.print(f"  [cyan]{card.id}[/cyan] {card.title}")
+
+
+def _resume_project(project_id: str, model: str | None) -> Any:
+    from chimera.orchestration.project import ProjectOrchestrator, ProjectState
+
+    pdir = ProjectOrchestrator.project_dir(get_settings().home, project_id)
+    if not (pdir / "project.json").exists():
+        console.print(f"[red]no project {project_id}[/red]")
+        raise typer.Exit(code=1)
+    state = ProjectState.load(pdir / "project.json")
+    from chimera.orchestration.project import ProjectConfig
+
+    return ProjectOrchestrator.load(
+        get_settings().home, project_id, solve_card=_project_lane(state.workspace, model),
+        config=ProjectConfig(require_plan_approval=not state.plan_approved),
+    )
+
+
+@project_app.command("run")
+def project_run(
+    project_id: str = typer.Argument(..., help="Project id."),
+    model: str = typer.Option(None, "--model", "-m", help="Override the solve model."),
+) -> None:
+    """Continue running a paused/escalated project (re-attempts a soft rail-stop)."""
+    _print_project(_resume_project(project_id, model).run())
+
+
+@project_app.command("step")
+def project_step(
+    project_id: str = typer.Argument(..., help="Project id."),
+    model: str = typer.Option(None, "--model", "-m", help="Override the solve model."),
+) -> None:
+    """Run exactly one iteration (cron-able)."""
+    _print_project(_resume_project(project_id, model).step())
+
+
+@project_app.command("approve")
+def project_approve(
+    project_id: str = typer.Argument(..., help="Project id."),
+    card: str = typer.Option(None, "--card", help="Approve a specific high-risk card instead of the plan."),
+    model: str = typer.Option(None, "--model", "-m", help="Override the solve model."),
+) -> None:
+    """Approve the initial plan (default) or a paused high-risk card, then continue."""
+    proj = _resume_project(project_id, model)
+    if card:
+        proj.approve_card(card)
+    else:
+        proj.approve_plan()
+    _print_project(proj.run())
+
+
+@project_app.command("deny")
+def project_deny(
+    project_id: str = typer.Argument(..., help="Project id."),
+    card: str = typer.Option(..., "--card", help="The high-risk card to reject."),
+) -> None:
+    """Reject a paused high-risk card (parks it for review, escalates to a human)."""
+    proj = _resume_project(project_id, None)
+    _print_project(proj.deny_card(card))
+
+
 # --- memory subcommands -------------------------------------------------------
 
 memory_app = typer.Typer(help="Curated long-term memory.", no_args_is_help=True)
@@ -4355,11 +4493,22 @@ def workflow(
 def drift(
     spec: str = typer.Argument(..., help="Spec YAML file."),
     workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root."),
+    only: str = typer.Option(None, "--only", help="Check only this requirement id (project cards)."),
 ) -> None:
     """Drift gate: check the workspace against a spec (Spec Growth). Exit 1 on drift."""
     from chimera.governance import check_drift, load_spec
+    from chimera.governance.drift import Spec
 
-    report = check_drift(load_spec(spec), Path(workspace))
+    spec_obj = load_spec(spec)
+    if only is not None:
+        # A per-requirement gate: the project orchestrator's cards verify with `--only <id>` so
+        # each card's success maps to exactly one requirement of the spec.
+        matched = [r for r in spec_obj.requirements if r.id == only]
+        if not matched:
+            console.print(f"[red]no requirement {only!r} in spec {spec_obj.name!r}[/red]")
+            raise typer.Exit(code=2)
+        spec_obj = Spec(name=spec_obj.name, requirements=matched)
+    report = check_drift(spec_obj, Path(workspace))
     console.print(f"[bold]{report.name}[/bold]")
     for result in report.results:
         mark = "[green]✓[/green]" if result.satisfied else "[red]✗[/red]"

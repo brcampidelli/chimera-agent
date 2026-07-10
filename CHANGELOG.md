@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **M19 Track B — `chimera project`: run a project start-to-finish against a Spec.** A new
+  `ProjectOrchestrator` (`chimera/orchestration/project.py`) drives a whole project above the single
+  task by stitching pieces that already existed: the drift **Spec** is the executable acceptance
+  authority (the ONLY "done" signal — nothing accepted on a model's say-so), a Kanban **board** is
+  the durable task-graph (dependencies in `card.metadata["depends_on"]`; a new `blocked` column for
+  cards whose deps aren't met), each unsatisfied requirement becomes a card whose verify command is
+  `chimera drift <spec> --only <id>`, and the solve lane (carrying the M19 EvolutionContext) works
+  each card verify-or-revert — so running a project feeds the flywheel. The loop runs until the Spec
+  aligns or a rail stops it: `max_iterations`, a **high-risk** card awaiting human approval
+  (`risk: high` in the spec → deploy/migration/delete pauses), or **no ready card left with the spec
+  still unaligned** (a failed card parks in review → escalate to a human). Durable + resumable
+  (`home/projects/<id>/`). CLI: `project start` / `status` / `run` / `step` (cron-able) / `approve`
+  [`--card`] / `deny --card`. The `Spec`/`Requirement` model gained additive `depends_on` + `risk`
+  fields, and `chimera drift` gained `--only <id>` (per-requirement gate for the cards).
 - **M19-A1 (mechanism) — the flip-point to couple skill *reading* to skill *evolving*.** A new
   `CHIMERA_SKILL_CARDS_READ` setting: when on, retrieving learned skill cards couples to the same
   condition that lets a run mint a skill (a run that can *write* a skill also *reads* the retrieved

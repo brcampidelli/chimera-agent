@@ -36,6 +36,12 @@ class Requirement(BaseModel):
     check: CheckKind
     target: str
     required: bool = True
+    # M19 Track B (project orchestrator): optional task-graph metadata a spec author can declare.
+    # ``depends_on`` lists requirement ids that must be satisfied before this one's card is ready;
+    # ``risk="high"`` makes the project orchestrator pause for human approval before running its card
+    # (deploy/migration/delete). Ignored by the plain drift gate — it only reads check/target.
+    depends_on: list[str] = Field(default_factory=list)
+    risk: str = ""
 
 
 class Spec(BaseModel):
