@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Spec-grounded test generation (`solve --gen-tests`)** — M18-1, from the arXiv sweep
+  (arXiv 2607.06636). When `solve` has no `--verify` command, the fitness gate falls back to an LLM
+  judging coverage — a proxy that rubber-stamps wrong code (a false positive that corrupts the gate).
+  `--gen-tests` instead generates an executable pytest module grounded in the task's extracted
+  atomic requirements and runs it as the gate, catching bugs the coverage grade misses. Opt-in;
+  generated once then re-run on retries; any generation/run error degrades to a non-blocking pass
+  (can only help, never falsely block). `chimera/core/spec_test.py`. *(Not yet "done" by the project's
+  bar: needs a published paired-A/B number — coverage-grade vs generated-tests — on a goldilocks model.)*
+
 ## [0.14.0] - 2026-07-09
 
 Integration-harmony pass. A full-repo audit (every tool, skill, CLI command, backend, and subsystem

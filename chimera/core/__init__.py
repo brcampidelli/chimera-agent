@@ -34,6 +34,7 @@ from chimera.core.ledger import ProgressAssessment, ProgressLedger, TaskLedger
 from chimera.core.planner import Plan, Planner
 from chimera.core.repomap import build_repo_map
 from chimera.core.runstate import RunCheckpointer
+from chimera.core.spec_test import SpecTestGenerator, SpecTestVerifier, workspace_digest
 from chimera.core.spine import assemble_spine
 from chimera.core.strong_verify import StrongVerifier
 from chimera.core.subagent import SubAgentTool
@@ -69,6 +70,9 @@ __all__ = [
     "RunCheckpointer",
     "build_repo_map",
     "RequirementChecklist",
+    "SpecTestGenerator",
+    "SpecTestVerifier",
+    "workspace_digest",
     "StrongVerifier",
     "CompletionContract",
     "ContractResult",

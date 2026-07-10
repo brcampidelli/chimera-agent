@@ -35,6 +35,7 @@ from chimera.core.ledger import ProgressLedger, TaskLedger
 from chimera.core.planner import Plan, Planner
 from chimera.core.repomap import build_repo_map
 from chimera.core.runstate import RunCheckpointer
+from chimera.core.spec_test import SpecTestGenerator, SpecTestVerifier
 from chimera.core.spine import assemble_spine
 from chimera.core.strong_verify import StrongVerifier
 from chimera.core.supervisor import Manager
@@ -149,6 +150,8 @@ class AutonomousAgent:
         pause_on_taint: bool = False,
         repo_map: bool = False,
         checklist: RequirementChecklist | None = None,
+        spec_test_generator: SpecTestGenerator | None = None,
+        workspace: Path | None = None,
         strong_verifier: StrongVerifier | None = None,
         playbook: Playbook | None = None,
         contract: CompletionContract | None = None,
@@ -175,6 +178,8 @@ class AutonomousAgent:
         self.pause_on_taint = pause_on_taint
         self.repo_map = repo_map
         self.checklist = checklist
+        self.spec_test_generator = spec_test_generator
+        self.workspace = workspace
         self.strong_verifier = strong_verifier
         self.playbook = playbook
         self.contract = contract
@@ -229,6 +234,17 @@ class AutonomousAgent:
         # task-level and stable, so it's done once here and reused by the coverage gate below.
         requirements = self.checklist.extract(task) if self.checklist is not None else []
         requirements_ctx = _format_requirements(requirements)
+        # Spec-grounded test generation (arXiv 2607.06636): when the user gave no --verify command,
+        # turn the weak LLM coverage-grade proxy into EXECUTABLE pytest grounded in the extracted
+        # requirements — it catches wrong code the coverage grade rubber-stamps (the false positive
+        # that corrupts the fitness gate). It slots into the verifier slot, so the coverage grade
+        # below is skipped (that path is gated on `verifier is None`). Non-blocking if nothing usable
+        # is generated. Run-scoped: these agents are built per task, so setting the verifier here is
+        # safe (it is only set when the user configured none).
+        if self.spec_test_generator is not None and self.verifier is None and requirements:
+            self.verifier = SpecTestVerifier(
+                self.spec_test_generator, task, requirements, self.workspace or Path.cwd()
+            )
         # M15-A5: sanitize the RECALLED / EVOLVED artifacts (lessons, skill cards, playbook) before
         # injecting them — a memory or skill distilled during a tainted run could carry chat-template
         # control tokens that try to spoof an instruction turn. The current-run parts (spine, repo,

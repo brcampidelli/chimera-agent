@@ -1858,6 +1858,9 @@ def solve(
     checklist: bool = typer.Option(
         False, "--checklist", help="Extract the task's atomic requirements and grade each attempt's coverage (catches dropped constraints)."
     ),
+    gen_tests: bool = typer.Option(
+        False, "--gen-tests", help="With no --verify: generate executable pytest grounded in the task's requirements and use it as the gate (catches wrong code the coverage grade rubber-stamps)."
+    ),
     playbook: bool = typer.Option(
         False, "--playbook", help="Inject the stored ACE strategy playbook into context, then curate it from this run's outcome (closed loop)."
     ),
@@ -1913,6 +1916,7 @@ def solve(
         ProgressLedger,
         RequirementChecklist,
         RunCheckpointer,
+        SpecTestGenerator,
         StrongVerifier,
         WorkspaceGuard,
     )
@@ -2057,7 +2061,13 @@ def solve(
             progress_ledger=ProgressLedger(gateway, model) if progress_ledger else None,
             # Requirement checklist (--checklist): extract atomic requirements + grade coverage
             # per attempt, so a weak model can't silently drop a "must include / must not" clause.
-            checklist=RequirementChecklist(gateway, model) if checklist else None,
+            # --gen-tests also needs the extracted requirements, so it turns extraction on too.
+            checklist=RequirementChecklist(gateway, model) if (checklist or gen_tests) else None,
+            # Spec-grounded test generation (--gen-tests): with no --verify command, generate
+            # executable pytest grounded in the extracted requirements and use it as the gate,
+            # replacing the weak LLM coverage grade that rubber-stamps wrong code.
+            spec_test_generator=SpecTestGenerator(gateway, model) if gen_tests else None,
+            workspace=ws,
             # Independent strong verification (--strong-verify MODEL): a stronger judge grades
             # hard-turn (retried) results before they're accepted. Uses the same gateway, other model.
             strong_verifier=StrongVerifier(gateway, strong_verify) if strong_verify else None,
