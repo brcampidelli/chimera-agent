@@ -81,10 +81,9 @@ CATALOG: tuple[Feature, ...] = (
             how="set Spotify OAuth creds; import the Spotify OpenAPI spec"),
     Feature("browser", "Browser automation", dep="playwright",
             how="pip install playwright && playwright install"),
-    Feature("voice_mode", "Full voice conversation (STT + TTS)",
-            env_any=("ELEVENLABS_API_KEY", "OPENAI_API_KEY"), how="set a TTS key; STT via Whisper/API"),
-    Feature("computer_use", "Control the desktop (advanced; off the server path)",
-            dep="pyautogui", how="pip install pyautogui"),
+    Feature("speech_io", "Speech building blocks: transcribe_audio (STT) + text_to_speech (TTS) tools",
+            env_any=("ELEVENLABS_API_KEY", "OPENAI_API_KEY"),
+            how="set a TTS key (STT via faster-whisper/API) — use the transcribe_audio & text_to_speech tools"),
 )
 
 

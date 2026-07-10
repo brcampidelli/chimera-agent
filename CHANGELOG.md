@@ -6,6 +6,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **Aggregate cross-agent monitor is now WIRED into the fan-out commands** (`solve-batch --taint`,
+  `crew-isolated --taint`). A functional audit found the v0.16.0 `AggregateMonitor` was built + tested
+  but never connected to an orchestrator, so its split-exfiltration defense was unreachable in a real
+  fan-out run. Under `--taint` each isolated worker now gets its own `TaintLedger` (capability
+  provenance), and after the batch the aggregate monitor runs over all workers' events and reports any
+  **cross-agent-taint** (one worker fetched untrusted, a different worker sank it) or **fan-out-volume**
+  collusion — escalating to review, never blocking. Opt-in, mirrors `solve --taint`.
+
+### Fixed
+- **Honest feature catalog** — `chimera features` no longer advertises two capabilities that had no
+  implementation: `computer_use` (no built-in tool, no dependency in any extra) is removed, and
+  `voice_mode` ("full voice conversation") is renamed to `speech_io` and described accurately as the
+  `transcribe_audio` (STT) + `text_to_speech` (TTS) building-block tools that actually exist.
+- **Graceful missing-key handling** for `skills-evolve`, `playbook curate`, and `rubric-grade` — these
+  three model-calling commands previously surfaced an uncaught `MissingCredentialsError` traceback;
+  they now print the same clean "No provider key configured" message and exit as every other command.
+- **`mypy chimera` is fully green** (219 files) — resolved 3 long-standing type-narrowing errors in the
+  scrape module (all runtime-safe `dict.get()`-called-twice patterns, now bound to a local first).
+
 ## [0.16.0] - 2026-07-09
 
 **"Task-Typed Fusion & Fan-Out Safety."** The Tier-2/3 half of the same 8-category arXiv sweep that

