@@ -77,8 +77,10 @@ class LifecycleCrew:
         self.max_build_attempts = max_build_attempts
 
     def run(self, task: str) -> LifecycleResult:
+        from chimera.config import get_settings
         from chimera.core.autonomous import AutonomousAgent, AutonomousConfig
         from chimera.core.planner import Planner
+        from chimera.evolution import build_evolution_context
 
         stages: list[StageResult] = []
 
@@ -87,11 +89,19 @@ class LifecycleCrew:
         plan_text = plan.as_text() or "(no steps)"
         stages.append(StageResult("plan", plan_text, bool(plan.steps)))
 
-        # 2 + 3. build + test — the AutonomousAgent owns the verify-or-revert gate
+        # 2 + 3. build + test — the AutonomousAgent owns the verify-or-revert gate.
+        # M19-A4: the lifecycle build is an autonomous, verified path — turn the flywheel on so
+        # the SDLC crew learns (skills + memory) from what it ships, like `chimera solve` does.
+        settings = get_settings()
+        evo = build_evolution_context(
+            settings, self.backend, self.model, home=settings.home,
+            include_memory=True, include_playbook=True,
+        )
         auto = AutonomousAgent(
             self.worker,
             verifier=self.verifier,
             guard=self.guard,
+            **evo.apply_to(),
             config=AutonomousConfig(
                 max_attempts=self.max_build_attempts, use_planner=False, use_manager=False
             ),

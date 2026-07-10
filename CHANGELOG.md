@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **M19-A4 — the flywheel now turns on every autonomous path, not just `chimera solve`.** The kanban
+  lanes, workflow `solve` steps, and the SDLC lifecycle crew now build the same six learning seams
+  `solve` does (via `build_evolution_context(..., include_memory=True, include_playbook=True)`), so
+  working a card / running a workflow step / shipping through the lifecycle **learns** (experience,
+  skills, memory, playbook) instead of running a bare, amnesiac agent. The hierarchical orchestrator
+  gets the read-and-record half: it injects recalled facts + skill cards into the **top model's**
+  synthesis (never the byte-identical worker prefix) and records each run as an experience lesson +
+  skill-card credit — but never distils a skill (a fan-out has no verify-or-revert signal, so it
+  accrues telemetry only). The honest hierarchy-bench A/B path is deliberately left context-free so
+  the measurement stays clean. A new `chimera/evolution/wiring.py` is the single source for *where*
+  the memory backend + ACE playbook live; the CLI helpers now delegate to it.
 - **M19-A3 — long-term memory readback.** The `solve` path *wrote* verified facts to long-term
   memory but never *read them back*, so cross-run knowledge was write-only. `AutonomousAgent` now
   recalls the relevant facts at the start of a run (duck-typed on `memory.search`) and injects them

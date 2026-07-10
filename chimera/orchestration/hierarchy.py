@@ -29,7 +29,10 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from chimera.evolution.context import EvolutionContext
 
 from chimera.orchestration.artifacts import ArtifactStore, build_envelope
 from chimera.orchestration.budget import BudgetedBackend, BudgetExceeded, EffortPolicy, TokenBudget
@@ -177,8 +180,14 @@ class HierarchicalOrchestrator:
         fusion: SupportsComplete | None = None,
         receipts_path: Path | None = None,
         config: HierarchyConfig | None = None,
+        evolution: EvolutionContext | None = None,
     ) -> None:
         self.gateway = gateway
+        # M19-A4: the shared flywheel, READ-and-write-telemetry only. A fan-out has no
+        # verify-or-revert signal, so it reads retrieved cards + recalled facts into the top
+        # model's synthesis and records the run as an experience lesson + card credit — but never
+        # distils a skill (distillation stays on the verified solve/lifecycle path).
+        self.evolution = evolution
         self.weak_model = weak_model
         self.mid_model = mid_model
         self.top_model = top_model
@@ -233,6 +242,7 @@ class HierarchicalOrchestrator:
             return self._fallback(task, shape, reason="all delegations failed")
 
         answer, synth_tokens = self._synthesize(task, envelopes)
+        self._record_outcome(task, answer)
         measured = sum(r.total_tokens for r in receipts) + synth_tokens
         counterfactual = sum(r.counterfactual_tokens or 0 for r in receipts) or None
         return HierarchyResult(
@@ -436,6 +446,9 @@ class HierarchicalOrchestrator:
             for env in envelopes
         )
         prompt = f"## Task\n{task}\n\n## Worker summaries\n{summaries}"
+        recall = self._recall_block(task)
+        if recall:
+            prompt = f"## Prior knowledge (advisory)\n{recall}\n\n{prompt}"
         if self.config.fuse_final and self.fusion is not None and _conflicting(envelopes):
             _log.debug("envelopes conflict — engaging fusion for the final synthesis")
             result = self.fusion.complete(
@@ -478,6 +491,7 @@ class HierarchicalOrchestrator:
         )
         if self.receipts_path is not None:
             append_delegation(self.receipts_path, receipt)
+        self._record_outcome(task, result.content)
         return HierarchyResult(
             answer=result.content,
             shape=shape,
@@ -485,6 +499,46 @@ class HierarchicalOrchestrator:
             fell_back=True,
             total_tokens=tokens,
         )
+
+    def _recall_block(self, task: str) -> str:
+        """Advisory prior-knowledge for the top model (M19-A4 read half): retrieved skill cards +
+        recalled memory facts, sanitized. Empty without an evolution context or when nothing matches.
+        Injected ONLY into the top model's synthesis prompt — never the byte-identical worker prefix.
+        """
+        if self.evolution is None:
+            return ""
+        parts: list[str] = []
+        cards = self.evolution.cards
+        if cards is not None:
+            ctx = cards.card_context(task)
+            if ctx:
+                parts.append(ctx)
+        search = getattr(self.evolution.memory, "search", None)
+        if callable(search):
+            try:
+                hits = search(task, k=5)
+            except Exception as exc:  # noqa: BLE001 — recall is advisory, never fail the run
+                _log.debug("hierarchy memory readback failed: %s", exc)
+                hits = []
+            facts = "\n".join(
+                f"- {getattr(h, 'content', '')}"
+                for h in (hits or [])
+                if str(getattr(h, "content", "")).strip()
+            )
+            if facts:
+                parts.append("Relevant prior facts:\n" + facts)
+        if not parts:
+            return ""
+        from chimera.governance.sanitize import sanitize_untrusted
+
+        return sanitize_untrusted("\n\n".join(parts))
+
+    def _record_outcome(self, task: str, answer: str) -> None:
+        """Record the run to the shared evolution context (M19-A4 write half): an experience lesson
+        + skill-card credit. Never distils a skill — a fan-out has no verify-or-revert signal, so it
+        accrues telemetry only (the honest gate)."""
+        if self.evolution is not None:
+            self.evolution.record_external(task, answer, success=bool(answer and answer.strip()))
 
     def _ask_top(self, system: str, user: str) -> str:
         return self.gateway.complete(

@@ -1483,6 +1483,8 @@ def orchestrate(
     ladder = settings.tier_ladder()
     per_delegation = budget or settings.delegation_budget
     gateway = LLMGateway()
+    from chimera.evolution import build_evolution_context
+
     orchestrator = HierarchicalOrchestrator(
         gateway,
         weak_model=ladder.weak,
@@ -1495,6 +1497,12 @@ def orchestrate(
         config=HierarchyConfig(
             max_workers=max_workers,
             effort=EffortPolicy(complex_budget=per_delegation),
+        ),
+        # M19-A4: read recalled facts/cards into synthesis + record the run (telemetry only, no
+        # skill distillation — a fan-out has no verify-or-revert signal).
+        evolution=build_evolution_context(
+            settings, gateway, None, home=settings.home,
+            evolve_skills=False, include_memory=True,
         ),
     )
     try:
@@ -1551,6 +1559,8 @@ def brief(
 
     ladder = settings.tier_ladder()
     gateway = LLMGateway()
+    from chimera.evolution import build_evolution_context
+
     orchestrator = HierarchicalOrchestrator(
         gateway,
         weak_model=ladder.weak,
@@ -1560,6 +1570,11 @@ def brief(
         fusion=FusionEngine(gateway),
         receipts_path=Path(settings.home) / "delegations.jsonl",
         config=HierarchyConfig(max_workers=max_workers),
+        # M19-A4: a recipe brief is a production path — read recalled facts + record the run.
+        evolution=build_evolution_context(
+            settings, gateway, None, home=settings.home,
+            evolve_skills=False, include_memory=True,
+        ),
     )
     specs = specs_from_brief(loaded, max_tokens=settings.delegation_budget)
     console.print(f"[dim]{loaded.name}: {len(specs)} topic(s) in parallel on {ladder.mid}[/dim]")
@@ -2916,26 +2931,21 @@ app.add_typer(playbook_app, name="playbook")
 
 
 def _playbook_path() -> Path:
-    return get_settings().home / "playbook.json"
+    from chimera.evolution.wiring import playbook_path
+
+    return playbook_path(get_settings())
 
 
 def _load_playbook() -> Playbook:
-    import json
+    from chimera.evolution.wiring import load_playbook
 
-    from chimera.evolution import Playbook
-
-    path = _playbook_path()
-    if not path.exists():
-        return Playbook()
-    return Playbook.from_dict(json.loads(path.read_text(encoding="utf-8")))
+    return load_playbook(get_settings())
 
 
 def _save_playbook(playbook: Playbook) -> None:
-    import json
+    from chimera.evolution.wiring import save_playbook
 
-    path = _playbook_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(playbook.to_dict(), indent=2), encoding="utf-8")
+    save_playbook(get_settings(), playbook)
 
 
 @playbook_app.command("show")
@@ -3349,22 +3359,15 @@ app.add_typer(memory_app, name="memory")
 
 def _semantic_embed() -> EmbedFn | None:
     """The gateway embedder when semantic memory is on, else None (keyword recall)."""
-    settings = get_settings()
-    if not settings.semantic_memory:
-        return None
-    from chimera.providers import LLMGateway
+    from chimera.evolution.wiring import semantic_embed
 
-    return LLMGateway(settings).embed
+    return semantic_embed(get_settings())
 
 
 def _memory_manager() -> MemoryManager:
-    from chimera.memory import MemoryManager, MemoryStore, SqliteMemoryStore
+    from chimera.evolution.wiring import build_memory_manager
 
-    settings = get_settings()
-    embed = _semantic_embed()
-    if settings.memory_backend == "sqlite":
-        return MemoryManager(SqliteMemoryStore(settings.home / "memory.db"), embed=embed)
-    return MemoryManager(MemoryStore(settings.home / "memory.json"), embed=embed)
+    return build_memory_manager(get_settings())
 
 
 def _learned_skill_labels(settings: Settings) -> list[str]:

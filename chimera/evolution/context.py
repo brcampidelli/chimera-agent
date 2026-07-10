@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from chimera.config import Settings
     from chimera.ecosystem.trajectory import TrajectoryCollector
     from chimera.governance.audit import AuditLog
-    from chimera.providers import LLMGateway
+    from chimera.providers.gateway import SupportsComplete
 
 
 @dataclass
@@ -75,7 +75,7 @@ class EvolutionContext:
 
 def build_evolution_context(
     settings: Settings,
-    gateway: LLMGateway,
+    gateway: SupportsComplete,
     model: str | None,
     *,
     home: Path,
@@ -86,16 +86,31 @@ def build_evolution_context(
     memory: Any = None,
     playbook: Playbook | None = None,
     skill_cards: bool | None = None,
+    include_memory: bool = False,
+    include_playbook: bool = False,
 ) -> EvolutionContext:
     """Assemble the six learning seams from settings — the single source of the flywheel wiring.
 
     Mirrors the inline block previously in ``chimera solve`` (A0, behaviour-preserving). ``memory`` and
-    ``playbook`` are injected by the caller (their construction pulls CLI-specific helpers); the other
+    ``playbook`` are injected by the caller (the CLI has its own env-gated construction); the other
     four are built here. ``skill_cards=None`` uses ``settings.skill_cards`` (today's default); pass an
     explicit bool to override (A1 couples reading to ``evolve_skills``).
+
+    ``include_memory``/``include_playbook`` (M19-A4): for the non-CLI autonomous paths (lanes,
+    workflow executors, lifecycle crew, the project orchestrator) that don't carry the CLI's env
+    gates, build the memory manager + ACE playbook from settings here — so those paths get the SAME
+    flywheel ``solve`` does. Ignored when the caller already injected a ``memory``/``playbook``.
     """
     from chimera.ecosystem.trajectory import TrajectoryCollector
 
+    if memory is None and include_memory:
+        from chimera.evolution.wiring import build_memory_manager
+
+        memory = build_memory_manager(settings)
+    if playbook is None and include_playbook:
+        from chimera.evolution.wiring import load_playbook
+
+        playbook = load_playbook(settings)
     use_cards = settings.skill_cards if skill_cards is None else skill_cards
     auto_evolver: AutoSkillEvolver | None = None
     if evolve_skills:

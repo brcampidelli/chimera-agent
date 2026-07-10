@@ -321,3 +321,95 @@ def test_dry_run_spends_no_worker_tokens(tmp_path: Path) -> None:
     assert plan["subtasks"] == ["Summarize doc A", "Summarize doc B"]
     assert plan["workers"] == 2
     assert not any(c["system"] == WORKER_SYSTEM for c in backend.calls)  # zero worker spend
+
+
+# ---------------------------------------------------------------------------
+# M19-A4: the hierarchy reads recalled facts into synthesis and records its runs
+# ---------------------------------------------------------------------------
+
+
+class _MemItem:
+    def __init__(self, content: str, provenance: str = "clean") -> None:
+        self.content = content
+        self.provenance = provenance
+
+
+class _FakeMemory:
+    def search(self, query: str, *, k: int = 5) -> list[_MemItem]:
+        return [_MemItem("prior fact: doc A dropped the retry flag")]
+
+
+class _UserRecordingBackend(FakeBackend):
+    """Also captures the USER prompt of each call (FakeBackend records only model+system)."""
+
+    def complete(self, messages: Any, **kwargs: Any) -> CompletionResult:
+        result = super().complete(messages, **kwargs)
+        user = ""
+        for m in messages:
+            data = m.as_dict() if isinstance(m, Message) else m
+            if data.get("role") == "user":
+                user = str(data.get("content", ""))
+        self.calls[-1]["user"] = user
+        return result
+
+
+def _orchestrator_with_evo(
+    backend: FakeBackend, tmp_path: Path, evolution: Any
+) -> HierarchicalOrchestrator:
+    store = ArtifactStore(tmp_path / "artifacts")
+    return HierarchicalOrchestrator(
+        backend,
+        weak_model=WEAK,
+        mid_model=MID,
+        top_model=TOP,
+        store=store,
+        verifier=EnvelopeVerifier(store=store, backend=None, spot_rate=0.0),
+        receipts_path=tmp_path / "delegations.jsonl",
+        evolution=evolution,
+    )
+
+
+def test_hierarchy_records_outcome_and_reads_recall(tmp_path: Path) -> None:
+    from chimera.evolution import EvolutionContext, ExperienceBuffer
+
+    exp = ExperienceBuffer(tmp_path / "exp.json")
+    evo = EvolutionContext(experience=exp, memory=_FakeMemory())
+    backend = _UserRecordingBackend()
+    orch = _orchestrator_with_evo(backend, tmp_path, evo)
+
+    result = orch.run(_READ_TASK)
+
+    assert result.answer == "Final synthesized answer."
+    # write half: the run was recorded as an experience lesson
+    rows = exp.all()
+    assert len(rows) == 1
+    assert rows[0].outcome == "success"
+    # read half: the recalled fact reached the synthesis prompt (top model), fenced as advisory
+    synth = [c for c in backend.calls if "Synthesize ONE final answer" in c["system"]]
+    assert synth and any("prior fact: doc A dropped the retry flag" in c.get("user", "") for c in synth)
+    assert any("Prior knowledge (advisory)" in c.get("user", "") for c in synth)
+    # the recalled fact must NOT contaminate the byte-identical worker prefix
+    worker_calls = [c for c in backend.calls if c["system"] == WORKER_SYSTEM]
+    assert worker_calls and all("prior fact" not in c.get("user", "") for c in worker_calls)
+
+
+def test_hierarchy_records_on_fallback(tmp_path: Path) -> None:
+    from chimera.evolution import EvolutionContext, ExperienceBuffer
+
+    exp = ExperienceBuffer(tmp_path / "exp.json")
+    evo = EvolutionContext(experience=exp)
+    backend = FakeBackend()
+    orch = _orchestrator_with_evo(backend, tmp_path, evo)
+
+    orch.run("What is the capital of France?")  # simple -> single-agent fallback
+
+    rows = exp.all()
+    assert len(rows) == 1  # the fallback answer is still recorded (telemetry only)
+
+
+def test_hierarchy_without_evolution_is_unchanged(tmp_path: Path) -> None:
+    # No evolution context -> no recall block, no recording: the default path is untouched.
+    backend = _UserRecordingBackend()
+    result = _orchestrator(backend, tmp_path).run(_READ_TASK)
+    assert result.answer == "Final synthesized answer."
+    assert all("Prior knowledge" not in c.get("user", "") for c in backend.calls)

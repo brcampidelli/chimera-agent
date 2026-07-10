@@ -36,6 +36,7 @@ def build_executors(*, workspace: Path, model: str | None = None) -> dict[str, S
         return StepResult(result.exit_code == 0, result.output[:_MAX_OUTPUT])
 
     def solve_step(step: WorkflowStep) -> StepResult:
+        from chimera.config import get_settings
         from chimera.core import (
             Agent,
             AgentConfig,
@@ -45,15 +46,23 @@ def build_executors(*, workspace: Path, model: str | None = None) -> dict[str, S
             WorkspaceGuard,
         )
         from chimera.core.verify import CommandVerifier
+        from chimera.evolution import build_evolution_context
         from chimera.tools import default_registry
 
         verify = step.with_.get("verify")
+        settings = get_settings()
         worker = Agent(gateway, default_registry(workspace), AgentConfig(model=model))
+        # M19-A4: a workflow solve step is an autonomous path — turn the flywheel on.
+        evo = build_evolution_context(
+            settings, gateway, model, home=settings.home,
+            include_memory=True, include_playbook=True,
+        )
         auto = AutonomousAgent(
             worker,
             planner=Planner(gateway, model),
             verifier=CommandVerifier(str(verify), workspace) if verify else None,
             guard=WorkspaceGuard(workspace),
+            **evo.apply_to(),
             config=AutonomousConfig(max_attempts=int(step.with_.get("max_attempts", 2))),
         )
         outcome = auto.run(str(step.with_.get("task", "")))

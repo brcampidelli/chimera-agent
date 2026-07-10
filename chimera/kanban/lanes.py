@@ -25,6 +25,7 @@ class SolveLane:
         self.max_attempts = max_attempts
 
     def run(self, card: KanbanCard) -> LaneResult:
+        from chimera.config import get_settings
         from chimera.core import (
             Agent,
             AgentConfig,
@@ -35,11 +36,19 @@ class SolveLane:
             WorkspaceGuard,
         )
         from chimera.core.verify import CommandVerifier
+        from chimera.evolution import build_evolution_context
         from chimera.providers import LLMGateway
         from chimera.tools import default_registry
 
         gateway = LLMGateway()
+        settings = get_settings()
         worker = Agent(gateway, default_registry(self.workspace), AgentConfig(model=self.model))
+        # M19-A4: a lane is an autonomous path too — turn the flywheel on (experience, skills,
+        # memory, playbook) so working a card learns exactly as `chimera solve` does.
+        evo = build_evolution_context(
+            settings, gateway, self.model, home=settings.home,
+            include_memory=True, include_playbook=True,
+        )
         auto = AutonomousAgent(
             worker,
             planner=Planner(gateway, self.model),
@@ -47,6 +56,7 @@ class SolveLane:
             verifier=CommandVerifier(card.verify, self.workspace) if card.verify else None,
             guard=WorkspaceGuard(self.workspace),
             spine_workspace=self.workspace,
+            **evo.apply_to(),
             config=AutonomousConfig(max_attempts=self.max_attempts),
         )
         result = auto.run(card.action)
