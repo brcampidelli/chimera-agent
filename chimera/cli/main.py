@@ -1650,6 +1650,85 @@ def cascade_bench(
     console.print(f"\nverdict: [{color}]{verdict}[/{color}] (cascade {cascade_rate:.0%} vs mid {mid_rate:.0%})")
 
 
+def _run_multistep_hierarchy_bench(gateway: Any, model: str, only: set[str], out: str | None) -> None:
+    """Multi-step hierarchy A/B: one growing context vs per-step scoped workers, over large docs.
+
+    The regime where the hierarchy actually saves tokens — the single agent re-sends every document on
+    every turn (cost ~ Q·ΣΣdocs), scoped workers pay each doc ~once. Also prices the MEASURED cache
+    reduction via the caching model (`cache_cost`) when the provider reports cache accounting.
+    """
+    import json as _json
+
+    from chimera.eval.cache_cost import dollar_cost, measured_dollar_reduction
+    from chimera.eval.hierarchy_ab import ArmOutcome, format_token_report, run_hierarchy_ab
+    from chimera.eval.hierarchy_multistep import (
+        MultiStepTask,
+        multistep_tasks,
+        run_baseline,
+        run_scoped,
+    )
+    from chimera.eval.paired import format_report
+    from chimera.fusion.receipts import resolve_price
+    from chimera.orchestration.receipts import estimate_tokens
+
+    tasks = [t for t in multistep_tasks() if not only or t.id in only]
+    if not tasks:
+        console.print("[red]No multi-step tasks matched.[/red]")
+        raise typer.Exit(code=1)
+    console.print(f"[dim]model={model} tasks={len(tasks)} (multi-step, large docs)[/dim]")
+    cache = {"base_cr": 0, "base_cw": 0, "scoped_cr": 0, "scoped_cw": 0, "base_reg": 0, "scoped_reg": 0}
+
+    def complete(messages: list[Any]) -> tuple[str, int, int, int]:
+        result = gateway.complete(messages, model=model)
+        tokens = (result.prompt_tokens or 0) + (result.completion_tokens or 0)
+        if tokens == 0:
+            tokens = estimate_tokens("".join(str(m["content"]) for m in messages) + (result.content or ""))
+        return (result.content or "", tokens, result.cache_read_tokens or 0, result.cache_write_tokens or 0)
+
+    def baseline(task: MultiStepTask) -> ArmOutcome:
+        run = run_baseline(task, complete)
+        cache["base_cr"] += run.cache_read
+        cache["base_cw"] += run.cache_write
+        cache["base_reg"] += run.tokens - run.cache_read
+        return ArmOutcome(passed=run.passed, tokens=run.tokens)
+
+    def treatment(task: MultiStepTask) -> ArmOutcome:
+        run = run_scoped(task, complete)
+        cache["scoped_cr"] += run.cache_read
+        cache["scoped_cw"] += run.cache_write
+        cache["scoped_reg"] += run.tokens - run.cache_read
+        return ArmOutcome(passed=run.passed, tokens=run.tokens)
+
+    report = run_hierarchy_ab(
+        tasks, restore=lambda _t: None, baseline=baseline, treatment=treatment,
+        baseline_name="single-context", treatment_name="scoped",
+    )
+    console.print(format_report(report.paired))
+    console.print(format_token_report(report))
+
+    # Turn the "caching narrows the win" caveat into a measured number when the provider reports it.
+    price = resolve_price(model)
+    total_cr = cache["base_cr"] + cache["scoped_cr"]
+    if price is not None and total_cr > 0:
+        base_usd = dollar_cost(regular_input=cache["base_reg"], output=0, cache_read=cache["base_cr"],
+                               input_per_m=price.input_per_m, output_per_m=price.output_per_m)
+        scoped_usd = dollar_cost(regular_input=cache["scoped_reg"], output=0, cache_read=cache["scoped_cr"],
+                                 input_per_m=price.input_per_m, output_per_m=price.output_per_m)
+        console.print(
+            f"[dim]measured dollar reduction (cache reads priced 0.1x): "
+            f"{measured_dollar_reduction(base_usd, scoped_usd):+.1%} "
+            f"(token reduction {report.summary().get('token_reduction')})[/dim]"
+        )
+    else:
+        console.print(
+            "[dim]no cache tokens reported — $ == tokens here; caching narrows the win only where the "
+            "provider caches the single agent's repeated context.[/dim]"
+        )
+    if out:
+        Path(out).write_text(_json.dumps(report.summary(), indent=2, default=str), encoding="utf-8")
+        console.print(f"[dim]wrote {out}[/dim]")
+
+
 @app.command(name="hierarchy-bench")
 def hierarchy_bench(
     model: str = typer.Option(None, "--model", "-m", help="Mid/worker model — BOTH arms use it, to isolate orchestration. Defaults to the tier ladder's mid."),
@@ -1657,12 +1736,17 @@ def hierarchy_bench(
     tasks: str = typer.Option("", "--tasks", help="Comma-separated task ids to filter (default: all 10 synthetic tasks)."),
     max_workers: int = typer.Option(4, "--max-workers", help="Max concurrent workers in the hierarchy arm."),
     out: str = typer.Option(None, "--out", help="Write the JSON summary to this path."),
+    multistep: bool = typer.Option(False, "--multistep", help="Run the MULTI-STEP suite instead (single growing context vs per-step scoped workers, over large docs) — the regime where the hierarchy actually saves tokens. Also reports a caching-aware dollar reduction."),
 ) -> None:
     """Paired A/B: single-agent (all docs inline) vs the hierarchy (one worker per doc). Calls real models.
 
     Both arms run on the SAME model so the comparison isolates the ORCHESTRATION (minimal-context
     scoping + budgets + contracts), not model strength. Quality = paired McNemar/Wilson (the only place
     "significant" appears); tokens = measured totals per arm, with no significance claim on cost.
+
+    `--multistep` switches to the companion suite where the token crossover lives: a single agent
+    re-sends every document on every turn (cost grows with turns), while scoped workers pay each doc
+    ~once — and prices the measured cache reduction via the caching model.
     """
     import json as _json
     import tempfile
@@ -1691,12 +1775,21 @@ def hierarchy_bench(
     mid = model or ladder.mid
     top = top_model or mid
     only = {t.strip() for t in tasks.split(",") if t.strip()}
+    gateway = LLMGateway()
+
+    if multistep:
+        try:
+            _run_multistep_hierarchy_bench(gateway, mid, only, out)
+        except MissingCredentialsError as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(code=1) from exc
+        return
+
     suite = [t for t in synthetic_tasks() if not only or t.id in only]
     if not suite:
         console.print(f"[red]No tasks matched {tasks!r}.[/red]")
         raise typer.Exit(code=1)
 
-    gateway = LLMGateway()
     workdir = Path(tempfile.mkdtemp(prefix="hierarchy-bench-"))
     console.print(f"[dim]model={mid} top={top} tasks={len(suite)} artifacts={workdir}[/dim]")
 
@@ -3944,6 +4037,61 @@ def bench_compare(
             "[dim]not significant — a larger task subset / more seeds, or the feature genuinely "
             "doesn't move the number. Report it honestly either way.[/dim]"
         )
+
+
+@app.command("transfer-gate")
+def transfer_gate(
+    tuned_baseline: str = typer.Argument(..., help="JSON pass/fail of the baseline on the TUNED slice (list of bools, or {task: bool})."),
+    tuned_treatment: str = typer.Argument(..., help="JSON pass/fail of the candidate on the TUNED slice (aligned, same order)."),
+    holdout_baseline: str = typer.Option(None, "--holdout-baseline", help="JSON pass/fail of the baseline on a DISJOINT same-capability holdout."),
+    holdout_treatment: str = typer.Option(None, "--holdout-treatment", help="JSON pass/fail of the candidate on the holdout (aligned)."),
+    require_significant: bool = typer.Option(False, "--require-significant", help="Require the tuned gain's paired CI to exclude 0, not just Δ>0."),
+    tol: float = typer.Option(0.0, "--tol", help="Max tolerated pass-rate drop on the holdout before promotion is blocked."),
+) -> None:
+    """Promote a learned change only if it helps its tuned slice AND doesn't regress a holdout.
+
+    Guards against *negative transfer* — a GEPA prompt / ACE delta / distilled skill that raises the pass
+    rate on the tasks it was tuned against but REGRESSES on other tasks sharing the capability. Feed the
+    tuned slice's paired pass/fail (baseline vs candidate) and, ideally, a disjoint same-capability
+    holdout's; the verdict is PROMOTE / BLOCK with the paired evidence (exit 1 on BLOCK, for CI).
+    Without a holdout it promotes on the tuned gain alone but flags that transfer was NOT measured.
+    """
+    import json
+
+    from chimera.eval.transfer import transfer_gated_promotion
+
+    def _load(path: str) -> list[bool]:
+        raw = json.loads(Path(path).read_text(encoding="utf-8"))
+        values = raw.values() if isinstance(raw, dict) else raw
+        return [bool(v) for v in values]
+
+    if (holdout_baseline is None) != (holdout_treatment is None):
+        console.print("[red]give BOTH --holdout-baseline and --holdout-treatment, or neither.[/red]")
+        raise typer.Exit(code=1)
+    try:
+        tb, tt = _load(tuned_baseline), _load(tuned_treatment)
+        hb = _load(holdout_baseline) if holdout_baseline else None
+        ht = _load(holdout_treatment) if holdout_treatment else None
+    except (OSError, json.JSONDecodeError) as exc:
+        console.print(f"[red]could not read results: {exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    decision = transfer_gated_promotion(
+        tuned_baseline=tb,
+        tuned_treatment=tt,
+        holdout_baseline=hb,
+        holdout_treatment=ht,
+        require_tuned_significant=require_significant,
+        holdout_regression_tol=tol,
+    )
+    verdict = "[green]PROMOTE[/green]" if decision.promote else "[red]BLOCK[/red]"
+    console.print(f"{verdict} — {decision.reason}")
+    if not decision.transfer_measured:
+        console.print(
+            "[yellow]transfer NOT measured (no holdout) — promotion rests on the tuned slice alone.[/yellow]"
+        )
+    if not decision.promote:
+        raise typer.Exit(code=1)
 
 
 @app.command("swe-bench-compare")

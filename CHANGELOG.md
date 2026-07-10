@@ -6,6 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **`chimera hierarchy-bench --multistep`** — the multi-step companion suite (a single growing context
+  vs per-step scoped workers, over large docs), the regime where the hierarchy *actually* saves tokens
+  (the single agent re-sends every document on every turn). Live-verified: **+66.5% token reduction** on
+  a sample task. Also prices the caching-aware dollar reduction via the caching model. This exposes the
+  `hierarchy_multistep` and `cache_cost` eval modules through the CLI (they were reachable only from the
+  external `bench/` scripts before).
+- **`chimera transfer-gate`** — promote a learned change (GEPA prompt / ACE delta / distilled skill) only
+  if it helps its tuned slice AND doesn't regress a disjoint same-capability holdout — guarding against
+  *negative transfer* (a change that memorizes its eval). Takes the tuned + optional holdout paired
+  pass/fail as JSON (like `bench-compare`), prints PROMOTE / BLOCK with the paired evidence, exits 1 on
+  BLOCK. Exposes the `eval/transfer.py` guard through the CLI (was test-only before).
+
 ## [0.16.1] - 2026-07-10
 
 **"Audit hardening."** A maintenance release from a full functional audit of the repo (3 parallel
