@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-07-09
+
+**"Trustworthy Verifier & Write Security."** The M18 cycle, grounded in an 8-category arXiv sweep
+(2026-07-09): five Tier-1 items that harden the weakest link in the "prove a weak model performs like
+a frontier one" thesis — the verifier — plus write-side security and a measured skill-lifecycle loop.
+Every item is an integration (never a reimplementation), opt-in, degrades safely, and is fake-tested.
+The headline (M18-1) shipped **with a measured paired A/B and an honest retraction**.
+
 ### Added
 - **PROBE — best-arm identification with a cheap-proxy control variate (`probe-select`)** — M18-5, from
   the arXiv sweep (arXiv 2607.06879). "Which model/config is best?" is a best-arm problem where each
