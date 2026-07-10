@@ -19,7 +19,7 @@ from chimera.skills.base import SkillResult
 from chimera.skills.llm_skill import LLMSkill
 
 SkillKind = Literal["pattern", "anti_pattern"]
-SkillStatus = Literal["active", "pending", "retired"]
+SkillStatus = Literal["active", "provisional", "pending", "retired"]
 Provenance = Literal["clean", "tainted"]
 
 _LEARNED_SYSTEM = (
@@ -126,6 +126,8 @@ class LearnedSkill(LLMSkill):
             status = "pending"
         elif raw_status == "retired":
             status = "retired"
+        elif raw_status == "provisional":
+            status = "provisional"
         provenance: Provenance = "tainted" if data.get("provenance") == "tainted" else "clean"
         return cls(
             name=str(data["name"]),

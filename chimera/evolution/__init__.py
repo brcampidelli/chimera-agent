@@ -22,6 +22,7 @@ from chimera.evolution.gepa import (
     optimize_template,
 )
 from chimera.evolution.learned_skill import LearnedSkill
+from chimera.evolution.lifecycle_policy import LifecycleDecisions, SkillLifecyclePolicy
 from chimera.evolution.playbook import (
     BackendDeltaProposer,
     Delta,
@@ -44,6 +45,8 @@ __all__ = [
     "format_lessons",
     "LearnedSkill",
     "SkillStore",
+    "SkillLifecyclePolicy",
+    "LifecycleDecisions",
     "SkillEvolver",
     "GEPAOptimizer",
     "GEPAResult",

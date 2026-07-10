@@ -92,9 +92,10 @@ class CardRetriever:
         self.last_retrieved: list[str] = []
 
     def card_context(self, task: str) -> str:
-        # Only ACTIVE skills are retrievable: a pending (possibly poisoned) skill must
-        # not influence reasoning until a human approves it.
-        cards = self.store.skills(status="active")
+        # Retrievable = active + provisional (M18-4): a provisional skill runs so it earns a measured
+        # track record for the lifecycle policy. A pending (possibly poisoned) or retired skill stays
+        # out until a human approves / it recovers.
+        cards = self.store.retrievable()
         if not cards:
             self.last_retrieved = []
             return ""

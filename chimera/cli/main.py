@@ -2115,6 +2115,8 @@ def solve(
                     SkillStore(settings.home / "skills.json"),
                     validator=SkillValidator(),
                     audit=allow_audit,
+                    # M18-4: born on measured probation when CHIMERA_PROVISIONAL_SKILLS is set.
+                    provisional=settings.provisional_skills,
                     # With fusion on and a real panel, evolve skills across the panel and
                     # keep the most transferable one (OpenClaw-Skill) instead of a
                     # single-model proposal.
@@ -2559,6 +2561,48 @@ def skills_retire(
     console.print(
         f"[green]Retired[/green] {len(targets)} skill(s) — excluded from retrieval, "
         "reactivate with: chimera skills-approve <name>"
+    )
+
+
+@app.command("skills-lifecycle")
+def skills_lifecycle(
+    apply: bool = typer.Option(False, "--apply", help="Actually promote/demote (default: dry-run preview)."),
+    promote_min_uses: int = typer.Option(5, "--promote-min-uses", help="Provisional probation length."),
+    promote_min_rate: float = typer.Option(0.7, "--promote-min-rate", help="Win rate to promote a provisional skill."),
+    demote_min_uses: int = typer.Option(5, "--demote-min-uses", help="Uses before a skill can be demoted."),
+    demote_max_rate: float = typer.Option(1 / 3, "--demote-max-rate", help="Win rate at/below which a skill is demoted."),
+) -> None:
+    """Run the measured skill-lifecycle loop (M18-4): promote proven provisionals, demote regressions.
+
+    Decisions come from the store's MEASURED usage stats (never a model's self-report): a provisional
+    skill that earns a high win rate over enough uses is promoted to active; a provisional that fails
+    probation or an active skill whose win rate regresses is retired (kept for review). Dry-run by
+    default; ``--apply`` closes the loop — cron it for a hands-off promote/demote cycle.
+    """
+    from chimera.evolution import SkillLifecyclePolicy, SkillStore
+
+    store = SkillStore(get_settings().home / "skills.json")
+    policy = SkillLifecyclePolicy(
+        promote_min_uses=promote_min_uses, promote_min_rate=promote_min_rate,
+        demote_min_uses=demote_min_uses, demote_max_rate=demote_max_rate,
+    )
+    decisions = policy.decide(store.stats())
+    if not decisions.promote and not decisions.demote:
+        console.print("[dim]No lifecycle changes — every skill is where the measured evidence puts it.[/dim]")
+        return
+    for name in decisions.promote:
+        console.print(f"[green]promote[/green] {name}  (provisional -> active: proven)")
+    for name in decisions.demote:
+        console.print(f"[red]demote[/red]  {name}  (-> retired: failed probation / regressed)")
+    if not apply:
+        console.print("\n[dim]Dry-run. Pass --apply to commit the promote/demote decisions.[/dim]")
+        return
+    for name in decisions.promote:
+        store.promote(name)
+    for name in decisions.demote:
+        store.retire(name)
+    console.print(
+        f"\n[green]Applied[/green] {len(decisions.promote)} promotion(s), {len(decisions.demote)} demotion(s)."
     )
 
 

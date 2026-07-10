@@ -160,6 +160,9 @@ class Settings(BaseSettings):
     # exposes for pure keyword search). Off by default — needs an embeddings-capable key.
     # On any embedder error, search falls back to the keyword/FTS path (never a hard fail). ---
     semantic_memory: bool = Field(default=False, validation_alias="CHIMERA_SEMANTIC_MEMORY")
+    # M18-4: birth newly-learned skills 'provisional' (retrieved on probation, then auto-promoted on a
+    # measured track record or demoted on regression). Off = new skills go straight to 'active' as before.
+    provisional_skills: bool = Field(default=False, validation_alias="CHIMERA_PROVISIONAL_SKILLS")
     embed_model: str = Field(
         default="openrouter/openai/text-embedding-3-small",
         validation_alias="CHIMERA_EMBED_MODEL",

@@ -125,6 +125,28 @@ class SkillStore:
         """Skills held for human review (e.g. distilled during a tainted run)."""
         return self.skills(status="pending")
 
+    def retrievable(
+        self, backend: SupportsComplete | None = None, model: str | None = None
+    ) -> list[LearnedSkill]:
+        """Skills eligible for retrieval: ``active`` plus ``provisional`` (on measured probation).
+
+        Provisional skills (M18-4) run so they accrue a real track record; the lifecycle policy then
+        promotes the ones that prove themselves and demotes the ones that don't. ``pending`` (held for
+        review) and ``retired`` stay excluded.
+        """
+        return [
+            s for s in self.skills(backend, model) if s.status in ("active", "provisional")
+        ]
+
+    def promote(self, name: str) -> bool:
+        """Promote a provisional skill to ``active`` (it passed measured probation). False if unknown."""
+        entry = self._dicts.get(name)
+        if entry is None:
+            return False
+        entry["status"] = "active"
+        self.save()
+        return True
+
     def approve(self, name: str) -> bool:
         """Activate a pending or retired skill after human review. Returns False if unknown.
 

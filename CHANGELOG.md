@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Measured skill-lifecycle loop — provisional tier + auto promote/demote** — M18-4, from the arXiv
+  sweep (arXiv 2607.07052, triple-corroborated; production −70% cost). Closes the loop Chimera half-had:
+  it could *signal* under-performing skills but applied retirement manually and had no promotion tier.
+  New skills can be born **`provisional`** (`CHIMERA_PROVISIONAL_SKILLS`, default off) — retrieved on
+  probation so they earn a real track record — and `chimera skills-lifecycle [--apply]` runs a
+  `SkillLifecyclePolicy` over the store's **measured** stats (never self-report): promote a provisional
+  that proves itself (≥N uses, high win rate) to active, demote a failed-probation provisional or a
+  regressed active skill to retired. Cron it for a hands-off promote/demote cycle. Default off = new
+  skills stay `active`, so nothing changes until you opt in. `chimera/evolution/lifecycle_policy.py`.
 - **Declared write-region for the file-writers (`solve --write-region`)** — M18-3, from the arXiv sweep
   (arXiv 2607.05483, PatchOptic). The workspace jail blocks writes *outside* the workspace, but nothing
   stopped a run from rewriting an *unrelated* file inside it — the injection→arbitrary-write attack ("a

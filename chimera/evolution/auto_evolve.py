@@ -50,12 +50,16 @@ class AutoSkillEvolver:
         collective: CollectiveSkillEvolver | None = None,
         min_transfer: float = 0.5,
         accept_mode: str = "point",
+        provisional: bool = False,
         audit: AuditLog | None = None,
     ) -> None:
         self.evolver = evolver
         self.store = store
         self.validator = validator
         self.audit = audit
+        # M18-4: when set, a clean-run skill is born 'provisional' (on measured probation) instead of
+        # active — the lifecycle policy promotes it once it proves itself, or demotes it if it doesn't.
+        self.provisional = provisional
         self.min_recurrences = min_recurrences
         # When a fusion panel is available, prefer a candidate proposed across the
         # panel and kept by cross-model transferability (OpenClaw-Skill) over a
@@ -82,6 +86,9 @@ class AutoSkillEvolver:
                     "taint_provenance",
                     {"artifact": "skill", "name": skill.name, "action": "held_pending"},
                 )
+        elif self.provisional:
+            skill.status = "provisional"
+            _log.debug("skill %s born PROVISIONAL (on measured probation)", skill.name)
         self.store.add(skill)
         return skill
 
