@@ -42,6 +42,7 @@ from chimera.core.spec_test import SpecTestGenerator, SpecTestVerifier
 from chimera.core.spine import assemble_spine
 from chimera.core.strong_verify import StrongVerifier
 from chimera.core.supervisor import Manager
+from chimera.core.task_normalizer import normalize_task
 from chimera.core.verify import Verifier
 from chimera.ecosystem.events import events_from_transcript
 from chimera.ecosystem.trajectory import TrajectoryCollector
@@ -117,6 +118,7 @@ class AutonomousConfig:
     max_attempts: int = 3
     use_planner: bool = True
     use_manager: bool = True
+    normalize_task: bool = False  # reshape a rambling bug-report task before planning (arXiv 2607.07593)
 
 
 @dataclass
@@ -270,8 +272,13 @@ class AutonomousAgent:
         # recurring success, an anti-pattern card on recurring failure)
         prior_successes = self._count_prior_successes(task)
         prior_failures = self._count_prior_failures(task)
+        # Bug-report normalization (arXiv 2607.07593): reshape a long, rambling bug-report task into a
+        # salient-facts-first form for the planner and worker prompt. Only the PROMPT text is
+        # normalized — the raw `task` stays the identity used for memory keys / experience below, so a
+        # normalized run still dedups against the same task. Deterministic no-op on non-bug or short tasks.
+        plan_task = normalize_task(task) if self.config.normalize_task else task
         plan = (
-            self.planner.plan(task, context=context)
+            self.planner.plan(plan_task, context=context)
             if self.planner and self.config.use_planner
             else None
         )
@@ -318,7 +325,7 @@ class AutonomousAgent:
         for index in range(start_index, self.config.max_attempts + 1):
             self._emit(_ev_attempt(index, self.config.max_attempts))
             snapshot = self.guard.snapshot() if self.guard else None
-            prompt = self._compose(task, plan, context, feedback)
+            prompt = self._compose(plan_task, plan, context, feedback)
             # Observed difficulty (issue #3): the first attempt uses the cost-aware worker;
             # once an attempt has failed (index > 1) the task has proven hard, so retries run
             # on the escalated fusion worker when one is given. Falls back to the same worker.
@@ -515,7 +522,7 @@ class AutonomousAgent:
                         task_ledger.add_guess((hint or vout or feedback)[:200])
                         task_ledger.note_replan()
                         plan = self.planner.plan(
-                            task, context="\n\n".join(p for p in (context, task_ledger.context()) if p)
+                            plan_task, context="\n\n".join(p for p in (context, task_ledger.context()) if p)
                         )
                         feedback = f"{feedback}\n\nRe-planned after repeated failure. {task_ledger.summary()}"
                         self._emit(_ev_status(f"re-planned after stall {task_ledger.summary()}"))

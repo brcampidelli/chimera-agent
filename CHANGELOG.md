@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Bug-report task normalizer (`solve --normalize-task`)** — Tier-2 from the arXiv sweep
+  (arXiv 2607.07593). A long, rambling bug report *hurts* an agent: narrative buries the few facts that
+  matter, and the paper measured that trimming it — surfacing the salient fields up front — improves
+  resolution. A deterministic, model-free normalizer runs **before planning**: when a task looks like a
+  bug report and is long enough to ramble, it extracts the salient sentences into a structured header
+  (location / error / expected-vs-actual / reproduce / fix-hint) and caps the original narrative. Only
+  the planner/worker *prompt* is normalized — the raw task stays the identity for memory keys and the
+  experience buffer, so a normalized run still dedups against the same task. Conservative: a non-bug or
+  short task, or one with no extractable fields, is returned unchanged. `chimera/core/task_normalizer.py`.
 - **TraceProbe anti-pattern detectors — auditable "why it failed" retry signals** — Tier-2 from the
   arXiv sweep (TraceProbe, arXiv 2607.06184). An outcome-only signal ("did verify pass?") never says
   *why* a hard attempt went wrong. Two cheap, deterministic detectors scan the per-step tool trace:

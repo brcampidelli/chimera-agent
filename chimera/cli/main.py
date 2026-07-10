@@ -1871,6 +1871,9 @@ def solve(
     probe_log: bool = typer.Option(
         False, "--probe-log", help="Log (arm, proxy=manager-judgment, reward=verified) per attempt to <home>/probe.jsonl for PROBE best-arm selection (see `chimera probe-select --from-log`). Needs --verify + a manager."
     ),
+    normalize_task: bool = typer.Option(
+        False, "--normalize-task", help="Reshape a long, rambling bug-report task into a salient-facts-first form (location/repro/expected-vs-actual/fix-hint) before planning. No-op on non-bug or short tasks."
+    ),
     playbook: bool = typer.Option(
         False, "--playbook", help="Inject the stored ACE strategy playbook into context, then curate it from this run's outcome (closed loop)."
     ),
@@ -2144,7 +2147,10 @@ def solve(
             # Durable execution (--thread): checkpoint the loop to SQLite so a crash can resume.
             checkpointer=RunCheckpointer(settings.home / "runs.db") if thread else None,
             config=AutonomousConfig(
-                max_attempts=max_attempts, use_planner=not no_plan, use_manager=not no_manager
+                max_attempts=max_attempts,
+                use_planner=not no_plan,
+                use_manager=not no_manager,
+                normalize_task=normalize_task,
             ),
         )
         outcome = auto.run(task, thread_id=thread)
