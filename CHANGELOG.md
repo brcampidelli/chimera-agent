@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-07-10
+
+**"Audit hardening."** A maintenance release from a full functional audit of the repo (3 parallel
+reviewers + live smoke tests across all three tiers). The audit found the core solid — 1295 tests,
+`mypy` fully green, `chimera maturity` 37/37 GA, `run`/`fuse`/`solve` verified end-to-end on real
+models — and closed the loose ends it surfaced: one shipped-but-unreachable safety feature, two
+dishonest feature-catalog entries, three commands that crashed instead of degrading, and an evolution
+gate that was narrower than it should be.
+
 ### Added
 - **`chimera hierarchy-bench`** — the hierarchy paired A/B (single-agent with all docs inline vs the
   orchestrator-worker hierarchy, one worker per doc, same model both arms to isolate the orchestration)
@@ -15,30 +24,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   significance claim on cost. `--tasks`, `--model`, `--top-model`, `--out`.
 
 ### Changed
-- **The aggregate cross-agent monitor is now ALWAYS ON for the fan-out commands** (`solve-batch`,
-  `crew-isolated`) — not just under `--taint`. Each parallel worker gets its own capability ledger and
-  the monitor runs over all of them after the batch (pure observability — recording changes no
-  behaviour; it only escalates a review note). `--taint` now controls the *stronger* per-worker
-  adaptive allowlist (dangerous-when-tainted tools require approval), independent of the monitor.
-  Documented with a firing example in `docs/security.md`.
-- **Aggregate cross-agent monitor is now WIRED into the fan-out commands** (`solve-batch`,
-  `crew-isolated`). A functional audit found the v0.16.0 `AggregateMonitor` was built + tested
-  but never connected to an orchestrator, so its split-exfiltration defense was unreachable in a real
-  fan-out run. Under `--taint` each isolated worker now gets its own `TaintLedger` (capability
-  provenance), and after the batch the aggregate monitor runs over all workers' events and reports any
+- **The aggregate cross-agent monitor now runs for the fan-out commands** (`solve-batch`,
+  `crew-isolated`) — the v0.16.0 `AggregateMonitor` was built + tested but connected to no orchestrator,
+  so its split-exfiltration defense was unreachable in a real run. Each parallel worker now gets its own
+  capability ledger, and after the batch the monitor runs over all of them and reports any
   **cross-agent-taint** (one worker fetched untrusted, a different worker sank it) or **fan-out-volume**
-  collusion — escalating to review, never blocking. Opt-in, mirrors `solve --taint`.
+  collusion. It is **always on** (pure observability — recording changes no behaviour; it only escalates
+  a review note, never blocks). `--taint` now controls only the *stronger* per-worker adaptive allowlist
+  (dangerous-when-tainted tools require approval), independent of the monitor. Firing example in
+  `docs/security.md`.
+- **Collective (cross-model) skill evolution now fires under `--cascade`, not just `--fuse`.** Both routes
+  reach fusion over the same multi-model panel at their reasoning peak, so a cascade run now also keeps
+  the most *transferable* skill proposal across the panel instead of a single-model one (shared
+  `panel_evolution` gate).
 
 ### Fixed
-- **Honest feature catalog** — `chimera features` no longer advertises two capabilities that had no
-  implementation: `computer_use` (no built-in tool, no dependency in any extra) is removed, and
-  `voice_mode` ("full voice conversation") is renamed to `speech_io` and described accurately as the
-  `transcribe_audio` (STT) + `text_to_speech` (TTS) building-block tools that actually exist.
+- **Honest feature catalog** — `chimera features` no longer advertises capabilities that don't exist:
+  `computer_use` (no built-in tool, no dependency in any extra) is removed; `voice_mode` ("full voice
+  conversation") is renamed to `speech_io` and described accurately as the `transcribe_audio` (STT) +
+  `text_to_speech` (TTS) building-block tools that exist; and `x_search` / `spotify` are labelled
+  "pluggable via the OpenAPI→tool importer (no built-in tool)".
 - **Graceful missing-key handling** for `skills-evolve`, `playbook curate`, and `rubric-grade` — these
   three model-calling commands previously surfaced an uncaught `MissingCredentialsError` traceback;
   they now print the same clean "No provider key configured" message and exit as every other command.
 - **`mypy chimera` is fully green** (219 files) — resolved 3 long-standing type-narrowing errors in the
   scrape module (all runtime-safe `dict.get()`-called-twice patterns, now bound to a local first).
+- Added a test for the messaging missing-extra install hint (a previously untested degradation path).
 
 ## [0.16.0] - 2026-07-09
 

@@ -2097,6 +2097,12 @@ def solve(
         if fuse:
             planner_backend = engine
 
+    # Collective (cross-model) skill evolution is meaningful whenever the run's reasoning peak is
+    # fusion over a multi-model panel — true for BOTH --fuse and --cascade (the cascade's top rung is
+    # the same fusion panel). Share the gate instead of tying it to --fuse alone (P2-cascade), so a
+    # cascade run keeps the most transferable proposal across the panel, not a single-model one.
+    panel_evolution = (fuse or cascade or settings.cascade) and len(settings.fusion_panel) >= 2
+
     # ACE playbook (--playbook): load the stored playbook once so it is injected into the run
     # and curated back afterwards. Kept outside _run_solve so the worktree path doesn't shadow it.
     stored_playbook = _load_playbook() if playbook else None
@@ -2211,12 +2217,12 @@ def solve(
                     audit=allow_audit,
                     # M18-4: born on measured probation when CHIMERA_PROVISIONAL_SKILLS is set.
                     provisional=settings.provisional_skills,
-                    # With fusion on and a real panel, evolve skills across the panel and
-                    # keep the most transferable one (OpenClaw-Skill) instead of a
-                    # single-model proposal.
+                    # With fusion reachable (--fuse OR --cascade) over a real panel, evolve skills
+                    # across the panel and keep the most transferable one (OpenClaw-Skill) instead
+                    # of a single-model proposal. See `panel_evolution` above.
                     collective=(
                         CollectiveSkillEvolver(gateway, settings.fusion_panel, validator=SkillValidator())
-                        if fuse and len(settings.fusion_panel) >= 2
+                        if panel_evolution
                         else None
                     ),
                     accept_mode=settings.skill_accept_mode,
