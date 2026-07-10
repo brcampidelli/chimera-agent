@@ -170,3 +170,20 @@ BENCH_MODEL=openrouter/meta-llama/llama-3.1-8b-instruct BENCH_ARM=chimera \
 chimera bench-compare results/ci-baseline.json results/ci-chimera.json \
   --baseline-name raw-8B --treatment-name chimera-8B
 ```
+
+---
+
+## M18-1 gate A/B — coverage-grade vs spec-grounded generated tests (PRE-REGISTERED 2026-07-09)
+
+**Regime:** `solve` with NO `--verify`. Two arms differ ONLY in the gate: `--checklist` (LLM coverage
+grade) vs `--gen-tests` (executable spec tests). Same model (mistral-small-3.2-24b, goldilocks), same
+scaffolding, paired fresh workspace per arm. The task's hidden test is withheld from solve and written
+only to grade — no leak.
+
+**Predictions (registered before the run):**
+1. **False positives** (gate says "success" but the hidden test fails) — gen-tests **< coverage-grade**.
+   This is the core M18-1 claim (executable spec tests catch wrong code the coverage grade rubber-stamps).
+2. **Resolve rate** (hidden test passes) — gen-tests **≥ coverage-grade**, but on a weak model both may
+   sit near the floor; the discriminating signal is #1, not necessarily a significant resolve-rate lift.
+3. n=6 is small; the paired McNemar/Wilson may well be non-significant. Report as-is, no re-roll.
+

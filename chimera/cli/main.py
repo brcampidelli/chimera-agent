@@ -1460,6 +1460,9 @@ def orchestrate(
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Show classification + decomposition + estimate; zero worker spend."
     ),
+    verify_model: str = typer.Option(
+        None, "--verify-model", help="Model slug for the spot-check auditor (a DISTINCT/cross-provider model that grades a worker's summary against its raw output). Default: the weak tier."
+    ),
 ) -> None:
     """Hierarchical run: top model decomposes/synthesizes, budgeted mid workers execute.
 
@@ -1486,6 +1489,7 @@ def orchestrate(
         mid_model=ladder.mid,
         top_model=ladder.top,
         store=ArtifactStore(Path(settings.home) / "artifacts"),
+        verifier_model=verify_model,
         fusion=FusionEngine(gateway),
         receipts_path=Path(settings.home) / "delegations.jsonl",
         config=HierarchyConfig(

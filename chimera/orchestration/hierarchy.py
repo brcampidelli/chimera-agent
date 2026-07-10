@@ -173,6 +173,7 @@ class HierarchicalOrchestrator:
         top_model: str,
         store: ArtifactStore,
         verifier: EnvelopeVerifier | None = None,
+        verifier_model: str | None = None,
         fusion: SupportsComplete | None = None,
         receipts_path: Path | None = None,
         config: HierarchyConfig | None = None,
@@ -182,8 +183,11 @@ class HierarchicalOrchestrator:
         self.mid_model = mid_model
         self.top_model = top_model
         self.store = store
+        # M18-2: the spot-check auditor runs on `verifier_model` when given — a DISTINCT model slug
+        # (cross-provider via the router) so it doesn't grade its own family's output. Defaults to the
+        # weak model, which already differs from the mid-tier worker it audits.
         self.verifier = verifier or EnvelopeVerifier(
-            store=store, backend=gateway, model=weak_model,
+            store=store, backend=gateway, model=weak_model, verifier_model=verifier_model,
             spot_rate=(config or HierarchyConfig()).spot_rate,
         )
         self.fusion = fusion

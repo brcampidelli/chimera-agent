@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Cross-provider, decomposed envelope auditing** — M18-2, from the arXiv sweep
+  (arXiv 2607.00563 + 2607.06799). The `EnvelopeVerifier`'s spot check now (a) grades three named
+  failure classes separately — **invented / dropped / contradiction** — instead of one holistic
+  verdict (a single verdict under-discriminates), and (b) can run the auditor on a **distinct model**
+  (`verifier_model` / `orchestrate --verify-model`), a cross-provider slug via the router, so a model
+  doesn't grade its own family's output (measured: cross-provider auditing beats a same-model judge,
+  and fine-tuned verifiers overfit). The auditor already re-derives its verdict from the raw artifact
+  and never trusts the summary's self-report; this makes that posture explicit and independent.
+  `chimera/orchestration/envelope_verify.py`, `hierarchy.py`. Back-compatible (legacy holistic verdicts
+  still parse).
 - **Spec-grounded test generation (`solve --gen-tests`)** — M18-1, from the arXiv sweep
   (arXiv 2607.06636). When `solve` has no `--verify` command, the fitness gate falls back to an LLM
   judging coverage — a proxy that rubber-stamps wrong code (a false positive that corrupts the gate).

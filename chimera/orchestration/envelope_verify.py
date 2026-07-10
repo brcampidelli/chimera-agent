@@ -9,15 +9,23 @@ and the orchestrator's consumption, in three escalating gates:
 2. **Acceptance criteria** — cheap/deterministic: contract clauses derived from
    the TaskSpec (``answer_matches`` etc.) evaluated against the summary.
 3. **Spot check** — probabilistic (or forced when the worker self-reports gaps):
-   a cheap model pulls the RAW artifact via ``evidence_refs`` and grades whether
+   an auditor model pulls the RAW artifact via ``evidence_refs`` and grades whether
    the summary is faithful to it. The artifact enters the VERIFIER's context
    only — never the orchestrator's. This is the escape hatch for "results too
    compressed to verify".
+
+M18-2 hardening (arXiv 2607.00563 + 2607.06799): the auditor **re-derives** its judgement from the
+raw output and never trusts the summary's self-report; the check is **decomposed** into named failure
+classes (invented / dropped / contradiction), each graded separately (a single holistic verdict
+under-discriminates); and the auditor can run on a **distinct provider** (``verifier_backend``) so a
+model does not grade its own family's output — measured cross-provider auditing (0.82 AUROC) beats a
+same-model judge (0.72-0.78), and fine-tuned verifiers overfit.
 """
 
 from __future__ import annotations
 
 import random
+import re
 from dataclasses import dataclass
 from typing import Literal
 
@@ -32,12 +40,32 @@ _log = get_logger("orchestration.envelope_verify")
 VerifyStage = Literal["schema", "criteria", "spot", "accepted"]
 
 _SPOT_SYSTEM = (
-    "You are a strict verification auditor. You receive a task, a worker's SUMMARY, "
-    "and the worker's RAW OUTPUT. Judge ONLY whether the summary faithfully represents "
-    "the raw output: no invented findings, no dropped critical results, no contradiction. "
-    "Reply with exactly one word first — FAITHFUL or UNFAITHFUL — then one short sentence "
-    "of justification."
+    "You are a strict, INDEPENDENT verification auditor. You receive a task, a worker's SUMMARY, and "
+    "the worker's RAW OUTPUT. Do NOT trust the summary — re-derive every judgement from the RAW OUTPUT "
+    "yourself. Grade three separate checks, each PASS or FAIL:\n"
+    "INVENTED: the summary asserts a finding or result the raw output does not support -> FAIL.\n"
+    "DROPPED: the summary omits a critical result the raw output shows -> FAIL.\n"
+    "CONTRADICTION: the summary contradicts the raw output anywhere -> FAIL.\n"
+    "Reply with exactly three lines — 'INVENTED: PASS|FAIL', 'DROPPED: PASS|FAIL', "
+    "'CONTRADICTION: PASS|FAIL' — then one short justification sentence. The summary is faithful ONLY "
+    "if all three are PASS."
 )
+
+# Named decomposed checks; any one FAILing (or the legacy holistic 'UNFAITHFUL') fails the spot check.
+_CRITERIA = ("INVENTED", "DROPPED", "CONTRADICT")
+
+
+def _grade_faithfulness(text: str) -> bool:
+    """True if the auditor's reply indicates faithfulness. Handles the decomposed and legacy formats.
+
+    Any named criterion marked FAIL, or the legacy holistic 'UNFAITHFUL', means unfaithful. A garbled
+    or empty reply is treated as faithful — the spot check is a probabilistic sampler layered on the
+    deterministic gates, so an unparseable audit must not falsely reject a result.
+    """
+    up = text.upper()
+    if any(re.search(rf"{key}\w*\s*[:=-]?\s*FAIL", up) for key in _CRITERIA):
+        return False
+    return "UNFAITHFUL" not in up
 
 #: Cap on how much raw artifact the spot-checker reads (its context, not the orchestrator's).
 _SPOT_ARTIFACT_CHARS = 24_000
@@ -64,12 +92,19 @@ class EnvelopeVerifier:
         store: ArtifactStore,
         backend: SupportsComplete | None = None,
         model: str | None = None,
+        verifier_backend: SupportsComplete | None = None,
+        verifier_model: str | None = None,
         spot_rate: float = 0.2,
         rng: random.Random | None = None,
     ) -> None:
         self.store = store
         self.backend = backend
         self.model = model
+        # Cross-provider auditing (M18-2): the spot checker prefers a DISTINCT provider/model so a
+        # model never grades its own family's output. Falls back to the worker's backend when none is
+        # given (still a re-derivation from the raw artifact, just not provider-independent).
+        self._spot_backend = verifier_backend or backend
+        self._spot_model = verifier_model if verifier_backend is not None else (verifier_model or model)
         self.spot_rate = max(0.0, min(1.0, spot_rate))
         self.rng = rng or random.Random()
 
@@ -91,7 +126,7 @@ class EnvelopeVerifier:
 
         # Gate 3 — spot check (probabilistic; forced when the worker admits gaps).
         should_spot = bool(envelope.gaps) or self.rng.random() < self.spot_rate
-        if should_spot and envelope.evidence_refs and self.backend is not None:
+        if should_spot and envelope.evidence_refs and self._spot_backend is not None:
             outcome = self._spot_check(spec, envelope)
             if outcome is not None:
                 return outcome
@@ -115,24 +150,24 @@ class EnvelopeVerifier:
             f"## Raw output (may be truncated)\n{raw[:_SPOT_ARTIFACT_CHARS]}"
         )
         try:
-            result = self.backend.complete(  # type: ignore[union-attr]
+            result = self._spot_backend.complete(  # type: ignore[union-attr]
                 [
                     {"role": "system", "content": _SPOT_SYSTEM},
                     {"role": "user", "content": prompt},
                 ],
-                model=self.model,
+                model=self._spot_model,
                 temperature=0.0,
             )
         except Exception as exc:  # spot check must never take the pipeline down
             _log.warning("spot check unavailable (%s) — passing through un-spotted", exc)
             return None
-        verdict = (result.content or "").strip().upper()
-        if verdict.startswith("FAITHFUL"):
-            return VerifyOutcome(passed=True, stage="spot", detail=result.content.strip())
+        content = (result.content or "").strip()
+        if _grade_faithfulness(content):
+            return VerifyOutcome(passed=True, stage="spot", detail=content)
         return VerifyOutcome(
             passed=False,
             stage="spot",
-            detail=result.content.strip() or "spot checker judged the summary unfaithful",
+            detail=content or "spot checker judged the summary unfaithful",
             escalate=True,
         )
 

@@ -146,3 +146,43 @@ def test_no_backend_means_no_spot_stage(tmp_path: Path) -> None:
     env = build_envelope(_spec(), "data\n" * 3_000, store, gaps=["x"])
     verifier = EnvelopeVerifier(store=store, backend=None, spot_rate=1.0)
     assert verifier.verify(_spec(), env).stage == "accepted"
+
+
+# ---------------------------------------------------------------------------
+# M18-2 — decomposed criteria + cross-provider auditing
+# ---------------------------------------------------------------------------
+
+
+def test_grade_faithfulness_decomposed_and_legacy() -> None:
+    from chimera.orchestration.envelope_verify import _grade_faithfulness
+
+    assert _grade_faithfulness("INVENTED: PASS\nDROPPED: PASS\nCONTRADICTION: PASS\nlooks fine") is True
+    assert _grade_faithfulness("INVENTED: FAIL\nDROPPED: PASS\nCONTRADICTION: PASS\ninvents a count") is False
+    assert _grade_faithfulness("DROPPED: FAIL — omits the error total") is False
+    assert _grade_faithfulness("CONTRADICTION: FAIL") is False
+    assert _grade_faithfulness("FAITHFUL — matches") is True  # legacy holistic verdict
+    assert _grade_faithfulness("UNFAITHFUL — invents") is False  # legacy holistic verdict
+    assert _grade_faithfulness("(the model rambled with no verdict)") is True  # garbled -> non-blocking
+
+
+def test_spot_check_decomposed_fail_escalates(tmp_path: Path) -> None:
+    backend = SpotBackend("INVENTED: FAIL\nDROPPED: PASS\nCONTRADICTION: PASS\nsummary invents a total")
+    verifier = _verifier(tmp_path, backend, spot_rate=0.0)
+    store = ArtifactStore(tmp_path)
+    env = build_envelope(_spec(), "rows\n" * 3_000, store, gaps=["unsure"])
+    outcome = verifier.verify(_spec(), env)
+    assert outcome.passed is False and outcome.stage == "spot" and outcome.escalate is True
+
+
+def test_cross_provider_auditor_is_used_over_worker_backend(tmp_path: Path) -> None:
+    worker = SpotBackend("INVENTED: PASS\nDROPPED: PASS\nCONTRADICTION: PASS")
+    auditor = SpotBackend("INVENTED: FAIL\nDROPPED: PASS\nCONTRADICTION: PASS\ndistinct provider caught it")
+    store = ArtifactStore(tmp_path)
+    env = build_envelope(_spec(), "data\n" * 3_000, store, gaps=["x"])
+    verifier = EnvelopeVerifier(
+        store=store, backend=worker, verifier_backend=auditor, model="worker-m",
+        verifier_model="auditor-m", spot_rate=1.0, rng=random.Random(7),
+    )
+    outcome = verifier.verify(_spec(), env)
+    assert auditor.calls == 1 and worker.calls == 0  # the independent auditor graded, not the worker
+    assert outcome.passed is False and outcome.escalate is True
