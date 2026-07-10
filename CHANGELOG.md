@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Panel-independence metric + blind-panel guard** — Tier-2 from the arXiv sweep (blind panel,
+  arXiv 2607.02507, corroborating MALLM 2607.05477: *independent* generation before deliberation lifts
+  quality; under pressure a non-blind panel's public/off-record answers diverged 3%→40%). Chimera's
+  fusion panel is **already blind by construction** — each model answers the same prompt with no sight
+  of the others — so this doesn't *add* blindness; it **formalizes and protects** it: a regression-guard
+  test asserts no panel member's prompt ever contains another member's answer, and `FusionTrace.panel_diversity()`
+  exposes the "panel independence" axis (mean pairwise dissimilarity of the panel's answers) so a run can
+  see whether that independence actually paid off (high = genuinely different perspectives for synthesis;
+  low = convergence, the cheap early-stop/vote territory).
 - **Task-typed fusion aggregation — vote vs synthesize by task type (`CHIMERA_FUSION_TASK_TYPED`)** —
   Tier-2 from the arXiv sweep (MALLM, arXiv 2607.05477). The best way to *aggregate* a multi-model
   panel depends on the task: a single-verifiable-answer task (arithmetic, counting, multiple-choice,

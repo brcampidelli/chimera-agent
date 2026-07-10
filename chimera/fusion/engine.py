@@ -91,6 +91,26 @@ class FusionTrace:
     def successful_panel(self) -> list[PanelResponse]:
         return [r for r in self.panel if r.error is None]
 
+    def panel_diversity(self) -> float | None:
+        """Mean pairwise dissimilarity (0..1) of the successful panel answers — the panel-independence
+        axis (MALLM / blind-panel, arXiv 2607.05477 + 2607.02507).
+
+        The fusion panel is blind by construction — each model answers the same prompt with no sight of
+        the others (:meth:`FusionEngine._run_panel`), so its answers are independent. This quantifies how
+        much that independence *paid off*: high diversity means the panel brought genuinely different
+        perspectives (synthesis has material to work with); low diversity means it converged (agreement —
+        the cheap early-stop / vote territory). ``None`` with fewer than two successful answers.
+        """
+        texts = [_normalize_ws(r.content) for r in self.panel if r.error is None]
+        if len(texts) < 2:
+            return None
+        dissims = [
+            1.0 - difflib.SequenceMatcher(None, a, b).ratio()
+            for i, a in enumerate(texts)
+            for b in texts[i + 1 :]
+        ]
+        return sum(dissims) / len(dissims)
+
     def prompt_tokens(self) -> int | None:
         """Total input tokens across stages, or ``None`` if no stage reported usage."""
         return _sum_opt(u.prompt_tokens for u in self.usage)
