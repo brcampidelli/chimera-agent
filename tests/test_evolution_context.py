@@ -75,6 +75,38 @@ def test_skill_cards_toggle(tmp_path: Path) -> None:
     assert isinstance(from_settings.cards, CardRetriever)
 
 
+def test_couple_read_off_by_default_leaves_cards_off(tmp_path: Path) -> None:
+    # A1 flip-point default OFF: evolving skills does NOT imply reading them (unchanged behaviour).
+    ctx = build_evolution_context(
+        _settings(), _FakeGateway(), "m", home=tmp_path, evolve_skills=True
+    )
+    assert ctx.cards is None
+
+
+def test_couple_read_on_couples_reading_to_evolving(tmp_path: Path) -> None:
+    # With the flip-point ON, a run that can mint a skill also reads the retrieved cards.
+    on = build_evolution_context(
+        _settings(CHIMERA_SKILL_CARDS_READ="true"),
+        _FakeGateway(), "m", home=tmp_path, evolve_skills=True,
+    )
+    assert isinstance(on.cards, CardRetriever)
+    # ...but with evolving OFF and no independent skill_cards, reading stays off.
+    off = build_evolution_context(
+        _settings(CHIMERA_SKILL_CARDS_READ="true"),
+        _FakeGateway(), "m", home=tmp_path, evolve_skills=False,
+    )
+    assert off.cards is None
+
+
+def test_explicit_skill_cards_override_wins_over_couple(tmp_path: Path) -> None:
+    # An explicit skill_cards=False beats the couple flag (used to force reading off).
+    ctx = build_evolution_context(
+        _settings(CHIMERA_SKILL_CARDS_READ="true"),
+        _FakeGateway(), "m", home=tmp_path, evolve_skills=True, skill_cards=False,
+    )
+    assert ctx.cards is None
+
+
 def test_memory_and_playbook_are_injected(tmp_path: Path) -> None:
     sentinel_memory = object()
     ctx = build_evolution_context(

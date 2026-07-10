@@ -111,7 +111,17 @@ def build_evolution_context(
         from chimera.evolution.wiring import load_playbook
 
         playbook = load_playbook(settings)
-    use_cards = settings.skill_cards if skill_cards is None else skill_cards
+    # Card reading resolution (M19-A1). Explicit override wins. Otherwise: with the flip-point
+    # ``skill_cards_couple_read`` ON, reading couples to ``evolve_skills`` (a run that can mint a
+    # skill also reads the retrieved ones — the A1 default once skillcard-bench justifies it); with
+    # it OFF (today's default), fall back to the independent ``skill_cards`` toggle. Behaviour is
+    # unchanged until the flip-point flag is set.
+    if skill_cards is not None:
+        use_cards = skill_cards
+    elif settings.skill_cards_couple_read:
+        use_cards = evolve_skills or settings.skill_cards
+    else:
+        use_cards = settings.skill_cards
     auto_evolver: AutoSkillEvolver | None = None
     if evolve_skills:
         auto_evolver = AutoSkillEvolver(

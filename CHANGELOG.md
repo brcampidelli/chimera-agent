@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **M19-A1 (mechanism) — the flip-point to couple skill *reading* to skill *evolving*.** A new
+  `CHIMERA_SKILL_CARDS_READ` setting: when on, retrieving learned skill cards couples to the same
+  condition that lets a run mint a skill (a run that can *write* a skill also *reads* the retrieved
+  ones), instead of the independent `CHIMERA_SKILL_CARDS` toggle. **Default OFF** — the mechanism is
+  wired and tested, but the default is not flipped until a paired `chimera skillcard-bench` shows
+  Δ ≥ 0 (no flipping a default by faith). When flipped, pair it with `CHIMERA_PROVISIONAL_SKILLS` +
+  the lifecycle cron so a misfiring card is born on probation and auto-demoted by measured stats.
 - **M19-A4 — the flywheel now turns on every autonomous path, not just `chimera solve`.** The kanban
   lanes, workflow `solve` steps, and the SDLC lifecycle crew now build the same six learning seams
   `solve` does (via `build_evolution_context(..., include_memory=True, include_playbook=True)`), so
