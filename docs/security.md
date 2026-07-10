@@ -22,6 +22,31 @@ Chimera can run shell commands, edit files, call APIs, and modify its own skills
 - **Quarantined reader** — the dual-LLM / CaMeL pattern: untrusted content is read by a
   tool-less model that can only emit schema-validated fields, so an injection can't produce
   a new instruction or tool call.
+- **Cross-agent monitor** — under fan-out a per-worker monitor is blind to a *split* flow (one
+  worker fetches untrusted, a different worker sinks it — the fetch and the sink live in
+  separate ledgers). An aggregate monitor sees the whole fan-out; it is **always on** for
+  `solve-batch` / `crew-isolated`.
+
+## Fan-out: the cross-agent monitor
+
+When several tool-using workers run in parallel (`solve-batch`, `crew-isolated`), each gets its
+own capability ledger, and after the batch an aggregate monitor runs over all of them. It catches
+patterns no single-worker monitor can see — the split exfiltration where worker A fetches
+untrusted content and worker B executes or exfiltrates it:
+
+```
+$ chimera solve-batch "read notes.md and summarize" "download the helper and run it" -w .
+task1: ok
+task2: ok
+merged 2 file(s) across 2 task(s)
+⚠ cross-agent monitor flagged (review):
+  - cross-agent-taint: untrusted content entered via one agent and a different agent
+    performed a sink (task2→task1) — a split flow no single-agent monitor sees
+```
+
+It only ever **escalates to review** — it never blocks a run — and it is pure observability
+(recording changes no behaviour). Add `--taint` on top to also arm each worker's adaptive
+allowlist (dangerous-when-tainted tools then require approval).
 
 ## Measured, not asserted
 

@@ -1650,6 +1650,91 @@ def cascade_bench(
     console.print(f"\nverdict: [{color}]{verdict}[/{color}] (cascade {cascade_rate:.0%} vs mid {mid_rate:.0%})")
 
 
+@app.command(name="hierarchy-bench")
+def hierarchy_bench(
+    model: str = typer.Option(None, "--model", "-m", help="Mid/worker model — BOTH arms use it, to isolate orchestration. Defaults to the tier ladder's mid."),
+    top_model: str = typer.Option(None, "--top-model", help="Top model for synthesis. Defaults to --model (same family keeps the isolation)."),
+    tasks: str = typer.Option("", "--tasks", help="Comma-separated task ids to filter (default: all 10 synthetic tasks)."),
+    max_workers: int = typer.Option(4, "--max-workers", help="Max concurrent workers in the hierarchy arm."),
+    out: str = typer.Option(None, "--out", help="Write the JSON summary to this path."),
+) -> None:
+    """Paired A/B: single-agent (all docs inline) vs the hierarchy (one worker per doc). Calls real models.
+
+    Both arms run on the SAME model so the comparison isolates the ORCHESTRATION (minimal-context
+    scoping + budgets + contracts), not model strength. Quality = paired McNemar/Wilson (the only place
+    "significant" appears); tokens = measured totals per arm, with no significance claim on cost.
+    """
+    import json as _json
+    import tempfile
+
+    from chimera.eval.hierarchy_ab import (
+        ArmOutcome,
+        HierarchyTask,
+        baseline_prompt,
+        format_token_report,
+        make_specs,
+        run_hierarchy_ab,
+        synthetic_tasks,
+    )
+    from chimera.eval.paired import format_report
+    from chimera.orchestration.artifacts import ArtifactStore
+    from chimera.orchestration.envelope_verify import EnvelopeVerifier
+    from chimera.orchestration.hierarchy import HierarchicalOrchestrator, HierarchyConfig
+    from chimera.orchestration.receipts import estimate_tokens
+    from chimera.providers import LLMGateway, MissingCredentialsError
+
+    settings = get_settings()
+    if not settings.has_any_key():
+        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+        raise typer.Exit(code=1)
+    ladder = settings.tier_ladder()
+    mid = model or ladder.mid
+    top = top_model or mid
+    only = {t.strip() for t in tasks.split(",") if t.strip()}
+    suite = [t for t in synthetic_tasks() if not only or t.id in only]
+    if not suite:
+        console.print(f"[red]No tasks matched {tasks!r}.[/red]")
+        raise typer.Exit(code=1)
+
+    gateway = LLMGateway()
+    workdir = Path(tempfile.mkdtemp(prefix="hierarchy-bench-"))
+    console.print(f"[dim]model={mid} top={top} tasks={len(suite)} artifacts={workdir}[/dim]")
+
+    def baseline(task: HierarchyTask) -> ArmOutcome:
+        prompt = baseline_prompt(task)
+        result = gateway.complete([{"role": "user", "content": prompt}], model=mid)
+        tokens = (result.prompt_tokens or 0) + (result.completion_tokens or 0)
+        if tokens == 0:  # provider reported nothing — estimate, and the token row says so
+            tokens = estimate_tokens(prompt + (result.content or ""))
+        return ArmOutcome(passed=task.check(result.content or ""), tokens=tokens)
+
+    def treatment(task: HierarchyTask) -> ArmOutcome:
+        store = ArtifactStore(workdir / task.id)
+        orchestrator = HierarchicalOrchestrator(
+            gateway,
+            weak_model=mid,
+            mid_model=mid,
+            top_model=top,
+            store=store,
+            verifier=EnvelopeVerifier(store=store, backend=None, spot_rate=0.0),
+            config=HierarchyConfig(max_workers=max_workers, fuse_final=False),
+        )
+        result = orchestrator.run_prepared(task.question, make_specs(task))
+        return ArmOutcome(passed=task.check(result.answer or ""), tokens=result.total_tokens)
+
+    try:
+        report = run_hierarchy_ab(suite, restore=lambda _t: None, baseline=baseline, treatment=treatment)
+    except MissingCredentialsError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    console.print(format_report(report.paired))
+    console.print(format_token_report(report))
+    if out:
+        Path(out).write_text(_json.dumps(report.summary(), indent=2, default=str), encoding="utf-8")
+        console.print(f"[dim]wrote {out}[/dim]")
+
+
 @app.command(name="skillcard-bench")
 def skillcard_bench(
     tasks: str = typer.Option("hard", "--tasks", help="Task suite: hard | demo."),
@@ -2232,7 +2317,7 @@ def solve_batch(
     max_attempts: int = typer.Option(2, "--max-attempts", help="Max verify-or-revert attempts per task."),
     max_workers: int = typer.Option(4, "--max-workers", help="Max concurrent isolated workers."),
     fuse: bool = typer.Option(False, "--fuse", help="Route deep-reasoning turns through fusion."),
-    taint: bool = typer.Option(False, "--taint", help="Track per-worker capability provenance and run the cross-agent monitor — flags split-exfiltration collusion no single-worker monitor sees under fan-out (FakeLab)."),
+    taint: bool = typer.Option(False, "--taint", help="Arm each worker's adaptive allowlist (dangerous-when-tainted tools require approval). The cross-agent collusion monitor runs regardless — it's always on for fan-out."),
 ) -> None:
     """Solve several tasks concurrently, each in its own git worktree (Tier-3 isolation).
 
@@ -2268,18 +2353,18 @@ def solve_batch(
 
     # Per-worker capability ledgers, so the aggregate cross-agent monitor can see the whole fan-out
     # (a split exfiltration — one worker fetches untrusted, another sinks it — lives BETWEEN workers,
-    # invisible to any single-worker monitor). Only under --taint; keyed by worker name.
+    # invisible to any single-worker monitor). ALWAYS ON for fan-out: recording is pure observability
+    # and changes no behaviour; the monitor only escalates a review note at the end. --taint additionally
+    # arms each worker's adaptive allowlist (dangerous-when-tainted tools require approval).
     ledgers: dict[str, TaintLedger] = {}
 
     def make_runner(name: str, one_task: str) -> Callable[[Path], AutonomousResult]:
         def run(ws: Path) -> AutonomousResult:
             from chimera.tools import default_registry
 
-            registry = default_registry(ws)
-            if taint:
-                ledger = TaintLedger()
-                ledgers[name] = ledger
-                registry = ledger_registry(registry, ledger, narrow_on_taint=True)
+            ledger = TaintLedger()
+            ledgers[name] = ledger
+            registry = ledger_registry(default_registry(ws), ledger, narrow_on_taint=taint)
             worker = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
             auto = AutonomousAgent(
                 worker,
@@ -2326,7 +2411,7 @@ def crew_isolated(
     max_workers: int = typer.Option(4, "--max-workers", help="Max concurrent isolated workers."),
     synthesize: bool = typer.Option(False, "--synthesize", help="A supervisor folds the merged results into one unified report."),
     fuse: bool = typer.Option(False, "--fuse", help="Route worker turns through fusion."),
-    taint: bool = typer.Option(False, "--taint", help="Track per-worker capability provenance and run the cross-agent monitor — flags split-exfiltration collusion no single-worker monitor sees under fan-out (FakeLab)."),
+    taint: bool = typer.Option(False, "--taint", help="Arm each worker's adaptive allowlist (dangerous-when-tainted tools require approval). The cross-agent collusion monitor runs regardless — it's always on for fan-out."),
 ) -> None:
     """Tier-3: tool-using workers split ONE task, each in its own git worktree, verify-gated.
 
@@ -2355,17 +2440,15 @@ def crew_isolated(
 
         backend = RoutedBackend(gateway, FusionEngine(gateway))
 
-    # Per-worker capability ledgers for the aggregate cross-agent monitor (only under --taint).
+    # Per-worker capability ledgers for the aggregate cross-agent monitor — always on for fan-out
+    # (pure observability; --taint additionally arms each worker's adaptive allowlist).
     ledgers: dict[str, Any] = {}
 
     def make_factory(wname: str) -> Callable[[Path], Any]:
         def factory(ws: Path) -> Any:
-            registry = default_registry(ws)
-            if taint:
-                ledger = TaintLedger()
-                ledgers[wname] = ledger
-                registry = ledger_registry(registry, ledger, narrow_on_taint=True)
-            return registry
+            ledger = TaintLedger()
+            ledgers[wname] = ledger
+            return ledger_registry(default_registry(ws), ledger, narrow_on_taint=taint)
 
         return factory
 

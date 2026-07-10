@@ -6,9 +6,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **`chimera hierarchy-bench`** — the hierarchy paired A/B (single-agent with all docs inline vs the
+  orchestrator-worker hierarchy, one worker per doc, same model both arms to isolate the orchestration)
+  now has a first-class CLI command, closing the asymmetry where every peer bench (fusion / cascade /
+  skillcard / schema / sandbox) had one but the hierarchy's `eval/hierarchy_ab.py` was reachable only
+  from the external `bench/` scripts. Quality = paired McNemar/Wilson; tokens = measured totals, no
+  significance claim on cost. `--tasks`, `--model`, `--top-model`, `--out`.
+
 ### Changed
-- **Aggregate cross-agent monitor is now WIRED into the fan-out commands** (`solve-batch --taint`,
-  `crew-isolated --taint`). A functional audit found the v0.16.0 `AggregateMonitor` was built + tested
+- **The aggregate cross-agent monitor is now ALWAYS ON for the fan-out commands** (`solve-batch`,
+  `crew-isolated`) — not just under `--taint`. Each parallel worker gets its own capability ledger and
+  the monitor runs over all of them after the batch (pure observability — recording changes no
+  behaviour; it only escalates a review note). `--taint` now controls the *stronger* per-worker
+  adaptive allowlist (dangerous-when-tainted tools require approval), independent of the monitor.
+  Documented with a firing example in `docs/security.md`.
+- **Aggregate cross-agent monitor is now WIRED into the fan-out commands** (`solve-batch`,
+  `crew-isolated`). A functional audit found the v0.16.0 `AggregateMonitor` was built + tested
   but never connected to an orchestrator, so its split-exfiltration defense was unreachable in a real
   fan-out run. Under `--taint` each isolated worker now gets its own `TaintLedger` (capability
   provenance), and after the batch the aggregate monitor runs over all workers' events and reports any
