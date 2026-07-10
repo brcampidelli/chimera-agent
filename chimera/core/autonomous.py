@@ -226,6 +226,11 @@ class AutonomousAgent:
         # past runs, injected so the worker/planner reuse what worked and avoid known
         # failure modes. Advisory only — verify-or-revert still decides success.
         card_ctx = self.cards.card_context(task) if self.cards is not None else ""
+        # Long-term memory readback (M19-A3): the solve path WROTE verified facts to memory but never
+        # read them back, so cross-run knowledge was write-only. Recall the relevant facts (duck-typed
+        # on memory.search) and inject them as advisory context — verify-or-revert still decides, so a
+        # misleading recalled fact can't corrupt the workspace; tainted facts carry their provenance.
+        facts_ctx = self._recall_facts(task)
         # Repo-map: a structural table of contents of the workspace, so the worker jumps to the
         # right file instead of exploring blind. Opt-in and bounded (see build_repo_map).
         repo_ctx = ""
@@ -262,9 +267,10 @@ class AutonomousAgent:
         lessons = sanitize_untrusted(lessons)
         card_ctx = sanitize_untrusted(card_ctx)
         playbook_ctx = sanitize_untrusted(playbook_ctx)
+        facts_ctx = sanitize_untrusted(facts_ctx)
         context = "\n\n".join(
             part
-            for part in (spine, repo_ctx, lessons, card_ctx, playbook_ctx, requirements_ctx)
+            for part in (spine, repo_ctx, lessons, card_ctx, facts_ctx, playbook_ctx, requirements_ctx)
             if part
         )
         # how many times this task pattern has already succeeded / failed (before this
@@ -466,7 +472,8 @@ class AutonomousAgent:
                         answer=answer, success=False, attempts=attempts, plan=plan, paused=True
                     )
                 return self._finalize_success(
-                    task, answer, attempts, prior_successes, plan, thread_id, tainted=run_tainted
+                    task, answer, attempts, prior_successes, plan, thread_id,
+                    tainted=run_tainted, productive=diff_productive,
                 )
 
             # Always surface the concrete verification output (the failing test/assert) on the
@@ -561,6 +568,7 @@ class AutonomousAgent:
         thread_id: str | None,
         *,
         tainted: bool,
+        productive: bool | None = None,
     ) -> AutonomousResult:
         """Commit a successful result: remember it, evolve a skill, clear the thread, return."""
         # M15-A3: on a tainted run only, strip any chat-template/control tokens the model may have
@@ -570,10 +578,17 @@ class AutonomousAgent:
             from chimera.governance.sanitize import strip_leaked_control_tokens
 
             answer = strip_leaked_control_tokens(answer)
+        # Diff-gate the LEARNING (nanobot "Dream" / M19-A2): a "hollow success" — the verifier
+        # passed but the real workspace snapshot shows an EMPTY diff — must not mint a skill or a
+        # memory fact, or the flywheel learns from work that never happened. ``productive is False``
+        # fires ONLY when a guard was present AND the diff was empty; ``None`` (no workspace, e.g. a
+        # Q&A answer with nothing to diff) never blocks, so legitimate no-artifact tasks still learn.
+        learn = productive is not False
         # Anti-poisoning provenance (Zombie Agents): artifacts from a tainted run stay marked
         # even after human approval — approval sanctions the action, not the content's trust.
-        self._remember_success(task, answer, tainted=tainted)
-        if self.auto_evolver is not None:
+        if learn:
+            self._remember_success(task, answer, tainted=tainted)
+        if learn and self.auto_evolver is not None:
             self.auto_evolver.maybe_evolve(task, answer, prior_successes, tainted=tainted)
             # M15-B4: if the run FAILED before it passed, distill the verified failed→passed
             # correction into an anti-pattern card — the eval, not a human, supplies the signal.
@@ -625,6 +640,36 @@ class AutonomousAgent:
         if self.experience is None:
             return ""
         return format_lessons(self.experience.relevant(task))
+
+    def _recall_facts(self, task: str, *, k: int = 5) -> str:
+        """Read back relevant long-term memory facts for this task (M19-A3).
+
+        Duck-typed on ``memory.search`` so any memory with a search method works; a store without
+        one simply yields nothing. Mirrors ``MemoryManager.profile``'s provenance surfacing — a
+        tainted fact is labelled inline so the model weighs it less, never as verified instruction.
+        Advisory only: recall never raises (degrades to empty), and verify-or-revert still decides.
+        """
+        search = getattr(self.memory, "search", None)
+        if not callable(search):
+            return ""
+        try:
+            hits = search(task, k=k)
+        except Exception as exc:  # noqa: BLE001 — recall is advisory, never fail the run
+            _log.debug("memory readback failed: %s", exc)
+            return ""
+        lines = [
+            f"- {getattr(item, 'content', '')}"
+            + (
+                " [unverified: learned from untrusted content]"
+                if getattr(item, "provenance", "clean") == "tainted"
+                else ""
+            )
+            for item in (hits or [])
+            if str(getattr(item, "content", "")).strip()
+        ]
+        if not lines:
+            return ""
+        return "Relevant prior facts (advisory):\n" + "\n".join(lines)
 
     def _count_prior_successes(self, task: str) -> int:
         if self.experience is None:

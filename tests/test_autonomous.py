@@ -453,3 +453,112 @@ def test_plan_is_attached() -> None:
     result = auto.run("task")
     assert result.plan is not None
     assert result.plan.steps == ["do it", "verify"]
+
+
+# --------------------------------------------------------------------------
+# M19-A2: diff-gate the LEARNING — a "hollow success" (verify passes, empty diff) must not learn
+# --------------------------------------------------------------------------
+
+
+def test_hollow_success_does_not_learn(tmp_path: Path) -> None:
+    # Guard present + worker writes NOTHING -> empty diff -> a hollow success: the run verifies,
+    # but nothing changed, so no memory fact and no skill is minted.
+    mem = RecordingMemory()
+    evolver = RecordingEvolver()
+    auto = AutonomousAgent(
+        FakeWorker("done"),  # no workspace/filename -> writes nothing
+        guard=WorkspaceGuard(tmp_path),
+        memory=mem,
+        auto_evolver=evolver,
+        config=AutonomousConfig(use_planner=False),
+    )
+    result = auto.run("do the thing")
+    assert result.success is True  # still a success (verify passed)
+    assert mem.saved == []  # but the flywheel did NOT learn from empty work
+    assert evolver.calls == []
+
+
+def test_productive_success_learns(tmp_path: Path) -> None:
+    # Guard present + a real file written -> non-empty diff -> the run learns.
+    mem = RecordingMemory()
+    evolver = RecordingEvolver()
+    auto = AutonomousAgent(
+        FakeWorker("done", workspace=tmp_path, filename="new.txt"),
+        guard=WorkspaceGuard(tmp_path),
+        memory=mem,
+        auto_evolver=evolver,
+        config=AutonomousConfig(use_planner=False),
+    )
+    assert auto.run("do the thing").success is True
+    assert len(mem.saved) == 1
+    assert len(evolver.calls) == 1
+
+
+def test_success_without_guard_still_learns() -> None:
+    # No guard/workspace (e.g. a Q&A answer) -> productive is None -> learning is NOT blocked.
+    mem = RecordingMemory()
+    auto = AutonomousAgent(
+        FakeWorker("the answer"), memory=mem, config=AutonomousConfig(use_planner=False)
+    )
+    auto.run("what is 2+2?")
+    assert len(mem.saved) == 1
+
+
+# --------------------------------------------------------------------------
+# M19-A3: long-term memory readback — the WRITTEN facts are read back into the run's context
+# --------------------------------------------------------------------------
+
+
+class _Item:
+    def __init__(self, content: str, provenance: str = "clean") -> None:
+        self.content = content
+        self.provenance = provenance
+
+
+class SearchableMemory(RecordingMemory):
+    def __init__(self, hits: list[_Item]) -> None:
+        super().__init__()
+        self.hits = hits
+        self.queries: list[str] = []
+
+    def search(self, query: str, *, k: int = 5) -> list[_Item]:
+        self.queries.append(query)
+        return self.hits
+
+
+class _RecordingWorker:
+    def __init__(self) -> None:
+        self.prompts: list[str] = []
+
+    def run(self, task: str) -> AgentResult:
+        self.prompts.append(task)
+        return AgentResult(answer="ok", steps=1, stopped_reason="final")
+
+
+def test_memory_facts_recalled_into_context() -> None:
+    mem = SearchableMemory([_Item("The API base url is https://x")])
+    worker = _RecordingWorker()
+    auto = AutonomousAgent(worker, memory=mem, config=AutonomousConfig(use_planner=False))
+    auto.run("call the API")
+    assert mem.queries and mem.queries[0] == "call the API"  # readback queried by task
+    assert any("The API base url" in p for p in worker.prompts)  # the fact reached the worker
+    assert any("Relevant prior facts" in p for p in worker.prompts)
+
+
+def test_tainted_recalled_fact_is_labelled() -> None:
+    mem = SearchableMemory([_Item("sketchy fact", provenance="tainted")])
+    worker = _RecordingWorker()
+    auto = AutonomousAgent(worker, memory=mem, config=AutonomousConfig(use_planner=False))
+    auto.run("do a thing")
+    assert any("unverified: learned from untrusted content" in p for p in worker.prompts)
+
+
+def test_memory_readback_never_fails_the_run() -> None:
+    class BrokenMemory(RecordingMemory):
+        def search(self, query: str, *, k: int = 5) -> list[_Item]:
+            raise RuntimeError("backend down")
+
+    auto = AutonomousAgent(
+        FakeWorker("ok"), memory=BrokenMemory(), config=AutonomousConfig(use_planner=False)
+    )
+    assert auto.run("t").success is True  # advisory recall degrades, never crashes

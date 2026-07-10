@@ -6,6 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **M19-A3 — long-term memory readback.** The `solve` path *wrote* verified facts to long-term
+  memory but never *read them back*, so cross-run knowledge was write-only. `AutonomousAgent` now
+  recalls the relevant facts at the start of a run (duck-typed on `memory.search`) and injects them
+  as an advisory "Relevant prior facts" block — sanitized, with tainted facts labelled inline so the
+  model weighs them less. Recall degrades to empty on any error (never fails the run); verify-or-
+  revert still decides success, so a misleading recalled fact can't corrupt the workspace.
+
+### Fixed
+- **M19-A2 — diff-gate the learning (no more hollow-success learning).** A "hollow success" — the
+  verifier passes but the real workspace snapshot shows an **empty diff** — no longer mints a skill
+  or a memory fact. The flywheel only learns from work that actually changed something. Gated tightly:
+  it fires **only** when a workspace guard is present AND the diff is empty; a no-workspace task (e.g.
+  a Q&A answer with nothing to diff) still learns as before.
+
 ### Changed
 - **M19-A0 — shared `EvolutionContext`.** The six self-learning seams (experience buffer, trajectory
   collection, long-term memory, learned-skill distillation + retrieval, ACE playbook) were assembled
