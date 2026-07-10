@@ -8,6 +8,7 @@ from chimera.evolution.attribution import Fault, attribute, localize_fault, qual
 from chimera.evolution.auto_evolve import AutoSkillEvolver
 from chimera.evolution.card_retrieval import CardIndex, CardRetriever, cards_context_block
 from chimera.evolution.collective import CollectiveSkillEvolver
+from chimera.evolution.context import EvolutionContext, build_evolution_context
 from chimera.evolution.edit_diagnostic import EditClass, classify_edit, topology_key
 from chimera.evolution.evolver import SkillEvolver
 from chimera.evolution.experience import Experience, ExperienceBuffer, format_lessons
@@ -30,7 +31,6 @@ from chimera.evolution.playbook import (
     PlaybookCurator,
     PlaybookItem,
 )
-from chimera.evolution.context import EvolutionContext, build_evolution_context
 from chimera.evolution.refine_bridge import (
     RefineOutcome,
     instances_from_trajectories,

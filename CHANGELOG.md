@@ -6,6 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-07-10
+
+**"Flywheel & Project."** Two capabilities land together. First, the self-evolution machinery — which
+already existed (skills → cards, GEPA, ACE playbook, long-term memory, the diff-gate, the measured
+skill lifecycle) — was only ever wired inside `chimera solve` and mostly write-only. M19 Track A turns
+the **flywheel** on across *every* autonomous path and makes it read back what it learned, so Chimera
+gets better with use — measured and reversible, never on a model's say-so. Second, `chimera project`
+adds the layer above the single task: run a whole **project** start-to-finish against a Spec, with the
+drift gate as the executable acceptance authority and human approval gates for risky steps. Honest
+scope note: this is a **capability** release, not a benchmark headline — the one default that *would*
+need a benchmark to justify (reading skills by default) ships as a wired-but-OFF mechanism, awaiting a
+paired `skillcard-bench` Δ ≥ 0.
+
 ### Added
 - **M19-A5 — GEPA refine bridge (`chimera evolve refine`).** GEPA could evolve a skill's prompt but
   nothing fed it from live runs. Now `evolve refine <skill>` mines **verified** trajectories
