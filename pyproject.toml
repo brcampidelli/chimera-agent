@@ -104,6 +104,15 @@ viz-vega = [
 documents = [
     "markitdown[docx,pptx,xlsx,pdf]>=0.1",
 ]
+# Batteries-included: everything a general-purpose assistant needs in one install — messaging
+# adapters, MCP, documents (docx/pdf/xlsx→md), media download (yt-dlp; audio also needs ffmpeg on
+# PATH), local speech-to-text (faster-whisper), data analysis (pandas/scikit-learn) and charts
+# (matplotlib/seaborn/plotly), plus YouTube transcripts. Deliberately EXCLUDES the GPU-heavy,
+# multi-GB extras (`imagegen-local`, `train`) — install those explicitly if you have a GPU.
+# One command for "I want all the features": pip install 'chimera-agent[full]'.
+full = [
+    "chimera-agent[messaging,mcp,documents,media-dl,stt,data,viz,youtube]",
+]
 # Back-compat alias: the browser (playwright) is now a CORE dependency, so `pip install
 # 'chimera-agent[browser]'` still works but installs nothing extra. The Chromium binary is
 # auto-downloaded on first browser use.

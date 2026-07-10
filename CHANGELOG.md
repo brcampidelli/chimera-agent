@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **`[full]` extra + batteries-included Docker image.** `pip install 'chimera-agent[full]'` now
+  installs every non-GPU feature in one command — messaging adapters, MCP, document ingestion
+  (docx/pdf/xlsx→md), media download (yt-dlp), local speech-to-text (faster-whisper), data analysis
+  (pandas/scikit-learn) and charts (matplotlib/seaborn/plotly), and YouTube transcripts. The GPU-heavy
+  extras (`imagegen-local`, `train`) stay opt-in. The official Dockerfile now builds from `[full]`
+  and installs `ffmpeg`, so the container image has vision, audio (speech-to-text + text-to-speech),
+  video, documents, data/charts, and the browser all working out of the box.
+
 ## [0.17.1] - 2026-07-10
 
 **Patch — `chimera project` resume fix (found by a live test).**

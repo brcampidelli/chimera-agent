@@ -5,8 +5,11 @@
 
 FROM python:3.12-slim
 
-# git: required for the git-worktree isolation (solve --isolate, IsolatedCrew, solve-batch).
-RUN apt-get update && apt-get install -y --no-install-recommends git \
+# System packages:
+#   git    — git-worktree isolation (solve --isolate, IsolatedCrew, solve-batch)
+#   curl   — some skills shell out to curl for HTTP
+#   ffmpeg — audio/video decoding for speech-to-text (transcribe_audio) and media download (yt-dlp)
+RUN apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # uv: the project's package manager (fast, deterministic installs).
@@ -15,9 +18,12 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 WORKDIR /app
 COPY . /app
 
-# Install Chimera + the native messaging adapters (Discord/Slack) and the MCP client.
-# Telegram/Signal are plain HTTP and need no extra; WhatsApp is a webhook.
-RUN uv pip install --system --no-cache '.[messaging,mcp]'
+# Install Chimera batteries-included: the `[full]` extra bundles the messaging adapters
+# (Discord/Slack), MCP, documents (docx/pdf/xlsx→md), media download (yt-dlp), speech-to-text
+# (faster-whisper), data analysis (pandas/scikit-learn) and charts (matplotlib/seaborn/plotly),
+# plus YouTube transcripts — so every non-GPU feature works out of the box in this image. The
+# GPU-heavy extras (`imagegen-local`, `train`) stay opt-in. For a minimal image, use '.[messaging,mcp]'.
+RUN uv pip install --system --no-cache '.[full]'
 
 # Bake the browser into the image so the `browser` tool works out of the box in the container.
 # Playwright is a core dependency, but pip only installs the Python package — the Chromium binary
