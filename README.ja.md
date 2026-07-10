@@ -166,6 +166,65 @@ uv run chimera workflow examples/email_triage/triage.yaml -w ./triage_workspace
 ```
 セットアップ + 毎日のスケジューリング + 正直な注意点：**[examples/email_triage/README.md](examples/email_triage/README.md)**。
 
+## 🧰 Chimera にできること —— そして各機能の有効化方法
+
+はじめての方へ。`pip install chimera-agent` と AI キーが 1 つあれば Chimera はすぐ使えます。一部の機能
+（ドキュメントを読む、音声を聞く、グラフを作る、動画をダウンロードする…）は **「extra（追加パッケージ）」**
+という小さな任意パッケージが必要で、いくつかはサービスのキーが必要です。このセクションでは**各機能、
+何をインストールすればよいか、そして試すためのコマンド**を一覧にします。予備知識は不要です。
+
+### すべて一度に有効化
+```bash
+pip install 'chimera-agent[full]'     # 下記の非 GPU 機能すべてを 1 コマンドで
+```
+音声と動画にはお使いのパソコンに **ffmpeg** も必要です：
+`macOS：brew install ffmpeg` · `Ubuntu/Debian：sudo apt install ffmpeg` · `Windows：choco install ffmpeg`。
+軽くしたい場合は `pip install chimera-agent` のままで、必要な extra だけ追加してください（「必要なもの」列参照）。
+**Docker を使う場合、公式イメージには以下すべてが最初から入っています。**
+
+### 各機能、ひとつずつ
+**必要なもの** = 追加するもの：`—` 基本インストールで動く · `[extra]` = `pip install 'chimera-agent[extra]'` · `キー：X` = `.env` に設定するプロバイダのキー。
+
+| できること | 必要なもの | 使い方 |
+|---|---|---|
+| **あなたを覚えるチャット** | — | `chimera chat` |
+| **質問を 1 つする** | — | `chimera run "X を 3 点で説明して"` |
+| **フルスクリーンのターミナルアプリ** | — | `chimera tui` |
+| **タスクを実行し、チェックに通った時だけ残す** | — | `chimera solve "app.py に hello() とテストを追加" --verify "pytest -q"` |
+| **複数モデルを 1 つの回答に融合** | — | `chimera fuse "あなたの質問" --show-panel` |
+| **専門エージェントのチーム** | — | `chimera crew "あなたのタスク" --mode supervisor` |
+| **プロジェクト全体を最後までやり切る**（危険な手順の前に確認で一時停止） | — | `chimera project start spec.yaml -w .` |
+| **画像を見る**（ビジョン） | キー：Gemini か OpenAI | `chimera run --image photo.jpg "これは何？" --model gemini/gemini-2.0-flash` |
+| **音声を聞く**（音声 → 文字） | `[stt]` + ffmpeg | `chimera run "meeting.mp3 を文字起こしして"` |
+| **話す**（文字 → 音声） | キー：ElevenLabs か OpenAI | 任意のタスクに「これを読み上げて speech.mp3 に保存して」 |
+| **ドキュメントを読む**（PDF・Word・Excel → 文字） | `[documents]` | `chimera run "report.pdf を要約して"` |
+| **動画/音声をダウンロード**（YouTube ほか 1000+ サイト） | `[media-dl]` + ffmpeg | `chimera run "<url> の音声をダウンロードして"` |
+| **データ分析とグラフ作成** | `[data,viz]` | `chimera run "sales.csv を読み込んで月次売上をグラフに"` |
+| **ウェブ検索** | キー：Tavily | `chimera run "ウェブ検索：最新の Python バージョン"` |
+| **実際のウェブページを読む・スクレイプ**（本物のブラウザ） | — | `chimera run "example.com を開いて見出しを教えて"` |
+| **長期記憶** | — | `chimera memory add "..."` · `chimera memory search "..."` |
+| **再利用可能なスキルを自分で学習** | — | `chimera solve` の実行中に起こる；`chimera skills` で一覧 |
+| **定期的な作業をスケジュール** | — | `chimera cron add brief "0 8 * * *" "ニュースを要約して"` |
+| **チャットボットとして稼働**（Discord/Telegram/Slack/Signal/WhatsApp） | `[messaging]` | `chimera serve --cron --discord` |
+| **任意の外部ツールに接続**（MCP） | `[mcp]` | ガイド：[docs/mcp.md](docs/mcp.md) |
+| **画像生成**（クラウド） | キー：OpenAI | タスクに「…の画像を生成して」 |
+| **画像生成**（完全ローカル、GPU 必要） | `[imagegen-local]` | 同上、オフライン |
+
+> 軽くしたい場合は extra を個別にインストール —— `messaging`・`mcp`・`documents`・`media-dl`・`stt`・
+> `data`・`viz`・`youtube`（すべて `full` に含まれます）に加え、GPU 専用の `imagegen-local` と `train`。
+> 例：`pip install 'chimera-agent[documents,stt]'`。
+
+### 初めてですか？初心者向けの 6 ステップ
+1. **Python 3.11+ をインストール**（[python.org](https://www.python.org/downloads/)）；`python --version` で確認。
+2. **Chimera をインストール：** `pip install 'chimera-agent[full]'`（または軽量コアなら `chimera-agent` だけ）。
+3. **AI キーを 1 つ入手** —— [OpenRouter](https://openrouter.ai) のキーが一番簡単（1 キー → 100+ モデル）。
+4. **キーを Chimera に渡す：** `.env.example` を `.env` にコピーし、`CHIMERA_OPENROUTER_KEYS=sk-or-...` を設定。
+5. **準備できたか確認：** `chimera doctor` —— 何が設定済みで何が足りないか教えてくれます。
+6. **試す：** `chimera chat`。
+
+ここから先は、上の表のどのコマンドもそのまま動きます。コピペ例つきの完全なコマンドリファレンス：
+**[docs/usage.md](docs/usage.md)**。
+
 ## 仕組み
 
 Chimera にタスクを与えると、計画を立て（最も関連性の高い組み込みスキルを浮かび上がらせ）、考え（問題が難しいときは

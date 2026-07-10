@@ -177,6 +177,66 @@ uv run chimera workflow examples/email_triage/triage.yaml -w ./triage_workspace
 ```
 Einrichtung + tägliche Zeitplanung + ehrliche Vorbehalte: **[examples/email_triage/README.md](examples/email_triage/README.md)**.
 
+## 🧰 Was Chimera kann — und wie du jede Funktion einschaltest
+
+Neu hier? Chimera läuft direkt nach `pip install chimera-agent` + einem KI-Schlüssel. Einige
+Fähigkeiten (Dokumente lesen, Audio hören, Diagramme erstellen, Video herunterladen…) brauchen ein
+kleines optionales Paket — ein sogenanntes **„Extra"** — und einige einen Dienst-Schlüssel. Dieser
+Abschnitt listet **jede Fähigkeit, genau was zu installieren ist und den Befehl zum Ausprobieren**.
+Keine Vorkenntnisse nötig.
+
+### Alles auf einmal einschalten
+```bash
+pip install 'chimera-agent[full]'     # jede Nicht-GPU-Funktion unten, in einem Befehl
+```
+Audio und Video brauchen außerdem **ffmpeg** auf deinem Computer:
+`macOS: brew install ffmpeg` · `Ubuntu/Debian: sudo apt install ffmpeg` · `Windows: choco install ffmpeg`.
+Lieber schlank? Behalte `pip install chimera-agent` und füge nur die gewünschten Extras hinzu (siehe
+Spalte „Braucht"). **Docker? Das offizielle Image enthält bereits alles unten.**
+
+### Jede Fähigkeit, Punkt für Punkt
+**Braucht** = was hinzufügen: `—` funktioniert in der Basis-Installation · `[extra]` = `pip install 'chimera-agent[extra]'` · `Schlüssel: X` = ein Anbieter-Schlüssel in `.env`.
+
+| Was du bekommst | Braucht | So benutzt du es |
+|---|---|---|
+| **Chat, der sich an dich erinnert** | — | `chimera chat` |
+| **Eine Frage stellen** | — | `chimera run "erkläre X in 3 Punkten"` |
+| **Vollbild-Terminal-App** | — | `chimera tui` |
+| **Eine Aufgabe erledigen, nur behalten wenn ein Test besteht** | — | `chimera solve "füge hello() zu app.py + einen Test hinzu" --verify "pytest -q"` |
+| **Mehrere Modelle zu einer Antwort verschmelzen** | — | `chimera fuse "deine Frage" --show-panel` |
+| **Ein Team von Spezialisten-Agenten** | — | `chimera crew "deine Aufgabe" --mode supervisor` |
+| **Ein ganzes Projekt bis zum Ende führen** (pausiert vor riskanten Schritten) | — | `chimera project start spec.yaml -w .` |
+| **Bilder sehen** (Vision) | Schlüssel: Gemini oder OpenAI | `chimera run --image foto.jpg "was ist das?" --model gemini/gemini-2.0-flash` |
+| **Audio hören** (Sprache → Text) | `[stt]` + ffmpeg | `chimera run "transkribiere meeting.mp3"` |
+| **Sprechen** (Text → Sprache) | Schlüssel: ElevenLabs oder OpenAI | bitte eine Aufgabe „lies das laut nach speech.mp3 vor" |
+| **Dokumente lesen** (PDF, Word, Excel → Text) | `[documents]` | `chimera run "fasse bericht.pdf zusammen"` |
+| **Video/Audio herunterladen** (YouTube + 1000+ Seiten) | `[media-dl]` + ffmpeg | `chimera run "lade das Audio von <url> herunter"` |
+| **Daten analysieren & Diagramme erstellen** | `[data,viz]` | `chimera run "lade umsatz.csv und plotte den Monatsumsatz"` |
+| **Im Web suchen** | Schlüssel: Tavily | `chimera run "suche im Web: die neueste Python-Version"` |
+| **Echte Webseiten lesen & scrapen** (ein echter Browser) | — | `chimera run "öffne example.com und nenne die Überschrift"` |
+| **Langzeitgedächtnis** | — | `chimera memory add "..."` · `chimera memory search "..."` |
+| **Wiederverwendbare Skills selbst lernen** | — | passiert während `chimera solve`; auflisten mit `chimera skills` |
+| **Wiederkehrende Arbeit planen** | — | `chimera cron add brief "0 8 * * *" "fasse die Nachrichten zusammen"` |
+| **Als Chat-Bot laufen** (Discord/Telegram/Slack/Signal/WhatsApp) | `[messaging]` | `chimera serve --cron --discord` |
+| **Beliebiges externes Tool anbinden** (MCP) | `[mcp]` | Anleitung: [docs/mcp.md](docs/mcp.md) |
+| **Bilder generieren** (gehostet) | Schlüssel: OpenAI | bitte eine Aufgabe „generiere ein Bild von …" |
+| **Bilder generieren** (100 % lokal, GPU nötig) | `[imagegen-local]` | dasselbe, offline |
+
+> Installiere Extras einzeln, wenn du es schlank willst — `messaging`, `mcp`, `documents`, `media-dl`,
+> `stt`, `data`, `viz`, `youtube` (alle in `full` enthalten), plus `imagegen-local` und `train` (nur GPU).
+> Beispiel: `pip install 'chimera-agent[documents,stt]'`.
+
+### Zum ersten Mal? Sechs Schritte für Einsteiger
+1. **Installiere Python 3.11+** ([python.org](https://www.python.org/downloads/)); prüfe mit `python --version`.
+2. **Installiere Chimera:** `pip install 'chimera-agent[full]'` (oder nur `chimera-agent` für den schlanken Kern).
+3. **Hol dir einen KI-Schlüssel** — ein [OpenRouter](https://openrouter.ai)-Schlüssel ist am einfachsten (ein Schlüssel → 100+ Modelle).
+4. **Gib Chimera den Schlüssel:** kopiere `.env.example` nach `.env`, setze `CHIMERA_OPENROUTER_KEYS=sk-or-...`.
+5. **Prüfe, ob alles bereit ist:** `chimera doctor` — es sagt, was eingerichtet ist und was fehlt.
+6. **Probier es aus:** `chimera chat`.
+
+Ab hier funktioniert jeder Befehl aus der Tabelle oben. Vollständige Befehlsreferenz mit
+Copy-&-Paste-Beispielen: **[docs/usage.md](docs/usage.md)**.
+
 ## Wie es funktioniert
 
 Gib Chimera eine Aufgabe; es plant (und hebt die relevantesten eingebauten Fähigkeiten hervor), denkt

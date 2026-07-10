@@ -169,6 +169,65 @@ uv run chimera workflow examples/email_triage/triage.yaml -w ./triage_workspace
 ```
 Setup + daily scheduling + honest caveats: **[examples/email_triage/README.md](examples/email_triage/README.md)**.
 
+## 🧰 What Chimera can do — and how to switch each thing on
+
+New here? Chimera works right after `pip install chimera-agent` + one AI key. A few abilities
+(reading documents, hearing audio, making charts, downloading video…) need a small optional
+package — called an **"extra"** — and some need a service key. This section lists **every ability,
+exactly what to install, and the command to try it**. No prior knowledge assumed.
+
+### Turn everything on at once
+```bash
+pip install 'chimera-agent[full]'     # every non-GPU feature below, one command
+```
+Audio and video also need **ffmpeg** on your computer:
+`macOS: brew install ffmpeg` · `Ubuntu/Debian: sudo apt install ffmpeg` · `Windows: choco install ffmpeg`.
+Prefer a lean install? Keep `pip install chimera-agent` and add only the extras you want (see the
+"Needs" column). **Using Docker? The official image already has everything below built in.**
+
+### Every ability, point by point
+**Needs** = what to add: `—` works in the core install · `[extra]` = `pip install 'chimera-agent[extra]'` · `key: X` = a provider key you put in `.env`.
+
+| What you get | Needs | How to use it |
+|---|---|---|
+| **Chat that remembers you** | — | `chimera chat` |
+| **Ask one question** | — | `chimera run "explain X in 3 bullets"` |
+| **Full-screen terminal app** | — | `chimera tui` |
+| **Do a task, keep it only if a check passes** | — | `chimera solve "add hello() to app.py + a test" --verify "pytest -q"` |
+| **Blend several models into one answer** | — | `chimera fuse "your question" --show-panel` |
+| **A team of specialist agents** | — | `chimera crew "your task" --mode supervisor` |
+| **Run a whole project to completion** (asks you before risky steps) | — | `chimera project start spec.yaml -w .` |
+| **See images** (vision) | key: Gemini or OpenAI | `chimera run --image photo.jpg "what's in this?" --model gemini/gemini-2.0-flash` |
+| **Hear audio** (speech → text) | `[stt]` + ffmpeg | `chimera run "transcribe meeting.mp3"` |
+| **Speak** (text → speech) | key: ElevenLabs or OpenAI | ask any task to "read this out loud to speech.mp3" |
+| **Read documents** (PDF, Word, Excel → text) | `[documents]` | `chimera run "summarize report.pdf"` |
+| **Download video/audio** (YouTube + 1000+ sites) | `[media-dl]` + ffmpeg | `chimera run "download the audio of <url>"` |
+| **Analyze data & make charts** | `[data,viz]` | `chimera run "load sales.csv and chart monthly revenue"` |
+| **Search the web** | key: Tavily | `chimera run "search the web: the latest Python version"` |
+| **Read & scrape real web pages** (a real browser) | — | `chimera run "open example.com and tell me the heading"` |
+| **Long-term memory** | — | `chimera memory add "..."` · `chimera memory search "..."` |
+| **Learn reusable skills automatically** | — | happens during `chimera solve`; list with `chimera skills` |
+| **Schedule recurring work** | — | `chimera cron add brief "0 8 * * *" "summarize the news"` |
+| **Run as a chat bot** (Discord/Telegram/Slack/Signal/WhatsApp) | `[messaging]` | `chimera serve --cron --discord` |
+| **Connect any external tool** (MCP) | `[mcp]` | guide: [docs/mcp.md](docs/mcp.md) |
+| **Generate images** (hosted) | key: OpenAI | ask a task to "generate an image of …" |
+| **Generate images** (fully local, needs a GPU) | `[imagegen-local]` | same, offline |
+
+> Install extras individually if you want a lean setup — `messaging`, `mcp`, `documents`, `media-dl`,
+> `stt`, `data`, `viz`, `youtube` (all bundled in `full`), plus the GPU-only `imagegen-local` and
+> `train`. Example: `pip install 'chimera-agent[documents,stt]'`.
+
+### First time? Six steps for total beginners
+1. **Install Python 3.11+** ([python.org](https://www.python.org/downloads/)); check with `python --version`.
+2. **Install Chimera:** `pip install 'chimera-agent[full]'` (or just `chimera-agent` for the lean core).
+3. **Get one AI key** — an [OpenRouter](https://openrouter.ai) key is easiest (one key → 100+ models).
+4. **Give Chimera the key:** copy `.env.example` to `.env`, set `CHIMERA_OPENROUTER_KEYS=sk-or-...`.
+5. **Check it's ready:** `chimera doctor` — it says what's set up and what's missing.
+6. **Try it:** `chimera chat`.
+
+From here, any command in the table above just works. Full command reference with copy-paste
+examples: **[docs/usage.md](docs/usage.md)**.
+
 ## How it works
 
 Give Chimera a task; it plans (surfacing the most relevant built-in skills), thinks (blending models

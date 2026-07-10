@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Documentation
+- **Beginner "what can it do & how" section in all 7 READMEs.** Every README (en/pt-BR/es/fr/de/
+  zh-CN/ja) now has a "🧰 What Chimera can do — and how to switch each thing on" section: a
+  point-by-point table of every ability with exactly which extra/key it needs and the command to try
+  it, a one-line "turn everything on" (`pip install 'chimera-agent[full]'`), and a six-step
+  first-time setup for total beginners.
+
 ### Added
 - **`[full]` extra + batteries-included Docker image.** `pip install 'chimera-agent[full]'` now
   installs every non-GPU feature in one command — messaging adapters, MCP, document ingestion

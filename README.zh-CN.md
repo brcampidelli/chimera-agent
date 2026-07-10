@@ -163,6 +163,62 @@ uv run chimera workflow examples/email_triage/triage.yaml -w ./triage_workspace
 ```
 配置 + 每日定时 + 诚实的注意事项：**[examples/email_triage/README.md](examples/email_triage/README.md)**。
 
+## 🧰 Chimera 能做什么 —— 以及如何开启每项功能
+
+刚上手？装好 `pip install chimera-agent` 加一个 AI 密钥后，Chimera 就能用了。一些能力（读文档、听音频、
+画图表、下载视频……）需要一个可选的小包 —— 叫做 **“extra（附加项）”** —— 有些还需要一个服务密钥。本节
+列出**每一项能力、具体要装什么、以及试用的命令**。无需任何基础。
+
+### 一次性全部开启
+```bash
+pip install 'chimera-agent[full]'     # 下面所有非 GPU 功能，一条命令
+```
+音频和视频还需要你电脑上装有 **ffmpeg**：
+`macOS：brew install ffmpeg` · `Ubuntu/Debian：sudo apt install ffmpeg` · `Windows：choco install ffmpeg`。
+想要精简安装？保留 `pip install chimera-agent`，只加你需要的 extra（见“需要”列）。**用 Docker？官方镜像
+已内置以下全部功能。**
+
+### 每项能力，逐条说明
+**需要** = 要额外加什么：`—` 基础安装即可 · `[extra]` = `pip install 'chimera-agent[extra]'` · `密钥：X` = 在 `.env` 里设置的服务商密钥。
+
+| 你能得到 | 需要 | 如何使用 |
+|---|---|---|
+| **记住你的聊天** | — | `chimera chat` |
+| **问一个问题** | — | `chimera run "用 3 点解释 X"` |
+| **全屏终端应用** | — | `chimera tui` |
+| **做一个任务，只有通过检查才保留** | — | `chimera solve "给 app.py 加 hello() 和一个测试" --verify "pytest -q"` |
+| **把多个模型融合成一个答案** | — | `chimera fuse "你的问题" --show-panel` |
+| **一支专家智能体团队** | — | `chimera crew "你的任务" --mode supervisor` |
+| **把整个项目做到完成**（危险步骤前会暂停征询你） | — | `chimera project start spec.yaml -w .` |
+| **看图片**（视觉） | 密钥：Gemini 或 OpenAI | `chimera run --image photo.jpg "这是什么？" --model gemini/gemini-2.0-flash` |
+| **听音频**（语音 → 文字） | `[stt]` + ffmpeg | `chimera run "转写 meeting.mp3"` |
+| **说话**（文字 → 语音） | 密钥：ElevenLabs 或 OpenAI | 让任意任务“把这段读出来存到 speech.mp3” |
+| **读文档**（PDF、Word、Excel → 文字） | `[documents]` | `chimera run "总结 report.pdf"` |
+| **下载视频/音频**（YouTube 等 1000+ 网站） | `[media-dl]` + ffmpeg | `chimera run "下载 <url> 的音频"` |
+| **分析数据并画图** | `[data,viz]` | `chimera run "加载 sales.csv 并画月度收入图"` |
+| **网络搜索** | 密钥：Tavily | `chimera run "上网搜：最新的 Python 版本"` |
+| **读取并抓取真实网页**（真实浏览器） | — | `chimera run "打开 example.com 并告诉我标题"` |
+| **长期记忆** | — | `chimera memory add "..."` · `chimera memory search "..."` |
+| **自动学会可复用技能** | — | 在 `chimera solve` 过程中发生；用 `chimera skills` 查看 |
+| **安排周期性工作** | — | `chimera cron add brief "0 8 * * *" "总结新闻"` |
+| **作为聊天机器人运行**（Discord/Telegram/Slack/Signal/WhatsApp） | `[messaging]` | `chimera serve --cron --discord` |
+| **接入任意外部工具**（MCP） | `[mcp]` | 指南：[docs/mcp.md](docs/mcp.md) |
+| **生成图片**（云端） | 密钥：OpenAI | 让任务“生成一张……的图片” |
+| **生成图片**（完全本地，需要 GPU） | `[imagegen-local]` | 同上，离线 |
+
+> 想精简就单独安装 extra —— `messaging`、`mcp`、`documents`、`media-dl`、`stt`、`data`、`viz`、`youtube`
+> （都已包含在 `full` 里），以及仅限 GPU 的 `imagegen-local` 和 `train`。例如：`pip install 'chimera-agent[documents,stt]'`。
+
+### 第一次用？新手六步
+1. **安装 Python 3.11+**（[python.org](https://www.python.org/downloads/)）；用 `python --version` 检查。
+2. **安装 Chimera：** `pip install 'chimera-agent[full]'`（或只装 `chimera-agent` 精简核心）。
+3. **拿一个 AI 密钥** —— [OpenRouter](https://openrouter.ai) 密钥最简单（一把密钥 → 100+ 模型）。
+4. **把密钥给 Chimera：** 把 `.env.example` 复制为 `.env`，设置 `CHIMERA_OPENROUTER_KEYS=sk-or-...`。
+5. **检查是否就绪：** `chimera doctor` —— 它会告诉你已配置什么、还缺什么。
+6. **试一下：** `chimera chat`。
+
+从这里开始，上表里的任何命令都能直接用。完整命令参考与可复制粘贴的示例：**[docs/usage.md](docs/usage.md)**。
+
 ## 工作原理
 
 给 Chimera 一个任务；它会规划（浮现出最相关的内置技能）、思考（遇到难题时融合多个模型）、用工具行动 ——
