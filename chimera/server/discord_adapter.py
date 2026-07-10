@@ -66,14 +66,34 @@ class DiscordAdapter:
             text=text, chat_id=str(channel_id), platform=self.platform, user=str(author_id)
         )
 
+    async def _respond(
+        self,
+        inbound: InboundMessage,
+        route: Callable[[InboundMessage], str],
+        *,
+        typing: Callable[[], Any],
+        send: Callable[[str], Any],
+    ) -> None:
+        """Run the (sync) agent off the event loop under a typing indicator, then send the reply.
+
+        The typing indicator ("Chimera is typing…") shows the message was received and a turn is in
+        flight — the caller passes ``message.channel.typing`` (an async context manager) and
+        ``message.channel.send`` (a coroutine). Kept free of discord.py so it's testable with fakes.
+        """
+        import asyncio
+
+        loop = asyncio.get_running_loop()
+        async with typing():  # discord auto-refreshes the indicator until the turn returns
+            reply = await loop.run_in_executor(None, route, inbound)
+        for chunk in chunk_text(reply, self.max_chars) or ["(no reply)"]:
+            await send(chunk)
+
     def start(self, route: Callable[[InboundMessage], str]) -> None:
         """Connect the bot and serve until interrupted (blocking).
 
         ``route`` is the gateway's ``on_message`` — the discord.py handler must keep the
         name ``on_message`` for the library to dispatch to it.
         """
-        import asyncio
-
         import discord  # lazy, optional dependency (the `messaging` extra)
 
         intents = discord.Intents.default()
@@ -96,12 +116,11 @@ class DiscordAdapter:
             )
             if inbound is None:
                 return
-            # Run the (synchronous) agent off the event loop so a slow turn does not block
-            # the gateway — and so the send_message tool can post back during the turn.
-            loop = asyncio.get_running_loop()
-            reply = await loop.run_in_executor(None, route, inbound)
-            for chunk in chunk_text(reply, self.max_chars) or ["(no reply)"]:
-                await message.channel.send(chunk)
+            # Show a typing indicator while the (synchronous) agent runs off the event loop, so a
+            # slow turn does not block the gateway and the user sees it was received and is working.
+            await self._respond(
+                inbound, route, typing=message.channel.typing, send=message.channel.send
+            )
 
         client.run(self.token)
 

@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Discord "typing…" indicator** — the Discord bot now shows a typing indicator while it works on a
+  turn, so you can see it received your message and a reply is in flight (it auto-refreshes until the
+  answer is sent, then chunks the reply as before). The reply flow was factored into a testable
+  `DiscordAdapter._respond` (typing + send injected), so it's covered without discord.py or a network.
+
 ## [0.16.2] - 2026-07-10
 
 **"Nothing shipped stays unreachable."** The final audit follow-up: the three eval modules that were
