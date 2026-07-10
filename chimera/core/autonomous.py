@@ -48,6 +48,7 @@ from chimera.ecosystem.trajectory import TrajectoryCollector
 from chimera.evolution.experience import ExperienceBuffer, Outcome, format_lessons
 from chimera.evolution.playbook import Playbook
 from chimera.evolution.stagnation import StagnationDetector
+from chimera.evolution.trace_probe import anti_pattern_hint
 from chimera.telemetry import get_logger
 
 _log = get_logger("core.autonomous")
@@ -474,6 +475,15 @@ class AutonomousAgent:
             hint = self._fault_hint(agent_result)
             if hint:
                 feedback = f"{feedback}\n\n{hint}" if feedback else hint
+
+            # Trace anti-patterns (TraceProbe): cheap, auditable process smells on a failed attempt —
+            # a search-loop (kept exploring without acting) or a verification-skip (edited without
+            # checking). Advisory retry coaching only; the verifier above already decided the outcome.
+            probe_hint = anti_pattern_hint(
+                events_from_transcript([m for m in agent_result.transcript if isinstance(m, dict)])
+            )
+            if probe_hint:
+                feedback = f"{feedback}\n\n{probe_hint}" if feedback else probe_hint
 
             # Progress ledger (Magentic-One inner loop): a structured self-check turns the
             # generic "it failed" into a concrete instruction for the next attempt — what

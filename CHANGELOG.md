@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **TraceProbe anti-pattern detectors — auditable "why it failed" retry signals** — Tier-2 from the
+  arXiv sweep (TraceProbe, arXiv 2607.06184). An outcome-only signal ("did verify pass?") never says
+  *why* a hard attempt went wrong. Two cheap, deterministic detectors scan the per-step tool trace:
+  **search-loop** (kept exploring — read/search/list/fetch — without ever editing or checking) and
+  **verification-skip** (edited files but ran no test/verify/command to confirm the change). They wire
+  **only into the failure retry-feedback** path of the autonomous loop — on an attempt that already
+  failed verify-or-revert, they add advisory coaching for the next attempt (alongside the existing
+  step-level fault hint), never a hard gate. `chimera/evolution/trace_probe.py`; operates on the
+  ordered tool events the loop already extracts, so it's model-free and testable.
 - **Panel-independence metric + blind-panel guard** — Tier-2 from the arXiv sweep (blind panel,
   arXiv 2607.02507, corroborating MALLM 2607.05477: *independent* generation before deliberation lifts
   quality; under pressure a non-blind panel's public/off-record answers diverged 3%→40%). Chimera's
