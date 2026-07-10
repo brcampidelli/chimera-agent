@@ -6,6 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-07-09
+
+**"Task-Typed Fusion & Fan-Out Safety."** The Tier-2/3 half of the same 8-category arXiv sweep that
+produced v0.15.0 (M18) — six integrations that refine the aggregation and safety layers rather than the
+verifier. All six map onto an existing component, are opt-in / degrade safely, and are model-free where
+possible. Fusion learns to *vote* on logic tasks (not just synthesize); the blind panel gets a
+regression guard and an independence metric; the autonomous loop gains auditable "why it failed" process
+signals and a bug-report normalizer; PROBE's best-arm selection is wired into the live `solve` loop; and
+a new aggregate monitor closes the collusion gap a per-worker monitor can't see under fan-out.
+
+**Parked (honest — not in this release):** Dyserve blast-radius node weighting + residual re-solve
+[2607.02942], exponential-weights judge weighting [2607.02247], skeptical-executor delegation clause
+[2607.07097], hard token-cap + evict-completed-work [2607.07666], cache-locality-aware routing
+[2607.02043], hot-worktree pool for the crew [2607.01415], and p95/p99 latency on the cost bench. None
+is blocking; each maps to an existing component and can be picked up later.
+
 ### Added
 - **Aggregate cross-agent monitor + collusion red-team** — Tier-2/3 from the arXiv sweep (FakeLab,
   arXiv 2607.07368). A per-worker monitor is **insufficient under fan-out**: work split across
