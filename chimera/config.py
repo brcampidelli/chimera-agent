@@ -128,6 +128,12 @@ class Settings(BaseSettings):
     fusion_agreement_threshold: float = Field(
         default=0.8, validation_alias="CHIMERA_FUSION_AGREEMENT"
     )
+    # --- Task-typed aggregation (MALLM, arXiv 2607.05477): when on, a logic/single-answer task
+    # (arithmetic, counting, multiple-choice, true/false) on which the panel reaches a clear
+    # majority is aggregated by VOTE, skipping the judge+synthesizer — a correct minority answer
+    # isn't averaged away, and it's cheaper. Off by default and conservative: knowledge/open tasks,
+    # and any logic task without a panel majority, still use judge -> synthesizer. ---
+    fusion_task_typed: bool = Field(default=False, validation_alias="CHIMERA_FUSION_TASK_TYPED")
 
     # --- Behaviour ---
     log_level: str = Field(default="INFO", validation_alias="CHIMERA_LOG_LEVEL")

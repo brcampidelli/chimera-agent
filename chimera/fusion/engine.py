@@ -86,6 +86,7 @@ class FusionTrace:
     final: str
     usage: list[StageUsage] = field(default_factory=list)
     early_stopped: bool = False  # selective mode: probe agreed, panel+judge short-circuited
+    aggregation: Literal["synth", "vote"] = "synth"  # task-typed routing: synthesize vs majority-vote
 
     def successful_panel(self) -> list[PanelResponse]:
         return [r for r in self.panel if r.error is None]
@@ -126,6 +127,12 @@ class FusionConfig:
     mode: Literal["full", "selective"] = "full"
     probe_k: int = 2
     agreement_threshold: float = 0.8
+    # Task-typed aggregation (MALLM, arXiv 2607.05477): when on, a logic/single-answer task on which
+    # the panel reaches a clear majority is aggregated by VOTE (skipping judge+synth) rather than
+    # synthesized — a correct minority answer isn't averaged away, and it's cheaper. Off by default:
+    # every other task, and any logic task without a majority, still uses judge -> synthesizer.
+    task_typed: bool = False
+    vote_threshold: float = 0.85
 
     @classmethod
     def from_settings(cls) -> FusionConfig:
@@ -140,6 +147,7 @@ class FusionConfig:
             mode=mode,
             probe_k=s.fusion_probe_k,
             agreement_threshold=s.fusion_agreement_threshold,
+            task_typed=s.fusion_task_typed,
         )
 
 
@@ -169,16 +177,44 @@ class FusionEngine:
     def _run_full(self, messages: list[MessageLike]) -> FusionTrace:
         _log.debug("fusion engaged: %d-model panel -> judge -> synthesizer", len(self.config.panel))
         panel = self._run_panel(messages)
-        judge = self._run_judge(messages, panel)
-        synth = self._run_synth(messages, judge.content)
+        analysis, final, aggregation, judge, synth = self._aggregate(messages, panel)
         trace = FusionTrace(
             panel=panel,
-            judge_analysis=judge.content,
-            final=synth.content,
+            judge_analysis=analysis,
+            final=final,
             usage=self._collect_usage(panel, judge, synth),
+            aggregation=aggregation,
         )
         self._log_usage(trace)
         return trace
+
+    def _aggregate(
+        self, messages: list[MessageLike], panel: list[PanelResponse]
+    ) -> tuple[str, str, Literal["synth", "vote"], CompletionResult | None, CompletionResult | None]:
+        """Aggregate the panel into a final answer, routing by task type when enabled.
+
+        Returns ``(judge_analysis, final, aggregation, judge_result, synth_result)``. For a
+        logic-typed task on which the panel reaches a clear majority, aggregates by VOTE (no judge
+        or synthesizer call — the majority answer *is* the final); otherwise runs the judge ->
+        synthesizer path. The vote branch is conservative: it needs ≥2 successful panel answers and a
+        real majority cluster, else it falls through to synthesis (today's behaviour).
+        """
+        ok = [r for r in panel if r.error is None]
+        if self.config.task_typed and len(ok) >= 2:
+            from chimera.fusion.task_type import classify_task_type
+
+            if classify_task_type(messages) == "logic":
+                from chimera.fusion.consistency import majority
+
+                winner = majority([r.content for r in ok], threshold=self.config.vote_threshold)
+                if winner is not None:
+                    _log.debug(
+                        "fusion task-typed: logic task with panel majority -> vote (skipped judge+synth)"
+                    )
+                    return "", winner, "vote", None, None
+        judge = self._run_judge(messages, panel)
+        synth = self._run_synth(messages, judge.content)
+        return judge.content, synth.content, "synth", judge, synth
 
     def _run_selective(self, messages: list[MessageLike]) -> FusionTrace:
         """Probe a few models first; short-circuit on agreement, else escalate to full.
@@ -193,25 +229,25 @@ class FusionEngine:
         ok = [r for r in probe if r.error is None]
         if len(ok) >= 2 and self._agree(ok):
             _log.debug("fusion early-stop: %d probe models agreed", len(ok))
-            synth = self._run_synth_agreed(messages, ok)
+            agreed = self._run_synth_agreed(messages, ok)
             trace = FusionTrace(
                 panel=probe,
                 judge_analysis="",
-                final=synth.content,
-                usage=self._collect_usage(probe, None, synth),
+                final=agreed.content,
+                usage=self._collect_usage(probe, None, agreed),
                 early_stopped=True,
             )
             self._log_usage(trace)
             return trace
         rest = self._run_panel(messages, self.config.panel[k:])
         panel = probe + rest
-        judge = self._run_judge(messages, panel)
-        synth = self._run_synth(messages, judge.content)
+        analysis, final, aggregation, judge, synth = self._aggregate(messages, panel)
         trace = FusionTrace(
             panel=panel,
-            judge_analysis=judge.content,
-            final=synth.content,
+            judge_analysis=analysis,
+            final=final,
             usage=self._collect_usage(panel, judge, synth),
+            aggregation=aggregation,
         )
         self._log_usage(trace)
         return trace
@@ -326,7 +362,7 @@ class FusionEngine:
         self,
         panel: list[PanelResponse],
         judge: CompletionResult | None,
-        synth: CompletionResult,
+        synth: CompletionResult | None,
     ) -> list[StageUsage]:
         usage: list[StageUsage] = [
             StageUsage("panel", r.model, r.prompt_tokens, r.completion_tokens)
@@ -337,7 +373,10 @@ class FusionEngine:
             usage.append(
                 StageUsage("judge", judge.model, judge.prompt_tokens, judge.completion_tokens)
             )
-        usage.append(StageUsage("synth", synth.model, synth.prompt_tokens, synth.completion_tokens))
+        if synth is not None:
+            usage.append(
+                StageUsage("synth", synth.model, synth.prompt_tokens, synth.completion_tokens)
+            )
         return usage
 
     def _log_usage(self, trace: FusionTrace) -> None:

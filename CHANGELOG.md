@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Task-typed fusion aggregation — vote vs synthesize by task type (`CHIMERA_FUSION_TASK_TYPED`)** —
+  Tier-2 from the arXiv sweep (MALLM, arXiv 2607.05477). The best way to *aggregate* a multi-model
+  panel depends on the task: a single-verifiable-answer task (arithmetic, counting, multiple-choice,
+  true/false) is best aggregated by **majority vote** — a correct minority answer must not be averaged
+  away by a synthesizer, and it's cheaper — while an open-ended/knowledge task is best **synthesized**
+  (judge → synthesizer, today's behaviour). Chimera already had both aggregators (`majority`, the
+  judge/synth path); this adds the routing signal: a cheap, deterministic **lexical** task-type
+  classifier (`chimera/fusion/task_type.py`, not a trained model) plus a `FusionEngine._aggregate` step
+  that votes on a logic task **only** when the panel reaches a clear majority, else falls through to
+  synthesis. Off by default and conservative — the sole behaviour change when enabled is "a logic task
+  with a real panel majority returns that majority instead of synthesizing it." `FusionTrace` gains an
+  `aggregation` field (`"synth"` | `"vote"`) for inspection.
 - **PROBE live wiring — record (arm, proxy, reward) per attempt (`solve --probe-log`)** — closes the loop
   the v0.15.0 note flagged as "the natural follow-on." `ProbeLog` (`chimera/fusion/probe_log.py`) is an
   append-only JSONL that the autonomous loop writes to when `--probe-log` is set: each verified attempt
