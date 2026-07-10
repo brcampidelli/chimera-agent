@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-07-10
+
+**"Batteries included."** One command installs every non-GPU feature, the official Docker image ships
+with all of it working out of the box, and every README now walks a complete beginner through what
+Chimera can do and how to switch each thing on — in all seven languages.
+
 ### Documentation
 - **Beginner "what can it do & how" section in all 7 READMEs.** Every README (en/pt-BR/es/fr/de/
   zh-CN/ja) now has a "🧰 What Chimera can do — and how to switch each thing on" section: a
