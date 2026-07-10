@@ -16,11 +16,52 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from chimera.interface import ChatSession
+from chimera.telemetry import get_logger
+
+_log = get_logger("server.gateway")
 
 
 def chunk_text(text: str, size: int) -> list[str]:
     """Split text into <=size chunks for a platform's message-length limit (empty -> [])."""
     return [text[start : start + size] for start in range(0, len(text), size)]
+
+
+def run_with_indicator(
+    route: Callable[[InboundMessage], str],
+    inbound: InboundMessage,
+    *,
+    ping: Callable[[], None],
+    interval: float = 4.0,
+) -> str:
+    """Run the (blocking) ``route(inbound)`` while re-pinging a fading "typing" indicator.
+
+    Some platforms' typing signals expire (Telegram's chat action after ~5s, Signal's typing message),
+    so they must be re-sent to stay visible for a whole turn. This runs the agent turn in a thread and
+    calls ``ping`` immediately and every ``interval`` seconds until it returns. ``ping`` failures are
+    swallowed — the indicator is best-effort and must never fail or delay the reply. Returns the reply.
+    """
+    import threading
+
+    box: dict[str, str] = {}
+
+    def work() -> None:
+        box["reply"] = route(inbound) or "(no reply)"
+
+    def _ping() -> None:
+        try:
+            ping()
+        except Exception as exc:  # noqa: BLE001 — a typing ping must never break the turn
+            _log.debug("typing indicator ping failed: %s", exc)
+
+    worker = threading.Thread(target=work, daemon=True)
+    _ping()
+    worker.start()
+    while True:
+        worker.join(timeout=interval)
+        if not worker.is_alive():
+            break
+        _ping()
+    return box.get("reply", "(no reply)")
 
 
 @dataclass

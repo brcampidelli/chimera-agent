@@ -7,10 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- **Discord "typing…" indicator** — the Discord bot now shows a typing indicator while it works on a
-  turn, so you can see it received your message and a reply is in flight (it auto-refreshes until the
-  answer is sent, then chunks the reply as before). The reply flow was factored into a testable
-  `DiscordAdapter._respond` (typing + send injected), so it's covered without discord.py or a network.
+- **"Typing…" / working indicators on every messaging transport** — a chat now shows the bot received
+  your message and is working on a reply, on each platform the way that platform allows:
+  - **Discord** — a real typing indicator (`channel.typing()`, auto-refreshing) around the turn.
+  - **Telegram** — the `sendChatAction("typing")` action, re-sent every few seconds (it expires ~5s)
+    for the whole turn.
+  - **Signal** — the bridge's typing indicator (started, refreshed, then stopped).
+  - **Slack** — Slack has no bot typing indicator, so a ⏳ reaction is placed on your message while the
+    turn runs and removed when the reply arrives (best-effort; needs `reactions:write`).
+
+  A shared `run_with_indicator` helper runs the (blocking) turn while re-pinging the fading indicators;
+  every indicator is best-effort (never fails or delays the reply). The Discord reply flow was factored
+  into a testable `DiscordAdapter._respond`. Covered by tests with no network or platform SDKs.
 
 ## [0.16.2] - 2026-07-10
 

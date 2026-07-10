@@ -78,14 +78,42 @@ class SlackAdapter:
             if req.type != "events_api":
                 return
             cli.send_socket_mode_response(SocketModeResponse(envelope_id=req.envelope_id))
-            inbound = self._message_from_event(req.payload.get("event", {}))
-            if inbound is not None:
-                self.send(inbound.chat_id, route(inbound) or "(no reply)")
+            event = req.payload.get("event", {})
+            inbound = self._message_from_event(event)
+            if inbound is None:
+                return
+            # Slack has no bot "typing" indicator, so mark the message with a ⏳ reaction while the turn
+            # runs (received + working), then remove it — a best-effort stand-in for typing.
+            ts = str(event.get("ts", ""))
+            self._react(inbound.chat_id, ts, add=True)
+            try:
+                reply = route(inbound) or "(no reply)"
+            finally:
+                self._react(inbound.chat_id, ts, add=False)
+            self.send(inbound.chat_id, reply)
 
         client.socket_mode_request_listeners.append(handle)
         _log.info("Slack adapter connecting (Socket Mode)")
         client.connect()
         self._stop.wait()  # block until stopped
+
+    def _react(self, channel: str, ts: str, *, add: bool, name: str = "hourglass_flowing_sand") -> None:
+        """Add/remove a working-indicator reaction on the user's message (best-effort; needs
+        reactions:write). Slack has no bot typing indicator, so this stands in for one."""
+        if not ts:
+            return
+        import httpx
+
+        url = f"https://slack.com/api/reactions.{'add' if add else 'remove'}"
+        try:
+            with httpx.Client(timeout=10) as client:
+                client.post(
+                    url,
+                    headers={"Authorization": f"Bearer {self.bot_token}"},
+                    json={"channel": channel, "timestamp": ts, "name": name},
+                )
+        except (httpx.HTTPError, ValueError) as exc:  # best-effort — never fail the turn
+            _log.debug("slack reaction failed: %s", exc)
 
     def stop(self) -> None:
         self._stop.set()

@@ -13,9 +13,10 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
+from functools import partial
 from typing import Any
 
-from chimera.server.gateway import InboundMessage, chunk_text
+from chimera.server.gateway import InboundMessage, chunk_text, run_with_indicator
 from chimera.telemetry import get_logger
 
 _log = get_logger("server.telegram")
@@ -88,7 +89,16 @@ class TelegramAdapter:
                     inbound = self._message_from_update(update)
                     if inbound is None:
                         continue
-                    self._post(client, inbound.chat_id, route(inbound) or "(no reply)")
+                    # Show "typing…" while the (blocking) turn runs — Telegram's chat action expires
+                    # after ~5s, so re-send it periodically until the reply is ready.
+                    reply = run_with_indicator(
+                        route, inbound, ping=partial(self._typing, client, inbound.chat_id)
+                    )
+                    self._post(client, inbound.chat_id, reply)
+
+    def _typing(self, client: Any, chat_id: str) -> None:
+        """Send the 'typing' chat action (best-effort; expires ~5s, refreshed by run_with_indicator)."""
+        client.post(self._url("sendChatAction"), json={"chat_id": chat_id, "action": "typing"})
 
     def _post(self, client: Any, chat_id: str, text: str) -> int:
         sent = 0

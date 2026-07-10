@@ -11,6 +11,7 @@ from chimera.server.gateway import (
     LocalAdapter,
     MessageGateway,
     chunk_text,
+    run_with_indicator,
 )
 from chimera.server.http import WebhookHandler, handle, make_server
 from chimera.server.mcp_server import CHIMERA_MCP_TOOLS, ChimeraMCP
@@ -31,6 +32,7 @@ __all__ = [
     "WhatsAppSender",
     "WhatsAppWebhook",
     "chunk_text",
+    "run_with_indicator",
     "handle",
     "make_server",
     "WebhookHandler",

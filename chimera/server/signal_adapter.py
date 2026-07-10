@@ -12,9 +12,10 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
+from functools import partial
 from typing import Any
 
-from chimera.server.gateway import InboundMessage
+from chimera.server.gateway import InboundMessage, run_with_indicator
 from chimera.telemetry import get_logger
 
 _log = get_logger("server.signal")
@@ -62,6 +63,17 @@ class SignalAdapter:
             json={"message": text, "number": self.number, "recipients": [chat_id]},
         )
 
+    def _typing(self, client: Any, chat_id: str, *, on: bool) -> None:
+        """Start/stop the Signal typing indicator via the bridge (best-effort; expires, so refreshed)."""
+        try:
+            client.request(
+                "PUT" if on else "DELETE",
+                f"{self.api_url}/v1/typing-indicator/{self.number}",
+                json={"recipient": chat_id},
+            )
+        except Exception as exc:  # noqa: BLE001 — typing is best-effort, never fail the turn
+            _log.debug("signal typing indicator failed: %s", exc)
+
     def start(self, route: Callable[[InboundMessage], str]) -> None:
         """Poll the bridge for messages and reply, until :meth:`stop` (blocking)."""
         import httpx
@@ -77,8 +89,15 @@ class SignalAdapter:
                     continue
                 for item in items if isinstance(items, list) else []:
                     inbound = self._message_from_envelope(item)
-                    if inbound is not None:
-                        self._send_via(client, inbound.chat_id, route(inbound) or "(no reply)")
+                    if inbound is None:
+                        continue
+                    # Show a typing indicator while the (blocking) turn runs; it expires, so refresh.
+                    reply = run_with_indicator(
+                        route, inbound,
+                        ping=partial(self._typing, client, inbound.chat_id, on=True),
+                    )
+                    self._typing(client, inbound.chat_id, on=False)
+                    self._send_via(client, inbound.chat_id, reply)
                 time.sleep(self.poll_interval)
 
     def stop(self) -> None:
