@@ -16,6 +16,7 @@ from chimera.tools.http import HttpGetTool
 from chimera.tools.registry import ToolRegistry
 from chimera.tools.search import GlobTool, GrepTool
 from chimera.tools.shell import RunShellTool
+from chimera.tools.write_region import WriteRegion
 
 
 class EchoTool(Tool):
@@ -33,19 +34,24 @@ class EchoTool(Tool):
         return str(kwargs.get("text", ""))
 
 
-def default_registry(workspace: Path | None = None) -> ToolRegistry:
+def default_registry(
+    workspace: Path | None = None, *, write_region: WriteRegion | None = None
+) -> ToolRegistry:
     """Build a registry pre-populated with the built-in native tools.
 
-    File and shell tools are rooted at ``workspace`` (default: current directory).
+    File and shell tools are rooted at ``workspace`` (default: current directory). When
+    ``write_region`` is given, the file-writing tools refuse a write outside its declared globs
+    (M18-3) — the capability boundary that blocks an injected instruction from rewriting an
+    unrelated file.
     """
     from chimera.sandbox import get_sandbox
 
     registry = ToolRegistry()
     registry.register(EchoTool())
     registry.register(ReadFileTool(workspace))
-    registry.register(WriteFileTool(workspace))
-    registry.register(EditFileTool(workspace))
-    registry.register(ApplyPatchTool(workspace))
+    registry.register(WriteFileTool(workspace, write_region=write_region))
+    registry.register(EditFileTool(workspace, write_region=write_region))
+    registry.register(ApplyPatchTool(workspace, write_region=write_region))
     registry.register(ListDirTool(workspace))
     registry.register(GrepTool(workspace))
     registry.register(GlobTool(workspace))

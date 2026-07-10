@@ -20,6 +20,7 @@ from typing import Any
 
 from chimera.tools.base import Tool
 from chimera.tools.workspace import resolve_in_workspace
+from chimera.tools.write_region import WriteRegion
 
 # Conflict-marker hunk format, familiar to models from git and Aider:
 #   <<<<<<< SEARCH
@@ -33,10 +34,11 @@ _HUNK_CLOSE = ">>>>>>> REPLACE"
 
 
 class _WorkspaceTool(Tool):
-    """Base for tools bound to a workspace root."""
+    """Base for tools bound to a workspace root (with an optional declared write-region)."""
 
-    def __init__(self, workspace: Path | None = None) -> None:
+    def __init__(self, workspace: Path | None = None, *, write_region: WriteRegion | None = None) -> None:
         self.workspace = (workspace or Path.cwd()).resolve()
+        self.write_region = write_region
 
 
 class EditFileTool(_WorkspaceTool):
@@ -59,6 +61,8 @@ class EditFileTool(_WorkspaceTool):
 
     def run(self, **kwargs: Any) -> str:
         path = resolve_in_workspace(self.workspace, str(kwargs["path"]))
+        if self.write_region is not None and (err := self.write_region.check(path)):
+            return err
         old = str(kwargs["old"])
         new = str(kwargs["new"])
         replace_all = bool(kwargs.get("replace_all", False))
@@ -130,6 +134,8 @@ class ApplyPatchTool(_WorkspaceTool):
 
     def run(self, **kwargs: Any) -> str:
         path = resolve_in_workspace(self.workspace, str(kwargs["path"]))
+        if self.write_region is not None and (err := self.write_region.check(path)):
+            return err
         rel = kwargs["path"]
         if not path.is_file():
             return f"error: file not found: {rel}"

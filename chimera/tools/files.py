@@ -7,15 +7,17 @@ from typing import Any
 
 from chimera.tools.base import Tool
 from chimera.tools.workspace import resolve_in_workspace
+from chimera.tools.write_region import WriteRegion
 
 _MAX_READ_CHARS = 20_000
 
 
 class _WorkspaceTool(Tool):
-    """Base for tools bound to a workspace root."""
+    """Base for tools bound to a workspace root (with an optional declared write-region)."""
 
-    def __init__(self, workspace: Path | None = None) -> None:
+    def __init__(self, workspace: Path | None = None, *, write_region: WriteRegion | None = None) -> None:
         self.workspace = (workspace or Path.cwd()).resolve()
+        self.write_region = write_region
 
 
 class ReadFileTool(_WorkspaceTool):
@@ -51,6 +53,8 @@ class WriteFileTool(_WorkspaceTool):
 
     def run(self, **kwargs: Any) -> str:
         path = resolve_in_workspace(self.workspace, str(kwargs["path"]))
+        if self.write_region is not None and (err := self.write_region.check(path)):
+            return err
         content = str(kwargs.get("content", ""))
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")

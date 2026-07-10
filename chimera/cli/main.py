@@ -1865,6 +1865,9 @@ def solve(
     gen_tests: bool = typer.Option(
         False, "--gen-tests", help="With no --verify: generate executable pytest grounded in the task's requirements and use it as the gate (catches wrong code the coverage grade rubber-stamps)."
     ),
+    write_region: str = typer.Option(
+        None, "--write-region", help="Comma-separated globs the file-writers may touch (e.g. 'src/**,*.py'). A write outside is refused — blocks an injected instruction from rewriting an unrelated file."
+    ),
     playbook: bool = typer.Option(
         False, "--playbook", help="Inject the stored ACE strategy playbook into context, then curate it from this run's outcome (closed loop)."
     ),
@@ -2007,7 +2010,10 @@ def solve(
     stored_playbook = _load_playbook() if playbook else None
 
     def _run_solve(ws: Path) -> AutonomousResult:
-        registry = default_registry(ws)
+        from chimera.tools.write_region import WriteRegion
+
+        region = WriteRegion(write_region.split(","), ws) if write_region else None
+        registry = default_registry(ws, write_region=region)
         # Per-session grant first (issue #4): scope the native tools before the meta-tools
         # (explorer/subagents) are added, so subagents inherit the same allowlist.
         from chimera.governance import AuditLog

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Declared write-region for the file-writers (`solve --write-region`)** — M18-3, from the arXiv sweep
+  (arXiv 2607.05483, PatchOptic). The workspace jail blocks writes *outside* the workspace, but nothing
+  stopped a run from rewriting an *unrelated* file inside it — the injection→arbitrary-write attack ("a
+  hostile page tells the agent to also update `config/secrets.py`"). A declared write-region (globs like
+  `src/**,*.py`) makes `write_file` / `edit_file` / `apply_patch` **refuse** a write outside it, before it
+  touches disk (fail-closed). Opt-in — an empty region keeps today's behaviour. Complements the taint
+  ledger (which *escalates* such writes) with a hard capability boundary. `chimera/tools/write_region.py`.
 - **Cross-provider, decomposed envelope auditing** — M18-2, from the arXiv sweep
   (arXiv 2607.00563 + 2607.06799). The `EnvelopeVerifier`'s spot check now (a) grades three named
   failure classes separately — **invented / dropped / contradiction** — instead of one holistic
