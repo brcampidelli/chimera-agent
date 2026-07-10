@@ -31,6 +31,12 @@ from chimera.evolution.playbook import (
     PlaybookItem,
 )
 from chimera.evolution.context import EvolutionContext, build_evolution_context
+from chimera.evolution.refine_bridge import (
+    RefineOutcome,
+    instances_from_trajectories,
+    refine_skill,
+)
+from chimera.evolution.rollback import RollbackDecision, apply_rollback, assess_rollback
 from chimera.evolution.skill_nudges import SkillNudge, detect_skill_nudges
 from chimera.evolution.skill_store import SkillStore
 from chimera.evolution.stagnation import (
@@ -82,4 +88,10 @@ __all__ = [
     "mean_pairwise_correlation",
     "EvolutionContext",
     "build_evolution_context",
+    "RefineOutcome",
+    "instances_from_trajectories",
+    "refine_skill",
+    "RollbackDecision",
+    "assess_rollback",
+    "apply_rollback",
 ]

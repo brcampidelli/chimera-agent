@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **M19-A5 — GEPA refine bridge (`chimera evolve refine`).** GEPA could evolve a skill's prompt but
+  nothing fed it from live runs. Now `evolve refine <skill>` mines **verified** trajectories
+  (successful, non-hollow-diff) into task instances, GEPA-refines the skill's template, and adopts the
+  winner **only through the transfer gate**: it must help its tuned slice AND not regress a disjoint,
+  same-capability holdout (the EvoAgentBench negative-transfer guard, which measured GEPA itself
+  regressing −12.3 without it). No holdout ⇒ **dry-run** (reported, never persisted). `--apply` writes
+  the refined template back (bumped version, usage counters preserved).
+- **M19-A6 — auto-rollback (`chimera evolve guard`).** Closes the evolution loop: `evolve guard` runs
+  the continuous-evolution benchmark and, on a **statistically significant** regression (the CI lower
+  bound on degradation > 0 — never a point estimate) or a cost drift past `--cost-drift-tol`, retracts
+  the most recently adopted skill. Retraction is a **retire** (reversible via `skills-approve`), not a
+  delete, so an over-eager rollback costs nothing permanent. `--apply` performs it; without it, the
+  guard just reports what it would retract.
 - **M19 Track B — `chimera project`: run a project start-to-finish against a Spec.** A new
   `ProjectOrchestrator` (`chimera/orchestration/project.py`) drives a whole project above the single
   task by stitching pieces that already existed: the drift **Spec** is the executable acceptance

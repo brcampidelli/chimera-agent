@@ -3696,6 +3696,113 @@ def evolve_status(
     console.print(f"[dim]{readiness.reason}[/dim]")
 
 
+@evolve_app.command("refine")
+def evolve_refine(
+    skill_name: str = typer.Argument(..., help="Name of the learned skill to refine."),
+    traj: str = typer.Option(None, "--traj", help="Trajectory JSONL (default: <home>/trajectories.jsonl)."),
+    model: str = typer.Option(None, "--model", "-m", help="Override the model."),
+    budget: int = typer.Option(20, "--budget", help="GEPA rollout budget."),
+    min_reward: float = typer.Option(
+        1.0, "--min-reward", help="Only mine trajectories at/above this reward (1.0 = verified)."
+    ),
+    apply: bool = typer.Option(
+        False, "--apply", help="Persist the refined skill IF it passes the transfer gate."
+    ),
+) -> None:
+    """GEPA-refine a skill from verified trajectories, gated on non-regressing transfer (M19-A5)."""
+    from chimera.evolution import SkillStore, instances_from_trajectories, refine_skill
+    from chimera.evolution.gepa import BackendExecutor, BackendReflector
+    from chimera.providers import LLMGateway
+
+    settings = get_settings()
+    if not settings.has_any_key():
+        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+        raise typer.Exit(code=1)
+    store = SkillStore(settings.home / "skills.json")
+    skill = store.get(skill_name)
+    if skill is None:
+        console.print(f"[red]no skill {skill_name!r} in the store[/red]")
+        raise typer.Exit(code=1)
+    instances = instances_from_trajectories(_collector(traj).all(), min_reward=min_reward)
+    if not instances:
+        console.print(
+            "[yellow]no verified trajectories to refine on (need successful, productive runs).[/yellow]"
+        )
+        raise typer.Exit(code=1)
+    # Disjoint holdout: every 3rd verified instance is held out (the same-capability transfer slice).
+    holdout = instances[::3]
+    tuned = [inst for i, inst in enumerate(instances) if i % 3 != 0]
+    if not tuned:  # too few to split — refine on all, but then transfer is not measured (dry-run)
+        tuned, holdout = instances, []
+    gateway = LLMGateway()
+    outcome = refine_skill(
+        skill, tuned,
+        executor=BackendExecutor(gateway, model), reflector=BackendReflector(gateway, model),
+        holdout=holdout or None, budget=budget,
+    )
+    console.print(
+        f"[bold]{skill_name}[/bold] refine: seed {outcome.result.seed_mean:.2f} -> "
+        f"best {outcome.result.best_mean:.2f} ({outcome.result.rollouts} rollouts)"
+    )
+    console.print(f"[dim]{outcome.decision.reason}[/dim]")
+    if outcome.promoted and apply:
+        store.add(outcome.skill)
+        console.print(
+            f"[green]applied[/green] refined template -> {outcome.skill.name} v{outcome.skill.version}"
+        )
+    elif outcome.promoted:
+        console.print("[yellow]promotable[/yellow] — re-run with --apply to persist.")
+    else:
+        console.print("[dim]not promoted (dry-run without a holdout, or the gate was not cleared).[/dim]")
+
+
+@evolve_app.command("guard")
+def evolve_guard(
+    limit: int = typer.Option(0, "--limit", help="Limit demo tasks (0 = all)."),
+    model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
+    cost_drift_tol: float = typer.Option(
+        None, "--cost-drift-tol", help="Also roll back if second-half mean cost exceeds first by more than this."
+    ),
+    apply: bool = typer.Option(
+        False, "--apply", help="Retire the most recent skill IF a SIGNIFICANT regression is measured."
+    ),
+) -> None:
+    """Watch evolution health; retract the most recent skill on a SIGNIFICANT regression (M19-A6)."""
+    from chimera.eval import SingleModelSolver, demo_tasks, run_continuous
+    from chimera.evolution import SkillStore, apply_rollback, assess_rollback
+    from chimera.providers import LLMGateway
+
+    settings = get_settings()
+    if not settings.has_any_key():
+        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+        raise typer.Exit(code=1)
+    tasks = list(demo_tasks())
+    if limit:
+        tasks = tasks[:limit]
+    report = run_continuous(SingleModelSolver(LLMGateway(), model), tasks)
+    store = SkillStore(settings.home / "skills.json")
+    recent = [s.name for s in store.skills(status="active")]
+    decision = assess_rollback(report, recent_artifacts=recent, cost_drift_tol=cost_drift_tol)
+    console.print(
+        f"pass rate [cyan]{report.pass_rate:.0%}[/cyan]  "
+        f"degradation [cyan]{report.degradation:+.0%}[/cyan] "
+        f"(CI {report.degradation_ci()[0]:+.0%}..{report.degradation_ci()[1]:+.0%})"
+    )
+    console.print(f"[dim]{decision.reason}[/dim]")
+    if decision.should_rollback and decision.target and apply:
+        if apply_rollback(store, decision):
+            console.print(
+                f"[yellow]retired[/yellow] {decision.target} "
+                f"(reversible: chimera skills-approve {decision.target})"
+            )
+    elif decision.should_rollback and decision.target:
+        console.print(
+            f"[yellow]would retire[/yellow] {decision.target} — re-run with --apply to act."
+        )
+    else:
+        console.print("[green]healthy[/green] — nothing to roll back.")
+
+
 @evolve_app.command("export")
 def evolve_export(
     out: str = typer.Option(..., "--out", help="Output JSONL path."),
