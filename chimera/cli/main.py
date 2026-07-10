@@ -2113,17 +2113,8 @@ def solve(
     )
     from chimera.core.autonomous import AutonomousResult
     from chimera.core.verify import CommandVerifier
-    from chimera.ecosystem import TrajectoryCollector
-    from chimera.evolution import (
-        AutoSkillEvolver,
-        CardRetriever,
-        CollectiveSkillEvolver,
-        ExperienceBuffer,
-        SkillEvolver,
-        SkillStore,
-    )
+    from chimera.evolution import build_evolution_context
     from chimera.fusion.probe_log import ProbeLog as _ProbeLog
-    from chimera.governance.validator import SkillValidator
     from chimera.providers import LLMGateway, MissingCredentialsError
     from chimera.tools import default_registry
 
@@ -2252,6 +2243,23 @@ def solve(
         )
         from chimera.evolution import StagnationDetector
 
+        # The six learning seams (experience, trajectories, memory, auto_evolver, cards, playbook)
+        # assembled once by the shared factory (M19-A0), so the flywheel is a property of the agent
+        # stack, not this one command. `memory`/`playbook` are injected — their construction pulls
+        # CLI-local helpers. Behaviour-preserving: same seams, same conditions as the old inline block.
+        evo = build_evolution_context(
+            settings,
+            gateway,
+            model,
+            home=settings.home,
+            collect=collect,
+            evolve_skills=not no_evolve_skills,
+            panel_evolution=panel_evolution,
+            audit=allow_audit,
+            memory=None if no_remember else _memory_manager(),
+            playbook=stored_playbook,
+        )
+
         auto = AutonomousAgent(
             worker,
             escalate_worker=escalate_worker,
@@ -2272,9 +2280,6 @@ def solve(
             # Independent strong verification (--strong-verify MODEL): a stronger judge grades
             # hard-turn (retried) results before they're accepted. Uses the same gateway, other model.
             strong_verifier=StrongVerifier(gateway, strong_verify) if strong_verify else None,
-            # ACE playbook (--playbook): inject accumulated, delta-curated strategy bullets as
-            # advisory context; the run is curated back into it afterwards (closed loop).
-            playbook=stored_playbook,
             # Dual-ledger re-plan (--replan): on a stall, rebuild the plan from accumulated
             # failure causes rather than just nudging. Needs the planner (so not with --no-plan).
             replan_on_stall=replan,
@@ -2297,35 +2302,9 @@ def solve(
             # PROBE (M18-5): record (arm, cheap manager proxy, verified reward) per attempt.
             probe_log=_ProbeLog(settings.home / "probe.jsonl") if probe_log else None,
             guard=WorkspaceGuard(ws),
-            experience=ExperienceBuffer(settings.home / "experience.json"),
-            trajectories=TrajectoryCollector(settings.home / "trajectories.jsonl") if collect else None,
-            memory=None if no_remember else _memory_manager(),
-            auto_evolver=(
-                None
-                if no_evolve_skills
-                else AutoSkillEvolver(
-                    SkillEvolver(gateway, model),
-                    SkillStore(settings.home / "skills.json"),
-                    validator=SkillValidator(),
-                    audit=allow_audit,
-                    # M18-4: born on measured probation when CHIMERA_PROVISIONAL_SKILLS is set.
-                    provisional=settings.provisional_skills,
-                    # With fusion reachable (--fuse OR --cascade) over a real panel, evolve skills
-                    # across the panel and keep the most transferable one (OpenClaw-Skill) instead
-                    # of a single-model proposal. See `panel_evolution` above.
-                    collective=(
-                        CollectiveSkillEvolver(gateway, settings.fusion_panel, validator=SkillValidator())
-                        if panel_evolution
-                        else None
-                    ),
-                    accept_mode=settings.skill_accept_mode,
-                )
-            ),
-            cards=(
-                CardRetriever(SkillStore(settings.home / "skills.json"), k=settings.skill_cards_k)
-                if settings.skill_cards
-                else None
-            ),
+            # The six learning seams (experience, trajectories, memory, auto_evolver, cards, playbook)
+            # from the shared factory above (M19-A0).
+            **evo.apply_to(),
             spine_workspace=ws,
             on_event=_stream_sink if stream else None,
             # Durable execution (--thread): checkpoint the loop to SQLite so a crash can resume.

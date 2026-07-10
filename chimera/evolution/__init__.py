@@ -30,6 +30,7 @@ from chimera.evolution.playbook import (
     PlaybookCurator,
     PlaybookItem,
 )
+from chimera.evolution.context import EvolutionContext, build_evolution_context
 from chimera.evolution.skill_nudges import SkillNudge, detect_skill_nudges
 from chimera.evolution.skill_store import SkillStore
 from chimera.evolution.stagnation import (
@@ -79,4 +80,6 @@ __all__ = [
     "StagnationReport",
     "pearson",
     "mean_pairwise_correlation",
+    "EvolutionContext",
+    "build_evolution_context",
 ]

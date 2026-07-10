@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **M19-A0 — shared `EvolutionContext`.** The six self-learning seams (experience buffer, trajectory
+  collection, long-term memory, learned-skill distillation + retrieval, ACE playbook) were assembled
+  inline only inside `chimera solve`; every other autonomous path built a bare agent that neither
+  learned nor read what was learned. A new `chimera/evolution/context.py` bundles them behind one
+  factory (`build_evolution_context`) + `apply_to()` (splat into `AutonomousAgent`) + `record_external`
+  (let a non-Autonomous path still log an experience row and credit retrieved skill cards). `solve()`
+  now calls the factory — behaviour-preserving, and the foundation for turning the flywheel on across
+  the lanes/lifecycle/hierarchy (M19 Track A).
+
 ## [0.16.3] - 2026-07-10
 
 **"Show me you're listening."** A chat now visibly acknowledges your message the moment it arrives —
