@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **`chimera project` — resume after `start --yes` no longer re-asks for plan approval.** A live test
+  on the VPS caught it: `project start --yes` auto-approved the plan for that invocation but never
+  persisted `plan_approved`, so a later `project approve <id> --card <c>` (a fresh orchestrator that
+  recomputes `require_plan_approval` from the durable state) bounced back to "approve the initial
+  plan" instead of running the approved high-risk card. The orchestrator now persists `plan_approved`
+  the moment a run proceeds past the plan gate, so resumes never re-ask.
+
 ## [0.17.0] - 2026-07-10
 
 **"Flywheel & Project."** Two capabilities land together. First, the self-evolution machinery — which

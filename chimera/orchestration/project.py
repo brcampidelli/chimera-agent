@@ -227,6 +227,13 @@ class ProjectOrchestrator:
         self._reconcile_blocked(satisfied)
         if self.config.require_plan_approval and not self.state.plan_approved:
             return self._set("awaiting_approval", "approve the initial plan to begin")
+        # Past the plan gate — persist that the plan is approved, so a resumed run (which recomputes
+        # ``require_plan_approval`` from the durable ``plan_approved``) never re-asks. Without this,
+        # a ``start --yes`` (require_plan_approval=False, but plan_approved never set) would re-pause
+        # for plan approval on the next resume — e.g. right after approving a high-risk card.
+        if not self.state.plan_approved:
+            self.state.plan_approved = True
+            self._save()
         if self.state.iterations >= self.config.max_iterations:
             return self._set("escalated", f"max_iterations ({self.config.max_iterations}) reached")
         card = self._next_ready_card(satisfied)

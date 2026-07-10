@@ -13,7 +13,7 @@ import yaml
 
 from chimera.kanban.dispatch import LaneResult
 from chimera.kanban.models import KanbanCard
-from chimera.orchestration.project import ProjectConfig, ProjectOrchestrator
+from chimera.orchestration.project import ProjectConfig, ProjectOrchestrator, ProjectState
 
 
 def _spec_file(tmp_path: Path, requirements: list[dict[str, Any]]) -> Path:
@@ -99,6 +99,37 @@ def test_high_risk_card_pauses_until_approved(tmp_path: Path) -> None:
     state = proj.run()
     assert state.status == "done"
     assert solve.ran == ["r1"]
+
+
+def test_yes_start_then_resume_approve_card_does_not_reask_plan(tmp_path: Path) -> None:
+    # Regression (VPS live test): `start --yes` pauses at a high-risk card; RESUMING with a fresh
+    # orchestrator (config recomputed as require_plan_approval = not plan_approved, like the CLI) and
+    # approving the card must COMPLETE — not bounce back to "approve the initial plan".
+    reqs = [
+        {"id": "build", "check": "contains", "target": "BUILT", "text": "build"},
+        {"id": "deploy", "check": "contains", "target": "SHIP", "text": "deploy",
+         "risk": "high", "depends_on": ["build"]},
+    ]
+    ws = tmp_path / "ws"
+    solve = FakeSolve(ws, {"build": "BUILT", "deploy": "SHIP"})
+    proj = _project(tmp_path, reqs, solve, require_plan_approval=False)  # --yes
+    state = proj.run()
+    assert state.status == "awaiting_approval"
+    assert state.pending_card_id is not None
+    assert state.plan_approved is True  # the fix: proceeding past the plan gate persisted this
+    pid, card_id = state.id, state.pending_card_id
+    home = tmp_path / "home"
+
+    # Resume exactly as the CLI does: require_plan_approval = not persisted plan_approved.
+    reloaded = ProjectState.load(ProjectOrchestrator.project_dir(home, pid) / "project.json")
+    resumed = ProjectOrchestrator.load(
+        home, pid, solve_card=solve,
+        config=ProjectConfig(require_plan_approval=not reloaded.plan_approved),
+    )
+    resumed.approve_card(card_id)
+    final = resumed.run()
+    assert final.status == "done"  # NOT stuck re-asking for plan approval
+    assert solve.ran == ["build", "deploy"]
 
 
 def test_denied_high_risk_card_escalates(tmp_path: Path) -> None:
