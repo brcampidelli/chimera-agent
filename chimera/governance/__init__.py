@@ -11,6 +11,7 @@ from chimera.governance.actors import (
     FourActorGovernance,
     GovernanceDecision,
 )
+from chimera.governance.aggregate_monitor import AggregateMonitor, CollusionFinding
 from chimera.governance.allowlist import restrict_registry
 from chimera.governance.audit import AuditLog
 from chimera.governance.drift import (
@@ -68,6 +69,8 @@ __all__ = [
     "CapabilityEvent",
     "SequenceAssessment",
     "assess_action",
+    "AggregateMonitor",
+    "CollusionFinding",
     "LedgeredTool",
     "ledger_registry",
     "fence",

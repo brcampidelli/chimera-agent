@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Aggregate cross-agent monitor + collusion red-team** — Tier-2/3 from the arXiv sweep (FakeLab,
+  arXiv 2607.07368). A per-worker monitor is **insufficient under fan-out**: work split across
+  sub-agents can look benign per agent while the *aggregate* is malicious. The canonical case is split
+  exfiltration — agent A fetches untrusted content (tainted in A's ledger), agent B execs it; B's own
+  `TaintLedger` never saw the fetch, so B's per-action `assess_action` allows it. `AggregateMonitor`
+  (`chimera/governance/aggregate_monitor.py`) sits one level up: given each sub-agent's capability
+  events, it escalates **cross-agent-taint** (one agent consumed untrusted content and a *different*
+  agent performed a sink — exec/escalation/executable-write) and **fan-out-volume** (aggregate sink
+  count over budget though each agent stays under its own). Like the per-agent ledger it only escalates
+  to *review*, never hard-blocks; pure/deterministic so an orchestrator feeds it `TaintLedger.events`
+  after a run. Ships with a collusion red-team test that proves the per-agent monitor misses the split
+  flow and the aggregate monitor catches it.
 - **Bug-report task normalizer (`solve --normalize-task`)** — Tier-2 from the arXiv sweep
   (arXiv 2607.07593). A long, rambling bug report *hurts* an agent: narrative buries the few facts that
   matter, and the paper measured that trimming it — surfacing the salient fields up front — improves
