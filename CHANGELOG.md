@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-07-10
+
+**Patch — `chimera project` resume fix (found by a live test).**
+
 ### Fixed
 - **`chimera project` — resume after `start --yes` no longer re-asks for plan approval.** A live test
   on the VPS caught it: `project start --yes` auto-approved the plan for that invocation but never
