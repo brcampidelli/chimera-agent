@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **PROBE — best-arm identification with a cheap-proxy control variate (`probe-select`)** — M18-5, from
+  the arXiv sweep (arXiv 2607.06879). "Which model/config is best?" is a best-arm problem where each
+  expensive reward (a real grade) pairs with a cheap proxy (a weak judge) of unknown correlation ρ.
+  `ProbeBestArm` uses the proxy as a **control variate** so the estimate's variance scales by (1−ρ²) —
+  fewer expensive draws when the proxy is good, and **unbiased when the proxy is useless** (β→0, it
+  degrades to the plain reward mean with a wider interval, never a biased one). Returns each arm's
+  adjusted mean ± interval, the δ-confident winner, and — if not yet confident — the arm to sample
+  next. Pure + offline-testable; `chimera probe-select` runs it over recorded (proxy, reward)
+  observations. `chimera/eval/probe.py`. (Live router wiring — recording proxy+reward per route — is
+  the natural follow-on.)
 - **Measured skill-lifecycle loop — provisional tier + auto promote/demote** — M18-4, from the arXiv
   sweep (arXiv 2607.07052, triple-corroborated; production −70% cost). Closes the loop Chimera half-had:
   it could *signal* under-performing skills but applied retirement manually and had no promotion tier.

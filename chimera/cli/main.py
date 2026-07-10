@@ -3671,6 +3671,47 @@ def redteam() -> None:
         )
 
 
+@app.command("probe-select")
+def probe_select(
+    data: str = typer.Argument(..., help='JSON: {"arm": [[proxy, reward-or-null], ...], ...} — cheap proxy scores paired with expensive rewards (null = a cheap-only draw).'),
+    delta: float = typer.Option(0.1, "--delta", help="Confidence level (smaller = stricter)."),
+    min_reward: int = typer.Option(2, "--min-reward", help="Expensive rewards required per arm before deciding."),
+) -> None:
+    """PROBE best-arm identification with a cheap-proxy control variate (M18-5).
+
+    "Which model/config is best?" where each expensive reward (a real grade) is paired with a cheap
+    proxy (a weak judge) of unknown correlation. PROBE uses the proxy as a control variate so the
+    estimate needs FEWER expensive draws the better the proxy correlates — and stays unbiased when the
+    proxy is useless. Prints each arm's adjusted mean ± interval, the winner, and — if not yet
+    confident — the arm to sample next. Feed it recorded (proxy, reward) observations from a bench.
+    """
+    import json
+
+    from chimera.eval.probe import ProbeBestArm
+
+    raw = json.loads(Path(data).read_text(encoding="utf-8"))
+    arms = {
+        str(name): [(float(o[0]), None if o[1] is None else float(o[1])) for o in obs]
+        for name, obs in raw.items()
+    }
+    decision = ProbeBestArm(delta=delta, min_reward=min_reward).select(arms)
+    for e in decision.estimates:
+        hw = "±∞" if e.half_width == float("inf") else f"±{e.half_width:.3f}"
+        console.print(
+            f"  {e.arm:<16} mean {e.mean:6.3f} {hw}   (rewards={e.n_reward}, proxy={e.n_proxy}, ρ={e.rho:.2f})"
+        )
+    if decision.best is None:
+        console.print("[dim]No arms.[/dim]")
+        return
+    if decision.confident:
+        console.print(f"\n[green]best: {decision.best}[/green] (δ-confident)")
+    else:
+        console.print(
+            f"\n[yellow]best so far: {decision.best}[/yellow] — not δ-confident; "
+            f"sample [bold]{decision.next_arm}[/bold] next"
+        )
+
+
 @app.command("bench-compare")
 def bench_compare(
     baseline: str = typer.Argument(..., help="JSON file of the baseline arm's per-task pass/fail (list of bools, or {task: bool})."),
