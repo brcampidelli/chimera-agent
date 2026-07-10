@@ -23,8 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `--gen-tests` instead generates an executable pytest module grounded in the task's extracted
   atomic requirements and runs it as the gate, catching bugs the coverage grade misses. Opt-in;
   generated once then re-run on retries; any generation/run error degrades to a non-blocking pass
-  (can only help, never falsely block). `chimera/core/spec_test.py`. *(Not yet "done" by the project's
-  bar: needs a published paired-A/B number — coverage-grade vs generated-tests — on a goldilocks model.)*
+  (can only help, never falsely block). `chimera/core/spec_test.py`. **Measured** (paired A/B, goldilocks
+  mistral-small-24b, n=6, `bench/local_lift/RESULTS.md`): gen-tests solved **3/6 vs 0/6** for the LLM
+  coverage grade (Δ +50pp, 3-0 discordant pairs, CI [-6.1%, +50%] — not significant at n=6, reported
+  as-is). Honest caveat: the win is a **resolve-rate** win (executable pytest feedback lets the weak
+  model converge), not the false-positive reduction I pre-registered — that prediction was **retracted**
+  (gen-tests had 1 false positive to coverage's 0, because the coverage arm never self-accepts anything,
+  and a weak model can still write a shallow generated test).
 
 ## [0.14.0] - 2026-07-09
 

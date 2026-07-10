@@ -187,3 +187,34 @@ only to grade — no leak.
    sit near the floor; the discriminating signal is #1, not necessarily a significant resolve-rate lift.
 3. n=6 is small; the paired McNemar/Wilson may well be non-significant. Report as-is, no re-roll.
 
+
+### Result (run 2026-07-09, mistral-small-3.2-24b, n=6, timeout 240s/arm) — as-is, no re-roll
+
+```
+                       coverage-grade  gen-tests
+resolve rate (hidden)      0/6 (0%)     3/6 (50%)
+paired delta (Δ)           +50.0%   95% CI [-6.1%, +50.0%]  -> NOT significant (CI includes 0)
+discordant pairs           gen-tests +3 / coverage +0  (roman_validate, config_parse, fix_percentile)
+false positives            0            1  (eval_expr)
+```
+
+**Prediction #2 HELD (strongly, directionally):** gen-tests solved 3/6 where coverage solved 0/6, all
+3 discordant pairs favouring gen-tests, 0 against. One pair short of significance at n=6 — the same
+"strong signal, small-n CI" pattern the goldilocks runs keep producing. Not significant, reported as-is,
+no re-roll (that would be p-hacking).
+
+**Prediction #1 RETRACTED — it was wrong in direction.** I predicted gen-tests would have *fewer* false
+positives than coverage. Actual: coverage 0, gen-tests 1. The honest reason: on this weak model the
+coverage-grade arm *never self-reported success* (0/6 self=PASS) — it just keeps judging "not covered"
+and reverts forever, so it has zero opportunity to false-accept (and zero true-accepts: it solves
+nothing). gen-tests self-reported success 4×, of which 3 were real and 1 (eval_expr) was a genuine false
+positive: the weak model wrote a generated test too shallow to catch the edge case the hidden test
+checks. So spec-grounded tests are NOT a perfect oracle — a weak model can write a weak test.
+
+**Honest verdict for M18-1:** the win is real but it is a **resolve-rate** win, not the false-positive
+reduction I hypothesised. Executable pytest feedback lets the weak model *converge* (concrete failing
+assertions to fix), where the LLM coverage grade is a dead end that accepts nothing. That is exactly the
+"weak-model-lift" the project chases, measured (+50pp, 3-0 discordant, non-significant at n=6). The
+caveat ships with it: `--gen-tests` can itself be fooled by a shallow generated test (1/6 here) — a
+candidate follow-up is to reject trivially-passing generated tests (min assertions / mutation check).
+Cost: ~$1-2 (12 solves on a cheap model). Key: disposable `.env` test key.
