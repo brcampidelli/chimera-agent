@@ -221,7 +221,8 @@ class CrawlTool(Tool):
         if not url:
             return "error: crawl needs a url"
         limit = int(kwargs.get("limit") or 20)
-        max_depth = int(kwargs.get("max_depth") if kwargs.get("max_depth") is not None else 2)
+        raw_depth = kwargs.get("max_depth")
+        max_depth = int(raw_depth) if raw_depth is not None else 2
         include = self._list(kwargs.get("include"))
         exclude = self._list(kwargs.get("exclude"))
         try:

@@ -96,10 +96,10 @@ class _LinkParser(HTMLParser):
         super().__init__()
         self.hrefs: list[str] = []
 
-    def handle_starttag(self, tag: str, attrs: object) -> None:
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if tag != "a":
             return
-        for name, value in attrs or []:  # type: ignore[union-attr]
+        for name, value in attrs:
             if name == "href" and value:
                 self.hrefs.append(value)
 

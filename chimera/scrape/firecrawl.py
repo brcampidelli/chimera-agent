@@ -30,5 +30,6 @@ def firecrawl_scrape(url: str, api_key: str, *, timeout: float = 45.0) -> tuple[
     if not isinstance(data, dict):
         raise ValueError("firecrawl: unexpected response shape")
     markdown = str(data.get("markdown") or "")
-    metadata = data.get("metadata") if isinstance(data.get("metadata"), dict) else {}
+    meta_raw = data.get("metadata")
+    metadata: dict[str, Any] = meta_raw if isinstance(meta_raw, dict) else {}
     return markdown, metadata
