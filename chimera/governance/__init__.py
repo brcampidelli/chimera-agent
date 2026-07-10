@@ -41,7 +41,6 @@ from chimera.governance.precedent import PrecedentStore
 from chimera.governance.quarantine import (
     QuarantinedReader,
     QuarantineResult,
-    QuarantineTool,
     fields_schema,
 )
 from chimera.governance.sanitize import (
@@ -80,7 +79,6 @@ __all__ = [
     "has_control_tokens",
     "QuarantinedReader",
     "QuarantineResult",
-    "QuarantineTool",
     "fields_schema",
     "SkillValidator",
     "ScheduleValidator",

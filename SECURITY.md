@@ -59,8 +59,8 @@ environment** when you grant autonomy:
   u/Dependent_Policy1307, u/Far-Stable2591, u/zoharel on r/AI_Agents.)
 - **Quarantined reader (dual-LLM / CaMeL)** — the structural answer to injection: untrusted
   content is read by a *tool-less* model that can only emit schema-validated JSON
-  (`QuarantinedReader` / the `quarantine_extract` tool), and the privileged agent acts only
-  on those fields. Even a fully hijacked extractor can only produce *wrong field values* —
+  (`QuarantinedReader`, surfaced to the agent through the `extract` tool), and the privileged
+  agent acts only on those fields. Even a fully hijacked extractor can only produce *wrong field values* —
   never a new instruction, tool call, or capability, because the output is bounded by the
   Pydantic schema, not by the model's obedience. **Honest limit:** this only covers the
   *structured-extraction* shape ("pull the sender/price/date"); a task that genuinely needs
