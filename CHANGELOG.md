@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.16.3] - 2026-07-10
+
+**"Show me you're listening."** A chat now visibly acknowledges your message the moment it arrives —
+the bot shows a typing/working indicator while it thinks, on every messaging transport, so you know it
+received you and a reply is on the way.
+
 ### Added
 - **"Typing…" / working indicators on every messaging transport** — a chat now shows the bot received
   your message and is working on a reply, on each platform the way that platform allows:
