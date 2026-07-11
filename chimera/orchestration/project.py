@@ -189,7 +189,10 @@ class ProjectOrchestrator:
 
     def approve_plan(self) -> ProjectState:
         self.state.plan_approved = True
-        if self.state.status == "awaiting_approval":
+        # Only resume when the pause was the PLAN gate — not when a high-risk card is still pending
+        # (that needs approve_card). Guarding this avoids writing an inconsistent running-but-pending
+        # state to disk that a concurrent `project status` reader could observe.
+        if self.state.status == "awaiting_approval" and self.state.pending_card_id is None:
             self.state.status = "running"
         return self._save()
 
@@ -205,9 +208,15 @@ class ProjectOrchestrator:
         return self._save()
 
     def deny_card(self, card_id: str) -> ProjectState:
-        """Reject a high-risk card: park it in review and escalate to a human."""
-        if self.board.get(card_id) is not None:
-            self.board.move(card_id, "review")
+        """Reject the pending high-risk card: park it in review and escalate to a human.
+
+        Guarded (mirrors ``approve_card``): only the card that is actually awaiting approval can be
+        denied. A wrong/stale ``card_id`` (a typo, or one re-submitted after the pause resolved) is a
+        no-op — it must not forcibly escalate a healthy project or lose track of the real pending card.
+        """
+        if self.state.pending_card_id != card_id:
+            return self.state
+        self.board.move(card_id, "review")
         self.state.pending_card_id = None
         self.state.status = "escalated"
         self.state.note = f"high-risk card {card_id} denied by human"

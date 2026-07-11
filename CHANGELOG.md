@@ -14,6 +14,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   the README capability table — run it to see exactly what's ready and what each missing piece needs.
 
 ### Fixed
+- **Diff-gate held across the HITL pause (found by an adversarial code review).** A tainted, *hollow*
+  success (verifier passed but the workspace diff was empty) that paused for human approval could be
+  learned — written to memory and distilled into a skill — when approved on resume, because the
+  diff-gate verdict wasn't carried through the checkpoint. The verdict is now persisted at the pause
+  and re-applied on resume, so the M19-A2 anti-hollow-learning gate holds through the approval path.
+- **`chimera project` — `deny_card` and `approve_plan` are now guarded.** A wrong/stale card id
+  passed to `deny_card` no longer force-escalates a healthy project or loses the real pending card
+  (it's a no-op unless the id matches the pending card). `approve_plan` no longer flips a project to
+  "running" while a high-risk card is still awaiting approval, avoiding an inconsistent on-disk state.
 - **`chimera features` — `youtube_transcript` no longer always shows as "missing".** Its dependency
   was checked by PIP name (`youtube-transcript-api`, with hyphens) instead of the importable module
   name (`youtube_transcript_api`), so `find_spec` never resolved it. Now checked correctly; a test

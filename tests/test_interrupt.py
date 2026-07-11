@@ -61,6 +61,43 @@ def test_pause_off_finalizes_even_when_tainted(tmp_path: Path) -> None:
     assert result.success is True and result.paused is False
 
 
+def test_approved_hollow_tainted_success_is_not_learned(tmp_path: Path) -> None:
+    # Regression: a tainted, HOLLOW success (verify passed, empty workspace diff) that pauses for
+    # approval must STILL be blocked from being learned when a human approves it on resume — the
+    # HITL path must not bypass the M19-A2 diff-gate.
+    from chimera.core.checkpoint import WorkspaceGuard
+
+    class _Mem:
+        def __init__(self) -> None:
+            self.saved: list[tuple[str, str]] = []
+
+        def remember(self, content: str, *, key: str | None = None, provenance: str = "clean") -> object:
+            self.saved.append((content, provenance))
+            return ("ADD", None)
+
+    ws = tmp_path / "ws"
+    ws.mkdir()  # empty + separate from runs.db, so the diff is genuinely empty (hollow)
+    store = RunCheckpointer(tmp_path / "runs.db")
+    mem = _Mem()
+
+    def build() -> AutonomousAgent:
+        return AutonomousAgent(
+            _OkWorker(),  # writes nothing -> empty diff -> hollow success
+            taint=_Taint(True), checkpointer=store, pause_on_taint=True,
+            guard=WorkspaceGuard(ws), memory=mem,  # type: ignore[arg-type]
+            config=AutonomousConfig(max_attempts=1, use_planner=False, use_manager=False),
+        )
+
+    build().run("t", thread_id="job")
+    saved = store.load("job")
+    assert saved is not None and saved["productive"] is False  # the fix: verdict persisted at pause
+
+    assert store.approve("job") is True
+    resumed = build().run("t", thread_id="job")
+    assert resumed.success is True
+    assert mem.saved == []  # the diff-gate held across the HITL pause — nothing learned
+
+
 def test_approve_finalizes_without_rerunning(tmp_path: Path) -> None:
     store = RunCheckpointer(tmp_path / "runs.db")
     worker = _OkWorker()

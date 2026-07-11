@@ -320,6 +320,9 @@ class AutonomousAgent:
                     return self._finalize_success(
                         task, str(saved["paused_answer"]), attempts, prior_successes, plan,
                         thread_id, tainted=bool(saved.get("was_tainted", True)),
+                        # Carry the diff-gate verdict across the pause so an approved hollow success
+                        # is still not learned (None on legacy checkpoints → learns, as before).
+                        productive=saved.get("productive"),
                     )
                 feedback = str(saved.get("feedback", ""))
                 start_index = int(saved.get("next_index", 1))
@@ -466,6 +469,10 @@ class AutonomousAgent:
                     self._save_checkpoint(
                         thread_id, task, index, feedback, plan, attempts,
                         awaiting_approval=True, paused_answer=answer, was_tainted=True,
+                        # Persist the diff-gate verdict (M19-A2): a hollow success (empty diff) must
+                        # STILL be blocked from minting a skill/memory when it's approved on resume —
+                        # otherwise the HITL path silently bypasses the anti-hollow-learning gate.
+                        productive=diff_productive,
                     )
                     self._emit(_ev_status(f"paused for approval — tainted run (thread {thread_id})"))
                     return AutonomousResult(

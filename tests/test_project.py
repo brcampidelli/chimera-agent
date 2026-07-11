@@ -145,6 +145,34 @@ def test_denied_high_risk_card_escalates(tmp_path: Path) -> None:
     assert solve.ran == []
 
 
+def test_deny_wrong_card_is_a_noop(tmp_path: Path) -> None:
+    # A stale/typo card id must NOT forcibly escalate a project or lose the real pending card.
+    reqs = [{"id": "r1", "check": "contains", "target": "SHIP", "text": "deploy", "risk": "high"}]
+    solve = FakeSolve(tmp_path / "ws", {"r1": "SHIP"})
+    proj = _project(tmp_path, reqs, solve, require_plan_approval=False)
+    state = proj.run()
+    assert state.status == "awaiting_approval"
+    real_pending = state.pending_card_id
+
+    proj.deny_card("bogus-card-id")  # wrong id
+    assert proj.state.status == "awaiting_approval"  # unchanged — not force-escalated
+    assert proj.state.pending_card_id == real_pending  # the real pending card is preserved
+
+
+def test_approve_plan_does_not_resume_while_a_card_is_pending(tmp_path: Path) -> None:
+    # A project paused on a high-risk CARD must not be flipped to "running" by approve_plan
+    # (which approves the plan gate) — that would write an inconsistent running-but-pending state.
+    reqs = [{"id": "r1", "check": "contains", "target": "SHIP", "text": "deploy", "risk": "high"}]
+    solve = FakeSolve(tmp_path / "ws", {"r1": "SHIP"})
+    proj = _project(tmp_path, reqs, solve, require_plan_approval=False)
+    proj.run()
+    assert proj.state.status == "awaiting_approval" and proj.state.pending_card_id is not None
+
+    proj.approve_plan()
+    assert proj.state.status == "awaiting_approval"  # still paused for the card, not running
+    assert proj.state.pending_card_id is not None
+
+
 def test_failed_card_escalates_to_human(tmp_path: Path) -> None:
     reqs = [{"id": "r1", "check": "contains", "target": "HELLO", "text": "has HELLO"}]
     solve = FakeSolve(tmp_path / "ws", {"r1": "HELLO"}, fail=("r1",))
