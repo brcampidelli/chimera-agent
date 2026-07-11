@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.18.2] - 2026-07-11
+
+**Adversarial-review hardening.** Two adversarial reviews — of the governance/security surface and the
+hierarchy/orchestration cost accounting — found ten real bugs the test suite missed, all fixed and
+regression-tested (the same discipline that caught the fusion bugs in 0.18.1). Plus honest tail-cost
+reporting in the cost bench and a friendlier contributor onboarding.
+
 ### Added
 - **Cost-bench reports the tail, not just the mean.** `chimera cascade-bench` now reports per-arm
   **p50 / p95 / p99 / max** token cost alongside the mean and tokens-per-pass. A cascade can look
