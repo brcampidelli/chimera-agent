@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   cheap on average while a handful of tasks escalate all the way to fusion — the p95/p99 surface that
   worst-case cost, which is what a token budget actually has to plan for.
 
+### Documentation
+- **Contributor onboarding.** A `Makefile` gives the whole quality gate in one command (`make check`)
+  plus `install` / `fmt` / `cov` / `docs` / `clean`; CONTRIBUTING now points to it. The
+  [Architecture](docs/architecture.md) map was refreshed to cover the newer subsystems — the taint
+  layer (ledger / aggregate monitor / drift / quarantine), the delegation cost economics
+  (hierarchy / cascade / budget / receipts), the self-evolution flywheel, and start-to-finish project
+  autonomy. The docs site now builds `--strict` clean, and the fusion-receipts page is in the nav.
+
 ### Fixed
 - **Hierarchy cost-honesty fixes from an adversarial review of the orchestration surface.** Four
   issues in the "the hierarchy saved X is auditable" claim, all fixed and regression-tested:

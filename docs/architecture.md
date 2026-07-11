@@ -78,6 +78,24 @@ A self-improving trust kernel (AgentTrust v2, `2606.08539`):
 - `GovernedTool` / `govern_registry` — wrap any tool so its execution is gated; composes with
   the existing agent loop unchanged (`chimera ... --guard`).
 
+### The taint layer (prompt-injection containment)
+
+Layered on top of the kernel — heuristic, honest, and never a hard boundary (the sandbox is):
+
+- `TaintLedger` + `LedgeredTool` (`ledger.py`, `ledger_tool.py`) — a per-run capability ledger.
+  A fetch taints its content; a write/exec that consumes tainted content **escalates to review**
+  (`assess_action`). Untrusted fetched content is returned **data-fenced** and with chat-template
+  control tokens stripped (`sanitize.py`), and durable artifacts from a tainted run keep a
+  `tainted` provenance so poison can't launder itself into a "clean" memory/skill.
+- `AggregateMonitor` (`aggregate_monitor.py`) — a monitor one level up: given each sub-agent's
+  capability events, it catches **split flows** a per-agent monitor can't see (agent A fetches
+  untrusted content, agent B execs or **exfiltrates** it).
+- `check_drift` (`drift.py`) — a `Spec` of executable requirements (`defines`/`contains`/`absent`/
+  `command`) that doubles as the `solve --verify` ground truth and the project orchestrator's
+  authority on "done" (below). Negative checks fail closed on files they can't scan.
+- `QuarantineTool` + adaptive allowlist (`quarantine.py`, `allowlist.py`) — a dual-LLM/CaMeL
+  quarantined reader and a taint-adaptive tool allowlist that narrows once a run is tainted.
+
 ## Multi-agent teams (Tier 3)
 
 `chimera/orchestration/`
@@ -101,6 +119,60 @@ A self-improving trust kernel (AgentTrust v2, `2606.08539`):
   ("Govern the Repository", `2606.28235`).
 - `TrajectoryCollector` — records (prompt, response, outcome) and exports **SFT / DPO**
   datasets. Actual fine-tuning is **opt-in and external** — Chimera collects, it doesn't train.
+
+## Cost economics & the delegation hierarchy
+
+`chimera/orchestration/` (hierarchy, cascade, budget, receipts, envelope_verify)
+
+Delegation only pays when it's cheaper than doing the work inline, and the claim is **measured, not
+asserted**:
+
+- `HierarchicalOrchestrator` — decompose → dispatch budgeted workers → verify each result →
+  synthesize. Read-shaped fan-out delegates; a trivially small subtask is answered inline by the
+  trusted top model.
+- `CascadeBackend` — weak → gate → mid → gate → fusion, climbing only when a tier's answer fails a
+  cheap acceptance gate. The **route log** records every hop, so the cost is the **sum over hops
+  tried**, not just the accepted one — escalations are paid for.
+- `TokenBudget` / `BudgetedBackend` / `EffortPolicy` — a hard token ceiling enforced at the backend,
+  per worker.
+- `EnvelopeVerifier` — schema → acceptance criteria → probabilistic **spot check** (grade a summary's
+  faithfulness against the raw artifact); a re-ask triggered by a spot failure is re-audited.
+- **Delegation receipts** (`receipts.py`) — every delegation logs its measured tokens/cost **and the
+  inline counterfactual in the same row**, priced at each model's own rate (unknown model → `None`,
+  never fabricated). The orchestrator's own decompose/synth overhead is metered too, so
+  `summarize_delegations` (`chimera delegations`) reports an **auditable** net saving, and
+  `cascade-bench` reports the cost **tail** (p50/p95/p99), not just the mean.
+
+## The self-evolution flywheel
+
+`chimera/evolution/`
+
+The "training" that never touches weights — fitness-signaled, gradient-free, and reversible:
+
+- `EvolutionContext` — the shared assembly (experience, trajectories, memory, auto-evolver, skill
+  cards, playbook) that makes learning a property of the agent *stack*, not just the `solve` command.
+- Skill cards + **GEPA** refinement, ACE **playbook**, and a `SkillLifecyclePolicy` that promotes/
+  demotes a skill by its **measured** use/success stats (a new skill is born `provisional`).
+- The **diff-gate** — a "hollow success" (verifier passed but the workspace diff is empty) does not
+  mint a skill or memory; the flywheel only learns from work that actually happened.
+- The **transfer-gate** (`eval/transfer.py`) — a tuned artifact is promoted only if it also holds on
+  a holdout, guarding against negative transfer. `maturity.Scorecard.weakest()` is the objective:
+  the loop targets the weakest capability. Regressions auto-roll-back only on a **statistically
+  significant** drop (a CI, never a single point).
+
+Every flip of a default is gated behind a **pre-registered** paired A/B (`bench/`), published whether
+it wins or loses — no re-rolling for significance.
+
+## Project autonomy (start-to-finish)
+
+`chimera/orchestration/project.py`
+
+`ProjectOrchestrator` runs a whole project against a `Spec`: task-graph (a Kanban DAG with
+`depends_on`) → each ready card solved (with the evolution context above) → **accepted against the
+Spec** via `check_drift` (the only authority on "done") → unmet requirements generate the next cards,
+looping until the Spec is aligned or a budget / max-iterations / human checkpoint stops it. Risky
+steps (`risk: high` — deploy / migration / delete) **pause for human approval**; the run is durable
+and resumable.
 
 ## Cross-cutting
 

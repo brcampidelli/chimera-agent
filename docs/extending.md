@@ -6,7 +6,7 @@ copy-pasteable example. No deep knowledge of the codebase required.
 
 New to the project first? Read the [Usage Guide](usage.md) and the
 [Architecture overview](architecture.md). Ready to send a change? See
-[CONTRIBUTING.md](../CONTRIBUTING.md).
+[CONTRIBUTING.md](https://github.com/brcampidelli/chimera-agent/blob/main/CONTRIBUTING.md).
 
 | I want to… | Add a… | Where |
 |---|---|---|

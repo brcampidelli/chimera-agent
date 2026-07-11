@@ -3,24 +3,33 @@
 Thanks for your interest! Chimera is in early alpha — the architecture is settling, so issues and
 design discussion are especially welcome.
 
-**Adding a feature?** The **[Extending guide](docs/extending.md)** shows how to add your own
-**tool, skill, or recipe** with complete, copy-paste examples — the fastest way to make your first
-contribution.
+**New here?** Two maps of the codebase:
+- **[Architecture](docs/architecture.md)** — where each subsystem lives and the research it builds on.
+- **[Extending guide](docs/extending.md)** — how to add your own **tool, skill, or recipe** with
+  complete, copy-paste examples — the fastest way to make your first contribution.
 
 ## Dev setup
 
 ```bash
-uv sync --extra dev
+make install            # = uv sync --extra dev
 uv run chimera doctor
 ```
 
 ## Quality gate (run before every PR)
 
 ```bash
+make check              # lint + type + test, the whole gate in one command
+```
+
+Prefer the raw commands (or on native Windows, where `make` may be absent)? They are:
+
+```bash
 uv run ruff check .
 uv run mypy chimera
 uv run pytest
 ```
+
+`make help` lists the other targets (`fmt`, `cov`, `docs`, `clean`).
 
 - **Type-safe**: `mypy --strict` clean; avoid `Any`.
 - **Small units**: functions ≤ 40 lines, files ≤ 300 lines where practical.

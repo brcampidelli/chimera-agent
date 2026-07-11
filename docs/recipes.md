@@ -91,7 +91,7 @@ uv run chimera solve "Research 'on-device small language models 2026': web_searc
 ```
 
 For a ready-made version with an executable check per step, see
-[`examples/research_brief`](../examples/research_brief/README.md) — it uses `arxiv_search` +
+[`examples/research_brief`](https://github.com/brcampidelli/chimera-agent/tree/main/examples/research_brief) — it uses `arxiv_search` +
 `web_search` out of the box, and with the `browser` extra installed the agent can also `read_text`
 full pages instead of stopping at search snippets.
 

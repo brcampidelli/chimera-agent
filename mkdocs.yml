@@ -45,4 +45,5 @@ nav:
       - Security & safeguards: security.md
   - Understand:
       - Architecture: architecture.md
+      - Fusion receipts (cost × quality): fusion-receipts.md
       - Benchmarks (weak-model lift): benchmarks.md
