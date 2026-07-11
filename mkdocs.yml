@@ -38,6 +38,8 @@ nav:
       - Recipes overview: recipes.md
   - Connect:
       - MCP servers: mcp.md
+  - Extend:
+      - Add a tool, skill, or recipe: extending.md
   - Operate:
       - Deploy (Docker / systemd): deploy.md
       - Security & safeguards: security.md

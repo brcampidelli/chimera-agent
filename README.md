@@ -346,7 +346,9 @@ uv run pytest -q         # the test suite
 
 Contributions are very welcome — code, docs, ideas, bug reports. Start with
 [CONTRIBUTING.md](CONTRIBUTING.md) and our [Code of Conduct](CODE_OF_CONDUCT.md).
-Found a security issue? See [SECURITY.md](SECURITY.md).
+Want to teach Chimera something new? The **[Extending guide](docs/extending.md)** walks through
+adding your own **tool, skill, or recipe** (with copy-paste examples). Found a security issue? See
+[SECURITY.md](SECURITY.md).
 
 ## Community
 

@@ -3,6 +3,10 @@
 Thanks for your interest! Chimera is in early alpha — the architecture is settling, so issues and
 design discussion are especially welcome.
 
+**Adding a feature?** The **[Extending guide](docs/extending.md)** shows how to add your own
+**tool, skill, or recipe** with complete, copy-paste examples — the fastest way to make your first
+contribution.
+
 ## Dev setup
 
 ```bash
