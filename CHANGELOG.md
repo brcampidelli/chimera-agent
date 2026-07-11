@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **M19-A1 measured — reading skill cards stays OFF by default (honest result).** Ran the
+  pre-registered paired A/B (`bench/skillcard/`) on a goldilocks model (mistral-small-24b, n=12):
+  injecting skill cards lifted accuracy **+16.7pp (66.7%→83.3%)** but the paired 95% CI was
+  **[−13.3%, +30.3%] — not significant**, and the token overhead was **+300%**. Both fail the
+  registered flip gate, so `CHIMERA_SKILL_CARDS_READ` stays OFF by default and card-reading remains
+  opt-in. The number is published either way (no re-rolling for significance).
+
 ### Added
 - **New example: `media_digest` — video/podcast → transcript → summary.** A real multimodal pipeline
   (`examples/media_digest/`): a script that composes `download_media` (yt-dlp) → `transcribe_audio`

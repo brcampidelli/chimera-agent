@@ -192,10 +192,11 @@ class Settings(BaseSettings):
     skill_cards: bool = Field(default=False, validation_alias="CHIMERA_SKILL_CARDS")
     skill_cards_k: int = Field(default=3, validation_alias="CHIMERA_SKILL_CARDS_K")
     # M19-A1 flip-point: when on, card READING couples to skill EVOLVING (a run that can mint a
-    # skill also reads the retrieved ones), instead of the independent `skill_cards` toggle. This is
-    # the single switch the A1 default-flip turns — kept OFF until a paired `chimera skillcard-bench`
-    # shows Δ ≥ 0 (don't flip a default by faith). Pair it with CHIMERA_PROVISIONAL_SKILLS + the
-    # lifecycle cron when flipping, so a misfiring card is born on probation and auto-demoted.
+    # skill also reads the retrieved ones), instead of the independent `skill_cards` toggle. Stays
+    # OFF by default — the paired A/B is in (bench/skillcard/RESULTS.md, goldilocks n=12): accuracy
+    # +16.7pp but NOT significant (CI includes 0) and +300% tokens, so it fails the registered
+    # flip gate and reading cards stays opt-in. Pair with CHIMERA_PROVISIONAL_SKILLS + the lifecycle
+    # cron if you do opt in, so a misfiring card is born on probation and auto-demoted.
     skill_cards_couple_read: bool = Field(
         default=False, validation_alias="CHIMERA_SKILL_CARDS_READ"
     )
