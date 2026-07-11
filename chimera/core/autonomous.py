@@ -106,6 +106,8 @@ class SupportsRunTainted(Protocol):
 
     def run_tainted(self) -> bool: ...
 
+    def record_fetch(self, source: str, content: str = ...) -> object: ...
+
 
 class SupportsCardContext(Protocol):
     """Retrieves TRS skill-card context relevant to a task (a CardRetriever)."""
@@ -328,6 +330,12 @@ class AutonomousAgent:
                 start_index = int(saved.get("next_index", 1))
                 steps = saved.get("plan_steps")
                 plan = Plan(steps=list(steps), raw=str(saved.get("plan_raw", ""))) if steps is not None else None
+                # Re-seed taint: the pre-crash run consumed untrusted content, so this resumed run is
+                # tainted too even if it fetches nothing new (it may succeed off residual workspace
+                # state). Without this the fresh ledger reads clean and the anti-poisoning gates
+                # (outbound strip, tainted provenance, pause-on-taint) silently no-op on resume.
+                if saved.get("was_tainted") and self.taint is not None and not self.taint.run_tainted():
+                    self.taint.record_fetch("resumed-tainted-state")
                 self._emit(_ev_status(f"resumed thread {thread_id} at attempt {start_index}"))
 
         self._emit(_ev_status("planning complete" if plan else "starting"))
@@ -548,7 +556,13 @@ class AutonomousAgent:
             # Durable checkpoint: this attempt failed, so persist the state to resume from the
             # NEXT attempt if the process dies. (A successful attempt returns above and clears
             # the thread, so only mid-run, still-failing state is ever checkpointed.)
-            self._save_checkpoint(thread_id, task, index + 1, feedback, plan, attempts)
+            # Persist taint (Zombie Agents): a fresh process resumes with an EMPTY ledger, so a
+            # later attempt succeeding off residual tainted workspace state would finalize as
+            # 'clean' — bypassing the outbound-strip, tainted-provenance and pause-on-taint gates.
+            self._save_checkpoint(
+                thread_id, task, index + 1, feedback, plan, attempts,
+                was_tainted=self.taint.run_tainted() if self.taint is not None else False,
+            )
 
         # The run ultimately failed: if this failure pattern recurs, distill an advisory
         # anti-pattern card so future attempts are warned. Guarded — the capability is

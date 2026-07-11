@@ -156,6 +156,16 @@ def test_merge_counts(tmp_path: Path) -> None:
     assert len(mgr.store) == 3
 
 
+def test_merge_preserves_tainted_provenance(tmp_path: Path) -> None:
+    # Importing another agent's memories must NOT launder a tainted fact to clean — the merge
+    # has to carry provenance through, or a poisoned import is recalled as verified.
+    mgr = _manager(tmp_path)
+    mgr.merge([MemoryItem(id="p", content="a poisoned fact from an untrusted store", provenance="tainted")])
+    stored = mgr.store.all()
+    assert len(stored) == 1
+    assert stored[0].provenance == "tainted"
+
+
 def test_delete(tmp_path: Path) -> None:
     mgr = _manager(tmp_path)
     _, item = mgr.remember("temporary")

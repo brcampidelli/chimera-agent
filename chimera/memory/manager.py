@@ -103,7 +103,12 @@ class MemoryManager:
         """Merge a batch, deduping against existing memory. Returns op counts."""
         counts = {"ADD": 0, "UPDATE": 0, "NOOP": 0}
         for item in items:
-            op, _ = self.remember(item.content, item.kind, key=item.key, source=item.source)
+            # Carry provenance through the merge: a tainted imported fact must NOT launder itself
+            # to clean (the same guarantee remember() makes for a direct tainted UPDATE).
+            op, _ = self.remember(
+                item.content, item.kind, key=item.key, source=item.source,
+                provenance=item.provenance,
+            )
             counts[op] += 1
         _log.debug("merged %d items: %s", len(items), counts)
         return counts

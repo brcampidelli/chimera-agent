@@ -40,8 +40,9 @@ class CollusionFinding:
 
 
 def _is_sink(event: CapabilityEvent) -> bool:
-    """A sink is an action that can cause external effect: exec, escalation, or an executable write."""
-    if event.kind in ("exec", "escalation"):
+    """A sink is an action that can cause external effect: exec, escalation, an outbound send
+    (email/post/webhook — the exfiltration channels), or a write into an executable file."""
+    if event.kind in ("exec", "escalation", "send"):
         return True
     return event.kind == "write" and event.ref.endswith(_CODE_SUFFIXES)
 

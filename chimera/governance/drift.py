@@ -82,6 +82,35 @@ def _present(workspace: Path, pattern: str) -> bool:
     return any(regex.search(text) for text in _iter_text(workspace))
 
 
+def _scan_absent(workspace: Path, pattern: str) -> tuple[bool, list[str]]:
+    """For a negative (``absent``) check: return (pattern_found, unscannable_files).
+
+    ``_iter_text`` silently skips oversized (> 1 MB) and undecodable files. For a POSITIVE check
+    that only risks a conservative false-'missing'; for a NEGATIVE (security) check it fails OPEN —
+    a forbidden pattern hiding in a skipped file would report 'absent'. So a negative check must
+    treat an unscannable file as un-verifiable, not as clean.
+    """
+    regex = re.compile(pattern)
+    found = False
+    unscannable: list[str] = []
+    for path in workspace.rglob("*"):
+        if path.is_dir():
+            continue
+        if any(part in _IGNORE_DIRS for part in path.relative_to(workspace).parts):
+            continue
+        try:
+            if path.stat().st_size > _MAX_FILE_BYTES:
+                unscannable.append(str(path.relative_to(workspace)))
+                continue
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            unscannable.append(str(path.relative_to(workspace)))
+            continue
+        if regex.search(text):
+            found = True
+    return found, unscannable
+
+
 def _defined(workspace: Path, name: str) -> bool:
     regex = re.compile(rf"^\s*(def|class)\s+{re.escape(name)}\b", re.MULTILINE)
     return any(regex.search(text) for text in _iter_text(workspace))
@@ -95,8 +124,17 @@ def _check(requirement: Requirement, workspace: Path) -> tuple[bool, str]:
         ok = _present(workspace, requirement.target)
         return ok, "" if ok else f"missing /{requirement.target}/"
     if requirement.check == "absent":
-        ok = not _present(workspace, requirement.target)
-        return ok, "" if ok else f"found /{requirement.target}/ (should be absent)"
+        found, unscannable = _scan_absent(workspace, requirement.target)
+        if found:
+            return False, f"found /{requirement.target}/ (should be absent)"
+        if unscannable:
+            # Fail closed: the pattern could be hiding in a file we couldn't read.
+            sample = ", ".join(unscannable[:3])
+            return False, (
+                f"cannot verify /{requirement.target}/ is absent: "
+                f"{len(unscannable)} unscannable file(s) (oversized/binary): {sample}"
+            )
+        return True, ""
     # command
     from chimera.sandbox import LocalSandbox
 

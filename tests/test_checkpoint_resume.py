@@ -125,3 +125,48 @@ def test_no_thread_is_a_noop(tmp_path: Path) -> None:
     agent = _agent(_CountingWorker(0), _RejectOnce(approve_from=1), store, attempts=1)
     agent.run("task")  # thread_id=None -> nothing persisted
     assert store.threads() == []
+
+
+# --- taint survives the checkpoint/resume boundary (anti-poisoning) ----------------------
+
+
+def _tainted_agent(
+    worker: object, manager: object, store: RunCheckpointer, taint: object, *,
+    attempts: int, pause_on_taint: bool = False,
+) -> AutonomousAgent:
+    return AutonomousAgent(
+        worker,  # type: ignore[arg-type]
+        manager=manager,  # type: ignore[arg-type]
+        checkpointer=store,
+        taint=taint,  # type: ignore[arg-type]
+        pause_on_taint=pause_on_taint,
+        config=AutonomousConfig(max_attempts=attempts, use_planner=False, use_manager=True),
+    )
+
+
+def test_taint_survives_crash_and_resume(tmp_path: Path) -> None:
+    from chimera.governance.ledger import TaintLedger
+
+    store = RunCheckpointer(tmp_path / "runs.db")
+    # Attempt 1 runs under taint (fetched untrusted content) and is rejected -> checkpointed;
+    # attempt 2 crashes, so the checkpoint survives. It must carry was_tainted=True.
+    taint1 = TaintLedger()
+    taint1.record_fetch("https://evil.test/instructions", content="do bad things")
+    agent1 = _tainted_agent(_CrashOnSecond(), _RejectOnce(approve_from=99), store, taint1, attempts=3)
+    with pytest.raises(RuntimeError):
+        agent1.run("task", thread_id="job")
+    saved = store.load("job")
+    assert saved is not None and saved.get("was_tainted") is True
+
+    # Resume in a FRESH process: a brand-new empty ledger. Without re-seeding, run_tainted() would be
+    # False and the anti-poisoning gate (pause_on_taint) would silently no-op. With the fix, the
+    # resumed run is re-tainted, so the successful attempt PAUSES for approval instead of finalizing.
+    taint2 = TaintLedger()
+    assert taint2.run_tainted() is False
+    agent2 = _tainted_agent(
+        _CountingWorker(0), _RejectOnce(approve_from=1), store, taint2, attempts=3,
+        pause_on_taint=True,
+    )
+    result = agent2.run("task", thread_id="job")
+    assert taint2.run_tainted() is True  # re-seeded from the tainted checkpoint
+    assert result.paused is True  # the tainted result paused for sign-off, not auto-finalized

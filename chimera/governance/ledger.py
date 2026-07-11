@@ -53,11 +53,28 @@ SIDE_EFFECT_TOOLS = frozenset(
 _URL_KEYS = ("url", "uri", "link")
 _QUERY_KEYS = ("query", "q", "search")
 _PATH_KEYS = ("path", "file", "filename", "filepath")
-_CONTENT_KEYS = ("content", "text", "data", "body")
+# Content keys include patch/diff shapes: an apply_patch/edit_file carrying its payload under
+# ``patch``/``diff``/``new_text`` must not slip past taint detection with an empty ("") content.
+_CONTENT_KEYS = ("content", "text", "data", "body", "patch", "diff", "new_text", "new_str", "contents")
 _COMMAND_KEYS = ("command", "cmd", "code", "script")
 
 # Files whose tainted content means "self-modification based on untrusted input".
 _CODE_SUFFIXES = (".py", ".sh", ".bash", ".zsh", ".js", ".ts", ".rb", ".pl", ".ps1")
+# Files another system EXECUTES/INTERPRETS — tainted content here is self-modification too, even
+# without a code suffix: a poisoned scheduler config, CI workflow, Dockerfile or shell dotfile runs
+# a payload on the next tick/build/login.
+_SELF_EXEC_SUFFIXES = (".yml", ".yaml", ".toml", ".service")
+_SELF_EXEC_NAMES = frozenset(
+    {"jobs.json", "crontab", "dockerfile", "makefile", ".bashrc", ".bash_profile",
+     ".profile", ".zshrc", ".zprofile", ".env"}
+)
+
+
+def _is_self_executing(path: str) -> bool:
+    """True if a write to ``path`` is code the agent (or another system) will later run."""
+    p = path.strip().lower()
+    base = p.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
+    return p.endswith(_CODE_SUFFIXES) or p.endswith(_SELF_EXEC_SUFFIXES) or base in _SELF_EXEC_NAMES
 
 # Below this length a tainted snippet is too generic to treat as a flow match (avoids
 # escalating on a stray shared word); above it, a verbatim reappearance is a real signal.
@@ -142,6 +159,16 @@ class TaintLedger:
     def record_exec(self, command: str) -> CapabilityEvent:
         _, refs = self._content_is_tainted(command)
         return self._add("exec", command[:200], tainted=bool(refs), provenance=refs)
+
+    def record_send(self, tool: str, target: str = "") -> CapabilityEvent:
+        """Record a non-idempotent OUTBOUND side effect (send_email/http_post/...).
+
+        This is an exfiltration SINK: the aggregate cross-agent monitor needs to see it to catch a
+        split flow (agent A fetches untrusted content, agent B sends it out). Without a recorded
+        event these channels were invisible to sink detection, and the split-exfil the monitor
+        exists to catch passed clean.
+        """
+        return self._add("send", (target or tool).strip() or tool)
 
     def record_env(self, var: str) -> CapabilityEvent:
         return self._add("env", (var or "").strip())
@@ -238,10 +265,10 @@ def assess_action(
         path = _first(args, _PATH_KEYS)
         content = _first(args, _CONTENT_KEYS)
         tainted, refs = ledger._content_is_tainted(content)
-        if tainted and path.endswith(_CODE_SUFFIXES):
+        if tainted and _is_self_executing(path):
             return SequenceAssessment(
                 True, Decision.REVIEW,
-                f"writes untrusted content into an executable file {path!r} ({', '.join(refs)})",
+                f"writes untrusted content into an executable/interpreted file {path!r} ({', '.join(refs)})",
                 refs,
             )
     return SequenceAssessment(False, Decision.ALLOW)

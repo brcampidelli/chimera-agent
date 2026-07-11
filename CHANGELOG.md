@@ -6,6 +6,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+- **Governance hardening from an adversarial review of the security surface.** Six real gaps the
+  tests missed, all fixed and regression-tested:
+  - *Taint survives crash/resume:* a run that consumed untrusted content, then crashed and resumed in
+    a fresh process, came back with an **empty** taint ledger — a later attempt succeeding off residual
+    workspace state finalized as "clean", bypassing the outbound-strip, tainted-provenance and
+    pause-on-taint gates. Taint is now persisted in the ordinary checkpoint and re-seeded on resume.
+  - *Aggregate monitor sees exfiltration sinks:* the cross-agent split-exfil monitor only counted
+    exec/escalation/executable-write as sinks — `send_email`/`http_post`/`post_webhook`/... produced
+    **no event at all**, so the exact attack it exists to catch (A fetches a secret, B sends it out)
+    passed clean. Outbound sends are now recorded as `send` sink events.
+  - *Memory merge no longer launders taint:* `MemoryManager.merge()` dropped provenance, so importing
+    another agent's memories stored every fact as `clean` — a poisoned import was recalled as verified.
+    Merge now carries `provenance` through (matching the guarantee `remember()` already made).
+  - *Drift `absent` fails closed:* a forbidden pattern hiding in an oversized (>1 MB) or undecodable
+    file was silently skipped, so the negative (security) check reported "absent" — a falsely-clean
+    verifier. An unscannable file now fails the check as un-verifiable.
+  - *Data-fence can't be closed early:* `fence()` now neutralizes its own fixed public close marker
+    if untrusted content embeds it (otherwise a fetched page containing `<<end-external-data>>` closed
+    the fence early and made its trailing lines read as outside the data region).
+  - *Taint write-escalation covers self-executing configs:* writing tainted content into `jobs.json`,
+    a CI `.yml`, a `Dockerfile`, a shell dotfile, etc. is self-modification too (the scheduler/CI runs
+    it next tick) — now escalated, not just `.py`/`.sh`. Content keys also cover `patch`/`diff`/`new_text`
+    so an `apply_patch` payload can't slip past taint detection with empty content.
+
 ## [0.18.1] - 2026-07-10
 
 **Fusion honesty + orchestration guards.** A maintenance release: an adversarial review of the fusion
