@@ -240,8 +240,26 @@ def test_cascade_bench_four_arms_offline(tmp_path: Path) -> None:
     assert summary["n"] == 1
     for arm in ARMS:
         assert f"{arm}_pass_rate" in summary
+        # Tail cost surfaced per arm, not just the mean.
+        for pct in ("p50", "p95", "p99", "max"):
+            assert f"{arm}_tokens_{pct}" in summary
     assert summary["cascade_pass_rate"] == 1.0
     assert summary["weak_pass_rate"] == 0.0
+    # Single task: every percentile equals that task's spend.
+    assert summary["cascade_tokens_p99"] == 450 and summary["cascade_tokens_max"] == 450
+
+
+def test_percentile_surfaces_the_tail() -> None:
+    from chimera.eval.cascade_bench import _percentile
+
+    assert _percentile([], 95) is None
+    assert _percentile([100], 95) == 100.0
+    # 1..100: the tail is far above the median — the whole point of reporting it.
+    xs = list(range(1, 101))
+    assert _percentile(xs, 50) == 50.5
+    assert 95 <= _percentile(xs, 95) <= 96  # type: ignore[operator]
+    assert 99 <= _percentile(xs, 99) <= 100  # type: ignore[operator]
+    assert _percentile(xs, 95) > _percentile(xs, 50)  # type: ignore[operator]  # tail above median
 
 
 def test_summarize_and_format_routes(tmp_path: Path) -> None:

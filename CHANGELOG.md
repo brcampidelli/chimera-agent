@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Cost-bench reports the tail, not just the mean.** `chimera cascade-bench` now reports per-arm
+  **p50 / p95 / p99 / max** token cost alongside the mean and tokens-per-pass. A cascade can look
+  cheap on average while a handful of tasks escalate all the way to fusion — the p95/p99 surface that
+  worst-case cost, which is what a token budget actually has to plan for.
+
 ### Fixed
 - **Hierarchy cost-honesty fixes from an adversarial review of the orchestration surface.** Four
   issues in the "the hierarchy saved X is auditable" claim, all fixed and regression-tested:
