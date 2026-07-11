@@ -6,6 +6,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **Hierarchy cost-honesty fixes from an adversarial review of the orchestration surface.** Four
+  issues in the "the hierarchy saved X is auditable" claim, all fixed and regression-tested:
+  - *Orchestrator overhead is now metered:* the top-model **decompose** and **synthesis** calls were
+    never counted — the reported "measured" cost and saving omitted the hierarchy's own overhead while
+    the counterfactual was a full inline agent. Both are now recorded as receipts (counterfactual = 0,
+    since a single inline agent pays no orchestration overhead), so they add to the measured cost AND
+    honestly reduce the saving.
+  - *Counterfactual no longer double-charges context:* each per-subtask inline counterfactual re-charged
+    the full ~24k-char orchestrator context, so summing D subtasks over-counted it (D−1)× and inflated
+    the saving. The receipt's counterfactual now shares the context across subtasks (a single inline
+    agent loads it once); the per-subtask profitability veto keeps full context.
+  - *Re-ask is re-audited:* when a spot check caught an unfaithful summary and triggered a bounded
+    re-ask, the re-verification skipped the spot check ~80% of the time and could re-accept a still-
+    unfaithful summary. The re-ask now forces the spot check.
+  - *Cascade weak-tier usage:* a k-sample weak-tier consensus returned only one sample's token usage,
+    so a downstream budget/meter saw 1/k of the real spend. The returned result now sums all k samples.
+
 ### Security
 - **Governance hardening from an adversarial review of the security surface.** Six real gaps the
   tests missed, all fixed and regression-tested:

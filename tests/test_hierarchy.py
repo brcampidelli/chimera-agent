@@ -138,11 +138,14 @@ def test_end_to_end_economy_source_detect_to_measured_saving(tmp_path: Path) -> 
 
     backend = FakeBackend()
     result = _orchestrator(backend, tmp_path).run("Compare alpha.md and bravo.md")
-    assert result.fell_back is False and len(result.receipts) == 2
+    # 2 worker delegations + the orchestrator's own decompose + synth overhead receipts.
+    assert result.fell_back is False and len(result.receipts) == 4
     summary = summarize_delegations(load_delegations(tmp_path / "delegations.jsonl"))
-    # Every delegation carries a counterfactual, and the honest net is reported.
-    assert summary["counterfactual_n"] == 2
-    assert "token_saving" in summary  # measured vs inline-counterfactual, in the same rows
+    # Workers carry a real inline counterfactual; the decompose+synth overhead carries cf=0 (a single
+    # inline agent pays no orchestration overhead), so all rows are counterfactual-paired and the
+    # overhead honestly REDUCES the saving instead of being hidden from the 'measured' side.
+    assert summary["counterfactual_n"] == 4
+    assert "token_saving" in summary  # measured (incl. overhead) vs inline-counterfactual
 
 
 # ---------------------------------------------------------------------------
@@ -158,12 +161,28 @@ def test_parallel_read_flows_decompose_dispatch_synthesize(tmp_path: Path) -> No
     assert result.shape == "parallel_read"
     assert result.answer == "Final synthesized answer."
     assert len(result.envelopes) == 2
-    assert len(result.receipts) == 2
-    # Receipts persisted with counterfactuals in the same rows.
+    assert len(result.receipts) == 4  # 2 workers + decompose + synth overhead
+    # Receipts persisted with counterfactuals in the same rows; overhead metered too.
     persisted = load_delegations(tmp_path / "delegations.jsonl")
-    assert len(persisted) == 2
-    assert all(r.counterfactual_tokens for r in persisted)
+    assert len(persisted) == 4
+    assert all(r.counterfactual_tokens is not None for r in persisted)  # 0 for overhead, real for workers
+    assert {r.task_id for r in persisted} >= {"decompose", "synthesis"}
     assert result.total_tokens and result.total_tokens > 0
+
+
+def test_counterfactual_shares_orchestrator_context_across_subtasks() -> None:
+    # The aggregate inline counterfactual loads the orchestrator context ONCE. Summing a per-subtask
+    # counterfactual that re-charges the full context D times would inflate the reported saving.
+    from chimera.orchestration.hierarchy import _shared_counterfactual
+    from chimera.orchestration.receipts import estimate_profitability
+    from chimera.orchestration.spec import TaskSpec
+
+    spec = TaskSpec(task_id="s", objective="summarize the document")
+    full = estimate_profitability(spec, orchestrator_context_chars=24_000).inline_est_tokens
+    shared = _shared_counterfactual(spec, 4).inline_est_tokens
+    old_aggregate = 4 * full  # the bug: context counted 4x
+    new_aggregate = 4 * shared  # fixed: context counted ~once
+    assert new_aggregate < old_aggregate * 0.6
 
 
 def test_workers_share_byte_identical_system_prefix(tmp_path: Path) -> None:
@@ -257,10 +276,11 @@ def test_trivial_subtask_runs_inline_skipping_worker(tmp_path: Path) -> None:
     top_inline_calls = [c for c in backend.calls if c["system"] == WORKER_SYSTEM and c["model"] == TOP]
     assert mid_worker_calls == []
     assert len(top_inline_calls) == 2
-    # Audited as top-tier delegations with the (delegate) counterfactual recorded.
+    # Audited as top-tier delegations with the counterfactual recorded — plus the top-tier
+    # decompose + synth overhead receipts (also top model).
     persisted = load_delegations(tmp_path / "delegations.jsonl")
-    assert [r.tier for r in persisted] == ["top", "top"]
-    assert all(r.counterfactual_tokens for r in persisted)
+    assert [r.tier for r in persisted] == ["top", "top", "top", "top"]
+    assert all(r.counterfactual_tokens is not None for r in persisted)
 
 
 def test_conflicting_requires_both_overlap_and_a_marker(tmp_path: Path) -> None:

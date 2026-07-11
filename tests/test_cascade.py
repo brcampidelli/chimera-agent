@@ -181,6 +181,25 @@ def test_weak_agreement_k_samples_and_disagreement_climbs(tmp_path: Path) -> Non
     assert record.accepted_tier == "mid"
 
 
+def test_weak_consensus_reports_summed_usage_of_all_samples(tmp_path: Path) -> None:
+    # When the weak tier agrees over k samples and sticks, the RETURNED result must report the usage
+    # of all k calls — a downstream budget/meter reading the result would otherwise see only 1/k.
+    class AgreeGateway(ScriptedGateway):
+        def complete(
+            self, messages: list[MessageLike], *, model: str | None = None, **kwargs: Any
+        ) -> CompletionResult:
+            self.calls.append(model or "?")
+            return CompletionResult(
+                content="the same agreed answer", model=WEAK, prompt_tokens=10, completion_tokens=5
+            )
+
+    gateway = AgreeGateway({})
+    backend = _cascade(gateway, ScriptedFusion(), tmp_path, agreement_k=3)
+    result = backend.complete(_user("easy"))
+    assert gateway.calls.count(WEAK) == 3  # three samples
+    assert result.prompt_tokens == 30 and result.completion_tokens == 15  # summed, not 1/k
+
+
 def test_route_record_stores_hash_not_prompt(tmp_path: Path) -> None:
     gateway = ScriptedGateway({WEAK: "fine"})
     backend = _cascade(gateway, ScriptedFusion(), tmp_path)

@@ -120,6 +120,18 @@ def test_spot_check_probabilistic_with_seeded_rng(tmp_path: Path) -> None:
     assert never.verify(_spec(), env).stage == "accepted"
 
 
+def test_force_spot_audits_even_without_gaps_or_rng(tmp_path: Path) -> None:
+    # A re-ask triggered by a spot failure must be spot-checked again — not re-accepted on the free
+    # schema+criteria gates ~80% of the time (spot_rate=0.0 here would otherwise skip it).
+    backend = SpotBackend("UNFAITHFUL — the retry still invents a figure.")
+    verifier = _verifier(tmp_path, backend, spot_rate=0.0)
+    store = ArtifactStore(tmp_path)
+    env = build_envelope(_spec(), "row\n" * 5_000, store)  # no gaps -> normally skipped
+    assert verifier.verify(_spec(), env).stage == "accepted"
+    forced = verifier.verify(_spec(), env, force_spot=True)
+    assert forced.stage == "spot" and forced.passed is False
+
+
 def test_missing_evidence_ref_fails_with_escalation(tmp_path: Path) -> None:
     verifier = _verifier(tmp_path, SpotBackend(), spot_rate=1.0)
     env = ResultEnvelope(task_id="t1", summary="fine", evidence_refs=["ghost.txt"],

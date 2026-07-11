@@ -45,6 +45,12 @@ _REFUSAL_MARKERS = (
 )
 
 
+def _sum_usage(results: list[CompletionResult], field_name: str) -> int | None:
+    """Sum a token field across sampled results (None if none reported)."""
+    values = [getattr(r, field_name) for r in results if getattr(r, field_name) is not None]
+    return sum(values) if values else None
+
+
 def default_gate(result: CompletionResult) -> bool:
     """Free acceptance gate: non-empty and not an refusal/apology opener."""
     text = (result.content or "").strip()
@@ -170,7 +176,13 @@ class CascadeBackend:
             consensus = next((s for s in samples if s.content == winner), samples[0])
             if self.gate(consensus):
                 self._accept(record, "weak")
-                return consensus
+                # Report the usage of ALL k samples, not just the winning one: a caller that meters
+                # the returned result (e.g. a BudgetedBackend) must see the real weak-tier spend, not
+                # 1/k of it. (The route log already records every hop; this fixes the returned usage.)
+                return consensus.model_copy(update={
+                    "prompt_tokens": _sum_usage(samples, "prompt_tokens"),
+                    "completion_tokens": _sum_usage(samples, "completion_tokens"),
+                })
             return None
         if self.gate(samples[0]):
             self._accept(record, "weak")

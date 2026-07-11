@@ -108,8 +108,15 @@ class EnvelopeVerifier:
         self.spot_rate = max(0.0, min(1.0, spot_rate))
         self.rng = rng or random.Random()
 
-    def verify(self, spec: TaskSpec, envelope: ResultEnvelope) -> VerifyOutcome:
-        """Run the gates in order; the first failure decides. All-pass -> accepted."""
+    def verify(
+        self, spec: TaskSpec, envelope: ResultEnvelope, *, force_spot: bool = False
+    ) -> VerifyOutcome:
+        """Run the gates in order; the first failure decides. All-pass -> accepted.
+
+        ``force_spot`` runs the spot check unconditionally — used when re-verifying a re-ask that was
+        triggered by a spot failure, so the expensive audit that caught the unfaithfulness isn't then
+        skipped ~80% of the time on the retry (which could re-accept a still-unfaithful summary).
+        """
         # Gate 1 — schema (free).
         problems = validate_envelope(spec, envelope)
         if problems:
@@ -124,8 +131,8 @@ class EnvelopeVerifier:
                     passed=False, stage="criteria", detail="; ".join(result.failures)
                 )
 
-        # Gate 3 — spot check (probabilistic; forced when the worker admits gaps).
-        should_spot = bool(envelope.gaps) or self.rng.random() < self.spot_rate
+        # Gate 3 — spot check (probabilistic; forced when the worker admits gaps or on a re-ask).
+        should_spot = force_spot or bool(envelope.gaps) or self.rng.random() < self.spot_rate
         if should_spot and envelope.evidence_refs and self._spot_backend is not None:
             outcome = self._spot_check(spec, envelope)
             if outcome is not None:

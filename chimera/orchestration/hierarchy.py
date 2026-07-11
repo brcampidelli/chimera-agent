@@ -39,6 +39,7 @@ from chimera.orchestration.budget import BudgetedBackend, BudgetExceeded, Effort
 from chimera.orchestration.envelope_verify import EnvelopeVerifier
 from chimera.orchestration.receipts import (
     DelegationReceipt,
+    ProfitEstimate,
     append_delegation,
     estimate_profitability,
     estimate_tokens,
@@ -46,7 +47,7 @@ from chimera.orchestration.receipts import (
 )
 from chimera.orchestration.roles import Role, RoleAgent
 from chimera.orchestration.spec import EffortBudget, ResultEnvelope, TaskSpec
-from chimera.providers.gateway import Message, SupportsComplete
+from chimera.providers.gateway import CompletionResult, Message, SupportsComplete
 from chimera.telemetry import get_logger
 
 _log = get_logger("orchestration.hierarchy")
@@ -227,33 +228,74 @@ class HierarchicalOrchestrator:
         else:
             _log.debug("%d distinct sources -> guaranteed-gain region, skipping profit veto", sources)
 
-        specs = self.decompose(task)
+        specs, decompose_tokens, decompose_estimated = self._decompose_metered(task)
         if not specs:
             return self._fallback(task, shape, reason="decomposition failed")
-        return self.run_prepared(task, specs, shape=shape)
+        return self.run_prepared(
+            task, specs, shape=shape,
+            overhead_tokens=decompose_tokens, overhead_estimated=decompose_estimated,
+        )
 
     def run_prepared(
-        self, task: str, specs: list[TaskSpec], *, shape: TaskShape = "parallel_read"
+        self,
+        task: str,
+        specs: list[TaskSpec],
+        *,
+        shape: TaskShape = "parallel_read",
+        overhead_tokens: int = 0,
+        overhead_estimated: bool = False,
     ) -> HierarchyResult:
         """Run with a caller-supplied decomposition (recipes know their own split —
-        no top-model decompose call is spent)."""
+        no top-model decompose call is spent, hence ``overhead_tokens=0`` by default)."""
         envelopes, receipts = self._dispatch(specs)
         if not envelopes:
             return self._fallback(task, shape, reason="all delegations failed")
 
-        answer, synth_tokens = self._synthesize(task, envelopes)
+        answer, synth_tokens, synth_estimated = self._synthesize(task, envelopes)
         self._record_outcome(task, answer)
-        measured = sum(r.total_tokens for r in receipts) + synth_tokens
+        # Meter the orchestrator's OWN overhead (decompose + synthesis) as receipts, or the
+        # "saving" would credit the hierarchy for a measured cost that omits its overhead while
+        # the counterfactual is a full inline agent. Counterfactual=0: a single inline agent pays
+        # no decompose/synth overhead, so this overhead correctly REDUCES the reported saving.
+        overhead = self._overhead_receipts(
+            task, overhead_tokens, overhead_estimated, synth_tokens, synth_estimated
+        )
+        all_receipts = receipts + overhead
+        measured = sum(r.total_tokens for r in all_receipts)
         counterfactual = sum(r.counterfactual_tokens or 0 for r in receipts) or None
         return HierarchyResult(
             answer=answer,
             shape=shape,
             envelopes=envelopes,
-            receipts=receipts,
+            receipts=all_receipts,
             fell_back=False,
             total_tokens=measured,
             counterfactual_tokens=counterfactual,
         )
+
+    def _overhead_receipts(
+        self, task: str, decompose_tokens: int, decompose_estimated: bool,
+        synth_tokens: int, synth_estimated: bool,
+    ) -> list[DelegationReceipt]:
+        """Receipts for the orchestrator's own top-model calls (decompose + synth). cf=0 (inline
+        pays no orchestration overhead), so they add to measured cost AND subtract from the saving."""
+        out: list[DelegationReceipt] = []
+        for label, toks, est in (
+            ("decompose", decompose_tokens, decompose_estimated),
+            ("synthesis", synth_tokens, synth_estimated),
+        ):
+            if toks <= 0:
+                continue
+            out.append(make_receipt(
+                TaskSpec(task_id=label, objective=task),
+                tier="top", model=self.top_model,
+                prompt_tokens=toks, completion_tokens=0, tokens_estimated=est,
+                counterfactual_tokens=0, counterfactual_model=self.top_model,
+            ))
+        if self.receipts_path is not None:
+            for receipt in out:
+                append_delegation(self.receipts_path, receipt)
+        return out
 
     def dry_run(self, task: str) -> dict[str, object]:
         """Classification + decomposition + profitability estimate — zero worker spend."""
@@ -278,19 +320,29 @@ class HierarchicalOrchestrator:
 
     def decompose(self, task: str) -> list[TaskSpec]:
         """Top model -> JSON subtasks, pydantic-validated, ONE repair retry, N capped."""
-        raw = self._ask_top(_DECOMPOSE_SYSTEM, task)
-        specs = self._parse_specs(raw)
+        return self._decompose_metered(task)[0]
+
+    def _decompose_metered(self, task: str) -> tuple[list[TaskSpec], int, bool]:
+        """decompose() + the tokens it actually spent (so run() can meter the overhead honestly).
+
+        Returns (specs, total_decompose_tokens, any_estimated)."""
+        r1 = self._complete_top(_DECOMPOSE_SYSTEM, task)
+        tokens, estimated = _result_tokens(r1, _DECOMPOSE_SYSTEM + task + (r1.content or ""))
+        specs = self._parse_specs(r1.content)
         if specs is None:  # one bounded repair attempt
-            raw = self._ask_top(
-                _DECOMPOSE_SYSTEM,
+            repair = (
                 f"{task}\n\nYour previous reply was not a valid JSON array. "
-                "Reply with ONLY the JSON array, no prose.",
+                "Reply with ONLY the JSON array, no prose."
             )
-            specs = self._parse_specs(raw)
+            r2 = self._complete_top(_DECOMPOSE_SYSTEM, repair)
+            t2, e2 = _result_tokens(r2, _DECOMPOSE_SYSTEM + repair + (r2.content or ""))
+            tokens += t2
+            estimated = estimated or e2
+            specs = self._parse_specs(r2.content)
         if not specs:
-            return []
+            return [], tokens, estimated
         cap = self.config.effort.workers_for("parallel_read", len(specs))
-        return specs[:cap]
+        return specs[:cap], tokens, estimated
 
     def _parse_specs(self, raw: str) -> list[TaskSpec] | None:
         text = raw.strip()
@@ -326,8 +378,14 @@ class HierarchicalOrchestrator:
 
     def _dispatch(self, specs: list[TaskSpec]) -> tuple[list[ResultEnvelope], list[DelegationReceipt]]:
         """Parallel budgeted workers; each raw output -> envelope -> verifier -> receipt."""
+        from functools import partial
+
+        # The aggregate inline counterfactual loads the orchestrator context ONCE for the whole task,
+        # not once per subtask — so each receipt's counterfactual charges only a 1/D share of it, or
+        # summing D rows would over-count the context (D-1)x and inflate the reported saving.
+        n = max(1, len(specs))
         with ThreadPoolExecutor(max_workers=self.config.max_workers) as pool:
-            results = list(pool.map(self._run_one, specs))
+            results = list(pool.map(partial(self._run_one, n_subtasks=n), specs))
         envelopes = [env for env, _ in results if env is not None]
         receipts = [rec for _, rec in results if rec is not None]
         if self.receipts_path is not None:
@@ -335,14 +393,16 @@ class HierarchicalOrchestrator:
                 append_delegation(self.receipts_path, receipt)
         return envelopes, receipts
 
-    def _run_one(self, spec: TaskSpec) -> tuple[ResultEnvelope | None, DelegationReceipt | None]:
+    def _run_one(
+        self, spec: TaskSpec, *, n_subtasks: int = 1
+    ) -> tuple[ResultEnvelope | None, DelegationReceipt | None]:
         # Per-subtask gate: a trivially small spec is cheaper answered inline by the
         # trusted top model than delegated through the worker+verify machinery.
         if (
             self.config.inline_below_spec_tokens
             and estimate_tokens(spec.render()) < self.config.inline_below_spec_tokens
         ):
-            return self._run_inline_subtask(spec)
+            return self._run_inline_subtask(spec, n_subtasks=n_subtasks)
         budget = TokenBudget(spec.effort.max_tokens)
         backend = BudgetedBackend(self.gateway, budget, mode="hard")
         worker = RoleAgent(
@@ -353,6 +413,9 @@ class HierarchicalOrchestrator:
         # Recorded on the receipt for audit; the ENFORCING gate is the whole-task one
         # in run() (Guard 2). Per-subtask inline execution is future work.
         gate = estimate_profitability(spec, orchestrator_context_chars=24_000)
+        # The receipt's counterfactual shares the orchestrator context across the D subtasks (loaded
+        # once inline), so the summed aggregate isn't inflated; the gate above keeps full context.
+        cf = _shared_counterfactual(spec, n_subtasks)
         try:
             raw = worker.act(spec.render())
         except BudgetExceeded:
@@ -380,7 +443,10 @@ class HierarchicalOrchestrator:
                         + f"\n\n## Verifier objection (fix this)\n{outcome.detail}"
                     )
                     candidate = build_envelope(spec, raw2, self.store)
-                    if self.verifier.verify(spec, candidate).passed:
+                    # Force the spot check on the re-ask: the first verification already caught this
+                    # worker being unfaithful, so the retry must be audited, not re-accepted on the
+                    # free schema+criteria gates ~80% of the time.
+                    if self.verifier.verify(spec, candidate, force_spot=True).passed:
                         envelope = candidate
                         verified = True
                 except Exception as exc:  # noqa: BLE001 -- re-ask is best-effort
@@ -395,7 +461,7 @@ class HierarchicalOrchestrator:
             prompt_tokens=budget.spent,
             completion_tokens=0,
             tokens_estimated=budget.estimated,
-            counterfactual_tokens=gate.inline_est_tokens,
+            counterfactual_tokens=cf.inline_est_tokens,
             counterfactual_model=self.top_model,
             profitable_estimate=gate.profitable,
             cache_read_tokens=budget.cache_read or None,
@@ -406,12 +472,13 @@ class HierarchicalOrchestrator:
         return envelope, receipt
 
     def _run_inline_subtask(
-        self, spec: TaskSpec
+        self, spec: TaskSpec, *, n_subtasks: int = 1
     ) -> tuple[ResultEnvelope | None, DelegationReceipt | None]:
         """Trivial subtask handled by the trusted top model directly — no worker, no
         verification (the top tier is the same one that synthesizes). The receipt is
-        tier='top' with the delegation counterfactual, so `chimera delegations` shows
-        the inline decision was audited, not hidden."""
+        tier='top' with the DELEGATE counterfactual (what delegating this one would have cost —
+        no orchestrator-context repetition to share), so `chimera delegations` shows the inline
+        decision was audited, not hidden. ``n_subtasks`` is accepted for a uniform dispatch signature."""
         gate = estimate_profitability(spec, orchestrator_context_chars=24_000)
         result = self.gateway.complete(
             [Message(role="system", content=WORKER_SYSTEM),
@@ -438,8 +505,12 @@ class HierarchicalOrchestrator:
             return None, receipt
         return build_envelope(spec, raw, self.store, status="ok"), receipt
 
-    def _synthesize(self, task: str, envelopes: list[ResultEnvelope]) -> tuple[str, int]:
-        """Top model over SUMMARIES ONLY; fusion only on real conflict (Self-MoA rule)."""
+    def _synthesize(
+        self, task: str, envelopes: list[ResultEnvelope]
+    ) -> tuple[str, int, bool]:
+        """Top model over SUMMARIES ONLY; fusion only on real conflict (Self-MoA rule).
+
+        Returns (answer, synth_tokens, estimated) — the tokens are metered as orchestrator overhead."""
         summaries = "\n\n".join(
             f"### {env.task_id}\n{env.summary}"
             + (f"\n(gaps: {'; '.join(env.gaps)})" if env.gaps else "")
@@ -461,10 +532,8 @@ class HierarchicalOrchestrator:
                  Message(role="user", content=prompt)],
                 model=self.top_model,
             )
-        tokens = (result.prompt_tokens or 0) + (result.completion_tokens or 0)
-        if tokens == 0:
-            tokens = estimate_tokens(prompt + (result.content or ""))
-        return result.content, tokens
+        tokens, estimated = _result_tokens(result, prompt + (result.content or ""))
+        return result.content, tokens, estimated
 
     def _fallback(self, task: str, shape: TaskShape, *, reason: str) -> HierarchyResult:
         """Single-agent path (top model, one shot) — the always-correct default.
@@ -540,12 +609,38 @@ class HierarchicalOrchestrator:
         if self.evolution is not None:
             self.evolution.record_external(task, answer, success=bool(answer and answer.strip()))
 
-    def _ask_top(self, system: str, user: str) -> str:
+    def _complete_top(self, system: str, user: str) -> CompletionResult:
         return self.gateway.complete(
             [Message(role="system", content=system), Message(role="user", content=user)],
             model=self.top_model,
             temperature=0.2,
-        ).content
+        )
+
+    def _ask_top(self, system: str, user: str) -> str:
+        return self._complete_top(system, user).content
+
+
+def _shared_counterfactual(spec: TaskSpec, n_subtasks: int) -> ProfitEstimate:
+    """Per-subtask inline counterfactual that shares the orchestrator context across the D subtasks.
+
+    A single inline agent loads the ~24k-char orchestrator context ONCE for the whole task; charging
+    the full context in every subtask's counterfactual would over-count it (D-1)x when summed, and
+    inflate the reported saving. So the receipt's counterfactual gets a 1/D share of that context.
+    (The per-subtask profitability veto keeps the full context — that's a genuinely per-subtask
+    question: "if I don't delegate THIS one, I pay full context + this subtask".)"""
+    share = max(1, 24_000 // max(1, n_subtasks))
+    return estimate_profitability(spec, orchestrator_context_chars=share)
+
+
+def _result_tokens(result: CompletionResult, fallback_text: str) -> tuple[int, bool]:
+    """Measured (prompt+completion) tokens, or a chars/4 estimate when the provider reported none.
+
+    Returns (tokens, estimated) so the flag can propagate onto the receipt — an estimate must never
+    masquerade as a measurement (the receipts' honesty rule)."""
+    tokens = (result.prompt_tokens or 0) + (result.completion_tokens or 0)
+    if tokens == 0:
+        return estimate_tokens(fallback_text), True
+    return tokens, False
 
 
 def _conflicting(envelopes: list[ResultEnvelope]) -> bool:
