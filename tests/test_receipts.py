@@ -55,6 +55,19 @@ def test_price_stage_unknown_model_is_none() -> None:
     assert price_stage(StageUsage("panel", "mystery/model", 1000, 1000)).usd is None
 
 
+def test_price_stage_priced_model_with_no_usage_is_unknown_not_free() -> None:
+    # A priced model whose provider reported NO token usage: the cost is UNKNOWN, never a fake $0.00
+    # (that would let a missing number masquerade as "free" and break the module's honesty rule).
+    cost = price_stage(StageUsage("panel", "deepseek/deepseek-chat", None, None))
+    assert cost.usd is None
+
+
+def test_price_stage_genuinely_free_model_with_no_usage_is_zero() -> None:
+    # A ":free" slug is measured-zero, so absent usage still prices to $0.00 (real, not a guess).
+    cost = price_stage(StageUsage("panel", "meta-llama/llama-3.1-8b-instruct:free", None, None))
+    assert cost.usd == 0.0
+
+
 # --- per-advisor attribution + totals ----------------------------------------------------
 
 

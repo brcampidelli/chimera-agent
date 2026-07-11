@@ -55,21 +55,20 @@ def _cluster(answers: list[str], threshold: float) -> list[list[int]]:
 
 
 def majority(answers: list[str], *, threshold: float = 0.85) -> str | None:
-    """Return the representative of the unique largest similarity cluster, or None on a tie.
+    """Return the representative of a true-majority similarity cluster (> half), or None.
 
-    None means no consensus (all distinct, or two clusters tie for largest) — the caller should
-    synthesize instead of voting. The representative is the longest member of the winning cluster
-    (usually the most complete phrasing).
+    None means no consensus — the caller should synthesize instead of voting. "Majority" is strict:
+    the winning cluster must hold **more than half** the samples, so a mere plurality (e.g. 2 of 5,
+    the rest scattered) does NOT win — a 40% cluster is weak agreement and synthesis is the honest
+    fallback. A strict majority also can't tie, so this subsumes the old distinct/tie guards. The
+    representative is the longest member of the winning cluster (usually the most complete phrasing).
     """
     if not answers:
         return None
     clusters = _cluster(answers, threshold)
-    clusters.sort(key=len, reverse=True)
-    top = clusters[0]
-    if len(top) < 2:
-        return None  # all distinct — no majority to speak of
-    if len(clusters) > 1 and len(clusters[1]) == len(top):
-        return None  # tie between the two largest clusters
+    top = max(clusters, key=len)
+    if len(top) < 2 or len(top) * 2 <= len(answers):
+        return None  # no cluster holds a strict majority of the samples
     return max((answers[i] for i in top), key=len)
 
 

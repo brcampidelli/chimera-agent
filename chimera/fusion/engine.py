@@ -171,12 +171,29 @@ class FusionConfig:
         )
 
 
+def _content_text(content: object) -> str:
+    """The TEXT of a message's content — never a stringified multimodal list.
+
+    A vision turn's content is a list of parts ({"type":"text",...}, {"type":"image_url",...} with a
+    base64 data URL). ``str()`` on that would dump the base64 blob into the judge/synth prompt (token
+    blow-up + nonsense). Join only the text parts instead.
+    """
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return " ".join(
+            str(p.get("text", "")) for p in content
+            if isinstance(p, dict) and p.get("type") == "text"
+        ).strip()
+    return str(content) if content else ""
+
+
 def _conversation_text(messages: list[MessageLike]) -> str:
     lines: list[str] = []
     for message in messages:
         data = message.as_dict() if isinstance(message, Message) else message
         role = str(data.get("role", "user"))
-        content = str(data.get("content", ""))
+        content = _content_text(data.get("content", ""))
         if content:
             lines.append(f"{role}: {content}")
     return "\n".join(lines)
@@ -295,7 +312,11 @@ class FusionEngine:
     ) -> CompletionResult:
         """Run the fusion pipeline and return the synthesized answer.
 
-        ``tools`` is ignored — fusion is a reasoning backend, not a tool-caller.
+        ``tools`` is ignored — fusion is a reasoning backend, not a tool-caller. ``temperature`` and
+        ``max_tokens`` are ALSO ignored on purpose: fusion is a multi-stage pipeline with its own
+        per-stage sampling (a diverse panel, a low-temperature judge, a synthesizer — all from
+        ``self.config``), so a single protocol-level temperature has no coherent meaning here. They
+        stay in the signature only for :class:`SupportsComplete` compatibility.
         """
         if tools:
             _log.debug("fusion ignores %d tool schema(s); use a single model for tools", len(tools))

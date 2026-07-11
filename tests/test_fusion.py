@@ -298,3 +298,67 @@ def test_tool_turn_skips_escalation_verifier() -> None:
     rb = RoutedBackend(single, fusion, RoutingPolicy(mode="always"), escalate_on_fail=verify)
     result = rb.complete([{"role": "user", "content": "x"}], tools=[{"type": "function"}])
     assert result.content == "single" and not fusion.called and calls == []
+
+
+def test_agreement_escalation_does_not_fuse_twice() -> None:
+    # A turn escalated to fusion by the agreement gate must not be fused a SECOND time by a failing
+    # escalate_on_fail check — that redundant call would silently double the cost-aware router's spend.
+    class DistinctSingle:
+        def __init__(self) -> None:
+            self.n = 0
+            self.answers = ["alpha alpha alpha", "beta beta beta beta", "gamma gamma gamma gamma"]
+
+        def complete(self, messages: list[Any], **kwargs: Any) -> CompletionResult:
+            content = self.answers[self.n]
+            self.n += 1
+            return CompletionResult(content=content, model="single")
+
+    class CountingFusion:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def complete(self, messages: list[Any], **kwargs: Any) -> CompletionResult:
+            self.calls += 1
+            return CompletionResult(content="FUSED", model="fusion")
+
+    single, fusion = DistinctSingle(), CountingFusion()
+    rb = RoutedBackend(
+        single,
+        fusion,
+        RoutingPolicy(mode="never"),
+        escalate_on_fail=lambda r: False,  # would re-escalate a single result
+        agreement_k=3,
+    )
+    result = rb.complete([{"role": "user", "content": "x"}])
+    assert result.content == "FUSED"
+    assert fusion.calls == 1  # already fused by the agreement gate — not fused again
+
+
+def test_dates_and_ranges_do_not_route_as_arithmetic() -> None:
+    policy = RoutingPolicy(mode="auto")
+
+    def reason(text: str) -> str:
+        return policy.fuse_reason([{"role": "user", "content": text}])
+
+    # A tight digit-hyphen-digit is a date/range/version, not subtraction — must not fuse as "arithmetic".
+    assert reason("the meeting is on 2026-07-10") != "arithmetic"
+    assert reason("pick something in the 10-20 bucket") != "arithmetic"
+    # A whitespace-padded subtraction is real arithmetic and still routes.
+    assert reason("what is 7 - 3?") == "arithmetic"
+
+
+def test_conversation_text_extracts_multimodal_text_not_base64() -> None:
+    # A vision turn's content is a list of parts; only the text parts belong in the judge/synth
+    # prompt — never a stringified base64 image blob.
+    from chimera.fusion.engine import _conversation_text
+
+    msg = {
+        "role": "user",
+        "content": [
+            {"type": "text", "text": "describe this picture"},
+            {"type": "image_url", "image_url": {"url": "data:image/png;base64,AAAABBBBCCCCDDDD"}},
+        ],
+    }
+    out = _conversation_text([msg])
+    assert "describe this picture" in out
+    assert "base64" not in out and "AAAABBBB" not in out

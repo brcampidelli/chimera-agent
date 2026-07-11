@@ -27,6 +27,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   the README capability table — run it to see exactly what's ready and what each missing piece needs.
 
 ### Fixed
+- **Fusion honesty & cost fixes (found by an adversarial review of the fusion surface).** Five issues
+  the tests missed, all now fixed and regression-tested:
+  - *Receipts:* a **priced** model whose provider reported no token usage was pricing to a fake
+    `$0.00` — a missing number masquerading as "free", exactly what the receipts module promises never
+    to do. It now prices to `None` (unknown); a genuinely `:free` model still prices to a real `$0.00`.
+  - *Judge/synth prompt:* a **vision** turn's multimodal content (a list with a base64 image part) was
+    being `str()`-dumped into the judge and synthesizer prompts — a base64 blob as "task text". Only
+    the text parts are extracted now.
+  - *Cost-aware router:* when the agreement gate already escalated a turn to fusion, a failing
+    `escalate_on_fail` check could fuse a **second, redundant time** — silently doubling the spend of
+    the "cost-aware" router. An already-fused result is no longer re-escalated.
+  - *Self-consistency voting:* `majority()` accepted a mere **plurality** (e.g. 2 of 5, the rest
+    scattered) as consensus. It now requires a strict majority (> half); weak agreement falls back to
+    synthesis, as the module's own "synthesis beats voting" thesis intends.
+  - *Router arithmetic gate:* a tight digit-hyphen-digit (`2026-07-10`, `10-20`, a version string) was
+    matching the arithmetic detector and routing dates/ranges to expensive fusion. Subtraction now
+    requires whitespace padding (`7 - 3`); the other operators stay tight.
 - **Diff-gate held across the HITL pause (found by an adversarial code review).** A tainted, *hollow*
   success (verifier passed but the workspace diff was empty) that paused for human approval could be
   learned — written to memory and distilled into a skill — when approved on resume, because the

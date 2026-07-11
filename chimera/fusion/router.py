@@ -77,7 +77,10 @@ _PRECISION_KEYWORDS = (
 
 # An actual arithmetic expression: digit, operator, digit (e.g. "7 * 11", "29×11"),
 # or a percentage (e.g. "15% of 80", "20% tip") — both are exact numeric answers.
-_ARITH_EXPR = re.compile(r"\d\s*[+\-*/×÷]\s*\d|\d\s*%")
+# The hyphen (subtraction) is required to be whitespace-padded ("7 - 3"): a TIGHT digit-hyphen-digit
+# is far more often a date ("2026-07-10"), a range ("10-20"), or a version than a subtraction, and
+# routing those to fusion would betray the "cost-aware" promise. The other operators stay tight.
+_ARITH_EXPR = re.compile(r"\d\s*[+*/×÷]\s*\d|\d\s+-\s+\d|\d\s*%")
 
 # Why a turn was (not) routed to fusion — useful for cost auditing and telemetry.
 FuseReason = Literal["mode", "length", "keyword", "precision", "arithmetic", "none"]
@@ -184,7 +187,13 @@ class RoutedBackend:
             )
         # Observed difficulty (issue #3): a turn priced as single may still be hard. If a
         # check on its result fails, re-escalate this turn to fusion rather than accept it.
-        if self.escalate_on_fail is not None and not self.escalate_on_fail(result):
+        # Guard: if agreement escalation ALREADY produced a fusion result, don't fuse a second,
+        # redundant time — that would silently double the cost of the "cost-aware" router.
+        if (
+            self.escalate_on_fail is not None
+            and result.model != "fusion"
+            and not self.escalate_on_fail(result)
+        ):
             _log.debug("single result failed verification; re-escalating turn to fusion")
             return self.fusion.complete(messages, temperature=temperature)
         return result

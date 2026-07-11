@@ -34,6 +34,16 @@ def test_majority_none_on_tie() -> None:
     assert majority(["a", "a", "b", "b"]) is None
 
 
+def test_majority_rejects_mere_plurality() -> None:
+    # 2 of 5 agree, the rest scatter: a 40% plurality is NOT a majority — synthesize, don't vote.
+    assert majority(["a", "a", "b", "c", "d"]) is None
+
+
+def test_majority_accepts_strict_majority() -> None:
+    # 3 of 5 agree (> half) — a real majority wins.
+    assert majority(["a", "a", "a", "b", "c"]) == "a"
+
+
 def test_majority_returns_longest_representative() -> None:
     # Similar answers cluster; the fullest phrasing represents the cluster.
     got = majority(["The answer is 42.", "The answer is 42", "nope"], threshold=0.8)

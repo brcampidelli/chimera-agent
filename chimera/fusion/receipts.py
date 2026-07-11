@@ -92,8 +92,14 @@ def price_stage(usage: StageUsage) -> StageCost:
     price = resolve_price(usage.model)
     usd: float | None = None
     if price is not None:
-        pt, ct = usage.prompt_tokens or 0, usage.completion_tokens or 0
-        usd = round(pt / 1_000_000 * price.input_per_m + ct / 1_000_000 * price.output_per_m, 6)
+        priced = price.input_per_m or price.output_per_m  # 0 for a genuinely-free model
+        if priced and usage.prompt_tokens is None and usage.completion_tokens is None:
+            # Priced model but the provider reported NO usage: the cost is UNKNOWN, not free.
+            # Same honesty rule as an unknown model — a missing number never masquerades as $0.
+            usd = None
+        else:
+            pt, ct = usage.prompt_tokens or 0, usage.completion_tokens or 0
+            usd = round(pt / 1_000_000 * price.input_per_m + ct / 1_000_000 * price.output_per_m, 6)
     return StageCost(usage.stage, usage.model, usage.prompt_tokens, usage.completion_tokens, usd)
 
 
