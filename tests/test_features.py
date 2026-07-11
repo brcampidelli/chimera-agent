@@ -30,15 +30,51 @@ def test_web_search_ready_only_with_key(monkeypatch: pytest.MonkeyPatch) -> None
     assert ready.ready is True  # type: ignore[attr-defined]
 
 
-def test_browser_reports_missing_dependency() -> None:
-    import importlib.util
-
-    if importlib.util.find_spec("playwright") is not None:
-        pytest.skip("browser extra installed — this checks the missing-dependency report")
+def test_browser_is_builtin_ready() -> None:
+    # Playwright is a CORE dependency now (the Chromium binary auto-installs on first use),
+    # so the browser capability is always available.
     status = _by_name(Settings())["browser"]
-    # playwright isn't installed in the test environment
-    assert status.ready is False  # type: ignore[attr-defined]
-    assert "playwright" in status.blocker  # type: ignore[attr-defined]
+    assert status.ready is True  # type: ignore[attr-defined]
+
+
+def test_multimedia_features_are_in_the_catalog() -> None:
+    names = set(_by_name(Settings()))
+    # The features the [full] extra enables must be discoverable via `chimera features`.
+    for name in ("documents", "media_download", "speech_to_text", "data_analysis", "charts"):
+        assert name in names, f"{name} missing from the features catalog"
+
+
+def test_missing_dep_reports_extra_based_install_hint() -> None:
+    # A blocked feature with an `extra` gives a copy-pasteable pip hint, not a bare module name.
+    from chimera.features import Feature, FeatureStatus
+
+    st = FeatureStatus(
+        feature=Feature("documents", "…", dep="markitdown", extra="documents"),
+        has_key=True, has_dep=False,
+    )
+    assert st.ready is False
+    assert st.blocker == "pip install 'chimera-agent[documents]'"
+
+
+def test_missing_system_binary_reports_install() -> None:
+    from chimera.features import Feature, FeatureStatus
+
+    st = FeatureStatus(
+        feature=Feature("media_download", "…", dep="yt_dlp", extra="media-dl", bin="ffmpeg"),
+        has_key=True, has_dep=True, has_bin=False,
+    )
+    assert st.ready is False
+    assert "ffmpeg" in st.blocker
+
+
+def test_catalog_deps_use_importable_names() -> None:
+    # Regression: a PIP name with a hyphen ("youtube-transcript-api") never resolves via find_spec.
+    from chimera.features import CATALOG
+
+    for feature in CATALOG:
+        if feature.dep is not None:
+            assert "-" not in feature.dep, f"{feature.name}: dep must be an import name, not a PIP name"
+            assert feature.dep.isidentifier() or "." in feature.dep
 
 
 def test_web_search_tool_without_key_returns_a_hint(monkeypatch: pytest.MonkeyPatch) -> None:

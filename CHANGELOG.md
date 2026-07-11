@@ -6,6 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **`chimera features` now mirrors every capability the `[full]` extra enables.** The catalog gained
+  document reading, media/video download, local speech-to-text, data analysis, and charts — each with
+  a copy-pasteable install hint (`pip install 'chimera-agent[documents]'`, etc.) and a check for
+  required system binaries (e.g. `ffmpeg`). So `chimera features` is now a live, accurate mirror of
+  the README capability table — run it to see exactly what's ready and what each missing piece needs.
+
+### Fixed
+- **`chimera features` — `youtube_transcript` no longer always shows as "missing".** Its dependency
+  was checked by PIP name (`youtube-transcript-api`, with hyphens) instead of the importable module
+  name (`youtube_transcript_api`), so `find_spec` never resolved it. Now checked correctly; a test
+  guards that every catalog dependency is an import name.
+
 ## [0.18.0] - 2026-07-10
 
 **"Batteries included."** One command installs every non-GPU feature, the official Docker image ships

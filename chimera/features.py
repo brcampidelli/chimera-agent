@@ -10,6 +10,7 @@ shape, or plug in via the MCP client / OpenAPI->tool importer that already exist
 from __future__ import annotations
 
 import contextlib
+import shutil
 from dataclasses import dataclass
 from importlib.util import find_spec
 
@@ -21,7 +22,9 @@ class Feature:
     name: str
     summary: str
     env_any: tuple[str, ...] = ()  # any one of these credentials satisfies it
-    dep: str | None = None  # an importable module that must be installed
+    dep: str | None = None  # an IMPORTABLE module name that must be installed (e.g. "yt_dlp")
+    extra: str | None = None  # the chimera-agent extra that provides `dep` (nicer install hint)
+    bin: str | None = None  # a system binary that must be on PATH (e.g. "ffmpeg")
     builtin: bool = False  # works out of the box (no key, no dep)
     how: str = ""  # one-line how-to
 
@@ -31,18 +34,29 @@ class FeatureStatus:
     feature: Feature
     has_key: bool
     has_dep: bool
+    has_bin: bool = True
 
     @property
     def ready(self) -> bool:
         key_ok = self.feature.builtin or not self.feature.env_any or self.has_key
-        return key_ok and (self.feature.dep is None or self.has_dep)
+        dep_ok = self.feature.dep is None or self.has_dep
+        bin_ok = self.feature.bin is None or self.has_bin
+        return key_ok and dep_ok and bin_ok
 
     @property
     def blocker(self) -> str:
         if not (self.feature.builtin or not self.feature.env_any or self.has_key):
             return "set " + " or ".join(self.feature.env_any)
         if self.feature.dep and not self.has_dep:
-            return f"pip install {self.feature.dep}"
+            # Prefer the friendly extra-based install (pip install 'chimera-agent[documents]')
+            # over the bare module name, so the hint actually works copy-pasted.
+            return (
+                f"pip install 'chimera-agent[{self.feature.extra}]'"
+                if self.feature.extra
+                else f"pip install {self.feature.dep}"
+            )
+        if self.feature.bin and not self.has_bin:
+            return f"install {self.feature.bin} (e.g. apt install {self.feature.bin})"
         return ""
 
 
@@ -65,7 +79,23 @@ CATALOG: tuple[Feature, ...] = (
     Feature("arxiv_search", "Search arXiv papers (arxiv_search tool)", builtin=True,
             how="arxiv_search is always available (no key needed)"),
     Feature("youtube_transcript", "Fetch YouTube transcripts (youtube_transcript tool)",
-            dep="youtube-transcript-api", how="uv sync --extra youtube"),
+            dep="youtube_transcript_api", extra="youtube",
+            how="pip install 'chimera-agent[youtube]'"),
+    Feature("documents", "Read PDF/Word/Excel/… as text (read_document tool via MarkItDown)",
+            dep="markitdown", extra="documents",
+            how="pip install 'chimera-agent[documents]' — then: chimera run \"summarize report.pdf\""),
+    Feature("media_download", "Download video/audio from YouTube + 1000+ sites (download_media tool)",
+            dep="yt_dlp", extra="media-dl", bin="ffmpeg",
+            how="pip install 'chimera-agent[media-dl]' + ffmpeg — then use the download_media tool"),
+    Feature("speech_to_text", "Transcribe audio locally (transcribe_audio tool via faster-whisper)",
+            dep="faster_whisper", extra="stt", bin="ffmpeg",
+            how="pip install 'chimera-agent[stt]' + ffmpeg (or set an OpenAI key to use the API)"),
+    Feature("data_analysis", "Analyze data with pandas/scikit-learn (data_analysis skill)",
+            dep="pandas", extra="data",
+            how="pip install 'chimera-agent[data]' — the data_analysis skill runs real pandas code"),
+    Feature("charts", "Make charts with matplotlib/seaborn/plotly (data_visualization skill)",
+            dep="matplotlib", extra="viz",
+            how="pip install 'chimera-agent[viz]' — the data_visualization skill renders charts"),
     Feature("x_search", "Search X (Twitter) — pluggable via the OpenAPI->tool importer (no built-in tool)",
             env_any=("X_BEARER_TOKEN",),
             how="set X_BEARER_TOKEN, then add a tool via the OpenAPI->tool importer"),
@@ -81,11 +111,8 @@ CATALOG: tuple[Feature, ...] = (
     Feature("spotify", "Control Spotify — pluggable via the OpenAPI->tool importer (no built-in tool)",
             env_any=("SPOTIFY_CLIENT_ID",),
             how="set Spotify OAuth creds; import the Spotify OpenAPI spec"),
-    Feature("browser", "Browser automation", dep="playwright",
-            how="pip install playwright && playwright install"),
-    Feature("speech_io", "Speech building blocks: transcribe_audio (STT) + text_to_speech (TTS) tools",
-            env_any=("ELEVENLABS_API_KEY", "OPENAI_API_KEY"),
-            how="set a TTS key (STT via faster-whisper/API) — use the transcribe_audio & text_to_speech tools"),
+    Feature("browser", "Browser automation — read/scrape rendered pages (browser tool)", builtin=True,
+            how="works out of the box (Chromium auto-installs on first use)"),
 )
 
 
@@ -97,14 +124,19 @@ def _dep_present(module: str | None) -> bool:
     return False
 
 
+def _bin_present(binary: str | None) -> bool:
+    return binary is None or shutil.which(binary) is not None
+
+
 def feature_status(settings: Settings | None = None) -> list[FeatureStatus]:
-    """Resolve each catalog feature against the current credentials and deps."""
+    """Resolve each catalog feature against the current credentials, deps, and system binaries."""
     creds = (settings or get_settings()).credentials()
     return [
         FeatureStatus(
             feature=feature,
             has_key=any(creds.get(var) for var in feature.env_any),
             has_dep=_dep_present(feature.dep),
+            has_bin=_bin_present(feature.bin),
         )
         for feature in CATALOG
     ]
