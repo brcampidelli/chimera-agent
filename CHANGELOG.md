@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.18.1] - 2026-07-10
+
+**Fusion honesty + orchestration guards.** A maintenance release: an adversarial review of the fusion
+surface caught five cost/honesty bugs the tests missed (fake `$0.00` receipts, base64 blobs in judge
+prompts, a double-fusion in the "cost-aware" router, plurality-as-majority voting, dates routed as
+arithmetic), plus the M19 diff-gate now holds across the human-approval pause and `chimera project`'s
+approval controls are guarded. The measured A1 skill-card result is published (default stays OFF).
+
 ### Changed
 - **M19-A1 measured — reading skill cards stays OFF by default (honest result).** Ran the
   pre-registered paired A/B (`bench/skillcard/`) on a goldilocks model (mistral-small-24b, n=12):
