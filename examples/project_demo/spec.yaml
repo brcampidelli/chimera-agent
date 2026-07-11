@@ -1,0 +1,27 @@
+# A Spec for `chimera project` — the executable definition of "done".
+#
+#   chimera project start examples/project_demo/spec.yaml -w ./scratch --yes
+#
+# Chimera reads this file, turns each unsatisfied requirement into a task, works it
+# (writing real files, verify-or-revert), and accepts it ONLY when this Spec is satisfied —
+# never on the model's say-so. `depends_on` orders the work; a `risk: high` requirement would
+# pause for your approval before running. Requirements are checked in order; each `check` is a
+# machine test (defines / contains / absent / command), so acceptance is objective.
+name: temperature-converter
+requirements:
+  - id: c_to_f
+    text: "temperature.py defines c_to_f(c) — Celsius to Fahrenheit (c * 9/5 + 32)"
+    check: defines
+    target: c_to_f
+
+  - id: f_to_c
+    text: "temperature.py also defines f_to_c(f) — Fahrenheit to Celsius ((f - 32) * 5/9)"
+    check: defines
+    target: f_to_c
+    depends_on: [c_to_f]
+
+  - id: round_trip
+    text: "the two conversions round-trip (converting there and back returns the original)"
+    check: command
+    target: python -c "from temperature import c_to_f, f_to_c; assert round(f_to_c(c_to_f(100))) == 100"
+    depends_on: [f_to_c]

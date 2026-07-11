@@ -54,6 +54,21 @@ def _project(tmp_path: Path, requirements: list[dict[str, Any]], solve: FakeSolv
     )
 
 
+def test_shipped_project_demo_spec_is_valid() -> None:
+    # Guard the flagship example (examples/project_demo/) so a Spec-model change can't silently
+    # break the showcased demo. Loads the real file and checks the dependency chain.
+    from chimera.governance.drift import load_spec
+
+    spec = load_spec("examples/project_demo/spec.yaml")
+    assert spec.name == "temperature-converter"
+    ids = [r.id for r in spec.requirements]
+    assert ids == ["c_to_f", "f_to_c", "round_trip"]
+    by_id = {r.id: r for r in spec.requirements}
+    assert by_id["f_to_c"].depends_on == ["c_to_f"]
+    assert by_id["round_trip"].depends_on == ["f_to_c"]
+    assert by_id["round_trip"].check == "command"
+
+
 def test_project_runs_to_done_respecting_dependencies(tmp_path: Path) -> None:
     reqs = [
         {"id": "r1", "check": "contains", "target": "HELLO", "text": "has HELLO"},
