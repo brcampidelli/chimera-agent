@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **New example: `media_digest` — video/podcast → transcript → summary.** A real multimodal pipeline
+  (`examples/media_digest/`): a script that composes `download_media` (yt-dlp) → `transcribe_audio`
+  (faster-whisper, fully local) → an LLM summary, plus the fully-agentic one-liner (`chimera solve
+  "download … transcribe … summarize …"`). Validated end-to-end. Added to the examples index.
+
 - **`chimera features` now mirrors every capability the `[full]` extra enables.** The catalog gained
   document reading, media/video download, local speech-to-text, data analysis, and charts — each with
   a copy-pasteable install hint (`pip install 'chimera-agent[documents]'`, etc.) and a check for
