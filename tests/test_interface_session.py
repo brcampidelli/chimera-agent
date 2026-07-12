@@ -116,3 +116,39 @@ def test_history_window_is_bounded() -> None:
     last_prompt = agent.prompts[-1]  # the prompt for "msg4"
     assert "msg3" in last_prompt and "msg2" in last_prompt  # within the 2-turn window
     assert "msg1" not in last_prompt and "msg0" not in last_prompt  # outside it
+
+
+class VerboseAgent:
+    """A fake agent that accepts the streaming callbacks and returns a rich AgentResult."""
+
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    def run(self, task: str, *, on_token=None, on_tool=None) -> AgentResult:  # type: ignore[no-untyped-def]
+        self.calls.append({"on_token": on_token, "on_tool": on_tool})
+        if on_token is not None:
+            on_token("hi")
+        return AgentResult(
+            answer="ok", steps=2, stopped_reason="final",
+            prompt_tokens=11, completion_tokens=4, usd=0.002, tool_names=["grep", "read_file"],
+        )
+
+
+def test_send_verbose_returns_turn_report_and_forwards_callbacks() -> None:
+    agent = VerboseAgent()
+    session = ChatSession(agent)
+    streamed: list[str] = []
+    report = session.send_verbose("hello", on_token=streamed.append)
+
+    assert report.answer == "ok"
+    assert report.prompt_tokens == 11 and report.completion_tokens == 4
+    assert report.usd == 0.002
+    assert report.tool_names == ["grep", "read_file"]
+    assert report.memory_facts_used == 0  # no memory configured -> honest zero
+    assert streamed == ["hi"]  # the token callback was forwarded to the agent
+    assert len(session.turns) == 1  # the exchange was recorded
+
+
+def test_send_still_returns_a_bare_string() -> None:
+    # The existing contract is preserved for the REPL / gateway / messaging callers.
+    assert isinstance(ChatSession(VerboseAgent()).send("hi"), str)

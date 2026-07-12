@@ -898,13 +898,24 @@ def tui(
     workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root for tools."),
     fuse: bool = typer.Option(False, "--fuse", help="Route deep-reasoning turns through fusion."),
     no_memory: bool = typer.Option(False, "--no-memory", help="Don't recall long-term memory."),
+    stream: bool = typer.Option(
+        True, "--stream/--no-stream", help="Live token streaming (single-model path only)."
+    ),
 ) -> None:
     """Launch the full-screen TUI — your right-hand. Requires a key."""
     from chimera.core import Agent, AgentConfig
     from chimera.interface import ChatSession
     from chimera.providers import LLMGateway
     from chimera.tools import default_registry
-    from chimera.tui.app import ChimeraTUI
+
+    try:
+        from chimera.tui.app import ChimeraTUI
+    except ImportError:  # Textual is a base dep, but degrade gracefully if the install was slimmed.
+        console.print(
+            "[yellow]Textual isn't installed — falling back to 'chimera chat'. "
+            "Install it with: pip install textual[/yellow]"
+        )
+        return chat(model=model, max_steps=max_steps, workspace=workspace, fuse=fuse, no_memory=no_memory)
 
     settings = get_settings()
     if not settings.has_any_key():
@@ -922,7 +933,9 @@ def tui(
     session = ChatSession(
         agent, memory=mem, graph=_recall_graph(mem), profile=_session_profile(mem)
     )
-    ChimeraTUI(session, model_label=model or settings.default_model).run()
+    ChimeraTUI(
+        session, model_label=model or settings.default_model, stream=stream, fuse=fuse
+    ).run()
 
 
 @app.command()

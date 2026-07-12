@@ -6,6 +6,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **The TUI is now a live, instrumented workspace.** `chimera tui` gained three things: (1) **real
+  token streaming** — the model's text streams into the log as it arrives (single-model path), and
+  finished replies render as **Markdown with syntax-highlighted code**; (2) an **activity panel** that
+  shows, from real signals, the tools the agent called this turn, the token count + cost, and how many
+  memory facts were recalled; (3) **ergonomics** — a command palette (`Ctrl+P`), slash-command
+  autocomplete, more key bindings (`Ctrl+R` reset, `Ctrl+L` clear, `PgUp`/`PgDn` scroll), and a
+  graceful fallback to `chimera chat` if Textual is missing. Honest by construction: no token stream
+  under `--fuse` (the panel says "synthesizing"), cost reads "unavailable" when unpriced, and there is
+  no verify/revert indicator in chat (that runs only in `solve`/`project`).
+- **`LLMGateway.stream_complete(...)`** — a streaming completion that pushes text deltas to an
+  `on_delta` callback while reassembling the full content, tool-call deltas (by index), and final
+  usage into a normal `CompletionResult`. `Agent.run` now accepts `on_token`/`on_tool` callbacks and
+  aggregates per-run token usage + cost into `AgentResult`; `ChatSession.send_verbose()` returns a
+  `TurnReport` with the turn's activity. All additive — the blocking `complete`/`send` paths are
+  unchanged.
+
 ## [0.18.8] - 2026-07-12
 
 **Project orchestrator hardening + a verify-or-revert demo.** A ninth adversarial review (the

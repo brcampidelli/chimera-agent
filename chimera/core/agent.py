@@ -13,6 +13,7 @@ toward resisting continuous-evolution degradation.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -106,14 +107,48 @@ class AgentConfig:
 
 
 @dataclass
+class ToolActivity:
+    """One tool invocation during a run — surfaced live to a UI via the ``on_tool`` callback."""
+
+    name: str
+    arguments: dict[str, Any]
+    ok: bool
+    observation: str
+
+
+@dataclass
+class _UsageTally:
+    """Running sum of token usage across every model call in one run."""
+
+    prompt: int = 0
+    completion: int = 0
+    cache_read: int = 0
+    cache_write: int = 0
+
+    def add(self, result: CompletionResult) -> None:
+        self.prompt += result.prompt_tokens or 0
+        self.completion += result.completion_tokens or 0
+        self.cache_read += result.cache_read_tokens or 0
+        self.cache_write += result.cache_write_tokens or 0
+
+
+@dataclass
 class AgentResult:
     """The outcome of an agent run."""
 
     answer: str
     steps: int
-    stopped_reason: str  # "final" | "max_steps"
+    stopped_reason: str  # "final" | "max_steps" | "tool_loop"
     transcript: list[MessageLike] = field(default_factory=list)
     tool_calls_made: int = 0
+    # Token/cost accounting, summed across every model call in the run (0 when the backend reported
+    # nothing). ``usd`` is the list-rate cost or None when the model's price is unknown — never guessed.
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
+    usd: float | None = None
+    tool_names: list[str] = field(default_factory=list)  # names of the tools actually called, in order
 
 
 class Agent:
@@ -146,7 +181,16 @@ class Agent:
             _log.debug("skill-context retrieval skipped: %s", exc)
             return ""
 
-    def run(self, task: str) -> AgentResult:
+    def run(
+        self,
+        task: str,
+        *,
+        on_token: Callable[[str], None] | None = None,
+        on_tool: Callable[[ToolActivity], None] | None = None,
+    ) -> AgentResult:
+        """Run the tool loop. ``on_token`` streams model text deltas as they arrive (when the backend
+        supports it); ``on_tool`` fires once per tool call with its outcome. Both are optional — with
+        neither, behaviour is exactly the pre-existing blocking run."""
         system_prompt = self.config.system_prompt
         skill_block = self._skill_context(task)
         if skill_block:
@@ -157,16 +201,13 @@ class Agent:
         ]
         tool_schema = self.tools.to_openai_schema(compact=self.config.compact_schemas) or None
         tool_calls_made = 0
+        tool_names: list[str] = []
+        usage = _UsageTally()
         nudged = False
         loop_detector = ToolLoopDetector() if self.config.detect_tool_loops else None
 
         for step in range(1, self.config.max_steps + 1):
-            result = self.backend.complete(
-                messages,
-                model=self.config.model,
-                temperature=self.config.temperature,
-                tools=tool_schema,
-            )
+            result = self._step(messages, tools=tool_schema, on_token=on_token, usage=usage)
             if not result.tool_calls:
                 # Narrate-instead-of-act guard: if asked to insist on action, push a described-but-
                 # unexecuted plan back once instead of accepting it as done. Only once, so a genuine
@@ -181,19 +222,18 @@ class Agent:
                     messages.append({"role": "user", "content": _ACTION_NUDGE})
                     continue
                 messages.append({"role": "assistant", "content": result.content})
-                return AgentResult(
-                    answer=result.content,
-                    steps=step,
-                    stopped_reason="final",
-                    transcript=messages,
-                    tool_calls_made=tool_calls_made,
-                )
+                return self._result(result.content, step, "final", messages, tool_calls_made,
+                                    tool_names, usage, result.model)
 
             messages.append(self._assistant_tool_message(result))
             tripped: str | None = None
             for call in result.tool_calls:
                 tool_calls_made += 1
+                tool_names.append(call.name)
                 observation = self._run_tool(call.name, call.arguments)
+                if on_tool is not None:
+                    on_tool(ToolActivity(call.name, call.arguments,
+                                         not observation.startswith("error:"), observation))
                 messages.append(
                     {"role": "tool", "tool_call_id": call.id, "content": observation}
                 )
@@ -210,35 +250,70 @@ class Agent:
                     f"Stop — you are repeating the same action ({tripped}). Do not call more tools. "
                     "Give your best final answer now with what you already have."
                 )
-                final = self.backend.complete(
-                    [*messages, {"role": "user", "content": nudge}],
-                    model=self.config.model,
-                    temperature=self.config.temperature,
-                    tools=None,
-                )
+                final = self._step([*messages, {"role": "user", "content": nudge}],
+                                   tools=None, on_token=on_token, usage=usage)
                 messages.append({"role": "assistant", "content": final.content})
-                return AgentResult(
-                    answer=final.content,
-                    steps=step,
-                    stopped_reason="tool_loop",
-                    transcript=messages,
-                    tool_calls_made=tool_calls_made,
-                )
+                return self._result(final.content, step, "tool_loop", messages, tool_calls_made,
+                                    tool_names, usage, final.model)
 
         # Budget exhausted: ask once more, without tools, for a final answer.
-        final = self.backend.complete(
-            [*messages, {"role": "user", "content": "Provide your final answer now."}],
-            model=self.config.model,
-            temperature=self.config.temperature,
-            tools=None,
-        )
+        final = self._step([*messages, {"role": "user", "content": "Provide your final answer now."}],
+                           tools=None, on_token=on_token, usage=usage)
         messages.append({"role": "assistant", "content": final.content})
+        return self._result(final.content, self.config.max_steps, "max_steps", messages,
+                            tool_calls_made, tool_names, usage, final.model)
+
+    def _step(
+        self,
+        messages: list[MessageLike],
+        *,
+        tools: list[dict[str, Any]] | None,
+        on_token: Callable[[str], None] | None,
+        usage: _UsageTally,
+    ) -> CompletionResult:
+        """One model call. Streams (with live token deltas) when a token callback is given AND the
+        backend supports ``stream_complete``; otherwise a plain blocking ``complete``. Either way the
+        call's token usage is folded into the run-level tally."""
+        result: CompletionResult
+        if on_token is not None and hasattr(self.backend, "stream_complete"):
+            result = self.backend.stream_complete(  # type: ignore[attr-defined]
+                messages, model=self.config.model, temperature=self.config.temperature,
+                tools=tools, on_delta=on_token,
+            )
+        else:
+            result = self.backend.complete(
+                messages, model=self.config.model, temperature=self.config.temperature, tools=tools,
+            )
+        usage.add(result)
+        return result
+
+    def _result(
+        self,
+        answer: str,
+        steps: int,
+        stopped_reason: str,
+        transcript: list[MessageLike],
+        tool_calls_made: int,
+        tool_names: list[str],
+        usage: _UsageTally,
+        model: str,
+    ) -> AgentResult:
+        """Assemble the final result, pricing the summed tokens at the model's list rate."""
+        from chimera.orchestration.receipts import price_delegation
+
+        usd = price_delegation(self.config.model or model, usage.prompt, usage.completion)
         return AgentResult(
-            answer=final.content,
-            steps=self.config.max_steps,
-            stopped_reason="max_steps",
-            transcript=messages,
+            answer=answer,
+            steps=steps,
+            stopped_reason=stopped_reason,
+            transcript=transcript,
             tool_calls_made=tool_calls_made,
+            prompt_tokens=usage.prompt,
+            completion_tokens=usage.completion,
+            cache_read_tokens=usage.cache_read,
+            cache_write_tokens=usage.cache_write,
+            usd=usd,
+            tool_names=tool_names,
         )
 
     def _run_tool(self, name: str, arguments: dict[str, Any]) -> str:

@@ -185,3 +185,59 @@ def test_agent_handles_unknown_tool_gracefully() -> None:
         isinstance(m, dict) and "unknown tool" in str(m.get("content", ""))
         for m in result.transcript
     )
+
+
+class StreamingBackend:
+    """A backend that streams: pushes content via on_delta, reports usage, optional first-step tool."""
+
+    def __init__(self, chunks: list[str], *, tool: ToolCall | None = None) -> None:
+        self.chunks = chunks
+        self.tool = tool
+        self.streamed = 0
+        self.blocking = 0
+        self._served_tool = False
+
+    def stream_complete(
+        self, messages: list[Any], *, tools: Any = None, on_delta: Any = None, **kwargs: Any
+    ) -> CompletionResult:
+        self.streamed += 1
+        for chunk in self.chunks:
+            if on_delta is not None:
+                on_delta(chunk)
+        if self.tool is not None and not self._served_tool:
+            self._served_tool = True  # first step: a tool call; next step: the final answer
+            return CompletionResult(
+                content="", model="fake", tool_calls=[self.tool], prompt_tokens=5, completion_tokens=3
+            )
+        return CompletionResult(
+            content="".join(self.chunks), model="fake", prompt_tokens=5, completion_tokens=3
+        )
+
+    def complete(self, messages: list[Any], *, tools: Any = None, **kwargs: Any) -> CompletionResult:
+        self.blocking += 1
+        return CompletionResult(content="blocking", model="fake")
+
+
+def test_run_streams_tokens_and_aggregates_usage() -> None:
+    from chimera.core.agent import ToolActivity
+
+    backend = StreamingBackend(["Hel", "lo"], tool=ToolCall(id="c1", name="echo", arguments={"text": "x"}))
+    agent = Agent(backend, _echo_registry(), AgentConfig(max_steps=4))
+    tokens: list[str] = []
+    tools: list[ToolActivity] = []
+    result = agent.run("hi", on_token=tokens.append, on_tool=tools.append)
+
+    assert backend.streamed >= 2 and backend.blocking == 0  # used the streaming path throughout
+    assert tokens == ["Hel", "lo", "Hel", "lo"]  # streamed on both steps
+    assert [t.name for t in tools] == ["echo"] and tools[0].ok is True
+    assert result.tool_names == ["echo"]
+    assert result.prompt_tokens == 10 and result.completion_tokens == 6  # summed across 2 calls
+
+
+def test_run_falls_back_to_blocking_without_stream_complete() -> None:
+    backend = ScriptedBackend([CompletionResult(content="done", model="fake")])
+    agent = Agent(backend, _echo_registry(), AgentConfig())
+    hits: list[str] = []
+    result = agent.run("hi", on_token=hits.append)  # backend exposes no stream_complete
+    assert hits == []  # nothing streamed
+    assert result.answer == "done"

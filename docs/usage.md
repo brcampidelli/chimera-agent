@@ -114,15 +114,26 @@ The same conversational core powers the TUI and (upcoming) messaging gateway.
 
 ### `tui` — full-screen terminal app
 
-A Textual full-screen UI over the same conversational core: a scrolling chat log,
-an input box, and a status bar. Same flags as `chat`.
+A Textual full-screen UI over the same conversational core. Two panes: a **conversation log** that
+renders replies as Markdown (fenced code is syntax-highlighted), with the model's tokens **streaming
+in live** as they arrive; and an **activity panel** showing what the agent did this turn — the tools
+it called, the token count and cost, and how many memory facts were recalled. Same flags as `chat`.
 
 ```bash
 uv run chimera tui
-uv run chimera tui --fuse --no-memory
+uv run chimera tui --no-stream        # answers render at the end instead of streaming
+uv run chimera tui --fuse --no-memory # fusion routing (no token stream — the panel says so)
 ```
 
-`/reset` clears context, `/exit` (or `Ctrl+C`) quits.
+Commands: `/model <slug>` · `/reset` (clear context) · `/clear` (clear screen) · `/stream` (toggle
+live tokens) · `/help` · `/exit`. Keys: `Ctrl+R` reset · `Ctrl+L` clear · `Ctrl+P` command palette ·
+`PgUp`/`PgDn` scroll · `Ctrl+C` quit. Slash commands autocomplete as you type.
+
+Honesty notes: token streaming is the single-model path only — under `--fuse` (a panel→judge→
+synthesizer turn) there are no incremental tokens, so the panel shows a "synthesizing" status rather
+than a fake cursor. Cost reads "unavailable" when the model's list price is unknown (never guessed).
+There is no verify/revert indicator here: verify-or-revert runs in `solve`/`project`, not in chat.
+If Textual isn't installed, `tui` falls back to the plain `chat` REPL.
 
 ### `serve` — messaging gateway (HTTP or Discord)
 

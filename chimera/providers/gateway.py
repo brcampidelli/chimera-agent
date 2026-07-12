@@ -16,7 +16,7 @@ import json
 import mimetypes
 import os
 import threading
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
@@ -123,6 +123,28 @@ class SupportsComplete(Protocol):
         temperature: float = ...,
         max_tokens: int | None = ...,
         tools: list[dict[str, Any]] | None = ...,
+        **kwargs: Any,
+    ) -> CompletionResult: ...
+
+
+class SupportsStream(Protocol):
+    """A backend that can stream a completion, pushing text deltas to ``on_delta``.
+
+    Only the single-model :class:`LLMGateway` implements this; the composite backends (fusion /
+    cascade / budgeted) expose ``complete`` only. Consumers feature-detect with ``hasattr(backend,
+    "stream_complete")`` and fall back to blocking :meth:`complete` when it is absent — so streaming
+    is a progressive enhancement, never a hard requirement.
+    """
+
+    def stream_complete(
+        self,
+        messages: list[MessageLike],
+        *,
+        model: str | None = ...,
+        temperature: float = ...,
+        max_tokens: int | None = ...,
+        tools: list[dict[str, Any]] | None = ...,
+        on_delta: Callable[[str], None] | None = ...,
         **kwargs: Any,
     ) -> CompletionResult: ...
 
@@ -408,6 +430,68 @@ class LLMGateway:
             if text:
                 yield text
 
+    def stream_complete(
+        self,
+        messages: list[MessageLike],
+        *,
+        model: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int | None = None,
+        tools: list[dict[str, Any]] | None = None,
+        on_delta: Callable[[str], None] | None = None,
+        **kwargs: Any,
+    ) -> CompletionResult:
+        """Streaming completion that still returns a normalized :class:`CompletionResult`.
+
+        A drop-in for :meth:`complete` for the interactive/single-model path: it streams the model's
+        text (each delta pushed to ``on_delta``) while reassembling the full content, any tool-call
+        deltas (by index) and the final usage — so the agent loop keeps its structure and still sees
+        ``tool_calls``. Like :meth:`stream`, this is one direct call: NO fallback chain and NO cache
+        (both meaningless for a live stream). Callers that need those keep using :meth:`complete`.
+        """
+        import litellm  # lazy: heavy import, keep CLI startup fast
+
+        resolved = self._resolve_model(model)
+        if not self.settings.has_any_key():
+            raise MissingCredentialsError(
+                "No provider key configured. Set one of "
+                f"{list(_KEY_ENV_VARS.values())} in your environment or .env."
+            )
+        call_kwargs = dict(self._provider_kwargs(), **kwargs)
+        keys = self._key_order(resolved.split("/", 1)[0])
+        if keys:
+            call_kwargs["api_key"] = keys[0]
+        response = litellm.completion(
+            model=resolved,
+            messages=_to_message_dicts(messages),
+            temperature=temperature,
+            max_tokens=max_tokens,
+            tools=tools,
+            stream=True,
+            stream_options={"include_usage": True},  # ask the provider for a final usage chunk
+            **call_kwargs,
+        )
+        content: list[str] = []
+        tool_acc: dict[int, dict[str, Any]] = {}
+        usage: dict[str, int | None] = {}
+        for chunk in response:
+            text = _delta_text(chunk)
+            if text:
+                content.append(text)
+                if on_delta is not None:
+                    on_delta(text)
+            _delta_tool_calls(chunk, tool_acc)
+            _accumulate_stream_usage(chunk, usage)
+        return CompletionResult(
+            content="".join(content),
+            model=resolved,
+            tool_calls=_finalize_stream_tool_calls(tool_acc),
+            prompt_tokens=usage.get("prompt_tokens"),
+            completion_tokens=usage.get("completion_tokens"),
+            cache_read_tokens=usage.get("cache_read_tokens"),
+            cache_write_tokens=usage.get("cache_write_tokens"),
+        )
+
     def embed(self, texts: list[str], *, model: str | None = None) -> list[list[float]]:
         """Embed a batch of texts into vectors (one call), for semantic memory recall.
 
@@ -511,3 +595,75 @@ def _delta_text(chunk: Any) -> str:
         return str(delta.content or "")
     except (AttributeError, IndexError, TypeError):
         return ""
+
+
+def _delta_tool_calls(chunk: Any, acc: dict[int, dict[str, Any]]) -> None:
+    """Merge a chunk's streamed tool-call deltas into ``acc`` (keyed by call index).
+
+    Providers stream a tool call in fragments: the name/id arrive once, the JSON arguments arrive as
+    a run of string pieces. We accumulate name/id (first non-empty wins) and concatenate arguments;
+    :func:`_finalize_stream_tool_calls` JSON-parses them at the end. Defensive: any odd shape is a
+    no-op, never a raise.
+    """
+    try:
+        deltas = chunk.choices[0].delta.tool_calls
+    except (AttributeError, IndexError, TypeError):
+        return
+    if not deltas:
+        return
+    for delta in deltas:
+        index = getattr(delta, "index", None)
+        if index is None:
+            index = len(acc)
+        slot = acc.setdefault(int(index), {"id": "", "name": "", "arguments": ""})
+        call_id = getattr(delta, "id", None)
+        if call_id and not slot["id"]:
+            slot["id"] = str(call_id)
+        fn = getattr(delta, "function", None)
+        if fn is not None:
+            name = getattr(fn, "name", None)
+            if name and not slot["name"]:
+                slot["name"] = str(name)
+            args = getattr(fn, "arguments", None)
+            if args:
+                slot["arguments"] += str(args)
+
+
+def _finalize_stream_tool_calls(acc: dict[int, dict[str, Any]]) -> list[ToolCall] | None:
+    """Turn accumulated tool-call fragments into ``ToolCall``s (JSON-parsing the arguments)."""
+    if not acc:
+        return None
+    calls: list[ToolCall] = []
+    for index in sorted(acc):
+        slot = acc[index]
+        if not slot.get("name"):
+            continue  # a fragment with no name is not a usable call
+        arguments: dict[str, Any] = {}
+        raw = slot.get("arguments") or ""
+        if raw:
+            try:
+                loaded = json.loads(raw)
+                if isinstance(loaded, dict):
+                    arguments = loaded
+            except json.JSONDecodeError:
+                _log.warning("could not parse streamed tool arguments: %r", raw)
+        calls.append(ToolCall(id=slot.get("id") or "", name=slot["name"], arguments=arguments))
+    return calls or None
+
+
+def _accumulate_stream_usage(chunk: Any, state: dict[str, int | None]) -> None:
+    """Capture token usage from the trailing ``include_usage`` chunk (defensive, last-wins)."""
+    usage = getattr(chunk, "usage", None)
+    if usage is None:
+        return
+    prompt = getattr(usage, "prompt_tokens", None)
+    completion = getattr(usage, "completion_tokens", None)
+    if prompt is not None:
+        state["prompt_tokens"] = prompt
+    if completion is not None:
+        state["completion_tokens"] = completion
+    read, write = LLMGateway._extract_cache_tokens(usage)
+    if read is not None:
+        state["cache_read_tokens"] = read
+    if write is not None:
+        state["cache_write_tokens"] = write

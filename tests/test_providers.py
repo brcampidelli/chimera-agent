@@ -15,6 +15,89 @@ def _resp(text: str) -> SimpleNamespace:
     return SimpleNamespace(choices=[SimpleNamespace(message=message)], usage=None)
 
 
+def _content_chunk(text: str) -> SimpleNamespace:
+    delta = SimpleNamespace(content=text, tool_calls=None)
+    return SimpleNamespace(choices=[SimpleNamespace(delta=delta)], usage=None)
+
+
+def _tool_chunk(*, index: int, call_id: str | None, name: str | None, arguments: str | None) -> SimpleNamespace:
+    fn = SimpleNamespace(name=name, arguments=arguments)
+    tc = SimpleNamespace(index=index, id=call_id, function=fn)
+    delta = SimpleNamespace(content=None, tool_calls=[tc])
+    return SimpleNamespace(choices=[SimpleNamespace(delta=delta)], usage=None)
+
+
+def _usage_chunk(prompt: int, completion: int) -> SimpleNamespace:
+    usage = SimpleNamespace(prompt_tokens=prompt, completion_tokens=completion)
+    delta = SimpleNamespace(content=None, tool_calls=None)
+    return SimpleNamespace(choices=[SimpleNamespace(delta=delta)], usage=usage)
+
+
+def test_stream_complete_streams_text_and_reports_usage(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    get_settings.cache_clear()
+    import litellm
+
+    def fake(**_: Any) -> list[SimpleNamespace]:
+        return [_content_chunk("Hel"), _content_chunk("lo"), _usage_chunk(10, 2)]
+
+    monkeypatch.setattr(litellm, "completion", fake)
+    from chimera.providers import LLMGateway
+    from chimera.providers.gateway import Message
+
+    deltas: list[str] = []
+    result = LLMGateway().stream_complete(
+        [Message(role="user", content="hi")], model="prov/m", on_delta=deltas.append
+    )
+    assert deltas == ["Hel", "lo"]  # on_delta got each fragment in order
+    assert result.content == "Hello"  # reassembled
+    assert result.prompt_tokens == 10 and result.completion_tokens == 2
+    assert result.tool_calls is None
+
+
+def test_stream_complete_reassembles_split_tool_calls(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    get_settings.cache_clear()
+    import litellm
+
+    def fake(**_: Any) -> list[SimpleNamespace]:
+        # A tool call arrives in fragments: name+id first, then the JSON arguments split across chunks.
+        return [
+            _tool_chunk(index=0, call_id="call_1", name="grep", arguments='{"pattern"'),
+            _tool_chunk(index=0, call_id=None, name=None, arguments=': "retry"}'),
+            _usage_chunk(7, 0),
+        ]
+
+    monkeypatch.setattr(litellm, "completion", fake)
+    from chimera.providers import LLMGateway
+    from chimera.providers.gateway import Message
+
+    result = LLMGateway().stream_complete([Message(role="user", content="hi")], model="prov/m")
+    assert result.tool_calls is not None
+    call = result.tool_calls[0]
+    assert call.name == "grep" and call.id == "call_1"
+    assert call.arguments == {"pattern": "retry"}  # fragments concatenated then JSON-parsed
+
+
+def test_stream_complete_survives_malformed_chunks(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    get_settings.cache_clear()
+    import litellm
+
+    def fake(**_: Any) -> list[SimpleNamespace]:
+        # A junk chunk (no .choices) and a tool fragment with unparseable JSON must not raise.
+        return [SimpleNamespace(), _content_chunk("ok"),
+                _tool_chunk(index=0, call_id="c", name="t", arguments="{bad json")]
+
+    monkeypatch.setattr(litellm, "completion", fake)
+    from chimera.providers import LLMGateway
+    from chimera.providers.gateway import Message
+
+    result = LLMGateway().stream_complete([Message(role="user", content="hi")], model="prov/m")
+    assert result.content == "ok"
+    assert result.tool_calls is not None and result.tool_calls[0].arguments == {}  # bad args -> {}
+
+
 def test_fallback_models_split_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CHIMERA_FALLBACK_MODELS", "a/b, c/d ,")
     assert Settings().fallback_models == ["a/b", "c/d"]
