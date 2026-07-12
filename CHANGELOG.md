@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **Provider cache no longer defeats consensus checks (16th adversarial review).** The completion
+  cache served `temperature>0` samples, so `k` identical sampled requests returned byte-identical
+  content — collapsing cascade agreement, the fusion router's agreement gate, and self-consistency
+  into fake unanimity (false confidence). The cache now serves/stores **only deterministic
+  (`temperature==0`) requests**. Also: an empty-content result is no longer cached (one malformed
+  response would otherwise serve `""` forever at $0); `acomplete()` now honors the credential pool so
+  a pool-only config authenticates; and the lazy key-rotator creation is lock-guarded against the
+  fusion panel's threads.
+
 ## [0.19.7] - 2026-07-12
 
 **Scheduler & migration hardening — 8 fixes from the 15th adversarial review (2 security-relevant).**
