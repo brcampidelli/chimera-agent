@@ -58,6 +58,21 @@ runs an injection corpus through the stack. On the built-in corpus the taint lay
 **attack success rate from 100% to ~14%** — and the report *names* what still gets through
 (exfiltration via an allowed tool) rather than claiming 100%.
 
+## Exposing the HTTP server
+
+`chimera serve` binds to `127.0.0.1` by default. Its state-changing endpoints (`/chat`, `/a2a`,
+`/webhook/*`) drive the agent, so **before exposing the server to a network**, set a bearer token:
+
+```bash
+export CHIMERA_SERVER_TOKEN="a-long-random-secret"   # required as: Authorization: Bearer <token>
+```
+
+With it set, those POST endpoints return `401` without a matching `Authorization: Bearer` header
+(`GET /health` and the A2A agent-card stay open). For the WhatsApp inbound webhook, set
+`CHIMERA_WHATSAPP_APP_SECRET` to your Meta app secret — Chimera then verifies each request's
+`X-Hub-Signature-256` HMAC and rejects a forged payload with `403`. Both are opt-in (unset = no auth,
+fine for localhost); a public deployment should set them (or sit behind an authenticating proxy).
+
 ## Honest limits
 
 This measures whether an *already-injected* agent's harmful action is stopped — not whether

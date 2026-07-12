@@ -230,6 +230,12 @@ class Settings(BaseSettings):
     whatsapp_verify_token: str | None = Field(
         default=None, validation_alias="CHIMERA_WHATSAPP_VERIFY_TOKEN"
     )
+    whatsapp_app_secret: str | None = Field(
+        default=None, validation_alias="CHIMERA_WHATSAPP_APP_SECRET"
+    )  # set to verify the inbound webhook's X-Hub-Signature-256 HMAC
+    # Optional bearer token guarding the state-changing HTTP endpoints (/a2a, /chat, /webhook/*).
+    # Unset = no auth (fine for localhost); set it before exposing the server to a network.
+    server_token: str | None = Field(default=None, validation_alias="CHIMERA_SERVER_TOKEN")
     signal_api_url: str | None = Field(default=None, validation_alias="CHIMERA_SIGNAL_API_URL")
     signal_number: str | None = Field(default=None, validation_alias="CHIMERA_SIGNAL_NUMBER")
 

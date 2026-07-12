@@ -7,8 +7,9 @@ logic lives in the pure :func:`handle` function (easy to unit-test); the
 
 from __future__ import annotations
 
+import hmac
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -22,18 +23,40 @@ _log = get_logger("server.http")
 WebhookHandler = Callable[[str, dict[str, Any]], list[str]]
 
 
+def _bearer_ok(headers: Mapping[str, str] | None, token: str) -> bool:
+    """Constant-time check of an ``Authorization: Bearer <token>`` header against ``token``."""
+    auth = ""
+    for key, value in (headers or {}).items():
+        if key.lower() == "authorization":
+            auth = value
+            break
+    prefix = "Bearer "
+    return auth.startswith(prefix) and hmac.compare_digest(auth[len(prefix) :], token)
+
+
 def handle(
     gateway: MessageGateway,
     method: str,
     path: str,
     body: bytes,
     *,
+    headers: Mapping[str, str] | None = None,
+    token: str | None = None,
     webhooks: WebhookHandler | None = None,
     whatsapp: Any = None,
     a2a: Any = None,  # (A2AServer, agent_card dict) — exposes A2A when provided
 ) -> tuple[int, dict[str, Any] | str]:
     """Pure request handler returning ``(status, body)`` — body is a dict (JSON) or a str (text)."""
     route = urlparse(path).path
+    # Auth (opt-in): when a token is configured, the state-changing POST endpoints require a bearer.
+    # /whatsapp is excluded — Meta can't send our bearer; it's authenticated by HMAC signature below.
+    if (
+        token
+        and method == "POST"
+        and (route in ("/a2a", "/chat") or route.startswith("/webhook/"))
+        and not _bearer_ok(headers, token)
+    ):
+        return 401, {"error": "unauthorized"}
     if method == "GET" and route == "/health":
         return 200, {"status": "ok", "active_chats": gateway.active_chats}
     if a2a is not None:
@@ -54,6 +77,14 @@ def handle(
             challenge = whatsapp.verify(params)
             return (200, challenge) if challenge is not None else (403, {"error": "verification failed"})
         if method == "POST":
+            sig = None
+            for key, value in (headers or {}).items():
+                if key.lower() == "x-hub-signature-256":
+                    sig = value
+                    break
+            verifier = getattr(whatsapp, "verify_signature", None)
+            if callable(verifier) and not verifier(body, sig):  # opt-in HMAC (no-op w/o an app_secret)
+                return 403, {"error": "invalid signature"}
             try:
                 payload = json.loads(body or b"{}")
             except json.JSONDecodeError:
@@ -102,11 +133,16 @@ def make_server(
     host: str = "127.0.0.1",
     port: int = 8765,
     *,
+    token: str | None = None,
     webhooks: WebhookHandler | None = None,
     whatsapp: Any = None,
     a2a: Any = None,
 ) -> ThreadingHTTPServer:
-    """Build (but don't start) an HTTP server wrapping ``gateway`` (and optional webhooks)."""
+    """Build (but don't start) an HTTP server wrapping ``gateway`` (and optional webhooks).
+
+    ``token``: when set, state-changing POST endpoints (/a2a, /chat, /webhook/*) require an
+    ``Authorization: Bearer <token>`` header. /whatsapp is authenticated by HMAC (app secret) instead.
+    """
 
     class Handler(BaseHTTPRequestHandler):
         def _send(self, status: int, payload: dict[str, Any] | str) -> None:
@@ -133,7 +169,9 @@ def make_server(
                 self._respond_sse(a2a[0].stream(json.loads(body or b"{}")))
                 return
             status, payload = handle(
-                gateway, method, self.path, body, webhooks=webhooks, whatsapp=whatsapp, a2a=a2a
+                gateway, method, self.path, body,
+                headers=dict(self.headers.items()), token=token,
+                webhooks=webhooks, whatsapp=whatsapp, a2a=a2a,
             )
             self._send(status, payload)
 

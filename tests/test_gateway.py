@@ -60,6 +60,42 @@ def test_http_handle_health_and_chat() -> None:
     assert status == 404
 
 
+def test_http_bearer_token_guards_state_changing_endpoints() -> None:
+    gateway = MessageGateway(EchoSession)
+    chat = b'{"text": "hi"}'
+    # No token configured -> open (current behavior, localhost-friendly).
+    assert handle(gateway, "POST", "/chat", chat)[0] == 200
+    # Token configured -> a POST without/with the wrong bearer is 401.
+    assert handle(gateway, "POST", "/chat", chat, token="s3cret")[0] == 401
+    assert handle(gateway, "POST", "/chat", chat, token="s3cret",
+                  headers={"Authorization": "Bearer nope"})[0] == 401
+    # Correct bearer passes.
+    assert handle(gateway, "POST", "/chat", chat, token="s3cret",
+                  headers={"Authorization": "Bearer s3cret"})[0] == 200
+    # GET /health stays open even with a token.
+    assert handle(gateway, "GET", "/health", b"", token="s3cret")[0] == 200
+
+
+def test_http_whatsapp_rejects_a_bad_hmac_signature() -> None:
+    import hashlib
+    import hmac
+
+    from chimera.server import WhatsAppSender, WhatsAppWebhook
+
+    gateway = MessageGateway(EchoSession)
+    hook = WhatsAppWebhook(
+        WhatsAppSender("t", "pid"), "vt", gateway.on_message, app_secret="appsecret"
+    )
+    body = b'{"entry": []}'
+    good = "sha256=" + hmac.new(b"appsecret", body, hashlib.sha256).hexdigest()
+    # No/incorrect signature -> 403; the correct HMAC passes.
+    assert handle(gateway, "POST", "/whatsapp", body, whatsapp=hook)[0] == 403
+    assert handle(gateway, "POST", "/whatsapp", body, whatsapp=hook,
+                  headers={"X-Hub-Signature-256": "sha256=deadbeef"})[0] == 403
+    assert handle(gateway, "POST", "/whatsapp", body, whatsapp=hook,
+                  headers={"X-Hub-Signature-256": good})[0] == 200
+
+
 def test_http_handle_webhook_fires_jobs() -> None:
     gateway = MessageGateway(EchoSession)
     seen: dict[str, object] = {}

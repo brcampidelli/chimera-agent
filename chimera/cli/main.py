@@ -1006,6 +1006,7 @@ def serve(
     a2a_pair = _build_a2a(backend, model, max_steps, workspace_path, host, port) if a2a else None
     server = make_server(
         message_gateway, host, port,
+        token=settings.server_token,
         webhooks=_webhook_handler(message_gateway),
         whatsapp=_whatsapp_webhook(settings, message_gateway),
         a2a=a2a_pair,
@@ -1251,7 +1252,10 @@ def _whatsapp_webhook(settings: Settings, gateway: MessageGateway) -> Any:
     from chimera.server import WhatsAppSender, WhatsAppWebhook
 
     sender = WhatsAppSender(settings.whatsapp_access_token, settings.whatsapp_phone_number_id)
-    return WhatsAppWebhook(sender, settings.whatsapp_verify_token, gateway.on_message)
+    return WhatsAppWebhook(
+        sender, settings.whatsapp_verify_token, gateway.on_message,
+        app_secret=settings.whatsapp_app_secret,
+    )
 
 
 def _webhook_handler(gateway: MessageGateway) -> Any:

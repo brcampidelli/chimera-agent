@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   callers — a generic message is returned and the detail logged server-side. Webhook/chat routes are
   matched against the parsed path (so `?query` strings don't break them), and a malformed
   `Content-Length` returns 400 instead of dropping the connection.
+- **Opt-in auth for the HTTP server.** State-changing endpoints (`/chat`, `/a2a`, `/webhook/*`) can now
+  require a bearer token (`CHIMERA_SERVER_TOKEN`), and the WhatsApp inbound webhook verifies the
+  `X-Hub-Signature-256` HMAC when `CHIMERA_WHATSAPP_APP_SECRET` is set — closing the "anyone who can
+  reach the port drives the autonomous agent / forges a WhatsApp message" gap. Both are opt-in (unset
+  = current localhost-friendly behavior); a public deployment should set them (see docs/security.md).
 
 ### Fixed
 - **`chimera evolve export` no longer trains on reward-hacked hollow successes.** `curate_sft` /

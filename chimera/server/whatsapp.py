@@ -81,11 +81,35 @@ class WhatsAppWebhook:
     """
 
     def __init__(
-        self, sender: WhatsAppSender, verify_token: str, route: Callable[[InboundMessage], str]
+        self,
+        sender: WhatsAppSender,
+        verify_token: str,
+        route: Callable[[InboundMessage], str],
+        *,
+        app_secret: str | None = None,
     ) -> None:
         self.sender = sender
         self.verify_token = verify_token
         self.route = route
+        # Meta app secret for inbound HMAC verification. When set, an unsigned/mis-signed webhook POST
+        # is rejected — otherwise anyone who knows the URL could forge a message and make the agent
+        # send an outbound reply to an attacker-chosen number. Opt-in (None = unverified, as before).
+        self.app_secret = app_secret
+
+    def verify_signature(self, raw_body: bytes, signature: str | None) -> bool:
+        """True if ``X-Hub-Signature-256`` is a valid HMAC-SHA256(app_secret, raw_body).
+
+        Returns True (unverified) when no app_secret is configured — verification is opt-in.
+        """
+        if not self.app_secret:
+            return True
+        import hashlib
+        import hmac
+
+        if not signature or not signature.startswith("sha256="):
+            return False
+        expected = hmac.new(self.app_secret.encode(), raw_body, hashlib.sha256).hexdigest()
+        return hmac.compare_digest(expected, signature[len("sha256=") :])
 
     def verify(self, params: dict[str, str]) -> str | None:
         """Meta webhook verification (GET): return hub.challenge when the token matches."""
