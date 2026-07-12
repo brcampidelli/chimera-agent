@@ -6,11 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.18.7] - 2026-07-12
+
 **Skills, memory-graph & tools hardening.** An eighth adversarial review (skills/skill_md, memory
 graph, native tools) found eleven real bugs — three of them **SSRF** holes in model-callable fetch
 tools (`http_get` was already patched; `browser` navigate and `download_media` were not), plus a
 workspace escape in `glob`, an unfenced document reader, and a status-laundering skill import — all
-fixed and regression-tested.
+fixed and regression-tested. Eighth review in the series; 71 bugs found across eleven surfaces so far.
 
 ### Security
 - **SSRF guard on `browser` and `download_media`.** Both take a model-/content-supplied URL and fetch
