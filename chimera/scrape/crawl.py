@@ -32,10 +32,17 @@ def _fetch_text(url: str, timeout: float = 15.0) -> str:
     """Fetch a URL as raw text (sitemaps, robots.txt); '' on any failure."""
     import httpx
 
+    from chimera.scrape.ssrf import check_url
+
     try:
-        resp = httpx.get(url, timeout=timeout, follow_redirects=True, headers={"User-Agent": _UA})
+        check_url(url)  # SSRF guard: reject internal/metadata hosts
+        resp = httpx.get(url, timeout=timeout, follow_redirects=False, headers={"User-Agent": _UA})
+        if resp.is_redirect and resp.headers.get("location"):
+            target = str(httpx.URL(url).join(resp.headers["location"]))
+            check_url(target)  # re-check the redirect hop
+            resp = httpx.get(target, timeout=timeout, follow_redirects=False, headers={"User-Agent": _UA})
         return resp.text if resp.status_code < 400 else ""
-    except Exception:  # noqa: BLE001 — a missing sitemap/robots is normal, not a crash
+    except Exception:  # noqa: BLE001 — a missing sitemap/robots (or a blocked internal URL) is not a crash
         return ""
 
 

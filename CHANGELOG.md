@@ -6,6 +6,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+- **Migration no longer launders foreign content as trusted (CRITICAL).** Imported memory was stored
+  as `provenance="clean"` and imported skills were copied verbatim — so another agent's (untrusted)
+  facts recalled as verified, and a foreign skill with `provenance: clean` was admitted `active` by
+  `skills-import`, bypassing the "imported = pending until a human approves" gate. Imported memory is
+  now tainted, and each imported SKILL.md is taint-stamped at the import boundary.
+- **SSRF guard on the scrape tools.** `scrape`/`extract`/`map`/`crawl`/firecrawl had no host
+  validation, so the agent could be steered into `http://169.254.169.254/…` (cloud metadata) or an
+  internal service. Every fetch (and each redirect hop — redirects are now followed manually) is
+  checked against private/loopback/link-local/reserved ranges; only http/https schemes are allowed.
+- **LocalSandbox (the default) no longer inherits provider secrets.** The gateway exports API keys to
+  `os.environ`, which the default sandbox passed wholesale to every command — an injected `echo
+  $OPENROUTER_API_KEY` could exfiltrate them. Secret-looking env vars are now scrubbed from the child
+  env (matching the Docker path).
+- **Docker sandbox timeout actually stops the container.** A `docker run` timeout only killed the
+  client; the container kept executing on the daemon. It now runs `--name`d and is `docker kill`ed on
+  timeout.
+- **Import files can't abort the whole import / pull host files via symlink.** Non-UTF-8 config/memory
+  files degrade with `errors="replace"` instead of crashing mid-import; skill copies preserve symlinks
+  (`symlinks=True`) instead of dereferencing them into the home.
+
+### Fixed
+- **LocalSandbox timeout kills the whole process tree** (`start_new_session` + `killpg`), so a forked
+  grandchild can't survive the timeout or hang the reap.
+- **Completion cache correctness & honesty.** The cache key now folds in the other response-affecting
+  params (top_p / seed / stop / response_format / api_base) so different requests can't collide; a
+  cache HIT reports 0 fresh tokens (with the count under `cache_read_tokens`) instead of re-billing a
+  $0 call; a fallback model's answer is no longer cached under the primary's key; and the temp file
+  is uniquely named so concurrent gateways can't corrupt it.
+- **Unbounded fetch bodies are capped** (10 MB, streamed) so a huge response can't OOM the host.
+- **`chimera migrate --apply` honors the configured memory backend** (it was writing to `memory.json`
+  even on a sqlite home — a silent no-op) and the embedder.
+- **Kanban board is crash-safe** (atomic save) and **resilient** (skips a malformed card instead of
+  aborting the whole board load).
+
 ## [0.18.5] - 2026-07-12
 
 **Data-integrity & server-security hardening.** Two adversarial reviews (memory-store + TUI; server/API

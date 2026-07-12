@@ -3069,9 +3069,18 @@ def migrate(
 
     target = Path(home) if home else get_settings().home
     if apply:
-        from chimera.memory import MemoryManager, MemoryStore
+        from chimera.evolution.wiring import semantic_embed
+        from chimera.memory import MemoryManager, MemoryStore, SqliteMemoryStore
 
-        manager = MemoryManager(MemoryStore(target / "memory.json"))
+        # Honor the configured backend + embedder, or the merge writes to a store the agent never
+        # reads (json while it recalls from sqlite) — a silent no-op that reports success.
+        _s = get_settings()
+        _store = (
+            SqliteMemoryStore(target / "memory.db")
+            if _s.memory_backend == "sqlite"
+            else MemoryStore(target / "memory.json")
+        )
+        manager = MemoryManager(_store, embed=semantic_embed(_s))
         result = importer.apply(target, memory_manager=manager)
     else:
         result = importer.scan()

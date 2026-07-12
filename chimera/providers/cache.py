@@ -14,7 +14,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import threading
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -44,7 +46,9 @@ class CompletionCache:
 
     def _save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(self.path.suffix + ".tmp")
+        # Unique tmp name (pid+uuid): a FIXED ".tmp" is shared by every CompletionCache instance on
+        # the same file, so two gateways writing concurrently could interleave and publish corrupt JSON.
+        tmp = self.path.with_suffix(f".{os.getpid()}.{uuid.uuid4().hex}.tmp")
         tmp.write_text(json.dumps(self._data, indent=2, ensure_ascii=False), encoding="utf-8")
         tmp.replace(self.path)  # atomic — never leaves a half-written cache file
 
@@ -55,16 +59,22 @@ class CompletionCache:
         messages: list[dict[str, Any]],
         temperature: float,
         max_tokens: int | None,
+        params: dict[str, Any] | None = None,
     ) -> str:
+        # `params` folds in the OTHER response-affecting request fields (top_p, seed, stop,
+        # response_format, api_base, ...) so two requests that differ only in those don't collide to
+        # the same key and serve each other's answer. Non-JSON-able values fall back to repr.
         payload = json.dumps(
             {
                 "model": model,
                 "messages": messages,
                 "temperature": temperature,
                 "max_tokens": max_tokens,
+                "params": params or {},
             },
             sort_keys=True,
             ensure_ascii=False,
+            default=repr,
         )
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 

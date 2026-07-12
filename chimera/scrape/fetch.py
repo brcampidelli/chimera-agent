@@ -20,6 +20,8 @@ from chimera.scrape.clean import extract_links, html_to_markdown, page_title, pl
 
 _UA = "Mozilla/5.0 (compatible; ChimeraAgent/1.0; +https://github.com/brcampidelli/chimera-agent)"
 _THIN_CHARS = 200  # below this, an HTTP result is probably a JS shell or a soft block -> escalate
+_MAX_BODY_BYTES = 10 * 1024 * 1024  # cap the download so a multi-GB body can't OOM the host
+_MAX_REDIRECTS = 10
 
 
 @dataclass
@@ -38,8 +40,25 @@ class FetchResult:
 def _http_fetch(url: str, timeout: float = 20.0) -> tuple[int, str]:
     import httpx
 
-    resp = httpx.get(url, timeout=timeout, follow_redirects=True, headers={"User-Agent": _UA})
-    return resp.status_code, resp.text
+    from chimera.scrape.ssrf import check_url
+
+    # Follow redirects MANUALLY so every hop is SSRF-checked (a public URL can 302 to an internal
+    # address / the cloud-metadata endpoint), and stream the body with a size cap so a huge response
+    # can't OOM the host.
+    with httpx.Client(timeout=timeout, follow_redirects=False, headers={"User-Agent": _UA}) as client:
+        for _ in range(_MAX_REDIRECTS):
+            check_url(url)
+            with client.stream("GET", url) as resp:
+                if resp.is_redirect and resp.headers.get("location"):
+                    url = str(httpx.URL(url).join(resp.headers["location"]))
+                    continue
+                body = bytearray()
+                for chunk in resp.iter_bytes():
+                    body += chunk
+                    if len(body) > _MAX_BODY_BYTES:
+                        break
+                return resp.status_code, bytes(body).decode(resp.encoding or "utf-8", errors="replace")
+    raise ValueError(f"too many redirects fetching {url!r}")
 
 
 def _browser_fetch(url: str) -> str:

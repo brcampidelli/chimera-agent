@@ -23,6 +23,22 @@ class BoomRunner:
         raise RuntimeError("lane crashed")
 
 
+def test_board_skips_a_malformed_card_and_saves_atomically(tmp_path: Path) -> None:
+    import json
+
+    path = tmp_path / "k.json"
+    good = KanbanBoard(path).add("keep", "act")  # writes one valid card
+    # Hand-corrupt: append a malformed entry.
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data.append({"id": "bad", "column": "not-a-column"})
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+    board = KanbanBoard(path)  # must not crash on the bad entry
+    assert [c.id for c in board.cards()] == [good.id]
+    board.add("another", "act")
+    assert not (tmp_path / "k.json.tmp").exists()  # atomic save leaves no stray temp file
+
+
 def test_board_add_starts_in_backlog(tmp_path: Path) -> None:
     board = KanbanBoard(tmp_path / "k.json")
     card = board.add("title", "do the thing", lane="solve")

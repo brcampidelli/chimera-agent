@@ -39,6 +39,17 @@ def test_local_sandbox_closes_stdin_so_reads_do_not_hang() -> None:
     assert result.exit_code == 0
 
 
+def test_local_sandbox_scrubs_secret_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    # A secret in the parent env must NOT be inherited by an agent-run command (exfil defense).
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-super-secret")
+    monkeypatch.setenv("SAFE_VAR", "keepme")
+    out = LocalSandbox().run('python -c "import os;print(os.environ.get(\'OPENROUTER_API_KEY\',\'MISSING\'))"')
+    assert "sk-super-secret" not in out.stdout
+    assert "MISSING" in out.stdout
+    safe = LocalSandbox().run('python -c "import os;print(os.environ.get(\'SAFE_VAR\',\'MISSING\'))"')
+    assert "keepme" in safe.stdout  # non-secret env still passes through
+
+
 def test_local_sandbox_runs_non_interactively() -> None:
     # The non-interactive env is applied, so git never opens an editor/pager or prompts.
     result = LocalSandbox().run('python -c "import os;print(os.environ[\'GIT_EDITOR\'])"')

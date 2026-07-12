@@ -7,6 +7,9 @@ import uuid
 from pathlib import Path
 
 from chimera.kanban.models import Column, KanbanCard
+from chimera.telemetry import get_logger
+
+_log = get_logger("kanban.board")
 
 
 class KanbanBoard:
@@ -23,13 +26,22 @@ class KanbanBoard:
             return
         raw = json.loads(self.path.read_text(encoding="utf-8") or "[]")
         for item in raw:
-            card = KanbanCard.model_validate(item)
+            # Skip a single malformed card (schema drift, hand-edit) instead of aborting the whole
+            # load — one bad entry must not make every board command crash.
+            try:
+                card = KanbanCard.model_validate(item)
+            except ValueError as exc:
+                _log.warning("skipping malformed kanban card: %s", exc)
+                continue
             self._cards[card.id] = card
 
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         data = [card.model_dump() for card in self._cards.values()]
-        self.path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        # Atomic write: a crash mid-write must not truncate the board and lose every card.
+        tmp = self.path.with_suffix(self.path.suffix + ".tmp")
+        tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        tmp.replace(self.path)
 
     def add(
         self, title: str, action: str, *, lane: str = "solve", verify: str | None = None

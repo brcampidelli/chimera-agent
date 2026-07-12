@@ -23,6 +23,27 @@ from chimera.memory.models import MemoryItem
 from chimera.telemetry import get_logger
 
 _log = get_logger("migration.base")
+
+
+def _taint_imported_skills(skills_dir: Path) -> None:
+    """Stamp every imported SKILL.md with ``provenance=tainted`` — the import boundary owns the
+    security label, not the untrusted source file. ``skills-import`` then holds a foreign skill
+    ``pending`` until a human approves it, instead of admitting an attacker's ``provenance: clean``.
+    """
+    if not skills_dir.exists():
+        return
+    from chimera.skills.skill_md import parse_skill_md, render_skill_md
+
+    candidates = list(skills_dir.rglob("SKILL.md")) + [
+        p for p in skills_dir.glob("*.md") if p.name != "SKILL.md"
+    ]
+    for md in candidates:
+        try:
+            skill = parse_skill_md(md.read_text(encoding="utf-8", errors="replace"))
+            skill.manifest.provenance = "tainted"
+            md.write_text(render_skill_md(skill), encoding="utf-8")
+        except Exception as exc:  # noqa: BLE001 — a non-skill .md must not break the import
+            _log.debug("could not taint-stamp %s: %s", md, exc)
 _MEMORY_NOTE = "memory files found; run --apply to merge into Chimera memory (dedup, non-destructive)"
 _BULLET = re.compile(r"^[-*]\s+")
 
@@ -79,9 +100,12 @@ class Importer(ABC):
         for name, src in self.skill_sources().items():
             target = dest / "skills" / name
             if src.is_dir():
-                shutil.copytree(src, target, dirs_exist_ok=True)
-            elif src.is_file():
+                # symlinks=True: preserve links as links instead of dereferencing them — a crafted
+                # source skill dir could otherwise symlink to ~/.ssh/id_rsa and copy its CONTENT in.
+                shutil.copytree(src, target, dirs_exist_ok=True, symlinks=True)
+            elif src.is_file() and not src.is_symlink():  # skip a symlinked skill file (no deref)
                 shutil.copy2(src, target if target.suffix else target.with_suffix(src.suffix))
+        _taint_imported_skills(dest / "skills")  # foreign skills stay pending until a human approves
         result.notes.append(f"imported into {dest}")
 
         if memory_manager is not None:
@@ -112,7 +136,7 @@ class DirectoryImporter(Importer):
         path = self._find_first(self.config_files)
         if path is None:
             return {}
-        text = path.read_text(encoding="utf-8")
+        text = path.read_text(encoding="utf-8", errors="replace")  # non-UTF-8 must not crash the scan
         try:
             data = json.loads(text) if path.suffix.lower() == ".json" else yaml.safe_load(text)
         except (json.JSONDecodeError, yaml.YAMLError):
@@ -164,7 +188,8 @@ class DirectoryImporter(Importer):
     def memory_items(self) -> list[MemoryItem]:
         items: list[MemoryItem] = []
         for name in self._memory_files():
-            text = (self.home / name).read_text(encoding="utf-8")
+            # errors="replace": a non-UTF-8 memory file must not crash the import mid-write.
+            text = (self.home / name).read_text(encoding="utf-8", errors="replace")
             for raw in text.splitlines():
                 line = raw.strip()
                 if not line or line.startswith("#"):
@@ -172,10 +197,14 @@ class DirectoryImporter(Importer):
                 content = _BULLET.sub("", line)
                 items.append(
                     MemoryItem(
-                        id=uuid.uuid4().hex[:8],
+                        id=uuid.uuid4().hex,  # full uuid — no 8-char collision-overwrite
                         kind="semantic",
                         content=content,
                         source=self.source,
+                        # SECURITY: imported memory is FOREIGN, unvetted content — it crosses a trust
+                        # boundary, so it must be tainted. Recall then surfaces it as [unverified],
+                        # and it can never launder itself into a "clean" fact.
+                        provenance="tainted",
                         metadata={"file": name},
                     )
                 )

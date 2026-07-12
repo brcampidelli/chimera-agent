@@ -18,6 +18,9 @@ def firecrawl_scrape(url: str, api_key: str, *, timeout: float = 45.0) -> tuple[
     """Return ``(markdown, metadata)`` for ``url`` via Firecrawl. Raises on any failure."""
     import httpx
 
+    from chimera.scrape.ssrf import check_url
+
+    check_url(url)  # SSRF guard before handing the URL to the fetch service
     resp = httpx.post(
         _ENDPOINT,
         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},

@@ -241,20 +241,29 @@ class LLMGateway:
         # HORIZON-style prompt caching: serve an identical tool-free request from cache.
         cache_key: str | None = None
         if self.cache is not None and tools is None:
+            # Fold the other response-affecting request fields into the key so e.g. two calls that
+            # differ only in top_p / seed / stop / response_format / api_base don't collide.
+            key_params = {k: v for k, v in {**extra, **kwargs}.items() if k != "api_key"}
             cache_key = CompletionCache.key(
                 model=resolved,
                 messages=message_dicts,
                 temperature=temperature,
                 max_tokens=max_tokens,
+                params=key_params,
             )
             hit = self.cache.get(cache_key)
             if hit is not None:
                 _log.debug("cache hit model=%s", resolved)
+                # A cache hit made NO API call and billed nothing: report 0 fresh tokens and surface
+                # the original count under cache_read_tokens, so a cost tally doesn't double-count a $0
+                # served-from-cache turn as if the tokens were spent again.
+                cached_total = (hit.get("prompt_tokens") or 0) + (hit.get("completion_tokens") or 0)
                 return CompletionResult(
                     content=hit.get("content", ""),
                     model=hit.get("model", resolved),
-                    prompt_tokens=hit.get("prompt_tokens"),
-                    completion_tokens=hit.get("completion_tokens"),
+                    prompt_tokens=0,
+                    completion_tokens=0,
+                    cache_read_tokens=cached_total or None,
                 )
 
         last_exc: Exception | None = None
@@ -282,7 +291,15 @@ class LLMGateway:
                     if api_key:
                         self._cred_pool.reset(api_key)  # a working key clears its cooldown
                     result = self._normalize(response, candidate)
-                    if cache_key is not None and self.cache is not None and result.tool_calls is None:
+                    # Only cache when the PRIMARY model answered: the key is derived from `resolved`,
+                    # so storing a fallback's answer under it would later serve the weaker fallback for
+                    # a primary request even after the primary recovers.
+                    if (
+                        cache_key is not None
+                        and self.cache is not None
+                        and result.tool_calls is None
+                        and candidate == resolved
+                    ):
                         self.cache.put(
                             cache_key,
                             {

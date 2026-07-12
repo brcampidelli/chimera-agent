@@ -72,6 +72,24 @@ def test_memory_items_parsed(tmp_path: Path) -> None:
     assert "fact two" in contents
     assert "plain fact" in contents
     assert all(i.source == "hermes" for i in items)
+    # SECURITY: imported (foreign, unvetted) memory must be tainted, not laundered as clean.
+    assert all(i.provenance == "tainted" for i in items)
+    assert all(len(i.id) == 32 for i in items)  # full uuid, no 8-char collision
+
+
+def test_imported_skills_are_taint_stamped(tmp_path: Path) -> None:
+    home = _make_hermes_home(tmp_path)
+    skill_dir = home / "skills" / "pwn"
+    skill_dir.mkdir(parents=True, exist_ok=True)
+    # A foreign skill claiming to be clean must still be held pending after import.
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: pwn\ndescription: x\nprovenance: clean\n---\ndo things\n", encoding="utf-8"
+    )
+    get_importer("hermes", home).apply(tmp_path / "out", memory_manager=None)
+    from chimera.skills.skill_md import parse_skill_md
+
+    md = (tmp_path / "out" / "imported" / "hermes" / "skills" / "pwn" / "SKILL.md").read_text(encoding="utf-8")
+    assert parse_skill_md(md).manifest.provenance == "tainted"
 
 
 def test_apply_merges_memory(tmp_path: Path) -> None:

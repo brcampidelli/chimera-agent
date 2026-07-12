@@ -201,6 +201,17 @@ def test_cache_key_is_deterministic() -> None:
     assert k1 == k2 != other
 
 
+def test_cache_key_differs_by_response_affecting_params() -> None:
+    from chimera.providers.cache import CompletionCache
+
+    msgs = [{"role": "user", "content": "hi"}]
+    base = CompletionCache.key(model="m", messages=msgs, temperature=0.0, max_tokens=None)
+    # Two requests that differ only in top_p / seed / api_base must NOT collide to the same key.
+    p1 = CompletionCache.key(model="m", messages=msgs, temperature=0.0, max_tokens=None, params={"top_p": 0.1})
+    p2 = CompletionCache.key(model="m", messages=msgs, temperature=0.0, max_tokens=None, params={"top_p": 0.9})
+    assert base != p1 != p2 and p1 != p2
+
+
 def test_cache_persists(tmp_path: Any) -> None:
     from chimera.providers.cache import CompletionCache
 

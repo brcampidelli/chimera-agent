@@ -16,6 +16,7 @@ agent keeps working (just without container isolation) instead of failing outrig
 from __future__ import annotations
 
 import subprocess
+from contextlib import suppress
 from pathlib import Path
 
 from chimera.sandbox.base import Sandbox, SandboxResult
@@ -63,8 +64,14 @@ class DockerSandbox:
         # is no TTY (git won't page). The non-interactive env is passed in too, so editors/credential
         # prompts never block — the same anti-hang guarantee as the local sandbox.
         env_args = [arg for k, v in _NONINTERACTIVE_ENV.items() for arg in ("-e", f"{k}={v}")]
+        # Named container so a timeout can actually STOP it: `docker run` timing out only kills the
+        # client — the container stays detached on the daemon (still executing, holding the bind-mount,
+        # exfiltrating) and `--rm` won't fire until it exits on its own. On timeout we `docker kill` it.
+        import uuid
+
+        name = f"chimera-{uuid.uuid4().hex[:12]}"
         argv = [
-            "docker", "run", "--rm",
+            "docker", "run", "--rm", "--name", name,
             "--network", "bridge" if self.network else "none",
             "--memory", self.memory,
             *(("--runtime", self.runtime) if self.runtime else ()),
@@ -78,6 +85,8 @@ class DockerSandbox:
                 argv, capture_output=True, text=True, timeout=timeout + 15, stdin=subprocess.DEVNULL
             )
         except subprocess.TimeoutExpired:
+            with suppress(OSError, subprocess.SubprocessError):
+                subprocess.run(["docker", "kill", name], capture_output=True, timeout=15)  # noqa: S603,S607
             return SandboxResult(
                 exit_code=124, stderr=f"command timed out after {timeout}s", timed_out=True
             )
