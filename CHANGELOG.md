@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.18.6] - 2026-07-12
+
+**Migration, provider & sandbox hardening.** Two adversarial reviews (migration/kanban/CLI;
+providers/sandbox/scrape) found fifteen real bugs the tests missed — including a **CRITICAL**
+taint-laundering in the migration importer, an **SSRF** hole in the scrape tools, and a
+provider-secret leak from the default sandbox — all fixed and regression-tested. Seventh review in the
+series; 60 bugs found across ten surfaces so far.
+
 ### Security
 - **Migration no longer launders foreign content as trusted (CRITICAL).** Imported memory was stored
   as `provenance="clean"` and imported skills were copied verbatim — so another agent's (untrusted)
