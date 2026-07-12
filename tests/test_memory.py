@@ -234,3 +234,20 @@ def test_persistence(tmp_path: Path) -> None:
     assert len(reopened.store) == 1
     op, _ = reopened.remember("durable fact", key="k")
     assert op == "NOOP"
+
+
+def test_search_reports_the_winning_layer_via_on_layer(tmp_path: Path) -> None:
+    mgr = _manager(tmp_path)  # default JSON store: no semantic, no FTS -> keyword layer
+    mgr.remember("Alex prefers TypeScript strict", "persona")
+    seen: list[str] = []
+    hits = mgr.search("what does Alex prefer", k=3, on_layer=seen.append)
+    assert hits  # something matched
+    assert seen == ["keyword"]  # the layer that actually produced the hits
+
+
+def test_search_does_not_report_a_layer_when_nothing_matches(tmp_path: Path) -> None:
+    mgr = _manager(tmp_path)
+    mgr.remember("Alex prefers TypeScript strict", "persona")
+    seen: list[str] = []
+    assert mgr.search("completely unrelated zzzptxq", k=3, on_layer=seen.append) == []
+    assert seen == []  # no layer contributed -> nothing reported (never guessed)

@@ -148,26 +148,45 @@ class ChatSession:
     def _recall(self, message: str) -> tuple[list[str], str | None]:
         """Recall long-term facts for this message: gated keyword/semantic hits + graph-linked facts.
 
-        Returns ``(facts, layer)``. ``layer`` is which retrieval layer contributed — currently always
-        None (the ``MemoryManager.search`` internals don't surface it yet); the fact *count* is honest
-        and cheap, the layer *label* stays absent rather than being guessed.
+        Returns ``(facts, layer)``. ``layer`` names the retrieval layer(s) that actually contributed —
+        e.g. ``"semantic"``, ``"fts"``, ``"keyword"``, ``"keyword+graph"`` — or None when nothing was
+        recalled. It reflects real hits (never guessed): a layer that returns nothing is not listed.
         """
         facts: list[str] = []
+        layers: list[str] = []
         if self.memory is not None:
-            items = self.memory.search(message, k=self.memory_k)
+            captured: dict[str, str] = {}
+            items = self._memory_search(message, lambda name: captured.__setitem__("layer", name))
             if self.gate is not None:
                 items = self.gate.filter(items, message)  # admission gate (trust boundary)
-            facts = [item.content for item in items]
+            if items:
+                facts = [item.content for item in items]
+                if "layer" in captured:
+                    layers.append(captured["layer"])
         if self.graph is not None:
             # Entity-aware recall: facts linked (via the graph) to entities named in the
             # message, even when they share no keyword with it. Deduped against keyword hits.
+            graph_added = 0
             for related in self.graph.related_facts(message, k=self.memory_k):
                 # Entity-linked facts skip the keyword-similarity gate (they intentionally may not
                 # overlap the query), but they must STILL pass the injection check — a graph-reachable
                 # tainted memory could otherwise inject override text the gate exists to block.
                 if related not in facts and (self.gate is None or self.gate.is_clean(related)):
                     facts.append(related)
-        return facts, None
+                    graph_added += 1
+            if graph_added:
+                layers.append("graph")
+        return facts, ("+".join(layers) if layers else None)
+
+    def _memory_search(
+        self, message: str, on_layer: Callable[[str], None]
+    ) -> list[MemoryItem]:
+        """Call ``memory.search`` capturing the winning layer, tolerating a fake without ``on_layer``."""
+        assert self.memory is not None
+        try:
+            return self.memory.search(message, k=self.memory_k, on_layer=on_layer)  # type: ignore[call-arg]
+        except TypeError:  # a minimal SupportsRecall fake that doesn't accept on_layer
+            return self.memory.search(message, k=self.memory_k)
 
     def _compose(self, message: str) -> str:
         facts, _layer = self._recall(message)

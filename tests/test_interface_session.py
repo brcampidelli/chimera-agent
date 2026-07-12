@@ -152,3 +152,12 @@ def test_send_verbose_returns_turn_report_and_forwards_callbacks() -> None:
 def test_send_still_returns_a_bare_string() -> None:
     # The existing contract is preserved for the REPL / gateway / messaging callers.
     assert isinstance(ChatSession(VerboseAgent()).send("hi"), str)
+
+
+def test_send_verbose_surfaces_the_memory_layer(tmp_path: Path) -> None:
+    mem = MemoryManager(MemoryStore(tmp_path / "m.json"))
+    mem.remember("Alex prefers TypeScript strict", "persona")
+    session = ChatSession(VerboseAgent(), memory=mem, gate=None)  # gate=None to isolate recall
+    report = session.send_verbose("what does Alex prefer?")
+    assert report.memory_facts_used >= 1
+    assert report.memory_layer == "keyword"  # the layer that produced the hit, surfaced honestly

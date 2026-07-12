@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from collections.abc import Callable
 
 from chimera.memory.models import MemoryItem, MemoryKind
 from chimera.memory.semantic import EmbedFn, SemanticIndex
@@ -214,13 +215,19 @@ class MemoryManager:
         )
         return f"What you know about the user:\n{facts}"
 
-    def search(self, query: str, *, k: int = 5) -> list[MemoryItem]:
+    def search(
+        self, query: str, *, k: int = 5, on_layer: Callable[[str], None] | None = None
+    ) -> list[MemoryItem]:
         """Retrieve relevant memories.
 
         Semantic ranking (opt-in, when an embedder is configured) first; on any embedder
         failure or when semantic is off, fall through to full-text (if the backend supports
         it) and finally to keyword overlap. The fallback is unconditional — recall must
         never hard-fail because an embeddings endpoint is down.
+
+        ``on_layer`` (optional) is called with the name of the layer that actually produced the
+        hits — ``"semantic"`` | ``"fts"`` | ``"keyword"`` — and never when a layer returns nothing,
+        so a UI can honestly show which layer contributed rather than guessing.
         """
         # A tokenless query (blank/whitespace/punctuation) has nothing to match — return [] up front
         # so every path agrees. Otherwise the semantic path would embed "" and return k arbitrary
@@ -231,12 +238,16 @@ class MemoryManager:
             try:
                 hits = self._semantic.search(query, self.store.all(), k)
                 if hits:
+                    if on_layer is not None:
+                        on_layer("semantic")
                     return hits
             except Exception as exc:  # noqa: BLE001 — degrade to lexical, never fail recall
                 _log.warning("semantic recall failed, falling back to keyword: %s", exc)
         backend_search = getattr(self.store, "search", None)
         if callable(backend_search):  # e.g. the SQLite/FTS5 store
             result: list[MemoryItem] = backend_search(query, k=k)
+            if result and on_layer is not None:
+                on_layer("fts")
             return result
         terms = set(_TOKEN.findall(query.lower()))
         if not terms:
@@ -248,4 +259,7 @@ class MemoryManager:
             if score:
                 scored.append((score, item.id, item))
         scored.sort(key=lambda entry: (-entry[0], entry[1]))
-        return [item for _, _, item in scored[:k]]
+        top = [item for _, _, item in scored[:k]]
+        if top and on_layer is not None:
+            on_layer("keyword")
+        return top

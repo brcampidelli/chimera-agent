@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **The TUI activity panel now names the memory layer that contributed.** `MemoryManager.search`
+  gained an optional `on_layer` callback that fires with the layer producing the hits
+  (`semantic`/`fts`/`keyword`, never when a layer returns nothing); `ChatSession` surfaces it on the
+  `TurnReport`, so the panel shows e.g. "3 facts recalled (keyword+graph)" instead of just a count —
+  the honest label, absent rather than guessed when unknown.
+
 ## [0.19.0] - 2026-07-12
 
 **A live, instrumented terminal UI.** `chimera tui` goes from a single-pane chat to a streaming

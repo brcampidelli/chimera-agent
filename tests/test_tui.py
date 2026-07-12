@@ -84,6 +84,7 @@ class DrivenSession:
             usd=0.0001,
             tool_names=["read_file"],
             memory_facts_used=2,
+            memory_layer="keyword",
             steps=1,
             stopped_reason="final",
         )
@@ -117,6 +118,7 @@ async def test_tui_interactive_flow_headless() -> None:
         assert "read_file" in str(app.query_one("#act-tools", Static).render())
         assert "in 12" in str(app.query_one("#act-tokens", Static).render())
         assert "2 fact" in str(app.query_one("#act-memory", Static).render())
+        assert "keyword" in str(app.query_one("#act-memory", Static).render())  # layer label shown
 
         # /model switches the model through the real input handler.
         app.query_one("#prompt", Input).value = "/model openrouter/x"
