@@ -92,10 +92,19 @@ class ProjectState(BaseModel):
     plan_approved: bool = False
     pending_card_id: str | None = None  # a high-risk card awaiting approval
     note: str = ""
+    # The config rails are persisted so a resume (`project run/step/approve`) rebuilds the SAME
+    # config from disk. Without this, a resume reconstructs ProjectConfig with the default
+    # max_iterations=20 — silently defeating a `--max-iterations N` the user set at start.
+    max_iterations: int = 20
+    require_plan_approval: bool = True
 
     def save(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(self.model_dump_json(indent=2), encoding="utf-8")
+        # Atomic write (mirrors the board): a crash mid-write must not truncate project.json and
+        # brick every later `project status`/`run`/`resume` for this project.
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(self.model_dump_json(indent=2), encoding="utf-8")
+        tmp.replace(path)
 
     @classmethod
     def load(cls, path: Path) -> ProjectState:
@@ -122,7 +131,14 @@ class ProjectOrchestrator:
         self.solve_card = solve_card
         self.state_path = state_path
         self.check_drift = check_drift_fn or _default_check_drift
-        self.config = config or ProjectConfig()
+        # No explicit config on a resume → rebuild the rails from the DURABLE state (not defaults).
+        # When a config IS given (start), it wins and is written back so the two stay in sync.
+        self.config = config or ProjectConfig(
+            max_iterations=state.max_iterations,
+            require_plan_approval=state.require_plan_approval,
+        )
+        state.max_iterations = self.config.max_iterations
+        state.require_plan_approval = self.config.require_plan_approval
         self._ws = Path(state.workspace).resolve()
         self._spec_abs = Path(state.spec_path).resolve()
 
@@ -146,6 +162,16 @@ class ProjectOrchestrator:
     ) -> ProjectOrchestrator:
         """Create a new project (dirs, board, state) from a spec file."""
         spec = _load_spec(spec_path)
+        # Refuse a spec with no requirements. `check_drift` starts `aligned=True` and only a failing
+        # REQUIRED requirement flips it false, so an empty (or all-optional) spec — e.g. a YAML typo
+        # like `requirement:` for `requirements:` that parses to [] — would vacuously report "done"
+        # having verified nothing. The spec is the only authority of done; an empty one is a mistake.
+        if not any(r.required for r in spec.requirements):
+            raise ValueError(
+                "spec has no required requirements — nothing to verify; refusing to start "
+                "(check the spec's `requirements:` block parsed correctly)"
+            )
+        cfg = config or ProjectConfig()
         pid = project_id or uuid.uuid4().hex[:8]
         pdir = cls.project_dir(home, pid)
         pdir.mkdir(parents=True, exist_ok=True)
@@ -156,12 +182,14 @@ class ProjectOrchestrator:
             workspace=str(Path(workspace).resolve()),
             board_path=str(pdir / "board.json"),
             status="planning",
+            max_iterations=cfg.max_iterations,
+            require_plan_approval=cfg.require_plan_approval,
         )
         state.save(pdir / "project.json")
         return cls(
             spec, board, state,
             solve_card=solve_card, state_path=pdir / "project.json",
-            check_drift_fn=check_drift_fn, config=config,
+            check_drift_fn=check_drift_fn, config=cfg,
         )
 
     @classmethod
@@ -216,7 +244,11 @@ class ProjectOrchestrator:
         """
         if self.state.pending_card_id != card_id:
             return self.state
-        self.board.move(card_id, "review")
+        # Guard the move (mirrors approve_card): the pending id lives in project.json, not the board,
+        # so a card dropped from the board (a failed model_validate on load, or a hand-edit) would make
+        # an unguarded board.move raise KeyError out to the CLI. A missing card just escalates cleanly.
+        if self.board.get(card_id) is not None:
+            self.board.move(card_id, "review")
         self.state.pending_card_id = None
         self.state.status = "escalated"
         self.state.note = f"high-risk card {card_id} denied by human"
@@ -228,6 +260,11 @@ class ProjectOrchestrator:
         """Advance one iteration: check the spec, sync cards, run at most ONE ready card."""
         if self.state.status == "done":
             return self.state
+        # A card stuck in `doing` is debris from a crash mid-_work (which is otherwise synchronous:
+        # move→run→record→move all in one step). Return it to backlog so its requirement is retried
+        # instead of being orphaned forever (a `doing` card is OPEN, so _sync_cards won't replace it,
+        # yet _next_ready_card only scans `backlog` → permanent "no ready card" escalation).
+        self._recover_orphaned_doing()
         report = self.check_drift(self.spec, self._ws)
         if report.aligned:
             return self._set("done", "spec aligned — project complete")
@@ -284,10 +321,28 @@ class ProjectOrchestrator:
 
     # ------------------------------------------------------------- internals
 
+    def _recover_orphaned_doing(self) -> None:
+        """Return any card left in ``doing`` (crash debris) to ``backlog`` so it can be retried."""
+        for card in self.board.cards("doing"):
+            self.board.move(card.id, "backlog")
+
     def _gaps(self, report: DriftReport) -> list[str]:
-        """Ids of REQUIRED requirements that are currently unsatisfied."""
+        """Ids of unsatisfied requirements that need a card: every unsatisfied REQUIRED requirement,
+        plus any unsatisfied requirement it (transitively) ``depends_on`` — a dependency must be
+        worked too, or a required requirement blocked on it can never become ready."""
+        satisfied = {r.id for r in report.results if r.satisfied}
         required = {r.id for r in self.spec.requirements if r.required}
-        return [r.id for r in report.results if not r.satisfied and r.id in required]
+        needed = {r.id for r in report.results if not r.satisfied and r.id in required}
+        frontier = list(needed)
+        while frontier:
+            req = self._requirement(frontier.pop())
+            if req is None:
+                continue
+            for dep in req.depends_on:
+                if dep not in satisfied and dep not in needed:
+                    needed.add(dep)
+                    frontier.append(dep)
+        return [r.id for r in report.results if not r.satisfied and r.id in needed]
 
     def _requirement(self, req_id: str) -> Requirement | None:
         return next((r for r in self.spec.requirements if r.id == req_id), None)

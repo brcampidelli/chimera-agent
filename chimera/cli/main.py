@@ -3451,11 +3451,11 @@ def _resume_project(project_id: str, model: str | None) -> Any:
         console.print(f"[red]no project {project_id}[/red]")
         raise typer.Exit(code=1)
     state = ProjectState.load(pdir / "project.json")
-    from chimera.orchestration.project import ProjectConfig
-
+    # No config override: `load` rebuilds the rails (max_iterations, require_plan_approval) from the
+    # DURABLE state, so a `--max-iterations N` set at start survives a resume. (The plan gate is
+    # already correct on its own — `require_plan_approval and not plan_approved`, both persisted.)
     return ProjectOrchestrator.load(
         get_settings().home, project_id, solve_card=_project_lane(state.workspace, model),
-        config=ProjectConfig(require_plan_approval=not state.plan_approved),
     )
 
 

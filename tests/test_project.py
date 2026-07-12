@@ -239,3 +239,94 @@ def test_project_resumes_from_disk(tmp_path: Path) -> None:
     )
     state = resumed.run()
     assert state.status == "done"
+
+
+def test_max_iterations_survives_resume_without_a_config(tmp_path: Path) -> None:
+    # The rail must be DURABLE: resuming (as the CLI does — no config, rebuilt from disk) must keep
+    # the max_iterations set at start, not silently reset to the default 20.
+    reqs = [{"id": "r1", "check": "contains", "target": "NEVER", "text": "never"}]
+
+    class NoopSolve(FakeSolve):
+        def run(self, card: KanbanCard) -> LaneResult:
+            self.ran.append(str(card.metadata["requirement_id"]))
+            return LaneResult(success=True, answer="claimed done, changed nothing")
+
+    solve = NoopSolve(tmp_path / "ws", {})
+    proj = _project(tmp_path, reqs, solve, require_plan_approval=False, max_iterations=1)
+    proj.run()
+    assert proj.state.iterations == 1  # tripped the rail at 1
+    pid, home = proj.state.id, tmp_path / "home"
+
+    # Resume WITHOUT a config (the fixed CLI path): the rail is rebuilt from durable state.
+    resumed = ProjectOrchestrator.load(home, pid, solve_card=solve)
+    assert resumed.config.max_iterations == 1  # not the default 20
+    resumed.run()
+    assert resumed.state.iterations == 1  # still capped — did not run 19 more past the user's limit
+
+
+def test_start_rejects_spec_with_no_requirements(tmp_path: Path) -> None:
+    # A misparsed/empty `requirements:` would make check_drift report `aligned=True` (nothing to
+    # flip it false) → a vacuous "done" with zero verification. Start must refuse it.
+    import pytest
+
+    solve = FakeSolve(tmp_path / "ws", {})
+    with pytest.raises(ValueError, match="no required requirements"):
+        _project(tmp_path, [], solve, require_plan_approval=False)
+
+
+def test_project_state_save_is_atomic(tmp_path: Path) -> None:
+    reqs = [{"id": "r1", "check": "contains", "target": "HELLO", "text": "has HELLO"}]
+    proj = _project(tmp_path, reqs, FakeSolve(tmp_path / "ws", {"r1": "HELLO"}),
+                    require_plan_approval=False)
+    p = proj.state_path
+    assert p.exists()
+    assert not p.with_suffix(p.suffix + ".tmp").exists()  # no temp left behind
+    assert ProjectState.load(p).id == proj.state.id  # round-trips
+
+
+def test_orphaned_doing_card_is_recovered_on_resume(tmp_path: Path) -> None:
+    # A card stuck in `doing` (crash debris) must be returned to backlog and retried, not orphaned
+    # into a permanent "no ready card" escalation.
+    reqs = [{"id": "r1", "check": "contains", "target": "HELLO", "text": "has HELLO"}]
+    solve = FakeSolve(tmp_path / "ws", {"r1": "HELLO"})
+    proj = _project(tmp_path, reqs, solve, require_plan_approval=False)
+    # Simulate the crash: a card for r1 left mid-work in `doing`.
+    card = proj.board.add(title="[r1]", action="do r1", lane="solve", verify="x")
+    card.metadata["requirement_id"] = "r1"
+    card.metadata["depends_on"] = []
+    proj.board.move(card.id, "doing")
+
+    state = proj.run()
+    assert state.status == "done"  # the orphan was recovered and worked, not stranded
+    assert solve.ran == ["r1"]
+
+
+def test_deny_missing_card_does_not_crash(tmp_path: Path) -> None:
+    # The pending id lives in project.json, not the board; if the card is gone from the board,
+    # deny must escalate cleanly rather than raise KeyError.
+    reqs = [{"id": "r1", "check": "contains", "target": "SHIP", "text": "deploy", "risk": "high"}]
+    solve = FakeSolve(tmp_path / "ws", {"r1": "SHIP"})
+    proj = _project(tmp_path, reqs, solve, require_plan_approval=False)
+    state = proj.run()
+    card_id = state.pending_card_id
+    assert card_id is not None
+    proj.board.remove(card_id)  # card vanishes from the board
+
+    proj.deny_card(card_id)  # must not raise
+    assert proj.state.status == "escalated"
+
+
+def test_required_requirement_depending_on_optional_gets_worked(tmp_path: Path) -> None:
+    # A required requirement that depends on an unsatisfied OPTIONAL one must still progress: the
+    # optional dependency has to be worked, or the required one is blocked forever.
+    reqs = [
+        {"id": "r_opt", "check": "contains", "target": "OPT", "text": "opt", "required": False},
+        {"id": "r_main", "check": "contains", "target": "MAIN", "text": "main",
+         "depends_on": ["r_opt"]},
+    ]
+    solve = FakeSolve(tmp_path / "ws", {"r_opt": "OPT", "r_main": "MAIN"})
+    proj = _project(tmp_path, reqs, solve, require_plan_approval=False)
+
+    state = proj.run()
+    assert state.status == "done"
+    assert solve.ran.index("r_opt") < solve.ran.index("r_main")  # dependency worked first

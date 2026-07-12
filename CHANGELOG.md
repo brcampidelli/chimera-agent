@@ -6,6 +6,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+**Project orchestrator hardening.** A ninth adversarial review (the `chimera project` loop + kanban
+DAG) found seven bugs — two of which could produce a false-green completion or defeat the runaway
+rail. All fixed and regression-tested; the core "the spec is the only authority of done" invariant
+held.
+
+### Fixed
+- **`max_iterations` is now durable across a resume.** `project run`/`step`/`approve` rebuilt the
+  config with the default `max_iterations=20`, silently overriding a `--max-iterations N` set at
+  `start` — so a resumed project could run far past the cap the user set (the runaway rail's whole
+  point). The rail (and `require_plan_approval`) are now persisted in `project.json` and rebuilt from
+  disk on resume.
+- **A spec with no requirements is refused instead of vacuously completing.** `check_drift` starts
+  `aligned=True` and only a failing *required* requirement flips it false, so an empty or all-optional
+  `requirements:` block (e.g. a YAML typo that parses to `[]`) reported "done" having verified
+  nothing. `project start` now rejects it.
+- **`project.json` is written atomically** (temp + replace, mirroring the board), so a crash
+  mid-write can't truncate it and brick every later `status`/`run`/`resume` for that project.
+- **A card interrupted mid-work is recovered, not orphaned.** A card left in `doing` by a crash was
+  never retried (it counts as an open card so no replacement is made, but the picker only scans
+  `backlog`) → a permanent "no ready card" escalation. Stale `doing` cards are now returned to
+  `backlog` at the start of each step.
+- **`deny_card` no longer raises if its card is gone from the board** (the pending id lives in
+  `project.json`, not the board); it escalates cleanly, matching `approve_card`'s guard.
+- **A required requirement that depends on an unsatisfied optional one now progresses.** The optional
+  dependency previously never got a card, so the required requirement stayed blocked forever; the
+  gap computation now pulls in the (transitive) unsatisfied dependencies of required requirements.
+
 ## [0.18.7] - 2026-07-12
 
 **Skills, memory-graph & tools hardening.** An eighth adversarial review (skills/skill_md, memory
