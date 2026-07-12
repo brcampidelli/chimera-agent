@@ -29,7 +29,7 @@ def test_hermes_scan(tmp_path: Path) -> None:
     assert result.source == "hermes"
     assert result.dry_run is True
     assert result.default_model == "openrouter/anthropic/claude-opus-4-8"
-    assert result.skills == ["echo", "greet"]
+    assert result.skills == ["echo.py", "greet"]  # files keep their extension (no stem-truncation)
     assert "MEMORY.md" in result.memory_files
     assert any("memory" in note.lower() for note in result.notes)
 
@@ -58,7 +58,7 @@ def test_openclaw_scan_json_config(tmp_path: Path) -> None:
 
     result = get_importer("openclaw", home).scan()
     assert result.default_model == "openai/gpt-5.5"
-    assert result.skills == ["summarize"]
+    assert result.skills == ["summarize.md"]
 
 
 def test_memory_items_parsed(tmp_path: Path) -> None:
@@ -107,6 +107,42 @@ def test_apply_merges_memory(tmp_path: Path) -> None:
     result2 = get_importer("hermes", home).apply(tmp_path / "out", memory_manager=manager)
     assert result2.memory_merged == {"ADD": 0, "UPDATE": 0, "NOOP": 2}
     assert len(manager.store) == 2
+
+
+def test_taint_pass_never_writes_through_a_symlink(tmp_path: Path) -> None:
+    """SECURITY: a SKILL.md symlinked to an outside file must NOT be overwritten by taint-stamping.
+
+    Simulates the post-copytree(symlinks=True) state: a hostile skill dir contains a SKILL.md that
+    is a symlink to a sensitive file. _taint_imported_skills must skip it, leaving the target intact.
+    """
+    from chimera.migration.base import _taint_imported_skills
+
+    secret = tmp_path / "secret.txt"
+    secret.write_text("DO NOT OVERWRITE", encoding="utf-8")
+    skills = tmp_path / "skills" / "evil"
+    skills.mkdir(parents=True)
+    link = skills / "SKILL.md"
+    try:
+        link.symlink_to(secret)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks not permitted on this platform/user")
+    _taint_imported_skills(tmp_path / "skills")
+    assert secret.read_text(encoding="utf-8") == "DO NOT OVERWRITE"  # target untouched
+
+
+def test_dotted_skill_filename_is_still_taint_stamped(tmp_path: Path) -> None:
+    """A dotted file name (planner.v2.md) must keep its .md and be stamped tainted, not evade it."""
+    home = _make_hermes_home(tmp_path)
+    (home / "skills" / "planner.v2.md").write_text(
+        "---\nname: planner\ndescription: x\nprovenance: clean\n---\ndo\n", encoding="utf-8"
+    )
+    result = get_importer("hermes", home).apply(tmp_path / "out", memory_manager=None)
+    assert "planner.v2.md" in result.skills  # extension preserved, not truncated to "planner.v2"
+    from chimera.skills.skill_md import parse_skill_md
+
+    dest = tmp_path / "out" / "imported" / "hermes" / "skills" / "planner.v2.md"
+    assert dest.exists()
+    assert parse_skill_md(dest.read_text(encoding="utf-8")).manifest.provenance == "tainted"
 
 
 def test_unknown_source_raises(tmp_path: Path) -> None:

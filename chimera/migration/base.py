@@ -38,7 +38,14 @@ def _taint_imported_skills(skills_dir: Path) -> None:
         p for p in skills_dir.glob("*.md") if p.name != "SKILL.md"
     ]
     for md in candidates:
+        # SECURITY: never read or write THROUGH a symlink. copytree(symlinks=True) preserves an
+        # attacker's links inside a copied skill dir; a SKILL.md symlinked to ~/.bashrc or
+        # ~/.ssh/authorized_keys would otherwise let this write-back overwrite that target
+        # (arbitrary-file-write). Skip any link, and require the real file to stay under skills_dir.
         try:
+            if md.is_symlink() or not md.resolve().is_relative_to(skills_dir.resolve()):
+                _log.debug("skipping symlinked/out-of-tree skill file: %s", md)
+                continue
             skill = parse_skill_md(md.read_text(encoding="utf-8", errors="replace"))
             skill.manifest.provenance = "tainted"
             md.write_text(render_skill_md(skill), encoding="utf-8")
@@ -167,7 +174,11 @@ class DirectoryImporter(Importer):
         for entry in sorted(skills_dir.iterdir()):
             if entry.name.startswith("."):
                 continue
-            sources[entry.stem if entry.is_file() else entry.name] = entry
+            # Key by FULL name (not stem): a stem key drops the extension of a dotted file like
+            # "planner.v2.md" (-> "planner.v2"), so it copies without ".md" and the taint pass, which
+            # scans *.md/SKILL.md, never stamps it. Full name also stops a dir "foo" and file "foo.md"
+            # from colliding on the same key and silently dropping one.
+            sources[entry.name] = entry
         return sources
 
     def _memory_files(self) -> list[str]:

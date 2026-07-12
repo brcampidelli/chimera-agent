@@ -1297,6 +1297,10 @@ def _webhook_handler(gateway: MessageGateway) -> Any:
                 )
             )
 
+        # Pick up webhook jobs added via `cron add --webhook` after the server started — the cron
+        # daemon reloads each tick, but this handler holds a frozen store, so without this a newly
+        # registered hook would silently do nothing until a restart.
+        scheduler.store.reload_if_changed()
         scheduler.fire_webhook(hook, time.time(), dispatch)
         return results
 
@@ -3115,6 +3119,12 @@ def migrate(
 ) -> None:
     """Import config + skills from another agent; --apply also merges long-term memory."""
     from chimera.migration import get_importer
+
+    if not Path(path).is_dir():
+        # Without this a typo'd/wrong path scans to an empty result and exits 0 — a silent no-op
+        # reported as success (and with --apply even writes an empty imported/ dir).
+        console.print(f"[red]source path does not exist or is not a directory: {path}[/red]")
+        raise typer.Exit(code=1)
 
     try:
         importer = get_importer(source, Path(path))

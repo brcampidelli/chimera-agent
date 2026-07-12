@@ -58,10 +58,53 @@ def test_cron_store_save_is_atomic(tmp_path: Path) -> None:
     store = CronStore(path)
     store.add(CronJob(id="j1", name="n", trigger="cron", schedule="0 9 * * *", action="run"))
     # No stray temp file left behind, and the file is valid JSON.
-    assert not (tmp_path / "jobs.json.tmp").exists()
+    assert not list(tmp_path.glob("jobs.json.*"))  # unique per-write temp is cleaned up
     import json
 
     assert json.loads(path.read_text(encoding="utf-8"))[0]["id"] == "j1"
+
+
+def test_structurally_broken_json_keeps_jobs_and_retries(tmp_path: Path) -> None:
+    # A truncated/typo'd file must NOT crash load() or wipe the in-memory crons (finding #1).
+    path = tmp_path / "jobs.json"
+    store = CronStore(path)
+    store.add(CronJob(id="j1", name="n", trigger="cron", schedule="0 9 * * *", action="run"))
+    path.write_text('[{"id": "j1", ', encoding="utf-8")  # truncated JSON, unparseable
+    store.reload_if_changed()  # must not raise
+    assert [j.id for j in store.list()] == ["j1"]  # kept, not wiped
+    # mtime was NOT advanced, so fixing the file triggers a fresh reload
+    import json
+
+    path.write_text(
+        json.dumps(
+            [CronJob(id="j2", name="n", trigger="cron", schedule="0 9 * * *", action="run").model_dump()]
+        ),
+        encoding="utf-8",
+    )
+    assert store.reload_if_changed() is True
+    assert [j.id for j in store.list()] == ["j2"]
+
+
+def test_non_list_root_is_ignored_not_fatal(tmp_path: Path) -> None:
+    path = tmp_path / "jobs.json"
+    path.write_text('{"id": "j1"}', encoding="utf-8")  # object root, not a list
+    store = CronStore(path)  # must not raise
+    assert store.list() == []
+
+
+def test_concurrent_add_from_another_process_is_not_lost(tmp_path: Path) -> None:
+    # A long-lived store holding a stale snapshot must not clobber a job another process wrote
+    # to the same file when it next saves (finding #2 — lost update).
+    path = tmp_path / "jobs.json"
+    daemon = CronStore(path)
+    daemon.add(CronJob(id="A", name="a", trigger="cron", schedule="0 9 * * *", action="run"))
+    # Another process adds job C directly to the file, out of band.
+    other = CronStore(path)
+    other.add(CronJob(id="C", name="c", trigger="cron", schedule="0 9 * * *", action="run"))
+    # The daemon, still holding its A-only snapshot, saves (e.g. mark_ran on A) — C must survive.
+    daemon.add(CronJob(id="B", name="b", trigger="cron", schedule="0 9 * * *", action="run"))
+    reopened = CronStore(path)
+    assert {j.id for j in reopened.list()} == {"A", "B", "C"}
 
 
 def test_run_due_dispatches_and_advances(tmp_path: Path) -> None:
