@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.19.6] - 2026-07-12
+
+**Cheaper skill-card injection.** The self-evolution flywheel's card-reading loop was kept opt-in
+mostly because injecting cards cost +~349% tokens on short tasks. This release cuts that ~7–9× — the
+honest engineering lever behind the M19-A1 default flip (which still waits on a larger accuracy A/B,
+not on cost).
+
 ### Changed
 - **Skill-card injection is ~7–9× cheaper (M19-A1 cost reduction).** Injecting learned reasoning cards
   used to cost +~349% tokens on short tasks — the decisive blocker keeping the flywheel's card-reading
