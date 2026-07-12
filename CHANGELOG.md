@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.19.5] - 2026-07-12
+
+**CLI honesty + safe prune.** A fourteenth adversarial review, a thorough 2nd pass of the ~4500-line
+Typer CLI. Most command groups reviewed clean; the fixes make CI-facing gates exit non-zero on
+failure and stop `memory prune` from silently deleting profile data.
+
 ### Fixed
 - **CLI gates now exit non-zero on failure.** `chimera workflow` and `chimera lifecycle` (and the
   `fusion-bench`/`cascade-bench`/`skillcard-bench` verdicts) printed a red "failed"/"REGRESSION" but
