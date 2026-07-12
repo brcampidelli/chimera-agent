@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.18.4] - 2026-07-12
+
+**Loop, scheduler & connector hardening.** Two adversarial reviews — of the core agent-loop and of
+the scheduler + integrations/MCP surfaces — found ten real bugs the tests missed, all fixed and
+regression-tested (fifth review in the series; 27 bugs found across six surfaces so far).
+
 ### Security
 - **MCP / OpenAPI tool output now goes through the fence + taint ledger.** The untrusted-content
   defense was name-based (a static `FETCH_TOOLS` set), but connector tool names come from the remote
