@@ -142,7 +142,12 @@ def build_evolution_context(
         memory=memory,
         auto_evolver=auto_evolver,
         cards=(
-            CardRetriever(SkillStore(home / "skills.json"), k=settings.skill_cards_k)
+            CardRetriever(
+                SkillStore(home / "skills.json"),
+                k=settings.skill_cards_k,
+                min_overlap=settings.skill_cards_min_overlap,
+                max_lines=settings.skill_cards_max_lines,
+            )
             if use_cards
             else None
         ),

@@ -1870,7 +1870,11 @@ def hierarchy_bench(
 @app.command(name="skillcard-bench")
 def skillcard_bench(
     tasks: str = typer.Option("hard", "--tasks", help="Task suite: hard | demo."),
-    k: int = typer.Option(3, "--k", help="How many cards to retrieve per task."),
+    k: int = typer.Option(1, "--k", help="How many cards to retrieve per task."),
+    min_overlap: int = typer.Option(
+        2, "--min-overlap", help="Relevance gate: inject a card only on >= N shared query terms (0=off)."
+    ),
+    max_lines: int = typer.Option(3, "--max-lines", help="Render budget: max lines per injected card."),
     use_store: bool = typer.Option(
         False, "--use-store", help="Bench your own learned cards (skills.json) instead of the demo set."
     ),
@@ -1894,7 +1898,9 @@ def skillcard_bench(
         cards = demo_cards()
 
     try:
-        report = run_skillcard_ab(LLMGateway(), suite, cards, k=k)
+        report = run_skillcard_ab(
+            LLMGateway(), suite, cards, k=k, min_overlap=min_overlap, max_lines=max_lines
+        )
     except MissingCredentialsError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc

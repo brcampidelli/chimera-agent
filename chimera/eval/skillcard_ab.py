@@ -80,9 +80,15 @@ def run_skillcard_ab(
     cards: list[LearnedSkill],
     *,
     k: int = 3,
+    min_overlap: int = 0,
+    max_lines: int = 4,
     model: str | None = None,
 ) -> CardABReport:
-    """Run each task with and without injected skill cards against ``backend``."""
+    """Run each task with and without injected skill cards against ``backend``.
+
+    ``min_overlap`` (relevance gate) and ``max_lines`` (render budget) mirror the runtime
+    ``CardRetriever`` knobs, so the A/B measures the exact injection cost the runtime would pay.
+    """
     index = CardIndex(cards)
     report = CardABReport()
     for task in tasks:
@@ -90,8 +96,8 @@ def run_skillcard_ab(
             base_out, base_tok = _solve_once(backend, task.prompt, model)
         except Exception:
             base_out, base_tok = "", None
-        retrieved = index.search(task.prompt, k=k)
-        block = cards_context_block(retrieved)
+        retrieved = index.search(task.prompt, k=k, min_overlap=min_overlap)
+        block = cards_context_block(retrieved, max_lines_per_card=max_lines)
         card_prompt = f"{block}\n\n{task.prompt}" if block else task.prompt
         try:
             card_out, card_tok = _solve_once(backend, card_prompt, model)

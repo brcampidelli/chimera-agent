@@ -55,10 +55,20 @@ class CardIndex:
     def __exit__(self, *exc: object) -> None:
         self.close()
 
-    def search(self, query: str, k: int = 3) -> list[LearnedSkill]:
+    def search(self, query: str, k: int = 3, *, min_overlap: int = 0) -> list[LearnedSkill]:
+        """Top-``k`` cards for ``query``. ``min_overlap`` gates on relevance: a returned card is kept
+        only if it shares at least that many query terms — so a task with no strong match returns []
+        (injects nothing, pays no tokens) instead of dragging in weakly-matched, misleading cards."""
         terms = _TOKEN.findall(query.lower())
         if not terms or not self._cards:
             return []
+        query_terms = set(terms)
+        ranked = self._ranked(terms, query_terms, k)
+        if min_overlap <= 0:
+            return ranked
+        return [c for c in ranked if self._overlap(query_terms, c) >= min_overlap]
+
+    def _ranked(self, terms: list[str], query_terms: set[str], k: int) -> list[LearnedSkill]:
         if self._fts:
             match = " OR ".join(terms)
             try:
@@ -71,7 +81,11 @@ class CardIndex:
                 return [self._cards[str(r[0])] for r in rows if str(r[0]) in self._cards]
             except sqlite3.OperationalError:
                 pass  # malformed FTS query — fall through to token overlap
-        return self._fallback(set(terms), k)
+        return self._fallback(query_terms, k)
+
+    @staticmethod
+    def _overlap(query_terms: set[str], card: LearnedSkill) -> int:
+        return len(query_terms & set(_TOKEN.findall(_doc(card).lower())))
 
     def _fallback(self, terms: set[str], k: int) -> list[LearnedSkill]:
         scored: list[tuple[int, str, LearnedSkill]] = []
@@ -98,9 +112,13 @@ def cards_context_block(cards: list[LearnedSkill], *, max_lines_per_card: int = 
 class CardRetriever:
     """Retrieves and formats skill-card context for a task from a SkillStore."""
 
-    def __init__(self, store: SkillStore, *, k: int = 3) -> None:
+    def __init__(
+        self, store: SkillStore, *, k: int = 3, min_overlap: int = 0, max_lines: int = 4
+    ) -> None:
         self.store = store
         self.k = k
+        self.min_overlap = min_overlap  # relevance gate: 0 = inject any match; higher = strong match only
+        self.max_lines = max_lines  # render budget per card (fewer lines = cheaper injection)
         self.last_retrieved: list[str] = []
 
     def card_context(self, task: str) -> str:
@@ -112,9 +130,9 @@ class CardRetriever:
             self.last_retrieved = []
             return ""
         with CardIndex(cards) as index:  # close the in-memory SQLite connection after the search
-            hits = index.search(task, k=self.k)
+            hits = index.search(task, k=self.k, min_overlap=self.min_overlap)
         self.last_retrieved = [card.name for card in hits]
-        return cards_context_block(hits)
+        return cards_context_block(hits, max_lines_per_card=self.max_lines)
 
     def record_outcome(self, success: bool) -> None:
         """Credit the run's outcome to the cards that were injected into it.

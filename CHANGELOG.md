@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **Skill-card injection is ~7–9× cheaper (M19-A1 cost reduction).** Injecting learned reasoning cards
+  used to cost +~349% tokens on short tasks — the decisive blocker keeping the flywheel's card-reading
+  loop opt-in. Three levers cut it to ~+37–48% (measured, two runs, now under the +50% gate): inject
+  the **single** best card (`CHIMERA_SKILL_CARDS_K=1`, was 3), a **relevance gate**
+  (`CHIMERA_SKILL_CARDS_MIN_OVERLAP=2` — a task with no strong match injects **nothing**, so it pays no
+  tokens and gets no misleading card), and a **shorter render** (`CHIMERA_SKILL_CARDS_MAX_LINES=3`).
+  These are the new defaults (they only apply when card reading is opted into). **The default still
+  stays OFF**: the cost blocker is removed, but the accuracy lift isn't statistically significant at
+  n=12 (it swung +16.7pp → −8.3pp between identical free-model runs) — flipping it now waits on a
+  larger paired A/B, not on code. See `bench/skillcard/RESULTS.md`.
+
 ## [0.19.5] - 2026-07-12
 
 **CLI honesty + safe prune.** A fourteenth adversarial review, a thorough 2nd pass of the ~4500-line

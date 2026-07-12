@@ -104,3 +104,32 @@ def test_card_index_is_a_closing_context_manager() -> None:
     except sqlite3.ProgrammingError:
         closed = True
     assert closed is True
+
+
+def test_search_relevance_gate_drops_weak_and_no_matches() -> None:
+    # min_overlap gates on shared query terms: a task with no strong match injects NOTHING (0 tokens),
+    # instead of dragging in weakly-matched cards. This is the M19-A1 cost reduction.
+    cards = _cards()  # 'two_pointer' triggers include 'sorted','pair','target'; 'dp' shares nothing here
+    with CardIndex(cards) as index:
+        q = "find a pair in a sorted array summing to target"
+        assert [c.name for c in index.search(q, k=5, min_overlap=0)]  # ungated: returns matches
+        strong = [c.name for c in index.search(q, k=5, min_overlap=3)]
+        assert strong == ["two_pointer"]  # only the strongly-overlapping card survives the gate
+        assert index.search("totally unrelated weather forecast", k=5, min_overlap=2) == []  # 0 cards
+
+
+def test_card_retriever_passes_gate_and_render_budget() -> None:
+    import tempfile
+
+    from chimera.evolution import LearnedSkill as _LS
+
+    with tempfile.TemporaryDirectory() as d:
+        store = SkillStore(Path(d) / "skills.json")
+        store.add(_LS(name="two_pointer", description="two-pointer scan of a sorted array",
+                      do="move pointers inward", check="pointers do not cross",
+                      triggers=["sorted", "pair", "target"]))
+        gated = CardRetriever(store, k=1, min_overlap=3, max_lines=2)
+        assert gated.card_context("pair in a sorted array to target")  # strong match -> injected
+        assert gated.last_retrieved == ["two_pointer"]
+        assert gated.card_context("unrelated weather") == ""  # weak/no match -> nothing injected
+        assert gated.last_retrieved == []

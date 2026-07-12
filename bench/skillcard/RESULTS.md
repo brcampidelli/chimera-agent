@@ -49,3 +49,34 @@ and accept the token cost.
 The M19-A1 "flip-point" (`CHIMERA_SKILL_CARDS_READ`) was shipped wired-but-OFF pending exactly this
 measurement. It's now measured: **the default stays OFF**, published with the number. The mechanism
 remains available for anyone who opts in.
+
+---
+
+## Update — cost reduction (cheap card injection)
+
+The original run's **decisive blocker was cost (+300% tokens), not accuracy.** We cut the injection
+cost with three levers and re-measured (same hard suite, n = 12, demo cards, OpenRouter free model):
+
+- **top-1, not top-3** cards (`CHIMERA_SKILL_CARDS_K=1`, was 3),
+- a **relevance gate** (`CHIMERA_SKILL_CARDS_MIN_OVERLAP=2`): a card is injected only when it shares
+  ≥ 2 query terms, so a task with no strong match pays **zero** extra tokens,
+- a **shorter render** (`CHIMERA_SKILL_CARDS_MAX_LINES=3`, was 4).
+
+| config | token overhead | accuracy Δ (run-to-run) |
+|---|---|---|
+| old (k=3, no gate, 4 lines) | **+349%** | +25 pp |
+| **cheap (k=1, gate≥2, 3 lines)** | **+37% … +48%** (two runs) | +16.7 pp, then −8.3 pp |
+
+- **Token overhead: blocker REMOVED.** ~349% → **~37–48%** across two runs — a **~7–9× reduction**,
+  now under the +50% gate. These cheaper knobs are the **new defaults** for card injection (they only
+  matter when someone opts into cards).
+- **Accuracy significance: STILL not met — and now clearly noise-dominated.** On n = 12 the free-model
+  accuracy Δ swung **+16.7 pp → −8.3 pp** between identical runs. You cannot conclude the lift is
+  positive, let alone significant, from this sample.
+
+### Revised decision
+
+**`CHIMERA_SKILL_CARDS_READ` stays OFF by default** — but the reason has narrowed: it is no longer
+blocked by *cost* (fixed), only by the absence of a *statistically significant* accuracy signal, which
+needs a much larger / real-task paired A/B than n = 12 free-model can provide. The honest engineering
+lever (make cards cheap) is done; flipping the default still waits on power, not code.

@@ -190,7 +190,13 @@ class Settings(BaseSettings):
     # Off by default (an experiment — injection can raise cost if retrieval misfires);
     # measure with `chimera skillcard-bench` before enabling. ---
     skill_cards: bool = Field(default=False, validation_alias="CHIMERA_SKILL_CARDS")
-    skill_cards_k: int = Field(default=3, validation_alias="CHIMERA_SKILL_CARDS_K")
+    skill_cards_k: int = Field(default=1, validation_alias="CHIMERA_SKILL_CARDS_K")
+    # Relevance gate + render budget (M19-A1 cost reduction): inject a card only when it shares at
+    # least ``min_overlap`` query terms (so a task with no strong match pays ZERO extra tokens instead
+    # of dragging in ~irrelevant cards), and cap each card at ``max_lines``. These crush the token
+    # overhead that failed the skillcard flip gate; see bench/skillcard/RESULTS.md.
+    skill_cards_min_overlap: int = Field(default=2, validation_alias="CHIMERA_SKILL_CARDS_MIN_OVERLAP")
+    skill_cards_max_lines: int = Field(default=3, validation_alias="CHIMERA_SKILL_CARDS_MAX_LINES")
     # M19-A1 flip-point: when on, card READING couples to skill EVOLVING (a run that can mint a
     # skill also reads the retrieved ones), instead of the independent `skill_cards` toggle. Stays
     # OFF by default — the paired A/B is in (bench/skillcard/RESULTS.md, goldilocks n=12): accuracy
