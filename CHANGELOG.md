@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.18.5] - 2026-07-12
+
+**Data-integrity & server-security hardening.** Two adversarial reviews (memory-store + TUI; server/API
++ ecosystem) found sixteen real bugs the tests missed — including a **CRITICAL** taint-laundering in the
+SQLite memory backend — all fixed and regression-tested, plus opt-in auth for the HTTP server. Sixth
+review in the series; 45 bugs found across eight surfaces so far.
+
 ### Security
 - **SQLite memory backend no longer launders taint (CRITICAL).** The optional SQLite/FTS5 store had
   no `provenance` column, so a `provenance="tainted"` memory came back `"clean"` on every read — the
