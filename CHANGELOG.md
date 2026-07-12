@@ -6,6 +6,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.19.7] - 2026-07-12
+
+**Scheduler & migration hardening — 8 fixes from the 15th adversarial review (2 security-relevant).**
+
+### Fixed
+- **Scheduler — a corrupt `jobs.json` no longer wipes every cron.** A truncated or typo'd store file
+  used to crash the whole store on load *and* clear all in-memory crons (the JSON parse sat outside
+  the per-entry guard, and `_jobs` was cleared before the parse). The store now keeps its current
+  jobs on an unreadable/invalid file and leaves its mtime unchanged, so a later fix reloads cleanly.
+- **Scheduler — concurrent `cron add` is no longer lost.** A long-lived daemon holding a stale
+  snapshot could clobber a job another process added while it was dispatching a long task. Writes now
+  fold in unknown on-disk jobs first (best-effort; not a substitute for an OS lock, and documented as
+  such).
+- **Scheduler — atomic writes use a unique temp file.** Two concurrent writers previously shared a
+  fixed `jobs.json.tmp` and could corrupt each other's write; each write now uses a unique temp name.
+- **Scheduler — webhook jobs registered after `chimera serve` starts now fire** (the handler reloads
+  the store before dispatch instead of holding a frozen copy).
+- **Migration — `migrate` can no longer overwrite arbitrary files via a symlinked skill.** A hostile
+  skill dir with a `SKILL.md` symlinked to e.g. `~/.bashrc` could be written through during
+  taint-stamping; the taint pass now skips symlinks and requires the real path to stay under the
+  skills dir.
+- **Migration — a dotted skill filename (`planner.v2.md`) keeps its extension and is taint-stamped**
+  (it used to be copied without `.md` and skip the taint boundary); files are now keyed by full name,
+  which also fixes a dir/file same-stem collision.
+- **Migration — `migrate <source> <bad-path>` now exits non-zero** instead of silently reporting
+  success on a nonexistent source directory.
+
 ## [0.19.6] - 2026-07-12
 
 **Cheaper skill-card injection.** The self-evolution flywheel's card-reading loop was kept opt-in
