@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.19.4] - 2026-07-12
+
+**Crew resilience.** A thirteenth adversarial review, of the multi-agent roles/crew surface. Most of
+it reviewed clean; the three fixes keep a crew honest and crash-proof — including a **crash when a
+single reviewer hit a transient error**.
+
 ### Fixed
 - **A crew's parallel review no longer crashes when one reviewer fails.** `parallel_review` /
   `SupervisorCrew` used `Executor.map`, which re-raises the first worker's exception — so one worker
