@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-07-12
+
+**Streaming-TUI hardening + memory-layer label.** A tenth adversarial review, aimed at the brand-new
+v0.19.0 streaming surface, found four gaps (no CRITICAL/HIGH — the concurrency race was the only MED);
+the activity panel also learned to name which memory layer contributed. All fixed and
+regression-tested.
+
 ### Fixed
 - **TUI: a second Enter can't start a concurrent turn.** The input is disabled while a turn is in
   flight (a thread worker can't be preempted, so a second submit would run a concurrent `send_verbose`
