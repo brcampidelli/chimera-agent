@@ -37,6 +37,27 @@ def test_related_facts_by_query() -> None:
     assert graph.related_facts("how does PassaPro store data?") == ["PassaPro uses Supabase"]
 
 
+def test_related_facts_matches_whole_words_only() -> None:
+    # A short entity ("Go", "AI", "C") must NOT match inside an unrelated word, or recall gets
+    # polluted. "Go uses goroutines" should surface only when "Go" appears as its own word.
+    graph = build_graph(["Go uses goroutines"])
+    assert graph.related_facts("recommend a good approach") == []  # "Go" not inside "good"
+    assert graph.related_facts("is Go fast?") == ["Go uses goroutines"]  # standalone word matches
+
+
+def test_from_dict_skips_malformed_relations() -> None:
+    graph = MemoryGraph.from_dict(
+        {"relations": [{"source": "a", "relation": "uses", "target": "b"}, {"source": "x"}, "junk"]}  # type: ignore[list-item]
+    )
+    assert graph.relations() == [Relation("a", "uses", "b")]  # the bad entries are dropped
+
+
+def test_load_corrupt_file_is_empty(tmp_path: Path) -> None:
+    path = tmp_path / "g.json"
+    path.write_text("{ this is not valid json", encoding="utf-8")
+    assert MemoryGraph.load(path).relations() == []  # truncated/corrupt file -> empty, not a crash
+
+
 def test_graph_persist_roundtrip(tmp_path: Path) -> None:
     graph = build_graph(["X requires Y"])
     path = tmp_path / "g.json"

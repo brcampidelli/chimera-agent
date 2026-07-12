@@ -93,6 +93,25 @@ def test_clean_import_stays_active() -> None:
     assert to_learned(md).status == "active"
 
 
+def test_provisional_status_survives_import() -> None:
+    # A clean skill on probation must round-trip as `provisional`, not be promoted to `active`.
+    md = SkillMd(SkillManifest(name="x", description="d", status="provisional"), instructions="## Do\nstuff")
+    assert to_learned(md).status == "provisional"
+
+
+def test_unknown_status_defaults_to_pending() -> None:
+    # A mistyped/unknown status must never silently become full `active` retrieval.
+    md = SkillMd(SkillManifest(name="x", description="d", status="bogus"), instructions="## Do\nstuff")
+    assert to_learned(md).status == "pending"
+
+
+def test_malformed_frontmatter_is_treated_as_body() -> None:
+    # Broken YAML frontmatter (e.g. from an untrusted import) must not crash the parser.
+    parsed = parse_skill_md("---\nname: [unclosed\n---\n\nthe body")
+    assert parsed.manifest.name == "unnamed"  # frontmatter ignored
+    assert "the body" in parsed.instructions
+
+
 # --- parsing robustness ------------------------------------------------------------------
 
 

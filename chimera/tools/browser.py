@@ -211,17 +211,23 @@ class BrowserTool(Tool):
             return f"error: browser unavailable: {exc}"
         if driver is None:
             return _INSTALL_HINT
+        # SSRF guard: a navigate target is a model-/content-supplied URL, so re-check every hop the
+        # same way http_get/download do — reject non-http(s) and hosts that resolve to private IPs.
+        from chimera.scrape.ssrf import check_url
+
         try:
             if action == "navigate":
                 url = str(kwargs.get("url", "")).strip()
                 if not url:
                     return "error: navigate needs a url"
+                check_url(url)
                 return render_elements(driver.navigate(url))
             if action == "read":
                 return render_elements(driver.read())
             if action == "read_text":
                 url = str(kwargs.get("url", "")).strip()
                 if url:
+                    check_url(url)
                     driver.navigate(url)
                 html = driver.page_html()
                 markdown = _html_to_markdown(html)  # None when the 'documents' extra is absent
@@ -232,6 +238,7 @@ class BrowserTool(Tool):
                     return "error: find needs a query"
                 url = str(kwargs.get("url", "")).strip()
                 if url:
+                    check_url(url)
                     driver.navigate(url)
                 return find_in_text(driver.page_text(), query)
             if action == "click":
@@ -247,6 +254,8 @@ class BrowserTool(Tool):
             if action == "back":
                 return render_elements(driver.back())
             return f"error: unknown action {action!r} (use navigate/read/read_text/find/click/type/back)"
+        except ValueError as exc:
+            return f"error: {exc}"  # SSRF-blocked URL
         except KeyError as exc:
             return f"error: {exc}"  # unknown ref, surfaced by the driver
         except Exception as exc:  # noqa: BLE001 — a page/driver failure is a tool error, not a crash

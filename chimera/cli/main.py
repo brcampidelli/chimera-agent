@@ -3566,7 +3566,11 @@ def _recall_graph(memory: MemoryManager | None) -> MemoryGraph | None:
         return None
     from chimera.memory import build_graph
 
-    return build_graph([item.content for item in memory.store.all()])
+    # Only CLEAN memories feed the graph: entity-linked facts skip the keyword-similarity path that
+    # tags a tainted fact "[unverified]", so a tainted fact recalled via the graph would otherwise
+    # reach the prompt unlabeled. Excluding them keeps entity recall honest (they still recall via
+    # search, which labels them).
+    return build_graph([i.content for i in memory.store.all() if i.provenance == "clean"])
 
 
 @memory_app.command("add")
@@ -3656,7 +3660,7 @@ def memory_graph(
     from chimera.memory import build_graph
 
     settings = get_settings()
-    texts = [item.content for item in _memory_manager().store.all()]
+    texts = [i.content for i in _memory_manager().store.all() if i.provenance == "clean"]
     graph = build_graph(texts)
     graph.save(settings.home / "memory_graph.json")
 

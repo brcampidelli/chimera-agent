@@ -61,6 +61,15 @@ class DownloadMediaTool(Tool):
         url = str(kwargs.get("url", "")).strip()
         if not url:
             return "error: download_media needs a url"
+        # SSRF guard: the URL is model-/content-supplied and yt-dlp will happily fetch an
+        # http(s) target — reject non-http(s) schemes and hosts resolving to private IPs before
+        # handing it off, the same guard http_get/browser use.
+        from chimera.scrape.ssrf import check_url
+
+        try:
+            check_url(url)
+        except ValueError as exc:
+            return f"error: {exc}"
         audio_only = bool(kwargs.get("audio_only"))
         out_dir = resolve_in_workspace(self.workspace, str(kwargs.get("out_dir") or "downloads"))
         out_dir.mkdir(parents=True, exist_ok=True)

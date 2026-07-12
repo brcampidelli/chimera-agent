@@ -14,6 +14,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from chimera.governance.ledger_tool import fence
+from chimera.governance.sanitize import sanitize_untrusted
 from chimera.tools.base import Tool
 from chimera.tools.workspace import resolve_in_workspace
 
@@ -64,5 +66,8 @@ class ReadDocumentTool(_WorkspaceTool):
         except Exception as exc:  # noqa: BLE001 — a bad/unsupported file is a tool error, not a crash
             return f"error: could not read {rel}: {exc}"
         if len(text) > _MAX_CHARS:
-            return text[:_MAX_CHARS] + f"\n... [truncated, {len(text)} chars total]"
-        return text
+            text = text[:_MAX_CHARS] + f"\n... [truncated, {len(text)} chars total]"
+        # A PDF/DOCX/HTML is untrusted external content — a document can carry a prompt injection
+        # just like a web page. Defang control tokens and data-fence it so its text can't pose as
+        # instructions, matching how the browser/fetch tools return page content.
+        return fence(sanitize_untrusted(text))

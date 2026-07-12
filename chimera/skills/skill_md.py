@@ -103,7 +103,10 @@ def parse_skill_md(text: str) -> SkillMd:
         if end != -1:
             raw = stripped[3:end]
             body = stripped[end + 4 :]
-            loaded = yaml.safe_load(raw)
+            try:
+                loaded = yaml.safe_load(raw)
+            except yaml.YAMLError:  # malformed frontmatter (untrusted import) -> treat as body-only
+                loaded = None
             if isinstance(loaded, dict):
                 front = loaded
     triggers = front.get("triggers") or []
@@ -155,6 +158,9 @@ def to_learned(
     m = skillmd.manifest
     # A tainted imported skill is held pending — never silently enters retrieval (Zombie Agents).
     status = "pending" if m.provenance == "tainted" else m.status
+    # Round-trip the real status (incl. `provisional`, which is on-probation) and default an
+    # unknown/mistyped status to `pending` — never silently promote it to full `active` retrieval.
+    final_status = status if status in ("active", "pending", "retired", "provisional") else "pending"
     return LearnedSkill(
         name=m.name,
         description=m.description,
@@ -167,7 +173,7 @@ def to_learned(
         risk=fields.get("risk", ""),
         triggers=list(m.triggers),
         kind="anti_pattern" if m.kind == "anti_pattern" else "pattern",
-        status="pending" if status == "pending" else ("retired" if status == "retired" else "active"),
+        status=final_status,  # type: ignore[arg-type]
         provenance="tainted" if m.provenance == "tainted" else "clean",
         backend=backend,  # type: ignore[arg-type]
         model=model,

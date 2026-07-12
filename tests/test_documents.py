@@ -28,14 +28,16 @@ def test_missing_extra_gives_install_hint(tmp_path: Path, monkeypatch: pytest.Mo
 def test_converts_and_returns_markdown(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(documents, "_markitdown_convert", lambda _p: "# Title\n\nBody text.")
     out = _doc(tmp_path).run(path="report.docx")
-    assert out == "# Title\n\nBody text."
+    # Document text is untrusted external content — it comes back data-fenced, not raw.
+    assert "# Title\n\nBody text." in out
+    assert "<<external-data" in out and "<<end-external-data>>" in out
 
 
 def test_truncates_large_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(documents, "_markitdown_convert", lambda _p: "x" * 25_000)
     out = _doc(tmp_path).run(path="report.docx")
     assert "truncated, 25000 chars total" in out
-    assert len(out) < 25_000
+    assert len(out) < 25_000 + 200  # fence markers add a small constant, body is still truncated
 
 
 def test_missing_file(tmp_path: Path) -> None:

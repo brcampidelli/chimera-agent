@@ -48,3 +48,15 @@ def test_glob_finds_files_by_pattern(tmp_path: Path) -> None:
 
 def test_glob_no_match(tmp_path: Path) -> None:
     assert GlobTool(_workspace(tmp_path)).run(pattern="**/*.rs") == "no files match"
+
+
+def test_glob_cannot_escape_workspace(tmp_path: Path) -> None:
+    # A '../' pattern resolves to a file OUTSIDE the workspace; pathlib.glob happily returns it,
+    # so the tool must drop any match whose real path isn't under the workspace root.
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "inside.txt").write_text("ok", encoding="utf-8")
+    (tmp_path / "secret.txt").write_text("TOP SECRET", encoding="utf-8")
+    out = GlobTool(ws).run(pattern="../*.txt")
+    assert out == "no files match"
+    assert "secret" not in out

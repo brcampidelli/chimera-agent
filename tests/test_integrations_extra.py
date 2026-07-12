@@ -62,19 +62,28 @@ def test_data_visualization_skill_requires_task() -> None:
 # --- media download (yt-dlp) -------------------------------------------------------------
 
 
+def _offline_ssrf(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Map any hostname to a public IP so the SSRF guard passes without real DNS."""
+    import chimera.scrape.ssrf as ssrf
+
+    monkeypatch.setattr(ssrf, "_resolve_ips", lambda host: ["93.184.216.34"])
+
+
 def test_download_media_saves_and_reports(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     def fake_dl(url: str, outtmpl: str, audio_only: bool) -> dict[str, Any]:
         Path(outtmpl.replace("%(title).80s.%(ext)s", "Clip.mp4")).write_bytes(b"video")
         return {"title": "Clip", "ext": "mp4"}
 
+    _offline_ssrf(monkeypatch)
     monkeypatch.setattr(download, "_ytdlp_download", fake_dl)
-    out = download.DownloadMediaTool(workspace=tmp_path).run(url="https://y/1")
+    out = download.DownloadMediaTool(workspace=tmp_path).run(url="https://youtube.com/1")
     assert "downloaded 'Clip'" in out and "Clip.mp4" in out
 
 
 def test_download_media_missing_extra(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    _offline_ssrf(monkeypatch)
     monkeypatch.setattr(download, "_ytdlp_download", lambda u, o, a: None)
-    out = download.DownloadMediaTool(workspace=tmp_path).run(url="https://y/1")
+    out = download.DownloadMediaTool(workspace=tmp_path).run(url="https://youtube.com/1")
     assert out.startswith("error:") and "media-dl" in out
 
 

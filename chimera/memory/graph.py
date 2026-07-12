@@ -106,7 +106,9 @@ class MemoryGraph:
         seen: set[str] = set()
         facts: list[str] = []
         for entity in sorted(self.entities()):
-            if entity.lower() in lowered:
+            # Whole-word match, not substring: a raw `in` lets a 1-2 char entity ("C", "AI", "Go")
+            # match inside unrelated words ("recommend", "brainstorm") and pollute the recall.
+            if re.search(rf"\b{re.escape(entity.lower())}\b", lowered):
                 for relation in self.relations_of(entity):
                     text = relation.as_text()
                     if text not in seen:
@@ -126,19 +128,29 @@ class MemoryGraph:
     def from_dict(cls, data: dict[str, list[dict[str, str]]]) -> MemoryGraph:
         graph = cls()
         for item in data.get("relations", []):
-            graph.add(Relation(item["source"], item["relation"], item["target"]))
+            # Skip a malformed relation (missing a field) instead of aborting the whole load.
+            if isinstance(item, dict) and {"source", "relation", "target"} <= item.keys():
+                graph.add(Relation(item["source"], item["relation"], item["target"]))
         return graph
 
     def save(self, path: Path) -> None:
-        Path(path).parent.mkdir(parents=True, exist_ok=True)
-        Path(path).write_text(json.dumps(self.to_dict(), indent=2), encoding="utf-8")
+        p = Path(path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        # Atomic write: a crash mid-write must not truncate the graph file and lose it all on next load.
+        tmp = p.with_suffix(p.suffix + ".tmp")
+        tmp.write_text(json.dumps(self.to_dict(), indent=2), encoding="utf-8")
+        tmp.replace(p)
 
     @classmethod
     def load(cls, path: Path) -> MemoryGraph:
         p = Path(path)
         if not p.exists():
             return cls()
-        return cls.from_dict(json.loads(p.read_text(encoding="utf-8") or "{}"))
+        try:
+            data = json.loads(p.read_text(encoding="utf-8") or "{}")
+        except json.JSONDecodeError:  # a truncated/corrupt file -> empty graph, not a crash
+            return cls()
+        return cls.from_dict(data)
 
     def __len__(self) -> int:
         return len(self._relations)

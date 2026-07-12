@@ -6,6 +6,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+**Skills, memory-graph & tools hardening.** An eighth adversarial review (skills/skill_md, memory
+graph, native tools) found eleven real bugs — three of them **SSRF** holes in model-callable fetch
+tools (`http_get` was already patched; `browser` navigate and `download_media` were not), plus a
+workspace escape in `glob`, an unfenced document reader, and a status-laundering skill import — all
+fixed and regression-tested.
+
+### Security
+- **SSRF guard on `browser` and `download_media`.** Both take a model-/content-supplied URL and fetch
+  it (Playwright `page.goto`, yt-dlp), with no host validation — so the agent could be steered into
+  `http://169.254.169.254/…` (cloud metadata) or an internal service. Both now run the same
+  `check_url` guard (`http_get` already did): every navigate/download target is rejected unless it is
+  a public http/https host.
+- **`glob` can no longer escape the workspace.** A pattern like `../../etc/passwd` (pathlib returns
+  the escaping path) or one crossing a symlink leaked files outside the workspace root. Each match is
+  now resolved and dropped unless it stays under the workspace.
+- **`read_document` output is data-fenced.** A PDF/DOCX/HTML can carry a prompt injection just like a
+  web page; its extracted text was returned raw. It is now defanged (control tokens) and wrapped in
+  the data-fence markers, matching the browser/fetch tools.
+- **Skill import no longer launders a probationary status.** `to_learned` collapsed a `provisional`
+  (on-probation) imported skill to `active`, and an unknown/mistyped status also became `active`. The
+  real status now round-trips, and any unknown status defaults to `pending` — never silent promotion
+  into retrieval.
+
+### Fixed
+- **Graph recall matches whole words, not substrings.** A 1–2 char entity (`Go`, `AI`, `C`) matched
+  inside unrelated words (`good`, `brainstorm`), polluting `related_facts`. Recall now requires a
+  whole-word match.
+- **Malformed SKILL.md frontmatter no longer crashes the parser** (untrusted import): broken YAML is
+  treated as a body-only skill instead of raising.
+- **Memory graph survives a corrupt/partial file.** `save` is now atomic (temp + replace) so a crash
+  mid-write can't truncate it; `load` returns an empty graph on invalid JSON; `from_dict` skips a
+  malformed relation instead of aborting the whole load.
+- **`memory graph` builds only from clean memories.** Both the recall path and the `memory graph`
+  command now exclude tainted facts from the entity-relation graph.
+
 ## [0.18.6] - 2026-07-12
 
 **Migration, provider & sandbox hardening.** Two adversarial reviews (migration/kanban/CLI;

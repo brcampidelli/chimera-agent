@@ -57,6 +57,16 @@ def _tool() -> tuple[BrowserTool, _FakeDriver]:
     return BrowserTool(driver=driver), driver
 
 
+@pytest.fixture(autouse=True)
+def _offline_dns(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the SSRF guard offline + deterministic: map any hostname to a public IP so
+    ``navigate`` to a public URL passes without real DNS. Literal private/loopback IPs never
+    hit DNS, so their blocked path is still exercised by the dedicated SSRF tests below."""
+    import chimera.scrape.ssrf as ssrf
+
+    monkeypatch.setattr(ssrf, "_resolve_ips", lambda host: ["93.184.216.34"])
+
+
 # --- rendering + fencing ----------------------------------------------------------------
 
 
@@ -210,3 +220,26 @@ def test_auto_install_can_be_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_browser_is_a_fetch_tool() -> None:
     # Consuming a page taints the run — the browser must be classified as untrusted-content fetch.
     assert "browser" in FETCH_TOOLS
+
+
+# --- SSRF guard on navigate -------------------------------------------------------------
+
+
+def test_navigate_blocks_metadata_endpoint() -> None:
+    tool, driver = _tool()
+    out = tool.run(action="navigate", url="http://169.254.169.254/latest/meta-data/")
+    assert out.startswith("error:") and "blocked" in out
+    assert driver.calls == []  # the page was never fetched
+
+
+def test_navigate_blocks_non_http_scheme() -> None:
+    tool, driver = _tool()
+    assert tool.run(action="navigate", url="file:///etc/passwd").startswith("error:")
+    assert driver.calls == []
+
+
+def test_read_text_blocks_ssrf_url() -> None:
+    tool, driver = _tool()
+    out = tool.run(action="read_text", url="http://127.0.0.1/admin")
+    assert out.startswith("error:") and "blocked" in out
+    assert driver.calls == []

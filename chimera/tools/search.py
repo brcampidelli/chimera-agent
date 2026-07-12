@@ -95,12 +95,18 @@ class GlobTool(_WorkspaceTool):
     def run(self, **kwargs: Any) -> str:
         pattern = str(kwargs["pattern"])
         limit = int(kwargs.get("max_results") or _MAX_RESULTS)
+        root = self.workspace.resolve()
         out: list[str] = []
         for path in sorted(self.workspace.glob(pattern)):
             if any(part in _IGNORE_DIRS for part in path.parts):
                 continue
-            if path.is_file():
-                out.append(path.relative_to(self.workspace).as_posix())
+            # A pattern like '../../etc/passwd' or one crossing a symlink can escape the workspace.
+            # Resolve and require the real path to stay under the workspace root before emitting it.
+            resolved = path.resolve()
+            if resolved != root and root not in resolved.parents:
+                continue
+            if resolved.is_file():
+                out.append(resolved.relative_to(root).as_posix())
                 if len(out) >= limit:
                     break
         return "\n".join(out) if out else "no files match"

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
@@ -83,16 +82,65 @@ def test_run_shell_timeout_is_capped(tmp_path: Path) -> None:
     assert sandbox.calls[0]["timeout"] == 120  # clamped to the configured ceiling
 
 
+class _FakeResponse:
+    """A minimal httpx streaming-response stand-in for the http_get manual-redirect loop."""
+
+    def __init__(self, *, status: int = 200, body: bytes = b"page-body", location: str | None = None) -> None:
+        self.status_code = status
+        self._body = body
+        self.encoding = "utf-8"
+        self.is_redirect = location is not None
+        self.headers = {"location": location} if location else {}
+
+    def __enter__(self) -> _FakeResponse:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        return None
+
+    def iter_bytes(self):  # type: ignore[no-untyped-def]
+        yield self._body
+
+
+class _FakeClient:
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        pass
+
+    def __enter__(self) -> _FakeClient:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        return None
+
+    def stream(self, method: str, url: str) -> _FakeResponse:
+        return _FakeResponse()
+
+
+def _offline_ssrf(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Map any hostname to a public IP so the SSRF guard passes without real DNS."""
+    import chimera.scrape.ssrf as ssrf
+
+    monkeypatch.setattr(ssrf, "_resolve_ips", lambda host: ["93.184.216.34"])
+
+
 def test_http_get_mocked(monkeypatch: pytest.MonkeyPatch) -> None:
     import httpx
 
-    def fake_get(url: str, **kwargs: object) -> SimpleNamespace:
-        return SimpleNamespace(status_code=200, text="page-body")
-
-    monkeypatch.setattr(httpx, "get", fake_get)
+    _offline_ssrf(monkeypatch)
+    monkeypatch.setattr(httpx, "Client", _FakeClient)
     out = HttpGetTool().run(url="https://example.com")
     assert "[200]" in out
     assert "page-body" in out
+
+
+def test_http_get_blocks_ssrf_metadata_endpoint() -> None:
+    # A private/metadata target must be refused before any request is made.
+    out = HttpGetTool().run(url="http://169.254.169.254/latest/meta-data/")
+    assert out.startswith("error:") and "blocked" in out
+
+
+def test_http_get_blocks_non_http_scheme() -> None:
+    assert HttpGetTool().run(url="file:///etc/passwd").startswith("error:")
 
 
 def test_default_registry_includes_native_tools(tmp_path: Path) -> None:
