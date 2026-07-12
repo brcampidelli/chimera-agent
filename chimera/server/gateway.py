@@ -43,9 +43,16 @@ def run_with_indicator(
     import threading
 
     box: dict[str, str] = {}
+    error: dict[str, BaseException] = {}
 
     def work() -> None:
-        box["reply"] = route(inbound) or "(no reply)"
+        # Capture a route() crash instead of letting it die silently in the daemon thread and
+        # surface as a benign "(no reply)" — for an honesty-first system a crash must not be
+        # misrepresented as an empty answer.
+        try:
+            box["reply"] = route(inbound) or "(no reply)"
+        except Exception as exc:  # noqa: BLE001 — carried out of the thread and re-raised after join
+            error["exc"] = exc
 
     def _ping() -> None:
         try:
@@ -61,6 +68,8 @@ def run_with_indicator(
         if not worker.is_alive():
             break
         _ping()
+    if "exc" in error:
+        raise error["exc"]
     return box.get("reply", "(no reply)")
 
 

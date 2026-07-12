@@ -44,7 +44,9 @@ class MemoryManager:
         provenance: str = "clean",
     ) -> MemoryItem:
         item = MemoryItem(
-            id=uuid.uuid4().hex[:8],
+            # Full uuid4 hex, not [:8]: an 8-char (32-bit) id has a ~1% birthday-collision chance by
+            # 10k memories, and add() overwrites on a clash — silently destroying a distinct memory.
+            id=uuid.uuid4().hex,
             kind=kind,
             content=content,
             key=key,
@@ -220,6 +222,11 @@ class MemoryManager:
         it) and finally to keyword overlap. The fallback is unconditional — recall must
         never hard-fail because an embeddings endpoint is down.
         """
+        # A tokenless query (blank/whitespace/punctuation) has nothing to match — return [] up front
+        # so every path agrees. Otherwise the semantic path would embed "" and return k arbitrary
+        # items while the keyword/FTS paths correctly return nothing.
+        if not _TOKEN.findall(query.lower()):
+            return []
         if self._semantic is not None:
             try:
                 hits = self._semantic.search(query, self.store.all(), k)

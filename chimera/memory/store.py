@@ -7,6 +7,9 @@ from pathlib import Path
 from typing import Protocol
 
 from chimera.memory.models import MemoryItem, MemoryKind
+from chimera.telemetry import get_logger
+
+_log = get_logger("memory.store")
 
 
 class MemoryBackend(Protocol):
@@ -34,13 +37,23 @@ class MemoryStore:
             return
         raw = json.loads(self.path.read_text(encoding="utf-8") or "[]")
         for item in raw:
-            obj = MemoryItem.model_validate(item)
+            # Skip a single malformed record (hand-edit, schema drift, truncated last object) instead
+            # of aborting the whole load — one bad entry must not lose every other memory.
+            try:
+                obj = MemoryItem.model_validate(item)
+            except ValueError as exc:
+                _log.warning("skipping malformed memory record: %s", exc)
+                continue
             self._items[obj.id] = obj
 
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         data = [item.model_dump() for item in self._items.values()]
-        self.path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        # Atomic write (temp + replace): a crash or ENOSPC mid-write must not truncate the store and
+        # make every memory unreadable on next load. os.replace is atomic on the same filesystem.
+        tmp = self.path.with_suffix(self.path.suffix + ".tmp")
+        tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        tmp.replace(self.path)
 
     def add(self, item: MemoryItem) -> None:
         self._items[item.id] = item

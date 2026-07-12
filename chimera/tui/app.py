@@ -9,6 +9,7 @@ stays responsive.
 
 from __future__ import annotations
 
+from rich.markup import escape
 from textual.app import App, ComposeResult
 from textual.widgets import Footer, Header, Input, RichLog
 
@@ -52,9 +53,11 @@ class ChimeraTUI(App[None]):
         if text.startswith("/model"):
             slug = text[len("/model") :].strip() or None
             self.session.set_model(slug)
-            self._append(f"[dim]model → {slug or 'default'}[/dim]")
+            self._append(f"[dim]model → {escape(slug or 'default')}[/dim]")
             return
-        self._append(f"[bold green]you ›[/bold green] {text}")
+        # escape() the untrusted text so brackets can't crash Rich's markup parser (e.g. "[/]") or
+        # forge styling/links; our own tags stay literal.
+        self._append(f"[bold green]you ›[/bold green] {escape(text)}")
         self.run_worker(lambda: self._respond(text), thread=True, exclusive=True)
 
     # -- testable dispatch (no event loop) ---------------------------------
@@ -70,8 +73,12 @@ class ChimeraTUI(App[None]):
         try:
             reply = self.reply_to(text)
         except Exception as exc:  # noqa: BLE001 — keep the TUI alive on transient errors
-            reply = f"[red]error: {exc}[/red]"
-        rendered = "[dim]context cleared[/dim]" if reply is None else f"[bold magenta]chimera ›[/bold magenta] {reply}"
+            reply = f"error: {exc}"
+        rendered = (
+            "[dim]context cleared[/dim]"
+            if reply is None
+            else f"[bold magenta]chimera ›[/bold magenta] {escape(reply)}"
+        )
         self.call_from_thread(self._append, rendered)
 
     def _append(self, markup: str) -> None:

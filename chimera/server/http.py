@@ -14,6 +14,9 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from chimera.server.gateway import InboundMessage, MessageGateway
+from chimera.telemetry import get_logger
+
+_log = get_logger("server.http")
 
 # Given a hook name and the POST payload, fire the matching jobs and return their results.
 WebhookHandler = Callable[[str, dict[str, Any]], list[str]]
@@ -57,20 +60,21 @@ def handle(
                 payload = {}
             handled = whatsapp.on_message(payload if isinstance(payload, dict) else {})
             return 200, {"received": handled}
-    if method == "POST" and path.startswith("/webhook/") and webhooks is not None:
-        hook = path[len("/webhook/") :]
+    if method == "POST" and route.startswith("/webhook/") and webhooks is not None:
+        hook = route[len("/webhook/") :]  # use the parsed path, not the raw path (strips ?query)
         try:
             payload = json.loads(body or b"{}")
         except json.JSONDecodeError:
             payload = {}
         try:
             results = webhooks(hook, payload if isinstance(payload, dict) else {})
-        except Exception as exc:  # noqa: BLE001 — surface as 500, don't crash the server
-            return 500, {"error": str(exc)}
+        except Exception:  # noqa: BLE001 — surface as 500 WITHOUT leaking internals to the caller
+            _log.exception("webhook %r failed", hook)
+            return 500, {"error": "internal error"}
         if not results:
             return 404, {"error": f"no webhook job registered for {hook!r}"}
         return 200, {"hook": hook, "fired": len(results), "results": results}
-    if method == "POST" and path == "/chat":
+    if method == "POST" and route == "/chat":
         try:
             data = json.loads(body or b"{}")
         except json.JSONDecodeError:
@@ -86,8 +90,9 @@ def handle(
         )
         try:
             reply = gateway.on_message(message)
-        except Exception as exc:  # noqa: BLE001 — surface the failure as a 500, don't crash the server
-            return 500, {"error": str(exc)}
+        except Exception:  # noqa: BLE001 — surface as 500 WITHOUT leaking internals (paths/secrets)
+            _log.exception("chat handler failed")
+            return 500, {"error": "internal error"}
         return 200, {"reply": reply, "chat_id": message.chat_id}
     return 404, {"error": "not found"}
 
@@ -104,8 +109,23 @@ def make_server(
     """Build (but don't start) an HTTP server wrapping ``gateway`` (and optional webhooks)."""
 
     class Handler(BaseHTTPRequestHandler):
+        def _send(self, status: int, payload: dict[str, Any] | str) -> None:
+            if isinstance(payload, str):
+                data, content_type = payload.encode("utf-8"), "text/plain"
+            else:
+                data, content_type = json.dumps(payload).encode("utf-8"), "application/json"
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
         def _respond(self, method: str) -> None:
-            length = int(self.headers.get("Content-Length", 0) or 0)
+            try:
+                length = int(self.headers.get("Content-Length", 0) or 0)
+            except ValueError:  # malformed Content-Length -> 400, not a dropped connection
+                self._send(400, {"error": "invalid Content-Length"})
+                return
             body = self.rfile.read(length) if length else b""
             # A2A message/stream is Server-Sent Events — it can't go through the pure `handle`
             # (which returns one body), so stream it directly off the A2AServer's iterator.
@@ -115,15 +135,7 @@ def make_server(
             status, payload = handle(
                 gateway, method, self.path, body, webhooks=webhooks, whatsapp=whatsapp, a2a=a2a
             )
-            if isinstance(payload, str):  # plain text (e.g. the WhatsApp verification challenge)
-                data, content_type = payload.encode("utf-8"), "text/plain"
-            else:
-                data, content_type = json.dumps(payload).encode("utf-8"), "application/json"
-            self.send_response(status)
-            self.send_header("Content-Type", content_type)
-            self.send_header("Content-Length", str(len(data)))
-            self.end_headers()
-            self.wfile.write(data)
+            self._send(status, payload)
 
         def _is_a2a_stream(self, body: bytes) -> bool:
             if urlparse(self.path).path != "/a2a":

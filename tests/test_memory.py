@@ -156,6 +156,40 @@ def test_merge_counts(tmp_path: Path) -> None:
     assert len(mgr.store) == 3
 
 
+def test_memory_ids_are_full_length_uuids(tmp_path: Path) -> None:
+    # Full uuid4 hex (32 chars), not an 8-char slice that collides and silently overwrites.
+    mgr = _manager(tmp_path)
+    _, item = mgr.remember("a fact")
+    assert len(item.id) == 32
+
+
+def test_blank_query_returns_nothing(tmp_path: Path) -> None:
+    mgr = _manager(tmp_path)
+    mgr.remember("some fact")
+    assert mgr.search("   ") == []  # tokenless query matches nothing on every path
+
+
+def test_store_load_skips_a_malformed_record(tmp_path: Path) -> None:
+    import json
+
+    from chimera.memory import MemoryStore
+
+    path = tmp_path / "mem.json"
+    good = MemoryItem(id="a", content="a good memory")
+    path.write_text(json.dumps([good.model_dump(), {"id": "bad"}]), encoding="utf-8")  # 2nd is invalid
+    store = MemoryStore(path)
+    assert [i.content for i in store.all()] == ["a good memory"]  # the good one survives
+
+
+def test_store_save_is_atomic(tmp_path: Path) -> None:
+    from chimera.memory import MemoryStore
+
+    path = tmp_path / "mem.json"
+    store = MemoryStore(path)
+    store.add(MemoryItem(id="a", content="x"))
+    assert not (tmp_path / "mem.json.tmp").exists()  # no stray temp file
+
+
 def test_consolidate_preserves_tainted_provenance(tmp_path: Path) -> None:
     # Merging a cluster that includes a tainted member must not launder it to clean.
     mgr = _manager(tmp_path)

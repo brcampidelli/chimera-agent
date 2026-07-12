@@ -12,6 +12,17 @@ def _item(content: str, *, kind: str = "semantic", key: str | None = None) -> Me
     return MemoryItem(id=uuid.uuid4().hex[:8], kind=kind, content=content, key=key, source="test")  # type: ignore[arg-type]
 
 
+def test_provenance_round_trips_through_sqlite(tmp_path: Path) -> None:
+    # SECURITY: a tainted memory must not launder itself to "clean" via the SQLite backend.
+    store = SqliteMemoryStore(tmp_path / "m.db")
+    item = MemoryItem(id=uuid.uuid4().hex, kind="semantic", content="poisoned fact",  # type: ignore[arg-type]
+                      source="test", provenance="tainted")
+    store.add(item)
+    assert store.get(item.id).provenance == "tainted"
+    assert store.all()[0].provenance == "tainted"
+    assert store.by_kind("semantic")[0].provenance == "tainted"
+
+
 def test_add_get_all_remove_roundtrip(tmp_path: Path) -> None:
     store = SqliteMemoryStore(tmp_path / "m.db")
     item = _item("Alex prefers absolute imports")

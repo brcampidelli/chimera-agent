@@ -50,3 +50,9 @@ class MemoryGate:
 
     def filter(self, items: list[MemoryItem], query: str) -> list[MemoryItem]:
         return [item for item in items if self.admit(item, query)[0]]
+
+    def is_clean(self, text: str) -> bool:
+        """Injection-only admission (no relevance floor), for facts recalled by a path OTHER than
+        keyword similarity — e.g. entity-graph links, which intentionally may share no token with the
+        query. Those still must not smuggle override/injection text into the prompt."""
+        return not (self.block_injection and bool(_INJECTION.search(text)))

@@ -37,6 +37,14 @@ class CurationConfig:
     # SkillCoach process filter: keep only traces whose step-following score >= this, so a
     # lucky-but-sloppy success (wrong/failed tool steps) is not trained on. 0.0 = off.
     min_process: float = 0.0
+    # Drop "hollow successes" — a run that claimed success but whose real working-tree diff was empty
+    # (diff_productive is False). That's the reward-hack signature; exporting it as a POSITIVE training
+    # example poisons the data. On by default (matches refine_bridge / the RFT loop's diff-gate).
+    drop_hollow_success: bool = True
+
+
+def _is_hollow(item: Trajectory, cfg: CurationConfig) -> bool:
+    return cfg.drop_hollow_success and getattr(item, "diff_productive", None) is False
 
 
 def curate_sft(trajectories: list[Trajectory], config: CurationConfig | None = None) -> list[dict[str, Any]]:
@@ -50,6 +58,8 @@ def curate_sft(trajectories: list[Trajectory], config: CurationConfig | None = N
     rows: list[dict[str, Any]] = []
     for item in sorted(trajectories, key=lambda t: -t.reward):
         if item.outcome != "success" or item.reward < cfg.min_reward:
+            continue
+        if _is_hollow(item, cfg):  # a reward-hacked empty-diff success is not positive supervision
             continue
         if item.steps < cfg.min_steps:  # long-horizon recipe
             continue
@@ -82,6 +92,7 @@ def curate_dpo(trajectories: list[Trajectory], config: CurationConfig | None = N
     for item in trajectories:
         if (
             item.outcome == "success"
+            and not _is_hollow(item, cfg)  # a hollow success must not be the PREFERRED response
             and item.process_score() >= cfg.min_process
             and (item.prompt not in best or item.reward > best[item.prompt].reward)
         ):

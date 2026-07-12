@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from chimera.orchestration.roles import Role, RoleAgent
 from chimera.providers.gateway import Message, SupportsComplete
 from chimera.telemetry import get_logger
+from chimera.tools.registry import ToolRegistry
 
 _log = get_logger("ecosystem.meta_agent")
 
@@ -99,9 +100,24 @@ class MetaAgent:
             model=self.model,
         )
 
-    def build(self, blueprint: AgentBlueprint, backend: SupportsComplete | None = None) -> RoleAgent:
+    def build(
+        self,
+        blueprint: AgentBlueprint,
+        backend: SupportsComplete | None = None,
+        *,
+        tools: ToolRegistry | None = None,
+    ) -> RoleAgent:
+        """Build the designed agent. When a ``tools`` registry is supplied, the built agent gets ONLY
+        the blueprint's allow-listed tools (the isolation is actually enforced, not just designed);
+        without one it is a persona-only single-shot agent."""
         role = Role(blueprint.name, blueprint.role_prompt, blueprint.model)
-        return RoleAgent(role, backend or self.backend)
+        restricted: ToolRegistry | None = None
+        if tools is not None and blueprint.tools:
+            restricted = ToolRegistry()
+            for name in blueprint.tools:  # already filtered to allowed_tools at design time
+                if name in tools:
+                    restricted.register(tools.get(name))
+        return RoleAgent(role, backend or self.backend, tools=restricted)
 
     @staticmethod
     def evaluate(

@@ -16,7 +16,10 @@ from pathlib import Path
 
 from chimera.memory.models import MemoryItem, MemoryKind
 
-_COLUMNS = "id, kind, content, key, source, metadata"
+# NOTE: provenance is a first-class column, not folded into metadata: it is a SECURITY signal
+# (a tainted memory must never launder itself to "clean"), and it must round-trip identically to the
+# JSON store or the guarantee breaks purely by backend choice.
+_COLUMNS = "id, kind, content, key, source, metadata, provenance"
 _TOKEN = re.compile(r"[a-z0-9]+")
 
 
@@ -28,26 +31,51 @@ class SqliteMemoryStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(str(self.path))
         self._fts = self._init_schema()
+        self._migrate_provenance()
 
     def _init_schema(self) -> bool:
         try:
             self._conn.execute(
                 "CREATE VIRTUAL TABLE IF NOT EXISTS memories USING fts5("
-                "id UNINDEXED, kind UNINDEXED, content, key UNINDEXED, source UNINDEXED, metadata UNINDEXED)"
+                "id UNINDEXED, kind UNINDEXED, content, key UNINDEXED, source UNINDEXED, "
+                "metadata UNINDEXED, provenance UNINDEXED)"
             )
             self._conn.commit()
             return True
         except sqlite3.OperationalError:  # FTS5 not compiled in — fall back to a plain table
             self._conn.execute(
                 "CREATE TABLE IF NOT EXISTS memories ("
-                "id TEXT PRIMARY KEY, kind TEXT, content TEXT, key TEXT, source TEXT, metadata TEXT)"
+                "id TEXT PRIMARY KEY, kind TEXT, content TEXT, key TEXT, source TEXT, "
+                "metadata TEXT, provenance TEXT DEFAULT 'clean')"
             )
             self._conn.commit()
             return False
 
+    def _migrate_provenance(self) -> None:
+        """Add the provenance column to a store created before it existed (rows default to 'clean').
+
+        A plain table can ALTER; an FTS5 virtual table cannot, so rebuild it (memory stores are small).
+        Old rows predate provenance tracking, so 'clean' is the honest default for them.
+        """
+        cols = {r[1] for r in self._conn.execute("PRAGMA table_info(memories)").fetchall()}
+        if "provenance" in cols:
+            return
+        old = "id, kind, content, key, source, metadata"
+        rows = self._conn.execute(f"SELECT {old} FROM memories").fetchall()
+        if self._fts:
+            self._conn.execute("DROP TABLE memories")
+            self._init_schema()
+        else:
+            self._conn.execute("ALTER TABLE memories ADD COLUMN provenance TEXT DEFAULT 'clean'")
+        if rows and self._fts:
+            self._conn.executemany(
+                f"INSERT INTO memories ({_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, 'clean')", rows
+            )
+        self._conn.commit()
+
     @staticmethod
-    def _to_item(row: tuple[str, str, str, str, str, str]) -> MemoryItem:
-        item_id, kind, content, key, source, metadata = row
+    def _to_item(row: tuple[str, str, str, str, str, str, str]) -> MemoryItem:
+        item_id, kind, content, key, source, metadata, provenance = row
         return MemoryItem(
             id=item_id,
             kind=kind,  # type: ignore[arg-type]
@@ -55,13 +83,15 @@ class SqliteMemoryStore:
             key=key or None,
             source=source,
             metadata=json.loads(metadata) if metadata else {},
+            provenance=provenance or "clean",
         )
 
     def add(self, item: MemoryItem) -> None:
         self._conn.execute("DELETE FROM memories WHERE id = ?", (item.id,))
         self._conn.execute(
-            f"INSERT INTO memories ({_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?)",
-            (item.id, item.kind, item.content, item.key or "", item.source, json.dumps(item.metadata)),
+            f"INSERT INTO memories ({_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (item.id, item.kind, item.content, item.key or "", item.source,
+             json.dumps(item.metadata), item.provenance),
         )
         self._conn.commit()
 
@@ -76,11 +106,15 @@ class SqliteMemoryStore:
         self._conn.commit()
 
     def all(self) -> list[MemoryItem]:
-        rows = self._conn.execute(f"SELECT {_COLUMNS} FROM memories").fetchall()
+        # ORDER BY rowid = stable insertion order (oldest first), which value.rank's positional
+        # recency proxy relies on. Without it the order is unspecified and prune keeps the wrong items.
+        rows = self._conn.execute(f"SELECT {_COLUMNS} FROM memories ORDER BY rowid").fetchall()
         return [self._to_item(row) for row in rows]
 
     def by_kind(self, kind: MemoryKind) -> list[MemoryItem]:
-        rows = self._conn.execute(f"SELECT {_COLUMNS} FROM memories WHERE kind = ?", (kind,)).fetchall()
+        rows = self._conn.execute(
+            f"SELECT {_COLUMNS} FROM memories WHERE kind = ? ORDER BY rowid", (kind,)
+        ).fetchall()
         return [self._to_item(row) for row in rows]
 
     def search(self, query: str, k: int = 5) -> list[MemoryItem]:

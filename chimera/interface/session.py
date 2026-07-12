@@ -60,6 +60,11 @@ class ChatSession:
         """Run one user message through the agent and record the exchange."""
         answer = self.agent.run(self._compose(message)).answer
         self.turns.append(ChatTurn(user=message, assistant=answer))
+        # Bound the transcript: only the last ``max_history`` turns ever reach the prompt, so a
+        # long-lived session (TUI / reused gateway) must not grow this list without limit.
+        cap = max(50, self.max_history * 4)
+        if len(self.turns) > cap:
+            del self.turns[:-cap]
         return answer
 
     def reset(self) -> None:
@@ -91,7 +96,10 @@ class ChatSession:
             # Entity-aware recall: facts linked (via the graph) to entities named in the
             # message, even when they share no keyword with it. Deduped against keyword hits.
             for related in self.graph.related_facts(message, k=self.memory_k):
-                if related not in facts:
+                # Entity-linked facts skip the keyword-similarity gate (they intentionally may not
+                # overlap the query), but they must STILL pass the injection check — a graph-reachable
+                # tainted memory could otherwise inject override text the gate exists to block.
+                if related not in facts and (self.gate is None or self.gate.is_clean(related)):
                     facts.append(related)
         if facts:
             parts.append("Relevant facts from memory:\n" + "\n".join(f"- {f}" for f in facts))

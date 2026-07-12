@@ -24,6 +24,19 @@ def _collector(tmp_path: Path) -> TrajectoryCollector:
     return collector
 
 
+def test_curate_drops_hollow_success(tmp_path: Path) -> None:
+    # A "success" whose real diff was empty (reward-hack signature) must NOT become positive
+    # training data — neither an SFT example nor the preferred DPO response.
+    collector = TrajectoryCollector(tmp_path / "traj.jsonl")
+    collector.record("task Z", "hollow win", outcome="success", reward=1.0, diff_productive=False)
+    collector.record("task Z", "honest loss", outcome="failure", reward=0.0)
+    traj = collector.all()
+    assert curate_sft(traj) == []  # hollow success excluded from SFT
+    assert curate_dpo(traj) == []  # no valid `chosen`, so no preference pair
+    # With the guard off, the operator can opt back in (the old behavior).
+    assert len(curate_sft(traj, CurationConfig(drop_hollow_success=False))) == 1
+
+
 def test_curate_sft_keeps_unique_successes(tmp_path: Path) -> None:
     rows = curate_sft(_collector(tmp_path).all(), CurationConfig(dedup=True))
     contents = [row["messages"][1]["content"] for row in rows]

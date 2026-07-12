@@ -6,6 +6,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+- **SQLite memory backend no longer launders taint (CRITICAL).** The optional SQLite/FTS5 store had
+  no `provenance` column, so a `provenance="tainted"` memory came back `"clean"` on every read — the
+  recall taint-label, and the remember/merge/consolidate anti-laundering guarantees, silently broke
+  purely by choosing that backend. Provenance is now a first-class column (with a safe migration for
+  existing stores that rebuilds the FTS5 table / ALTERs a plain table; old rows default to `clean`).
+- **Entity-graph facts now pass the injection gate.** Recall reachable via the memory graph (not the
+  keyword-similarity path) skipped `MemoryGate`, so a graph-linked tainted fact could inject override
+  text into the prompt. Graph facts now go through an injection-only check (`gate.is_clean`).
+- **HTTP handlers no longer leak internal exception text** (paths, config keys, provider bodies) to
+  callers — a generic message is returned and the detail logged server-side. Webhook/chat routes are
+  matched against the parsed path (so `?query` strings don't break them), and a malformed
+  `Content-Length` returns 400 instead of dropping the connection.
+
+### Fixed
+- **`chimera evolve export` no longer trains on reward-hacked hollow successes.** `curate_sft` /
+  `curate_dpo` never checked `diff_productive`, so an empty-diff "success" could become a positive SFT
+  example (or the *preferred* DPO response). A `drop_hollow_success` knob (on by default) excludes
+  them, matching the refine/RFT diff-gate.
+- **Memory store is crash-safe and resilient.** `MemoryStore.save()` is now atomic (temp + replace)
+  so a crash mid-write can't truncate the store; `load()` skips a single malformed record instead of
+  aborting (losing every memory).
+- **Memory ids are full-length UUIDs**, not an 8-char slice that had a ~1% birthday-collision chance
+  by 10k memories and silently overwrote a distinct memory on a clash.
+- **SQLite `all()`/`by_kind()` return a stable insertion order** (`ORDER BY rowid`), which `value.rank`
+  relies on — otherwise `prune` could drop recent, high-value memories.
+- **Blank/tokenless recall queries return nothing** on every path (the semantic path used to return k
+  arbitrary items while keyword/FTS returned none).
+- **The TUI escapes user + model text** before rendering, so bracket input (e.g. `[/]`) can't crash
+  Rich's markup parser and content can't forge styling/links.
+- **Messaging gateway surfaces a crashed turn** instead of swallowing it as a benign "(no reply)".
+- **`MetaAgent.build()` can actually enforce the tool allowlist** when given a registry (previously the
+  designed agent was built tool-less, so the isolation safeguard was decorative).
+
 ## [0.18.4] - 2026-07-12
 
 **Loop, scheduler & connector hardening.** Two adversarial reviews — of the core agent-loop and of
