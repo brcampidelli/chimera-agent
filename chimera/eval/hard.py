@@ -55,6 +55,28 @@ def hard_tasks() -> list[EvalTask]:
     ]
 
 
+def hard_tasks_plus() -> list[EvalTask]:
+    """The 12 traps of :func:`hard_tasks` plus 12 more — a bigger n for a tighter paired CI.
+
+    Kept separate from :func:`hard_tasks` so other benches/tests that expect the 12-task suite are
+    unaffected; used by ``skillcard-bench --tasks big`` for the M19-A1 accuracy-power A/B.
+    """
+    return hard_tasks() + [
+        EvalTask("clock_strikes", "A clock takes 5 seconds to strike 6 o'clock (6 strikes). How many seconds does it take to strike 12 o'clock (12 strikes)?" + _ONLY, _has_num(11)),
+        EvalTask("pills_30", "A doctor gives you 3 pills and says to take one every 30 minutes. How many minutes until you have taken all of them?" + _ONLY, _has_num(60)),
+        EvalTask("sheep_but_9", "A farmer has 17 sheep. All but 9 die. How many sheep are still alive?" + _ONLY, _has_num(9)),
+        EvalTask("overtake_2nd", "In a running race you just overtook the runner who was in 2nd place. What place are you in now?" + _ONLY, _has_num(2)),
+        EvalTask("hens_eggs", "If 3 hens lay 3 eggs in 3 days, how many eggs do 6 hens lay in 6 days?" + _ONLY, _has_num(12)),
+        EvalTask("banana_letters", "How many letters are in the word 'banana'?" + _ONLY, _has_num(6)),
+        EvalTask("mississippi_s", "How many times does the letter 's' appear in the word 'mississippi'?" + _ONLY, _has_num(4)),
+        EvalTask("months_28", "How many months of the year have exactly 28 days?" + _ONLY, _has_num(12)),
+        EvalTask("candles", "You have 5 candles and blow 2 of them out right away. The rest burn all the way down. How many candles remain in the end?" + _ONLY, _has_num(2)),
+        EvalTask("coin_next", "A fair coin has landed on heads 5 times in a row. What is the percent chance the next flip is heads?" + _ONLY, _has_num(50)),
+        EvalTask("pages_read", "You read a book from the start of page 20 to the end of page 30, inclusive. How many pages did you read?" + _ONLY, _has_num(11)),
+        EvalTask("half_of_half", "What is half of half of 100?" + _ONLY, _has_num(25)),
+    ]
+
+
 HARD_CHAIN_START = "17"
 
 # (id, instruction template, correct operation) — the state is always the first integer

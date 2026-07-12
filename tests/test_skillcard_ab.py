@@ -52,3 +52,22 @@ def test_demo_cards_all_carry_content() -> None:
 
 def test_empty_report_summary() -> None:
     assert CardABReport().summary() == {"tasks": 0.0}
+
+
+def test_paired_counts_discordant_pairs_for_the_flip_gate() -> None:
+    from chimera.eval.skillcard_ab import CardABRow
+
+    # 2 both-pass, 1 cards-only win, 1 no-cards-only win, 1 both-fail
+    rows = [
+        CardABRow("a", base_ok=True, base_tokens=1, card_ok=True, card_tokens=1, hit=True),
+        CardABRow("b", base_ok=True, base_tokens=1, card_ok=True, card_tokens=1, hit=True),
+        CardABRow("c", base_ok=False, base_tokens=1, card_ok=True, card_tokens=1, hit=True),  # cards won
+        CardABRow("d", base_ok=True, base_tokens=1, card_ok=False, card_tokens=1, hit=False),  # no-cards won
+        CardABRow("e", base_ok=False, base_tokens=1, card_ok=False, card_tokens=1, hit=False),
+    ]
+    p = CardABReport(rows).paired()
+    assert (p.both_pass, p.treatment_only, p.baseline_only, p.both_fail) == (2, 1, 1, 1)
+    assert p.n == 5 and p.discordant == 2
+    assert p.delta == 0.0  # one win each way -> net zero, CI must straddle 0
+    lo, hi = p.diff_ci
+    assert lo < 0.0 < hi

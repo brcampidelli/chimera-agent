@@ -1869,7 +1869,7 @@ def hierarchy_bench(
 
 @app.command(name="skillcard-bench")
 def skillcard_bench(
-    tasks: str = typer.Option("hard", "--tasks", help="Task suite: hard | demo."),
+    tasks: str = typer.Option("hard", "--tasks", help="Task suite: hard | big | demo. 'big' = 24 traps for a tighter paired CI."),
     k: int = typer.Option(1, "--k", help="How many cards to retrieve per task."),
     min_overlap: int = typer.Option(
         2, "--min-overlap", help="Relevance gate: inject a card only on >= N shared query terms (0=off)."
@@ -1881,13 +1881,18 @@ def skillcard_bench(
 ) -> None:
     """A/B reasoning with vs without injected TRS skill cards. Calls real models."""
     from chimera.eval.continuous import demo_tasks
-    from chimera.eval.hard import hard_tasks
+    from chimera.eval.hard import hard_tasks, hard_tasks_plus
     from chimera.eval.skillcard_ab import demo_cards, run_skillcard_ab
     from chimera.evolution import SkillStore
     from chimera.providers import LLMGateway, MissingCredentialsError
 
     settings = get_settings()
-    suite = hard_tasks() if tasks == "hard" else demo_tasks()
+    if tasks == "big":
+        suite = hard_tasks_plus()
+    elif tasks == "hard":
+        suite = hard_tasks()
+    else:
+        suite = demo_tasks()
     if use_store:
         cards = [c for c in SkillStore(settings.home / "skills.json").skills() if c.has_card()]
         if not cards:
@@ -1932,6 +1937,21 @@ def skillcard_bench(
         f"\nverdict: [{color}]{verdict}[/{color}] "
         f"(card accuracy within 1pp of no-cards: {delta:+.1f}pp; "
         f"token delta {summary.get('token_delta_pct', 0.0):+.1f}%)"
+    )
+
+    # The registered M19-A1 default-flip gate: the paired McNemar accuracy CI lower bound >= 0 AND
+    # token overhead < +50%. Reported so the flip decision is reproducible from the run, not by hand.
+    paired = report.paired()
+    lo, hi = paired.diff_ci
+    tok = summary.get("token_delta_pct", 0.0)
+    acc_ok, tok_ok = lo >= 0.0, tok < 50.0
+    flip = "JUSTIFIED" if (acc_ok and tok_ok) else "NOT justified"
+    fcolor = "green" if (acc_ok and tok_ok) else "yellow"
+    console.print(
+        f"[bold]A1 flip gate:[/bold] [{fcolor}]{flip}[/{fcolor}]  "
+        f"(paired Δ {paired.delta * 100:+.1f}pp, 95% CI [{lo * 100:+.1f}%, {hi * 100:+.1f}%] "
+        f"→ acc {'✓' if acc_ok else '✗'}; tokens {tok:+.1f}% → {'✓' if tok_ok else '✗'}; "
+        f"n={paired.n}, discordant={paired.discordant})"
     )
     if verdict != "PASS":
         raise typer.Exit(code=1)  # a REGRESSION verdict must fail the process so CI catches it

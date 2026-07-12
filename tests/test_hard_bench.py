@@ -16,6 +16,7 @@ from chimera.eval import (
     hard_tasks,
     run_chain,
 )
+from chimera.eval.hard import hard_tasks_plus
 
 
 class OracleSolver:
@@ -43,6 +44,18 @@ def test_hard_tasks_checks_accept_correct_reject_wrong() -> None:
     assert tasks["sister_age"].check("67") and not tasks["sister_age"].check("35")
     assert tasks["days"].check("Wednesday") and not tasks["days"].check("Tuesday")
     assert tasks["feathers"].check("same") and not tasks["feathers"].check("bricks")
+
+
+def test_hard_tasks_plus_superset_unique_and_checkable() -> None:
+    base = {t.id for t in hard_tasks()}
+    plus = {t.id: t for t in hard_tasks_plus()}
+    assert base <= set(plus)  # the plus suite is a superset of the 12-task hard suite
+    assert len(plus) == 24  # 12 base + 12 new traps, all ids unique
+    # the new traps' deterministic checks accept the right answer and reject a wrong one
+    assert plus["clock_strikes"].check("11") and not plus["clock_strikes"].check("10")
+    assert plus["overtake_2nd"].check("2") and not plus["overtake_2nd"].check("1")
+    assert plus["coin_next"].check("50") and not plus["coin_next"].check("100")
+    assert plus["months_28"].check("12") and not plus["months_28"].check("1")
 
 
 def test_hard_chain_perfect_run_holds() -> None:

@@ -80,3 +80,44 @@ cost with three levers and re-measured (same hard suite, n = 12, demo cards, Ope
 blocked by *cost* (fixed), only by the absence of a *statistically significant* accuracy signal, which
 needs a much larger / real-task paired A/B than n = 12 free-model can provide. The honest engineering
 lever (make cards cheap) is done; flipping the default still waits on power, not code.
+
+---
+
+## Update — bigger paired A/B on a stronger model (the power attack)
+
+To attack the power blocker directly we (a) doubled the suite to **n = 24** reasoning traps
+(`skillcard-bench --tasks big`, each with a matching demo card so retrieval is best-case), (b) ran it
+on **`deepseek/deepseek-chat-v3.1`** (a strong model, not the free tier), and (c) wired the paired
+**McNemar + Wilson CI** and the two-condition flip gate directly into the bench output so the decision
+is reproducible from the run, not hand-computed (`CardABReport.paired()` → `chimera skillcard-bench`
+now prints an `A1 flip gate:` line).
+
+| | no cards | with cards |
+|---|---|---|
+| accuracy | 83.3% (20/24) | **95.8% (23/24)** |
+| avg tokens / task | 64 | 143 |
+
+- **Paired Δ:** **+12.5 pp**, discordant pairs **3 for cards, 0 against**, 95% CI **[−1.5%, +12.5%]**
+  → **still NOT significant** (lower bound −1.5% < 0), but only just.
+- **Token overhead:** **+121.9%** — higher than the +37–48% from the gated free-model runs, because on
+  this suite *every* task has a matching card (100% hit), so the relevance gate never skips one and the
+  full injection cost is paid on all 24. Both numbers are honest; they measure different task mixes.
+
+### What the bigger run actually proves
+
+The binding constraint is **not** cost-in-general and **not** the direction of the effect — it is the
+**number of discordant pairs**. A stronger model agrees with itself on most tasks (both arms pass), so
+even doubling n only produced **3** discordant pairs, all favouring cards (a clean 3–0). McNemar cannot
+clear 0 at 95% on a 3–0 split (exact binomial p = 0.25); it would take roughly a **5–0** discordant
+sweep. More tasks alone won't fix that if the model keeps agreeing with itself — you need either a
+weaker model (more room to disagree) or a much larger, harder suite that generates more discordant
+pairs. The accuracy lift has now been **directionally positive and never negative on a discordant pair
+across three separate runs and two models** — a real signal that the sample still can't certify.
+
+### Decision (unchanged, now precisely diagnosed)
+
+**`CHIMERA_SKILL_CARDS_READ` stays OFF by default.** Both gate conditions still fail at n = 24:
+accuracy CI lower bound < 0, and (on an all-hit suite) tokens > +50%. The honest engineering is done —
+cheap injection (v0.19.6) and a self-reporting flip gate (this run) — and the remaining blocker is now
+named exactly: **discordant-pair power**, which no code change can manufacture. The mechanism stays
+available to anyone who opts in.

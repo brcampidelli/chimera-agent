@@ -15,8 +15,12 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from chimera.eval.continuous import EvalTask
+
+if TYPE_CHECKING:
+    from chimera.eval.paired import PairedResult
 from chimera.evolution.card_retrieval import CardIndex, cards_context_block
 from chimera.evolution.learned_skill import LearnedSkill
 from chimera.providers.gateway import Message, SupportsComplete
@@ -35,6 +39,21 @@ class CardABRow:
 @dataclass
 class CardABReport:
     rows: list[CardABRow] = field(default_factory=list)
+
+    def paired(self) -> PairedResult:
+        """The paired (McNemar) comparison of cards vs no-cards over the same tasks.
+
+        This is the honest significance test behind the M19-A1 flip gate: it conditions out the tasks
+        where both arms agreed and reports a Wilson CI on the discordant pairs. ``diff_ci`` including 0
+        means the accuracy lift is not proven, however large the point estimate.
+        """
+        from chimera.eval.paired import PairedResult
+
+        a = sum(1 for r in self.rows if r.base_ok and r.card_ok)  # both pass
+        b = sum(1 for r in self.rows if r.base_ok and not r.card_ok)  # no-cards won
+        c = sum(1 for r in self.rows if not r.base_ok and r.card_ok)  # cards won
+        d = sum(1 for r in self.rows if not r.base_ok and not r.card_ok)  # both fail
+        return PairedResult("no-cards", "cards", both_pass=a, baseline_only=b, treatment_only=c, both_fail=d)
 
     def summary(self) -> dict[str, float]:
         n = len(self.rows)
@@ -130,7 +149,7 @@ def demo_cards() -> list[LearnedSkill]:
             do="identify what is actually asked; use only the relevant quantities",
             avoid="doing arithmetic on numbers that do not affect the answer",
             check="does the answer depend only on the relevant quantities?",
-            triggers=["apples", "eat", "buy", "pears", "how many", "left", "sister", "age"],
+            triggers=["apples", "eat", "buy", "pears", "how many", "left", "sister", "age", "sheep", "die", "alive"],
         ),
         LearnedSkill(
             name="count_letters_exactly",
@@ -139,7 +158,7 @@ def demo_cards() -> list[LearnedSkill]:
             do="scan character by character and tally each match, then recount",
             avoid="guessing from the word's length or overall shape",
             check="the tally matches on a second pass",
-            triggers=["letter", "appear", "times", "count", "word", "strawberry"],
+            triggers=["letter", "letters", "appear", "times", "count", "word", "strawberry", "banana", "mississippi"],
         ),
         LearnedSkill(
             name="doubling_one_step_before",
@@ -166,6 +185,51 @@ def demo_cards() -> list[LearnedSkill]:
             do="track whether the entity actually leaves the set",
             avoid="subtracting when nothing left the set",
             check="did anyone or anything actually leave?",
-            triggers=["killers", "room", "nobody", "leaves", "how many", "now"],
+            triggers=["killers", "room", "nobody", "leaves", "how many", "now", "candles", "blow", "blown", "remain"],
+        ),
+        LearnedSkill(
+            name="off_by_one_intervals",
+            description="fencepost errors: gaps between events, inclusive ranges",
+            trigger="counting time between evenly spaced events, or an inclusive range",
+            do="N events have N-1 gaps between them; an inclusive range a..b has b-a+1 items",
+            avoid="using the event count as the gap count, or last-first without the +1",
+            check="do the gaps (or the inclusive count) reconcile with a tiny worked example?",
+            triggers=["strike", "strikes", "clock", "pill", "pills", "every", "minutes", "seconds", "pages", "page", "inclusive", "read"],
+        ),
+        LearnedSkill(
+            name="overtaking_keeps_place",
+            description="overtaking takes the passed runner's rank, not first place",
+            trigger="a race where you overtake the runner in Nth place",
+            do="passing the runner in Nth place puts you in Nth place — you take their spot",
+            avoid="answering first, or shifting by the wrong number of places",
+            check="you cannot be ahead of runners you have not yet passed",
+            triggers=["overtake", "overtook", "race", "place", "runner", "pass", "passed"],
+        ),
+        LearnedSkill(
+            name="gamblers_fallacy_independent",
+            description="independent trials have no memory of past outcomes",
+            trigger="a probability question after a streak of independent outcomes",
+            do="a fair coin is 50% on the next flip regardless of the prior streak",
+            avoid="letting the run of heads or tails change the stated probability",
+            check="are the trials actually independent? then the streak is irrelevant",
+            triggers=["coin", "heads", "tails", "row", "probability", "percent", "chance", "flip"],
+        ),
+        LearnedSkill(
+            name="rate_scales_with_both",
+            description="output scales with workers AND time when both change",
+            trigger="a rate problem where both the worker count and the duration change",
+            do="reduce to one worker's rate per unit time, then scale by workers times periods",
+            avoid="assuming the answer equals the original count when both inputs scaled",
+            check="does one unit's rate, scaled by both factors, reproduce the totals?",
+            triggers=["hens", "eggs", "lay", "days", "produce"],
+        ),
+        LearnedSkill(
+            name="trick_calendar_fact",
+            description="watch for trick general-knowledge premises",
+            trigger="a general-knowledge question with a hidden trivial answer",
+            do="every month has at least 28 days, so all 12 do",
+            avoid="pattern-matching to the 'special' item (February) instead of reading literally",
+            check="does the literal reading give a simpler, larger answer?",
+            triggers=["months", "month", "28", "days", "year"],
         ),
     ]
