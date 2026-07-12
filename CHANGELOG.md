@@ -6,15 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.19.8] - 2026-07-12
+
+**Provider-gateway hardening — 4 fixes from the 16th adversarial review (1 HIGH).**
+
 ### Fixed
-- **Provider cache no longer defeats consensus checks (16th adversarial review).** The completion
-  cache served `temperature>0` samples, so `k` identical sampled requests returned byte-identical
-  content — collapsing cascade agreement, the fusion router's agreement gate, and self-consistency
-  into fake unanimity (false confidence). The cache now serves/stores **only deterministic
-  (`temperature==0`) requests**. Also: an empty-content result is no longer cached (one malformed
-  response would otherwise serve `""` forever at $0); `acomplete()` now honors the credential pool so
-  a pool-only config authenticates; and the lazy key-rotator creation is lock-guarded against the
-  fusion panel's threads.
+- **The completion cache no longer defeats consensus checks.** It served `temperature>0` samples, so
+  `k` identical sampled requests returned byte-identical content — collapsing cascade agreement, the
+  fusion router's agreement gate, and self-consistency into **fake unanimity** (false confidence).
+  The cache now serves/stores **only deterministic (`temperature==0`) requests**.
+- **An empty-content result is no longer cached** (one malformed response would otherwise serve `""`
+  forever at $0 for that key).
+- **`acomplete()` now honors the credential pool** — a pool-only config (`CHIMERA_OPENROUTER_KEYS`
+  with no single `*_API_KEY`) previously AUTH-failed; its docstring is corrected (it is not used by
+  the fusion panel, which runs threaded `complete()`).
+- **The lazy key-rotator creation is lock-guarded** against the fusion panel's threads (two threads
+  racing the first call for a provider could build two rotators and drop an advanced index).
 
 ## [0.19.7] - 2026-07-12
 
