@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.19.2] - 2026-07-12
+
+**File-edit data integrity.** An eleventh adversarial review, of the file-mutation surface
+(`edit_file`/`apply_patch`/`write_file`), found that edits silently rewrote every line ending and
+weren't crash-atomic — the logic guards were solid, but the byte-I/O layer wasn't. All fixed and
+byte-level regression-tested.
+
 ### Fixed
 - **File edits no longer silently rewrite every line ending (data integrity).** `edit_file`,
   `apply_patch`, and `write_file` read/wrote via `Path.read_text`/`write_text`, whose universal-newline
