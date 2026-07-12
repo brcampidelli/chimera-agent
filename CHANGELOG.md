@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-07-12
+
+**A live, instrumented terminal UI.** `chimera tui` goes from a single-pane chat to a streaming
+workspace: the model's tokens appear as they're generated, replies render as syntax-highlighted
+Markdown, and a side panel shows what the agent actually did (tools, tokens, cost, memory) — with
+strict honesty about what a chat turn can and can't report.
+
 ### Added
 - **The TUI is now a live, instrumented workspace.** `chimera tui` gained three things: (1) **real
   token streaming** — the model's text streams into the log as it arrives (single-model path), and
