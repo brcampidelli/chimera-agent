@@ -6,6 +6,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **TUI: a second Enter can't start a concurrent turn.** The input is disabled while a turn is in
+  flight (a thread worker can't be preempted, so a second submit would run a concurrent `send_verbose`
+  on the same non-thread-safe `ChatSession`, interleaving the transcript and live buffer); it re-opens
+  when the turn finishes. Found in a tenth adversarial review of the new streaming surface.
+- **`stream_complete` degrades instead of erroring on strict providers.** `stream_options` is now sent
+  with `drop_params=True`, so a native anthropic/gemini model (or a strict `api_base`) that rejects the
+  param drops it and streams anyway (usage just comes back unknown) rather than failing every TUI turn.
+- **Streamed tool calls without a provider `index` no longer split in two.** Fragments now merge into
+  the currently-open call instead of minting a new slot per chunk (which lost the arguments).
+- **Cost honesty:** the activity panel flags "(excl. cache)" next to the turn cost when cache tokens
+  are present, since the price is off prompt+completion at list rate and cache reads/writes bill
+  differently.
+
 ### Added
 - **The TUI activity panel now names the memory layer that contributed.** `MemoryManager.search`
   gained an optional `on_layer` callback that fires with the layer producing the hits

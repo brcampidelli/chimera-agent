@@ -469,6 +469,10 @@ class LLMGateway:
             tools=tools,
             stream=True,
             stream_options={"include_usage": True},  # ask the provider for a final usage chunk
+            # A native anthropic/gemini model (or a strict api_base) can reject the unknown
+            # stream_options param; drop_params lets LiteLLM strip what a provider doesn't support so
+            # the stream still runs (usage just comes back unknown) rather than erroring the whole turn.
+            drop_params=True,
             **call_kwargs,
         )
         content: list[str] = []
@@ -614,7 +618,10 @@ def _delta_tool_calls(chunk: Any, acc: dict[int, dict[str, Any]]) -> None:
     for delta in deltas:
         index = getattr(delta, "index", None)
         if index is None:
-            index = len(acc)
+            # A provider that omits `index` streams one call at a time; merge fragments into the
+            # currently-open slot (its later args-only chunks) rather than minting a new slot per
+            # chunk (which would split one call into name-slot + orphaned-args-slot and lose the args).
+            index = max(acc) if acc else 0
         slot = acc.setdefault(int(index), {"id": "", "name": "", "arguments": ""})
         call_id = getattr(delta, "id", None)
         if call_id and not slot["id"]:

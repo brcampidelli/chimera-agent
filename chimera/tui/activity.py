@@ -55,10 +55,14 @@ class ActivityPanel(VerticalScroll):
         self.query_one("#act-tools", Static).update("\n".join(self._tools))
 
     def set_tokens(self, report: TurnReport) -> None:
-        cost = f"~ ${report.usd:.4f}" if report.usd is not None else "cost: unavailable"
-        cache = ""
-        if report.cache_read_tokens or report.cache_write_tokens:
-            cache = f"\ncache r/w {report.cache_read_tokens}/{report.cache_write_tokens}"
+        has_cache = bool(report.cache_read_tokens or report.cache_write_tokens)
+        if report.usd is None:
+            cost = "cost: unavailable"
+        else:
+            # The price is off prompt+completion at list rate; cache read/write bill differently, so
+            # when cache tokens are present flag that the shown cost excludes them (don't imply exact).
+            cost = f"~ ${report.usd:.4f}" + (" (excl. cache)" if has_cache else "")
+        cache = f"\ncache r/w {report.cache_read_tokens}/{report.cache_write_tokens}" if has_cache else ""
         self.query_one("#act-tokens", Static).update(
             f"in {report.prompt_tokens} · out {report.completion_tokens}{cache}\n{cost}"
         )

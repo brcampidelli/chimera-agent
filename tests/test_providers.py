@@ -79,6 +79,50 @@ def test_stream_complete_reassembles_split_tool_calls(monkeypatch: pytest.Monkey
     assert call.arguments == {"pattern": "retry"}  # fragments concatenated then JSON-parsed
 
 
+def test_stream_complete_sets_drop_params_and_usage_option(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    get_settings.cache_clear()
+    import litellm
+
+    captured: dict[str, Any] = {}
+
+    def fake(**kw: Any) -> list[SimpleNamespace]:
+        captured.update(kw)
+        return [_content_chunk("ok"), _usage_chunk(1, 1)]
+
+    monkeypatch.setattr(litellm, "completion", fake)
+    from chimera.providers import LLMGateway
+    from chimera.providers.gateway import Message
+
+    LLMGateway().stream_complete([Message(role="user", content="hi")], model="prov/m")
+    assert captured["stream"] is True
+    assert captured["stream_options"] == {"include_usage": True}
+    assert captured["drop_params"] is True  # so a provider rejecting stream_options degrades, not errors
+
+
+def test_stream_complete_reassembles_tool_call_without_index(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    get_settings.cache_clear()
+    import litellm
+
+    def fake(**_: Any) -> list[SimpleNamespace]:
+        # A provider that omits `index` and fragments one call: name first, args-only next.
+        return [
+            _tool_chunk(index=None, call_id="c", name="grep", arguments='{"p'),
+            _tool_chunk(index=None, call_id=None, name=None, arguments='attern": "x"}'),
+            _usage_chunk(1, 0),
+        ]
+
+    monkeypatch.setattr(litellm, "completion", fake)
+    from chimera.providers import LLMGateway
+    from chimera.providers.gateway import Message
+
+    result = LLMGateway().stream_complete([Message(role="user", content="hi")], model="prov/m")
+    assert result.tool_calls is not None and len(result.tool_calls) == 1  # ONE call, not split in two
+    assert result.tool_calls[0].name == "grep"
+    assert result.tool_calls[0].arguments == {"pattern": "x"}
+
+
 def test_stream_complete_survives_malformed_chunks(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
     get_settings.cache_clear()

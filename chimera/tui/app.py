@@ -148,6 +148,10 @@ class ChimeraTUI(App[None]):
             # escape() the untrusted text so brackets can't crash Rich's markup parser (e.g. "[/]").
             self._append(f"[bold green]you ›[/bold green] {escape(text)}")
             self._activity().start_turn(self._busy_label())
+            # Disable input for the duration of the turn. A thread worker can't be preempted, so a
+            # second Enter would spin up a CONCURRENT send_verbose on the same (non-thread-safe)
+            # ChatSession — interleaving the transcript and the live buffer. Re-enabled on finish.
+            self.query_one("#prompt", Input).disabled = True
             self.run_worker(lambda: self._respond(text), thread=True, exclusive=True)
 
     # -- testable dispatch (no event loop) ---------------------------------
@@ -188,6 +192,9 @@ class ChimeraTUI(App[None]):
     def on_turn_finished(self, message: TurnFinished) -> None:
         self._live = ""
         self.query_one("#live", Static).update("")
+        prompt = self.query_one("#prompt", Input)
+        prompt.disabled = False  # re-open input for the next turn (also on the error path below)
+        prompt.focus()
         if message.report is None:
             self._append(f"[dim]{escape(message.note or 'done')}[/dim]")
             self._activity().set_status("idle")
