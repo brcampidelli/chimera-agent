@@ -156,6 +156,17 @@ def test_merge_counts(tmp_path: Path) -> None:
     assert len(mgr.store) == 3
 
 
+def test_consolidate_preserves_tainted_provenance(tmp_path: Path) -> None:
+    # Merging a cluster that includes a tainted member must not launder it to clean.
+    mgr = _manager(tmp_path)
+    mgr.add("deploy uses github actions ci pipeline", kind="semantic", provenance="tainted")
+    mgr.add("deploy uses github actions ci pipeline daily", kind="semantic")  # clusters with it
+    mgr.consolidate(lambda parts: "deploy: github actions ci", kinds=("semantic",))
+    items = mgr.store.all()
+    assert len(items) == 1
+    assert items[0].provenance == "tainted"
+
+
 def test_merge_preserves_tainted_provenance(tmp_path: Path) -> None:
     # Importing another agent's memories must NOT launder a tainted fact to clean — the merge
     # has to carry provenance through, or a poisoned import is recalled as verified.

@@ -478,6 +478,43 @@ def test_hollow_success_does_not_learn(tmp_path: Path) -> None:
     assert evolver.calls == []
 
 
+class _RecordingCards:
+    def __init__(self) -> None:
+        self.outcomes: list[bool] = []
+
+    def card_context(self, task: str) -> str:
+        return ""
+
+    def record_outcome(self, success: bool) -> None:
+        self.outcomes.append(success)
+
+
+def test_hollow_success_does_not_credit_card_telemetry(tmp_path: Path) -> None:
+    # The card win rate is the measured promote/demote signal — a hollow success (verify passed,
+    # empty diff) must not raise it, the same way it must not mint a skill/memory.
+    cards = _RecordingCards()
+    auto = AutonomousAgent(
+        FakeWorker("done"),  # writes nothing -> hollow success
+        guard=WorkspaceGuard(tmp_path),
+        cards=cards,  # type: ignore[arg-type]
+        config=AutonomousConfig(use_planner=False),
+    )
+    assert auto.run("do the thing").success is True
+    assert cards.outcomes == []  # hollow success does not feed the promotion signal
+
+
+def test_productive_success_credits_card_telemetry(tmp_path: Path) -> None:
+    cards = _RecordingCards()
+    auto = AutonomousAgent(
+        FakeWorker("done", workspace=tmp_path, filename="new.txt"),  # real diff
+        guard=WorkspaceGuard(tmp_path),
+        cards=cards,  # type: ignore[arg-type]
+        config=AutonomousConfig(use_planner=False),
+    )
+    assert auto.run("do the thing").success is True
+    assert cards.outcomes == [True]  # verified productive success credits the card
+
+
 def test_productive_success_learns(tmp_path: Path) -> None:
     # Guard present + a real file written -> non-empty diff -> the run learns.
     mem = RecordingMemory()

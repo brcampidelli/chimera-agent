@@ -61,16 +61,15 @@ class EvolutionContext:
     def record_external(self, task: str, answer: str, *, success: bool) -> None:
         """Record an outcome from a NON-AutonomousAgent path (e.g. the hierarchy fan-out).
 
-        Writes an experience lesson and credits the run to any injected skill cards — the read/write
-        halves of the flywheel a bare RoleAgent run would otherwise skip. Skill DISTILLATION is
-        intentionally NOT done here: it needs the verify-or-revert signal that only the solve/lifecycle
-        path carries, so a fan-out run accrues lessons + card telemetry but never mints a skill.
+        Writes an advisory experience lesson ONLY. It does NOT credit skill-card success telemetry:
+        this path has no verify-or-revert signal, so ``success`` here is self-reported (a non-empty
+        answer), and card uses/successes are the input to the *measured* promote/demote policy. Feeding
+        an unverified success into that signal would make the promotion the project markets as
+        "measured, never self-reported" self-reported. Card telemetry comes only from verified paths
+        (solve/lifecycle, past the diff-gate). Skill DISTILLATION is likewise not done here.
         """
         if self.experience is not None:
             self.experience.record(task, "success" if success else "failure", detail=answer[:500])
-        recorder = getattr(self.cards, "record_outcome", None)
-        if callable(recorder):
-            recorder(bool(success))
 
 
 def build_evolution_context(

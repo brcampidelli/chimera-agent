@@ -151,9 +151,12 @@ class MemoryManager:
                 summary = summarizer([item.content for item in group])  # type: ignore[operator]
                 if not summary.strip():
                     continue
+                # Propagate the strongest provenance of the cluster: merging a tainted member into a
+                # summary must NOT launder it to clean (same guarantee remember/merge uphold).
+                prov = "tainted" if any(i.provenance == "tainted" for i in group) else "clean"
                 for item in group:
                     self.store.remove(item.id)
-                self.add(summary, kind, source="chimera")
+                self.add(summary, kind, source="chimera", provenance=prov)
                 removed += len(group) - 1
         _log.debug("consolidated: removed %d memories", removed)
         return removed

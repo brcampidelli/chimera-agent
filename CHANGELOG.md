@@ -6,6 +6,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **Self-evolution flywheel honesty (adversarial review of the differentiator surface).** Four ways the
+  "measured, never self-reported" learning signal could be credited outside the honesty gates — all
+  fixed and regression-tested (the flywheel's math — paired stats, Wilson/Newcombe CIs, the diff-gate,
+  GEPA — reviewed clean):
+  - *Unverified fan-out no longer credits skill promotion:* the hierarchy fan-out recorded a card
+    "success" for any non-empty output (no verify-or-revert), and that success rate is the input to
+    the auto promote/demote policy — a self-reported signal masquerading as measured. The fan-out now
+    records only an advisory experience lesson; card telemetry comes only from verified paths.
+  - *Hollow success no longer credits skill promotion:* a hollow success (verifier passed, empty diff)
+    was diff-gated out of minting a skill/memory, but still raised the retrieved cards' win rate. The
+    card credit is now gated on the same diff verdict.
+  - *Memory consolidation no longer launders taint:* merging a cluster wrote the summary as
+    `provenance="clean"`, erasing a tainted member's provenance. It now propagates the strongest
+    provenance of the cluster.
+  - *Transfer gate rejects an empty holdout:* an empty (not just `None`) holdout fell through to a
+    zero-task paired comparison and reported "generalizes, transfer measured" — a fail-open that
+    disabled the negative-transfer guard. An empty holdout now takes the honest "not measured" path.
+
 ## [0.18.2] - 2026-07-11
 
 **Adversarial-review hardening.** Two adversarial reviews — of the governance/security surface and the

@@ -55,6 +55,19 @@ def test_falls_back_to_tuned_when_no_holdout_but_flags_untested() -> None:
     assert "TRANSFER NOT MEASURED" in d.reason
 
 
+def test_empty_holdout_is_not_a_measured_pass() -> None:
+    # An EMPTY holdout (e.g. the disjoint-slice generator found no tasks) must NOT be reported as a
+    # measured non-regression — that would silently disable the negative-transfer guard (fail-open).
+    d = transfer_gated_promotion(
+        tuned_baseline=[False, False, True],
+        tuned_treatment=[True, True, True],
+        holdout_baseline=[],
+        holdout_treatment=[],
+    )
+    assert d.transfer_measured is False
+    assert "TRANSFER NOT MEASURED" in d.reason
+
+
 def test_regression_tolerance_allows_small_dips() -> None:
     # A tiny holdout dip within tolerance should NOT block.
     d = transfer_gated_promotion(

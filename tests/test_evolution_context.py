@@ -115,7 +115,9 @@ def test_memory_and_playbook_are_injected(tmp_path: Path) -> None:
     assert ctx.memory is sentinel_memory
 
 
-def test_record_external_writes_experience_and_credits_cards(tmp_path: Path) -> None:
+def test_record_external_writes_experience_but_never_credits_card_telemetry(tmp_path: Path) -> None:
+    # The fan-out has NO verify-or-revert signal, so an unverified "success" must not feed the
+    # measured promote/demote card telemetry — only the advisory experience lesson is recorded.
     exp = ExperienceBuffer(tmp_path / "experience.json")
 
     class _Cards:
@@ -131,7 +133,7 @@ def test_record_external_writes_experience_and_credits_cards(tmp_path: Path) -> 
     all_rows = exp.all()
     assert len(all_rows) == 1
     assert all_rows[0].outcome == "success"
-    assert cards.outcomes == [True]
+    assert cards.outcomes == []  # unverified success does NOT touch the promotion signal
 
 
 def test_record_external_is_safe_without_seams() -> None:

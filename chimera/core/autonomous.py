@@ -618,7 +618,12 @@ class AutonomousAgent:
                 self.auto_evolver.maybe_distill_correction(
                     task, last_failed.answer, answer, tainted=tainted
                 )
-        self._record_card_outcome(True)
+        # Diff-gate the card telemetry too (M19-A2): a hollow success (verifier passed, empty diff)
+        # must not raise a retrieved card's win rate — that rate is the measured promote/demote
+        # signal, and crediting a success for work that never happened bypasses the gate the same
+        # way minting a skill would. ``learn is False`` ⇒ neutral (no use, no success credit).
+        if learn:
+            self._record_card_outcome(True)
         self._clear_checkpoint(thread_id)
         self._emit(_ev_final(True, answer))
         return AutonomousResult(answer=answer, success=True, attempts=attempts, plan=plan)

@@ -83,7 +83,9 @@ def transfer_gated_promotion(
             tuned=tuned, holdout=None, transfer_measured=False,
         )
 
-    if holdout_baseline is None or holdout_treatment is None:
+    # Falsy = None OR empty: an EMPTY holdout is not a measured non-regression — compare_paired([], [])
+    # would give n=0, Δ=0.0, "no regression", falsely asserting transfer was measured on zero tasks.
+    if not holdout_baseline or not holdout_treatment:
         return TransferDecision(
             promote=True,
             reason=f"tuned slice improved (Δ={tuned.delta:+.1%}); TRANSFER NOT MEASURED (no holdout)",
