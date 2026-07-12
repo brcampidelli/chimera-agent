@@ -116,20 +116,26 @@ class MemoryManager:
         _log.debug("merged %d items: %s", len(items), counts)
         return counts
 
-    def prune(self, max_items: int) -> int:
-        """Keep the ``max_items`` highest-value memories; remove the rest. Returns count.
+    def prune(self, max_items: int, *, dry_run: bool = False) -> int:
+        """Keep the ``max_items`` highest-value memories; remove the rest. Returns the count removed.
 
         Value is the multi-factor model in :mod:`chimera.memory.value` (recency,
         specificity, kind, curation, reliability) — not a single cue.
+
+        ``persona`` facts (the durable cross-session profile) are NEVER pruned — they're identity,
+        not budget fodder — so the ``max_items`` budget applies only to the prunable items. With
+        ``dry_run=True`` nothing is deleted; the return value is how many WOULD be removed.
         """
         from chimera.memory.value import rank
 
-        items = self.store.all()
-        if len(items) <= max_items:
+        prunable = [item for item in self.store.all() if item.kind != "persona"]
+        if len(prunable) <= max_items:
             return 0
-        for _, item in rank(items)[max_items:]:
-            self.store.remove(item.id)
-        return len(items) - max_items
+        to_remove = [item for _, item in rank(prunable)[max_items:]]
+        if not dry_run:
+            for item in to_remove:
+                self.store.remove(item.id)
+        return len(to_remove)
 
     def consolidate(
         self,

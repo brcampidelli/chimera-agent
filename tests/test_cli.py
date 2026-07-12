@@ -312,3 +312,16 @@ def test_init_does_not_clobber_existing_env(tmp_path: Path, monkeypatch: pytest.
     assert "MY_CUSTOM=keepme" in env  # unrelated line preserved
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     get_settings.cache_clear()
+
+
+def test_solve_rejects_multiple_hitl_flags() -> None:
+    # Two HITL actions at once (thread/action could mismatch) must be refused before any model call.
+    result = runner.invoke(app, ["solve", "x", "--approve", "A", "--deny", "B"])
+    assert result.exit_code == 1
+    assert "only one" in result.stdout.lower()
+
+
+def test_solve_edit_requires_answer() -> None:
+    result = runner.invoke(app, ["solve", "x", "--edit", "T1"])  # no --answer -> would finalize empty
+    assert result.exit_code == 1
+    assert "--answer" in result.stdout

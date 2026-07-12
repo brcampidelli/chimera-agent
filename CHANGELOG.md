@@ -6,6 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **CLI gates now exit non-zero on failure.** `chimera workflow` and `chimera lifecycle` (and the
+  `fusion-bench`/`cascade-bench`/`skillcard-bench` verdicts) printed a red "failed"/"REGRESSION" but
+  exited 0 — so `chimera workflow triage.yaml && ./deploy.sh` would deploy on a failed workflow, and a
+  bench regression stayed green in CI. They now `raise typer.Exit(1)` on the failing branch, matching
+  `solve`/`drift`/`transfer-gate`. A fourteenth adversarial review, of the CLI.
+- **`memory prune` no longer silently deletes data.** It ran immediately and hard-deleted everything
+  below the budget — including `persona`/profile facts. It is now **dry-run by default** (shows the
+  count; `--apply` to delete), and **persona facts are never pruned** (the budget applies only to
+  prunable items), matching the reversible, `--apply`-gated `skills-retire`.
+- **`solve` HITL flags are validated.** Passing more than one of `--approve`/`--respond`/`--edit`/
+  `--deny` is refused (they could pick one thread but run another's action), and `--edit` now requires
+  `--answer` (it would otherwise finalize the paused run with an empty answer).
+- **`.env` writes are atomic** (temp + `os.replace`) so a crash mid-write can't truncate the user's
+  secrets/config.
+
 ## [0.19.4] - 2026-07-12
 
 **Crew resilience.** A thirteenth adversarial review, of the multi-agent roles/crew surface. Most of

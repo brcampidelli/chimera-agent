@@ -82,7 +82,10 @@ def _set_env_var(path: Path, key: str, value: str) -> None:
             break
     else:
         lines.append(f"{key}={value}")
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    # Atomic write: a crash mid-write to .env must not truncate the user's secrets/config.
+    tmp = path.parent / (path.name + ".tmp")
+    tmp.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    tmp.replace(path)
 
 
 def _apply_tool_allowlist(
@@ -1467,6 +1470,8 @@ def fusion_bench(
         f"\nverdict: [{color}]{verdict}[/{color}] "
         f"(selective accuracy within 1pp of full: {delta:+.1f}pp)"
     )
+    if verdict != "PASS":
+        raise typer.Exit(code=1)  # a REGRESSION verdict must fail the process so CI catches it
 
 
 @app.command()
@@ -1680,6 +1685,8 @@ def cascade_bench(
     verdict = "PASS" if cascade_rate >= mid_rate else "BELOW MID"
     color = "green" if verdict == "PASS" else "red"
     console.print(f"\nverdict: [{color}]{verdict}[/{color}] (cascade {cascade_rate:.0%} vs mid {mid_rate:.0%})")
+    if verdict != "PASS":
+        raise typer.Exit(code=1)  # a BELOW-MID verdict must fail the process so CI catches it
 
 
 def _run_multistep_hierarchy_bench(gateway: Any, model: str, only: set[str], out: str | None) -> None:
@@ -1920,6 +1927,8 @@ def skillcard_bench(
         f"(card accuracy within 1pp of no-cards: {delta:+.1f}pp; "
         f"token delta {summary.get('token_delta_pct', 0.0):+.1f}%)"
     )
+    if verdict != "PASS":
+        raise typer.Exit(code=1)  # a REGRESSION verdict must fail the process so CI catches it
 
 
 @app.command(name="schema-bench")
@@ -2154,6 +2163,13 @@ def solve(
 
     # Human-in-the-loop envelope (LangGraph {accept, edit, respond, ignore}) over the taint-pause.
     # 'ignore' (deny) drops the run without touching a model (no key needed).
+    if sum(bool(x) for x in (deny, approve, respond, edit)) > 1:
+        console.print("[red]Use only one of --approve / --respond / --edit / --deny.[/red]")
+        raise typer.Exit(code=1)
+    if edit and not answer_text:
+        # An edit finalizes the reviewed answer as-is; without --answer it would commit an empty one.
+        console.print("[red]--edit requires --answer with the revised text.[/red]")
+        raise typer.Exit(code=1)
     if deny:
         RunCheckpointer(settings.home / "runs.db").delete(deny)
         console.print(f"[yellow]Discarded[/yellow] paused run {deny!r}.")
@@ -3636,9 +3652,25 @@ def memory_list() -> None:
 @memory_app.command("prune")
 def memory_prune(
     max_items: int = typer.Option(50, "--max", help="Keep the N highest-value memories."),
+    apply: bool = typer.Option(
+        False, "--apply", help="Actually delete. Default is a dry-run preview (no data lost)."
+    ),
 ) -> None:
-    """Prune low-value memory under a budget (multi-factor value model)."""
-    removed = _memory_manager().prune(max_items)
+    """Prune low-value memory under a budget. Dry-run by default; persona/profile facts are never pruned."""
+    mgr = _memory_manager()
+    would_remove = mgr.prune(max_items, dry_run=True)
+    if would_remove == 0:
+        console.print("[dim]nothing to prune — memory is within budget[/dim]")
+        return
+    if not apply:
+        # Deletion is irreversible; never remove memory on the plain command. Show the count and
+        # require --apply, mirroring the reversible skills-retire's dry-run-by-default discipline.
+        console.print(
+            f"[yellow]{would_remove} low-value memory item(s) would be pruned[/yellow] "
+            "(persona/profile facts are kept). Re-run with [bold]--apply[/bold] to delete."
+        )
+        return
+    removed = mgr.prune(max_items)
     console.print(f"pruned {removed} low-value memory item(s)")
 
 
@@ -4596,6 +4628,8 @@ def lifecycle(
         console.print(f"  {stage.output.strip()[:500]}")
     status = "[green]success[/green]" if result.success else "[red]failed[/red]"
     console.print(f"\nlifecycle: {status}")
+    if not result.success:
+        raise typer.Exit(code=1)  # a gate must fail the process, not just print red (CI/scripts)
 
 
 @app.command()
@@ -4624,6 +4658,8 @@ def workflow(
         console.print(f"  {mark} {run.name} [{run.uses}]{extra}")
     status = "[green]success[/green]" if result.success else "[red]failed[/red]"
     console.print(f"workflow: {status}")
+    if not result.success:
+        raise typer.Exit(code=1)  # advertised as a production entrypoint — a failed run must exit non-zero
 
 
 @app.command()

@@ -122,16 +122,26 @@ def test_autoconsolidate_runs_when_over_budget(tmp_path: Path) -> None:
     assert removed == 1  # over budget -> the cluster of 2 is merged into 1
 
 
-def test_prune_keeps_highest_value(tmp_path: Path) -> None:
+def test_prune_protects_persona_and_budgets_only_prunable(tmp_path: Path) -> None:
     mgr = _manager(tmp_path)
     mgr.add("a low working scratch note", kind="working")
     mgr.add("Alex prefers TypeScript strict and absolute imports", kind="persona", key="alex-prefs")
     mgr.add("another working scratch", kind="working")
+    # Budget of 1 applies only to the 2 prunable (working) items — persona is never pruned.
     removed = mgr.prune(max_items=1)
-    assert removed == 2
+    assert removed == 1  # one of the two working notes; the persona fact is untouchable
     remaining = mgr.store.all()
-    assert len(remaining) == 1
-    assert "Alex prefers" in remaining[0].content  # the persona/keyed fact survived
+    assert len(remaining) == 2
+    assert any("Alex prefers" in item.content for item in remaining)  # persona survived
+
+
+def test_prune_dry_run_deletes_nothing(tmp_path: Path) -> None:
+    mgr = _manager(tmp_path)
+    mgr.add("a low working scratch note", kind="working")
+    mgr.add("another working scratch", kind="working")
+    would = mgr.prune(max_items=1, dry_run=True)
+    assert would == 1  # reports what WOULD go
+    assert len(mgr.store.all()) == 2  # ...but nothing was deleted
 
 
 def test_remember_update_by_key(tmp_path: Path) -> None:
