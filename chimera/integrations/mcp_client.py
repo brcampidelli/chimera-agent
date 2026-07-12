@@ -43,6 +43,11 @@ class MCPSession(Protocol):
 class MCPTool(Tool):
     """A Chimera tool that proxies to a tool on an MCP server."""
 
+    #: Output comes from a remote MCP server — the most untrusted content in the system. The name is
+    #: chosen by the server, so it won't be in the static FETCH_TOOLS set; this marker tells
+    #: ``LedgeredTool`` to fence + taint-track it regardless of name.
+    untrusted_output = True
+
     def __init__(
         self,
         spec: MCPToolSpec,
@@ -176,7 +181,13 @@ class StdioMCPSession:
             self._session.call_tool(name, arguments), self._loop
         )
         result = future.result(timeout=120)
-        return _content_to_text(result)
+        text = _content_to_text(result)
+        # Per the MCP spec a tool-execution failure comes back as a normal result with isError=True
+        # (not a protocol error). Surface it as an `error:` observation so the agent can tell a real
+        # answer from a failure — otherwise "database connection refused" reads as a valid result.
+        if getattr(result, "isError", False):
+            return f"error: {text or 'MCP tool reported a failure'}"
+        return text
 
     def close(self) -> None:
         # Signal _serve to exit; its AsyncExitStack then unwinds in its own task.

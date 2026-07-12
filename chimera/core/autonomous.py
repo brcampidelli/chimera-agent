@@ -361,14 +361,18 @@ class AutonomousAgent:
             # failing attempt. Otherwise the Manager's approval is the gate. This
             # stops a strict reviewer from vetoing — and reverting — verified-correct
             # work just because it judged the narration rather than the artifact.
-            verified, vout = self._verify()
+            verified, vout, abstained = self._verify()
+            # A verifier that ABSTAINED (e.g. spec-test generation produced no tests) is NOT
+            # authoritative — treat this attempt as if there were no verifier, so the Manager review
+            # and the coverage checklist still run instead of accepting on an empty non-block.
+            verifier_active = self.verifier is not None and not abstained
             # PROBE proxy (M18-5): in probe mode compute the cheap manager judgment even on a passing
             # attempt, so the logged (proxy, reward) pair is unbiased; reused below → no extra call.
             probe_proxy: bool | None = None
             proxy_fb = ""
             if self.probe_log is not None and self.manager is not None:
                 probe_proxy, proxy_fb = self._review(task, answer, context)
-            if self.verifier is not None:
+            if verifier_active:
                 ok = verified
                 if verified:
                     approved, fb = True, ""
@@ -381,7 +385,7 @@ class AutonomousAgent:
                 ok = approved
             # Record the paired observation for PROBE: arm = which worker ran, proxy = the cheap
             # manager verdict, reward = the verified outcome (only with a real verifier + manager).
-            if self.probe_log is not None and self.verifier is not None and probe_proxy is not None:
+            if self.probe_log is not None and verifier_active and probe_proxy is not None:
                 arm = "escalate" if worker is self.escalate_worker else "worker"
                 self.probe_log.record(
                     arm=arm, proxy=1.0 if probe_proxy else 0.0, reward=1.0 if verified else 0.0
@@ -409,7 +413,7 @@ class AutonomousAgent:
             # happy path. The checklist is a proxy verifier for when you have no tests, not a second
             # opinion on top of them. (Requirements are still injected up front, so the worker targets
             # them from attempt 1 regardless.)
-            if ok and self.checklist is not None and requirements and self.verifier is None:
+            if ok and self.checklist is not None and requirements and not verifier_active:
                 misses = self.checklist.grade(task, answer, requirements)
                 if misses:
                     ok = False
@@ -494,7 +498,9 @@ class AutonomousAgent:
             # Always surface the concrete verification output (the failing test/assert) on the
             # retry — it is the single most actionable signal for fixing the exact defect — ALONGSIDE
             # any manager feedback, rather than letting the manager's prose shadow it.
-            _verify_fb = f"Verification failed:\n{vout}" if vout else ""
+            # Only frame vout as "Verification failed" when the verifier was actually authoritative;
+            # an abstention ("no runnable tests") is not a failure and must not read as one.
+            _verify_fb = f"Verification failed:\n{vout}" if (vout and verifier_active) else ""
             feedback = "\n\n".join(p for p in (fb, _verify_fb) if p) or (
                 "The attempt did not pass verification."
             )
@@ -729,11 +735,13 @@ class AutonomousAgent:
         review = self.manager.review(task, answer, context=context)
         return review.approved, review.feedback
 
-    def _verify(self) -> tuple[bool, str]:
+    def _verify(self) -> tuple[bool, str, bool]:
+        """Returns (passed, output, abstained). ``abstained`` = the verifier had nothing runnable to
+        check, so the caller must fall back to its other gates instead of accepting on it."""
         if self.verifier is None:
-            return True, ""
+            return True, "", True
         result = self.verifier.verify()
-        return result.passed, result.output
+        return result.passed, result.output, result.abstained
 
     @staticmethod
     def _fault_hint(result: AgentResult) -> str:

@@ -6,6 +6,9 @@ import json
 from pathlib import Path
 
 from chimera.scheduler.models import CronJob
+from chimera.telemetry import get_logger
+
+_log = get_logger("scheduler.store")
 
 
 class CronStore:
@@ -25,7 +28,13 @@ class CronStore:
         self._mtime = self.path.stat().st_mtime
         raw = json.loads(self.path.read_text(encoding="utf-8") or "[]")
         for item in raw:
-            job = CronJob.model_validate(item)
+            # Skip a single malformed entry (hand-edit, version skew, partial write) instead of
+            # letting it abort the whole load — one bad line must not silently drop every other cron.
+            try:
+                job = CronJob.model_validate(item)
+            except ValueError as exc:
+                _log.warning("skipping malformed cron entry: %s", exc)
+                continue
             self._jobs[job.id] = job
 
     def reload_if_changed(self) -> bool:
@@ -48,7 +57,12 @@ class CronStore:
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         data = [job.model_dump() for job in self._jobs.values()]
-        self.path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        # Atomic write (temp + replace): the crontab is safety-critical — a plain write_text truncates
+        # the file first, so a crash mid-write or a concurrent reader would see 0 bytes and drop every
+        # cron. os.replace is atomic on the same filesystem. (Matches providers/cache.py's convention.)
+        tmp = self.path.with_suffix(self.path.suffix + ".tmp")
+        tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        tmp.replace(self.path)
         self._mtime = self.path.stat().st_mtime
 
     def add(self, job: CronJob) -> None:

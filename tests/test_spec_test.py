@@ -112,10 +112,12 @@ def test_verifier_failing_tests_propagate(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert SpecTestVerifier(_Gen("def test_x():\n    assert 0"), "t", _reqs(), tmp_path).verify().passed is False
 
 
-def test_verifier_nonblocking_when_nothing_generated(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_verifier_abstains_when_nothing_generated(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    # No runnable tests -> ABSTAIN (not a positive pass): the caller must fall back to its other
+    # gates rather than accept on an empty non-block.
     monkeypatch.setattr(spec_test, "CommandVerifier", _Runner)
     res = SpecTestVerifier(_Gen(""), "t", _reqs(), tmp_path).verify()
-    assert res.passed and "non-blocking" in res.output
+    assert res.abstained is True
     assert not (tmp_path / "test_chimera_spec.py").exists()
 
 

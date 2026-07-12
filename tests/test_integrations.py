@@ -18,6 +18,7 @@ from chimera.integrations import (
     tools_from_openapi,
 )
 from chimera.tools import ToolRegistry
+from chimera.tools.base import Tool
 
 SPEC: dict[str, Any] = {
     "openapi": "3.0.0",
@@ -185,3 +186,38 @@ def test_mcp_connector_wraps_tools() -> None:
 def test_mcp_connector_name_prefix() -> None:
     connector = MCPConnector("kb", FakeMCPSession(), name_prefix="kb.")
     assert connector.tools()[0].name == "kb.search"
+
+
+def test_mcp_tool_output_is_fenced_and_taints_the_run() -> None:
+    # A connector tool's name ("search") is chosen by the remote server, so it's not in FETCH_TOOLS.
+    # Its output must STILL be data-fenced and mark the run tainted (the untrusted_output marker).
+    from chimera.governance import FENCE_CLOSE, LedgeredTool, TaintLedger
+
+    tool = MCPConnector("kb", FakeMCPSession()).tools()[0]
+    led = TaintLedger()
+    out = LedgeredTool(tool, led).run(q="hello")
+    assert FENCE_CLOSE in out
+    assert led.run_tainted() is True
+
+
+class _StubTool(Tool):
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.description = name
+        self.parameters = {"type": "object", "properties": {}}
+
+    def run(self, **kwargs: Any) -> str:
+        return "builtin"
+
+
+def test_connector_into_registry_skips_a_colliding_name() -> None:
+    # A remote server must not shadow a builtin by advertising its name.
+    from chimera.tools.registry import ToolRegistry
+
+    reg = ToolRegistry()
+    reg.register(_StubTool("search"))  # a pre-existing (builtin-like) tool
+    creg = ConnectorRegistry()
+    creg.register(MCPConnector("kb", FakeMCPSession()))  # also exposes a tool named "search"
+    added = creg.into_tool_registry(reg)
+    assert added == 0  # collision skipped, not overwritten
+    assert reg.get("search").run() == "builtin"  # the original survives

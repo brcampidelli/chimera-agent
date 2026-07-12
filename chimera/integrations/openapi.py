@@ -43,6 +43,11 @@ def _retry_delay(attempt: int, retry_after: str | None, *, backoff: float, cap: 
 class RestApiTool(Tool):
     """A single REST operation generated from an OpenAPI spec."""
 
+    #: Output comes from a remote REST API — untrusted external content. The operation name is chosen
+    #: by the spec, so it won't be in FETCH_TOOLS; this marker tells ``LedgeredTool`` to fence +
+    #: taint-track the response regardless of name.
+    untrusted_output = True
+
     def __init__(
         self,
         *,
@@ -87,6 +92,11 @@ class RestApiTool(Tool):
 
         import httpx  # lazy
 
+        # Fail fast on a missing required path param: substituting "" would build a DIFFERENT URL
+        # (e.g. GET /items/ instead of /items/{id}) and silently hit the wrong endpoint.
+        missing = [p for p in self.path_params if not str(kwargs.get(p, "")).strip()]
+        if missing:
+            return f"error: missing required path parameter(s): {', '.join(missing)}"
         url = self._url(kwargs)
         query = {name: kwargs[name] for name in self.query_params if name in kwargs}
         body = kwargs.get("body") if self.has_body else None

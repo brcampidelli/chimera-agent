@@ -51,9 +51,21 @@ class ConnectorRegistry:
         return tools
 
     def into_tool_registry(self, registry: ToolRegistry) -> int:
-        """Register every connector tool into ``registry``. Returns the count."""
+        """Register every connector tool into ``registry``. Returns the count of tools added.
+
+        A name collision is SKIPPED with a warning, not silently overwritten: a remote MCP/OpenAPI
+        server chooses its own tool names, so ``replace=True`` would let it shadow a builtin (e.g.
+        ``read_file``/``send_message``) and hijack every later call. Use a ``name_prefix`` to namespace
+        a connector whose tools you do want to override.
+        """
         count = 0
         for tool in self.all_tools():
-            registry.register(tool, replace=True)
+            if tool.name in registry:
+                _log.warning(
+                    "connector tool %r collides with an existing tool — skipping (use a name_prefix "
+                    "to namespace it)", tool.name,
+                )
+                continue
+            registry.register(tool)
             count += 1
         return count

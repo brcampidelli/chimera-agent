@@ -30,6 +30,40 @@ def test_invalid_cron_expression_rejected(tmp_path: Path) -> None:
         sched.schedule_cron("bad", "not a cron", "x", now=NOW)
 
 
+def test_agent_created_cron_starts_disabled(tmp_path: Path) -> None:
+    # The "self-learned crons start disabled" invariant is defended at the scheduler boundary,
+    # not just in the learner — an agent-created cron must not fire until a human enables it.
+    sched = _scheduler(tmp_path)
+    human = sched.schedule_cron("h", "0 9 * * *", "x", now=NOW, created_by="human")
+    agent = sched.schedule_cron("a", "0 9 * * *", "x", now=NOW, created_by="agent")
+    assert human.enabled is True
+    assert agent.enabled is False
+
+
+def test_malformed_job_entry_is_skipped_not_fatal(tmp_path: Path) -> None:
+    # One bad entry (hand-edit / version skew) must not drop every other cron on load.
+    path = tmp_path / "jobs.json"
+    good = CronJob(id="ok1", name="good", trigger="cron", schedule="0 9 * * *", action="run")
+    import json
+
+    path.write_text(
+        json.dumps([good.model_dump(), {"id": "bad", "not": "a valid job"}]), encoding="utf-8"
+    )
+    store = CronStore(path)
+    assert [j.id for j in store.list()] == ["ok1"]  # the good one survives
+
+
+def test_cron_store_save_is_atomic(tmp_path: Path) -> None:
+    path = tmp_path / "jobs.json"
+    store = CronStore(path)
+    store.add(CronJob(id="j1", name="n", trigger="cron", schedule="0 9 * * *", action="run"))
+    # No stray temp file left behind, and the file is valid JSON.
+    assert not (tmp_path / "jobs.json.tmp").exists()
+    import json
+
+    assert json.loads(path.read_text(encoding="utf-8"))[0]["id"] == "j1"
+
+
 def test_run_due_dispatches_and_advances(tmp_path: Path) -> None:
     sched = _scheduler(tmp_path)
     job = sched.schedule_cron("daily", "0 9 * * *", "run report", now=NOW)

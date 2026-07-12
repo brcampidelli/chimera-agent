@@ -49,6 +49,9 @@ class Scheduler:
             schedule=cron_expr,
             action=action,
             created_by=created_by,
+            # Defend the "self-learned crons start disabled" invariant at the boundary, not just in
+            # the learner: an agent-created cron must not fire until a human enables it.
+            enabled=created_by != "agent",
             next_run=_next_after(cron_expr, now),
         )
         self.store.add(job)
@@ -69,6 +72,7 @@ class Scheduler:
             schedule=event,
             action=action,
             created_by=created_by,
+            enabled=created_by != "agent",  # agent-created triggers start disabled (same invariant)
         )
         self.store.add(job)
         return job

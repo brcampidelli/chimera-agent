@@ -80,11 +80,21 @@ class WorkspaceGuard:
     def restore(self, snapshot: FileSnapshot) -> int:
         """Restore the workspace to ``snapshot``. Returns the number of changes."""
         changes = 0
-        current = {p.relative_to(self.workspace).as_posix() for p in self._iter_files()}
-
-        for rel in current - snapshot.present:
-            (self.workspace / rel).unlink(missing_ok=True)
-            changes += 1
+        # A snapshot that hit the file cap is TRUNCATED: some pre-existing files were never captured,
+        # so we cannot tell "created since" from "existed but uncaptured". Deleting the difference
+        # would destroy untouched user data — the exact opposite of verify-or-revert's job. In that
+        # case skip the delete pass entirely and only restore the content we did capture.
+        truncated = len(snapshot.present) >= self.max_files
+        if truncated:
+            _log.warning(
+                "snapshot truncated at %d files; skipping delete-new pass on restore to avoid "
+                "removing uncaptured pre-existing files", self.max_files,
+            )
+        else:
+            current = {p.relative_to(self.workspace).as_posix() for p in self._iter_files()}
+            for rel in current - snapshot.present:
+                (self.workspace / rel).unlink(missing_ok=True)
+                changes += 1
 
         for rel, content in snapshot.files.items():
             target = self.workspace / rel

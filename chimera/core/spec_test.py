@@ -138,12 +138,15 @@ class SpecTestVerifier:
             )
         code = self._generated
         if not code:
-            return VerificationResult(True, "spec-test: no runnable tests generated (non-blocking pass)")
+            # ABSTAIN, not pass: no runnable tests means no evidence. The caller must fall back to its
+            # other gates (Manager, coverage checklist) — accepting on this would be a fail-open that
+            # SUPPLANTS those gates with nothing.
+            return VerificationResult(True, "spec-test: no runnable tests generated", abstained=True)
         test_path = self.workspace / _TEST_FILE
         try:
             test_path.write_text(code, encoding="utf-8")
         except OSError as exc:
-            return VerificationResult(True, f"spec-test: could not write tests ({exc}) — non-blocking pass")
+            return VerificationResult(True, f"spec-test: could not write tests ({exc})", abstained=True)
         runner = CommandVerifier(self.command.format(file=_TEST_FILE), self.workspace, timeout=self.timeout)
         result = runner.verify()
         return VerificationResult(result.passed, f"spec-grounded tests ({_TEST_FILE}):\n{result.output}")

@@ -157,15 +157,21 @@ class LedgeredTool(Tool):
         if idem_key is not None:
             self._idempotency_cache[idem_key] = result
         self._record_effect(kwargs, result)  # ledger sees the RAW content (taint snippets)
-        if self.name in FETCH_TOOLS and result.strip():
+        if self._is_fetch() and result.strip():
             # M15-A3: defang chat-template/control tokens BEFORE fencing, so untrusted content
             # can't spoof a system/user turn or a tool call to break out of the data fence.
             return fence(sanitize_untrusted(result))
         return result
 
+    def _is_fetch(self) -> bool:
+        """A tool whose output is untrusted external content — by builtin name OR by an
+        ``untrusted_output`` marker on the wrapped tool (MCP / OpenAPI connectors, whose names come
+        from a remote server and so can't be listed statically in FETCH_TOOLS)."""
+        return self.name in FETCH_TOOLS or bool(getattr(self.inner, "untrusted_output", False))
+
     def _record_effect(self, args: Mapping[str, Any], result: str) -> None:
         name = self.name
-        if name in FETCH_TOOLS:
+        if self._is_fetch():
             source = _first(args, _URL_KEYS) or _first(args, _QUERY_KEYS) or name
             self.ledger.record_fetch(source, content=result)
         elif name in WRITE_TOOLS:

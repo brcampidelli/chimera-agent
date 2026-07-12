@@ -21,6 +21,10 @@ class VerificationResult:
 
     passed: bool
     output: str = ""
+    abstained: bool = False
+    """True = the verifier had nothing runnable to check (e.g. spec-test generation produced no
+    tests). A ``passed=True, abstained=True`` result is NOT positive evidence — the caller must fall
+    back to its other gates (Manager review, coverage checklist) rather than accept on it."""
 
 
 class Verifier(Protocol):
@@ -49,6 +53,10 @@ class CommandVerifier:
             )
         except subprocess.TimeoutExpired:
             return VerificationResult(False, f"verification timed out after {self.timeout}s")
+        except OSError as exc:
+            # e.g. the cwd was removed, or the command binary is missing — report a failed/unverifiable
+            # attempt instead of letting it propagate and abort the whole run.
+            return VerificationResult(False, f"verification could not run: {exc}")
         output = ((proc.stdout or "") + (proc.stderr or ""))[:_MAX_OUTPUT_CHARS]
         return VerificationResult(proc.returncode == 0, output)
 

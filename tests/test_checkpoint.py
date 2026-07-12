@@ -22,6 +22,20 @@ def test_restore_reverts_changes_and_deletes_new(tmp_path: Path) -> None:
     assert not (tmp_path / "b.txt").exists()
 
 
+def test_truncated_snapshot_does_not_delete_uncaptured_files(tmp_path: Path) -> None:
+    # With more files than the cap, the snapshot is truncated. restore() must NOT delete the
+    # uncaptured pre-existing files (they'd look "new") — that would be data loss.
+    for i in range(5):
+        (tmp_path / f"f{i}.txt").write_text(f"content {i}", encoding="utf-8")
+    guard = WorkspaceGuard(tmp_path, max_files=2)  # capture only 2 of the 5
+    snap = guard.snapshot()
+    assert len(snap.present) == 2
+
+    guard.restore(snap)
+    survivors = sorted(p.name for p in tmp_path.glob("*.txt"))
+    assert survivors == ["f0.txt", "f1.txt", "f2.txt", "f3.txt", "f4.txt"]  # none deleted
+
+
 def test_restore_recreates_deleted_file(tmp_path: Path) -> None:
     (tmp_path / "keep.txt").write_text("content", encoding="utf-8")
     guard = WorkspaceGuard(tmp_path)

@@ -6,6 +6,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+- **MCP / OpenAPI tool output now goes through the fence + taint ledger.** The untrusted-content
+  defense was name-based (a static `FETCH_TOOLS` set), but connector tool names come from the remote
+  server — so MCP/REST responses (the *most* untrusted content) were returned raw, unfenced, and never
+  marked as a fetch, silently disabling taint escalation for exactly those tools. Connector tools now
+  carry an `untrusted_output` marker that `LedgeredTool` honors regardless of name.
+- **Connector tools can no longer silently shadow a builtin.** `ConnectorRegistry.into_tool_registry`
+  registered with `replace=True`, so a remote server advertising `read_file`/`send_message` would
+  overwrite the builtin and hijack every later call. A name collision is now skipped with a warning.
+- **Agent-created crons start disabled at the scheduler boundary.** The "self-learned crons start
+  disabled pending approval" invariant was enforced only in the learner; `Scheduler.schedule_cron/
+  schedule_event(created_by="agent")` now forces `enabled=False` too (defense in depth).
+
+### Fixed
+- **`--gen-tests` fail-open (adversarial review of the core agent loop).** When spec-test generation
+  produced no tests, the verifier returned a passing result that *supplanted* the Manager review and
+  the coverage checklist — a run could be accepted with zero verification. The verifier now ABSTAINS
+  (a new `VerificationResult.abstained` flag) and the loop falls back to its other gates.
+- **verify-or-revert could delete untouched user files.** When a workspace exceeded the snapshot file
+  cap (5000), `restore()` deleted every current file absent from the truncated snapshot — including
+  pre-existing files that were never captured. A truncated snapshot now skips the delete pass.
+- **`CommandVerifier` no longer crashes the run on a non-timeout `OSError`** (e.g. a removed cwd); it
+  reports an unverifiable attempt instead of aborting.
+- **MCP tool failures are surfaced as errors.** A `CallToolResult` with `isError=True` was flattened
+  to a plain string, so a server-side failure read as a valid answer. It's now prefixed `error:`.
+- **Cron store is crash-safe and resilient.** `save()` is now atomic (temp + `os.replace`) so a crash
+  or concurrent read can't truncate the crontab and drop every job; `load()` skips a single malformed
+  entry instead of aborting the whole load.
+- **OpenAPI calls fail fast on a missing required path param** (which would otherwise build a
+  different URL, e.g. `/items/` instead of `/items/{id}`) instead of silently hitting it.
+
 ## [0.18.3] - 2026-07-11
 
 **Flywheel honesty.** An adversarial review of the self-evolution flywheel — the project's
