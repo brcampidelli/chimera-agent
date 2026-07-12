@@ -62,7 +62,13 @@ def parallel_review(reviewers: list[RoleAgent], subject: str, *, max_workers: in
         return []
 
     def review(agent: RoleAgent) -> AgentMessage:
-        return AgentMessage(agent.name, agent.act(subject))
+        # One reviewer failing (e.g. a transient provider error inside its agent loop) must fail only
+        # ITS unit, not sink the whole panel — Executor.map would otherwise re-raise the first
+        # exception and discard every other reviewer's completed work.
+        try:
+            return AgentMessage(agent.name, agent.act(subject))
+        except Exception as exc:  # noqa: BLE001 — degrade to N-1 reviewers, never crash the run
+            return AgentMessage(agent.name, f"[error] {exc}")
 
     with ThreadPoolExecutor(max_workers=min(max_workers, len(reviewers))) as pool:
         return list(pool.map(review, reviewers))
@@ -86,13 +92,16 @@ class SupervisorCrew:
 
     def run(self, task: str) -> CrewResult:
         results = parallel_review(self.workers, task, max_workers=self.max_workers)
-        consolidated = consolidate(results)
         if self.shared_memory is not None:
-            for message in consolidated:
+            # Dedup only for MEMORY storage (avoid persisting N near-identical notes).
+            for message in consolidate(results):
                 self.shared_memory.remember(message.content, kind="episodic", key=f"crew:{message.sender}")
         final = self.supervisor.act(
             f"Synthesize the team's work into a single best answer for the task:\n{task}",
-            context=render(consolidated),
+            # Feed the supervisor the RAW reviews, not consolidated ones: collapsing agreeing workers
+            # into a single voice would turn a 3-to-1 majority into a 1-to-1 tie before the deciding
+            # agent ever sees the real consensus strength.
+            context=render(results),
         )
         return CrewResult(answer=final, transcript=[*results, AgentMessage(self.supervisor.name, final)])
 

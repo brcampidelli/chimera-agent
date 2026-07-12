@@ -6,6 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **A crew's parallel review no longer crashes when one reviewer fails.** `parallel_review` /
+  `SupervisorCrew` used `Executor.map`, which re-raises the first worker's exception — so one worker
+  hitting a transient provider error sank the whole `chimera crew --mode supervisor` run and discarded
+  every other reviewer's completed work. Each reviewer now degrades to an `[error]` message instead,
+  so the panel survives N-1 workers (a thirteenth adversarial review, of the roles/crew surface).
+- **The supervisor now sees the real consensus.** Reviews were consolidated (near-duplicates merged)
+  *before* the supervisor synthesized them, collapsing a 3-to-1 majority into a 1-to-1 tie; the
+  supervisor now receives the raw reviews (dedup is kept only for memory storage).
+- **Per-role tool allowlist is now enforced, not decorative.** A `Role.allowed_tools` filters the
+  registry fail-closed before the worker's agent loop, so a role can't reach a tool outside its remit
+  even when it shares the crew's registry.
+
 ## [0.19.3] - 2026-07-12
 
 **Self-evolution flywheel hardening.** A twelfth adversarial review, of the evolution internals. Its

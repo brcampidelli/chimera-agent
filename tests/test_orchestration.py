@@ -139,3 +139,57 @@ def test_parallel_review() -> None:
     messages = parallel_review(reviewers, "subject")
     assert {m.sender for m in messages} == {"r1", "r2"}
     assert parallel_review([], "x") == []
+
+
+# --- 13th adversarial review: crew resilience + honest consensus + tool allowlist --------
+
+
+class _BoomBackend:
+    """A backend that always fails — stands in for a transient provider error."""
+
+    def complete(self, messages: list[Any], **kwargs: Any) -> CompletionResult:
+        raise RuntimeError("provider down")
+
+
+class _EchoUserBackend:
+    """Echoes the user message (context + task) back, so we can inspect what an agent received."""
+
+    def complete(self, messages: list[Any], **kwargs: Any) -> CompletionResult:
+        user = ""
+        for message in messages:
+            data = message.as_dict() if hasattr(message, "as_dict") else message
+            if data.get("role") == "user":
+                user = str(data.get("content", ""))
+        return CompletionResult(content=user, model="fake")
+
+
+def test_parallel_review_survives_a_failing_reviewer() -> None:
+    good = RoleAgent(Role("good", "good"), RoleBackend())
+    bad = RoleAgent(Role("bad", "bad"), _BoomBackend())
+    results = parallel_review([good, bad], "subject")  # must NOT raise
+    by_sender = {m.sender: m.content for m in results}
+    assert by_sender["good"] == "good"  # the healthy reviewer's work is preserved
+    assert by_sender["bad"].startswith("[error]")  # the failure is marked, not fatal
+
+
+def test_supervisor_sees_raw_reviews_preserving_consensus_strength() -> None:
+    agree = "answer is 42"
+    workers = [RoleAgent(Role(f"w{i}", agree), RoleBackend()) for i in range(3)]
+    workers.append(RoleAgent(Role("w3", "answer is 7"), RoleBackend()))  # lone dissenter
+    crew = SupervisorCrew(RoleAgent(Role("boss", "boss"), _EchoUserBackend()), workers)
+    result = crew.run("what is the answer")
+    # The supervisor's context (echoed into its answer) keeps all 3 agreeing voices — a 3-to-1
+    # majority, not the 1-to-1 tie that pre-supervisor consolidation would have produced.
+    assert result.answer.count("answer is 42") == 3
+    assert "answer is 7" in result.answer
+
+
+def test_restrict_tools_enforces_allowlist_fail_closed() -> None:
+    from chimera.orchestration.roles import _restrict_tools
+    from chimera.tools import ToolRegistry
+    from chimera.tools.builtin import EchoTool
+
+    reg = ToolRegistry()
+    reg.register(EchoTool())
+    assert _restrict_tools(reg, ["echo"]).names() == ["echo"]
+    assert _restrict_tools(reg, ["nonexistent"]).names() == []  # unknown -> absent, not error

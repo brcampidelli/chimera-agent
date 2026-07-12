@@ -25,6 +25,17 @@ class Role:
     name: str
     system_prompt: str
     model: str | None = None
+    allowed_tools: list[str] | None = None  # if set, the worker sees ONLY these tools (fail-closed)
+
+
+def _restrict_tools(registry: ToolRegistry, allowed: list[str]) -> ToolRegistry:
+    """A registry with only the ``allowed`` tools — fail-closed: an unknown name is simply absent."""
+    subset = ToolRegistry()
+    allow = set(allowed)
+    for tool in registry.tools():
+        if tool.name in allow:
+            subset.register(tool)
+    return subset
 
 
 class RoleAgent:
@@ -57,9 +68,15 @@ class RoleAgent:
         if self.tools is not None:
             from chimera.core.agent import Agent, AgentConfig
 
+            # Enforce the role's declared tool allowlist (if any) by filtering the registry BEFORE the
+            # agent loop — so a role can't reach a tool outside its remit even though it shares the
+            # crew's registry. Fail-closed and enforced, not merely suggested in the prompt.
+            tools = self.tools if self.role.allowed_tools is None else _restrict_tools(
+                self.tools, self.role.allowed_tools
+            )
             agent = Agent(
                 self.backend,
-                self.tools,
+                tools,
                 AgentConfig(
                     model=self.role.model,
                     max_steps=self.max_steps,
