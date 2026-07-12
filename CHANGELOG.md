@@ -6,10 +6,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-**Project orchestrator hardening.** A ninth adversarial review (the `chimera project` loop + kanban
-DAG) found seven bugs — two of which could produce a false-green completion or defeat the runaway
-rail. All fixed and regression-tested; the core "the spec is the only authority of done" invariant
-held.
+## [0.18.8] - 2026-07-12
+
+**Project orchestrator hardening + a verify-or-revert demo.** A ninth adversarial review (the
+`chimera project` loop + kanban DAG) found seven bugs — two of which could produce a false-green
+completion or defeat the runaway rail. All fixed and regression-tested; the core "the spec is the
+only authority of done" invariant held. Ships with a new example that demonstrates the honest
+artifact: a *failed* change being detected and rolled back with a receipt.
+
+### Added
+- **`examples/revert_demo/` — verify-or-revert, demonstrated.** A deterministic, model-free example
+  that copies a sample workspace, injects a regression, runs the acceptance check (which fails),
+  reverts to the checkpoint, and re-checks (which passes) — printing a receipt at each step. It drives
+  the real primitives behind `chimera solve`/`chimera project` (`WorkspaceGuard` + `CommandVerifier`)
+  and exits non-zero if verify-or-revert ever failed to protect the tree.
 
 ### Fixed
 - **`max_iterations` is now durable across a resume.** `project run`/`step`/`approve` rebuilt the
