@@ -192,6 +192,7 @@ class LLMGateway:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
         self._rotators: dict[str, _KeyRotator] = {}
+        self._rotators_lock = threading.Lock()  # the fusion panel calls _key_order from many threads
         # M15-C2: per-credential cooldown pool — a rate-limited/revoked key is rested, not hammered.
         self._cred_pool = CredentialPool()
         self.cache: CompletionCache | None = (
@@ -228,10 +229,13 @@ class LLMGateway:
         Empty means "let LiteLLM read the key from the environment" (today's
         behaviour); a non-empty pool is rotated round-robin across calls.
         """
-        rotator = self._rotators.get(provider)
-        if rotator is None:
-            rotator = _KeyRotator(self.settings.credential_pool(provider))
-            self._rotators[provider] = rotator
+        with self._rotators_lock:
+            # Lock the get-or-create so two threads racing the first call for a provider don't build
+            # two rotators (one clobbering the other's advanced round-robin index).
+            rotator = self._rotators.get(provider)
+            if rotator is None:
+                rotator = _KeyRotator(self.settings.credential_pool(provider))
+                self._rotators[provider] = rotator
         order = rotator.order()
         # Skip keys still cooling down from a recent failure; if ALL are cooling, try them anyway
         # (a stale cooldown must never leave the gateway with zero keys and a hard failure).
@@ -261,8 +265,12 @@ class LLMGateway:
         message_dicts = _to_message_dicts(messages)
 
         # HORIZON-style prompt caching: serve an identical tool-free request from cache.
+        # ONLY for temperature==0 (deterministic) requests. Caching a sampled (temp>0) call would
+        # serve byte-identical content for every "independent" sample, collapsing the k-sample
+        # consensus / self-consistency / cascade-agreement checks into fake unanimity (they resample
+        # the SAME request at temp>0 expecting variation) — silent, and it reports false confidence.
         cache_key: str | None = None
-        if self.cache is not None and tools is None:
+        if self.cache is not None and tools is None and temperature == 0:
             # Fold the other response-affecting request fields into the key so e.g. two calls that
             # differ only in top_p / seed / stop / response_format / api_base don't collide.
             key_params = {k: v for k, v in {**extra, **kwargs}.items() if k != "api_key"}
@@ -320,6 +328,8 @@ class LLMGateway:
                         cache_key is not None
                         and self.cache is not None
                         and result.tool_calls is None
+                        and result.content  # never cache an empty-content result (one malformed
+                        # response would otherwise serve "" forever for this key at $0)
                         and candidate == resolved
                     ):
                         self.cache.put(
@@ -362,7 +372,11 @@ class LLMGateway:
         tools: list[dict[str, Any]] | None = None,
         **kwargs: Any,
     ) -> CompletionResult:
-        """Async variant of :meth:`complete` (used by the parallel fusion panel)."""
+        """Async single-shot completion. Minimal by design: no fallback chain or cache (the fusion
+        panel runs threaded :meth:`complete`, not this). It DOES honor the credential pool so a
+        pool-only config (``CHIMERA_OPENROUTER_KEYS`` with no single ``*_API_KEY``) authenticates —
+        ``_export_keys_to_env`` only exports single keys, so relying on the env would AUTH-fail.
+        """
         import litellm
 
         resolved = self._resolve_model(model)
@@ -372,14 +386,17 @@ class LLMGateway:
                 f"{list(_KEY_ENV_VARS.values())} in your environment or .env."
             )
 
+        call_kwargs: dict[str, Any] = dict(self._provider_kwargs(), **kwargs)
+        keys = self._key_order(resolved.split("/", 1)[0])
+        if keys and keys[0]:
+            call_kwargs["api_key"] = keys[0]
         response = await litellm.acompletion(
             model=resolved,
             messages=_to_message_dicts(messages),
             temperature=temperature,
             max_tokens=max_tokens,
             tools=tools,
-            **self._provider_kwargs(),
-            **kwargs,
+            **call_kwargs,
         )
         return self._normalize(response, resolved)
 

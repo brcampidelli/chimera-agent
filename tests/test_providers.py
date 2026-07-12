@@ -417,3 +417,64 @@ def test_cache_skips_tool_turns(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) 
     gateway.complete(msgs, model="m", tools=tools)
     gateway.complete(msgs, model="m", tools=tools)
     assert calls["n"] == 2  # tool turns always hit the model live
+
+
+def test_cache_only_serves_deterministic_requests(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    # A sampled (temperature>0) request must NEVER be served from cache: repeated identical samples
+    # would return byte-identical content, collapsing the k-sample consensus / self-consistency /
+    # cascade-agreement checks into fake unanimity (16th-review HIGH). Deterministic (temp==0) calls
+    # may still be cached.
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    monkeypatch.setenv("CHIMERA_CACHE", "1")
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path / "home"))
+    get_settings.cache_clear()
+    import litellm
+
+    calls = {"n": 0}
+
+    def fake(**_: Any) -> SimpleNamespace:
+        calls["n"] += 1
+        return _resp(f"answer-{calls['n']}")
+
+    monkeypatch.setattr(litellm, "completion", fake)
+    from chimera.providers import LLMGateway
+    from chimera.providers.gateway import Message
+
+    gw = LLMGateway()
+    msgs = [Message(role="user", content="hi")]
+    gw.complete(msgs, model="prov/m", temperature=0.7)
+    gw.complete(msgs, model="prov/m", temperature=0.7)
+    assert calls["n"] == 2  # both sampled calls hit the model live (no cache collapse)
+
+    gw.complete(msgs, model="prov/m", temperature=0.0)
+    gw.complete(msgs, model="prov/m", temperature=0.0)
+    assert calls["n"] == 3  # first temp=0 call is live, the second is a genuine cache hit
+
+
+def test_empty_completion_is_not_cached(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
+    # An empty-content result must not be cached, or one malformed response would serve "" forever
+    # at $0 for that key (16th-review MED).
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    monkeypatch.setenv("CHIMERA_CACHE", "1")
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path / "home"))
+    get_settings.cache_clear()
+    import litellm
+
+    calls = {"n": 0}
+
+    def fake(**_: Any) -> SimpleNamespace:
+        calls["n"] += 1
+        return _resp("" if calls["n"] == 1 else "real answer")
+
+    monkeypatch.setattr(litellm, "completion", fake)
+    from chimera.providers import LLMGateway
+    from chimera.providers.gateway import Message
+
+    gw = LLMGateway()
+    msgs = [Message(role="user", content="hi")]
+    assert gw.complete(msgs, model="prov/m", temperature=0.0).content == ""  # empty, not cached
+    # a second identical deterministic call re-hits the model instead of serving the cached ""
+    assert gw.complete(msgs, model="prov/m", temperature=0.0).content == "real answer"
+    assert calls["n"] == 2
