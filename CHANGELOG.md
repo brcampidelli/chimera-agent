@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.19.3] - 2026-07-12
+
+**Self-evolution flywheel hardening.** A twelfth adversarial review, of the evolution internals. Its
+statistical core (the honest-benchmark gates: McNemar/Wilson/Newcombe, transfer-gate, diff-gate,
+rollback, GEPA) reviewed clean; the six fixes are in the skill-store persistence and lifecycle
+plumbing around it — including a **crash could lose the entire learned-skill library**.
+
 ### Fixed
 - **The learned-skill store is now crash-safe (data integrity of the differentiator).** `SkillStore`
   wrote `skills.json` with a plain truncating write on every `record_use` (the flywheel's
