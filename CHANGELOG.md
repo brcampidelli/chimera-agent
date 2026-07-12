@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.18.3] - 2026-07-11
+
+**Flywheel honesty.** An adversarial review of the self-evolution flywheel — the project's
+differentiator — found four ways the "measured, never self-reported" learning signal could be credited
+outside the honesty gates. All fixed and regression-tested; the flywheel's statistics reviewed clean.
+
 ### Fixed
 - **Self-evolution flywheel honesty (adversarial review of the differentiator surface).** Four ways the
   "measured, never self-reported" learning signal could be credited outside the honesty gates — all
