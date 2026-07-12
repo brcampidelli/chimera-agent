@@ -6,6 +6,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **File edits no longer silently rewrite every line ending (data integrity).** `edit_file`,
+  `apply_patch`, and `write_file` read/wrote via `Path.read_text`/`write_text`, whose universal-newline
+  translation flipped the WHOLE file to the platform's line ending (a one-line edit on an LF file
+  became a whole-file CRLF diff on Windows, and vice-versa on Linux). They now read as bytes normalized
+  to `\n` for matching and write back preserving the file's **original** newline convention — an
+  eleventh adversarial review, of the file-mutation surface. A CRLF file also now anchors a model's
+  `\n`-based match string correctly.
+- **File writes are crash-atomic.** `edit_file`/`apply_patch`/`write_file` write to a temp file and
+  `os.replace` it into place, so a crash or I/O error mid-write can't truncate the user's existing file
+  (the documented "atomic" guarantee now holds against I/O failure, not just logical anchor failure).
+- **`apply_patch` anchors every hunk against the ORIGINAL content** (not a copy mutated by earlier
+  hunks) and rejects overlapping target regions — a later hunk can no longer accidentally match text an
+  earlier hunk inserted.
+- **`edit_file`/`apply_patch` on a non-UTF-8 file** return a clear "not a UTF-8 text file" error
+  instead of an opaque generic failure (the file is never touched).
+
 ## [0.19.1] - 2026-07-12
 
 **Streaming-TUI hardening + memory-layer label.** A tenth adversarial review, aimed at the brand-new

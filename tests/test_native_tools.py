@@ -147,3 +147,11 @@ def test_default_registry_includes_native_tools(tmp_path: Path) -> None:
     registry = default_registry(tmp_path)
     for name in ("echo", "read_file", "write_file", "list_dir", "run_shell", "http_get"):
         assert name in registry
+
+
+def test_write_file_is_byte_exact_no_newline_translation(tmp_path: Path) -> None:
+    from chimera.tools import WriteFileTool
+
+    WriteFileTool(tmp_path).run(path="a.txt", content="line1\nline2\n")
+    assert (tmp_path / "a.txt").read_bytes() == b"line1\nline2\n"  # '\n' kept, not OS-translated
+    assert not (tmp_path / "a.txt.chimera-tmp").exists()

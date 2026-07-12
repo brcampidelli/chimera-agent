@@ -114,3 +114,70 @@ def test_apply_patch_multiline_hunk(tmp_path: Path) -> None:
     out = ApplyPatchTool(tmp_path).run(path="m.py", patch=patch)
     assert "applied 1 hunk(s)" in out
     assert (tmp_path / "m.py").read_text(encoding="utf-8") == "def f():\n    return 2\n\nx = 9\n"
+
+
+# --- data-integrity: byte-level newline preservation, atomicity, patch anchoring ---------
+
+
+def test_edit_preserves_lf_and_does_not_flip_untouched_lines(tmp_path: Path) -> None:
+    p = tmp_path / "a.py"
+    p.write_bytes(b"x = 1\ny = 2\n")  # pure LF on disk
+    assert "edited" in EditFileTool(tmp_path).run(path="a.py", old="y = 2", new="y = 3")
+    assert p.read_bytes() == b"x = 1\ny = 3\n"  # untouched line NOT flipped to CRLF
+
+
+def test_edit_matches_and_preserves_crlf(tmp_path: Path) -> None:
+    p = tmp_path / "a.py"
+    p.write_bytes(b"x = 1\r\ny = 2\r\n")  # CRLF file
+    # The model's old/new use '\n' (how read_file shows it); it must still anchor AND keep CRLF.
+    assert "edited" in EditFileTool(tmp_path).run(path="a.py", old="y = 2", new="y = 3")
+    assert p.read_bytes() == b"x = 1\r\ny = 3\r\n"
+
+
+def test_edit_non_utf8_file_reported_clearly_and_untouched(tmp_path: Path) -> None:
+    p = tmp_path / "bin.dat"
+    p.write_bytes(b"\xff\xfe not utf8")
+    out = EditFileTool(tmp_path).run(path="bin.dat", old="x", new="y")
+    assert out.startswith("error:") and "not a UTF-8" in out
+    assert p.read_bytes() == b"\xff\xfe not utf8"
+
+
+def test_edit_leaves_no_temp_file(tmp_path: Path) -> None:
+    p = tmp_path / "a.py"
+    p.write_bytes(b"a\n")
+    EditFileTool(tmp_path).run(path="a.py", old="a", new="b")
+    assert not (tmp_path / "a.py.chimera-tmp").exists()
+    assert sorted(f.name for f in tmp_path.iterdir()) == ["a.py"]
+
+
+def test_apply_patch_anchors_against_original_not_inserted_text(tmp_path: Path) -> None:
+    # hunk1 turns X into Y; a naive sequential apply would let hunk2's SEARCH=Z still work but a
+    # SEARCH matching an INSERTED value would wrongly anchor. Anchoring on the ORIGINAL is correct.
+    p = tmp_path / "a.txt"
+    p.write_bytes(b"X\nZ\n")
+    patch = (
+        "<<<<<<< SEARCH\nX\n=======\nY\n>>>>>>> REPLACE\n"
+        "<<<<<<< SEARCH\nZ\n=======\nDONE\n>>>>>>> REPLACE\n"
+    )
+    assert "applied 2" in ApplyPatchTool(tmp_path).run(path="a.txt", patch=patch)
+    assert p.read_bytes() == b"Y\nDONE\n"
+
+
+def test_apply_patch_rejects_overlapping_hunks(tmp_path: Path) -> None:
+    p = tmp_path / "a.txt"
+    p.write_bytes(b"hello world\n")
+    patch = (
+        "<<<<<<< SEARCH\nhello world\n=======\nA\n>>>>>>> REPLACE\n"
+        "<<<<<<< SEARCH\nworld\n=======\nB\n>>>>>>> REPLACE\n"
+    )
+    out = ApplyPatchTool(tmp_path).run(path="a.txt", patch=patch)
+    assert out.startswith("error:") and "overlap" in out
+    assert p.read_bytes() == b"hello world\n"  # all-or-nothing: unchanged
+
+
+def test_apply_patch_preserves_crlf(tmp_path: Path) -> None:
+    p = tmp_path / "a.txt"
+    p.write_bytes(b"a = 1\r\nb = 2\r\n")
+    patch = "<<<<<<< SEARCH\nb = 2\n=======\nb = 3\n>>>>>>> REPLACE\n"
+    ApplyPatchTool(tmp_path).run(path="a.txt", patch=patch)
+    assert p.read_bytes() == b"a = 1\r\nb = 3\r\n"

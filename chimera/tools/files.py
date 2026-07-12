@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from chimera.tools.base import Tool
-from chimera.tools.workspace import resolve_in_workspace
+from chimera.tools.workspace import atomic_write_text, resolve_in_workspace
 from chimera.tools.write_region import WriteRegion
 
 _MAX_READ_CHARS = 20_000
@@ -57,7 +57,9 @@ class WriteFileTool(_WorkspaceTool):
             return err
         content = str(kwargs.get("content", ""))
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content, encoding="utf-8")
+        # Byte-exact atomic write: never OS-translate the model's newlines, and never truncate an
+        # existing file if the write is interrupted (temp + replace).
+        atomic_write_text(path, content)
         return f"wrote {len(content)} chars to {path.relative_to(self.workspace)}"
 
 

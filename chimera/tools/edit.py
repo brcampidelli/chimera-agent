@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from chimera.tools.base import Tool
-from chimera.tools.workspace import resolve_in_workspace
+from chimera.tools.workspace import atomic_write_text, read_text_for_edit, resolve_in_workspace
 from chimera.tools.write_region import WriteRegion
 
 # Conflict-marker hunk format, familiar to models from git and Aider:
@@ -73,7 +73,10 @@ class EditFileTool(_WorkspaceTool):
             return "error: 'old' must be non-empty (it anchors the edit)"
         if old == new:
             return "error: 'old' and 'new' are identical — nothing to change"
-        content = path.read_text(encoding="utf-8")
+        try:
+            content, newline = read_text_for_edit(path)
+        except UnicodeDecodeError:
+            return f"error: {rel} is not a UTF-8 text file — cannot edit"
         count = content.count(old)
         if count == 0:
             return f"error: 'old' not found in {rel} (must match exactly, including whitespace)"
@@ -83,7 +86,7 @@ class EditFileTool(_WorkspaceTool):
                 "it unique, or pass replace_all=true"
             )
         updated = content.replace(old, new) if replace_all else content.replace(old, new, 1)
-        path.write_text(updated, encoding="utf-8")
+        atomic_write_text(path, updated, newline=newline)  # preserve the file's line endings; atomic
         where = f"{count} occurrences" if replace_all else "1 occurrence"
         return f"edited {rel}: replaced {where}"
 
@@ -143,17 +146,34 @@ class ApplyPatchTool(_WorkspaceTool):
             hunks = _parse_hunks(str(kwargs["patch"]))
         except ValueError as exc:
             return f"error: {exc}"
-        content = path.read_text(encoding="utf-8")
-        # Apply against a working copy; only persist if every hunk anchors uniquely (atomic).
-        working = content
+        try:
+            content, newline = read_text_for_edit(path)
+        except UnicodeDecodeError:
+            return f"error: {rel} is not a UTF-8 text file — cannot edit"
+        # Anchor EVERY hunk against the ORIGINAL content (not a copy mutated by earlier hunks), so a
+        # later hunk can't accidentally match text an earlier hunk inserted. Collect each hunk's span,
+        # reject any overlap, then apply all edits by offset in one pass — genuinely all-or-nothing.
+        spans: list[tuple[int, int, str, int]] = []  # (start, end, replacement, hunk_number)
         for index, (search, replace) in enumerate(hunks, start=1):
             if search == "":
                 return f"error: hunk {index} has an empty SEARCH block (it anchors the edit)"
-            occurrences = working.count(search)
+            occurrences = content.count(search)
             if occurrences == 0:
                 return f"error: hunk {index} SEARCH not found (must match exactly, incl. whitespace)"
             if occurrences > 1:
                 return f"error: hunk {index} SEARCH is ambiguous ({occurrences} matches) — add context"
-            working = working.replace(search, replace, 1)
-        path.write_text(working, encoding="utf-8")
+            start = content.index(search)
+            spans.append((start, start + len(search), replace, index))
+        spans.sort()
+        for prev, curr in zip(spans, spans[1:], strict=False):
+            if curr[0] < prev[1]:
+                return f"error: hunks {prev[3]} and {curr[3]} target overlapping regions"
+        out: list[str] = []
+        cursor = 0
+        for start, end, replace, _ in spans:
+            out.append(content[cursor:start])
+            out.append(replace)
+            cursor = end
+        out.append(content[cursor:])
+        atomic_write_text(path, "".join(out), newline=newline)  # preserve line endings; atomic
         return f"applied {len(hunks)} hunk(s) to {rel}"
