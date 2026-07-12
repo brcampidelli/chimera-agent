@@ -6,6 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **The learned-skill store is now crash-safe (data integrity of the differentiator).** `SkillStore`
+  wrote `skills.json` with a plain truncating write on every `record_use` (the flywheel's
+  highest-frequency write) — a crash mid-write left it unloadable, losing the whole learned-skill
+  library. It now writes atomically (temp + `os.replace`) and skips a single malformed entry (or a
+  corrupt file) on load instead of aborting, matching the convention every sibling store already
+  follows. A twelfth adversarial review, of the self-evolution internals — whose statistical core
+  (McNemar/Wilson/Newcombe, transfer-gate, diff-gate, rollback, GEPA) reviewed clean.
+- **A regressed skill can now actually be demoted.** Promotion carried the lifetime win-rate forward,
+  so an `active` skill that started strong then broke needed ~8 consecutive failures to cross the
+  retire threshold; `promote` now resets the probation counters so demotion tracks *recent* behavior.
+- **Deterministic skill retrieval.** The FTS ranking now tie-breaks on name, so which card lands in
+  the top-k (and gets credited a use/success) can't flip between runs on equal BM25 rank.
+- **No leaked SQLite connection per retrieval** — the in-memory card index is now a closing context
+  manager — and a resumed HITL-approved run no longer credits skill cards it didn't actually use.
+
 ## [0.19.2] - 2026-07-12
 
 **File-edit data integrity.** An eleventh adversarial review, of the file-mutation surface

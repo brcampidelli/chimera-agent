@@ -46,6 +46,15 @@ class CardIndex:
         except sqlite3.OperationalError:  # FTS5 not compiled in — use the fallback scorer
             return False
 
+    def close(self) -> None:
+        self._conn.close()
+
+    def __enter__(self) -> CardIndex:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.close()
+
     def search(self, query: str, k: int = 3) -> list[LearnedSkill]:
         terms = _TOKEN.findall(query.lower())
         if not terms or not self._cards:
@@ -53,8 +62,11 @@ class CardIndex:
         if self._fts:
             match = " OR ".join(terms)
             try:
+                # Secondary sort on name so tied BM25 ranks resolve deterministically — otherwise which
+                # card lands in the top-k (and gets injected + credited a use/success) could flip
+                # between runs, matching the deterministic token-overlap fallback below.
                 rows = self._conn.execute(
-                    "SELECT name FROM cards WHERE doc MATCH ? ORDER BY rank LIMIT ?", (match, k)
+                    "SELECT name FROM cards WHERE doc MATCH ? ORDER BY rank, name LIMIT ?", (match, k)
                 ).fetchall()
                 return [self._cards[str(r[0])] for r in rows if str(r[0]) in self._cards]
             except sqlite3.OperationalError:
@@ -99,7 +111,8 @@ class CardRetriever:
         if not cards:
             self.last_retrieved = []
             return ""
-        hits = CardIndex(cards).search(task, k=self.k)
+        with CardIndex(cards) as index:  # close the in-memory SQLite connection after the search
+            hits = index.search(task, k=self.k)
         self.last_retrieved = [card.name for card in hits]
         return cards_context_block(hits)
 

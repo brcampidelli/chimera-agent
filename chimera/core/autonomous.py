@@ -112,6 +112,8 @@ class SupportsRunTainted(Protocol):
 class SupportsCardContext(Protocol):
     """Retrieves TRS skill-card context relevant to a task (a CardRetriever)."""
 
+    last_retrieved: list[str]  # names of the cards the last card_context injected (credited on outcome)
+
     def card_context(self, task: str) -> str: ...
 
 
@@ -319,6 +321,11 @@ class AutonomousAgent:
                 # HITL 'accept'/'edit': finalize the EXACT reviewed answer as-is (no re-run) —
                 # approval is of the specific output (edited or not), not a re-execution.
                 if saved.get("approved") and saved.get("paused_answer") is not None:
+                    # The pre-computed answer being approved wasn't produced by THIS process's card
+                    # retrieval (line ~230), so don't credit those cards a use/success — that would
+                    # inflate the measured win-rate that drives promotion. Clear the retrieval first.
+                    if self.cards is not None:
+                        self.cards.last_retrieved = []
                     return self._finalize_success(
                         task, str(saved["paused_answer"]), attempts, prior_successes, plan,
                         thread_id, tainted=bool(saved.get("was_tainted", True)),

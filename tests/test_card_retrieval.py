@@ -88,3 +88,19 @@ def test_autonomous_injects_card_context() -> None:
     )
     auto.run("solve something")
     assert "sentinel_card" in worker.prompt  # the card block reached the worker's context
+
+
+def test_card_index_is_a_closing_context_manager() -> None:
+    import sqlite3
+
+    from chimera.evolution.card_retrieval import CardIndex
+
+    with CardIndex([]) as index:
+        conn = index._conn
+    # after the context exits the in-memory connection is closed (no per-retrieval leak)
+    try:
+        conn.execute("SELECT 1")
+        closed = False
+    except sqlite3.ProgrammingError:
+        closed = True
+    assert closed is True

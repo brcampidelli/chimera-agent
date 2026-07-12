@@ -26,13 +26,25 @@ class SkillStore:
         self._dicts = {}
         if not self.path.exists():
             return
-        raw = json.loads(self.path.read_text(encoding="utf-8") or "[]")
+        try:
+            raw = json.loads(self.path.read_text(encoding="utf-8") or "[]")
+        except json.JSONDecodeError:  # a truncated/corrupt file -> empty store, not a crash on init
+            return
+        if not isinstance(raw, list):
+            return
         for item in raw:
-            self._dicts[str(item["name"])] = item
+            # Skip a single malformed entry instead of aborting the whole load — one bad record must
+            # not brick the entire learned-skill library (the convention every sibling store follows).
+            if isinstance(item, dict) and "name" in item:
+                self._dicts[str(item["name"])] = item
 
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(list(self._dicts.values()), indent=2), encoding="utf-8")
+        # Atomic write: save() runs on every record_use (the flywheel's highest-frequency write), so a
+        # crash mid-write must not truncate skills.json and make the whole library unloadable.
+        tmp = self.path.with_suffix(self.path.suffix + ".tmp")
+        tmp.write_text(json.dumps(list(self._dicts.values()), indent=2), encoding="utf-8")
+        tmp.replace(self.path)
 
     def add(self, skill: LearnedSkill) -> None:
         entry = skill.to_dict()
@@ -144,6 +156,12 @@ class SkillStore:
         if entry is None:
             return False
         entry["status"] = "active"
+        # Reset the probation counters so the demote rule measures POST-promotion behavior, not the
+        # lifetime ratio. Otherwise a skill promoted at a high rate would need many more failures to
+        # cross the demote threshold — the heavier its winning history, the slower it can be retired
+        # on a real regression, contradicting the "auto-demote on measured regression" contract.
+        entry["uses"] = 0
+        entry["successes"] = 0
         self.save()
         return True
 
