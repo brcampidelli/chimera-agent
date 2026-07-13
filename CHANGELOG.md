@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Desktop app backend (M21 Fase A).** A new opt-in `[desktop]` extra (`pip install
+  chimera-agent[desktop]`) adds a FastAPI HTTP+SSE API (`chimera/api/`) that the forthcoming React UI
+  (`apps/desktop`) consumes, plus a `chimera app` command that serves it (and the built SPA
+  same-origin) and opens the browser. The flagship `POST /api/chat/stream` streams `token`/`tool`/
+  `done` Server-Sent Events by bridging the existing `ChatSession.send_verbose` callbacks — reusing
+  the real agent stack unchanged; under `--fuse` it degrades to a final-answer event (no fake cursor).
+  Conversations now **persist** to `<home>/sessions/<id>.json` (atomic writes, corrupt-file tolerant),
+  exposed via `GET/POST/DELETE /api/sessions`. The bearer token (`CHIMERA_SERVER_TOKEN`) guards the
+  mutating endpoints when set; the core CLI and stdlib messaging gateway are untouched.
+
 ## [0.19.8] - 2026-07-12
 
 **Provider-gateway hardening — 4 fixes from the 16th adversarial review (1 HIGH).**

@@ -1042,6 +1042,77 @@ def serve(
             cron_stop.set()
 
 
+@app.command(name="app")
+def desktop_app(
+    host: str = typer.Option("127.0.0.1", "--host", help="Bind host (localhost by default)."),
+    port: int = typer.Option(8765, "--port", help="Bind port."),
+    model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
+    max_steps: int = typer.Option(6, "--max-steps", help="Max tool-calling steps per message."),
+    workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root for tools."),
+    fuse: bool = typer.Option(False, "--fuse", help="Route turns through fusion (no token streaming)."),
+    no_memory: bool = typer.Option(False, "--no-memory", help="Don't recall long-term memory."),
+    open_browser: bool = typer.Option(True, "--open/--no-open", help="Open the app in your browser."),
+) -> None:
+    """Run the Chimera Desktop app: the HTTP+SSE API + the built React UI (needs the 'desktop' extra).
+
+    Serves the same-origin SPA (``apps/desktop/dist``) and a streaming chat API over the real agent
+    stack. Install with ``pip install 'chimera-agent[desktop]'`` and build the UI once with
+    ``pnpm --dir apps/desktop build``.
+    """
+    try:
+        import uvicorn
+
+        from chimera.api import build_api_app
+    except ImportError:
+        console.print(
+            "[red]The desktop app needs the 'desktop' extra.[/red]\n"
+            "  pip install 'chimera-agent[desktop]'"
+        )
+        raise typer.Exit(code=1) from None
+
+    from chimera.core import Agent, AgentConfig
+    from chimera.interface import ChatSession
+    from chimera.providers import LLMGateway
+    from chimera.tools import default_registry
+
+    settings = get_settings()
+    if not settings.has_any_key():
+        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+        raise typer.Exit(code=1)
+
+    llm = LLMGateway()
+    backend: SupportsComplete = llm
+    if fuse:
+        from chimera.fusion import FusionEngine, RoutedBackend
+
+        backend = RoutedBackend(llm, FusionEngine(llm))
+
+    workspace_path = Path(workspace)
+    shared_memory = None if no_memory else _memory_manager()
+    shared_graph = _recall_graph(shared_memory)
+    shared_profile = shared_memory.profile() if shared_memory is not None else ""
+
+    def factory() -> ChatSession:
+        registry = default_registry(workspace_path)
+        runner = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
+        return ChatSession(runner, memory=shared_memory, graph=shared_graph, profile=shared_profile)
+
+    # The built SPA, if present, is served same-origin (no CORS). Absent = API-only (dev uses Vite).
+    dist = Path(__file__).resolve().parents[2] / "apps" / "desktop" / "dist"
+    static_dir = dist if (dist / "index.html").exists() else None
+    api = build_api_app(factory, settings=settings, static_dir=static_dir)
+
+    url = f"http://{host}:{port}"
+    ui_note = "" if static_dir is not None else "  [yellow](UI not built — API only; run 'pnpm --dir apps/desktop build')[/yellow]"
+    console.print(f"[bold]Chimera Desktop[/bold] on {url}  [dim](API at /api). Ctrl+C to stop.[/dim]{ui_note}")
+    if open_browser and static_dir is not None:
+        import threading
+        import webbrowser
+
+        threading.Timer(1.0, lambda: webbrowser.open(url)).start()
+    uvicorn.run(api, host=host, port=port, log_level="warning")
+
+
 def _start_cron_daemon(
     backend: SupportsComplete, model: str | None, max_steps: int, workspace: Path, tick: int
 ) -> Any:

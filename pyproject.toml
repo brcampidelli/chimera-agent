@@ -124,6 +124,15 @@ browser = []
 bench = [
     "terminal-bench>=0.2; python_version >= '3.12'",
 ]
+# Desktop app backend: the FastAPI/SSE API that the React frontend (apps/desktop) talks to.
+# Opt-in — the core CLI/gateway never needs it (the stdlib http.server still serves messaging +
+# webhooks). `chimera app` starts this and serves the built SPA same-origin. sse-starlette gives
+# the token/tool/done event stream; uvicorn is the ASGI server.
+desktop = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "sse-starlette>=2.0",
+]
 # Build the documentation site (mkdocs-material). Only needed to render/deploy docs.
 docs = [
     "mkdocs-material>=9.5",
