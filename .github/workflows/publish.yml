@@ -28,8 +28,32 @@ jobs:
         with:
           python-version: "3.12"
 
+      # The desktop UI is bundled into the wheel (chimera/_desktop_dist via force-include), so the
+      # built SPA must exist BEFORE `uv build` — otherwise the published wheel ships API-only. Build it.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: apps/desktop
+
+      - name: Build the desktop UI (into apps/desktop/dist)
+        run: npm --prefix apps/desktop run build
+
+      - name: Verify the built UI exists before packaging
+        run: test -f apps/desktop/dist/index.html
+
       - name: Build wheel + sdist
         run: uv build
+
+      - name: Verify the wheel actually bundles the desktop UI
+        run: |
+          WHL=$(ls dist/*.whl)
+          python -c "import zipfile,sys; ns=zipfile.ZipFile(sys.argv[1]).namelist(); assert 'chimera/_desktop_dist/index.html' in ns, 'desktop UI missing from wheel'; print('OK: desktop UI bundled in', sys.argv[1])" "$WHL"
 
       - name: Publish to PyPI (Trusted Publishing — no token)
         uses: pypa/gh-action-pypi-publish@release/v1
