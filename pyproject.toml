@@ -175,6 +175,13 @@ artifacts = ["apps/desktop/dist/**"]
 [tool.hatch.build.targets.wheel.force-include]
 "apps/desktop/dist" = "chimera/_desktop_dist"
 
+# `uv build` builds the sdist first, then builds the wheel *from that sdist*. The wheel force-include
+# above points at `apps/desktop/dist`, so that path must exist inside the sdist — otherwise the
+# wheel-from-sdist step fails. Keep the built SPA in the sdist at its original path (it's gitignored,
+# so `artifacts` un-ignores it). This does not remap it, so the wheel's force-include still finds it.
+[tool.hatch.build.targets.sdist]
+artifacts = ["apps/desktop/dist/**"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"
