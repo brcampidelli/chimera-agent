@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.21.1] - 2026-07-12
+
 ### Added
 - **Desktop app is installable (PWA, M21 Fase D).** The built UI is now a Progressive Web App — with
   `chimera app` running, Chrome/Edge offer **Install**, and it opens in its own window with a
