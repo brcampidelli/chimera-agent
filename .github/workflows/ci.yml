@@ -66,3 +66,52 @@ jobs:
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: uv run pytest -m integration -q
+
+  desktop:
+    name: desktop app (API types drift + build)
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install Python deps (the desktop extra provides FastAPI for the schema)
+        run: uv sync --extra dev --extra desktop
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: apps/desktop
+
+      - name: Regenerate the OpenAPI schema + TypeScript types
+        run: |
+          uv run python -m chimera.api.schema_dump > apps/desktop/openapi.json
+          npm --prefix apps/desktop run gen:api
+
+      # The drift gate: if the committed schema/types differ from a fresh regeneration, someone changed
+      # a backend response model without running `gen:api`. Fail loudly with the fix.
+      - name: Fail if the generated API types are stale
+        run: |
+          if ! git diff --quiet -- apps/desktop/openapi.json apps/desktop/src/lib/api-schema.ts; then
+            echo "::error::Desktop API types are out of date. Run these and commit the result:"
+            echo "  python -m chimera.api.schema_dump > apps/desktop/openapi.json"
+            echo "  npm --prefix apps/desktop run gen:api"
+            git --no-pager diff -- apps/desktop/openapi.json apps/desktop/src/lib/api-schema.ts
+            exit 1
+          fi
+
+      - name: Build the frontend (tsc + vite — proves the UI matches the generated types)
+        run: npm --prefix apps/desktop run build
