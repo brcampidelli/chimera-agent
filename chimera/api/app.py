@@ -206,7 +206,13 @@ def _report_dict(report: Any, session_id: str) -> dict[str, Any]:
 
 def _mount_spa(app: FastAPI, static_dir: Path) -> None:
     """Serve the built SPA at ``/`` with a fallback so client-side routes resolve to index.html."""
+    import mimetypes
+
     from fastapi.staticfiles import StaticFiles
+
+    # Serve the PWA manifest with its proper type (mimetypes doesn't know .webmanifest by default);
+    # the service worker (.js) already gets text/javascript, which the browser requires to register it.
+    mimetypes.add_type("application/manifest+json", ".webmanifest")
 
     index = static_dir / "index.html"
     assets = static_dir / "assets"

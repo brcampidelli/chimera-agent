@@ -1,0 +1,13 @@
+{
+  "name": "Chimera",
+  "short_name": "Chimera",
+  "description": "Local UI for the Chimera agent — chat, memory, skills, schedule and tasks.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b1120",
+  "theme_color": "#0b1120",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

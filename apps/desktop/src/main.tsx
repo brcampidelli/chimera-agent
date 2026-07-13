@@ -16,3 +16,13 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     </QueryClientProvider>
   </React.StrictMode>,
 );
+
+// Register the service worker only in the built app (not under the Vite dev server, where a caching
+// SW would fight HMR). This is what makes the app installable to the desktop as a PWA.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {
+      /* installability is a progressive enhancement — a failed SW must not break the app */
+    });
+  });
+}

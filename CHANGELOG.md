@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Desktop app is installable (PWA, M21 Fase D).** The built UI is now a Progressive Web App — with
+  `chimera app` running, Chrome/Edge offer **Install**, and it opens in its own window with a
+  taskbar/dock icon, no Electron or Tauri. A minimal service worker caches the static shell for
+  instant startup and deliberately **never intercepts `/api`**, so the SSE chat stream is untouched.
+  (Added a manifest, an SVG app icon, the service worker + registration, and the correct
+  `.webmanifest` MIME type on the backend.) Verified live: SW registered/active at scope `/`,
+  manifest valid (standalone display).
+
 ## [0.21.0] - 2026-07-12
 
 **Chimera Desktop grows a full app — Settings + Memory / Skills / Schedule / Tasks.** The desktop UI

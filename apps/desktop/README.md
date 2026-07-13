@@ -17,6 +17,14 @@ chimera app        # serves the UI + API on http://127.0.0.1:8765 and opens your
 `chimera app --fuse` routes turns through LLM-Fusion (no token streaming — the answer arrives whole);
 `--no-memory` skips long-term recall; `--model <slug>` overrides the model.
 
+### Install it as an app (PWA)
+
+The built app is a **Progressive Web App**: with `chimera app` running, open it in Chrome or Edge and
+use **Install** (the icon in the address bar, or ⋮ → *Install Chimera*). It then opens in its own
+window with a taskbar/dock icon — an app-like experience with no Electron, Tauri, or Rust. A small
+service worker caches the static shell for instant startup; it never touches `/api`, so the chat
+stream is unaffected.
+
 ## Develop
 
 ```bash
