@@ -1,4 +1,4 @@
-import { Plus, Trash2, MessageSquare } from "lucide-react";
+import { Plus, Trash2, MessageSquare, Settings as SettingsIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { SessionMeta } from "@/lib/types";
@@ -6,12 +6,22 @@ import type { SessionMeta } from "@/lib/types";
 interface Props {
   sessions: SessionMeta[];
   currentId: string | null;
+  settingsActive: boolean;
   onSelect: (id: string) => void;
   onNew: () => void;
   onDelete: (id: string) => void;
+  onOpenSettings: () => void;
 }
 
-export function Sessions({ sessions, currentId, onSelect, onNew, onDelete }: Props) {
+export function Sessions({
+  sessions,
+  currentId,
+  settingsActive,
+  onSelect,
+  onNew,
+  onDelete,
+  onOpenSettings,
+}: Props) {
   return (
     <div className="flex h-full w-64 shrink-0 flex-col border-r border-border bg-card">
       <div className="flex items-center gap-2 px-3 py-3">
@@ -53,6 +63,16 @@ export function Sessions({ sessions, currentId, onSelect, onNew, onDelete }: Pro
           </div>
         ))}
       </nav>
+      <button
+        className={cn(
+          "flex items-center gap-2 border-t border-border px-4 py-3 text-sm",
+          settingsActive ? "bg-muted" : "hover:bg-muted/60",
+        )}
+        onClick={onOpenSettings}
+      >
+        <SettingsIcon className="h-4 w-4 text-muted-foreground" />
+        Settings
+      </button>
     </div>
   );
 }

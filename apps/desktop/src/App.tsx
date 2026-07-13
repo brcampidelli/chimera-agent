@@ -4,6 +4,7 @@ import { Moon, Sun } from "lucide-react";
 import { Sessions } from "@/components/Sessions";
 import { Chat } from "@/components/Chat";
 import { Composer } from "@/components/Composer";
+import { Settings } from "@/components/Settings";
 import { Activity, type Status } from "@/components/Activity";
 import { Button } from "@/components/ui/button";
 import { deleteSession, getSession, listSessions, streamChat } from "@/lib/api";
@@ -27,6 +28,7 @@ export default function App() {
   const { dark, toggle } = useTheme();
   const { data: sessions = [] } = useQuery({ queryKey: ["sessions"], queryFn: listSessions });
 
+  const [view, setView] = useState<"chat" | "settings">("chat");
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [live, setLive] = useState("");
@@ -37,6 +39,7 @@ export default function App() {
   const abortRef = useRef<AbortController | null>(null);
 
   const openSession = useCallback(async (id: string) => {
+    setView("chat");
     setCurrentId(id);
     setLive("");
     setTools([]);
@@ -52,6 +55,7 @@ export default function App() {
   }, []);
 
   const newChat = useCallback(() => {
+    setView("chat");
     setCurrentId(null);
     setMessages([]);
     setLive("");
@@ -122,24 +126,36 @@ export default function App() {
     <div className="flex h-full">
       <Sessions
         sessions={sessions}
-        currentId={currentId}
+        currentId={view === "chat" ? currentId : null}
+        settingsActive={view === "settings"}
         onSelect={openSession}
         onNew={newChat}
         onDelete={removeSession}
+        onOpenSettings={() => setView("settings")}
       />
       <main className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-border px-4 py-2.5">
           <span className="text-sm font-medium text-muted-foreground">
-            {currentId ? (sessions.find((s) => s.id === currentId)?.title ?? "Chat") : "New chat"}
+            {view === "settings"
+              ? "Settings"
+              : currentId
+                ? (sessions.find((s) => s.id === currentId)?.title ?? "Chat")
+                : "New chat"}
           </span>
           <Button size="icon" variant="ghost" onClick={toggle} title="Toggle theme">
             {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
         </header>
-        <Chat messages={messages} live={live} busy={busy} />
-        <Composer busy={busy} onSend={send} onStop={stop} />
+        {view === "settings" ? (
+          <Settings />
+        ) : (
+          <>
+            <Chat messages={messages} live={live} busy={busy} />
+            <Composer busy={busy} onSend={send} onStop={stop} />
+          </>
+        )}
       </main>
-      <Activity status={status} tools={tools} report={report} />
+      {view === "chat" && <Activity status={status} tools={tools} report={report} />}
     </div>
   );
 }

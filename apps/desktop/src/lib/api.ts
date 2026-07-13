@@ -1,4 +1,4 @@
-import type { SessionMeta, TurnReport, ToolEvent } from "@/lib/types";
+import type { AppConfig, DoctorInfo, SessionMeta, TurnReport, ToolEvent } from "@/lib/types";
 
 async function json<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -14,6 +14,11 @@ export const getSession = (id: string) =>
   json<{ id: string; turns: { user: string; assistant: string }[] }>(`/api/sessions/${id}`);
 export const deleteSession = (id: string) =>
   json<{ deleted: boolean }>(`/api/sessions/${id}`, { method: "DELETE" });
+
+export const getConfig = () => json<AppConfig>("/api/config");
+export const getDoctor = () => json<DoctorInfo>("/api/doctor");
+export const patchConfig = (updates: Record<string, string>) =>
+  json<{ updated: string[] }>("/api/config", { method: "PATCH", body: JSON.stringify(updates) });
 
 export interface StreamHandlers {
   onSession?: (id: string) => void;

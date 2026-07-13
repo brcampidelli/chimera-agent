@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Desktop app — Settings screen + config API (M21 Fase B).** New `GET /api/config`, `PATCH
+  /api/config`, and `GET /api/doctor` endpoints back a Settings screen (Model / API keys / Memory /
+  Cache / Sandbox / Server token) mirroring the reference apps. **Secrets are never returned in
+  cleartext** — each key reports `{set, hint}` with at most a last-4 hint (the server token reports
+  presence only); writes go to `.env` through a strict allowlist (no arbitrary-key injection) and
+  clear the settings cache. The write endpoint requires the bearer token when one is configured.
+
 ## [0.20.0] - 2026-07-12
 
 **Chimera Desktop — a local web app (React ↔ Python over HTTP+SSE).** A new opt-in `[desktop]` extra

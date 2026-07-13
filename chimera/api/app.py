@@ -85,6 +85,27 @@ def build_api_app(
     def health() -> dict[str, Any]:
         return {"status": "ok", "sessions": len(store.list())}
 
+    @app.get("/api/config")
+    def read_config_endpoint() -> dict[str, Any]:
+        from chimera.api.config_api import read_config
+
+        return read_config(get_settings())  # fresh settings (a prior PATCH cleared the cache)
+
+    @app.patch("/api/config", dependencies=[guard])
+    def patch_config_endpoint(updates: dict[str, str]) -> dict[str, Any]:
+        from chimera.api.config_api import patch_config
+
+        try:
+            return patch_config(updates)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get("/api/doctor")
+    def doctor_endpoint() -> dict[str, Any]:
+        from chimera.api.config_api import doctor
+
+        return doctor(get_settings())
+
     @app.get("/api/sessions")
     def list_sessions() -> list[dict[str, Any]]:
         return [

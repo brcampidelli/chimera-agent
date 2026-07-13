@@ -129,3 +129,46 @@ def test_bearer_token_guards_chat_when_configured(tmp_path: Any) -> None:
 
 def test_health_ok(tmp_path: Any) -> None:
     assert _client(tmp_path).get("/api/health").json()["status"] == "ok"
+
+
+def test_read_config_masks_every_secret(tmp_path: Any) -> None:
+    from chimera.api.config_api import read_config
+
+    settings = Settings(
+        CHIMERA_HOME=str(tmp_path), OPENROUTER_API_KEY="sk-supersecretvalue9999", CHIMERA_SERVER_TOKEN="tok"
+    )
+    cfg = read_config(settings)
+    blob = json.dumps(cfg)
+    assert "sk-supersecretvalue9999" not in blob  # the raw key never appears anywhere
+    openrouter = next(p for p in cfg["providers"] if p["env"] == "OPENROUTER_API_KEY")
+    assert openrouter["set"] is True and openrouter["hint"] == "…9999"  # only a last-4 hint
+    assert cfg["server"]["token_set"] is True  # server token: presence only, no hint field leaked
+
+
+def test_patch_config_rejects_unknown_keys(tmp_path: Any) -> None:
+    from chimera.api.config_api import patch_config
+
+    with pytest.raises(ValueError, match="not editable"):
+        patch_config({"CHIMERA_HOME": "/etc/evil", "PATH": "x"}, env_path=tmp_path / ".env")
+
+
+def test_patch_config_writes_env_atomically(tmp_path: Any) -> None:
+    from chimera.api.config_api import patch_config
+
+    env = tmp_path / ".env"
+    env.write_text("EXISTING=1\n", encoding="utf-8")
+    result = patch_config(
+        {"CHIMERA_DEFAULT_MODEL": "openrouter/x", "OPENROUTER_API_KEY": "sk-new"}, env_path=env
+    )
+    assert result["updated"] == ["CHIMERA_DEFAULT_MODEL", "OPENROUTER_API_KEY"]
+    text = env.read_text(encoding="utf-8")
+    assert "EXISTING=1" in text  # pre-existing lines preserved
+    assert "CHIMERA_DEFAULT_MODEL=openrouter/x" in text
+    assert not list(tmp_path.glob(".env.tmp"))  # atomic temp cleaned up
+
+
+def test_config_endpoint_shape(tmp_path: Any) -> None:
+    cfg = _client(tmp_path).get("/api/config").json()
+    assert {"models", "memory", "cache", "sandbox", "server", "providers"} <= set(cfg)
+    # no provider entry ever carries a raw key field
+    assert all(set(p) == {"env", "label", "set", "hint"} for p in cfg["providers"])

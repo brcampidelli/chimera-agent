@@ -33,6 +33,42 @@ export interface ToolEvent {
   ok: boolean;
 }
 
+export interface ProviderCfg {
+  env: string;
+  label: string;
+  set: boolean;
+  hint: string;
+}
+
+export interface AppConfig {
+  models: {
+    default: string;
+    weak: string;
+    mid: string;
+    orchestrator: string;
+    cost_mode: string;
+    cascade: boolean;
+    api_base: string | null;
+    fallback_models: string[];
+    tiers: { weak: string; mid: string; top: string };
+  };
+  memory: { backend: string; semantic: boolean; auto_consolidate: boolean };
+  cache: { completion: boolean; prompt: boolean };
+  sandbox: { mode: string; image: string };
+  server: { token_set: boolean };
+  providers: ProviderCfg[];
+}
+
+export interface DoctorInfo {
+  has_any_key: boolean;
+  configured_providers: string[];
+  default_model: string;
+  tiers: { weak: string; mid: string; top: string };
+  memory_backend: string;
+  cache: boolean;
+  sandbox: string;
+}
+
 export type Role = "user" | "assistant";
 
 export interface Message {
