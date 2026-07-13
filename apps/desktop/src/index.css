@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Palette: HSL, navy primary (H222), a clear blue accent (H214) — deliberately no purple/indigo/violet.
+   Panels are sharp (rounded-none); chips/CTAs use the rounded `chip` radius. Light + dark are both
+   first-class; the theme toggle stamps data-theme on <html>. */
+:root {
+  --background: 222 30% 97%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --muted: 222 20% 93%;
+  --muted-foreground: 222 12% 42%;
+  --border: 222 18% 87%;
+  --input: 222 18% 85%;
+  --primary: 222 47% 11%;
+  --primary-foreground: 210 40% 98%;
+  --accent: 214 88% 46%;
+  --accent-foreground: 0 0% 100%;
+  --ring: 214 88% 46%;
+  --ok: 142 62% 38%;
+  --bad: 0 72% 48%;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: 222 42% 7%;
+    --foreground: 210 20% 92%;
+    --card: 222 34% 10%;
+    --card-foreground: 210 20% 92%;
+    --muted: 222 24% 15%;
+    --muted-foreground: 215 14% 62%;
+    --border: 222 22% 18%;
+    --input: 222 22% 20%;
+    --primary: 210 20% 92%;
+    --primary-foreground: 222 47% 11%;
+    --accent: 214 90% 58%;
+    --accent-foreground: 222 47% 11%;
+    --ring: 214 90% 58%;
+    --ok: 142 55% 52%;
+    --bad: 0 72% 62%;
+  }
+}
+
+:root[data-theme="dark"] {
+  --background: 222 42% 7%;
+  --foreground: 210 20% 92%;
+  --card: 222 34% 10%;
+  --card-foreground: 210 20% 92%;
+  --muted: 222 24% 15%;
+  --muted-foreground: 215 14% 62%;
+  --border: 222 22% 18%;
+  --input: 222 22% 20%;
+  --primary: 210 20% 92%;
+  --primary-foreground: 222 47% 11%;
+  --accent: 214 90% 58%;
+  --accent-foreground: 222 47% 11%;
+  --ring: 214 90% 58%;
+  --ok: 142 55% 52%;
+  --bad: 0 72% 62%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: theme("fontFamily.sans");
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Markdown transcript: readable measure, tidy code + headings without a heavy prose plugin. */
+.md > * + * {
+  margin-top: 0.6rem;
+}
+.md h1, .md h2, .md h3 {
+  font-weight: 600;
+  line-height: 1.3;
+}
+.md h1 { font-size: 1.15rem; }
+.md h2 { font-size: 1.05rem; }
+.md h3 { font-size: 1rem; }
+.md ul, .md ol {
+  padding-left: 1.25rem;
+}
+.md ul { list-style: disc; }
+.md ol { list-style: decimal; }
+.md a {
+  color: hsl(var(--accent));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.md code {
+  font-family: theme("fontFamily.mono");
+  font-size: 0.85em;
+  background: hsl(var(--muted));
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+}
+.md pre {
+  background: hsl(222 40% 9%);
+  color: hsl(210 20% 90%);
+  padding: 0.85rem 1rem;
+  overflow-x: auto;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+.md pre code {
+  background: transparent;
+  padding: 0;
+  font-size: inherit;
+}

@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   Conversations now **persist** to `<home>/sessions/<id>.json` (atomic writes, corrupt-file tolerant),
   exposed via `GET/POST/DELETE /api/sessions`. The bearer token (`CHIMERA_SERVER_TOKEN`) guards the
   mutating endpoints when set; the core CLI and stdlib messaging gateway are untouched.
+- **Desktop app frontend (`apps/desktop`).** A Vite + React + TypeScript + Tailwind + shadcn-style UI
+  that `chimera app` serves same-origin. Fase A ships the flagship **Chat** screen (three panes — a
+  Markdown/code transcript, a live token buffer, and an activity sidebar showing the real tools /
+  tokens / cost / memory each turn used) and a **persisted Sessions** list. Talks to the backend over
+  HTTP+SSE (POST stream read via `fetch`, since SSE lives on a POST). Built and smoke-tested end to
+  end against a real model. Settings / Memory / Skills / Cron / Tasks screens are Fase B/C.
 
 ## [0.19.8] - 2026-07-12
 
