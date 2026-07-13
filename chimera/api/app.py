@@ -53,16 +53,18 @@ class ChatRequest(BaseModel):
     stream: bool = True
 
 
-def _require_token(settings: Settings) -> Callable[[Request], None]:
-    """A dependency that enforces the bearer token on mutating endpoints when one is configured.
+def _require_token() -> Callable[[Request], None]:
+    """A dependency that enforces the bearer token on protected endpoints when one is configured.
 
     When ``CHIMERA_SERVER_TOKEN`` is unset (the localhost default) it is a no-op, matching the stdlib
     gateway's opt-in auth. When set, the constant-time check mirrors ``server/http.py``'s ``_bearer_ok``.
+    Reads the token from ``get_settings()`` on each call — NOT a build-time snapshot — so a token set at
+    runtime (via ``PATCH /api/config``, which clears the settings cache) takes effect immediately.
     """
     import hmac
 
     def check(request: Request) -> None:
-        token = settings.server_token
+        token = get_settings().server_token
         if not token:
             return
         header = request.headers.get("authorization", "")
@@ -87,7 +89,7 @@ def build_api_app(
     settings = settings or get_settings()
     store = SessionStore(settings.home / "sessions")
     manager = SessionManager(factory, store)
-    guard = Depends(_require_token(settings))
+    guard = Depends(_require_token())
 
     app = FastAPI(title="Chimera Desktop API", version="1", docs_url="/api/docs", openapi_url="/api/openapi.json")
 
@@ -95,7 +97,7 @@ def build_api_app(
     def health() -> dict[str, Any]:
         return {"status": "ok", "sessions": len(store.list())}
 
-    @app.get("/api/config", response_model=ConfigOut)
+    @app.get("/api/config", dependencies=[guard], response_model=ConfigOut)
     def read_config_endpoint() -> dict[str, Any]:
         from chimera.api.config_api import read_config
 
@@ -110,20 +112,20 @@ def build_api_app(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    @app.get("/api/doctor", response_model=DoctorOut)
+    @app.get("/api/doctor", dependencies=[guard], response_model=DoctorOut)
     def doctor_endpoint() -> dict[str, Any]:
         from chimera.api.config_api import doctor
 
         return doctor(get_settings())
 
-    @app.get("/api/sessions", response_model=list[SessionMetaOut])
+    @app.get("/api/sessions", dependencies=[guard], response_model=list[SessionMetaOut])
     def list_sessions() -> list[dict[str, Any]]:
         return [
             {"id": m.id, "title": m.title, "turns": m.turns, "updated_at": m.updated_at}
             for m in manager.list()
         ]
 
-    @app.get("/api/sessions/{session_id}", response_model=SessionDetailOut)
+    @app.get("/api/sessions/{session_id}", dependencies=[guard], response_model=SessionDetailOut)
     def get_session(session_id: str) -> dict[str, Any]:
         turns = store.load(session_id)
         if not turns and session_id not in [m.id for m in store.list()]:
@@ -159,12 +161,15 @@ def build_api_app(
 
         def work() -> None:
             try:
-                report = session.send_verbose(
-                    req.message,
-                    on_token=on_token if req.stream else None,
-                    on_tool=on_tool,
-                )
-                manager.persist(session_id)  # durable transcript now includes this turn
+                # Serialize turns per session: a second concurrent turn on the same session waits here
+                # rather than racing the non-thread-safe ChatSession (interleaved transcript / double save).
+                with manager.lock_for(session_id):
+                    report = session.send_verbose(
+                        req.message,
+                        on_token=on_token if req.stream else None,
+                        on_tool=on_tool,
+                    )
+                    manager.persist(session_id)  # durable transcript now includes this turn
                 emit("done", _report_dict(report, session_id))
             except Exception as exc:  # noqa: BLE001 — surfaced to the client as an error event
                 _log.warning("chat turn failed: %s", exc)
@@ -172,6 +177,9 @@ def build_api_app(
             finally:
                 loop.call_soon_threadsafe(queue.put_nowait, None)  # sentinel: end of stream
 
+        # KNOWN LIMITATION: if the client disconnects mid-turn, this worker still runs the agent turn
+        # to completion (an LLM call can't be cleanly cancelled), so that turn's token cost can't be
+        # reclaimed. The queue is drained-or-dropped either way, so memory stays bounded per turn.
         threading.Thread(target=work, daemon=True).start()
 
         async def events() -> AsyncIterator[dict[str, str]]:
@@ -194,6 +202,31 @@ def build_api_app(
         _mount_spa(app, static_dir)
 
     return app
+
+
+_LOOPBACK = {"127.0.0.1", "::1", "localhost"}
+
+
+def _index_html(index: Path, request: Request) -> Any:
+    """Serve index.html, injecting the bearer token as a meta tag ONLY for a loopback client.
+
+    When a token is configured, the guarded read endpoints need the same-origin browser to send it —
+    but the browser can't hold a server secret. Injecting it into the page is safe only for a directly-
+    connected local client (127.0.0.1): a remotely-exposed instance serves the page WITHOUT the token,
+    so remote clients can't read it back. (Behind a reverse proxy the client host is the proxy; expose
+    the UI remotely only behind your own auth layer — see docs.)
+    """
+    from html import escape
+
+    from fastapi.responses import HTMLResponse
+
+    html = index.read_text(encoding="utf-8")
+    token = get_settings().server_token
+    client = request.client.host if request.client else ""
+    if token and client in _LOOPBACK:
+        tag = f'<meta name="chimera-token" content="{escape(token, quote=True)}">'
+        html = html.replace("</head>", tag + "</head>", 1)
+    return HTMLResponse(html)
 
 
 def _report_dict(report: Any, session_id: str) -> dict[str, Any]:
@@ -230,13 +263,17 @@ def _mount_spa(app: FastAPI, static_dir: Path) -> None:
         app.mount("/assets", StaticFiles(directory=assets), name="assets")
 
     @app.get("/")
-    def _root() -> FileResponse:
-        return FileResponse(index)
+    def _root(request: Request) -> Any:
+        return _index_html(index, request)
 
     @app.get("/{full_path:path}")
-    def _spa_fallback(full_path: str) -> FileResponse:
-        # Any non-/api path that isn't a real asset falls back to the SPA entrypoint (client routing).
+    def _spa_fallback(full_path: str, request: Request) -> Any:
+        # An unknown /api/* path is a real 404, not the SPA — returning index.html there would mask
+        # a wrong URL / stale generated client as a 200.
+        if full_path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="not found")
+        # Any other path that isn't a real asset falls back to the SPA entrypoint (client routing).
         candidate = (static_dir / full_path).resolve()
         if candidate.is_file() and static_dir.resolve() in candidate.parents:
             return FileResponse(candidate)
-        return FileResponse(index)
+        return _index_html(index, request)

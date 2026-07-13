@@ -137,6 +137,11 @@ def patch_config(updates: dict[str, str], *, env_path: Path | None = None) -> di
     rejected = [k for k in updates if k not in ALLOWED_KEYS]
     if rejected:
         raise ValueError(f"not editable: {', '.join(sorted(rejected))}")
+    # Allowlisting the KEY isn't enough: a newline in the VALUE would split into extra .env lines and
+    # inject arbitrary env vars (e.g. a provider key, or disabling the sandbox). Reject control chars.
+    for key, value in updates.items():
+        if any(c in str(value) for c in "\r\n"):
+            raise ValueError(f"value for {key} may not contain a newline")
     path = env_path or Path(".env")
     for key, value in updates.items():
         _write_env_var(path, key, str(value))

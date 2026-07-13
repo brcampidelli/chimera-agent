@@ -118,13 +118,53 @@ def test_session_is_persisted_and_listed_and_deletable(tmp_path: Any) -> None:
     assert client.get(f"/api/sessions/{sid}").status_code == 404
 
 
-def test_bearer_token_guards_chat_when_configured(tmp_path: Any) -> None:
-    client = _client(tmp_path, token="s3cret")
+def _token_client(monkeypatch: Any, tmp_path: Any, token: str) -> TestClient:
+    # The guard reads get_settings() fresh (so a runtime token change enforces), so the token must be
+    # in the process settings, not just the injected Settings — set it via env + clear the cache.
+    from chimera.config import Settings, get_settings
+
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path))
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-x")
+    monkeypatch.setenv("CHIMERA_SERVER_TOKEN", token)
+    get_settings.cache_clear()
+    from chimera.api import build_api_app
+
+    return TestClient(build_api_app(lambda: ChatSession(_FakeAgent()), settings=Settings()))
+
+
+def test_bearer_token_guards_chat_when_configured(monkeypatch: Any, tmp_path: Any) -> None:
+    from chimera.config import get_settings
+
+    client = _token_client(monkeypatch, tmp_path, "s3cret")
     assert client.post("/api/chat/stream", json={"message": "hi"}).status_code == 401
     ok = client.post(
         "/api/chat/stream", json={"message": "hi"}, headers={"Authorization": "Bearer s3cret"}
     )
     assert ok.status_code == 200
+    get_settings.cache_clear()
+
+
+def test_reads_require_token_when_configured(monkeypatch: Any, tmp_path: Any) -> None:
+    from chimera.config import get_settings
+
+    client = _token_client(monkeypatch, tmp_path, "s3cret")
+    # A GET read now requires the token too (transcripts/memory/config must not be readable without it).
+    assert client.get("/api/config").status_code == 401
+    assert client.get("/api/memory").status_code == 401
+    assert client.get("/api/config", headers={"Authorization": "Bearer s3cret"}).status_code == 200
+    assert client.get("/api/health").status_code == 200  # health stays open for liveness checks
+    get_settings.cache_clear()
+
+
+def test_patch_config_rejects_newline_in_value(tmp_path: Any) -> None:
+    # A newline in the value would inject extra .env lines even though the key is allowlisted.
+    from chimera.api.config_api import patch_config
+
+    with pytest.raises(ValueError, match="newline"):
+        patch_config(
+            {"CHIMERA_CACHE": "1\nOPENROUTER_API_KEY=sk-evil"}, env_path=tmp_path / ".env"
+        )
+    assert not (tmp_path / ".env").exists()  # nothing was written
 
 
 def test_health_ok(tmp_path: Any) -> None:

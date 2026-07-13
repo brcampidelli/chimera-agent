@@ -15,6 +15,7 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 from chimera.interface import ChatSession
@@ -136,33 +137,59 @@ class SessionManager:
     touched, hydrated with any persisted transcript, and re-persisted after each turn via
     :meth:`persist`. This keeps the durable store and the in-memory conversation in sync without
     changing ``ChatSession`` itself.
+
+    Two safeguards: the live cache is LRU-bounded (``max_live``) so a client posting many random
+    session ids can't grow it without limit (memory DoS); and each session has a lock so two
+    concurrent turns on the SAME session serialize instead of racing the non-thread-safe ``ChatSession``.
     """
 
-    def __init__(self, factory: object, store: SessionStore) -> None:
+    def __init__(self, factory: object, store: SessionStore, *, max_live: int = 64) -> None:
+        import threading
+        from collections import OrderedDict
+
         # factory: Callable[[], ChatSession] — kept as object to avoid importing the Callable alias here.
         self._factory = factory
         self._store = store
-        self._live: dict[str, ChatSession] = {}
+        self._max_live = max_live
+        self._live: OrderedDict[str, ChatSession] = OrderedDict()
+        self._locks: dict[str, threading.Lock] = {}
+        self._mutex = threading.Lock()
 
     def new(self) -> str:
         """Mint a fresh empty session id (nothing is written until its first turn)."""
         return uuid4().hex[:12]
 
     def get(self, session_id: str) -> ChatSession:
-        """Return the live session for ``session_id``, hydrating its transcript from disk on first use."""
-        if session_id not in self._live:
+        """Return the live session for ``session_id``, hydrating from disk on first use (LRU-bounded)."""
+        with self._mutex:
+            if session_id in self._live:
+                self._live.move_to_end(session_id)  # mark most-recently-used
+                return self._live[session_id]
             session: ChatSession = self._factory()  # type: ignore[operator]
             session.turns = self._store.load(session_id)
             self._live[session_id] = session
-        return self._live[session_id]
+            while len(self._live) > self._max_live:
+                evicted, _ = self._live.popitem(last=False)  # drop least-recently-used
+                self._locks.pop(evicted, None)
+            return session
+
+    def lock_for(self, session_id: str) -> Any:
+        """The per-session lock — hold it around a turn so concurrent turns on one session serialize."""
+        with self._mutex:
+            import threading
+
+            return self._locks.setdefault(session_id, threading.Lock())
 
     def persist(self, session_id: str) -> None:
-        session = self._live.get(session_id)
+        with self._mutex:
+            session = self._live.get(session_id)
         if session is not None:
             self._store.save(session_id, session.turns)
 
     def delete(self, session_id: str) -> bool:
-        self._live.pop(session_id, None)
+        with self._mutex:
+            self._live.pop(session_id, None)
+            self._locks.pop(session_id, None)
         return self._store.delete(session_id)
 
     def list(self) -> list[SessionMeta]:

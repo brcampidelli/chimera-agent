@@ -6,6 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **Desktop API hardening — 8 fixes from the 17th adversarial review (2 security-relevant).** (1) The
+  `.env` config write allowlisted the key but not the value, so a newline in a value could inject
+  extra `.env` lines (e.g. a provider key) — values with `\r`/`\n` are now rejected. (2) When a server
+  token is set, the **read** endpoints (transcripts, memory, config) are now guarded too, not just
+  mutations; the token is injected into the SPA **only for a loopback client** so the local browser
+  still authenticates while a remotely-exposed instance never hands the secret to remote clients.
+  (3) The token guard now reads settings fresh, so a token set at runtime via the UI takes effect
+  immediately. (4) Concurrent turns on the same session serialize behind a per-session lock instead of
+  racing the non-thread-safe `ChatSession`. (5) The live-session cache is LRU-bounded (no unbounded
+  growth from random session ids). (6) `memory` search `k` is clamped (a negative `k` can't dump the
+  whole store). (7) An unknown `/api/*` path returns 404 instead of the SPA's index. (8) Documented
+  that an in-flight turn's token cost isn't reclaimed if the client disconnects mid-stream. The SSE
+  bridge auth, secret masking, session/SPA path-traversal guards, and project HITL (no token spend on
+  approve/deny) reviewed clean.
+
 ### Added
 - **Desktop API is fully typed; the frontend generates its types from it (no contract drift).** Every
   desktop endpoint now declares a Pydantic `response_model` (`chimera/api/schemas.py`), so

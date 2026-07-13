@@ -11,11 +11,20 @@ import type {
   ToolEvent,
 } from "@/lib/types";
 
+// The backend injects the bearer token into the page (as a meta tag) only for a loopback client, when
+// CHIMERA_SERVER_TOKEN is set. We forward it so the guarded endpoints work; when no token is set the
+// meta is absent and nothing is sent (the localhost default is unauthenticated).
+const SERVER_TOKEN =
+  (document.querySelector('meta[name="chimera-token"]') as HTMLMetaElement | null)?.content ?? "";
+
+function authHeaders(extra?: HeadersInit): HeadersInit {
+  const base: Record<string, string> = { "Content-Type": "application/json" };
+  if (SERVER_TOKEN) base.Authorization = `Bearer ${SERVER_TOKEN}`;
+  return { ...base, ...(extra ?? {}) };
+}
+
 async function json<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
-  });
+  const res = await fetch(path, { ...init, headers: authHeaders(init?.headers) });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return (await res.json()) as T;
 }
@@ -91,7 +100,7 @@ export async function streamChat(
   try {
     res = await fetch("/api/chat/stream", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders(),
       body: JSON.stringify({ message, session_id: sessionId, stream: true }),
       signal,
     });

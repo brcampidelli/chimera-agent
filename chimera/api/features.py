@@ -135,13 +135,14 @@ def register_features(app: FastAPI, guard: params.Depends) -> None:
     """Attach the Fase C feature routes to ``app``. ``guard`` enforces the bearer token on mutations."""
 
     # ---- Memory -----------------------------------------------------------------------------------
-    @app.get("/api/memory", response_model=list[MemoryItemOut])
+    @app.get("/api/memory", dependencies=[guard], response_model=list[MemoryItemOut])
     def list_memory(q: str = "", k: int = 30) -> list[dict[str, Any]]:
+        k = max(1, min(k, 200))  # clamp: a negative/huge k must not dump the whole store
         mgr = _memory_manager()
         items = mgr.search(q, k=k) if q.strip() else mgr.store.all()
         return [_item_dict(it) for it in items]
 
-    @app.get("/api/memory/profile", response_model=MemoryProfileOut)
+    @app.get("/api/memory/profile", dependencies=[guard], response_model=MemoryProfileOut)
     def memory_profile() -> dict[str, Any]:
         mgr = _memory_manager()
         return {
@@ -163,7 +164,7 @@ def register_features(app: FastAPI, guard: params.Depends) -> None:
         return {"deleted": True}
 
     # ---- Skills -----------------------------------------------------------------------------------
-    @app.get("/api/skills", response_model=SkillsOut)
+    @app.get("/api/skills", dependencies=[guard], response_model=SkillsOut)
     def list_skills() -> dict[str, Any]:
         store = _skill_store()
         return {"stats": store.stats(), "retirement_candidates": store.retirement_candidates()}
@@ -181,7 +182,7 @@ def register_features(app: FastAPI, guard: params.Depends) -> None:
         return {"retired": True}
 
     # ---- Cron -------------------------------------------------------------------------------------
-    @app.get("/api/cron", response_model=list[CronJobOut])
+    @app.get("/api/cron", dependencies=[guard], response_model=list[CronJobOut])
     def list_cron() -> list[dict[str, Any]]:
         return [_job_dict(j) for j in _cron_store().list()]
 
@@ -211,7 +212,7 @@ def register_features(app: FastAPI, guard: params.Depends) -> None:
         return {"deleted": existed}
 
     # ---- Tasks: standalone kanban board + projects (with HITL approvals) --------------------------
-    @app.get("/api/kanban", response_model=dict[str, list[TaskCardOut]])
+    @app.get("/api/kanban", dependencies=[guard], response_model=dict[str, list[TaskCardOut]])
     def get_kanban() -> dict[str, Any]:
         from chimera.kanban import KanbanBoard
         from chimera.kanban.models import COLUMNS
@@ -219,7 +220,7 @@ def register_features(app: FastAPI, guard: params.Depends) -> None:
         board = KanbanBoard(get_settings().home / "kanban.json")
         return {col: [_card_dict(c) for c in board.cards(col)] for col in COLUMNS}
 
-    @app.get("/api/projects", response_model=list[ProjectStateOut])
+    @app.get("/api/projects", dependencies=[guard], response_model=list[ProjectStateOut])
     def list_projects() -> list[dict[str, Any]]:
         from chimera.orchestration.project import ProjectState
 
@@ -233,7 +234,7 @@ def register_features(app: FastAPI, guard: params.Depends) -> None:
                     _log.debug("skipping unreadable project %s: %s", state_path, exc)
         return out
 
-    @app.get("/api/projects/{project_id}", response_model=ProjectDetailOut)
+    @app.get("/api/projects/{project_id}", dependencies=[guard], response_model=ProjectDetailOut)
     def get_project(project_id: str) -> dict[str, Any]:
         from chimera.kanban import KanbanBoard
         from chimera.kanban.models import COLUMNS
