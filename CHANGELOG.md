@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-07-12
+
+**Chimera Desktop — a local web app (React ↔ Python over HTTP+SSE).** A new opt-in `[desktop]` extra
+adds a FastAPI HTTP+SSE API and a Vite/React/Tailwind UI that `chimera app` serves same-origin. The
+chat streams tokens live and shows the real tools / cost / memory each turn used; conversations
+persist. Built on the existing agent stack — no new engine, and the core CLI is untouched.
+
 ### Added
 - **Desktop app backend (M21 Fase A).** A new opt-in `[desktop]` extra (`pip install
   chimera-agent[desktop]`) adds a FastAPI HTTP+SSE API (`chimera/api/`) that the forthcoming React UI
