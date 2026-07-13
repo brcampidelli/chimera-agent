@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-07-12
+
+**Chimera Desktop grows a full app — Settings + Memory / Skills / Schedule / Tasks.** The desktop UI
+(from v0.20.0) is now a complete control surface: a Settings screen (models / API keys / cache /
+sandbox / server token, secrets always masked) and a left icon-rail navigating dedicated Memory,
+Skills, Schedule, and Tasks screens — every one a view over the real managers, with the project
+milestone **approve/deny (HITL)** wired in. All read/HITL endpoints are LLM-free; token-spending
+paths stay on chat/solve.
+
 ### Added
 - **Desktop app — Memory / Skills / Schedule / Tasks screens + feature API (M21 Fase C).** New
   endpoints reuse the existing managers (no reimplementation, no reimplemented state): memory
