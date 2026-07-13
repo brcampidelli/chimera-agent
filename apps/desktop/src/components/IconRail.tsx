@@ -10,6 +10,7 @@ import {
   Sun,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BrandMark } from "@/components/BrandMark";
 
 export type View = "chat" | "memory" | "skills" | "cron" | "tasks" | "settings";
 
@@ -62,9 +63,7 @@ export function IconRail({
 }) {
   return (
     <div className="flex w-14 shrink-0 flex-col items-center gap-1 border-r border-white/5 bg-card/40 py-3">
-      <div className="mb-2 select-none text-xl drop-shadow-[0_0_10px_hsl(var(--accent)/0.6)]" aria-hidden>
-        🔺
-      </div>
+      <BrandMark className="mb-2 h-8 w-8" glow />
       <nav className="flex flex-1 flex-col items-center gap-1.5">
         {NAV.map((n) => (
           <RailButton

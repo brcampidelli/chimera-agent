@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import { cn } from "@/lib/utils";
+import { BrandMark } from "@/components/BrandMark";
 import type { Message } from "@/lib/types";
 
 interface Props {
@@ -30,9 +31,7 @@ function Bubble({
   }
   return (
     <div className="flex gap-3">
-      <span className="mt-0.5 select-none text-lg" aria-hidden>
-        🔺
-      </span>
+      <BrandMark className="mt-0.5 h-6 w-6 shrink-0" alt="Chimera" />
       <div className={cn("md min-w-0 flex-1 text-[15px] leading-relaxed")}>
         {streaming ? (
           <span className="whitespace-pre-wrap">
@@ -50,9 +49,7 @@ function Bubble({
 function Empty() {
   return (
     <div className="flex h-full flex-col items-center justify-center py-24 text-center">
-      <div className="mb-3 text-4xl" aria-hidden>
-        🔺
-      </div>
+      <BrandMark className="mb-4 h-16 w-16" glow />
       <h1 className="text-lg font-semibold">Chimera</h1>
       <p className="mt-1 max-w-sm text-sm text-muted-foreground">
         Ask anything. Tokens stream live; the panel on the right shows the tools, cost, and memory

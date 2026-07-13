@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **Real Chimera brand icon in the desktop app.** Replaced the placeholder `🔺` emoji mark (rail,
+  sidebar header, chat empty-state, assistant avatar) with the actual icon (blue lion + cyan serpent
+  on deep navy), served from `/chimera-icon.png` via a shared `BrandMark` component, and pointed the
+  favicon + PWA manifest at it too (dropping the placeholder `icon.svg`).
+
 ## [0.22.0] - 2026-07-13
 
 **The desktop app now ships in the wheel — and got a full neumorphic redesign.** Two things landed

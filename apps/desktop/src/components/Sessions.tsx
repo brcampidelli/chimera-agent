@@ -1,5 +1,6 @@
 import { Plus, Trash2, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BrandMark } from "@/components/BrandMark";
 import { cn } from "@/lib/utils";
 import type { SessionMeta } from "@/lib/types";
 
@@ -15,9 +16,7 @@ export function Sessions({ sessions, currentId, onSelect, onNew, onDelete }: Pro
   return (
     <div className="flex h-full w-64 shrink-0 flex-col border-r border-white/5 bg-card/40">
       <div className="flex items-center gap-2 px-4 py-3.5">
-        <span className="text-lg drop-shadow-[0_0_10px_hsl(var(--accent)/0.6)]" aria-hidden>
-          🔺
-        </span>
+        <BrandMark className="h-6 w-6" glow />
         <span className="font-semibold tracking-tight">Chimera</span>
       </div>
       <div className="px-3 pb-3">
