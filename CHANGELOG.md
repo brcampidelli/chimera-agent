@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.22.1] - 2026-07-13
+
 ### Changed
 - **Real Chimera brand icon in the desktop app.** Replaced the placeholder `🔺` emoji mark (rail,
   sidebar header, chat empty-state, assistant avatar) with the actual icon (blue lion + cyan serpent
