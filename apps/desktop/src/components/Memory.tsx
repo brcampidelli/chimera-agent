@@ -5,7 +5,7 @@ import { addMemory, deleteMemory, getMemory } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
 
-const inputCls = "h-9 w-full border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring";
+const inputCls = "field h-9 w-full px-3 text-sm";
 
 export function Memory() {
   const qc = useQueryClient();
@@ -59,7 +59,7 @@ export function Memory() {
           >
             <Search className="h-3.5 w-3.5 text-muted-foreground" />
             <input
-              className="h-7 w-40 border border-input bg-background px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
+              className="field h-7 w-40 px-2 text-xs"
               placeholder="search…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}

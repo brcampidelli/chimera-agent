@@ -7,12 +7,14 @@ function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
   return (
     <button
       onClick={onChange}
-      className={`relative h-5 w-9 rounded-chip transition ${on ? "bg-accent" : "bg-muted"}`}
+      className={`relative h-5 w-9 rounded-chip transition-all ${
+        on ? "bg-accent-grad shadow-[0_0_12px_-2px_hsl(var(--accent)/0.75)]" : "bg-muted shadow-inset"
+      }`}
       role="switch"
       aria-checked={on}
       title={on ? "Disable" : "Enable"}
     >
-      <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${on ? "left-4" : "left-0.5"}`} />
+      <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all ${on ? "left-4" : "left-0.5"}`} />
     </button>
   );
 }

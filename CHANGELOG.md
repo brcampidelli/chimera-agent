@@ -6,6 +6,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-07-13
+
+**The desktop app now ships in the wheel — and got a full neumorphic redesign.** Two things landed
+together: the built UI is bundled into the PyPI package for the first time (so `pip install
+chimera-agent[desktop]` actually gives you the app, not just the API), and every screen was
+redesigned into a soft-UI system harmonized with the Chimera brand.
+
+### Fixed
+- **The desktop UI is now bundled in the wheel (it never was before).** The CLI resolved the built
+  SPA at `apps/desktop/dist`, a *source-checkout* path, so a `pip install chimera-agent[desktop]` user
+  only ever got the API with a "UI not built" note — the app announced since v0.20.0 was effectively
+  source-only. The wheel now force-includes the built SPA as `chimera/_desktop_dist` (via
+  `artifacts` + `force-include` in `pyproject.toml`), and `chimera app` / `serve --ui` prefers a
+  source-checkout `dist` (for live dev rebuilds) and falls back to the packaged copy. Verified against
+  the built wheel: `chimera/_desktop_dist/{index.html,assets,manifest.webmanifest,sw.js}` are present
+  and the installed-layout resolver picks them up.
+
+### Changed
+- **Neumorphic soft-UI redesign of the whole desktop app, harmonized with the brand.** A dark
+  deep-navy ground with a subtle radial accent glow; raised "surface" cards (soft outer shadow + top
+  highlight); recessed inset fields with a blue focus glow; blue→cyan gradient primary buttons and
+  pill CTAs; glowing gradient toggles; and accent-haloed active icons in the left rail — all driven by
+  CSS-variable shadow tokens that adapt per theme (a clean flat light fallback is kept). The palette
+  (blue + cyan on navy) is taken from the Chimera icon. Frontend-only: no API or contract change, so
+  the generated OpenAPI types are untouched. Verified live across Chat, Settings, Memory, Skills, and
+  Tasks.
+
 ## [0.21.2] - 2026-07-13
 
 **Desktop API hardening + a drift-proof typed frontend client.** An adversarial review of the new

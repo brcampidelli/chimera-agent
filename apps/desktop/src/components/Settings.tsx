@@ -7,9 +7,9 @@ import type { AppConfig, DoctorInfo, ProviderCfg } from "@/lib/types";
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="border border-border bg-card">
-      <h2 className="border-b border-border px-4 py-2.5 text-sm font-semibold">{title}</h2>
-      <div className="divide-y divide-border">{children}</div>
+    <section className="surface overflow-hidden">
+      <h2 className="border-b border-white/5 px-4 py-2.5 text-sm font-semibold">{title}</h2>
+      <div className="divide-y divide-white/[0.04]">{children}</div>
     </section>
   );
 }
@@ -26,8 +26,7 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
   );
 }
 
-const inputCls =
-  "h-8 w-56 border border-input bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-ring";
+const inputCls = "field h-8 w-56 px-2.5 text-sm";
 
 function TextField({
   value,
@@ -59,12 +58,16 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
   return (
     <button
       onClick={() => onChange(!on)}
-      className={`relative h-5 w-9 rounded-chip transition ${on ? "bg-accent" : "bg-muted"}`}
+      className={`relative h-5 w-9 rounded-chip transition-all ${
+        on
+          ? "bg-accent-grad shadow-[0_0_12px_-2px_hsl(var(--accent)/0.75)]"
+          : "bg-muted shadow-inset"
+      }`}
       role="switch"
       aria-checked={on}
     >
       <span
-        className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${
+        className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all ${
           on ? "left-4" : "left-0.5"
         }`}
       />

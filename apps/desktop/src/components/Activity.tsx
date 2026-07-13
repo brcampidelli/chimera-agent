@@ -18,7 +18,7 @@ const statusLabel: Record<Status, string> = {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="border-t border-border px-4 py-3">
+    <div className="border-t border-white/5 px-4 py-3">
       <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
         {title}
       </div>
@@ -35,11 +35,13 @@ export function Activity({ status, tools, report }: Props) {
         ? "unavailable"
         : `~ $${report.usd.toFixed(4)}`;
   return (
-    <aside className="flex h-full w-72 shrink-0 flex-col overflow-y-auto bg-card">
-      <div className="flex items-center gap-2 px-4 py-3">
+    <aside className="flex h-full w-72 shrink-0 flex-col overflow-y-auto border-l border-white/5 bg-card/40">
+      <div className="flex items-center gap-2 px-4 py-3.5">
         <span
           className={`h-2 w-2 rounded-full ${
-            status === "idle" ? "bg-muted-foreground" : "bg-accent animate-pulse"
+            status === "idle"
+              ? "bg-muted-foreground"
+              : "animate-pulse bg-accent shadow-[0_0_10px_1px_hsl(var(--accent)/0.8)]"
           }`}
         />
         <span className="text-sm font-medium">{statusLabel[status]}</span>

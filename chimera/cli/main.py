@@ -1098,7 +1098,11 @@ def desktop_app(
         return ChatSession(runner, memory=shared_memory, graph=shared_graph, profile=shared_profile)
 
     # The built SPA, if present, is served same-origin (no CORS). Absent = API-only (dev uses Vite).
-    dist = Path(__file__).resolve().parents[2] / "apps" / "desktop" / "dist"
+    # Prefer a source-checkout build (live `pnpm build` output); fall back to the copy bundled in the
+    # wheel (chimera/_desktop_dist) so a pip-installed `[desktop]` user gets the UI, not just the API.
+    _dev_dist = Path(__file__).resolve().parents[2] / "apps" / "desktop" / "dist"
+    _pkg_dist = Path(__file__).resolve().parent.parent / "_desktop_dist"
+    dist = _dev_dist if (_dev_dist / "index.html").exists() else _pkg_dist
     static_dir = dist if (dist / "index.html").exists() else None
     api = build_api_app(factory, settings=settings, static_dir=static_dir)
 

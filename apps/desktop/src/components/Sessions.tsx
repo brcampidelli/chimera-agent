@@ -13,19 +13,19 @@ interface Props {
 
 export function Sessions({ sessions, currentId, onSelect, onNew, onDelete }: Props) {
   return (
-    <div className="flex h-full w-64 shrink-0 flex-col border-r border-border bg-card">
-      <div className="flex items-center gap-2 px-3 py-3">
-        <span className="text-lg" aria-hidden>
+    <div className="flex h-full w-64 shrink-0 flex-col border-r border-white/5 bg-card/40">
+      <div className="flex items-center gap-2 px-4 py-3.5">
+        <span className="text-lg drop-shadow-[0_0_10px_hsl(var(--accent)/0.6)]" aria-hidden>
           🔺
         </span>
-        <span className="font-semibold">Chimera</span>
+        <span className="font-semibold tracking-tight">Chimera</span>
       </div>
-      <div className="px-3 pb-2">
+      <div className="px-3 pb-3">
         <Button size="sm" className="w-full" onClick={onNew}>
           <Plus className="h-4 w-4" /> New chat
         </Button>
       </div>
-      <nav className="flex-1 overflow-y-auto px-2 py-1">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-1">
         {sessions.length === 0 && (
           <p className="px-2 py-4 text-sm text-muted-foreground">No conversations yet.</p>
         )}
@@ -33,8 +33,10 @@ export function Sessions({ sessions, currentId, onSelect, onNew, onDelete }: Pro
           <div
             key={s.id}
             className={cn(
-              "group flex items-center gap-2 px-2 py-2 text-sm cursor-pointer",
-              s.id === currentId ? "bg-muted" : "hover:bg-muted/60",
+              "group flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm transition",
+              s.id === currentId
+                ? "bg-accent/12 text-foreground shadow-[inset_0_0_0_1px_hsl(var(--accent)/0.2)]"
+                : "hover:bg-white/5",
             )}
             onClick={() => onSelect(s.id)}
           >

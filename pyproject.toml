@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "chimera-agent"
-version = "0.21.2"
+version = "0.22.0"
 description = "An open-source, self-evolving AI agent whose reasoning core is an LLM-Fusion engine (panel -> judge -> synthesizer)."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -166,6 +166,14 @@ Changelog = "https://github.com/brcampidelli/chimera-agent/blob/main/CHANGELOG.m
 
 [tool.hatch.build.targets.wheel]
 packages = ["chimera"]
+# The built desktop SPA (apps/desktop/dist) is gitignored but must ship in the wheel so that a
+# `pip install chimera-agent[desktop]` user actually gets the UI (not just the API). `artifacts`
+# un-ignores it for file selection; `force-include` maps it into the package as chimera/_desktop_dist,
+# where the CLI's `chimera app`/`serve --ui` looks for it when no source-checkout dist is present.
+artifacts = ["apps/desktop/dist/**"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"apps/desktop/dist" = "chimera/_desktop_dist"
 
 [tool.ruff]
 line-length = 100

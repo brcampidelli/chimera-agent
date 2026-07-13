@@ -140,7 +140,7 @@ export default function App() {
       <main className="flex min-w-0 flex-1 flex-col">
         {view === "chat" && (
           <>
-            <header className="flex items-center border-b border-border px-4 py-2.5">
+            <header className="flex items-center border-b border-white/5 px-5 py-3">
               <span className="text-sm font-medium text-muted-foreground">
                 {currentId ? (sessions.find((s) => s.id === currentId)?.title ?? "Chat") : "New chat"}
               </span>

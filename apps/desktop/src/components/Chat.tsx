@@ -22,7 +22,7 @@ function Bubble({
   if (role === "user") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] whitespace-pre-wrap bg-primary px-4 py-2 text-primary-foreground rounded-chip rounded-br-none">
+        <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-accent-grad px-4 py-2 text-accent-foreground shadow-btn">
           {content}
         </div>
       </div>

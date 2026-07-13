@@ -29,8 +29,8 @@ export function Composer({ busy, onSend, onStop }: Props) {
   }
 
   return (
-    <div className="border-t border-border bg-background p-3">
-      <div className="mx-auto flex max-w-3xl items-end gap-2 border border-input bg-card px-3 py-2">
+    <div className="border-t border-white/5 p-3">
+      <div className="field mx-auto flex max-w-3xl items-end gap-2 rounded-2xl px-3 py-2">
         <textarea
           ref={ref}
           rows={1}

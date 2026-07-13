@@ -2,67 +2,97 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Palette: HSL, navy primary (H222), a clear blue accent (H214) — deliberately no purple/indigo/violet.
-   Panels are sharp (rounded-none); chips/CTAs use the rounded `chip` radius. Light + dark are both
-   first-class; the theme toggle stamps data-theme on <html>. */
+/* ── Chimera design system ───────────────────────────────────────────────────────────────────────
+   A tactile, dark "soft-UI": deep-navy surfaces raised by soft outer drop-shadows + a top inner
+   highlight, recessed input fields, and an always-visible soft focus glow. The accent is the brand
+   blue→cyan (from the Chimera mark: blue lion, cyan snake/dragon). Dark is the primary look; light is
+   a clean flat fallback. Shadows live in CSS vars so they adapt per theme.
+   ──────────────────────────────────────────────────────────────────────────────────────────────── */
+
 :root {
-  --background: 222 30% 97%;
-  --foreground: 222 47% 11%;
-  --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
-  --muted: 222 20% 93%;
-  --muted-foreground: 222 12% 42%;
-  --border: 222 18% 87%;
-  --input: 222 18% 85%;
-  --primary: 222 47% 11%;
-  --primary-foreground: 210 40% 98%;
-  --accent: 214 88% 46%;
+  /* Dark (default) — deep navy from the icon background. */
+  --background: 222 45% 8%;
+  --foreground: 210 22% 91%;
+  --card: 222 28% 14%;
+  --card-foreground: 210 22% 91%;
+  --muted: 222 24% 19%;
+  --muted-foreground: 214 14% 60%;
+  --border: 222 22% 24%;
+  --input: 222 34% 9%;
+  --primary: 210 22% 91%;
+  --primary-foreground: 222 47% 11%;
+  --accent: 217 91% 62%;
   --accent-foreground: 0 0% 100%;
-  --ring: 214 88% 46%;
-  --ok: 142 62% 38%;
-  --bad: 0 72% 48%;
+  --accent2: 189 94% 55%;
+  --ring: 217 91% 62%;
+  --ok: 152 58% 50%;
+  --bad: 0 72% 62%;
+
+  --elev: 0 12px 30px -12px rgba(0, 0, 0, 0.72), 0 2px 6px -2px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  --elev-lg: 0 30px 70px -18px rgba(0, 0, 0, 0.78), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  --inset: inset 0 2px 6px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  --glow: 0 0 0 3px hsl(var(--ring) / 0.28), 0 0 22px -2px hsl(var(--ring) / 0.5);
+  --btn-shadow: 0 8px 18px -8px hsl(var(--accent) / 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.28);
+  --btn-shadow-hover: 0 10px 28px -8px hsl(var(--accent) / 0.72),
+    0 0 26px -4px hsl(var(--accent2) / 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.34);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --background: 222 42% 7%;
-    --foreground: 210 20% 92%;
-    --card: 222 34% 10%;
-    --card-foreground: 210 20% 92%;
-    --muted: 222 24% 15%;
-    --muted-foreground: 215 14% 62%;
-    --border: 222 22% 18%;
-    --input: 222 22% 20%;
-    --primary: 210 20% 92%;
-    --primary-foreground: 222 47% 11%;
-    --accent: 214 90% 58%;
-    --accent-foreground: 222 47% 11%;
-    --ring: 214 90% 58%;
-    --ok: 142 55% 52%;
-    --bad: 0 72% 62%;
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --background: 214 42% 96%;
+    --foreground: 222 47% 14%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 14%;
+    --muted: 214 30% 92%;
+    --muted-foreground: 222 12% 42%;
+    --border: 214 24% 86%;
+    --input: 214 34% 97%;
+    --primary: 222 47% 14%;
+    --primary-foreground: 0 0% 100%;
+    --accent: 217 91% 52%;
+    --accent-foreground: 0 0% 100%;
+    --accent2: 189 90% 42%;
+    --ring: 217 91% 52%;
+    --ok: 152 55% 40%;
+    --bad: 0 72% 50%;
+
+    --elev: 0 10px 26px -12px rgba(30, 50, 90, 0.2), 0 1px 3px rgba(30, 50, 90, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    --elev-lg: 0 24px 54px -16px rgba(30, 50, 90, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    --inset: inset 0 2px 5px rgba(30, 50, 90, 0.13);
+    --glow: 0 0 0 3px hsl(var(--ring) / 0.2), 0 0 16px -2px hsl(var(--ring) / 0.32);
+    --btn-shadow: 0 7px 16px -7px hsl(var(--accent) / 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    --btn-shadow-hover: 0 9px 22px -7px hsl(var(--accent) / 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.5);
   }
 }
 
-:root[data-theme="dark"] {
-  --background: 222 42% 7%;
-  --foreground: 210 20% 92%;
-  --card: 222 34% 10%;
-  --card-foreground: 210 20% 92%;
-  --muted: 222 24% 15%;
-  --muted-foreground: 215 14% 62%;
-  --border: 222 22% 18%;
-  --input: 222 22% 20%;
-  --primary: 210 20% 92%;
-  --primary-foreground: 222 47% 11%;
-  --accent: 214 90% 58%;
-  --accent-foreground: 222 47% 11%;
-  --ring: 214 90% 58%;
-  --ok: 142 55% 52%;
-  --bad: 0 72% 62%;
-}
+:root[data-theme="light"] {
+  --background: 214 42% 96%;
+  --foreground: 222 47% 14%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 14%;
+  --muted: 214 30% 92%;
+  --muted-foreground: 222 12% 42%;
+  --border: 214 24% 86%;
+  --input: 214 34% 97%;
+  --primary: 222 47% 14%;
+  --primary-foreground: 0 0% 100%;
+  --accent: 217 91% 52%;
+  --accent-foreground: 0 0% 100%;
+  --accent2: 189 90% 42%;
+  --ring: 217 91% 52%;
+  --ok: 152 55% 40%;
+  --bad: 0 72% 50%;
 
-* {
-  border-color: hsl(var(--border));
+  --elev: 0 10px 26px -12px rgba(30, 50, 90, 0.2), 0 1px 3px rgba(30, 50, 90, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  --elev-lg: 0 24px 54px -16px rgba(30, 50, 90, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  --inset: inset 0 2px 5px rgba(30, 50, 90, 0.13);
+  --glow: 0 0 0 3px hsl(var(--ring) / 0.2), 0 0 16px -2px hsl(var(--ring) / 0.32);
+  --btn-shadow: 0 7px 16px -7px hsl(var(--accent) / 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  --btn-shadow-hover: 0 9px 22px -7px hsl(var(--accent) / 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 html,
@@ -73,30 +103,86 @@ body,
 }
 
 body {
-  background: hsl(var(--background));
   color: hsl(var(--foreground));
   font-family: theme("fontFamily.sans");
   -webkit-font-smoothing: antialiased;
+  /* Deep navy ground with a faint top-center glow — the textured backdrop from the reference. */
+  background-color: hsl(var(--background));
+  background-image: radial-gradient(
+    120% 80% at 50% -10%,
+    hsl(var(--accent) / 0.1) 0%,
+    transparent 55%
+  );
+  background-attachment: fixed;
 }
 
-/* Markdown transcript: readable measure, tidy code + headings without a heavy prose plugin. */
+/* Thin, unobtrusive scrollbars that match the surface. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: 9999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.6);
+  background-clip: padding-box;
+}
+
+@layer components {
+  /* A raised surface (card / panel). */
+  .surface {
+    @apply rounded-xl2 border border-white/5 bg-card shadow-elev;
+  }
+  /* A recessed input field. */
+  .field {
+    @apply rounded-lg border border-black/20 bg-input shadow-inset outline-none transition;
+  }
+  .field:focus,
+  .field:focus-within {
+    box-shadow: var(--glow), var(--inset);
+    border-color: hsl(var(--accent) / 0.5);
+  }
+}
+
+/* Markdown transcript styling. */
 .md > * + * {
   margin-top: 0.6rem;
 }
-.md h1, .md h2, .md h3 {
+.md h1,
+.md h2,
+.md h3 {
   font-weight: 600;
   line-height: 1.3;
 }
-.md h1 { font-size: 1.15rem; }
-.md h2 { font-size: 1.05rem; }
-.md h3 { font-size: 1rem; }
-.md ul, .md ol {
+.md h1 {
+  font-size: 1.15rem;
+}
+.md h2 {
+  font-size: 1.05rem;
+}
+.md h3 {
+  font-size: 1rem;
+}
+.md ul,
+.md ol {
   padding-left: 1.25rem;
 }
-.md ul { list-style: disc; }
-.md ol { list-style: decimal; }
+.md ul {
+  list-style: disc;
+}
+.md ol {
+  list-style: decimal;
+}
 .md a {
-  color: hsl(var(--accent));
+  color: hsl(var(--accent2));
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -104,16 +190,18 @@ body {
   font-family: theme("fontFamily.mono");
   font-size: 0.85em;
   background: hsl(var(--muted));
-  padding: 0.1rem 0.3rem;
-  border-radius: 3px;
+  padding: 0.1rem 0.35rem;
+  border-radius: 5px;
 }
 .md pre {
-  background: hsl(222 40% 9%);
-  color: hsl(210 20% 90%);
+  background: hsl(var(--input));
+  color: hsl(210 20% 88%);
   padding: 0.85rem 1rem;
   overflow-x: auto;
   font-size: 0.82rem;
   line-height: 1.5;
+  border-radius: 0.7rem;
+  box-shadow: var(--inset);
 }
 .md pre code {
   background: transparent;

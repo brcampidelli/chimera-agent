@@ -38,8 +38,10 @@ function RailButton({
       title={label}
       aria-label={label}
       className={cn(
-        "flex h-11 w-11 items-center justify-center transition",
-        active ? "bg-muted text-accent" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+        "relative flex h-11 w-11 items-center justify-center rounded-xl2 transition-all duration-150",
+        active
+          ? "bg-accent/15 text-accent shadow-[inset_0_0_0_1px_hsl(var(--accent)/0.3),0_0_16px_-4px_hsl(var(--accent)/0.6)]"
+          : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
       )}
     >
       <Icon className="h-5 w-5" />
@@ -59,11 +61,11 @@ export function IconRail({
   onToggleTheme: () => void;
 }) {
   return (
-    <div className="flex w-12 shrink-0 flex-col items-center border-r border-border bg-card py-2">
-      <div className="mb-2 select-none text-xl" aria-hidden>
+    <div className="flex w-14 shrink-0 flex-col items-center gap-1 border-r border-white/5 bg-card/40 py-3">
+      <div className="mb-2 select-none text-xl drop-shadow-[0_0_10px_hsl(var(--accent)/0.6)]" aria-hidden>
         🔺
       </div>
-      <nav className="flex flex-1 flex-col items-center gap-1">
+      <nav className="flex flex-1 flex-col items-center gap-1.5">
         {NAV.map((n) => (
           <RailButton
             key={n.view}
@@ -74,7 +76,7 @@ export function IconRail({
           />
         ))}
       </nav>
-      <div className="flex flex-col items-center gap-1">
+      <div className="flex flex-col items-center gap-1.5">
         <RailButton
           active={false}
           label={dark ? "Light theme" : "Dark theme"}
