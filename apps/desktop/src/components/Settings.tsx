@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, KeyRound, Loader2 } from "lucide-react";
 import { getConfig, getDoctor, patchConfig } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { LANGS, useI18n, useT } from "@/lib/i18n";
 import type { AppConfig, DoctorInfo, ProviderCfg } from "@/lib/types";
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
@@ -37,6 +38,7 @@ function TextField({
   onSave: (v: string) => void;
   placeholder?: string;
 }) {
+  const t = useT();
   const [v, setV] = useState(value);
   const dirty = v !== value;
   return (
@@ -48,9 +50,26 @@ function TextField({
         onChange={(e) => setV(e.target.value)}
       />
       <Button size="sm" disabled={!dirty} onClick={() => onSave(v)}>
-        Save
+        {t("common.save")}
       </Button>
     </>
+  );
+}
+
+function LanguageSelect() {
+  const { lang, setLang } = useI18n();
+  return (
+    <select
+      className={inputCls}
+      value={lang}
+      onChange={(e) => setLang(e.target.value as (typeof LANGS)[number]["code"])}
+    >
+      {LANGS.map((l) => (
+        <option key={l.code} value={l.code}>
+          {l.label}
+        </option>
+      ))}
+    </select>
   );
 }
 
@@ -96,6 +115,7 @@ function Select({
 }
 
 function SecretField({ provider, onSave }: { provider: ProviderCfg; onSave: (v: string) => void }) {
+  const t = useT();
   const [editing, setEditing] = useState(false);
   const [v, setV] = useState("");
   if (!editing) {
@@ -103,13 +123,13 @@ function SecretField({ provider, onSave }: { provider: ProviderCfg; onSave: (v: 
       <>
         {provider.set ? (
           <span className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Check className="h-3.5 w-3.5 text-ok" /> set {provider.hint}
+            <Check className="h-3.5 w-3.5 text-ok" /> {t("settings.isSet")} {provider.hint}
           </span>
         ) : (
-          <span className="text-xs text-muted-foreground">not set</span>
+          <span className="text-xs text-muted-foreground">{t("settings.notSet")}</span>
         )}
         <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
-          {provider.set ? "Replace" : "Set"}
+          {provider.set ? t("common.replace") : t("common.set")}
         </Button>
       </>
     );
@@ -120,7 +140,7 @@ function SecretField({ provider, onSave }: { provider: ProviderCfg; onSave: (v: 
         className={inputCls}
         type="password"
         autoFocus
-        placeholder="paste key…"
+        placeholder={t("settings.pasteKey")}
         value={v}
         onChange={(e) => setV(e.target.value)}
       />
@@ -133,13 +153,14 @@ function SecretField({ provider, onSave }: { provider: ProviderCfg; onSave: (v: 
           setV("");
         }}
       >
-        Save
+        {t("common.save")}
       </Button>
     </>
   );
 }
 
 export function Settings() {
+  const t = useT();
   const qc = useQueryClient();
   const config = useQuery({ queryKey: ["config"], queryFn: getConfig });
   const doctor = useQuery({ queryKey: ["doctor"], queryFn: getDoctor });
@@ -167,18 +188,26 @@ export function Settings() {
       <div className="mx-auto max-w-2xl space-y-6 px-6 py-6">
         <div className="flex items-center gap-2">
           <KeyRound className="h-5 w-5" />
-          <h1 className="text-lg font-semibold">Settings</h1>
+          <h1 className="text-lg font-semibold">{t("settings.title")}</h1>
           {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
         </div>
 
+        <Card title={t("settings.card.appearance")}>
+          <Row label={t("settings.row.language")} hint={t("settings.hint.language")}>
+            <LanguageSelect />
+          </Row>
+        </Card>
+
         {d && (
-          <Card title="Status">
-            <Row label="Providers with a key">
+          <Card title={t("settings.card.status")}>
+            <Row label={t("settings.row.providersWithKey")}>
               <span className="text-sm">
-                {d.configured_providers.length ? d.configured_providers.join(", ") : "none"}
+                {d.configured_providers.length
+                  ? d.configured_providers.join(", ")
+                  : t("settings.none")}
               </span>
             </Row>
-            <Row label="Model ladder (weak · mid · top)" hint="resolved from cost mode + overrides">
+            <Row label={t("settings.row.modelLadder")} hint={t("settings.hint.modelLadder")}>
               <span className="max-w-56 truncate font-mono text-xs">
                 {d.tiers.weak} · {d.tiers.mid} · {d.tiers.top}
               </span>
@@ -186,27 +215,27 @@ export function Settings() {
           </Card>
         )}
 
-        <Card title="Model">
-          <Row label="Default model">
+        <Card title={t("settings.card.model")}>
+          <Row label={t("settings.row.defaultModel")}>
             <TextField
               value={c.models.default}
               placeholder="openrouter/…"
               onSave={(v) => save({ CHIMERA_DEFAULT_MODEL: v })}
             />
           </Row>
-          <Row label="Cost mode" hint="how the tier ladder is filled">
+          <Row label={t("settings.row.costMode")} hint={t("settings.hint.costMode")}>
             <Select
               value={c.models.cost_mode}
               options={["auto", "cheap", "balanced", "premium"]}
               onChange={(v) => save({ CHIMERA_COST_MODE: v })}
             />
           </Row>
-          <Row label="Cascade" hint="weak → gate → mid → gate → fusion">
+          <Row label={t("settings.row.cascade")} hint={t("settings.hint.cascade")}>
             <Toggle on={c.models.cascade} onChange={(v) => save({ CHIMERA_CASCADE: String(v) })} />
           </Row>
         </Card>
 
-        <Card title="API keys">
+        <Card title={t("settings.card.apiKeys")}>
           {c.providers.map((p) => (
             <Row key={p.env} label={p.label} hint={p.env}>
               <SecretField provider={p} onSave={(v) => save({ [p.env]: v })} />
@@ -214,15 +243,15 @@ export function Settings() {
           ))}
         </Card>
 
-        <Card title="Memory">
-          <Row label="Backend">
+        <Card title={t("settings.card.memory")}>
+          <Row label={t("settings.row.backend")}>
             <Select
               value={c.memory.backend}
               options={["json", "sqlite"]}
               onChange={(v) => save({ CHIMERA_MEMORY_BACKEND: v })}
             />
           </Row>
-          <Row label="Semantic recall" hint="embeddings, falls back to FTS">
+          <Row label={t("settings.row.semantic")} hint={t("settings.hint.semantic")}>
             <Toggle
               on={c.memory.semantic}
               onChange={(v) => save({ CHIMERA_SEMANTIC_MEMORY: String(v) })}
@@ -230,11 +259,11 @@ export function Settings() {
           </Row>
         </Card>
 
-        <Card title="Cache & sandbox">
-          <Row label="Completion cache" hint="deterministic (temp=0) requests only">
+        <Card title={t("settings.card.cacheSandbox")}>
+          <Row label={t("settings.row.completionCache")} hint={t("settings.hint.completionCache")}>
             <Toggle on={c.cache.completion} onChange={(v) => save({ CHIMERA_CACHE: String(v) })} />
           </Row>
-          <Row label="Sandbox">
+          <Row label={t("settings.row.sandbox")}>
             <Select
               value={c.sandbox.mode}
               options={["local", "docker"]}
@@ -243,8 +272,8 @@ export function Settings() {
           </Row>
         </Card>
 
-        <Card title="Server">
-          <Row label="API bearer token" hint="required for write endpoints when set">
+        <Card title={t("settings.card.server")}>
+          <Row label={t("settings.row.bearer")} hint={t("settings.hint.bearer")}>
             <SecretField
               provider={{ env: "CHIMERA_SERVER_TOKEN", label: "token", set: c.server.token_set, hint: "" }}
               onSave={(v) => save({ CHIMERA_SERVER_TOKEN: v })}
@@ -252,9 +281,7 @@ export function Settings() {
           </Row>
         </Card>
 
-        {mutation.isError && (
-          <p className="text-sm text-bad">Couldn't save — is the bearer token required?</p>
-        )}
+        {mutation.isError && <p className="text-sm text-bad">{t("settings.saveError")}</p>}
       </div>
     </div>
   );

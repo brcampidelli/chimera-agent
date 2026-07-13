@@ -3,6 +3,7 @@ import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/BrandMark";
+import { useT } from "@/lib/i18n";
 import type { Message } from "@/lib/types";
 
 interface Props {
@@ -47,14 +48,12 @@ function Bubble({
 }
 
 function Empty() {
+  const t = useT();
   return (
     <div className="flex h-full flex-col items-center justify-center py-24 text-center">
       <BrandMark className="mb-4 h-16 w-16" glow />
       <h1 className="text-lg font-semibold">Chimera</h1>
-      <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-        Ask anything. Tokens stream live; the panel on the right shows the tools, cost, and memory
-        each turn actually used.
-      </p>
+      <p className="mt-1 max-w-sm text-sm text-muted-foreground">{t("chat.empty.body")}</p>
     </div>
   );
 }

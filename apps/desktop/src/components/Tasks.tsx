@@ -3,6 +3,7 @@ import { KanbanSquare, ShieldAlert } from "lucide-react";
 import { approveProject, denyProject, getKanban, getProjects } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
+import { useT } from "@/lib/i18n";
 import type { ProjectState, TaskCard } from "@/lib/types";
 
 const COLUMN_ORDER = ["backlog", "doing", "review", "blocked", "done"];
@@ -16,6 +17,7 @@ function statusTone(s: string): "ok" | "accent" | "warn" | "bad" | "muted" {
 }
 
 function ProjectRow({ p, onChange }: { p: ProjectState; onChange: () => void }) {
+  const t = useT();
   const approve = useMutation({
     mutationFn: (card?: string) => approveProject(p.id, card),
     onSuccess: onChange,
@@ -29,7 +31,7 @@ function ProjectRow({ p, onChange }: { p: ProjectState; onChange: () => void }) 
         <span className="truncate font-mono text-sm">{p.id}</span>
         <Badge tone={statusTone(p.status)}>{p.status.replace("_", " ")}</Badge>
         <span className="text-xs text-muted-foreground">
-          iter {p.iterations}/{p.max_iterations}
+          {t("tasks.iter", { a: p.iterations, b: p.max_iterations })}
         </span>
       </div>
       {p.note && <div className="mt-1 text-xs text-muted-foreground">{p.note}</div>}
@@ -38,15 +40,15 @@ function ProjectRow({ p, onChange }: { p: ProjectState; onChange: () => void }) 
           <ShieldAlert className="h-4 w-4 text-[hsl(38_92%_42%)]" />
           <span className="flex-1 text-xs">
             {p.pending_card_id
-              ? `A high-risk step needs approval (card ${p.pending_card_id}).`
-              : "The initial plan needs approval before it runs."}
+              ? t("tasks.awaitingStep", { card: p.pending_card_id })
+              : t("tasks.awaitingPlan")}
           </span>
           <Button size="sm" onClick={() => approve.mutate(p.pending_card_id ?? undefined)}>
-            {p.pending_card_id ? "Approve step" : "Approve plan"}
+            {p.pending_card_id ? t("tasks.approveStep") : t("tasks.approvePlan")}
           </Button>
           {p.pending_card_id && (
             <Button size="sm" variant="outline" onClick={() => deny.mutate(p.pending_card_id!)}>
-              Deny
+              {t("tasks.deny")}
             </Button>
           )}
         </div>
@@ -56,8 +58,9 @@ function ProjectRow({ p, onChange }: { p: ProjectState; onChange: () => void }) 
 }
 
 function Board({ columns }: { columns: Record<string, TaskCard[]> }) {
+  const t = useT();
   const cols = COLUMN_ORDER.filter((c) => (columns[c]?.length ?? 0) > 0);
-  if (cols.length === 0) return <EmptyState text="The board is empty." />;
+  if (cols.length === 0) return <EmptyState text={t("tasks.boardEmpty")} />;
   return (
     <div className="flex gap-3 overflow-x-auto p-3">
       {cols.map((col) => (
@@ -76,7 +79,7 @@ function Board({ columns }: { columns: Record<string, TaskCard[]> }) {
                 <div className="text-sm">{c.title}</div>
                 {c.risk === "high" && (
                   <div className="mt-1.5">
-                    <Badge tone="bad">high risk</Badge>
+                    <Badge tone="bad">{t("tasks.highRisk")}</Badge>
                   </div>
                 )}
               </div>
@@ -89,6 +92,7 @@ function Board({ columns }: { columns: Record<string, TaskCard[]> }) {
 }
 
 export function Tasks() {
+  const t = useT();
   const qc = useQueryClient();
   const projects = useQuery({ queryKey: ["projects"], queryFn: getProjects });
   const kanban = useQuery({ queryKey: ["kanban"], queryFn: getKanban });
@@ -98,18 +102,18 @@ export function Tasks() {
   };
 
   return (
-    <Screen title="Tasks" icon={<KanbanSquare className="h-5 w-5" />}>
-      <Panel title="Projects">
+    <Screen title={t("tasks.title")} icon={<KanbanSquare className="h-5 w-5" />}>
+      <Panel title={t("tasks.projects")}>
         {projects.isLoading ? (
           <Spinner />
         ) : !projects.data || projects.data.length === 0 ? (
-          <EmptyState text="No projects. Start one with `chimera project start --spec spec.yaml`." />
+          <EmptyState text={t("tasks.projectsEmpty")} />
         ) : (
           projects.data.map((p) => <ProjectRow key={p.id} p={p} onChange={refresh} />)
         )}
       </Panel>
 
-      <Panel title="Board">
+      <Panel title={t("tasks.board")}>
         {kanban.isLoading ? <Spinner /> : <Board columns={kanban.data ?? {}} />}
       </Panel>
     </Screen>

@@ -11,15 +11,16 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/BrandMark";
+import { useT } from "@/lib/i18n";
 
 export type View = "chat" | "memory" | "skills" | "cron" | "tasks" | "settings";
 
-const NAV: { view: View; label: string; icon: ComponentType<{ className?: string }> }[] = [
-  { view: "chat", label: "Chat", icon: MessageSquare },
-  { view: "memory", label: "Memory", icon: Brain },
-  { view: "skills", label: "Skills", icon: Sparkles },
-  { view: "cron", label: "Schedule", icon: Clock },
-  { view: "tasks", label: "Tasks", icon: KanbanSquare },
+const NAV: { view: View; labelKey: string; icon: ComponentType<{ className?: string }> }[] = [
+  { view: "chat", labelKey: "nav.chat", icon: MessageSquare },
+  { view: "memory", labelKey: "nav.memory", icon: Brain },
+  { view: "skills", labelKey: "nav.skills", icon: Sparkles },
+  { view: "cron", labelKey: "nav.schedule", icon: Clock },
+  { view: "tasks", labelKey: "nav.tasks", icon: KanbanSquare },
 ];
 
 function RailButton({
@@ -61,6 +62,7 @@ export function IconRail({
   dark: boolean;
   onToggleTheme: () => void;
 }) {
+  const t = useT();
   return (
     <div className="flex w-14 shrink-0 flex-col items-center gap-1 border-r border-white/5 bg-card/40 py-3">
       <BrandMark className="mb-2 h-8 w-8" glow />
@@ -69,7 +71,7 @@ export function IconRail({
           <RailButton
             key={n.view}
             active={view === n.view}
-            label={n.label}
+            label={t(n.labelKey)}
             icon={n.icon}
             onClick={() => onSelect(n.view)}
           />
@@ -78,13 +80,13 @@ export function IconRail({
       <div className="flex flex-col items-center gap-1.5">
         <RailButton
           active={false}
-          label={dark ? "Light theme" : "Dark theme"}
+          label={dark ? t("theme.light") : t("theme.dark")}
           icon={dark ? Sun : Moon}
           onClick={onToggleTheme}
         />
         <RailButton
           active={view === "settings"}
-          label="Settings"
+          label={t("nav.settings")}
           icon={SettingsIcon}
           onClick={() => onSelect("settings")}
         />

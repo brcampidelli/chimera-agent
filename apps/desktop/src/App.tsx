@@ -11,6 +11,7 @@ import { Cron } from "@/components/Cron";
 import { Tasks } from "@/components/Tasks";
 import { Activity, type Status } from "@/components/Activity";
 import { deleteSession, getSession, listSessions, streamChat } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 import type { Message, ToolEvent, TurnReport } from "@/lib/types";
 
 function useTheme() {
@@ -28,6 +29,7 @@ function useTheme() {
 
 export default function App() {
   const qc = useQueryClient();
+  const t = useT();
   const { dark, toggle } = useTheme();
   const { data: sessions = [] } = useQuery({ queryKey: ["sessions"], queryFn: listSessions });
 
@@ -142,7 +144,9 @@ export default function App() {
           <>
             <header className="flex items-center border-b border-white/5 px-5 py-3">
               <span className="text-sm font-medium text-muted-foreground">
-                {currentId ? (sessions.find((s) => s.id === currentId)?.title ?? "Chat") : "New chat"}
+                {currentId
+                  ? (sessions.find((s) => s.id === currentId)?.title ?? t("chat.header.chat"))
+                  : t("chat.header.new")}
               </span>
             </header>
             <Chat messages={messages} live={live} busy={busy} />

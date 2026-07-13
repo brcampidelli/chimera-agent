@@ -6,6 +6,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-07-13
+
+**The desktop app speaks 7 languages.** A language selector (the same 7 languages as the README) with
+browser auto-detection.
+
+### Added
+- **Interface language selector — 7 languages (en / pt / es / fr / de / zh / ja).** A new
+  **Settings → Appearance → Language** control. On first run the UI auto-detects the browser language
+  and falls back to English; the choice persists to `localStorage`. Every visible string across Chat,
+  Sessions, Memory, Skills, Schedule, Tasks, Settings, and the activity panel is translated through a
+  small in-app dictionary (`src/lib/i18n.tsx`) — no i18n runtime dependency added (~27 kB of strings).
+
+### Fixed
+- **PWA icon is no longer declared `maskable`.** The brand icon has a wordmark near its lower edge that
+  maskable launchers (e.g. Android adaptive icons) would crop, so the manifest now declares only
+  `purpose: "any"`.
+
 ## [0.22.1] - 2026-07-13
 
 ### Changed

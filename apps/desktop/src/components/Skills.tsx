@@ -3,6 +3,7 @@ import { Sparkles } from "lucide-react";
 import { approveSkill, getSkills, retireSkill } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
+import { useT } from "@/lib/i18n";
 import type { SkillStat } from "@/lib/types";
 
 function statusTone(status: string): "ok" | "accent" | "warn" | "muted" {
@@ -13,6 +14,7 @@ function statusTone(status: string): "ok" | "accent" | "warn" | "muted" {
 }
 
 export function Skills() {
+  const t = useT();
   const qc = useQueryClient();
   const skills = useQuery({ queryKey: ["skills"], queryFn: getSkills });
   const invalidate = () => qc.invalidateQueries({ queryKey: ["skills"] });
@@ -23,12 +25,12 @@ export function Skills() {
   const candidates = new Set(skills.data?.retirement_candidates ?? []);
 
   return (
-    <Screen title="Skills" icon={<Sparkles className="h-5 w-5" />}>
-      <Panel title="Learned skills">
+    <Screen title={t("skills.title")} icon={<Sparkles className="h-5 w-5" />}>
+      <Panel title={t("skills.learned")}>
         {skills.isLoading ? (
           <Spinner />
         ) : rows.length === 0 ? (
-          <EmptyState text="No learned skills yet — they're distilled from verified runs." />
+          <EmptyState text={t("skills.empty")} />
         ) : (
           rows.map((s) => (
             <div key={s.name} className="flex items-center gap-3 px-4 py-3">
@@ -40,19 +42,19 @@ export function Skills() {
                   {candidates.has(s.name) && <Badge tone="bad">retire?</Badge>}
                 </div>
                 <div className="mt-0.5 text-xs text-muted-foreground">
-                  {s.uses} use{s.uses === 1 ? "" : "s"} · {s.successes} win{s.successes === 1 ? "" : "s"}
+                  {t("skills.stats", { uses: s.uses, wins: s.successes })}
                   {s.rate != null && ` · ${Math.round(s.rate * 100)}%`}
                 </div>
               </div>
               <div className="flex shrink-0 gap-2">
                 {s.status === "pending" && (
                   <Button size="sm" onClick={() => approve.mutate(s.name)}>
-                    Approve
+                    {t("common.approve")}
                   </Button>
                 )}
                 {s.status !== "retired" && (
                   <Button size="sm" variant="outline" onClick={() => retire.mutate(s.name)}>
-                    Retire
+                    {t("skills.retire")}
                   </Button>
                 )}
               </div>

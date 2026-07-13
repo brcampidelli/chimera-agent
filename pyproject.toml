@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "chimera-agent"
-version = "0.22.1"
+version = "0.23.0"
 description = "An open-source, self-evolving AI agent whose reasoning core is an LLM-Fusion engine (panel -> judge -> synthesizer)."
 readme = "README.md"
 requires-python = ">=3.11"

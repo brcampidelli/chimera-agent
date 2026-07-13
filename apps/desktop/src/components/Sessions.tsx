@@ -2,6 +2,7 @@ import { Plus, Trash2, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandMark } from "@/components/BrandMark";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 import type { SessionMeta } from "@/lib/types";
 
 interface Props {
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function Sessions({ sessions, currentId, onSelect, onNew, onDelete }: Props) {
+  const t = useT();
   return (
     <div className="flex h-full w-64 shrink-0 flex-col border-r border-white/5 bg-card/40">
       <div className="flex items-center gap-2 px-4 py-3.5">
@@ -21,12 +23,12 @@ export function Sessions({ sessions, currentId, onSelect, onNew, onDelete }: Pro
       </div>
       <div className="px-3 pb-3">
         <Button size="sm" className="w-full" onClick={onNew}>
-          <Plus className="h-4 w-4" /> New chat
+          <Plus className="h-4 w-4" /> {t("sessions.new")}
         </Button>
       </div>
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-1">
         {sessions.length === 0 && (
-          <p className="px-2 py-4 text-sm text-muted-foreground">No conversations yet.</p>
+          <p className="px-2 py-4 text-sm text-muted-foreground">{t("sessions.empty")}</p>
         )}
         {sessions.map((s) => (
           <div
@@ -43,7 +45,7 @@ export function Sessions({ sessions, currentId, onSelect, onNew, onDelete }: Pro
             <span className="flex-1 truncate">{s.title}</span>
             <button
               className="opacity-0 transition group-hover:opacity-100"
-              title="Delete"
+              title={t("common.delete")}
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete(s.id);

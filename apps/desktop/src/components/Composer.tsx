@@ -1,6 +1,7 @@
 import { useRef, useState, type KeyboardEvent } from "react";
 import { ArrowUp, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/lib/i18n";
 
 interface Props {
   busy: boolean;
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export function Composer({ busy, onSend, onStop }: Props) {
+  const t = useT();
   const [value, setValue] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -35,7 +37,7 @@ export function Composer({ busy, onSend, onStop }: Props) {
           ref={ref}
           rows={1}
           value={value}
-          placeholder="Message Chimera…"
+          placeholder={t("composer.placeholder")}
           className="max-h-40 flex-1 resize-none bg-transparent py-1 text-sm outline-none placeholder:text-muted-foreground"
           onChange={(e) => {
             setValue(e.target.value);
@@ -45,17 +47,17 @@ export function Composer({ busy, onSend, onStop }: Props) {
           onKeyDown={onKeyDown}
         />
         {busy ? (
-          <Button size="icon" variant="outline" title="Stop" onClick={onStop}>
+          <Button size="icon" variant="outline" title={t("composer.stop")} onClick={onStop}>
             <Square className="h-4 w-4" />
           </Button>
         ) : (
-          <Button size="icon" title="Send" onClick={submit} disabled={!value.trim()}>
+          <Button size="icon" title={t("composer.send")} onClick={submit} disabled={!value.trim()}>
             <ArrowUp className="h-4 w-4" />
           </Button>
         )}
       </div>
       <p className="mx-auto mt-1.5 max-w-3xl text-center text-[11px] text-muted-foreground">
-        Enter to send · Shift+Enter for a new line
+        {t("composer.hint")}
       </p>
     </div>
   );
