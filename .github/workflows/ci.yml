@@ -30,7 +30,9 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: uv sync --extra dev
+        # Include the desktop extra so mypy sees FastAPI's real types (without it, strict mode flags
+        # every route decorator as untyped) and the desktop API tests actually run instead of skipping.
+        run: uv sync --extra dev --extra desktop
 
       - name: Ruff (lint)
         run: uv run ruff check .
