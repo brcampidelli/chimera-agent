@@ -15,21 +15,17 @@ permissions:
   contents: read
 
 jobs:
-  pypi-publish:
-    name: Build and publish to PyPI
+  # The desktop UI is bundled into the wheel (chimera/_desktop_dist via force-include), so the built
+  # SPA must exist before `uv build`. This job runs `npm ci` (which executes arbitrary dependency
+  # lifecycle scripts) and is deliberately kept UNPRIVILEGED — no `id-token` here. It hands the built
+  # UI to the publish job as an artifact, so a compromised frontend dependency can never reach the
+  # OIDC-privileged step that mints the PyPI trusted-publishing token.
+  build-ui:
+    name: Build the desktop UI
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write  # mint the OIDC token PyPI checks — this is the whole point
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          python-version: "3.12"
-
-      # The desktop UI is bundled into the wheel (chimera/_desktop_dist via force-include), so the
-      # built SPA must exist BEFORE `uv build` — otherwise the published wheel ships API-only. Build it.
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
@@ -43,6 +39,40 @@ jobs:
 
       - name: Build the desktop UI (into apps/desktop/dist)
         run: npm --prefix apps/desktop run build
+
+      - name: Verify the built UI exists
+        run: test -f apps/desktop/dist/index.html
+
+      - name: Upload the built UI
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-ui
+          path: apps/desktop/dist
+          if-no-files-found: error
+          retention-days: 1
+
+  pypi-publish:
+    name: Build and publish to PyPI
+    needs: build-ui
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # mint the OIDC token PyPI checks — this is the whole point
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      # Pull the desktop UI built by the unprivileged `build-ui` job. This job never runs `npm ci`,
+      # so the only code executing alongside the OIDC token is our own + the (trusted) Python build
+      # backend — that minimizes the attack surface of the trusted-publishing token.
+      - name: Download the built desktop UI
+        uses: actions/download-artifact@v4
+        with:
+          name: desktop-ui
+          path: apps/desktop/dist
 
       - name: Verify the built UI exists before packaging
         run: test -f apps/desktop/dist/index.html
