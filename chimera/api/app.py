@@ -176,6 +176,10 @@ def build_api_app(
 
         return EventSourceResponse(events())
 
+    from chimera.api.features import register_features
+
+    register_features(app, guard)  # Memory / Skills / Cron / Tasks (Fase C)
+
     if static_dir is not None:
         _mount_spa(app, static_dir)
 

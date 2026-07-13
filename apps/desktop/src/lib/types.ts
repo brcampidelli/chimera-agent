@@ -69,6 +69,56 @@ export interface DoctorInfo {
   sandbox: string;
 }
 
+export interface MemoryItem {
+  id: string;
+  content: string;
+  kind: string;
+  provenance: string;
+  source: string;
+}
+
+export interface SkillStat {
+  name: string;
+  kind: string;
+  status: string;
+  provenance: string;
+  uses: number;
+  successes: number;
+  rate: number | null;
+}
+
+export interface CronJob {
+  id: string;
+  name: string;
+  trigger: string;
+  schedule: string;
+  action: string;
+  enabled: boolean;
+  next_run: number | null;
+  last_run: number | null;
+  created_by: string;
+}
+
+export interface TaskCard {
+  id: string;
+  title: string;
+  action: string;
+  column: string;
+  success: boolean | null;
+  risk: string | null;
+  depends_on: string[];
+}
+
+export interface ProjectState {
+  id: string;
+  status: string;
+  iterations: number;
+  plan_approved: boolean;
+  pending_card_id: string | null;
+  note: string;
+  max_iterations: number;
+}
+
 export type Role = "user" | "assistant";
 
 export interface Message {

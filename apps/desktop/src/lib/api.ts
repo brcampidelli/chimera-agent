@@ -1,4 +1,15 @@
-import type { AppConfig, DoctorInfo, SessionMeta, TurnReport, ToolEvent } from "@/lib/types";
+import type {
+  AppConfig,
+  CronJob,
+  DoctorInfo,
+  MemoryItem,
+  ProjectState,
+  SessionMeta,
+  SkillStat,
+  TaskCard,
+  TurnReport,
+  ToolEvent,
+} from "@/lib/types";
 
 async function json<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -19,6 +30,46 @@ export const getConfig = () => json<AppConfig>("/api/config");
 export const getDoctor = () => json<DoctorInfo>("/api/doctor");
 export const patchConfig = (updates: Record<string, string>) =>
   json<{ updated: string[] }>("/api/config", { method: "PATCH", body: JSON.stringify(updates) });
+
+// --- Memory ---
+export const getMemory = (q = "") =>
+  json<MemoryItem[]>(`/api/memory${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+export const addMemory = (content: string, kind: string) =>
+  json<{ status: string; item: MemoryItem }>("/api/memory", {
+    method: "POST",
+    body: JSON.stringify({ content, kind }),
+  });
+export const deleteMemory = (id: string) =>
+  json<{ deleted: boolean }>(`/api/memory/${id}`, { method: "DELETE" });
+
+// --- Skills ---
+export const getSkills = () =>
+  json<{ stats: SkillStat[]; retirement_candidates: string[] }>("/api/skills");
+export const approveSkill = (name: string) =>
+  json<{ approved: boolean }>(`/api/skills/${name}/approve`, { method: "POST" });
+export const retireSkill = (name: string) =>
+  json<{ retired: boolean }>(`/api/skills/${name}/retire`, { method: "POST" });
+
+// --- Cron ---
+export const getCron = () => json<CronJob[]>("/api/cron");
+export const enableCron = (id: string) => json<CronJob>(`/api/cron/${id}/enable`, { method: "POST" });
+export const disableCron = (id: string) =>
+  json<CronJob>(`/api/cron/${id}/disable`, { method: "POST" });
+export const deleteCron = (id: string) =>
+  json<{ deleted: boolean }>(`/api/cron/${id}`, { method: "DELETE" });
+
+// --- Tasks (kanban + projects, HITL) ---
+export const getKanban = () => json<Record<string, TaskCard[]>>("/api/kanban");
+export const getProjects = () => json<ProjectState[]>("/api/projects");
+export const getProject = (id: string) =>
+  json<{ state: ProjectState; columns: Record<string, TaskCard[]> }>(`/api/projects/${id}`);
+export const approveProject = (id: string, card?: string) =>
+  json<ProjectState>(`/api/projects/${id}/approve`, {
+    method: "POST",
+    body: JSON.stringify({ card: card ?? null }),
+  });
+export const denyProject = (id: string, card: string) =>
+  json<ProjectState>(`/api/projects/${id}/deny`, { method: "POST", body: JSON.stringify({ card }) });
 
 export interface StreamHandlers {
   onSession?: (id: string) => void;

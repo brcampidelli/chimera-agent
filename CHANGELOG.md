@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Desktop app — Memory / Skills / Schedule / Tasks screens + feature API (M21 Fase C).** New
+  endpoints reuse the existing managers (no reimplementation, no reimplemented state): memory
+  (`GET/POST/DELETE /api/memory` + `/api/memory/profile`), skills (`GET /api/skills` +
+  approve/retire), cron (`GET /api/cron` + enable/disable/delete), and tasks (`GET /api/kanban`,
+  `GET /api/projects[/{id}]` + **HITL** `approve`/`deny` on milestone checkpoints). The
+  token-spending paths (running a project step, executing a skill) are deliberately kept off these
+  endpoints — the app drives those through chat/solve. The UI gains a left icon-rail navigating to
+  Chat / Memory (browse/search/add facts, persona flag, taint badges) / Skills (learned skills with
+  status + uses/wins + approve/retire) / Schedule (cron jobs with enable toggle) / Tasks (projects
+  with approve/deny for high-risk steps + the kanban board) / Settings.
 - **Desktop app — Settings screen + config API (M21 Fase B).** New `GET /api/config`, `PATCH
   /api/config`, and `GET /api/doctor` endpoints back a Settings screen (Model / API keys / Memory /
   Cache / Sandbox / Server token) mirroring the reference apps. **Secrets are never returned in

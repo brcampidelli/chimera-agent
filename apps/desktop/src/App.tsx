@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Moon, Sun } from "lucide-react";
+import { IconRail, type View } from "@/components/IconRail";
 import { Sessions } from "@/components/Sessions";
 import { Chat } from "@/components/Chat";
 import { Composer } from "@/components/Composer";
 import { Settings } from "@/components/Settings";
+import { Memory } from "@/components/Memory";
+import { Skills } from "@/components/Skills";
+import { Cron } from "@/components/Cron";
+import { Tasks } from "@/components/Tasks";
 import { Activity, type Status } from "@/components/Activity";
-import { Button } from "@/components/ui/button";
 import { deleteSession, getSession, listSessions, streamChat } from "@/lib/api";
 import type { Message, ToolEvent, TurnReport } from "@/lib/types";
 
@@ -28,7 +31,7 @@ export default function App() {
   const { dark, toggle } = useTheme();
   const { data: sessions = [] } = useQuery({ queryKey: ["sessions"], queryFn: listSessions });
 
-  const [view, setView] = useState<"chat" | "settings">("chat");
+  const [view, setView] = useState<View>("chat");
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [live, setLive] = useState("");
@@ -124,36 +127,33 @@ export default function App() {
 
   return (
     <div className="flex h-full">
-      <Sessions
-        sessions={sessions}
-        currentId={view === "chat" ? currentId : null}
-        settingsActive={view === "settings"}
-        onSelect={openSession}
-        onNew={newChat}
-        onDelete={removeSession}
-        onOpenSettings={() => setView("settings")}
-      />
+      <IconRail view={view} onSelect={setView} dark={dark} onToggleTheme={toggle} />
+      {view === "chat" && (
+        <Sessions
+          sessions={sessions}
+          currentId={currentId}
+          onSelect={openSession}
+          onNew={newChat}
+          onDelete={removeSession}
+        />
+      )}
       <main className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-border px-4 py-2.5">
-          <span className="text-sm font-medium text-muted-foreground">
-            {view === "settings"
-              ? "Settings"
-              : currentId
-                ? (sessions.find((s) => s.id === currentId)?.title ?? "Chat")
-                : "New chat"}
-          </span>
-          <Button size="icon" variant="ghost" onClick={toggle} title="Toggle theme">
-            {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
-        </header>
-        {view === "settings" ? (
-          <Settings />
-        ) : (
+        {view === "chat" && (
           <>
+            <header className="flex items-center border-b border-border px-4 py-2.5">
+              <span className="text-sm font-medium text-muted-foreground">
+                {currentId ? (sessions.find((s) => s.id === currentId)?.title ?? "Chat") : "New chat"}
+              </span>
+            </header>
             <Chat messages={messages} live={live} busy={busy} />
             <Composer busy={busy} onSend={send} onStop={stop} />
           </>
         )}
+        {view === "memory" && <Memory />}
+        {view === "skills" && <Skills />}
+        {view === "cron" && <Cron />}
+        {view === "tasks" && <Tasks />}
+        {view === "settings" && <Settings />}
       </main>
       {view === "chat" && <Activity status={status} tools={tools} report={report} />}
     </div>

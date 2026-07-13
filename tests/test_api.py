@@ -172,3 +172,71 @@ def test_config_endpoint_shape(tmp_path: Any) -> None:
     assert {"models", "memory", "cache", "sandbox", "server", "providers"} <= set(cfg)
     # no provider entry ever carries a raw key field
     assert all(set(p) == {"env", "label", "set", "hint"} for p in cfg["providers"])
+
+
+def test_cron_list_enable_disable_delete(monkeypatch: Any, tmp_path: Any) -> None:
+    # features.py reads get_settings().home, so point HOME at tmp_path and clear the cache; the client
+    # then shares that settings instance.
+    from chimera.config import Settings, get_settings
+    from chimera.scheduler import CronJob, CronStore
+
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path))
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-x")
+    get_settings.cache_clear()
+    store = CronStore(tmp_path / "scheduler" / "jobs.json")
+    store.add(CronJob(id="j1", name="daily", trigger="cron", schedule="0 9 * * *", action="brief"))
+
+    from fastapi.testclient import TestClient
+
+    from chimera.api import build_api_app
+
+    client = TestClient(build_api_app(lambda: ChatSession(_FakeAgent()), settings=Settings()))
+    jobs = client.get("/api/cron").json()
+    assert [j["id"] for j in jobs] == ["j1"] and jobs[0]["action"] == "brief"
+
+    assert client.post("/api/cron/j1/disable").json()["enabled"] is False
+    assert client.post("/api/cron/j1/enable").json()["enabled"] is True
+    assert client.post("/api/cron/nope/enable").status_code == 404
+    assert client.delete("/api/cron/j1").json() == {"deleted": True}
+    assert client.get("/api/cron").json() == []
+    get_settings.cache_clear()
+
+
+def _feature_client(monkeypatch: Any, tmp_path: Any) -> TestClient:
+    from chimera.config import Settings, get_settings
+
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path))
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-x")
+    get_settings.cache_clear()
+    from chimera.api import build_api_app
+
+    return TestClient(build_api_app(lambda: ChatSession(_FakeAgent()), settings=Settings()))
+
+
+def test_memory_add_list_delete(monkeypatch: Any, tmp_path: Any) -> None:
+    from chimera.config import get_settings
+
+    client = _feature_client(monkeypatch, tmp_path)
+    r = client.post("/api/memory", json={"content": "Bruno prefers HSL palettes", "kind": "semantic"})
+    assert r.json()["status"] in ("ADD", "UPDATE")
+    item_id = r.json()["item"]["id"]
+    listed = client.get("/api/memory").json()
+    assert any(m["content"] == "Bruno prefers HSL palettes" for m in listed)
+    assert client.post("/api/memory", json={"content": "x", "kind": "bogus"}).status_code == 400
+    assert client.delete(f"/api/memory/{item_id}").json() == {"deleted": True}
+    get_settings.cache_clear()
+
+
+def test_skills_list_and_approve(monkeypatch: Any, tmp_path: Any) -> None:
+    from chimera.config import get_settings
+    from chimera.evolution import SkillStore
+    from chimera.evolution.learned_skill import LearnedSkill
+
+    store = SkillStore(tmp_path / "skills.json")
+    store.add(LearnedSkill(name="reread", description="reread trick premises", do="x", check="y", status="pending"))
+    client = _feature_client(monkeypatch, tmp_path)
+    data = client.get("/api/skills").json()
+    assert any(s["name"] == "reread" for s in data["stats"])
+    assert client.post("/api/skills/reread/approve").json() == {"approved": True}
+    assert client.post("/api/skills/nope/approve").status_code == 404
+    get_settings.cache_clear()
