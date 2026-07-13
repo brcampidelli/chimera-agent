@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.21.2] - 2026-07-13
+
+**Desktop API hardening + a drift-proof typed frontend client.** An adversarial review of the new
+`chimera/api` surface fixed 8 bugs (2 security-relevant), and the frontend's types are now generated
+from the backend's OpenAPI schema so the two can't drift.
+
 ### Fixed
 - **Desktop API hardening — 8 fixes from the 17th adversarial review (2 security-relevant).** (1) The
   `.env` config write allowlisted the key but not the value, so a newline in a value could inject
