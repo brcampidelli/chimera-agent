@@ -16,6 +16,19 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, params
 from pydantic import BaseModel
 
+from chimera.api.schemas import (
+    ApprovedOut,
+    CronJobOut,
+    DeletedOut,
+    MemoryAddOut,
+    MemoryItemOut,
+    MemoryProfileOut,
+    ProjectDetailOut,
+    ProjectStateOut,
+    RetiredOut,
+    SkillsOut,
+    TaskCardOut,
+)
 from chimera.config import get_settings
 from chimera.telemetry import get_logger
 
@@ -122,13 +135,13 @@ def register_features(app: FastAPI, guard: params.Depends) -> None:
     """Attach the Fase C feature routes to ``app``. ``guard`` enforces the bearer token on mutations."""
 
     # ---- Memory -----------------------------------------------------------------------------------
-    @app.get("/api/memory")
+    @app.get("/api/memory", response_model=list[MemoryItemOut])
     def list_memory(q: str = "", k: int = 30) -> list[dict[str, Any]]:
         mgr = _memory_manager()
         items = mgr.search(q, k=k) if q.strip() else mgr.store.all()
         return [_item_dict(it) for it in items]
 
-    @app.get("/api/memory/profile")
+    @app.get("/api/memory/profile", response_model=MemoryProfileOut)
     def memory_profile() -> dict[str, Any]:
         mgr = _memory_manager()
         return {
@@ -136,7 +149,7 @@ def register_features(app: FastAPI, guard: params.Depends) -> None:
             "persona": [_item_dict(it) for it in mgr.store.by_kind("persona")],
         }
 
-    @app.post("/api/memory", dependencies=[guard])
+    @app.post("/api/memory", dependencies=[guard], response_model=MemoryAddOut)
     def add_memory(body: MemoryAdd) -> dict[str, Any]:
         if body.kind not in _MEMORY_KINDS:
             raise HTTPException(status_code=400, detail=f"kind must be one of {sorted(_MEMORY_KINDS)}")
@@ -144,35 +157,35 @@ def register_features(app: FastAPI, guard: params.Depends) -> None:
         status, item = mgr.remember(body.content, body.kind, key=body.key)
         return {"status": status, "item": _item_dict(item)}
 
-    @app.delete("/api/memory/{item_id}", dependencies=[guard])
+    @app.delete("/api/memory/{item_id}", dependencies=[guard], response_model=DeletedOut)
     def delete_memory(item_id: str) -> dict[str, bool]:
         _memory_manager().delete(item_id)
         return {"deleted": True}
 
     # ---- Skills -----------------------------------------------------------------------------------
-    @app.get("/api/skills")
+    @app.get("/api/skills", response_model=SkillsOut)
     def list_skills() -> dict[str, Any]:
         store = _skill_store()
         return {"stats": store.stats(), "retirement_candidates": store.retirement_candidates()}
 
-    @app.post("/api/skills/{name}/approve", dependencies=[guard])
+    @app.post("/api/skills/{name}/approve", dependencies=[guard], response_model=ApprovedOut)
     def approve_skill(name: str) -> dict[str, bool]:
         if not _skill_store().approve(name):
             raise HTTPException(status_code=404, detail="skill not found")
         return {"approved": True}
 
-    @app.post("/api/skills/{name}/retire", dependencies=[guard])
+    @app.post("/api/skills/{name}/retire", dependencies=[guard], response_model=RetiredOut)
     def retire_skill(name: str) -> dict[str, bool]:
         if not _skill_store().retire(name):
             raise HTTPException(status_code=404, detail="skill not found")
         return {"retired": True}
 
     # ---- Cron -------------------------------------------------------------------------------------
-    @app.get("/api/cron")
+    @app.get("/api/cron", response_model=list[CronJobOut])
     def list_cron() -> list[dict[str, Any]]:
         return [_job_dict(j) for j in _cron_store().list()]
 
-    @app.post("/api/cron/{job_id}/enable", dependencies=[guard])
+    @app.post("/api/cron/{job_id}/enable", dependencies=[guard], response_model=CronJobOut)
     def enable_cron(job_id: str) -> dict[str, Any]:
         from chimera.scheduler import Scheduler
 
@@ -181,7 +194,7 @@ def register_features(app: FastAPI, guard: params.Depends) -> None:
             raise HTTPException(status_code=404, detail="job not found")
         return _job_dict(Scheduler(store).enable(job_id, now=time.time()))
 
-    @app.post("/api/cron/{job_id}/disable", dependencies=[guard])
+    @app.post("/api/cron/{job_id}/disable", dependencies=[guard], response_model=CronJobOut)
     def disable_cron(job_id: str) -> dict[str, Any]:
         from chimera.scheduler import Scheduler
 
@@ -190,7 +203,7 @@ def register_features(app: FastAPI, guard: params.Depends) -> None:
             raise HTTPException(status_code=404, detail="job not found")
         return _job_dict(Scheduler(store).disable(job_id))
 
-    @app.delete("/api/cron/{job_id}", dependencies=[guard])
+    @app.delete("/api/cron/{job_id}", dependencies=[guard], response_model=DeletedOut)
     def delete_cron(job_id: str) -> dict[str, bool]:
         store = _cron_store()
         existed = job_id in store
@@ -198,7 +211,7 @@ def register_features(app: FastAPI, guard: params.Depends) -> None:
         return {"deleted": existed}
 
     # ---- Tasks: standalone kanban board + projects (with HITL approvals) --------------------------
-    @app.get("/api/kanban")
+    @app.get("/api/kanban", response_model=dict[str, list[TaskCardOut]])
     def get_kanban() -> dict[str, Any]:
         from chimera.kanban import KanbanBoard
         from chimera.kanban.models import COLUMNS
@@ -206,7 +219,7 @@ def register_features(app: FastAPI, guard: params.Depends) -> None:
         board = KanbanBoard(get_settings().home / "kanban.json")
         return {col: [_card_dict(c) for c in board.cards(col)] for col in COLUMNS}
 
-    @app.get("/api/projects")
+    @app.get("/api/projects", response_model=list[ProjectStateOut])
     def list_projects() -> list[dict[str, Any]]:
         from chimera.orchestration.project import ProjectState
 
@@ -220,7 +233,7 @@ def register_features(app: FastAPI, guard: params.Depends) -> None:
                     _log.debug("skipping unreadable project %s: %s", state_path, exc)
         return out
 
-    @app.get("/api/projects/{project_id}")
+    @app.get("/api/projects/{project_id}", response_model=ProjectDetailOut)
     def get_project(project_id: str) -> dict[str, Any]:
         from chimera.kanban import KanbanBoard
         from chimera.kanban.models import COLUMNS
@@ -235,13 +248,13 @@ def register_features(app: FastAPI, guard: params.Depends) -> None:
         columns = {col: [_card_dict(c) for c in board.cards(col)] for col in COLUMNS}
         return {"state": _state_dict(state), "columns": columns}
 
-    @app.post("/api/projects/{project_id}/approve", dependencies=[guard])
+    @app.post("/api/projects/{project_id}/approve", dependencies=[guard], response_model=ProjectStateOut)
     def approve_project(project_id: str, body: ApproveBody) -> dict[str, Any]:
         orch = _load_project(project_id)
         state = orch.approve_card(body.card) if body.card else orch.approve_plan()
         return _state_dict(state)
 
-    @app.post("/api/projects/{project_id}/deny", dependencies=[guard])
+    @app.post("/api/projects/{project_id}/deny", dependencies=[guard], response_model=ProjectStateOut)
     def deny_project(project_id: str, body: ApproveBody) -> dict[str, Any]:
         if not body.card:
             raise HTTPException(status_code=400, detail="card id required to deny")

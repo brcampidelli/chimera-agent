@@ -1,17 +1,26 @@
-// Hand-written now; the plan's fast-follow generates these from the backend's OpenAPI schema
-// (`/api/openapi.json`) via openapi-typescript, so the contract can't drift.
+// The API response types are GENERATED from the backend's OpenAPI schema (see `api-schema.ts`, built
+// by `npm run gen:api`). Re-exporting them here means the UI can't drift from the backend: if a
+// response model changes, regenerating the schema changes these types and any mismatch is a TS error.
+//
+// The chat stream is Server-Sent Events, not a typed HTTP body, so its event payloads (TurnReport,
+// ToolEvent) and the pure UI types (Message/Role) are hand-written below — they have no OpenAPI schema.
 
-export interface SessionMeta {
-  id: string;
-  title: string;
-  turns: number;
-  updated_at: number;
-}
+import type { components } from "@/lib/api-schema";
 
-export interface ChatTurn {
-  user: string;
-  assistant: string;
-}
+type Schemas = components["schemas"];
+
+export type SessionMeta = Schemas["SessionMetaOut"];
+export type ChatTurn = Schemas["TurnOut"];
+export type MemoryItem = Schemas["MemoryItemOut"];
+export type SkillStat = Schemas["SkillStatOut"];
+export type CronJob = Schemas["CronJobOut"];
+export type TaskCard = Schemas["TaskCardOut"];
+export type ProjectState = Schemas["ProjectStateOut"];
+export type ProviderCfg = Schemas["ProviderOut"];
+export type AppConfig = Schemas["ConfigOut"];
+export type DoctorInfo = Schemas["DoctorOut"];
+
+// --- SSE event payloads + UI-only types (not in the OpenAPI schema) ---
 
 export interface TurnReport {
   session_id: string;
@@ -31,92 +40,6 @@ export interface TurnReport {
 export interface ToolEvent {
   name: string;
   ok: boolean;
-}
-
-export interface ProviderCfg {
-  env: string;
-  label: string;
-  set: boolean;
-  hint: string;
-}
-
-export interface AppConfig {
-  models: {
-    default: string;
-    weak: string;
-    mid: string;
-    orchestrator: string;
-    cost_mode: string;
-    cascade: boolean;
-    api_base: string | null;
-    fallback_models: string[];
-    tiers: { weak: string; mid: string; top: string };
-  };
-  memory: { backend: string; semantic: boolean; auto_consolidate: boolean };
-  cache: { completion: boolean; prompt: boolean };
-  sandbox: { mode: string; image: string };
-  server: { token_set: boolean };
-  providers: ProviderCfg[];
-}
-
-export interface DoctorInfo {
-  has_any_key: boolean;
-  configured_providers: string[];
-  default_model: string;
-  tiers: { weak: string; mid: string; top: string };
-  memory_backend: string;
-  cache: boolean;
-  sandbox: string;
-}
-
-export interface MemoryItem {
-  id: string;
-  content: string;
-  kind: string;
-  provenance: string;
-  source: string;
-}
-
-export interface SkillStat {
-  name: string;
-  kind: string;
-  status: string;
-  provenance: string;
-  uses: number;
-  successes: number;
-  rate: number | null;
-}
-
-export interface CronJob {
-  id: string;
-  name: string;
-  trigger: string;
-  schedule: string;
-  action: string;
-  enabled: boolean;
-  next_run: number | null;
-  last_run: number | null;
-  created_by: string;
-}
-
-export interface TaskCard {
-  id: string;
-  title: string;
-  action: string;
-  column: string;
-  success: boolean | null;
-  risk: string | null;
-  depends_on: string[];
-}
-
-export interface ProjectState {
-  id: string;
-  status: string;
-  iterations: number;
-  plan_approved: boolean;
-  pending_card_id: string | null;
-  note: string;
-  max_iterations: number;
 }
 
 export type Role = "user" | "assistant";

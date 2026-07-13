@@ -28,6 +28,16 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
+from chimera.api.schemas import (
+    ConfigOut,
+    DeletedOut,
+    DoctorOut,
+    HealthOut,
+    NewSessionOut,
+    SessionDetailOut,
+    SessionMetaOut,
+    UpdatedOut,
+)
 from chimera.api.sessions import SessionManager, SessionStore
 from chimera.config import Settings, get_settings
 from chimera.core.agent import ToolActivity
@@ -81,17 +91,17 @@ def build_api_app(
 
     app = FastAPI(title="Chimera Desktop API", version="1", docs_url="/api/docs", openapi_url="/api/openapi.json")
 
-    @app.get("/api/health")
+    @app.get("/api/health", response_model=HealthOut)
     def health() -> dict[str, Any]:
         return {"status": "ok", "sessions": len(store.list())}
 
-    @app.get("/api/config")
+    @app.get("/api/config", response_model=ConfigOut)
     def read_config_endpoint() -> dict[str, Any]:
         from chimera.api.config_api import read_config
 
         return read_config(get_settings())  # fresh settings (a prior PATCH cleared the cache)
 
-    @app.patch("/api/config", dependencies=[guard])
+    @app.patch("/api/config", dependencies=[guard], response_model=UpdatedOut)
     def patch_config_endpoint(updates: dict[str, str]) -> dict[str, Any]:
         from chimera.api.config_api import patch_config
 
@@ -100,20 +110,20 @@ def build_api_app(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    @app.get("/api/doctor")
+    @app.get("/api/doctor", response_model=DoctorOut)
     def doctor_endpoint() -> dict[str, Any]:
         from chimera.api.config_api import doctor
 
         return doctor(get_settings())
 
-    @app.get("/api/sessions")
+    @app.get("/api/sessions", response_model=list[SessionMetaOut])
     def list_sessions() -> list[dict[str, Any]]:
         return [
             {"id": m.id, "title": m.title, "turns": m.turns, "updated_at": m.updated_at}
             for m in manager.list()
         ]
 
-    @app.get("/api/sessions/{session_id}")
+    @app.get("/api/sessions/{session_id}", response_model=SessionDetailOut)
     def get_session(session_id: str) -> dict[str, Any]:
         turns = store.load(session_id)
         if not turns and session_id not in [m.id for m in store.list()]:
@@ -123,11 +133,11 @@ def build_api_app(
             "turns": [{"user": t.user, "assistant": t.assistant} for t in turns],
         }
 
-    @app.post("/api/sessions", dependencies=[guard])
+    @app.post("/api/sessions", dependencies=[guard], response_model=NewSessionOut)
     def new_session() -> dict[str, str]:
         return {"id": manager.new()}
 
-    @app.delete("/api/sessions/{session_id}", dependencies=[guard])
+    @app.delete("/api/sessions/{session_id}", dependencies=[guard], response_model=DeletedOut)
     def delete_session(session_id: str) -> dict[str, bool]:
         return {"deleted": manager.delete(session_id)}
 

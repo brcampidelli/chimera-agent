@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Desktop API is fully typed; the frontend generates its types from it (no contract drift).** Every
+  desktop endpoint now declares a Pydantic `response_model` (`chimera/api/schemas.py`), so
+  `/api/openapi.json` describes exact response shapes. The frontend's API types are **generated** from
+  that schema (`python -m chimera.api.schema_dump` → `npm run gen:api` → `src/lib/api-schema.ts`) and
+  re-exported from `types.ts`, so a backend model change surfaces as a TypeScript build error instead
+  of a silent runtime mismatch. (The SSE chat-stream payloads stay hand-written — they aren't typed
+  HTTP bodies.)
+
 ## [0.21.1] - 2026-07-12
 
 ### Added

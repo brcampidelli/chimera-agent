@@ -44,6 +44,19 @@ npm --prefix apps/desktop run dev   # terminal 2: Vite dev server (proxies /api 
 
 Settings (models / API keys / cache / MCP), Memory, Skills, Cron and Tasks screens are Fase B/C.
 
-The hand-written types in `src/lib/types.ts` are a placeholder — the fast-follow generates them from
-the backend's OpenAPI schema (`/api/openapi.json`) via `openapi-typescript`, so the contract can't
-drift.
+## Typed API client (no drift)
+
+The API response types in `src/lib/types.ts` are **generated from the backend's OpenAPI schema**, so
+the UI can't drift from the server: every endpoint has a Pydantic `response_model` (`chimera/api/
+schemas.py`), and the frontend re-exports those shapes. If a backend model changes, regenerate and any
+mismatch becomes a TypeScript error at build time. To regenerate:
+
+```bash
+# 1. dump the schema from the backend (single source of truth)
+python -m chimera.api.schema_dump > apps/desktop/openapi.json
+# 2. generate the TypeScript definitions
+npm --prefix apps/desktop run gen:api    # openapi-typescript openapi.json → src/lib/api-schema.ts
+```
+
+(The chat stream is Server-Sent Events, not a typed HTTP body, so its event payloads stay hand-written
+in `types.ts`.)

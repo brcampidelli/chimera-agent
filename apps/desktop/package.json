@@ -8,17 +8,18 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "gen:api": "openapi-typescript openapi.json -o src/lib/api-schema.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.51.11",
     "clsx": "^2.1.1",
+    "highlight.js": "^11.10.0",
     "lucide-react": "^0.408.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^9.0.1",
     "rehype-highlight": "^7.0.0",
-    "highlight.js": "^11.10.0",
     "tailwind-merge": "^2.4.0"
   },
   "devDependencies": {
@@ -26,6 +27,7 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.19",
+    "openapi-typescript": "^7.13.0",
     "postcss": "^8.4.40",
     "tailwindcss": "^3.4.7",
     "typescript": "^5.5.4",
