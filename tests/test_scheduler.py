@@ -72,8 +72,9 @@ def test_structurally_broken_json_keeps_jobs_and_retries(tmp_path: Path) -> None
     path.write_text('[{"id": "j1", ', encoding="utf-8")  # truncated JSON, unparseable
     store.reload_if_changed()  # must not raise
     assert [j.id for j in store.list()] == ["j1"]  # kept, not wiped
-    # mtime was NOT advanced, so fixing the file triggers a fresh reload
+    # mtime was NOT advanced past the broken read, so fixing the file triggers a fresh reload.
     import json
+    import os
 
     path.write_text(
         json.dumps(
@@ -81,6 +82,11 @@ def test_structurally_broken_json_keeps_jobs_and_retries(tmp_path: Path) -> None
         ),
         encoding="utf-8",
     )
+    # Force a distinctly newer mtime: on coarse-granularity clocks (Windows) all three writes can
+    # share one tick, which would make reload_if_changed miss the fix — this asserts the *logic*
+    # (a changed file reloads) without depending on wall-clock resolution.
+    future = path.stat().st_mtime + 10
+    os.utime(path, (future, future))
     assert store.reload_if_changed() is True
     assert [j.id for j in store.list()] == ["j2"]
 
