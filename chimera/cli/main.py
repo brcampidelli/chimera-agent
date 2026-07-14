@@ -1077,8 +1077,13 @@ def desktop_app(
 
     settings = get_settings()
     if not settings.has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
-        raise typer.Exit(code=1)
+        # Unlike run/solve/fuse (which need a model to do their job and stay strict), the desktop app
+        # can BOOT keyless: LLMGateway() below is lazy (no model call), and the UI opens a first-run
+        # setup screen that adds + live-tests a key from the browser. So notify and CONTINUE, don't exit.
+        console.print(
+            "[yellow]No provider key yet[/yellow] — the app opens a setup screen; "
+            "add a key there to start chatting."
+        )
 
     llm = LLMGateway()
     from chimera.fusion import FusionEngine, RoutedBackend

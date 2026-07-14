@@ -1,5 +1,6 @@
 import type {
   AppConfig,
+  ConfigTest,
   CronJob,
   DoctorInfo,
   GovernanceAudit,
@@ -53,6 +54,13 @@ export const getTools = () => json<Tools>("/api/tools");
 export const getMaturity = () => json<Maturity>("/api/maturity");
 export const patchConfig = (updates: Record<string, string>) =>
   json<{ updated: string[] }>("/api/config", { method: "PATCH", body: JSON.stringify(updates) });
+// The ONLY honest "key works" call: makes a real 1-token completion server-side. `ok:true` means it
+// authenticated; otherwise `error` carries a short, secret-free message. Used by the onboarding wizard.
+export const testProviderKey = (model?: string) =>
+  json<ConfigTest>("/api/config/test", {
+    method: "POST",
+    body: JSON.stringify({ model: model ?? null }),
+  });
 
 // --- Memory ---
 export const getMemory = (q = "") =>

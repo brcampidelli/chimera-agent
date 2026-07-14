@@ -345,6 +345,18 @@ def test_patch_config_writes_env_atomically(tmp_path: Any) -> None:
     assert not list(tmp_path.glob(".env.tmp"))  # atomic temp cleaned up
 
 
+def test_patch_config_updates_process_env_live(monkeypatch: Any, tmp_path: Any) -> None:
+    # A key set through the wizard must be usable THIS session (no restart): patch_config also writes
+    # os.environ, so the running gateway / get_settings() sees it immediately, not only the .env file.
+    from chimera.api.config_api import patch_config
+
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    patch_config({"OPENROUTER_API_KEY": "sk-live-now"}, env_path=tmp_path / ".env")
+    import os
+
+    assert os.environ["OPENROUTER_API_KEY"] == "sk-live-now"
+
+
 def test_config_endpoint_shape(tmp_path: Any) -> None:
     cfg = _client(tmp_path).get("/api/config").json()
     assert {"models", "memory", "cache", "sandbox", "server", "providers"} <= set(cfg)

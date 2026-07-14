@@ -185,6 +185,53 @@
         "title": "ConfigOut",
         "type": "object"
       },
+      "ConfigTestOut": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "model",
+          "error"
+        ],
+        "title": "ConfigTestOut",
+        "type": "object"
+      },
+      "ConfigTestRequest": {
+        "properties": {
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          }
+        },
+        "title": "ConfigTestRequest",
+        "type": "object"
+      },
       "CronJobOut": {
         "properties": {
           "action": {
@@ -1799,6 +1846,44 @@
           }
         },
         "summary": "Patch Config Endpoint"
+      }
+    },
+    "/api/config/test": {
+      "post": {
+        "operationId": "config_test_endpoint_api_config_test_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigTestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigTestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Config Test Endpoint"
       }
     },
     "/api/cron": {

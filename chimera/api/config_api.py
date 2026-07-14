@@ -14,6 +14,7 @@ This maps directly to the competitor's Model / API-Keys / Gateway settings panes
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -145,5 +146,9 @@ def patch_config(updates: dict[str, str], *, env_path: Path | None = None) -> di
     path = env_path or Path(".env")
     for key, value in updates.items():
         _write_env_var(path, key, str(value))
+        # Also update the live process env, so the running gateway / get_settings() sees the new value
+        # THIS session without a restart — a key added in the onboarding wizard is usable immediately
+        # (Settings reads from os.environ; .env is only re-read on a fresh process).
+        os.environ[key] = str(value)
     get_settings.cache_clear()  # the lru_cache must not serve stale settings after a write
     return {"updated": sorted(updates)}

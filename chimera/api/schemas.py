@@ -118,6 +118,12 @@ class DoctorOut(BaseModel):
     sandbox: str
 
 
+class ConfigTestOut(BaseModel):
+    ok: bool  # True ONLY after a real 1-token call authenticated — the sole honest "key works" signal
+    model: str  # the model the test call used (the given one, or the default)
+    error: str | None  # a short, secret-free failure message when ok is False; null on success
+
+
 # --- memory ---------------------------------------------------------------------------------------
 
 

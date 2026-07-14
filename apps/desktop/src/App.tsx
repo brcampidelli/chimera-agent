@@ -15,8 +15,10 @@ import { Runs } from "@/components/Runs";
 import { Governance } from "@/components/Governance";
 import { Maturity } from "@/components/Maturity";
 import { Tools } from "@/components/Tools";
+import { Onboarding } from "@/components/Onboarding";
 import { Activity, type Status } from "@/components/Activity";
-import { deleteSession, getSession, listSessions, streamChat } from "@/lib/api";
+import { Spinner } from "@/components/ui/panel";
+import { deleteSession, getDoctor, getSession, listSessions, streamChat } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import type { Message, ToolEvent, TurnReport } from "@/lib/types";
 
@@ -38,6 +40,10 @@ export default function App() {
   const t = useT();
   const { dark, toggle } = useTheme();
   const { data: sessions = [] } = useQuery({ queryKey: ["sessions"], queryFn: listSessions });
+  // First-run gate: no provider key => show the Onboarding wizard instead of the app (a keyed user
+  // never sees it). Session-local "skip" lets a GUI-first user jump to Settings without a key yet.
+  const doctor = useQuery({ queryKey: ["doctor"], queryFn: getDoctor });
+  const [skipOnboarding, setSkipOnboarding] = useState(false);
 
   const [view, setView] = useState<View>("chat");
   const [currentId, setCurrentId] = useState<string | null>(null);
@@ -133,6 +139,26 @@ export default function App() {
     setStatus("idle");
     setLive("");
   }, []);
+
+  // Gate the first render on the doctor's key check (all hooks above always run, so this stays a
+  // safe early return). While loading, a spinner; no key + not skipped => the setup wizard.
+  if (doctor.isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Spinner />
+      </div>
+    );
+  }
+  if (doctor.data && !doctor.data.has_any_key && !skipOnboarding) {
+    return (
+      <Onboarding
+        onSkip={() => {
+          setSkipOnboarding(true);
+          setView("settings");
+        }}
+      />
+    );
+  }
 
   return (
     <div className="flex h-full">

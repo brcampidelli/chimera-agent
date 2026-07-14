@@ -39,6 +39,23 @@ export interface paths {
         patch: operations["patch_config_endpoint_api_config_patch"];
         trace?: never;
     };
+    "/api/config/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Config Test Endpoint */
+        post: operations["config_test_endpoint_api_config_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cron": {
         parameters: {
             query?: never;
@@ -558,6 +575,20 @@ export interface components {
             providers: components["schemas"]["ProviderOut"][];
             sandbox: components["schemas"]["SandboxCfgOut"];
             server: components["schemas"]["ServerCfgOut"];
+        };
+        /** ConfigTestOut */
+        ConfigTestOut: {
+            /** Error */
+            error: string | null;
+            /** Model */
+            model: string;
+            /** Ok */
+            ok: boolean;
+        };
+        /** ConfigTestRequest */
+        ConfigTestRequest: {
+            /** Model */
+            model?: string | null;
         };
         /** CronJobOut */
         CronJobOut: {
@@ -1171,6 +1202,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UpdatedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    config_test_endpoint_api_config_test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfigTestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigTestOut"];
                 };
             };
             /** @description Validation Error */

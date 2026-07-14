@@ -239,6 +239,20 @@ const en: Dict = {
     "Maturity is measured against the source test suite (present in a source checkout or CI). It isn't available in this build.",
   "maturity.coverageNote":
     "Coverage = a test with that stem exists (evidence presence), not that it passes; performance benchmarks are not shown.",
+  "onboarding.title": "Welcome to Chimera",
+  "onboarding.intro":
+    "Chimera needs one provider key to start — a single OpenRouter key unlocks 100+ models.",
+  "onboarding.keyLabel": "OpenRouter API key",
+  "onboarding.save": "Save",
+  "onboarding.test": "Test key",
+  "onboarding.saved": "Key saved (present) — test it to confirm it works.",
+  "onboarding.verified": "Verified — it works.",
+  "onboarding.testFailed": "The test call failed.",
+  "onboarding.model": "Default model (optional)",
+  "onboarding.costMode": "Cost mode",
+  "onboarding.finish": "Finish",
+  "onboarding.skip": "Skip to Settings",
+  "onboarding.getKeyLink": "Get a key at openrouter.ai/keys",
 };
 
 const pt: Dict = {
@@ -455,6 +469,20 @@ const pt: Dict = {
     "A maturidade é medida contra a suíte de testes do código-fonte (presente em um checkout ou na CI). Não está disponível nesta build.",
   "maturity.coverageNote":
     "Cobertura = existe um teste com aquele nome (presença de evidência), não que ele passe; benchmarks de desempenho não são exibidos.",
+  "onboarding.title": "Bem-vindo ao Chimera",
+  "onboarding.intro":
+    "O Chimera precisa de uma chave de provedor para começar — uma única chave OpenRouter libera mais de 100 modelos.",
+  "onboarding.keyLabel": "Chave de API do OpenRouter",
+  "onboarding.save": "Salvar",
+  "onboarding.test": "Testar chave",
+  "onboarding.saved": "Chave salva (presente) — teste para confirmar que funciona.",
+  "onboarding.verified": "Verificada — funciona.",
+  "onboarding.testFailed": "A chamada de teste falhou.",
+  "onboarding.model": "Modelo padrão (opcional)",
+  "onboarding.costMode": "Modo de custo",
+  "onboarding.finish": "Concluir",
+  "onboarding.skip": "Pular para Configurações",
+  "onboarding.getKeyLink": "Obtenha uma chave em openrouter.ai/keys",
 };
 
 const es: Dict = {
@@ -671,6 +699,20 @@ const es: Dict = {
     "La madurez se mide contra la suite de pruebas del código fuente (presente en un checkout o en CI). No está disponible en esta build.",
   "maturity.coverageNote":
     "Cobertura = existe una prueba con ese nombre (presencia de evidencia), no que pase; no se muestran benchmarks de rendimiento.",
+  "onboarding.title": "Bienvenido a Chimera",
+  "onboarding.intro":
+    "Chimera necesita una clave de proveedor para empezar — una sola clave de OpenRouter desbloquea más de 100 modelos.",
+  "onboarding.keyLabel": "Clave de API de OpenRouter",
+  "onboarding.save": "Guardar",
+  "onboarding.test": "Probar clave",
+  "onboarding.saved": "Clave guardada (presente) — pruébala para confirmar que funciona.",
+  "onboarding.verified": "Verificada — funciona.",
+  "onboarding.testFailed": "La llamada de prueba falló.",
+  "onboarding.model": "Modelo por defecto (opcional)",
+  "onboarding.costMode": "Modo de coste",
+  "onboarding.finish": "Finalizar",
+  "onboarding.skip": "Ir a Ajustes",
+  "onboarding.getKeyLink": "Consigue una clave en openrouter.ai/keys",
 };
 
 const fr: Dict = {
@@ -887,6 +929,20 @@ const fr: Dict = {
     "La maturité est mesurée par rapport à la suite de tests du code source (présente dans un checkout ou en CI). Elle n'est pas disponible dans cette build.",
   "maturity.coverageNote":
     "Couverture = un test portant ce nom existe (présence de preuve), pas qu'il réussit ; les benchmarks de performance ne sont pas affichés.",
+  "onboarding.title": "Bienvenue sur Chimera",
+  "onboarding.intro":
+    "Chimera a besoin d'une clé de fournisseur pour démarrer — une seule clé OpenRouter débloque plus de 100 modèles.",
+  "onboarding.keyLabel": "Clé d'API OpenRouter",
+  "onboarding.save": "Enregistrer",
+  "onboarding.test": "Tester la clé",
+  "onboarding.saved": "Clé enregistrée (présente) — testez-la pour confirmer qu'elle fonctionne.",
+  "onboarding.verified": "Vérifiée — elle fonctionne.",
+  "onboarding.testFailed": "L'appel de test a échoué.",
+  "onboarding.model": "Modèle par défaut (optionnel)",
+  "onboarding.costMode": "Mode de coût",
+  "onboarding.finish": "Terminer",
+  "onboarding.skip": "Aller aux Paramètres",
+  "onboarding.getKeyLink": "Obtenez une clé sur openrouter.ai/keys",
 };
 
 const de: Dict = {
@@ -1103,6 +1159,20 @@ const de: Dict = {
     "Die Reife wird gegen die Quellcode-Testsuite gemessen (in einem Checkout oder in CI vorhanden). In diesem Build ist sie nicht verfügbar.",
   "maturity.coverageNote":
     "Abdeckung = ein Test mit diesem Namen existiert (Nachweis vorhanden), nicht dass er besteht; Performance-Benchmarks werden nicht angezeigt.",
+  "onboarding.title": "Willkommen bei Chimera",
+  "onboarding.intro":
+    "Chimera braucht einen Anbieter-Schlüssel zum Start — ein einziger OpenRouter-Schlüssel schaltet über 100 Modelle frei.",
+  "onboarding.keyLabel": "OpenRouter-API-Schlüssel",
+  "onboarding.save": "Speichern",
+  "onboarding.test": "Schlüssel testen",
+  "onboarding.saved": "Schlüssel gespeichert (vorhanden) — teste ihn, um zu bestätigen, dass er funktioniert.",
+  "onboarding.verified": "Verifiziert — er funktioniert.",
+  "onboarding.testFailed": "Der Testaufruf ist fehlgeschlagen.",
+  "onboarding.model": "Standardmodell (optional)",
+  "onboarding.costMode": "Kostenmodus",
+  "onboarding.finish": "Fertig",
+  "onboarding.skip": "Zu den Einstellungen",
+  "onboarding.getKeyLink": "Hol dir einen Schlüssel auf openrouter.ai/keys",
 };
 
 const zh: Dict = {
@@ -1318,6 +1388,20 @@ const zh: Dict = {
     "成熟度是针对源码测试套件衡量的（存在于源码检出或 CI 中）。此构建中不可用。",
   "maturity.coverageNote":
     "覆盖 = 存在一个以该词干命名的测试（证据存在），并不代表它通过；不展示性能基准。",
+  "onboarding.title": "欢迎使用 Chimera",
+  "onboarding.intro":
+    "Chimera 需要一个提供商密钥才能开始 —— 一个 OpenRouter 密钥即可解锁 100+ 模型。",
+  "onboarding.keyLabel": "OpenRouter API 密钥",
+  "onboarding.save": "保存",
+  "onboarding.test": "测试密钥",
+  "onboarding.saved": "密钥已保存（已存在）—— 测试以确认它可用。",
+  "onboarding.verified": "已验证 —— 可用。",
+  "onboarding.testFailed": "测试调用失败。",
+  "onboarding.model": "默认模型（可选）",
+  "onboarding.costMode": "成本模式",
+  "onboarding.finish": "完成",
+  "onboarding.skip": "跳转到设置",
+  "onboarding.getKeyLink": "在 openrouter.ai/keys 获取密钥",
 };
 
 const ja: Dict = {
@@ -1533,6 +1617,20 @@ const ja: Dict = {
     "成熟度はソースのテストスイート（ソースチェックアウトや CI に存在）に対して測定されます。このビルドでは利用できません。",
   "maturity.coverageNote":
     "カバレッジ = その名前のテストが存在すること（証拠の有無）であり、合格を意味しません。性能ベンチマークは表示されません。",
+  "onboarding.title": "Chimera へようこそ",
+  "onboarding.intro":
+    "Chimera を始めるにはプロバイダーのキーが 1 つ必要です —— OpenRouter のキー 1 つで 100 以上のモデルが使えます。",
+  "onboarding.keyLabel": "OpenRouter API キー",
+  "onboarding.save": "保存",
+  "onboarding.test": "キーをテスト",
+  "onboarding.saved": "キーを保存しました（設定済み）—— テストして動作を確認してください。",
+  "onboarding.verified": "検証済み —— 動作します。",
+  "onboarding.testFailed": "テスト呼び出しに失敗しました。",
+  "onboarding.model": "既定のモデル（任意）",
+  "onboarding.costMode": "コストモード",
+  "onboarding.finish": "完了",
+  "onboarding.skip": "設定へスキップ",
+  "onboarding.getKeyLink": "openrouter.ai/keys でキーを取得",
 };
 
 const DICTS: Record<Lang, Dict> = { en, pt, es, fr, de, zh, ja };

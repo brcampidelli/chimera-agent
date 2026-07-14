@@ -34,6 +34,7 @@ from chimera.api.maturity_api import maturity_report
 from chimera.api.runs import load_runs
 from chimera.api.schemas import (
     ConfigOut,
+    ConfigTestOut,
     DeletedOut,
     DoctorOut,
     GovernanceAuditOut,
@@ -70,6 +71,11 @@ class ChatRequest(BaseModel):
     fuse: bool = False
     """Route THIS turn through the fusion engine (panel → judge → synthesizer), tool-free — so the
     Fusion screen can show how the answer was composed. Off = the session's normal backend."""
+
+
+class ConfigTestRequest(BaseModel):
+    model: str | None = None
+    """The model slug to test-call. None = the configured default model."""
 
 
 class RunRequest(BaseModel):
@@ -165,6 +171,15 @@ def build_api_app(
         from chimera.api.config_api import doctor
 
         return doctor(get_settings())
+
+    @app.post("/api/config/test", dependencies=[guard], response_model=ConfigTestOut)
+    def config_test_endpoint(req: ConfigTestRequest) -> dict[str, Any]:
+        # The ONLY endpoint that makes a real model call: a minimal 1-token completion so the
+        # onboarding wizard can honestly say "key works" — presence checks (doctor) never authenticate.
+        # Failures come back as {ok:false, error} (short, secret-free), never a 500.
+        from chimera.api.config_test import test_provider
+
+        return test_provider(req.model)
 
     @app.get("/api/usage", dependencies=[guard], response_model=UsageSummaryOut)
     def usage_endpoint() -> dict[str, Any]:

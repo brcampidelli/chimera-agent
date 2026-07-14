@@ -20,6 +20,7 @@ export type ProjectState = Schemas["ProjectStateOut"];
 export type ProviderCfg = Schemas["ProviderOut"];
 export type AppConfig = Schemas["ConfigOut"];
 export type DoctorInfo = Schemas["DoctorOut"];
+export type ConfigTest = Schemas["ConfigTestOut"];
 export type UsageSummary = Schemas["UsageSummaryOut"];
 export type RunReceipt = Schemas["RunReceiptOut"];
 export type AttemptReceipt = Schemas["AttemptReceiptOut"];

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **First-run onboarding wizard: the desktop app now boots without a key and guides you to add +
+  live-test an OpenRouter key from the UI (`chimera app` no longer hard-exits without a key).** When
+  the doctor reports no provider key, the app opens a full-screen setup screen (the GUI equivalent of
+  `chimera init`) instead of the chat: paste an OpenRouter key, Save it, then Test it. It stays
+  honest about "present vs verified" — after Save the key is only *saved (present)*; it says
+  *verified — it works* ONLY after a real 1-token call passes, via the one new endpoint
+  `POST /api/config/test` (`ConfigTestOut`, the sole place that authenticates a key; presence checks
+  never do). A wizard-set key is usable the same session (PATCH now also updates the live process
+  env), and a keyed user never sees the wizard. Optional default-model + cost-mode selects and a
+  "skip to Settings" link are included; the CLI stays fully sovereign (only `chimera app` relaxes —
+  run/solve/fuse still require a key).
 - **Tools screen: lists the agent's registered tools with capability tags (network/read/write/exec/side-effect).**
 - **Maturity screen: the agent's coverage scorecard by surface (live from the test suite, or a shipped snapshot), with the weakest surface highlighted.**
 
