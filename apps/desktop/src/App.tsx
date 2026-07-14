@@ -11,6 +11,7 @@ import { Cron } from "@/components/Cron";
 import { Tasks } from "@/components/Tasks";
 import { Fusion } from "@/components/Fusion";
 import { Usage } from "@/components/Usage";
+import { Runs } from "@/components/Runs";
 import { Activity, type Status } from "@/components/Activity";
 import { deleteSession, getSession, listSessions, streamChat } from "@/lib/api";
 import { useT } from "@/lib/i18n";
@@ -162,6 +163,7 @@ export default function App() {
         {view === "tasks" && <Tasks />}
         {view === "fusion" && <Fusion report={report} />}
         {view === "usage" && <Usage />}
+        {view === "runs" && <Runs />}
         {view === "settings" && <Settings />}
       </main>
       {view === "chat" && <Activity status={status} tools={tools} report={report} />}

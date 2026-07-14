@@ -31,6 +31,49 @@
         "title": "ApprovedOut",
         "type": "object"
       },
+      "AttemptReceiptOut": {
+        "properties": {
+          "diff_summary": {
+            "title": "Diff Summary",
+            "type": "string"
+          },
+          "feedback": {
+            "title": "Feedback",
+            "type": "string"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "reverted": {
+            "title": "Reverted",
+            "type": "boolean"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          },
+          "verified": {
+            "title": "Verified",
+            "type": "boolean"
+          },
+          "verify_output": {
+            "title": "Verify Output",
+            "type": "string"
+          }
+        },
+        "required": [
+          "index",
+          "verified",
+          "reverted",
+          "success",
+          "verify_output",
+          "diff_summary",
+          "feedback"
+        ],
+        "title": "AttemptReceiptOut",
+        "type": "object"
+      },
       "CacheCfgOut": {
         "properties": {
           "completion": {
@@ -585,6 +628,59 @@
           "retired"
         ],
         "title": "RetiredOut",
+        "type": "object"
+      },
+      "RunReceiptOut": {
+        "properties": {
+          "answer": {
+            "title": "Answer",
+            "type": "string"
+          },
+          "attempts": {
+            "items": {
+              "$ref": "#/components/schemas/AttemptReceiptOut"
+            },
+            "title": "Attempts",
+            "type": "array"
+          },
+          "paused": {
+            "title": "Paused",
+            "type": "boolean"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          },
+          "ts": {
+            "title": "Ts",
+            "type": "string"
+          },
+          "verify_command": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verify Command"
+          }
+        },
+        "required": [
+          "ts",
+          "task",
+          "success",
+          "paused",
+          "verify_command",
+          "answer",
+          "attempts"
+        ],
+        "title": "RunReceiptOut",
         "type": "object"
       },
       "SandboxCfgOut": {
@@ -1717,6 +1813,28 @@
           }
         },
         "summary": "Deny Project"
+      }
+    },
+    "/api/runs": {
+      "get": {
+        "operationId": "runs_endpoint_api_runs_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RunReceiptOut"
+                  },
+                  "title": "Response Runs Endpoint Api Runs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Runs Endpoint"
       }
     },
     "/api/sessions": {

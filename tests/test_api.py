@@ -163,6 +163,29 @@ def test_chat_turn_appends_usage_line_and_usage_endpoint_summarizes(tmp_path: An
     assert summary["route_mix"] == {"single": 1, "fusion": 0, "cascade": 0}
 
 
+def test_runs_endpoint_returns_receipts_newest_first(tmp_path: Any) -> None:
+    from chimera.api.runs import RunReceipt, append_run
+
+    # Seed two run receipts under the client's home (append order = chronological).
+    run_log = tmp_path / "home" / "runs.jsonl"
+    append_run(run_log, RunReceipt(ts="2026-07-13T00:00:00+00:00", task="older", success=True))
+    append_run(
+        run_log,
+        RunReceipt(
+            ts="2026-07-13T01:00:00+00:00",
+            task="newer",
+            success=False,
+            verify_command="pytest -q",
+        ),
+    )
+
+    client = _client(tmp_path)
+    runs = client.get("/api/runs").json()
+    assert [r["task"] for r in runs] == ["newer", "older"]  # most recent first
+    assert runs[0]["success"] is False and runs[0]["verify_command"] == "pytest -q"
+    assert runs[1]["success"] is True and runs[1]["verify_command"] is None
+
+
 def test_session_is_persisted_and_listed_and_deletable(tmp_path: Any) -> None:
     client = _client(tmp_path)
     resp = client.post("/api/chat/stream", json={"message": "remember me", "stream": True})

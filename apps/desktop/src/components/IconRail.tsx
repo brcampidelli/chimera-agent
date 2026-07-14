@@ -7,6 +7,7 @@ import {
   KanbanSquare,
   Network,
   BarChart3,
+  ListChecks,
   Settings as SettingsIcon,
   Moon,
   Sun,
@@ -23,6 +24,7 @@ export type View =
   | "tasks"
   | "fusion"
   | "usage"
+  | "runs"
   | "settings";
 
 const NAV: { view: View; labelKey: string; icon: ComponentType<{ className?: string }> }[] = [
@@ -33,6 +35,7 @@ const NAV: { view: View; labelKey: string; icon: ComponentType<{ className?: str
   { view: "tasks", labelKey: "nav.tasks", icon: KanbanSquare },
   { view: "fusion", labelKey: "nav.fusion", icon: Network },
   { view: "usage", labelKey: "nav.usage", icon: BarChart3 },
+  { view: "runs", labelKey: "nav.runs", icon: ListChecks },
 ];
 
 function RailButton({

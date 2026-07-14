@@ -255,3 +255,26 @@ class UsageSummaryOut(BaseModel):
     by_session: list[UsageSessionOut]
     cache_hit_pct: float | None  # cache_read / (prompt + cache_read), or None when the denominator is 0
     route_mix: dict[str, int]  # {"single", "fusion", "cascade"} turn counts
+
+
+# --- runs (autonomous run receipts) ---------------------------------------------------------------
+
+
+class AttemptReceiptOut(BaseModel):
+    index: int
+    verified: bool  # executable evidence passed for this attempt
+    reverted: bool  # the workspace was rolled back after this attempt failed
+    success: bool
+    verify_output: str  # the concrete verifier output (test/assert), truncated
+    diff_summary: str  # what this attempt actually changed in the workspace, audited before any revert
+    feedback: str  # the retry feedback this attempt produced, truncated
+
+
+class RunReceiptOut(BaseModel):
+    ts: str  # ISO-8601 UTC timestamp of the run's completion
+    task: str  # the task text, truncated
+    success: bool
+    paused: bool  # interrupted for human approval (paused runs aren't persisted; false in practice)
+    verify_command: str | None  # the shell command that judged the run, or null (no verifier)
+    answer: str  # the final answer, truncated
+    attempts: list[AttemptReceiptOut]  # the per-attempt verify-or-revert proof trail

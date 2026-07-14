@@ -2468,6 +2468,9 @@ def solve(
             on_event=_stream_sink if stream else None,
             # Durable execution (--thread): checkpoint the loop to SQLite so a crash can resume.
             checkpointer=RunCheckpointer(settings.home / "runs.db") if thread else None,
+            # Run receipt: persist how this run proved its work (verify-or-revert per attempt) to an
+            # append-only log the desktop "Runs" screen reads read-only. Best-effort — never fails a run.
+            run_log=settings.home / "runs.jsonl",
             config=AutonomousConfig(
                 max_attempts=max_attempts,
                 use_planner=not no_plan,

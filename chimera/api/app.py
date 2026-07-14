@@ -29,12 +29,14 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
+from chimera.api.runs import load_runs
 from chimera.api.schemas import (
     ConfigOut,
     DeletedOut,
     DoctorOut,
     HealthOut,
     NewSessionOut,
+    RunReceiptOut,
     SessionDetailOut,
     SessionMetaOut,
     UpdatedOut,
@@ -133,6 +135,12 @@ def build_api_app(
     @app.get("/api/usage", dependencies=[guard], response_model=UsageSummaryOut)
     def usage_endpoint() -> dict[str, Any]:
         return summarize_usage(load_usage(settings.home / "usage.jsonl"))
+
+    @app.get("/api/runs", dependencies=[guard], response_model=list[RunReceiptOut])
+    def runs_endpoint() -> list[Any]:
+        # Read-only: the last 100 run receipts, most recent first. Persisting happens in the
+        # autonomous loop (CLI solve) — this surface never triggers a run (that's step 3b).
+        return list(reversed(load_runs(settings.home / "runs.jsonl")))[:100]
 
     @app.get("/api/sessions", dependencies=[guard], response_model=list[SessionMetaOut])
     def list_sessions() -> list[dict[str, Any]]:

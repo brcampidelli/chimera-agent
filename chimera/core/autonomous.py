@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
@@ -135,6 +136,7 @@ class Attempt:
     success: bool = False
     feedback: str = ""
     verify_output: str = ""
+    diff_summary: str = ""
 
 
 @dataclass
@@ -179,6 +181,7 @@ class AutonomousAgent:
         spine_workspace: Path | None = None,
         on_event: EventSink | None = None,
         checkpointer: RunCheckpointer | None = None,
+        run_log: Path | None = None,
         config: AutonomousConfig | None = None,
     ) -> None:
         self.worker = worker
@@ -208,6 +211,7 @@ class AutonomousAgent:
         self.spine_workspace = spine_workspace
         self.on_event = on_event
         self.checkpointer = checkpointer
+        self.run_log = run_log
         self.config = config or AutonomousConfig()
 
     def _emit(self, event: AgentEvent) -> None:
@@ -453,6 +457,7 @@ class AutonomousAgent:
                 pdiff = diff_snapshots(snapshot, self.guard.snapshot())
                 diff_productive = pdiff.is_productive
                 diff_summary = pdiff.audit_summary()
+                attempt.diff_summary = diff_summary or ""
             if not ok and snapshot is not None and self.guard is not None:
                 self.guard.restore(snapshot)
                 attempt.reverted = True
@@ -590,7 +595,9 @@ class AutonomousAgent:
         self._clear_checkpoint(thread_id)  # exhausted the budget — a terminal state, not resumable
         last = attempts[-1].answer if attempts else ""
         self._emit(_ev_final(False, last))
-        return AutonomousResult(answer=last, success=False, attempts=attempts, plan=plan)
+        result = AutonomousResult(answer=last, success=False, attempts=attempts, plan=plan)
+        self._persist_receipt(result, task)
+        return result
 
     def _finalize_success(
         self,
@@ -639,7 +646,29 @@ class AutonomousAgent:
             self._record_card_outcome(True)
         self._clear_checkpoint(thread_id)
         self._emit(_ev_final(True, answer))
-        return AutonomousResult(answer=answer, success=True, attempts=attempts, plan=plan)
+        result = AutonomousResult(answer=answer, success=True, attempts=attempts, plan=plan)
+        self._persist_receipt(result, task)
+        return result
+
+    def _persist_receipt(self, result: AutonomousResult, task: str) -> None:
+        """Append a run receipt recording how this finished run PROVED its work (read-only evidence).
+
+        Best-effort: persisting a receipt must NEVER break or fail a run, so any error (disk,
+        serialization) is swallowed with a debug log. Reads the verify command off the verifier when
+        it exposes one (``CommandVerifier.command``); ``None`` for a run with no executable verifier.
+        """
+        if self.run_log is None:
+            return
+        try:
+            from chimera.api.runs import append_run, build_receipt
+
+            verify_command = getattr(self.verifier, "command", None)
+            receipt = build_receipt(
+                result, task, verify_command, datetime.now(UTC).isoformat()
+            )
+            append_run(self.run_log, receipt)
+        except Exception as exc:  # noqa: BLE001 — receipt persistence is best-effort, never fatal
+            _log.debug("run receipt skipped: %s", exc)
 
     def _save_checkpoint(
         self,

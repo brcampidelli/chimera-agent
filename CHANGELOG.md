@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Runs screen in the desktop app.** A new read-only sidebar view shows how each autonomous run
+  (`chimera solve`) PROVED its work: per run, the task, a pass/fail/paused status badge, the verify
+  command that judged it, and the verify-or-revert attempt trail — each attempt's index, a
+  verified ✓/✗, a `reverted` (↩) flag, the workspace diff it actually made (audited before any
+  revert), and the concrete verifier output in a collapsible. Shows only real captured evidence —
+  an empty field is omitted, never fabricated; the empty state points at the CLI (an in-app run
+  trigger comes next). Each finished run is persisted best-effort to an append-only `runs.jsonl`
+  (persisting a receipt can never break a run) and served by a new guarded `GET /api/runs`
+  endpoint (`RunReceiptOut`, most recent first, last 100).
 - **Cost / Usage dashboard in the desktop app.** A new sidebar view aggregates every chat turn's
   real token/cost accounting: totals (turns · tokens · spend), a hand-rolled SVG spend-per-day chart
   (falls back to tokens/day when prices are unknown), a per-model ranked breakdown, top sessions, and

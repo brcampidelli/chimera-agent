@@ -31,6 +31,7 @@ const en: Dict = {
   "nav.skills": "Skills",
   "nav.schedule": "Schedule",
   "nav.tasks": "Tasks",
+  "nav.runs": "Runs",
   "nav.settings": "Settings",
   "theme.light": "Light theme",
   "theme.dark": "Dark theme",
@@ -157,6 +158,18 @@ const en: Dict = {
   "usage.single": "single",
   "usage.fusion": "fusion",
   "usage.cascade": "cascade",
+  "runs.title": "Runs",
+  "runs.empty":
+    "No runs yet — run `chimera solve \"…\" --verify \"…\"` from the CLI (an in-app trigger is coming next).",
+  "runs.passed": "passed",
+  "runs.failed": "failed",
+  "runs.paused": "paused",
+  "runs.verifyCmd": "Verify",
+  "runs.attempt": "Attempt",
+  "runs.reverted": "reverted",
+  "runs.diff": "diff",
+  "runs.output": "verifier output",
+  "runs.noVerify": "no verify command",
 };
 
 const pt: Dict = {
@@ -165,6 +178,7 @@ const pt: Dict = {
   "nav.skills": "Habilidades",
   "nav.schedule": "Agenda",
   "nav.tasks": "Tarefas",
+  "nav.runs": "Execuções",
   "nav.settings": "Configurações",
   "theme.light": "Tema claro",
   "theme.dark": "Tema escuro",
@@ -291,6 +305,18 @@ const pt: Dict = {
   "usage.single": "único",
   "usage.fusion": "fusão",
   "usage.cascade": "cascata",
+  "runs.title": "Execuções",
+  "runs.empty":
+    "Nenhuma execução ainda — rode `chimera solve \"…\" --verify \"…\"` pelo CLI (um gatilho no app vem a seguir).",
+  "runs.passed": "aprovada",
+  "runs.failed": "falhou",
+  "runs.paused": "pausada",
+  "runs.verifyCmd": "Verificação",
+  "runs.attempt": "Tentativa",
+  "runs.reverted": "revertida",
+  "runs.diff": "diff",
+  "runs.output": "saída do verificador",
+  "runs.noVerify": "sem comando de verificação",
 };
 
 const es: Dict = {
@@ -299,6 +325,7 @@ const es: Dict = {
   "nav.skills": "Habilidades",
   "nav.schedule": "Agenda",
   "nav.tasks": "Tareas",
+  "nav.runs": "Ejecuciones",
   "nav.settings": "Ajustes",
   "theme.light": "Tema claro",
   "theme.dark": "Tema oscuro",
@@ -425,6 +452,18 @@ const es: Dict = {
   "usage.single": "único",
   "usage.fusion": "fusión",
   "usage.cascade": "cascada",
+  "runs.title": "Ejecuciones",
+  "runs.empty":
+    "Aún no hay ejecuciones — ejecuta `chimera solve \"…\" --verify \"…\"` desde el CLI (un disparador en la app llega pronto).",
+  "runs.passed": "aprobada",
+  "runs.failed": "fallida",
+  "runs.paused": "pausada",
+  "runs.verifyCmd": "Verificación",
+  "runs.attempt": "Intento",
+  "runs.reverted": "revertida",
+  "runs.diff": "diff",
+  "runs.output": "salida del verificador",
+  "runs.noVerify": "sin comando de verificación",
 };
 
 const fr: Dict = {
@@ -433,6 +472,7 @@ const fr: Dict = {
   "nav.skills": "Compétences",
   "nav.schedule": "Planning",
   "nav.tasks": "Tâches",
+  "nav.runs": "Exécutions",
   "nav.settings": "Paramètres",
   "theme.light": "Thème clair",
   "theme.dark": "Thème sombre",
@@ -559,6 +599,18 @@ const fr: Dict = {
   "usage.single": "simple",
   "usage.fusion": "fusion",
   "usage.cascade": "cascade",
+  "runs.title": "Exécutions",
+  "runs.empty":
+    "Aucune exécution pour l'instant — lancez `chimera solve \"…\" --verify \"…\"` depuis le CLI (un déclencheur dans l'app arrive bientôt).",
+  "runs.passed": "réussie",
+  "runs.failed": "échouée",
+  "runs.paused": "en pause",
+  "runs.verifyCmd": "Vérification",
+  "runs.attempt": "Tentative",
+  "runs.reverted": "annulée",
+  "runs.diff": "diff",
+  "runs.output": "sortie du vérificateur",
+  "runs.noVerify": "aucune commande de vérification",
 };
 
 const de: Dict = {
@@ -567,6 +619,7 @@ const de: Dict = {
   "nav.skills": "Fähigkeiten",
   "nav.schedule": "Zeitplan",
   "nav.tasks": "Aufgaben",
+  "nav.runs": "Läufe",
   "nav.settings": "Einstellungen",
   "theme.light": "Helles Thema",
   "theme.dark": "Dunkles Thema",
@@ -693,6 +746,18 @@ const de: Dict = {
   "usage.single": "einzeln",
   "usage.fusion": "Fusion",
   "usage.cascade": "Kaskade",
+  "runs.title": "Läufe",
+  "runs.empty":
+    "Noch keine Läufe — führe `chimera solve \"…\" --verify \"…\"` im CLI aus (ein In-App-Auslöser kommt als Nächstes).",
+  "runs.passed": "bestanden",
+  "runs.failed": "fehlgeschlagen",
+  "runs.paused": "pausiert",
+  "runs.verifyCmd": "Verifikation",
+  "runs.attempt": "Versuch",
+  "runs.reverted": "zurückgesetzt",
+  "runs.diff": "Diff",
+  "runs.output": "Verifizierer-Ausgabe",
+  "runs.noVerify": "kein Verifikationsbefehl",
 };
 
 const zh: Dict = {
@@ -701,6 +766,7 @@ const zh: Dict = {
   "nav.skills": "技能",
   "nav.schedule": "计划",
   "nav.tasks": "任务",
+  "nav.runs": "运行",
   "nav.settings": "设置",
   "theme.light": "浅色主题",
   "theme.dark": "深色主题",
@@ -826,6 +892,18 @@ const zh: Dict = {
   "usage.single": "单一",
   "usage.fusion": "融合",
   "usage.cascade": "级联",
+  "runs.title": "运行",
+  "runs.empty":
+    "还没有运行 —— 在 CLI 中执行 `chimera solve \"…\" --verify \"…\"`（应用内触发即将推出）。",
+  "runs.passed": "通过",
+  "runs.failed": "失败",
+  "runs.paused": "已暂停",
+  "runs.verifyCmd": "验证",
+  "runs.attempt": "尝试",
+  "runs.reverted": "已回滚",
+  "runs.diff": "差异",
+  "runs.output": "验证输出",
+  "runs.noVerify": "无验证命令",
 };
 
 const ja: Dict = {
@@ -834,6 +912,7 @@ const ja: Dict = {
   "nav.skills": "スキル",
   "nav.schedule": "スケジュール",
   "nav.tasks": "タスク",
+  "nav.runs": "実行",
   "nav.settings": "設定",
   "theme.light": "ライトテーマ",
   "theme.dark": "ダークテーマ",
@@ -959,6 +1038,18 @@ const ja: Dict = {
   "usage.single": "単一",
   "usage.fusion": "融合",
   "usage.cascade": "カスケード",
+  "runs.title": "実行",
+  "runs.empty":
+    "まだ実行がありません — CLI で `chimera solve \"…\" --verify \"…\"` を実行してください（アプリ内トリガーは近日対応）。",
+  "runs.passed": "合格",
+  "runs.failed": "失敗",
+  "runs.paused": "一時停止",
+  "runs.verifyCmd": "検証",
+  "runs.attempt": "試行",
+  "runs.reverted": "巻き戻し",
+  "runs.diff": "差分",
+  "runs.output": "検証出力",
+  "runs.noVerify": "検証コマンドなし",
 };
 
 const DICTS: Record<Lang, Dict> = { en, pt, es, fr, de, zh, ja };

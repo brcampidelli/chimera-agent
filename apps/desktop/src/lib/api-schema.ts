@@ -278,6 +278,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Runs Endpoint */
+        get: operations["runs_endpoint_api_runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sessions": {
         parameters: {
             query?: never;
@@ -395,6 +412,23 @@ export interface components {
         ApprovedOut: {
             /** Approved */
             approved: boolean;
+        };
+        /** AttemptReceiptOut */
+        AttemptReceiptOut: {
+            /** Diff Summary */
+            diff_summary: string;
+            /** Feedback */
+            feedback: string;
+            /** Index */
+            index: number;
+            /** Reverted */
+            reverted: boolean;
+            /** Success */
+            success: boolean;
+            /** Verified */
+            verified: boolean;
+            /** Verify Output */
+            verify_output: string;
         };
         /** CacheCfgOut */
         CacheCfgOut: {
@@ -596,6 +630,23 @@ export interface components {
         RetiredOut: {
             /** Retired */
             retired: boolean;
+        };
+        /** RunReceiptOut */
+        RunReceiptOut: {
+            /** Answer */
+            answer: string;
+            /** Attempts */
+            attempts: components["schemas"]["AttemptReceiptOut"][];
+            /** Paused */
+            paused: boolean;
+            /** Success */
+            success: boolean;
+            /** Task */
+            task: string;
+            /** Ts */
+            ts: string;
+            /** Verify Command */
+            verify_command: string | null;
         };
         /** SandboxCfgOut */
         SandboxCfgOut: {
@@ -1285,6 +1336,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    runs_endpoint_api_runs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunReceiptOut"][];
                 };
             };
         };
