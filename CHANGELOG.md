@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-07-14
+
 ### Added
 - **Code screen Phase 2: editable file viewer with save (guarded, newline-preserving, atomic) and a
   streaming command-runner (workspace-scoped, honors the sandbox setting, fresh subprocess per command
