@@ -22,6 +22,8 @@ export type DoctorInfo = Schemas["DoctorOut"];
 export type UsageSummary = Schemas["UsageSummaryOut"];
 export type RunReceipt = Schemas["RunReceiptOut"];
 export type AttemptReceipt = Schemas["AttemptReceiptOut"];
+export type InjectionReport = Schemas["InjectionReportOut"];
+export type GovernanceAudit = Schemas["GovernanceAuditOut"];
 
 // --- SSE event payloads + UI-only types (not in the OpenAPI schema) ---
 

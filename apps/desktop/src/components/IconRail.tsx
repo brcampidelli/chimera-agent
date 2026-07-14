@@ -8,6 +8,7 @@ import {
   Network,
   BarChart3,
   ListChecks,
+  Shield,
   Settings as SettingsIcon,
   Moon,
   Sun,
@@ -25,6 +26,7 @@ export type View =
   | "fusion"
   | "usage"
   | "runs"
+  | "governance"
   | "settings";
 
 const NAV: { view: View; labelKey: string; icon: ComponentType<{ className?: string }> }[] = [
@@ -36,6 +38,7 @@ const NAV: { view: View; labelKey: string; icon: ComponentType<{ className?: str
   { view: "fusion", labelKey: "nav.fusion", icon: Network },
   { view: "usage", labelKey: "nav.usage", icon: BarChart3 },
   { view: "runs", labelKey: "nav.runs", icon: ListChecks },
+  { view: "governance", labelKey: "nav.governance", icon: Shield },
 ];
 
 function RailButton({

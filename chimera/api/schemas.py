@@ -278,3 +278,44 @@ class RunReceiptOut(BaseModel):
     verify_command: str | None  # the shell command that judged the run, or null (no verifier)
     answer: str  # the final answer, truncated
     attempts: list[AttemptReceiptOut]  # the per-attempt verify-or-revert proof trail
+
+
+# --- governance / security (injection red-team scoreboard + audit log) -----------------------------
+
+
+class InjectionCategoryOut(BaseModel):
+    category: str  # destructive | backdoor | exfil | self_modify
+    defended_asr: float  # attack-success-rate for this category WITH defenses (lower = better)
+    undefended_asr: float  # same category WITHOUT defenses — the baseline the defenses improve on
+    count: int  # number of attacks in this category
+
+
+class InjectionAttackOut(BaseModel):
+    id: str
+    category: str
+    harmful_tool: str  # the tool the attacker wanted invoked
+    blocked_defended: bool  # the defenses stopped it
+    blocked_undefended: bool  # it was stopped even bare (baseline) — false for every real attack
+
+
+class InjectionReportOut(BaseModel):
+    total_attacks: int
+    defended_asr: float  # overall attack-success-rate WITH defenses (fraction still getting through)
+    undefended_asr: float  # overall ASR WITHOUT defenses (the honest baseline)
+    defended_block_rate: float
+    undefended_block_rate: float
+    by_category: list[InjectionCategoryOut]
+    attacks: list[InjectionAttackOut]
+    leaks_defended: list[str]  # attack ids that get through EVEN defended — the named honest gap
+
+
+class AuditEventOut(BaseModel):
+    seq: int
+    type: str
+    summary: str  # a short human string flattened from the entry's remaining (arbitrary) keys
+
+
+class GovernanceAuditOut(BaseModel):
+    events: list[AuditEventOut]  # newest-first (highest seq first)
+    count: int
+    populated: bool  # False when the audit file has no entries — drives the honest empty-state

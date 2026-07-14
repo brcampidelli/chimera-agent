@@ -2,6 +2,8 @@ import type {
   AppConfig,
   CronJob,
   DoctorInfo,
+  GovernanceAudit,
+  InjectionReport,
   MemoryItem,
   ProjectState,
   RunReceipt,
@@ -41,6 +43,9 @@ export const getConfig = () => json<AppConfig>("/api/config");
 export const getDoctor = () => json<DoctorInfo>("/api/doctor");
 export const getUsage = () => json<UsageSummary>("/api/usage");
 export const getRuns = () => json<RunReceipt[]>("/api/runs");
+export const getGovernanceInjection = () =>
+  json<InjectionReport>("/api/governance/injection");
+export const getGovernanceAudit = () => json<GovernanceAudit>("/api/governance/audit");
 export const patchConfig = (updates: Record<string, string>) =>
   json<{ updated: string[] }>("/api/config", { method: "PATCH", body: JSON.stringify(updates) });
 

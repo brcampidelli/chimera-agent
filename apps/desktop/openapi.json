@@ -74,6 +74,29 @@
         "title": "AttemptReceiptOut",
         "type": "object"
       },
+      "AuditEventOut": {
+        "properties": {
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "seq",
+          "type",
+          "summary"
+        ],
+        "title": "AuditEventOut",
+        "type": "object"
+      },
       "CacheCfgOut": {
         "properties": {
           "completion": {
@@ -287,6 +310,32 @@
         "title": "DoctorOut",
         "type": "object"
       },
+      "GovernanceAuditOut": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/AuditEventOut"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "populated": {
+            "title": "Populated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "events",
+          "count",
+          "populated"
+        ],
+        "title": "GovernanceAuditOut",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -316,6 +365,124 @@
           "sessions"
         ],
         "title": "HealthOut",
+        "type": "object"
+      },
+      "InjectionAttackOut": {
+        "properties": {
+          "blocked_defended": {
+            "title": "Blocked Defended",
+            "type": "boolean"
+          },
+          "blocked_undefended": {
+            "title": "Blocked Undefended",
+            "type": "boolean"
+          },
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "harmful_tool": {
+            "title": "Harmful Tool",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "category",
+          "harmful_tool",
+          "blocked_defended",
+          "blocked_undefended"
+        ],
+        "title": "InjectionAttackOut",
+        "type": "object"
+      },
+      "InjectionCategoryOut": {
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "defended_asr": {
+            "title": "Defended Asr",
+            "type": "number"
+          },
+          "undefended_asr": {
+            "title": "Undefended Asr",
+            "type": "number"
+          }
+        },
+        "required": [
+          "category",
+          "defended_asr",
+          "undefended_asr",
+          "count"
+        ],
+        "title": "InjectionCategoryOut",
+        "type": "object"
+      },
+      "InjectionReportOut": {
+        "properties": {
+          "attacks": {
+            "items": {
+              "$ref": "#/components/schemas/InjectionAttackOut"
+            },
+            "title": "Attacks",
+            "type": "array"
+          },
+          "by_category": {
+            "items": {
+              "$ref": "#/components/schemas/InjectionCategoryOut"
+            },
+            "title": "By Category",
+            "type": "array"
+          },
+          "defended_asr": {
+            "title": "Defended Asr",
+            "type": "number"
+          },
+          "defended_block_rate": {
+            "title": "Defended Block Rate",
+            "type": "number"
+          },
+          "leaks_defended": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Leaks Defended",
+            "type": "array"
+          },
+          "total_attacks": {
+            "title": "Total Attacks",
+            "type": "integer"
+          },
+          "undefended_asr": {
+            "title": "Undefended Asr",
+            "type": "number"
+          },
+          "undefended_block_rate": {
+            "title": "Undefended Block Rate",
+            "type": "number"
+          }
+        },
+        "required": [
+          "total_attacks",
+          "defended_asr",
+          "undefended_asr",
+          "defended_block_rate",
+          "undefended_block_rate",
+          "by_category",
+          "attacks",
+          "leaks_defended"
+        ],
+        "title": "InjectionReportOut",
         "type": "object"
       },
       "MemoryAdd": {
@@ -1504,6 +1671,42 @@
           }
         },
         "summary": "Doctor Endpoint"
+      }
+    },
+    "/api/governance/audit": {
+      "get": {
+        "operationId": "governance_audit_endpoint_api_governance_audit_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GovernanceAuditOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Governance Audit Endpoint"
+      }
+    },
+    "/api/governance/injection": {
+      "get": {
+        "operationId": "governance_injection_endpoint_api_governance_injection_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InjectionReportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Governance Injection Endpoint"
       }
     },
     "/api/health": {

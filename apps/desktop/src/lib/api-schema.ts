@@ -124,6 +124,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/governance/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Governance Audit Endpoint */
+        get: operations["governance_audit_endpoint_api_governance_audit_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/governance/injection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Governance Injection Endpoint */
+        get: operations["governance_injection_endpoint_api_governance_injection_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -431,6 +465,15 @@ export interface components {
             /** Verify Output */
             verify_output: string;
         };
+        /** AuditEventOut */
+        AuditEventOut: {
+            /** Seq */
+            seq: number;
+            /** Summary */
+            summary: string;
+            /** Type */
+            type: string;
+        };
         /** CacheCfgOut */
         CacheCfgOut: {
             /** Completion */
@@ -507,6 +550,15 @@ export interface components {
             sandbox: string;
             tiers: components["schemas"]["TiersOut"];
         };
+        /** GovernanceAuditOut */
+        GovernanceAuditOut: {
+            /** Count */
+            count: number;
+            /** Events */
+            events: components["schemas"]["AuditEventOut"][];
+            /** Populated */
+            populated: boolean;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -518,6 +570,49 @@ export interface components {
             sessions: number;
             /** Status */
             status: string;
+        };
+        /** InjectionAttackOut */
+        InjectionAttackOut: {
+            /** Blocked Defended */
+            blocked_defended: boolean;
+            /** Blocked Undefended */
+            blocked_undefended: boolean;
+            /** Category */
+            category: string;
+            /** Harmful Tool */
+            harmful_tool: string;
+            /** Id */
+            id: string;
+        };
+        /** InjectionCategoryOut */
+        InjectionCategoryOut: {
+            /** Category */
+            category: string;
+            /** Count */
+            count: number;
+            /** Defended Asr */
+            defended_asr: number;
+            /** Undefended Asr */
+            undefended_asr: number;
+        };
+        /** InjectionReportOut */
+        InjectionReportOut: {
+            /** Attacks */
+            attacks: components["schemas"]["InjectionAttackOut"][];
+            /** By Category */
+            by_category: components["schemas"]["InjectionCategoryOut"][];
+            /** Defended Asr */
+            defended_asr: number;
+            /** Defended Block Rate */
+            defended_block_rate: number;
+            /** Leaks Defended */
+            leaks_defended: string[];
+            /** Total Attacks */
+            total_attacks: number;
+            /** Undefended Asr */
+            undefended_asr: number;
+            /** Undefended Block Rate */
+            undefended_block_rate: number;
         };
         /** MemoryAdd */
         MemoryAdd: {
@@ -1072,6 +1167,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DoctorOut"];
+                };
+            };
+        };
+    };
+    governance_audit_endpoint_api_governance_audit_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GovernanceAuditOut"];
+                };
+            };
+        };
+    };
+    governance_injection_endpoint_api_governance_injection_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InjectionReportOut"];
                 };
             };
         };

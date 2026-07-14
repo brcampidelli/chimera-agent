@@ -32,6 +32,7 @@ const en: Dict = {
   "nav.schedule": "Schedule",
   "nav.tasks": "Tasks",
   "nav.runs": "Runs",
+  "nav.governance": "Governance",
   "nav.settings": "Settings",
   "theme.light": "Light theme",
   "theme.dark": "Dark theme",
@@ -181,6 +182,23 @@ const en: Dict = {
   "runs.verifying": "verifying…",
   "runs.doneOk": "done: passed",
   "runs.doneFail": "done: failed",
+  "governance.title": "Governance & Security",
+  "governance.injection.title": "Injection defense",
+  "governance.injection.undefendedAsr": "Undefended ASR",
+  "governance.injection.defendedAsr": "Defended ASR",
+  "governance.injection.blockRate": "Block rate",
+  "governance.injection.lowerBetter": "lower is better",
+  "governance.injection.attacks": "{n} attacks",
+  "governance.injection.byCategory": "By category",
+  "governance.injection.attacksTable": "Per attack",
+  "governance.injection.defended": "defended",
+  "governance.injection.undefended": "undefended",
+  "governance.injection.leaksNote": "Still get through even defended (honest gap)",
+  "governance.injection.note":
+    "Measures defense-in-depth of an already-injected agent (synthetic corpus, no model) — not the model's susceptibility to being injected.",
+  "governance.audit.title": "Audit log",
+  "governance.audit.empty":
+    "No audit events yet. The desktop chat isn't governed by default — `chimera run --guard` or `solve --guard/--taint` write governance decisions to `.chimera/audit.jsonl`.",
 };
 
 const pt: Dict = {
@@ -190,6 +208,7 @@ const pt: Dict = {
   "nav.schedule": "Agenda",
   "nav.tasks": "Tarefas",
   "nav.runs": "Execuções",
+  "nav.governance": "Governança",
   "nav.settings": "Configurações",
   "theme.light": "Tema claro",
   "theme.dark": "Tema escuro",
@@ -339,6 +358,23 @@ const pt: Dict = {
   "runs.verifying": "verificando…",
   "runs.doneOk": "concluído: aprovada",
   "runs.doneFail": "concluído: falhou",
+  "governance.title": "Governança e Segurança",
+  "governance.injection.title": "Defesa contra injeção",
+  "governance.injection.undefendedAsr": "ASR sem defesa",
+  "governance.injection.defendedAsr": "ASR com defesa",
+  "governance.injection.blockRate": "Taxa de bloqueio",
+  "governance.injection.lowerBetter": "menor = melhor",
+  "governance.injection.attacks": "{n} ataques",
+  "governance.injection.byCategory": "Por categoria",
+  "governance.injection.attacksTable": "Por ataque",
+  "governance.injection.defended": "com defesa",
+  "governance.injection.undefended": "sem defesa",
+  "governance.injection.leaksNote": "Passam mesmo com defesa (lacuna honesta)",
+  "governance.injection.note":
+    "Mede defesa-em-profundidade de um agente já injetado (corpus sintético, sem modelo) — não a suscetibilidade do modelo a ser injetado.",
+  "governance.audit.title": "Registro de auditoria",
+  "governance.audit.empty":
+    "Nenhum evento de auditoria ainda. O chat do desktop não é governado por padrão — `chimera run --guard` ou `solve --guard/--taint` gravam as decisões de governança em `.chimera/audit.jsonl`.",
 };
 
 const es: Dict = {
@@ -348,6 +384,7 @@ const es: Dict = {
   "nav.schedule": "Agenda",
   "nav.tasks": "Tareas",
   "nav.runs": "Ejecuciones",
+  "nav.governance": "Gobernanza",
   "nav.settings": "Ajustes",
   "theme.light": "Tema claro",
   "theme.dark": "Tema oscuro",
@@ -497,6 +534,23 @@ const es: Dict = {
   "runs.verifying": "verificando…",
   "runs.doneOk": "listo: aprobada",
   "runs.doneFail": "listo: fallida",
+  "governance.title": "Gobernanza y Seguridad",
+  "governance.injection.title": "Defensa contra inyección",
+  "governance.injection.undefendedAsr": "ASR sin defensa",
+  "governance.injection.defendedAsr": "ASR con defensa",
+  "governance.injection.blockRate": "Tasa de bloqueo",
+  "governance.injection.lowerBetter": "menor = mejor",
+  "governance.injection.attacks": "{n} ataques",
+  "governance.injection.byCategory": "Por categoría",
+  "governance.injection.attacksTable": "Por ataque",
+  "governance.injection.defended": "con defensa",
+  "governance.injection.undefended": "sin defensa",
+  "governance.injection.leaksNote": "Pasan incluso con defensa (brecha honesta)",
+  "governance.injection.note":
+    "Mide la defensa en profundidad de un agente ya inyectado (corpus sintético, sin modelo) — no la susceptibilidad del modelo a ser inyectado.",
+  "governance.audit.title": "Registro de auditoría",
+  "governance.audit.empty":
+    "Aún no hay eventos de auditoría. El chat de escritorio no está gobernado por defecto — `chimera run --guard` o `solve --guard/--taint` escriben las decisiones de gobernanza en `.chimera/audit.jsonl`.",
 };
 
 const fr: Dict = {
@@ -506,6 +560,7 @@ const fr: Dict = {
   "nav.schedule": "Planning",
   "nav.tasks": "Tâches",
   "nav.runs": "Exécutions",
+  "nav.governance": "Gouvernance",
   "nav.settings": "Paramètres",
   "theme.light": "Thème clair",
   "theme.dark": "Thème sombre",
@@ -655,6 +710,23 @@ const fr: Dict = {
   "runs.verifying": "vérification…",
   "runs.doneOk": "terminé : réussie",
   "runs.doneFail": "terminé : échouée",
+  "governance.title": "Gouvernance et Sécurité",
+  "governance.injection.title": "Défense contre l'injection",
+  "governance.injection.undefendedAsr": "ASR sans défense",
+  "governance.injection.defendedAsr": "ASR avec défense",
+  "governance.injection.blockRate": "Taux de blocage",
+  "governance.injection.lowerBetter": "plus bas = mieux",
+  "governance.injection.attacks": "{n} attaques",
+  "governance.injection.byCategory": "Par catégorie",
+  "governance.injection.attacksTable": "Par attaque",
+  "governance.injection.defended": "avec défense",
+  "governance.injection.undefended": "sans défense",
+  "governance.injection.leaksNote": "Passent même avec défense (faille honnête)",
+  "governance.injection.note":
+    "Mesure la défense en profondeur d'un agent déjà injecté (corpus synthétique, sans modèle) — pas la susceptibilité du modèle à être injecté.",
+  "governance.audit.title": "Journal d'audit",
+  "governance.audit.empty":
+    "Aucun événement d'audit pour l'instant. Le chat de bureau n'est pas gouverné par défaut — `chimera run --guard` ou `solve --guard/--taint` écrivent les décisions de gouvernance dans `.chimera/audit.jsonl`.",
 };
 
 const de: Dict = {
@@ -664,6 +736,7 @@ const de: Dict = {
   "nav.schedule": "Zeitplan",
   "nav.tasks": "Aufgaben",
   "nav.runs": "Läufe",
+  "nav.governance": "Governance",
   "nav.settings": "Einstellungen",
   "theme.light": "Helles Thema",
   "theme.dark": "Dunkles Thema",
@@ -813,6 +886,23 @@ const de: Dict = {
   "runs.verifying": "verifiziere…",
   "runs.doneOk": "fertig: bestanden",
   "runs.doneFail": "fertig: fehlgeschlagen",
+  "governance.title": "Governance & Sicherheit",
+  "governance.injection.title": "Injektionsabwehr",
+  "governance.injection.undefendedAsr": "ASR ohne Abwehr",
+  "governance.injection.defendedAsr": "ASR mit Abwehr",
+  "governance.injection.blockRate": "Blockrate",
+  "governance.injection.lowerBetter": "niedriger = besser",
+  "governance.injection.attacks": "{n} Angriffe",
+  "governance.injection.byCategory": "Nach Kategorie",
+  "governance.injection.attacksTable": "Pro Angriff",
+  "governance.injection.defended": "mit Abwehr",
+  "governance.injection.undefended": "ohne Abwehr",
+  "governance.injection.leaksNote": "Kommen selbst mit Abwehr durch (ehrliche Lücke)",
+  "governance.injection.note":
+    "Misst die tiefengestaffelte Abwehr eines bereits injizierten Agenten (synthetischer Korpus, kein Modell) — nicht die Anfälligkeit des Modells, injiziert zu werden.",
+  "governance.audit.title": "Audit-Protokoll",
+  "governance.audit.empty":
+    "Noch keine Audit-Ereignisse. Der Desktop-Chat wird standardmäßig nicht überwacht — `chimera run --guard` oder `solve --guard/--taint` schreiben Governance-Entscheidungen nach `.chimera/audit.jsonl`.",
 };
 
 const zh: Dict = {
@@ -822,6 +912,7 @@ const zh: Dict = {
   "nav.schedule": "计划",
   "nav.tasks": "任务",
   "nav.runs": "运行",
+  "nav.governance": "治理",
   "nav.settings": "设置",
   "theme.light": "浅色主题",
   "theme.dark": "深色主题",
@@ -970,6 +1061,23 @@ const zh: Dict = {
   "runs.verifying": "验证中…",
   "runs.doneOk": "完成：通过",
   "runs.doneFail": "完成：失败",
+  "governance.title": "治理与安全",
+  "governance.injection.title": "注入防御",
+  "governance.injection.undefendedAsr": "无防御 ASR",
+  "governance.injection.defendedAsr": "有防御 ASR",
+  "governance.injection.blockRate": "拦截率",
+  "governance.injection.lowerBetter": "越低越好",
+  "governance.injection.attacks": "{n} 个攻击",
+  "governance.injection.byCategory": "按类别",
+  "governance.injection.attacksTable": "逐个攻击",
+  "governance.injection.defended": "有防御",
+  "governance.injection.undefended": "无防御",
+  "governance.injection.leaksNote": "即使有防御仍能通过（诚实披露的缺口）",
+  "governance.injection.note":
+    "衡量已被注入的智能体的纵深防御（合成语料，无模型）——并非模型被注入的易感性。",
+  "governance.audit.title": "审计日志",
+  "governance.audit.empty":
+    "还没有审计事件。桌面聊天默认不受治理——`chimera run --guard` 或 `solve --guard/--taint` 会将治理决策写入 `.chimera/audit.jsonl`。",
 };
 
 const ja: Dict = {
@@ -979,6 +1087,7 @@ const ja: Dict = {
   "nav.schedule": "スケジュール",
   "nav.tasks": "タスク",
   "nav.runs": "実行",
+  "nav.governance": "ガバナンス",
   "nav.settings": "設定",
   "theme.light": "ライトテーマ",
   "theme.dark": "ダークテーマ",
@@ -1127,6 +1236,23 @@ const ja: Dict = {
   "runs.verifying": "検証中…",
   "runs.doneOk": "完了：合格",
   "runs.doneFail": "完了：失敗",
+  "governance.title": "ガバナンスとセキュリティ",
+  "governance.injection.title": "インジェクション防御",
+  "governance.injection.undefendedAsr": "防御なし ASR",
+  "governance.injection.defendedAsr": "防御あり ASR",
+  "governance.injection.blockRate": "ブロック率",
+  "governance.injection.lowerBetter": "低いほど良い",
+  "governance.injection.attacks": "{n} 件の攻撃",
+  "governance.injection.byCategory": "カテゴリ別",
+  "governance.injection.attacksTable": "攻撃ごと",
+  "governance.injection.defended": "防御あり",
+  "governance.injection.undefended": "防御なし",
+  "governance.injection.leaksNote": "防御ありでも通過する（正直なギャップ）",
+  "governance.injection.note":
+    "すでに注入されたエージェントの多層防御を測定します（合成コーパス、モデルなし）— モデルが注入されやすさそのものではありません。",
+  "governance.audit.title": "監査ログ",
+  "governance.audit.empty":
+    "監査イベントはまだありません。デスクトップのチャットは既定ではガバナンス対象外です——`chimera run --guard` または `solve --guard/--taint` がガバナンスの判断を `.chimera/audit.jsonl` に記録します。",
 };
 
 const DICTS: Record<Lang, Dict> = { en, pt, es, fr, de, zh, ja };

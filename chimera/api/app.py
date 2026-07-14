@@ -29,12 +29,15 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
+from chimera.api.governance import read_audit, run_injection_suite
 from chimera.api.runs import load_runs
 from chimera.api.schemas import (
     ConfigOut,
     DeletedOut,
     DoctorOut,
+    GovernanceAuditOut,
     HealthOut,
+    InjectionReportOut,
     NewSessionOut,
     RunReceiptOut,
     SessionDetailOut,
@@ -169,6 +172,19 @@ def build_api_app(
         # Read-only: the last 100 run receipts, most recent first. Each was persisted by the
         # autonomous loop (CLI `solve` or the POST trigger below) via its ``run_log``.
         return list(reversed(load_runs(settings.home / "runs.jsonl")))[:100]
+
+    @app.get("/api/governance/injection", dependencies=[guard], response_model=InjectionReportOut)
+    def governance_injection_endpoint() -> dict[str, Any]:
+        # Cheap synthetic compute (no LLM, no side effects): the red-team corpus run with and without
+        # the defenses, side by side. GET is fine — it reads nothing and writes nothing.
+        return run_injection_suite()
+
+    @app.get("/api/governance/audit", dependencies=[guard], response_model=GovernanceAuditOut)
+    def governance_audit_endpoint() -> dict[str, Any]:
+        # Read-only: the governance audit log (written by CLI guarded/tainted runs), newest-first.
+        # The desktop chat doesn't write it, so an empty log is the honest, expected state.
+        events = [_audit_event(e) for e in read_audit(settings.home / "audit.jsonl")]
+        return {"events": events, "count": len(events), "populated": bool(events)}
 
     @app.post("/api/runs", dependencies=[guard])
     async def run_stream(req: RunRequest) -> EventSourceResponse:
@@ -355,6 +371,18 @@ def _event_dict(event: AgentEvent) -> dict[str, Any]:
     """
     data = {k: v for k, v in event.data.items() if k != "answer"}
     return {"kind": event.kind, "text": event.text, **data}
+
+
+def _audit_event(entry: dict[str, Any]) -> dict[str, Any]:
+    """Flatten one arbitrary audit entry into the typed ``{seq, type, summary}`` shape for the UI.
+
+    ``summary`` is a short ``key=value`` string built from whatever keys remain after ``seq``/``type``
+    (e.g. ``action=… decision=… rule=… reason=…``) — only real captured keys, nothing invented.
+    """
+    seq = entry.get("seq", 0)
+    etype = str(entry.get("type", ""))
+    parts = [f"{k}={v}" for k, v in entry.items() if k not in ("seq", "type")]
+    return {"seq": int(seq) if isinstance(seq, int) else 0, "type": etype, "summary": " ".join(parts)}
 
 
 def _build_solve_agent(

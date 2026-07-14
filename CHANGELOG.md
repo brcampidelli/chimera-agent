@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Governance / Security screen in the desktop app.** A new sidebar view shows the injection
+  red-team scoreboard (attack-success-rate with vs. without the defenses, per-category and per-attack,
+  naming the honest gap that still gets through even defended) plus an audit-log viewer, served by
+  guarded `GET /api/governance/injection` (`InjectionReportOut`) and `GET /api/governance/audit`
+  (`GovernanceAuditOut`). The injection corpus is synthetic and needs no model; the audit log is
+  empty by default (only CLI guarded/tainted runs write it), and the UI says so honestly.
 - **Runs screen in the desktop app.** A new sidebar view shows how each autonomous run
   (`chimera solve`) PROVED its work: per run, the task, a pass/fail/paused status badge, the verify
   command that judged it, and the verify-or-revert attempt trail — each attempt's index, a
