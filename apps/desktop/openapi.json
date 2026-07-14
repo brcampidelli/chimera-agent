@@ -369,6 +369,40 @@
         "title": "DoctorOut",
         "type": "object"
       },
+      "ExecRequest": {
+        "properties": {
+          "command": {
+            "title": "Command",
+            "type": "string"
+          },
+          "cwd": {
+            "default": "",
+            "title": "Cwd",
+            "type": "string"
+          },
+          "timeout": {
+            "default": 60,
+            "title": "Timeout",
+            "type": "number"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          }
+        },
+        "required": [
+          "command"
+        ],
+        "title": "ExecRequest",
+        "type": "object"
+      },
       "FileDiffOut": {
         "properties": {
           "patch": {
@@ -418,6 +452,53 @@
           "note"
         ],
         "title": "FsFileOut",
+        "type": "object"
+      },
+      "FsFileWriteRequest": {
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          }
+        },
+        "required": [
+          "path",
+          "content"
+        ],
+        "title": "FsFileWriteRequest",
+        "type": "object"
+      },
+      "FsFileWrittenOut": {
+        "properties": {
+          "bytes": {
+            "title": "Bytes",
+            "type": "integer"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "bytes"
+        ],
+        "title": "FsFileWrittenOut",
         "type": "object"
       },
       "FsNodeOut": {
@@ -2313,6 +2394,42 @@
         "summary": "Doctor Endpoint"
       }
     },
+    "/api/fs/exec": {
+      "post": {
+        "operationId": "fs_exec_stream_api_fs_exec_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Fs Exec Stream"
+      }
+    },
     "/api/fs/file": {
       "get": {
         "operationId": "fs_file_endpoint_api_fs_file_get",
@@ -2366,6 +2483,42 @@
           }
         },
         "summary": "Fs File Endpoint"
+      },
+      "put": {
+        "operationId": "fs_file_write_endpoint_api_fs_file_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FsFileWriteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FsFileWrittenOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Fs File Write Endpoint"
       }
     },
     "/api/fs/tree": {

@@ -28,6 +28,7 @@ export type FileDiff = Schemas["FileDiffOut"];
 export type FsTree = Schemas["FsTreeOut"];
 export type FsNode = Schemas["FsNodeOut"];
 export type FsFile = Schemas["FsFileOut"];
+export type FsFileWritten = Schemas["FsFileWrittenOut"];
 export type InjectionReport = Schemas["InjectionReportOut"];
 export type GovernanceAudit = Schemas["GovernanceAuditOut"];
 export type ToolInfo = Schemas["ToolInfoOut"];

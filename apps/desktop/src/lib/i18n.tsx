@@ -237,7 +237,22 @@ const en: Dict = {
   "code.safetyNote":
     "The agent edits this workspace and runs your verify command here — the same capability as `chimera solve` in a terminal (localhost, bearer-guarded).",
   "code.phase2note":
-    "Read-only viewer: the agent edits and you watch. Per-hunk approve/reject and live per-keystroke diffs are Phase 2 and not shown.",
+    "Phase 2: the viewer is editable (opt-in) with an atomic, newline-preserving, size-capped save, and the command runner streams each command as a fresh subprocess — combined output, not an interactive terminal.",
+  "code.edit": "Edit",
+  "code.save": "Save",
+  "code.discard": "Discard",
+  "code.dirty": "unsaved",
+  "code.saved": "Saved.",
+  "code.saveError": "Couldn't save — is the bearer token required, or the file too large?",
+  "code.noUndo": "No undo after save (unless this folder is a git repo you commit).",
+  "code.cmdRunner": "Command runner",
+  "code.cmdPlaceholder": "a command to run in this workspace — e.g. npm test",
+  "code.cwd": "cwd (optional, relative to the workspace)",
+  "code.exit": "exit",
+  "code.freshProcNote":
+    "Each command is a fresh subprocess — cwd and env don't persist between commands (no cd/export state).",
+  "code.execSecurityNote":
+    "Runs commands in your workspace on the host (or the configured sandbox); localhost + bearer-guarded. Not an interactive terminal.",
   "governance.title": "Governance & Security",
   "governance.injection.title": "Injection defense",
   "governance.injection.undefendedAsr": "Undefended ASR",
@@ -522,7 +537,22 @@ const pt: Dict = {
   "code.safetyNote":
     "O agente edita este workspace e roda seu comando de verificação aqui — a mesma capacidade do `chimera solve` num terminal (localhost, protegido por token).",
   "code.phase2note":
-    "Visualizador somente leitura: o agente edita e você observa. Aprovar/rejeitar por trecho e diff ao vivo a cada tecla são da Fase 2 e não são exibidos.",
+    "Fase 2: o visualizador é editável (opt-in) com salvamento atômico, que preserva o fim de linha e com limite de tamanho, e o executor de comandos transmite cada comando como um subprocesso novo — saída combinada, não um terminal interativo.",
+  "code.edit": "Editar",
+  "code.save": "Salvar",
+  "code.discard": "Descartar",
+  "code.dirty": "não salvo",
+  "code.saved": "Salvo.",
+  "code.saveError": "Não foi possível salvar — o token bearer é exigido, ou o arquivo é grande demais?",
+  "code.noUndo": "Sem desfazer após salvar (a menos que esta pasta seja um repositório git que você commita).",
+  "code.cmdRunner": "Executor de comandos",
+  "code.cmdPlaceholder": "um comando para rodar neste workspace — ex.: npm test",
+  "code.cwd": "cwd (opcional, relativo ao workspace)",
+  "code.exit": "saída",
+  "code.freshProcNote":
+    "Cada comando é um subprocesso novo — cwd e env não persistem entre comandos (sem estado de cd/export).",
+  "code.execSecurityNote":
+    "Roda comandos no seu workspace no host (ou no sandbox configurado); localhost + protegido por token. Não é um terminal interativo.",
   "governance.title": "Governança e Segurança",
   "governance.injection.title": "Defesa contra injeção",
   "governance.injection.undefendedAsr": "ASR sem defesa",
@@ -807,7 +837,22 @@ const es: Dict = {
   "code.safetyNote":
     "El agente edita este workspace y ejecuta tu comando de verificación aquí — la misma capacidad que `chimera solve` en una terminal (localhost, protegido por token).",
   "code.phase2note":
-    "Visor de solo lectura: el agente edita y tú observas. Aprobar/rechazar por fragmento y diff en vivo por pulsación son de la Fase 2 y no se muestran.",
+    "Fase 2: el visor es editable (opcional) con guardado atómico, que conserva el fin de línea y con límite de tamaño, y el ejecutor de comandos transmite cada comando como un subproceso nuevo — salida combinada, no un terminal interactivo.",
+  "code.edit": "Editar",
+  "code.save": "Guardar",
+  "code.discard": "Descartar",
+  "code.dirty": "sin guardar",
+  "code.saved": "Guardado.",
+  "code.saveError": "No se pudo guardar — ¿se requiere el token bearer, o el archivo es demasiado grande?",
+  "code.noUndo": "Sin deshacer tras guardar (a menos que esta carpeta sea un repositorio git que confirmes).",
+  "code.cmdRunner": "Ejecutor de comandos",
+  "code.cmdPlaceholder": "un comando para ejecutar en este workspace — p. ej. npm test",
+  "code.cwd": "cwd (opcional, relativo al workspace)",
+  "code.exit": "salida",
+  "code.freshProcNote":
+    "Cada comando es un subproceso nuevo — cwd y env no persisten entre comandos (sin estado de cd/export).",
+  "code.execSecurityNote":
+    "Ejecuta comandos en tu workspace en el host (o el sandbox configurado); localhost + protegido por token. No es un terminal interactivo.",
   "governance.title": "Gobernanza y Seguridad",
   "governance.injection.title": "Defensa contra inyección",
   "governance.injection.undefendedAsr": "ASR sin defensa",
@@ -1092,7 +1137,22 @@ const fr: Dict = {
   "code.safetyNote":
     "L'agent modifie ce workspace et exécute votre commande de vérification ici — la même capacité que `chimera solve` dans un terminal (localhost, protégé par token).",
   "code.phase2note":
-    "Visionneuse en lecture seule : l'agent modifie et vous observez. L'approbation/refus par bloc et le diff en direct par frappe relèvent de la Phase 2 et ne sont pas affichés.",
+    "Phase 2 : la visionneuse est modifiable (optionnel) avec une sauvegarde atomique, préservant les fins de ligne et plafonnée en taille, et l'exécuteur de commandes diffuse chaque commande comme un sous-processus neuf — sortie combinée, pas un terminal interactif.",
+  "code.edit": "Modifier",
+  "code.save": "Enregistrer",
+  "code.discard": "Annuler",
+  "code.dirty": "non enregistré",
+  "code.saved": "Enregistré.",
+  "code.saveError": "Impossible d'enregistrer — le token bearer est-il requis, ou le fichier est-il trop volumineux ?",
+  "code.noUndo": "Pas d'annulation après l'enregistrement (sauf si ce dossier est un dépôt git que vous validez).",
+  "code.cmdRunner": "Exécuteur de commandes",
+  "code.cmdPlaceholder": "une commande à exécuter dans ce workspace — ex. npm test",
+  "code.cwd": "cwd (optionnel, relatif au workspace)",
+  "code.exit": "code",
+  "code.freshProcNote":
+    "Chaque commande est un sous-processus neuf — cwd et env ne persistent pas entre les commandes (pas d'état cd/export).",
+  "code.execSecurityNote":
+    "Exécute des commandes dans votre workspace sur l'hôte (ou le sandbox configuré) ; localhost + protégé par token. Pas un terminal interactif.",
   "governance.title": "Gouvernance et Sécurité",
   "governance.injection.title": "Défense contre l'injection",
   "governance.injection.undefendedAsr": "ASR sans défense",
@@ -1377,7 +1437,22 @@ const de: Dict = {
   "code.safetyNote":
     "Der Agent bearbeitet diesen Workspace und führt hier deinen Verifikationsbefehl aus — dieselbe Fähigkeit wie `chimera solve` im Terminal (localhost, per Token geschützt).",
   "code.phase2note":
-    "Schreibgeschützte Ansicht: der Agent bearbeitet, du schaust zu. Genehmigen/Ablehnen pro Hunk und Live-Diff pro Tastendruck sind Phase 2 und werden nicht angezeigt.",
+    "Phase 2: die Ansicht ist bearbeitbar (opt-in) mit atomarem, zeilenenden-erhaltendem und größenbegrenztem Speichern, und der Befehls-Runner streamt jeden Befehl als frischen Subprozess — kombinierte Ausgabe, kein interaktives Terminal.",
+  "code.edit": "Bearbeiten",
+  "code.save": "Speichern",
+  "code.discard": "Verwerfen",
+  "code.dirty": "ungespeichert",
+  "code.saved": "Gespeichert.",
+  "code.saveError": "Konnte nicht speichern — ist der Bearer-Token erforderlich, oder ist die Datei zu groß?",
+  "code.noUndo": "Kein Rückgängig nach dem Speichern (außer dieser Ordner ist ein Git-Repo, das du committest).",
+  "code.cmdRunner": "Befehls-Runner",
+  "code.cmdPlaceholder": "ein Befehl, der in diesem Workspace läuft — z. B. npm test",
+  "code.cwd": "cwd (optional, relativ zum Workspace)",
+  "code.exit": "Exit",
+  "code.freshProcNote":
+    "Jeder Befehl ist ein frischer Subprozess — cwd und env bleiben zwischen Befehlen nicht erhalten (kein cd/export-Zustand).",
+  "code.execSecurityNote":
+    "Führt Befehle in deinem Workspace auf dem Host (oder dem konfigurierten Sandbox) aus; localhost + per Token geschützt. Kein interaktives Terminal.",
   "governance.title": "Governance & Sicherheit",
   "governance.injection.title": "Injektionsabwehr",
   "governance.injection.undefendedAsr": "ASR ohne Abwehr",
@@ -1661,7 +1736,22 @@ const zh: Dict = {
   "code.safetyNote":
     "智能体会编辑此工作区并在此运行你的验证命令 —— 与在终端中运行 `chimera solve` 的能力相同（本地回环，受 bearer 令牌保护）。",
   "code.phase2note":
-    "只读查看器：智能体编辑，你观看。按块批准/拒绝和逐键实时差异属于第二阶段，暂不显示。",
+    "第二阶段：查看器可编辑（可选），保存是原子的、保留行尾并有大小上限；命令执行器将每条命令作为全新子进程流式输出 —— 合并输出，而非交互式终端。",
+  "code.edit": "编辑",
+  "code.save": "保存",
+  "code.discard": "放弃",
+  "code.dirty": "未保存",
+  "code.saved": "已保存。",
+  "code.saveError": "无法保存 —— 是否需要 bearer 令牌，或文件过大？",
+  "code.noUndo": "保存后无法撤销（除非此文件夹是你提交的 git 仓库）。",
+  "code.cmdRunner": "命令执行器",
+  "code.cmdPlaceholder": "在此工作区运行的命令 —— 例如 npm test",
+  "code.cwd": "cwd（可选，相对于工作区）",
+  "code.exit": "退出码",
+  "code.freshProcNote":
+    "每条命令都是全新子进程 —— cwd 和 env 不会在命令间保留（无 cd/export 状态）。",
+  "code.execSecurityNote":
+    "在主机上你的工作区中运行命令（或配置的沙箱）；本地回环 + 受 bearer 令牌保护。不是交互式终端。",
   "governance.title": "治理与安全",
   "governance.injection.title": "注入防御",
   "governance.injection.undefendedAsr": "无防御 ASR",
@@ -1945,7 +2035,22 @@ const ja: Dict = {
   "code.safetyNote":
     "エージェントはこのワークスペースを編集し、ここであなたの検証コマンドを実行します —— ターミナルでの `chimera solve` と同じ機能です（localhost、bearer で保護）。",
   "code.phase2note":
-    "読み取り専用ビューア：エージェントが編集し、あなたは見守ります。ハンク単位の承認/却下やキー入力ごとのライブ差分はフェーズ2で、表示しません。",
+    "フェーズ2：ビューアは編集可能（オプトイン）で、保存はアトミックかつ改行を保持しサイズ上限あり。コマンドランナーは各コマンドを新しいサブプロセスとしてストリーム表示します —— 結合出力であり、対話型ターミナルではありません。",
+  "code.edit": "編集",
+  "code.save": "保存",
+  "code.discard": "破棄",
+  "code.dirty": "未保存",
+  "code.saved": "保存しました。",
+  "code.saveError": "保存できませんでした —— bearer トークンが必要か、ファイルが大きすぎませんか？",
+  "code.noUndo": "保存後は元に戻せません（このフォルダがあなたがコミットする git リポジトリでない限り）。",
+  "code.cmdRunner": "コマンドランナー",
+  "code.cmdPlaceholder": "このワークスペースで実行するコマンド —— 例: npm test",
+  "code.cwd": "cwd（任意、ワークスペースからの相対）",
+  "code.exit": "終了コード",
+  "code.freshProcNote":
+    "各コマンドは新しいサブプロセスです —— cwd と env はコマンド間で保持されません（cd/export の状態なし）。",
+  "code.execSecurityNote":
+    "ホスト上のあなたのワークスペース（または設定されたサンドボックス）でコマンドを実行します。localhost + bearer 保護。対話型ターミナルではありません。",
   "governance.title": "ガバナンスとセキュリティ",
   "governance.injection.title": "インジェクション防御",
   "governance.injection.undefendedAsr": "防御なし ASR",

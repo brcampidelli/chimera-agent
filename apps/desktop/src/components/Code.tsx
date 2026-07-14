@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import hljs from "highlight.js";
 import {
@@ -9,9 +9,13 @@ import {
   Folder,
   FolderOpen,
   Loader2,
+  Pencil,
   Play,
+  Save,
+  Terminal,
+  X,
 } from "lucide-react";
-import { getFsFile, getFsTree, getRuns, streamRun, type RunEvent } from "@/lib/api";
+import { getFsFile, getFsTree, getRuns, saveFile, streamExec, streamRun, type RunEvent } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/panel";
 import { useT, type TFunc } from "@/lib/i18n";
@@ -217,19 +221,70 @@ function TreePanel({
   );
 }
 
-/** The center column: the read-only file viewer (syntax-highlighted, honest binary/truncated notes). */
+/** The center column: a syntax-highlighted viewer with an opt-in editor. Read-only is the default;
+ *  "Edit" swaps in a mono textarea → Save PUTs it (atomic + newline-preserving + size-capped
+ *  server-side). Truncated/binary files are NOT editable (saving would clobber the unseen remainder). */
 function Viewer({ workspace, path }: { workspace: string; path: string | null }) {
   const t = useT();
+  const qc = useQueryClient();
   const q = useQuery({
     queryKey: ["fs-file", workspace, path],
     queryFn: () => getFsFile(workspace || null, path as string),
     enabled: path !== null,
   });
   const name = path ? path.split("/").pop() ?? path : "";
+  const loaded = q.data?.content ?? "";
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+
+  // Leave edit mode (and clear any flash) whenever the open file changes.
+  useEffect(() => {
+    setEditing(false);
+    setSaveErr(false);
+    setSavedFlash(false);
+  }, [path]);
+
+  const dirty = editing && draft !== loaded;
+  // Only a clean, whole read is editable — a truncated (clipped at the read cap) or binary/non-text
+  // file is not, since saving the shown text would overwrite the part we never loaded.
+  const editable = path !== null && !!q.data && !q.data.note && !q.data.truncated;
+
   const html = useMemo(
     () => (q.data && q.data.content ? highlightFile(q.data.content, name) : ""),
     [q.data, name],
   );
+
+  function startEdit() {
+    setDraft(loaded);
+    setSaveErr(false);
+    setSavedFlash(false);
+    setEditing(true);
+  }
+  function discard() {
+    setDraft(loaded);
+    setEditing(false);
+    setSaveErr(false);
+  }
+  async function save() {
+    if (!path || saving) return;
+    setSaving(true);
+    setSaveErr(false);
+    try {
+      await saveFile(workspace || null, path, draft);
+      setEditing(false);
+      setSavedFlash(true);
+      // Re-read the file (its on-disk newline may differ from the draft) and refresh the tree.
+      await qc.invalidateQueries({ queryKey: ["fs-file", workspace, path] });
+      void qc.invalidateQueries({ queryKey: ["fs-tree"] });
+    } catch {
+      setSaveErr(true);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <section className="flex min-h-0 flex-1 flex-col border-white/5 lg:border-r">
@@ -238,25 +293,66 @@ function Viewer({ workspace, path }: { workspace: string; path: string | null })
         <span className="min-w-0 flex-1 truncate font-mono text-xs text-foreground">
           {path ?? t("code.noFile")}
         </span>
+        {dirty ? <Badge tone="warn">{t("code.dirty")}</Badge> : null}
         {q.data?.truncated ? <Badge tone="warn">{t("code.truncated")}</Badge> : null}
+        {savedFlash && !editing ? (
+          <span className="text-[11px] text-ok">{t("code.saved")}</span>
+        ) : null}
+        {editing ? (
+          <>
+            <Button size="sm" variant="ghost" disabled={saving} onClick={discard}>
+              <X className="h-3.5 w-3.5" /> {t("code.discard")}
+            </Button>
+            <Button size="sm" disabled={saving || !dirty} onClick={() => void save()}>
+              {saving ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Save className="h-3.5 w-3.5" />
+              )}
+              {t("code.save")}
+            </Button>
+          </>
+        ) : editable ? (
+          <Button size="sm" variant="ghost" onClick={startEdit}>
+            <Pencil className="h-3.5 w-3.5" /> {t("code.edit")}
+          </Button>
+        ) : null}
       </div>
-      <div className="min-h-0 flex-1 overflow-auto">
-        {path === null ? (
-          <div className="px-4 py-6 text-sm text-muted-foreground">{t("code.viewerHint")}</div>
-        ) : q.isLoading ? (
-          <div className="flex justify-center py-10 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" />
+      {editing ? (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <textarea
+            className="min-h-0 flex-1 resize-none bg-transparent p-4 font-mono text-[12.5px] leading-relaxed text-foreground outline-none"
+            value={draft}
+            spellCheck={false}
+            onChange={(e) => setDraft(e.target.value)}
+          />
+          <div className="border-t border-white/5 px-4 py-1.5 text-[11px]">
+            {saveErr ? (
+              <span className="text-bad">{t("code.saveError")}</span>
+            ) : (
+              <span className="text-muted-foreground">{t("code.noUndo")}</span>
+            )}
           </div>
-        ) : q.isError ? (
-          <div className="px-4 py-6 text-sm text-bad">{t("code.fileError")}</div>
-        ) : q.data?.note ? (
-          <div className="px-4 py-6 text-sm text-muted-foreground">{t("code.binaryNote")}</div>
-        ) : (
-          <pre className="overflow-x-auto p-4 text-[12.5px] leading-relaxed">
-            <code className="hljs bg-transparent" dangerouslySetInnerHTML={{ __html: html }} />
-          </pre>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-auto">
+          {path === null ? (
+            <div className="px-4 py-6 text-sm text-muted-foreground">{t("code.viewerHint")}</div>
+          ) : q.isLoading ? (
+            <div className="flex justify-center py-10 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+            </div>
+          ) : q.isError ? (
+            <div className="px-4 py-6 text-sm text-bad">{t("code.fileError")}</div>
+          ) : q.data?.note ? (
+            <div className="px-4 py-6 text-sm text-muted-foreground">{t("code.binaryNote")}</div>
+          ) : (
+            <pre className="overflow-x-auto p-4 text-[12.5px] leading-relaxed">
+              <code className="hljs bg-transparent" dangerouslySetInnerHTML={{ __html: html }} />
+            </pre>
+          )}
+        </div>
+      )}
     </section>
   );
 }
@@ -457,6 +553,97 @@ function RunPanel({
   );
 }
 
+/** An HONEST command-runner (NOT an interactive terminal): a command input + optional cwd, streamed
+ *  line by line into a scrolling <pre> (combined stdout+stderr), then the exit code. Each Run is a
+ *  fresh subprocess — cwd/env don't persist between commands — so we render no fake prompt/TTY. */
+function CmdRunner({ workspace }: { workspace: string }) {
+  const t = useT();
+  const [command, setCommand] = useState("");
+  const [cwd, setCwd] = useState("");
+  const [running, setRunning] = useState(false);
+  const [lines, setLines] = useState<string[]>([]);
+  const [exitCode, setExitCode] = useState<number | null>(null);
+
+  function run() {
+    if (!command.trim() || running) return;
+    setRunning(true);
+    setLines([]);
+    setExitCode(null);
+    void streamExec(
+      { command: command.trim(), workspace: workspace || null, cwd: cwd.trim() },
+      {
+        onLine: (text) => setLines((prev) => [...prev, text]),
+        onExit: (code) => {
+          setExitCode(code);
+          setRunning(false);
+        },
+        onError: (msg) => {
+          setLines((prev) => [...prev, msg]);
+          setRunning(false);
+        },
+      },
+    );
+  }
+
+  return (
+    <section className="border-t border-white/5">
+      <div className="flex items-center gap-2 px-4 pt-2.5 text-accent">
+        <Terminal className="h-4 w-4" />
+        <h2 className="text-sm font-semibold text-foreground">{t("code.cmdRunner")}</h2>
+      </div>
+      <div className="flex flex-wrap gap-2 px-4 pt-2">
+        <input
+          className="field h-9 min-w-0 flex-1 px-3 font-mono text-xs"
+          placeholder={t("code.cmdPlaceholder")}
+          value={command}
+          onChange={(e) => setCommand(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              run();
+            }
+          }}
+          disabled={running}
+        />
+        <input
+          className="field h-9 w-56 px-3 font-mono text-xs"
+          placeholder={t("code.cwd")}
+          value={cwd}
+          onChange={(e) => setCwd(e.target.value)}
+          disabled={running}
+        />
+        <Button size="sm" disabled={!command.trim() || running} onClick={run}>
+          {running ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" /> {t("code.running")}
+            </>
+          ) : (
+            <>
+              <Play className="h-4 w-4" /> {t("code.run")}
+            </>
+          )}
+        </Button>
+      </div>
+      <p className="px-4 pt-2 text-[11px] text-muted-foreground">{t("code.freshProcNote")}</p>
+      <p className="px-4 pb-1 text-[11px] text-muted-foreground">{t("code.execSecurityNote")}</p>
+      {lines.length > 0 || exitCode !== null ? (
+        <pre className="mx-4 mb-3 max-h-56 overflow-auto rounded-chip bg-white/[0.03] p-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
+          {lines.map((line, i) => (
+            <div key={i} className="whitespace-pre-wrap break-all">
+              {line || " "}
+            </div>
+          ))}
+          {exitCode !== null ? (
+            <div className={cn("mt-1", exitCode === 0 ? "text-ok" : "text-bad")}>
+              {t("code.exit")} {exitCode}
+            </div>
+          ) : null}
+        </pre>
+      ) : null}
+    </section>
+  );
+}
+
 export function Code() {
   const t = useT();
   const qc = useQueryClient();
@@ -492,6 +679,7 @@ export function Code() {
           }}
         />
       </div>
+      <CmdRunner workspace={workspace} />
       <p className="border-t border-white/5 px-5 py-2 text-[11px] text-muted-foreground">
         {t("code.phase2note")}
       </p>

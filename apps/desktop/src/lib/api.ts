@@ -4,6 +4,7 @@ import type {
   CronJob,
   DoctorInfo,
   FsFile,
+  FsFileWritten,
   FsTree,
   GovernanceAudit,
   InjectionReport,
@@ -69,6 +70,13 @@ export const getFsFile = (workspace: string | null | undefined, path: string) =>
   if (workspace) params.set("workspace", workspace);
   return json<FsFile>(`/api/fs/file?${params.toString()}`);
 };
+// Editable-viewer save (PUT): atomic + newline-preserving + size-capped server-side. A `..` escape or
+// oversize content is a 400. Returns the bytes actually written (may exceed content length on a CRLF file).
+export const saveFile = (workspace: string | null | undefined, path: string, content: string) =>
+  json<FsFileWritten>("/api/fs/file", {
+    method: "PUT",
+    body: JSON.stringify({ workspace: workspace || null, path, content }),
+  });
 export const getMaturity = () => json<Maturity>("/api/maturity");
 export const patchConfig = (updates: Record<string, string>) =>
   json<{ updated: string[] }>("/api/config", { method: "PATCH", body: JSON.stringify(updates) });
@@ -294,5 +302,79 @@ function dispatchRun(frame: string, h: RunStreamHandlers): void {
   }
   if (event === "event") h.onEvent?.(payload as unknown as RunEvent);
   else if (event === "done") h.onDone?.(payload as unknown as RunDone);
+  else if (event === "error") h.onError?.(payload.message as string);
+}
+
+// --- Command runner (workspace-scoped, streamed; fresh subprocess per command — NOT a terminal) ---
+
+export interface ExecRequestInput {
+  command: string;
+  workspace?: string | null;
+  cwd?: string;
+  timeout?: number;
+}
+
+export interface ExecStreamHandlers {
+  onLine?: (text: string) => void;
+  onExit?: (code: number) => void;
+  onError?: (msg: string) => void;
+}
+
+/** Run one command and stream its combined stdout+stderr line by line, then the exit code. Mirrors
+ *  {@link streamRun}: the SSE lives on a POST, so we read the body and parse `line`/`exit` frames.
+ *  Each call is a FRESH subprocess on the host (or the configured sandbox) — cwd/env don't persist. */
+export async function streamExec(
+  req: ExecRequestInput,
+  handlers: ExecStreamHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch("/api/fs/exec", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(req),
+      signal,
+    });
+  } catch (err) {
+    handlers.onError?.(err instanceof Error ? err.message : "network error");
+    return;
+  }
+  if (!res.ok || !res.body) {
+    handlers.onError?.(`HTTP ${res.status}`);
+    return;
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
+    let sep: number;
+    while ((sep = buffer.indexOf("\n\n")) !== -1) {
+      dispatchExec(buffer.slice(0, sep), handlers);
+      buffer = buffer.slice(sep + 2);
+    }
+  }
+  if (buffer.trim()) dispatchExec(buffer, handlers);
+}
+
+function dispatchExec(frame: string, h: ExecStreamHandlers): void {
+  let event = "message";
+  let data = "";
+  for (const line of frame.split("\n")) {
+    if (line.startsWith("event:")) event = line.slice(6).trim();
+    else if (line.startsWith("data:")) data += line.slice(5).trim();
+  }
+  if (!data) return;
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse(data);
+  } catch {
+    return;
+  }
+  if (event === "line") h.onLine?.(payload.text as string);
+  else if (event === "exit") h.onExit?.(payload.code as number);
   else if (event === "error") h.onError?.(payload.message as string);
 }

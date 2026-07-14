@@ -321,6 +321,11 @@ class FsFileOut(BaseModel):
     note: str  # a short honest note ("binary or non-text", "not found") or "" for a clean read
 
 
+class FsFileWrittenOut(BaseModel):
+    path: str  # the (relative) file written
+    bytes: int  # bytes actually written to disk (may exceed content length on a CRLF-preserved file)
+
+
 # --- governance / security (injection red-team scoreboard + audit log) -----------------------------
 
 

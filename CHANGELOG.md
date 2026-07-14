@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Code screen Phase 2: editable file viewer with save (guarded, newline-preserving, atomic) and a
+  streaming command-runner (workspace-scoped, honors the sandbox setting, fresh subprocess per command
+  — not an interactive terminal).** The viewer gains an opt-in **Edit** toggle → a mono editor →
+  **Save**, which PUTs to a new `PUT /api/fs/file` (path-scoped by the same workspace guard, atomic
+  temp+replace, preserving the file's own CRLF/LF newline, size-capped at 1 MB); truncated/binary
+  files stay read-only (saving would clobber the unseen remainder), a dirty badge shows unsaved edits,
+  Discard reverts, and the copy is honest that there's **no undo after save** (unless the folder is a
+  git repo you commit). A new **Command runner** panel streams `POST /api/fs/exec` line by line
+  (combined stdout+stderr) then the exit code: each command is a **fresh subprocess** — cwd/env don't
+  persist between commands (no `cd`/`export` state) — run in your workspace on the host (or, when
+  `CHIMERA_SANDBOX=docker`, one-shot inside the configured sandbox, kept isolated), reusing the shell
+  tool's secret-scrubbed env, timeout cap (1..3600 s), and cwd guard. It is deliberately labeled a
+  command-runner, not a terminal, and renders no fake interactive prompt/TTY. Both endpoints are
+  localhost + bearer-guarded; a `..`/oversize/cwd-escape is a clean 400.
 - **Code screen (Phase 1): a workspace file tree + viewer and a verify-or-revert coding runner — the
   agent edits your folder and the real per-file diff of what it changed (or attempted + reverted) is
   shown; run receipts now carry real unified diffs (benefits the CLI too).** Pick a workspace, browse

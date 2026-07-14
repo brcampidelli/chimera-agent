@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from chimera.api.fs_api import list_tree, read_file
+from chimera.api.fs_api import list_tree, read_file, write_file
 from chimera.tools.workspace import PathEscapesWorkspaceError
 
 
@@ -76,3 +76,34 @@ def test_path_escape_raises_for_tree_and_file(tmp_path: Path) -> None:
         list_tree(tmp_path, "../..")
     with pytest.raises(PathEscapesWorkspaceError):
         read_file(tmp_path, "../secret.txt")
+
+
+# --- write_file (editable viewer save) ------------------------------------------------------------
+
+
+def test_write_creates_a_new_file_and_parent_dirs(tmp_path: Path) -> None:
+    out = write_file(tmp_path, "pkg/sub/new.txt", "hello\nworld\n")
+    assert out == {"path": "pkg/sub/new.txt", "bytes": 12}
+    written = tmp_path / "pkg" / "sub" / "new.txt"
+    assert written.read_bytes() == b"hello\nworld\n"  # new file gets plain \n
+
+
+def test_write_preserves_crlf_on_an_existing_crlf_file(tmp_path: Path) -> None:
+    # The editor loads content \n-normalized (as read_file returns it); saving it back must restore
+    # the file's own CRLF convention, not flip untouched lines to the platform ending.
+    target = tmp_path / "win.txt"
+    target.write_bytes(b"a\r\nb\r\n")
+    out = write_file(tmp_path, "win.txt", "a\nb\nc\n")
+    assert target.read_bytes() == b"a\r\nb\r\nc\r\n"
+    assert out["bytes"] == 9  # 3 lines × ("x" + "\r\n") == 9 bytes on disk
+
+
+def test_write_rejects_a_path_escape(tmp_path: Path) -> None:
+    with pytest.raises(PathEscapesWorkspaceError):
+        write_file(tmp_path, "../evil.txt", "x")
+
+
+def test_write_rejects_oversize_content(tmp_path: Path) -> None:
+    with pytest.raises(ValueError):
+        write_file(tmp_path, "big.txt", "a" * 50, max_bytes=10)
+    assert not (tmp_path / "big.txt").exists()  # rejected before any write

@@ -141,6 +141,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/fs/exec": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fs Exec Stream */
+        post: operations["fs_exec_stream_api_fs_exec_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/fs/file": {
         parameters: {
             query?: never;
@@ -150,7 +167,8 @@ export interface paths {
         };
         /** Fs File Endpoint */
         get: operations["fs_file_endpoint_api_fs_file_get"];
-        put?: never;
+        /** Fs File Write Endpoint */
+        put: operations["fs_file_write_endpoint_api_fs_file_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -721,6 +739,23 @@ export interface components {
             sandbox: string;
             tiers: components["schemas"]["TiersOut"];
         };
+        /** ExecRequest */
+        ExecRequest: {
+            /** Command */
+            command: string;
+            /**
+             * Cwd
+             * @default
+             */
+            cwd: string;
+            /**
+             * Timeout
+             * @default 60
+             */
+            timeout: number;
+            /** Workspace */
+            workspace?: string | null;
+        };
         /** FileDiffOut */
         FileDiffOut: {
             /** Patch */
@@ -740,6 +775,22 @@ export interface components {
             path: string;
             /** Truncated */
             truncated: boolean;
+        };
+        /** FsFileWriteRequest */
+        FsFileWriteRequest: {
+            /** Content */
+            content: string;
+            /** Path */
+            path: string;
+            /** Workspace */
+            workspace?: string | null;
+        };
+        /** FsFileWrittenOut */
+        FsFileWrittenOut: {
+            /** Bytes */
+            bytes: number;
+            /** Path */
+            path: string;
         };
         /** FsNodeOut */
         FsNodeOut: {
@@ -1568,6 +1619,39 @@ export interface operations {
             };
         };
     };
+    fs_exec_stream_api_fs_exec_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExecRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     fs_file_endpoint_api_fs_file_get: {
         parameters: {
             query: {
@@ -1587,6 +1671,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FsFileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fs_file_write_endpoint_api_fs_file_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FsFileWriteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FsFileWrittenOut"];
                 };
             };
             /** @description Validation Error */

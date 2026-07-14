@@ -271,6 +271,29 @@ def test_fs_tree_and_file_endpoints_scope_to_the_workspace(tmp_path: Any) -> Non
     )
 
 
+def test_fs_file_put_writes_and_guards(tmp_path: Any) -> None:
+    """PUT /api/fs/file writes a (new) file atomically inside the workspace and returns its byte
+    count; a path escape or oversize content is a clean 400 (never a 500)."""
+    from chimera.api import build_api_app
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    client = TestClient(
+        build_api_app(lambda: ChatSession(_FakeAgent()), settings=settings, workspace=ws)
+    )
+
+    resp = client.put("/api/fs/file", json={"path": "pkg/new.py", "content": "x = 1\n"})
+    assert resp.status_code == 200
+    assert resp.json() == {"path": "pkg/new.py", "bytes": 6}
+    assert (ws / "pkg" / "new.py").read_bytes() == b"x = 1\n"  # parent dir created, content on disk
+
+    # A `..` escape and content over the 1 MB cap both map to 400 (never a 500).
+    assert client.put("/api/fs/file", json={"path": "../evil", "content": "x"}).status_code == 400
+    big = "a" * 1_000_001
+    assert client.put("/api/fs/file", json={"path": "big.txt", "content": big}).status_code == 400
+
+
 def test_session_is_persisted_and_listed_and_deletable(tmp_path: Any) -> None:
     client = _client(tmp_path)
     resp = client.post("/api/chat/stream", json={"message": "remember me", "stream": True})

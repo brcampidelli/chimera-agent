@@ -38,6 +38,7 @@ from chimera.api.schemas import (
     DeletedOut,
     DoctorOut,
     FsFileOut,
+    FsFileWrittenOut,
     FsTreeOut,
     GovernanceAuditOut,
     HealthOut,
@@ -81,6 +82,23 @@ class ChatRequest(BaseModel):
 class ConfigTestRequest(BaseModel):
     model: str | None = None
     """The model slug to test-call. None = the configured default model."""
+
+
+class FsFileWriteRequest(BaseModel):
+    workspace: str | None = None
+    """The workspace root the write is scoped to. None = the app's launch workspace."""
+    path: str
+    content: str
+
+
+class ExecRequest(BaseModel):
+    workspace: str | None = None
+    """The workspace root the command runs in. None = the app's launch workspace."""
+    command: str
+    cwd: str = ""
+    """Working directory, relative to the workspace (default: workspace root). Does NOT persist —
+    each command is a fresh subprocess."""
+    timeout: float = 60
 
 
 class RunRequest(BaseModel):
@@ -347,6 +365,71 @@ def build_api_app(
             return read_file(ws, path)
         except PathEscapesWorkspaceError as exc:
             raise HTTPException(status_code=400, detail="invalid path") from exc
+
+    @app.put("/api/fs/file", dependencies=[guard], response_model=FsFileWrittenOut)
+    def fs_file_write_endpoint(req: FsFileWriteRequest) -> dict[str, Any]:
+        # Editable-viewer save: atomic (temp+replace), newline-preserving, size-capped (1 MB). A path
+        # escape or oversize content is a clean 400 — never a 500. Guarded + workspace-scoped, the same
+        # capability the agent's WriteFileTool already has (localhost, bearer-guarded).
+        from chimera.api.fs_api import write_file
+        from chimera.tools.workspace import PathEscapesWorkspaceError
+
+        ws = _resolve_fs_workspace(req.workspace)
+        try:
+            return write_file(ws, req.path, req.content)
+        except PathEscapesWorkspaceError as exc:
+            raise HTTPException(status_code=400, detail="invalid path") from exc
+        except ValueError as exc:  # content over the byte cap
+            raise HTTPException(status_code=400, detail="content too large") from exc
+
+    @app.post("/api/fs/exec", dependencies=[guard])
+    async def fs_exec_stream(req: ExecRequest) -> EventSourceResponse:
+        # HONEST command-runner (NOT an interactive terminal): each call is a FRESH subprocess — cwd/env
+        # do NOT persist between commands. Streams combined stdout+stderr line by line on the local
+        # sandbox; honors CHIMERA_SANDBOX (non-local runs one-shot inside the sandbox, isolated). Same
+        # side-effecting power as `run_shell` / a terminal in the workspace, gated the same way (bearer
+        # + localhost bind). The child env scrubs provider secrets (reused from LocalSandbox).
+        from chimera.api.exec_stream import resolve_exec_cwd, run_streamed
+
+        ws = _resolve_fs_workspace(req.workspace)
+        try:
+            resolve_exec_cwd(ws, req.cwd)  # pre-validate so a cwd escape is a clean 400, not a stream
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="invalid cwd") from exc
+        timeout = max(1.0, min(float(req.timeout), 3600.0))  # clamp to the shell tool's 1..3600 cap
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
+
+        def push(frame: dict[str, Any]) -> None:
+            loop.call_soon_threadsafe(queue.put_nowait, frame)
+
+        def work() -> None:
+            try:
+                code = run_streamed(
+                    req.command,
+                    workspace=ws,
+                    cwd=req.cwd,
+                    timeout=timeout,
+                    on_line=lambda text: push({"kind": "line", "text": text}),
+                    settings=settings,
+                )
+                push({"kind": "exit", "code": code})
+            except Exception as exc:  # noqa: BLE001 — surfaced to the client as a non-zero exit
+                _log.warning("exec failed: %s", exc)
+                push({"kind": "exit", "code": 1})
+            finally:
+                loop.call_soon_threadsafe(queue.put_nowait, None)  # sentinel: end of stream
+
+        threading.Thread(target=work, daemon=True).start()
+
+        async def events() -> AsyncIterator[dict[str, str]]:
+            while True:
+                item = await queue.get()
+                if item is None:
+                    break
+                yield {"event": item["kind"], "data": json.dumps(item)}
+
+        return EventSourceResponse(events())
 
     @app.get("/api/sessions", dependencies=[guard], response_model=list[SessionMetaOut])
     def list_sessions() -> list[dict[str, Any]]:
