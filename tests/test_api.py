@@ -44,6 +44,7 @@ class _FakeAgent:
             completion_tokens=2,
             usd=0.001,
             tool_names=["read_file"],
+            model="openrouter/test-model",
         )
 
 
@@ -137,6 +138,29 @@ def test_fuse_flag_swaps_agent_backend_for_the_turn_then_restores(tmp_path: Any)
     assert seen["backend_during_run"] is fuse_backend  # swapped in for the fused turn
     assert done["route_meta"] == {"kind": "fusion", "panel": []}  # fusion trace surfaced
     assert agent.backend is default_backend  # restored after the turn
+
+
+def test_chat_turn_appends_usage_line_and_usage_endpoint_summarizes(tmp_path: Any) -> None:
+    from chimera.api.usage import load_usage
+
+    client = _client(tmp_path)
+    client.post("/api/chat/stream", json={"message": "hi", "stream": True})
+
+    # A usage record was appended for the turn, carrying the turn's real signals.
+    records = load_usage(tmp_path / "home" / "usage.jsonl")
+    assert len(records) == 1
+    rec = records[0]
+    assert rec.model == "openrouter/test-model"
+    assert rec.prompt_tokens == 10 and rec.completion_tokens == 2
+    assert rec.usd == 0.001 and rec.tools == 1 and rec.route_kind is None
+
+    # And GET /api/usage returns the aggregated summary shape over that record.
+    summary = client.get("/api/usage").json()
+    assert {"totals", "by_day", "by_model", "by_session", "cache_hit_pct", "route_mix"} <= set(summary)
+    assert summary["totals"]["turns"] == 1
+    assert summary["totals"]["usd"] == 0.001 and summary["totals"]["unpriced_turns"] == 0
+    assert summary["by_model"][0]["model"] == "openrouter/test-model"
+    assert summary["route_mix"] == {"single": 1, "fusion": 0, "cascade": 0}
 
 
 def test_session_is_persisted_and_listed_and_deletable(tmp_path: Any) -> None:

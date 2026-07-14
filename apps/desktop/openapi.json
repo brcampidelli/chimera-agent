@@ -858,6 +858,219 @@
         "title": "UpdatedOut",
         "type": "object"
       },
+      "UsageDayOut": {
+        "properties": {
+          "completion_tokens": {
+            "title": "Completion Tokens",
+            "type": "integer"
+          },
+          "day": {
+            "title": "Day",
+            "type": "string"
+          },
+          "prompt_tokens": {
+            "title": "Prompt Tokens",
+            "type": "integer"
+          },
+          "turns": {
+            "title": "Turns",
+            "type": "integer"
+          },
+          "unpriced": {
+            "title": "Unpriced",
+            "type": "integer"
+          },
+          "usd": {
+            "title": "Usd",
+            "type": "number"
+          }
+        },
+        "required": [
+          "day",
+          "turns",
+          "prompt_tokens",
+          "completion_tokens",
+          "usd",
+          "unpriced"
+        ],
+        "title": "UsageDayOut",
+        "type": "object"
+      },
+      "UsageModelOut": {
+        "properties": {
+          "completion_tokens": {
+            "title": "Completion Tokens",
+            "type": "integer"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "prompt_tokens": {
+            "title": "Prompt Tokens",
+            "type": "integer"
+          },
+          "turns": {
+            "title": "Turns",
+            "type": "integer"
+          },
+          "unpriced": {
+            "title": "Unpriced",
+            "type": "integer"
+          },
+          "usd": {
+            "title": "Usd",
+            "type": "number"
+          }
+        },
+        "required": [
+          "model",
+          "turns",
+          "prompt_tokens",
+          "completion_tokens",
+          "usd",
+          "unpriced"
+        ],
+        "title": "UsageModelOut",
+        "type": "object"
+      },
+      "UsageSessionOut": {
+        "properties": {
+          "completion_tokens": {
+            "title": "Completion Tokens",
+            "type": "integer"
+          },
+          "prompt_tokens": {
+            "title": "Prompt Tokens",
+            "type": "integer"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turns": {
+            "title": "Turns",
+            "type": "integer"
+          },
+          "unpriced": {
+            "title": "Unpriced",
+            "type": "integer"
+          },
+          "usd": {
+            "title": "Usd",
+            "type": "number"
+          }
+        },
+        "required": [
+          "session_id",
+          "turns",
+          "prompt_tokens",
+          "completion_tokens",
+          "usd",
+          "unpriced"
+        ],
+        "title": "UsageSessionOut",
+        "type": "object"
+      },
+      "UsageSummaryOut": {
+        "properties": {
+          "by_day": {
+            "items": {
+              "$ref": "#/components/schemas/UsageDayOut"
+            },
+            "title": "By Day",
+            "type": "array"
+          },
+          "by_model": {
+            "items": {
+              "$ref": "#/components/schemas/UsageModelOut"
+            },
+            "title": "By Model",
+            "type": "array"
+          },
+          "by_session": {
+            "items": {
+              "$ref": "#/components/schemas/UsageSessionOut"
+            },
+            "title": "By Session",
+            "type": "array"
+          },
+          "cache_hit_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Hit Pct"
+          },
+          "route_mix": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Route Mix",
+            "type": "object"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/UsageTotalsOut"
+          }
+        },
+        "required": [
+          "totals",
+          "by_day",
+          "by_model",
+          "by_session",
+          "cache_hit_pct",
+          "route_mix"
+        ],
+        "title": "UsageSummaryOut",
+        "type": "object"
+      },
+      "UsageTotalsOut": {
+        "properties": {
+          "cache_read_tokens": {
+            "title": "Cache Read Tokens",
+            "type": "integer"
+          },
+          "cache_write_tokens": {
+            "title": "Cache Write Tokens",
+            "type": "integer"
+          },
+          "completion_tokens": {
+            "title": "Completion Tokens",
+            "type": "integer"
+          },
+          "prompt_tokens": {
+            "title": "Prompt Tokens",
+            "type": "integer"
+          },
+          "turns": {
+            "title": "Turns",
+            "type": "integer"
+          },
+          "unpriced_turns": {
+            "title": "Unpriced Turns",
+            "type": "integer"
+          },
+          "usd": {
+            "title": "Usd",
+            "type": "number"
+          }
+        },
+        "required": [
+          "turns",
+          "prompt_tokens",
+          "completion_tokens",
+          "cache_read_tokens",
+          "cache_write_tokens",
+          "usd",
+          "unpriced_turns"
+        ],
+        "title": "UsageTotalsOut",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -1714,6 +1927,24 @@
           }
         },
         "summary": "Retire Skill"
+      }
+    },
+    "/api/usage": {
+      "get": {
+        "operationId": "usage_endpoint_api_usage_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageSummaryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Usage Endpoint"
       }
     }
   }

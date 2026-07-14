@@ -72,6 +72,7 @@ class TurnReport:
     tool_names: list[str] = field(default_factory=list)
     memory_facts_used: int = 0
     memory_layer: str | None = None
+    model: str = ""  # the model slug that answered this turn (for the usage log's per-model breakdown)
     steps: int = 0
     stopped_reason: str = ""
     # Per-turn fusion/cascade trace from the backend (UI-ready JSON), or None for a single-model turn.
@@ -120,6 +121,7 @@ class ChatSession:
             tool_names=list(result.tool_names),
             memory_facts_used=len(facts),
             memory_layer=layer,
+            model=result.model,
             steps=result.steps,
             stopped_reason=result.stopped_reason,
             route_meta=result.route_meta,

@@ -20,6 +20,7 @@ import asyncio
 import json
 import threading
 from collections.abc import AsyncIterator, Callable
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -37,8 +38,10 @@ from chimera.api.schemas import (
     SessionDetailOut,
     SessionMetaOut,
     UpdatedOut,
+    UsageSummaryOut,
 )
 from chimera.api.sessions import SessionManager, SessionStore
+from chimera.api.usage import UsageRecord, append_usage, load_usage, summarize_usage
 from chimera.config import Settings, get_settings
 from chimera.core.agent import ToolActivity
 from chimera.interface import ChatSession
@@ -127,6 +130,10 @@ def build_api_app(
 
         return doctor(get_settings())
 
+    @app.get("/api/usage", dependencies=[guard], response_model=UsageSummaryOut)
+    def usage_endpoint() -> dict[str, Any]:
+        return summarize_usage(load_usage(settings.home / "usage.jsonl"))
+
     @app.get("/api/sessions", dependencies=[guard], response_model=list[SessionMetaOut])
     def list_sessions() -> list[dict[str, Any]]:
         return [
@@ -191,6 +198,7 @@ def build_api_app(
                         if swap:
                             agent.backend = original
                     manager.persist(session_id)  # durable transcript now includes this turn
+                    _append_usage(report, session_id, settings)
                 emit("done", _report_dict(report, session_id))
             except Exception as exc:  # noqa: BLE001 — surfaced to the client as an error event
                 _log.warning("chat turn failed: %s", exc)
@@ -248,6 +256,29 @@ def _index_html(index: Path, request: Request) -> Any:
         tag = f'<meta name="chimera-token" content="{escape(token, quote=True)}">'
         html = html.replace("</head>", tag + "</head>", 1)
     return HTMLResponse(html)
+
+
+def _append_usage(report: Any, session_id: str, settings: Settings) -> None:
+    """Append this turn's usage record to the usage log. Best-effort: usage logging must NEVER break
+    a turn, so any failure (disk, serialization) is swallowed with a debug log."""
+    try:
+        route_kind = report.route_meta.get("kind") if report.route_meta else None
+        record = UsageRecord(
+            ts=datetime.now(UTC).isoformat(),
+            session_id=session_id,
+            model=report.model,
+            prompt_tokens=report.prompt_tokens,
+            completion_tokens=report.completion_tokens,
+            cache_read_tokens=report.cache_read_tokens,
+            cache_write_tokens=report.cache_write_tokens,
+            usd=report.usd,
+            tools=len(report.tool_names),
+            memory_facts=report.memory_facts_used,
+            route_kind=route_kind,
+        )
+        append_usage(settings.home / "usage.jsonl", record)
+    except Exception as exc:  # noqa: BLE001 — usage logging is best-effort, never fatal to a turn
+        _log.debug("usage logging skipped: %s", exc)
 
 
 def _report_dict(report: Any, session_id: str) -> dict[str, Any]:

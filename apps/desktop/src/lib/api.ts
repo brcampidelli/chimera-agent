@@ -9,6 +9,7 @@ import type {
   TaskCard,
   TurnReport,
   ToolEvent,
+  UsageSummary,
 } from "@/lib/types";
 
 // The backend injects the bearer token into the page (as a meta tag) only for a loopback client, when
@@ -37,6 +38,7 @@ export const deleteSession = (id: string) =>
 
 export const getConfig = () => json<AppConfig>("/api/config");
 export const getDoctor = () => json<DoctorInfo>("/api/doctor");
+export const getUsage = () => json<UsageSummary>("/api/usage");
 export const patchConfig = (updates: Record<string, string>) =>
   json<{ updated: string[] }>("/api/config", { method: "PATCH", body: JSON.stringify(updates) });
 

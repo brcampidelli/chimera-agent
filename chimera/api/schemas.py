@@ -206,3 +206,52 @@ class ProjectStateOut(BaseModel):
 class ProjectDetailOut(BaseModel):
     state: ProjectStateOut
     columns: dict[str, list[TaskCardOut]]
+
+
+# --- usage (cost / usage dashboard) ---------------------------------------------------------------
+
+
+class UsageTotalsOut(BaseModel):
+    turns: int
+    prompt_tokens: int
+    completion_tokens: int
+    cache_read_tokens: int
+    cache_write_tokens: int
+    usd: float  # SUM of only the priced turns' cost — unknown prices are excluded, not summed as 0
+    unpriced_turns: int  # count of turns whose price was unknown (usd is None)
+
+
+class UsageDayOut(BaseModel):
+    day: str  # "YYYY-MM-DD"
+    turns: int
+    prompt_tokens: int
+    completion_tokens: int
+    usd: float  # summed over ONLY the priced turns of this day
+    unpriced: int  # turns this day whose price is unknown (usd None) — not folded into usd
+
+
+class UsageModelOut(BaseModel):
+    model: str
+    turns: int
+    prompt_tokens: int
+    completion_tokens: int
+    usd: float  # summed over ONLY the priced turns of this model
+    unpriced: int  # turns of this model whose price is unknown (usd None)
+
+
+class UsageSessionOut(BaseModel):
+    session_id: str
+    turns: int
+    prompt_tokens: int
+    completion_tokens: int
+    usd: float  # summed over ONLY the priced turns of this session
+    unpriced: int  # turns of this session whose price is unknown (usd None)
+
+
+class UsageSummaryOut(BaseModel):
+    totals: UsageTotalsOut
+    by_day: list[UsageDayOut]
+    by_model: list[UsageModelOut]
+    by_session: list[UsageSessionOut]
+    cache_hit_pct: float | None  # cache_read / (prompt + cache_read), or None when the denominator is 0
+    route_mix: dict[str, int]  # {"single", "fusion", "cascade"} turn counts

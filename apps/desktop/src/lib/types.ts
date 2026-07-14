@@ -19,6 +19,7 @@ export type ProjectState = Schemas["ProjectStateOut"];
 export type ProviderCfg = Schemas["ProviderOut"];
 export type AppConfig = Schemas["ConfigOut"];
 export type DoctorInfo = Schemas["DoctorOut"];
+export type UsageSummary = Schemas["UsageSummaryOut"];
 
 // --- SSE event payloads + UI-only types (not in the OpenAPI schema) ---
 

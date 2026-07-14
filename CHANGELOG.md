@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Cost / Usage dashboard in the desktop app.** A new sidebar view aggregates every chat turn's
+  real token/cost accounting: totals (turns · tokens · spend), a hand-rolled SVG spend-per-day chart
+  (falls back to tokens/day when prices are unknown), a per-model ranked breakdown, top sessions, and
+  cache-hit % + route-mix (single/fusion/cascade) tiles. Honest about cost: a turn whose price is
+  unknown (`usd=None`) is counted as **unpriced**, never summed as $0 — the total only adds prices it
+  actually knows, and no fabricated "router savings" number is shown. Each turn is persisted to an
+  append-only `usage.jsonl` (best-effort — usage logging can never break a turn) and served by a new
+  guarded `GET /api/usage` endpoint (`UsageSummaryOut`), with the model slug now threaded from
+  `AgentResult` → `TurnReport` → the log for the per-model view.
 - **Fusion & Cascade screen in the desktop app.** A new sidebar view shows, for the latest turn, HOW
   the answer was composed: the fusion panel → judge → synthesis breakdown (with per-model tokens,
   panel diversity, and aggregation mode), or the cascade tier ladder (weak → mid → fusion) with the

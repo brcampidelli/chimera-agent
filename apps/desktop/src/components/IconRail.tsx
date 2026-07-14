@@ -6,6 +6,7 @@ import {
   Clock,
   KanbanSquare,
   Network,
+  BarChart3,
   Settings as SettingsIcon,
   Moon,
   Sun,
@@ -14,7 +15,15 @@ import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/BrandMark";
 import { useT } from "@/lib/i18n";
 
-export type View = "chat" | "memory" | "skills" | "cron" | "tasks" | "fusion" | "settings";
+export type View =
+  | "chat"
+  | "memory"
+  | "skills"
+  | "cron"
+  | "tasks"
+  | "fusion"
+  | "usage"
+  | "settings";
 
 const NAV: { view: View; labelKey: string; icon: ComponentType<{ className?: string }> }[] = [
   { view: "chat", labelKey: "nav.chat", icon: MessageSquare },
@@ -23,6 +32,7 @@ const NAV: { view: View; labelKey: string; icon: ComponentType<{ className?: str
   { view: "cron", labelKey: "nav.schedule", icon: Clock },
   { view: "tasks", labelKey: "nav.tasks", icon: KanbanSquare },
   { view: "fusion", labelKey: "nav.fusion", icon: Network },
+  { view: "usage", labelKey: "nav.usage", icon: BarChart3 },
 ];
 
 function RailButton({

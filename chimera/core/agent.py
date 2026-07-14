@@ -149,6 +149,7 @@ class AgentResult:
     cache_write_tokens: int = 0
     usd: float | None = None
     tool_names: list[str] = field(default_factory=list)  # names of the tools actually called, in order
+    model: str = ""  # the model slug that actually answered (for a per-model usage breakdown)
     # Per-turn fusion/cascade trace from the backend (UI-ready JSON), or None for a single-model turn.
     route_meta: dict[str, Any] | None = None
 
@@ -318,6 +319,7 @@ class Agent:
             cache_write_tokens=usage.cache_write,
             usd=usd,
             tool_names=tool_names,
+            model=model,
             route_meta=route_meta,
         )
 
