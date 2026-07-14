@@ -587,6 +587,78 @@
         "title": "MemoryItemOut",
         "type": "object"
       },
+      "MemoryLayerOut": {
+        "properties": {
+          "clean": {
+            "title": "Clean",
+            "type": "integer"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "tainted": {
+            "title": "Tainted",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "count",
+          "clean",
+          "tainted"
+        ],
+        "title": "MemoryLayerOut",
+        "type": "object"
+      },
+      "MemoryLayersOut": {
+        "properties": {
+          "by_source": {
+            "items": {
+              "$ref": "#/components/schemas/MemorySourceOut"
+            },
+            "title": "By Source",
+            "type": "array"
+          },
+          "clean": {
+            "title": "Clean",
+            "type": "integer"
+          },
+          "layers": {
+            "items": {
+              "$ref": "#/components/schemas/MemoryLayerOut"
+            },
+            "title": "Layers",
+            "type": "array"
+          },
+          "semantic_embeddings_enabled": {
+            "title": "Semantic Embeddings Enabled",
+            "type": "boolean"
+          },
+          "tainted": {
+            "title": "Tainted",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "clean",
+          "tainted",
+          "layers",
+          "by_source",
+          "semantic_embeddings_enabled"
+        ],
+        "title": "MemoryLayersOut",
+        "type": "object"
+      },
       "MemoryProfileOut": {
         "properties": {
           "persona": {
@@ -606,6 +678,24 @@
           "persona"
         ],
         "title": "MemoryProfileOut",
+        "type": "object"
+      },
+      "MemorySourceOut": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "count"
+        ],
+        "title": "MemorySourceOut",
         "type": "object"
       },
       "ModelsCfgOut": {
@@ -1840,6 +1930,24 @@
           }
         },
         "summary": "Add Memory"
+      }
+    },
+    "/api/memory/layers": {
+      "get": {
+        "operationId": "memory_layers_api_memory_layers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryLayersOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Memory Layers"
       }
     },
     "/api/memory/profile": {

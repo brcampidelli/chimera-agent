@@ -22,6 +22,7 @@ from chimera.api.schemas import (
     DeletedOut,
     MemoryAddOut,
     MemoryItemOut,
+    MemoryLayersOut,
     MemoryProfileOut,
     ProjectDetailOut,
     ProjectStateOut,
@@ -141,6 +142,16 @@ def register_features(app: FastAPI, guard: params.Depends) -> None:
         mgr = _memory_manager()
         items = mgr.search(q, k=k) if q.strip() else mgr.store.all()
         return [_item_dict(it) for it in items]
+
+    @app.get("/api/memory/layers", dependencies=[guard], response_model=MemoryLayersOut)
+    def memory_layers() -> dict[str, Any]:
+        from chimera.api.memory_layers import summarize_memory_layers
+
+        settings = get_settings()
+        return summarize_memory_layers(
+            _memory_manager().store.all(),
+            semantic_embeddings_enabled=settings.semantic_memory,
+        )
 
     @app.get("/api/memory/profile", dependencies=[guard], response_model=MemoryProfileOut)
     def memory_profile() -> dict[str, Any]:

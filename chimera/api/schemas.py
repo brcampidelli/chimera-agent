@@ -319,3 +319,29 @@ class GovernanceAuditOut(BaseModel):
     events: list[AuditEventOut]  # newest-first (highest seq first)
     count: int
     populated: bool  # False when the audit file has no entries — drives the honest empty-state
+
+
+# --- memory layers (by-kind + provenance + by-source view) ----------------------------------------
+
+
+class MemoryLayerOut(BaseModel):
+    kind: str  # working | episodic | semantic | persona (+ any unknown kind, folded in trailing)
+    count: int
+    clean: int  # items in this kind with provenance "clean"
+    tainted: int  # items in this kind with provenance "tainted" (shown as "unverified")
+
+
+class MemorySourceOut(BaseModel):
+    source: str  # origin app (e.g. "chimera", "hermes"); "" when blank (UI shows "—")
+    count: int
+
+
+class MemoryLayersOut(BaseModel):
+    total: int
+    clean: int  # overall items with provenance "clean"
+    tainted: int  # overall items with provenance "tainted"
+    layers: list[MemoryLayerOut]  # ALWAYS the 4 canonical kinds (0-count included) + any unknown
+    by_source: list[MemorySourceOut]  # top 20, count desc
+    # Pass-through of settings.semantic_memory (opt-in, off by default). A boolean flag for an honest UI
+    # note only — NOT an embeddings index count; no such index exists when it is False.
+    semantic_embeddings_enabled: bool

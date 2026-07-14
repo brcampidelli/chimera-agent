@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Memory screen: layers (by kind) + provenance (clean/unverified) + by-source breakdown.** A new
+  layers panel above the fact list shows total/clean/unverified tiles, per-kind counts (the full
+  `working · episodic · semantic · persona` taxonomy, 0-count kinds included) with a clean/unverified
+  split, and a by-source list, served by a guarded `GET /api/memory/layers` (`MemoryLayersOut`). It
+  reports only per-kind fact counts (never a vector-index count) and adds an honest note when the
+  opt-in semantic-embeddings layer is off.
 - **Governance / Security screen in the desktop app.** A new sidebar view shows the injection
   red-team scoreboard (attack-success-rate with vs. without the defenses, per-category and per-attack,
   naming the honest gap that still gets through even defended) plus an audit-log viewer, served by

@@ -210,6 +210,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/memory/layers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Memory Layers */
+        get: operations["memory_layers_api_memory_layers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/memory/profile": {
         parameters: {
             query?: never;
@@ -654,12 +671,45 @@ export interface components {
             /** Source */
             source: string;
         };
+        /** MemoryLayerOut */
+        MemoryLayerOut: {
+            /** Clean */
+            clean: number;
+            /** Count */
+            count: number;
+            /** Kind */
+            kind: string;
+            /** Tainted */
+            tainted: number;
+        };
+        /** MemoryLayersOut */
+        MemoryLayersOut: {
+            /** By Source */
+            by_source: components["schemas"]["MemorySourceOut"][];
+            /** Clean */
+            clean: number;
+            /** Layers */
+            layers: components["schemas"]["MemoryLayerOut"][];
+            /** Semantic Embeddings Enabled */
+            semantic_embeddings_enabled: boolean;
+            /** Tainted */
+            tainted: number;
+            /** Total */
+            total: number;
+        };
         /** MemoryProfileOut */
         MemoryProfileOut: {
             /** Persona */
             persona: components["schemas"]["MemoryItemOut"][];
             /** Profile */
             profile: string;
+        };
+        /** MemorySourceOut */
+        MemorySourceOut: {
+            /** Count */
+            count: number;
+            /** Source */
+            source: string;
         };
         /** ModelsCfgOut */
         ModelsCfgOut: {
@@ -1314,6 +1364,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    memory_layers_api_memory_layers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryLayersOut"];
                 };
             };
         };

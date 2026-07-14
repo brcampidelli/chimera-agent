@@ -5,6 +5,7 @@ import type {
   GovernanceAudit,
   InjectionReport,
   MemoryItem,
+  MemoryLayers,
   ProjectState,
   RunReceipt,
   SessionMeta,
@@ -52,6 +53,7 @@ export const patchConfig = (updates: Record<string, string>) =>
 // --- Memory ---
 export const getMemory = (q = "") =>
   json<MemoryItem[]>(`/api/memory${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+export const getMemoryLayers = () => json<MemoryLayers>("/api/memory/layers");
 export const addMemory = (content: string, kind: string) =>
   json<{ status: string; item: MemoryItem }>("/api/memory", {
     method: "POST",

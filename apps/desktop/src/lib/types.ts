@@ -12,6 +12,7 @@ type Schemas = components["schemas"];
 export type SessionMeta = Schemas["SessionMetaOut"];
 export type ChatTurn = Schemas["TurnOut"];
 export type MemoryItem = Schemas["MemoryItemOut"];
+export type MemoryLayers = Schemas["MemoryLayersOut"];
 export type SkillStat = Schemas["SkillStatOut"];
 export type CronJob = Schemas["CronJobOut"];
 export type TaskCard = Schemas["TaskCardOut"];
