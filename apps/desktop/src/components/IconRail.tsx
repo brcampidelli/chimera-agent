@@ -8,6 +8,7 @@ import {
   Network,
   BarChart3,
   ListChecks,
+  Wrench,
   Shield,
   Settings as SettingsIcon,
   Moon,
@@ -26,6 +27,7 @@ export type View =
   | "fusion"
   | "usage"
   | "runs"
+  | "tools"
   | "governance"
   | "settings";
 
@@ -38,6 +40,7 @@ const NAV: { view: View; labelKey: string; icon: ComponentType<{ className?: str
   { view: "fusion", labelKey: "nav.fusion", icon: Network },
   { view: "usage", labelKey: "nav.usage", icon: BarChart3 },
   { view: "runs", labelKey: "nav.runs", icon: ListChecks },
+  { view: "tools", labelKey: "nav.tools", icon: Wrench },
   { view: "governance", labelKey: "nav.governance", icon: Shield },
 ];
 

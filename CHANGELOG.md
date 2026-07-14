@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Tools screen: lists the agent's registered tools with capability tags (network/read/write/exec/side-effect).**
+
 ## [0.24.0] - 2026-07-14
 
 ### Added

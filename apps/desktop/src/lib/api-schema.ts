@@ -434,6 +434,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tools Endpoint */
+        get: operations["tools_endpoint_api_tools_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/usage": {
         parameters: {
             query?: never;
@@ -887,6 +904,26 @@ export interface components {
             top: string;
             /** Weak */
             weak: string;
+        };
+        /** ToolInfoOut */
+        ToolInfoOut: {
+            /** Description */
+            description: string;
+            /** Name */
+            name: string;
+            /** Params */
+            params: string[];
+            /** Tags */
+            tags: string[];
+            /** Untrusted Output */
+            untrusted_output: boolean;
+        };
+        /** ToolsOut */
+        ToolsOut: {
+            /** Count */
+            count: number;
+            /** Tools */
+            tools: components["schemas"]["ToolInfoOut"][];
         };
         /** TurnOut */
         TurnOut: {
@@ -1793,6 +1830,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tools_endpoint_api_tools_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolsOut"];
                 };
             };
         };

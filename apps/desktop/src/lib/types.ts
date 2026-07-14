@@ -25,6 +25,8 @@ export type RunReceipt = Schemas["RunReceiptOut"];
 export type AttemptReceipt = Schemas["AttemptReceiptOut"];
 export type InjectionReport = Schemas["InjectionReportOut"];
 export type GovernanceAudit = Schemas["GovernanceAuditOut"];
+export type ToolInfo = Schemas["ToolInfoOut"];
+export type Tools = Schemas["ToolsOut"];
 
 // --- SSE event payloads + UI-only types (not in the OpenAPI schema) ---
 

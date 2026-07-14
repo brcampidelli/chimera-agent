@@ -13,6 +13,7 @@ import type {
   TaskCard,
   TurnReport,
   ToolEvent,
+  Tools,
   UsageSummary,
 } from "@/lib/types";
 
@@ -47,6 +48,7 @@ export const getRuns = () => json<RunReceipt[]>("/api/runs");
 export const getGovernanceInjection = () =>
   json<InjectionReport>("/api/governance/injection");
 export const getGovernanceAudit = () => json<GovernanceAudit>("/api/governance/audit");
+export const getTools = () => json<Tools>("/api/tools");
 export const patchConfig = (updates: Record<string, string>) =>
   json<{ updated: string[] }>("/api/config", { method: "PATCH", body: JSON.stringify(updates) });
 

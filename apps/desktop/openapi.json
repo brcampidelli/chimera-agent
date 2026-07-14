@@ -1217,6 +1217,66 @@
         "title": "TiersOut",
         "type": "object"
       },
+      "ToolInfoOut": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "params": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Params",
+            "type": "array"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "untrusted_output": {
+            "title": "Untrusted Output",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "params",
+          "tags",
+          "untrusted_output"
+        ],
+        "title": "ToolInfoOut",
+        "type": "object"
+      },
+      "ToolsOut": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/ToolInfoOut"
+            },
+            "title": "Tools",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tools",
+          "count"
+        ],
+        "title": "ToolsOut",
+        "type": "object"
+      },
       "TurnOut": {
         "properties": {
           "assistant": {
@@ -2430,6 +2490,24 @@
           }
         },
         "summary": "Retire Skill"
+      }
+    },
+    "/api/tools": {
+      "get": {
+        "operationId": "tools_endpoint_api_tools_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Tools Endpoint"
       }
     },
     "/api/usage": {

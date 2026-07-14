@@ -42,6 +42,7 @@ from chimera.api.schemas import (
     RunReceiptOut,
     SessionDetailOut,
     SessionMetaOut,
+    ToolsOut,
     UpdatedOut,
     UsageSummaryOut,
 )
@@ -172,6 +173,18 @@ def build_api_app(
         # Read-only: the last 100 run receipts, most recent first. Each was persisted by the
         # autonomous loop (CLI `solve` or the POST trigger below) via its ``run_log``.
         return list(reversed(load_runs(settings.home / "runs.jsonl")))[:100]
+
+    @app.get("/api/tools", dependencies=[guard], response_model=ToolsOut)
+    def tools_endpoint() -> dict[str, Any]:
+        # The agent's registered tools, so the screen reflects exactly the desktop agent's registry
+        # (native + key-gated tools that light up when a credential/dep is present). Cheap and
+        # side-effect free: building the registry only instantiates tool objects + reads settings
+        # (the browser's Chromium binary downloads on first USE, not registration).
+        from chimera.api.tools_api import list_tools
+        from chimera.tools.builtin import default_registry
+
+        tools = list_tools(default_registry(workspace))
+        return {"tools": tools, "count": len(tools)}
 
     @app.get("/api/governance/injection", dependencies=[guard], response_model=InjectionReportOut)
     def governance_injection_endpoint() -> dict[str, Any]:

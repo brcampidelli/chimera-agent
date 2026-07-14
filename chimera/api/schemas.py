@@ -345,3 +345,20 @@ class MemoryLayersOut(BaseModel):
     # Pass-through of settings.semantic_memory (opt-in, off by default). A boolean flag for an honest UI
     # note only — NOT an embeddings index count; no such index exists when it is False.
     semantic_embeddings_enabled: bool
+
+
+# --- tools (agent tool registry inventory) --------------------------------------------------------
+
+
+class ToolInfoOut(BaseModel):
+    name: str
+    description: str
+    params: list[str]  # the tool's parameter NAMES (parameters.properties keys); [] when it takes none
+    tags: list[str]  # capability tags derived purely from the tool NAME vs the governance sets, in a
+    # stable order: network / read / write / exec / side-effect. [] when the name is in none of them.
+    untrusted_output: bool  # True only for MCP/OpenAPI-imported tools; False for native tools (read as-is)
+
+
+class ToolsOut(BaseModel):
+    tools: list[ToolInfoOut]
+    count: int

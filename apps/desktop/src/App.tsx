@@ -13,6 +13,7 @@ import { Fusion } from "@/components/Fusion";
 import { Usage } from "@/components/Usage";
 import { Runs } from "@/components/Runs";
 import { Governance } from "@/components/Governance";
+import { Tools } from "@/components/Tools";
 import { Activity, type Status } from "@/components/Activity";
 import { deleteSession, getSession, listSessions, streamChat } from "@/lib/api";
 import { useT } from "@/lib/i18n";
@@ -165,6 +166,7 @@ export default function App() {
         {view === "fusion" && <Fusion report={report} />}
         {view === "usage" && <Usage />}
         {view === "runs" && <Runs />}
+        {view === "tools" && <Tools />}
         {view === "governance" && <Governance />}
         {view === "settings" && <Settings />}
       </main>
