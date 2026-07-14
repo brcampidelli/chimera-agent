@@ -271,6 +271,12 @@ class UsageSummaryOut(BaseModel):
 # --- runs (autonomous run receipts) ---------------------------------------------------------------
 
 
+class FileDiffOut(BaseModel):
+    path: str
+    patch: str  # a unified-diff body (@@ hunks, +/- lines) — the real change this attempt made
+    truncated: bool  # the patch was clipped to the char bound
+
+
 class AttemptReceiptOut(BaseModel):
     index: int
     verified: bool  # executable evidence passed for this attempt
@@ -279,6 +285,7 @@ class AttemptReceiptOut(BaseModel):
     verify_output: str  # the concrete verifier output (test/assert), truncated
     diff_summary: str  # what this attempt actually changed in the workspace, audited before any revert
     feedback: str  # the retry feedback this attempt produced, truncated
+    diffs: list[FileDiffOut]  # real per-file unified diffs (on a reverted attempt: what it ATTEMPTED)
 
 
 class RunReceiptOut(BaseModel):
@@ -289,6 +296,29 @@ class RunReceiptOut(BaseModel):
     verify_command: str | None  # the shell command that judged the run, or null (no verifier)
     answer: str  # the final answer, truncated
     attempts: list[AttemptReceiptOut]  # the per-attempt verify-or-revert proof trail
+
+
+# --- filesystem (read-only tree + file viewer for the Code screen) --------------------------------
+
+
+class FsNodeOut(BaseModel):
+    name: str  # the entry's base name
+    path: str  # its path relative to the workspace (POSIX), the key to expand/open it
+    is_dir: bool
+
+
+class FsTreeOut(BaseModel):
+    workspace: str  # the resolved workspace root this listing is scoped to
+    path: str  # the (relative) directory listed
+    entries: list[FsNodeOut]  # immediate children only (dirs first, then files, alphabetical)
+    capped: bool  # the listing hit the max-entries cap (some children are omitted)
+
+
+class FsFileOut(BaseModel):
+    path: str  # the (relative) file read
+    content: str  # UTF-8 text, truncated at the read cap; empty for a binary/dir/missing file
+    truncated: bool  # the content was clipped at the read cap
+    note: str  # a short honest note ("binary or non-text", "not found") or "" for a clean read
 
 
 # --- governance / security (injection red-team scoreboard + audit log) -----------------------------

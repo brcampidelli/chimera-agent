@@ -7,7 +7,7 @@ from pathlib import Path
 from chimera.core.checkpoint import FileSnapshot
 from chimera.ecosystem.loop import rejection_sample, run_rft
 from chimera.ecosystem.trajectory import Trajectory, TrajectoryCollector
-from chimera.evolution.diff_gate import ProductiveDiff, diff_snapshots
+from chimera.evolution.diff_gate import ProductiveDiff, diff_snapshots, unified_diffs
 
 
 def _snap(files: dict[str, str], *, binaries: set[str] | None = None) -> FileSnapshot:
@@ -72,6 +72,60 @@ def test_audit_summary_caps_the_file_list() -> None:
 
 def test_empty_diff_is_not_productive() -> None:
     assert ProductiveDiff().is_productive is False
+
+
+# --- unified per-file diffs (the Code screen's real patch) --------------------------------
+
+
+def test_unified_diff_of_a_modified_file_has_real_hunk_and_pm_lines() -> None:
+    before = _snap({"a.py": "x = 1\ny = 2\n"})
+    after = _snap({"a.py": "x = 1\ny = 99\n"})
+    diffs = unified_diffs(before, after)
+    assert [d.path for d in diffs] == ["a.py"]
+    patch = diffs[0].patch
+    assert "@@" in patch  # a real hunk header
+    assert "-y = 2" in patch and "+y = 99" in patch
+    assert diffs[0].truncated is False
+
+
+def test_unified_diff_of_a_new_file_is_all_added_lines() -> None:
+    diffs = unified_diffs(_snap({}), _snap({"new.py": "line1\nline2"}))
+    patch = diffs[0].patch
+    assert "+line1" in patch and "+line2" in patch
+    assert "-line1" not in patch  # a fresh file has no removed lines
+
+
+def test_unified_diff_of_a_removed_file_is_all_removed_lines() -> None:
+    diffs = unified_diffs(_snap({"gone.py": "a\nb"}), _snap({}))
+    patch = diffs[0].patch
+    assert "-a" in patch and "-b" in patch
+    assert "+a" not in patch
+
+
+def test_unified_diffs_caps_the_number_of_files() -> None:
+    after = _snap({f"f{i}.py": f"content {i}" for i in range(30)})
+    diffs = unified_diffs(_snap({}), after, max_files=5)
+    assert len(diffs) == 5
+    assert [d.path for d in diffs] == ["f0.py", "f1.py", "f10.py", "f11.py", "f12.py"]  # sorted
+
+
+def test_unified_diff_truncates_a_large_patch() -> None:
+    big_after = _snap({"big.py": "\n".join(f"line {i}" for i in range(2000))})
+    diffs = unified_diffs(_snap({}), big_after, max_chars=200)
+    assert diffs[0].truncated is True
+    assert "[diff truncated]" in diffs[0].patch
+
+
+def test_unified_diff_of_a_binary_add_is_a_note_not_a_crash() -> None:
+    diffs = unified_diffs(_snap({}), _snap({}, binaries={"img.png"}))
+    assert diffs[0].path == "img.png"
+    assert "binary" in diffs[0].patch.lower()
+
+
+def test_unified_diffs_skips_whitespace_only_change() -> None:
+    before = _snap({"a.py": "def f():\n    return 1"})
+    after = _snap({"a.py": "def f():   \n    return 1\n\n"})  # whitespace only
+    assert unified_diffs(before, after) == []
 
 
 # --- the rejection-sampling gate ---------------------------------------------------------

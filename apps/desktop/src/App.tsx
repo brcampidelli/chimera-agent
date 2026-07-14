@@ -12,6 +12,7 @@ import { Tasks } from "@/components/Tasks";
 import { Fusion } from "@/components/Fusion";
 import { Usage } from "@/components/Usage";
 import { Runs } from "@/components/Runs";
+import { Code } from "@/components/Code";
 import { Governance } from "@/components/Governance";
 import { Maturity } from "@/components/Maturity";
 import { Tools } from "@/components/Tools";
@@ -194,6 +195,7 @@ export default function App() {
         {view === "fusion" && <Fusion report={report} />}
         {view === "usage" && <Usage />}
         {view === "runs" && <Runs />}
+        {view === "code" && <Code />}
         {view === "tools" && <Tools />}
         {view === "mcp" && <Mcp />}
         {view === "governance" && <Governance />}

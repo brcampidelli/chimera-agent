@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
+    from chimera.evolution.diff_gate import FileDiff
     from chimera.fusion.probe_log import ProbeLog
 
 from chimera.core.agent import AgentResult
@@ -137,6 +138,7 @@ class Attempt:
     feedback: str = ""
     verify_output: str = ""
     diff_summary: str = ""
+    diffs: list[FileDiff] = field(default_factory=list)  # real per-file unified diffs (pre-revert)
 
 
 @dataclass
@@ -452,12 +454,14 @@ class AutonomousAgent:
             diff_productive: bool | None = None
             diff_summary: str | None = None
             if snapshot is not None and self.guard is not None:
-                from chimera.evolution.diff_gate import diff_snapshots
+                from chimera.evolution.diff_gate import diff_snapshots, unified_diffs
 
-                pdiff = diff_snapshots(snapshot, self.guard.snapshot())
+                after = self.guard.snapshot()  # one capture feeds both the summary and the per-file diffs
+                pdiff = diff_snapshots(snapshot, after)
                 diff_productive = pdiff.is_productive
                 diff_summary = pdiff.audit_summary()
                 attempt.diff_summary = diff_summary or ""
+                attempt.diffs = unified_diffs(snapshot, after)  # real diffs, BEFORE any revert below
             if not ok and snapshot is not None and self.guard is not None:
                 self.guard.restore(snapshot)
                 attempt.reverted = True

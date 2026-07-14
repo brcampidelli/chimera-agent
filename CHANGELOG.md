@@ -6,6 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Code screen (Phase 1): a workspace file tree + viewer and a verify-or-revert coding runner — the
+  agent edits your folder and the real per-file diff of what it changed (or attempted + reverted) is
+  shown; run receipts now carry real unified diffs (benefits the CLI too).** Pick a workspace, browse
+  a lazy (one-level-at-a-time) file tree, open a file in a syntax-highlighted read-only viewer
+  (binary/truncated files are labeled honestly), then type an instruction + optional verify command
+  and Run it: the agent runs the same plain solve core as `chimera solve` in a terminal — writing
+  files and executing your verify command inside the workspace (localhost, bearer-guarded) — streamed
+  live, and the newest run's per-file unified diffs are rendered (green `+` / red `-` / dim `@@`,
+  each file collapsible). A **reverted** attempt's diffs are clearly labeled as what it ATTEMPTED
+  before the workspace was rolled back after verification failed. New read-only `GET /api/fs/tree` and
+  `GET /api/fs/file` endpoints are path-scoped by the same workspace guard the file tools use. The
+  diff seam is bounded (≤20 files per attempt, each patch ≤4000 chars, flagged when truncated) and
+  benefits the CLI: every autonomous run receipt now records the real unified diff of each attempt.
+
 ## [0.25.0] - 2026-07-14
 
 ### Added

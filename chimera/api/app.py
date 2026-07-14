@@ -37,6 +37,8 @@ from chimera.api.schemas import (
     ConfigTestOut,
     DeletedOut,
     DoctorOut,
+    FsFileOut,
+    FsTreeOut,
     GovernanceAuditOut,
     HealthOut,
     InjectionReportOut,
@@ -308,6 +310,43 @@ def build_api_app(
                 yield {"event": event, "data": json.dumps(payload)}
 
         return EventSourceResponse(events())
+
+    def _resolve_fs_workspace(ws_param: str | None) -> Path:
+        # Which workspace the read-only fs endpoints are scoped to: the request's ``workspace`` query
+        # when given (validated: must exist and be a dir, else 400 — mirrors how POST /api/runs
+        # resolves its workspace), otherwise the app's launch workspace.
+        if not ws_param:
+            return workspace
+        ws = Path(ws_param).expanduser().resolve()
+        if not ws.is_dir():
+            raise HTTPException(status_code=400, detail="workspace not found")
+        return ws
+
+    @app.get("/api/fs/tree", dependencies=[guard], response_model=FsTreeOut)
+    def fs_tree_endpoint(path: str = "", workspace: str | None = None) -> dict[str, Any]:
+        # Read-only, lazy one-level directory listing scoped to the workspace (path-guarded). A `..`
+        # escape → 400; a huge dir is capped (flagged) so it never serializes unbounded.
+        from chimera.api.fs_api import list_tree
+        from chimera.tools.workspace import PathEscapesWorkspaceError
+
+        ws = _resolve_fs_workspace(workspace)
+        try:
+            return list_tree(ws, path)
+        except PathEscapesWorkspaceError as exc:
+            raise HTTPException(status_code=400, detail="invalid path") from exc
+
+    @app.get("/api/fs/file", dependencies=[guard], response_model=FsFileOut)
+    def fs_file_endpoint(path: str, workspace: str | None = None) -> dict[str, Any]:
+        # Read-only single-file read (path-guarded, capped at 20k). Binary/dir/missing → an honest
+        # note, never a 500; only a path escape is a 400.
+        from chimera.api.fs_api import read_file
+        from chimera.tools.workspace import PathEscapesWorkspaceError
+
+        ws = _resolve_fs_workspace(workspace)
+        try:
+            return read_file(ws, path)
+        except PathEscapesWorkspaceError as exc:
+            raise HTTPException(status_code=400, detail="invalid path") from exc
 
     @app.get("/api/sessions", dependencies=[guard], response_model=list[SessionMetaOut])
     def list_sessions() -> list[dict[str, Any]]:

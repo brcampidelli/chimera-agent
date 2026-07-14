@@ -3,6 +3,8 @@ import type {
   ConfigTest,
   CronJob,
   DoctorInfo,
+  FsFile,
+  FsTree,
   GovernanceAudit,
   InjectionReport,
   Maturity,
@@ -53,6 +55,20 @@ export const getGovernanceInjection = () =>
   json<InjectionReport>("/api/governance/injection");
 export const getGovernanceAudit = () => json<GovernanceAudit>("/api/governance/audit");
 export const getTools = () => json<Tools>("/api/tools");
+
+// --- Filesystem (read-only tree + file viewer for the Code screen) ---
+// Both are path-scoped server-side to the workspace; a `..` escape is a 400, a binary/dir is an
+// honest note (never a 500). The tree is lazy — one directory level per call.
+export const getFsTree = (workspace?: string | null, path = "") => {
+  const params = new URLSearchParams({ path });
+  if (workspace) params.set("workspace", workspace);
+  return json<FsTree>(`/api/fs/tree?${params.toString()}`);
+};
+export const getFsFile = (workspace: string | null | undefined, path: string) => {
+  const params = new URLSearchParams({ path });
+  if (workspace) params.set("workspace", workspace);
+  return json<FsFile>(`/api/fs/file?${params.toString()}`);
+};
 export const getMaturity = () => json<Maturity>("/api/maturity");
 export const patchConfig = (updates: Record<string, string>) =>
   json<{ updated: string[] }>("/api/config", { method: "PATCH", body: JSON.stringify(updates) });

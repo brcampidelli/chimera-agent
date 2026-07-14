@@ -37,6 +37,13 @@
             "title": "Diff Summary",
             "type": "string"
           },
+          "diffs": {
+            "items": {
+              "$ref": "#/components/schemas/FileDiffOut"
+            },
+            "title": "Diffs",
+            "type": "array"
+          },
           "feedback": {
             "title": "Feedback",
             "type": "string"
@@ -69,7 +76,8 @@
           "success",
           "verify_output",
           "diff_summary",
-          "feedback"
+          "feedback",
+          "diffs"
         ],
         "title": "AttemptReceiptOut",
         "type": "object"
@@ -359,6 +367,111 @@
           "sandbox"
         ],
         "title": "DoctorOut",
+        "type": "object"
+      },
+      "FileDiffOut": {
+        "properties": {
+          "patch": {
+            "title": "Patch",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "patch",
+          "truncated"
+        ],
+        "title": "FileDiffOut",
+        "type": "object"
+      },
+      "FsFileOut": {
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "content",
+          "truncated",
+          "note"
+        ],
+        "title": "FsFileOut",
+        "type": "object"
+      },
+      "FsNodeOut": {
+        "properties": {
+          "is_dir": {
+            "title": "Is Dir",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "path",
+          "is_dir"
+        ],
+        "title": "FsNodeOut",
+        "type": "object"
+      },
+      "FsTreeOut": {
+        "properties": {
+          "capped": {
+            "title": "Capped",
+            "type": "boolean"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/FsNodeOut"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "workspace": {
+            "title": "Workspace",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace",
+          "path",
+          "entries",
+          "capped"
+        ],
+        "title": "FsTreeOut",
         "type": "object"
       },
       "GovernanceAuditOut": {
@@ -2198,6 +2311,117 @@
           }
         },
         "summary": "Doctor Endpoint"
+      }
+    },
+    "/api/fs/file": {
+      "get": {
+        "operationId": "fs_file_endpoint_api_fs_file_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "title": "Path",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workspace"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FsFileOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Fs File Endpoint"
+      }
+    },
+    "/api/fs/tree": {
+      "get": {
+        "operationId": "fs_tree_endpoint_api_fs_tree_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "path",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Path",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workspace"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FsTreeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Fs Tree Endpoint"
       }
     },
     "/api/governance/audit": {

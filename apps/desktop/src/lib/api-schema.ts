@@ -141,6 +141,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/fs/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fs File Endpoint */
+        get: operations["fs_file_endpoint_api_fs_file_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/fs/tree": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fs Tree Endpoint */
+        get: operations["fs_tree_endpoint_api_fs_tree_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/governance/audit": {
         parameters: {
             query?: never;
@@ -572,6 +606,8 @@ export interface components {
         AttemptReceiptOut: {
             /** Diff Summary */
             diff_summary: string;
+            /** Diffs */
+            diffs: components["schemas"]["FileDiffOut"][];
             /** Feedback */
             feedback: string;
             /** Index */
@@ -684,6 +720,46 @@ export interface components {
             /** Sandbox */
             sandbox: string;
             tiers: components["schemas"]["TiersOut"];
+        };
+        /** FileDiffOut */
+        FileDiffOut: {
+            /** Patch */
+            patch: string;
+            /** Path */
+            path: string;
+            /** Truncated */
+            truncated: boolean;
+        };
+        /** FsFileOut */
+        FsFileOut: {
+            /** Content */
+            content: string;
+            /** Note */
+            note: string;
+            /** Path */
+            path: string;
+            /** Truncated */
+            truncated: boolean;
+        };
+        /** FsNodeOut */
+        FsNodeOut: {
+            /** Is Dir */
+            is_dir: boolean;
+            /** Name */
+            name: string;
+            /** Path */
+            path: string;
+        };
+        /** FsTreeOut */
+        FsTreeOut: {
+            /** Capped */
+            capped: boolean;
+            /** Entries */
+            entries: components["schemas"]["FsNodeOut"][];
+            /** Path */
+            path: string;
+            /** Workspace */
+            workspace: string;
         };
         /** GovernanceAuditOut */
         GovernanceAuditOut: {
@@ -1488,6 +1564,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DoctorOut"];
+                };
+            };
+        };
+    };
+    fs_file_endpoint_api_fs_file_get: {
+        parameters: {
+            query: {
+                path: string;
+                workspace?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FsFileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fs_tree_endpoint_api_fs_tree_get: {
+        parameters: {
+            query?: {
+                path?: string;
+                workspace?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FsTreeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

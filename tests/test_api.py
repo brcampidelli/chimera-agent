@@ -240,6 +240,37 @@ def test_post_runs_streams_events_done_and_persists_receipt(tmp_path: Any) -> No
     assert listed[0]["task"] == "make it so"
 
 
+def test_fs_tree_and_file_endpoints_scope_to_the_workspace(tmp_path: Any) -> None:
+    """The read-only fs endpoints list a workspace's tree and read a file, guarded by the app's
+    workspace and the path-escape check (a `..` → 400; an invalid workspace param → 400)."""
+    from chimera.api import build_api_app
+
+    ws = tmp_path / "ws"
+    (ws / "src").mkdir(parents=True)
+    (ws / "src" / "main.py").write_text("print('x')\n", encoding="utf-8")
+    (ws / ".git").mkdir()
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    client = TestClient(
+        build_api_app(lambda: ChatSession(_FakeAgent()), settings=settings, workspace=ws)
+    )
+
+    tree = client.get("/api/fs/tree").json()
+    names = [e["name"] for e in tree["entries"]]
+    assert names == ["src"] and ".git" not in names  # dir only, ignored dir pruned
+
+    sub = client.get("/api/fs/tree", params={"path": "src"}).json()
+    assert [e["path"] for e in sub["entries"]] == ["src/main.py"]
+
+    f = client.get("/api/fs/file", params={"path": "src/main.py"}).json()
+    assert f["content"] == "print('x')\n" and f["note"] == ""
+
+    # A path escape is a clean 400 (never a 500), and an invalid workspace param is a 400 too.
+    assert client.get("/api/fs/file", params={"path": "../secret"}).status_code == 400
+    assert (
+        client.get("/api/fs/tree", params={"workspace": str(tmp_path / "nope")}).status_code == 400
+    )
+
+
 def test_session_is_persisted_and_listed_and_deletable(tmp_path: Any) -> None:
     client = _client(tmp_path)
     resp = client.post("/api/chat/stream", json={"message": "remember me", "stream": True})

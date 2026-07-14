@@ -26,6 +26,14 @@ if TYPE_CHECKING:
 _log = get_logger("api.runs")
 
 
+class FileDiffReceipt(BaseModel):
+    """One file's real unified diff for an attempt (the machine truth of what that file changed)."""
+
+    path: str = ""
+    patch: str = ""  # a difflib unified-diff body (@@ hunks, +/- lines), bounded in the builder
+    truncated: bool = False  # the patch was clipped to the char bound
+
+
 class AttemptReceipt(BaseModel):
     """One attempt's proof: whether it verified, whether it was reverted, and what it changed."""
 
@@ -36,6 +44,7 @@ class AttemptReceipt(BaseModel):
     verify_output: str = ""  # the concrete verifier output (test/assert), truncated in the builder
     diff_summary: str = ""  # the workspace diff this attempt made, as audited before any revert
     feedback: str = ""  # the retry feedback this attempt produced, truncated in the builder
+    diffs: list[FileDiffReceipt] = []  # real per-file unified diffs (what the attempt changed/attempted)
 
 
 class RunReceipt(BaseModel):
@@ -63,6 +72,16 @@ def build_receipt(
             verify_output=(a.verify_output or "")[:4000],
             diff_summary=a.diff_summary or "",
             feedback=(a.feedback or "")[:1000],
+            # Bound the per-file diffs defensively again (at most 20 files, each patch <= 4000 chars) so
+            # a big run can't bloat runs.jsonl — the caps mirror unified_diffs' own defaults.
+            diffs=[
+                FileDiffReceipt(
+                    path=d.path,
+                    patch=(d.patch or "")[:4000],
+                    truncated=bool(d.truncated) or len(d.patch or "") > 4000,
+                )
+                for d in list(getattr(a, "diffs", None) or [])[:20]
+            ],
         )
         for a in result.attempts
     ]

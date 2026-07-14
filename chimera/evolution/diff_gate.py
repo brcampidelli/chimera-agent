@@ -17,6 +17,7 @@ no real content change does not read as productive; an added empty file does not
 
 from __future__ import annotations
 
+import difflib
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -99,3 +100,64 @@ def diff_snapshots(before: FileSnapshot, after: FileSnapshot) -> ProductiveDiff:
             modified.append(rel)
 
     return ProductiveDiff(added=added, removed=removed, modified=modified)
+
+
+@dataclass
+class FileDiff:
+    """A real per-file unified diff between two snapshots — the machine truth of what one file changed.
+
+    ``patch`` is a ``difflib.unified_diff`` body (``@@`` hunk headers, ``+``/``-`` lines); ``truncated``
+    is True when the patch was clipped to the char bound. A reverted attempt's diffs are what it
+    ATTEMPTED before the rollback — the receipt's ``reverted`` flag is what says they're not on disk.
+    """
+
+    path: str
+    patch: str
+    truncated: bool = False
+
+
+def unified_diffs(
+    before: FileSnapshot, after: FileSnapshot, *, max_files: int = 20, max_chars: int = 4000
+) -> list[FileDiff]:
+    """Compute real per-file unified diffs for every path that changed between two snapshots.
+
+    Reuses :func:`diff_snapshots`' normalized classification to decide *which* paths changed (so a
+    whitespace-only reflow yields no diff), then renders each one's actual (un-normalized) content as
+    a unified diff. An added file diffs against ``""`` (all ``+`` lines); a removed file against ``""``
+    (all ``-`` lines); a modified file against its prior content. A binary path (tracked for presence
+    but with no captured content) yields a short note instead of a patch — never a crash.
+
+    Bounds keep the output (and the receipt it feeds) small: at most ``max_files`` files, sorted by
+    path for determinism; each patch truncated to ``max_chars`` (``truncated=True`` + a marker line).
+    """
+    pdiff = diff_snapshots(before, after)
+    added = set(pdiff.added)
+    removed = set(pdiff.removed)
+    out: list[FileDiff] = []
+    for rel in pdiff.changed[:max_files]:  # `changed` is already sorted + de-duplicated
+        before_text: str | None
+        after_text: str | None
+        if rel in added:
+            before_text, after_text = "", after.files.get(rel)
+        elif rel in removed:
+            before_text, after_text = before.files.get(rel), ""
+        else:  # modified
+            before_text, after_text = before.files.get(rel), after.files.get(rel)
+        if before_text is None or after_text is None:
+            # A binary/unreadable side: presence changed but there is no text to diff.
+            out.append(FileDiff(path=rel, patch=f"(binary or non-text file: {rel})", truncated=False))
+            continue
+        patch = "\n".join(
+            difflib.unified_diff(
+                before_text.splitlines(),
+                after_text.splitlines(),
+                fromfile=rel,
+                tofile=rel,
+                lineterm="",
+            )
+        )
+        truncated = len(patch) > max_chars
+        if truncated:
+            patch = patch[:max_chars] + "\n… [diff truncated]"
+        out.append(FileDiff(path=rel, patch=patch, truncated=truncated))
+    return out
