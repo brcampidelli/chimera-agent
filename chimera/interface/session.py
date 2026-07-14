@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import Any, Protocol
 
 from chimera.core.agent import AgentResult, ToolActivity
 from chimera.memory.gate import MemoryGate
@@ -74,6 +74,8 @@ class TurnReport:
     memory_layer: str | None = None
     steps: int = 0
     stopped_reason: str = ""
+    # Per-turn fusion/cascade trace from the backend (UI-ready JSON), or None for a single-model turn.
+    route_meta: dict[str, Any] | None = None
 
 
 @dataclass
@@ -120,6 +122,7 @@ class ChatSession:
             memory_layer=layer,
             steps=result.steps,
             stopped_reason=result.stopped_reason,
+            route_meta=result.route_meta,
         )
 
     def _record(self, message: str, answer: str) -> None:

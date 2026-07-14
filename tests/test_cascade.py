@@ -110,6 +110,42 @@ def test_mid_refusal_climbs_to_fusion(tmp_path: Path) -> None:
     assert record.accepted_tier == "fusion"
 
 
+def test_cascade_complete_sets_route_meta(tmp_path: Path) -> None:
+    gateway = ScriptedGateway({WEAK: "the capital is Paris"})
+    fusion = ScriptedFusion()
+    backend = _cascade(gateway, fusion, tmp_path)
+    result = backend.complete(_user("capital of France?"))
+    meta = result.route_meta
+    assert meta is not None
+    assert meta["kind"] == "cascade"
+    assert meta["accepted_tier"] == "weak"
+    assert meta["tiers_tried"] == ["weak"]
+    assert meta["models"]["weak"] == WEAK
+    assert "fusion" not in meta  # a single-model tier carries no nested fusion trace
+
+
+class FusionMetaStub:
+    """A fusion backend whose result carries a fusion route_meta (like the real FusionEngine)."""
+
+    def complete(self, messages: list[MessageLike], **kwargs: Any) -> CompletionResult:
+        return CompletionResult(
+            content="fused", model="fusion", prompt_tokens=900, completion_tokens=300,
+            route_meta={"kind": "fusion", "panel": [{"model": "m1", "content": "x"}]},
+        )
+
+
+def test_cascade_nests_inner_fusion_route_meta(tmp_path: Path) -> None:
+    gateway = ScriptedGateway({WEAK: "", MID: ""})  # both fail the gate -> escalate to fusion
+    backend = _cascade(gateway, FusionMetaStub(), tmp_path)  # type: ignore[arg-type]
+    result = backend.complete(_user("hard question"))
+    meta = result.route_meta
+    assert meta is not None
+    assert meta["kind"] == "cascade"
+    assert meta["accepted_tier"] == "fusion"
+    assert meta["fusion"]["kind"] == "fusion"
+    assert meta["fusion"]["panel"][0]["model"] == "m1"
+
+
 def test_tool_turns_bypass_weak_straight_to_mid(tmp_path: Path) -> None:
     gateway = ScriptedGateway({MID: "tool call issued"})
     fusion = ScriptedFusion()

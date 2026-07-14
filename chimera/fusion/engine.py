@@ -321,11 +321,38 @@ class FusionEngine:
         if tools:
             _log.debug("fusion ignores %d tool schema(s); use a single model for tools", len(tools))
         trace = self.run(messages)
+        route_meta = {
+            "kind": "fusion",
+            "aggregation": trace.aggregation,
+            "early_stopped": trace.early_stopped,
+            "diversity": trace.panel_diversity(),
+            "panel": [
+                {
+                    "model": r.model,
+                    "content": r.content,
+                    "error": r.error,
+                    "prompt_tokens": r.prompt_tokens,
+                    "completion_tokens": r.completion_tokens,
+                }
+                for r in trace.panel
+            ],
+            "judge_analysis": trace.judge_analysis,
+            "stages": [
+                {
+                    "stage": u.stage,
+                    "model": u.model,
+                    "prompt_tokens": u.prompt_tokens,
+                    "completion_tokens": u.completion_tokens,
+                }
+                for u in trace.usage
+            ],
+        }
         return CompletionResult(
             content=trace.final,
             model="fusion",
             prompt_tokens=trace.prompt_tokens(),
             completion_tokens=trace.completion_tokens(),
+            route_meta=route_meta,
         )
 
     # -- stages ------------------------------------------------------------

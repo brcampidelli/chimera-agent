@@ -388,6 +388,11 @@ export interface components {
         };
         /** ChatRequest */
         ChatRequest: {
+            /**
+             * Fuse
+             * @default false
+             */
+            fuse: boolean;
             /** Message */
             message: string;
             /** Session Id */

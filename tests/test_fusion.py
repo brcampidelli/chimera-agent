@@ -41,6 +41,17 @@ def test_fusion_complete_returns_final() -> None:
     assert result.model == "fusion"
 
 
+def test_fusion_complete_sets_route_meta() -> None:
+    result = FusionEngine(FakeBackend(), CONFIG).complete([{"role": "user", "content": "hi"}])
+    meta = result.route_meta
+    assert meta is not None
+    assert meta["kind"] == "fusion"
+    assert meta["aggregation"] == "synth"
+    assert [p["model"] for p in meta["panel"]] == ["m1", "m2"]
+    assert [p["content"] for p in meta["panel"]] == ["panel:m1", "panel:m2"]
+    assert meta["judge_analysis"] == "JUDGE"
+
+
 class TokenBackend:
     """Backend that reports token usage, to exercise per-stage telemetry (#4)."""
 

@@ -42,6 +42,7 @@ from chimera.api.sessions import SessionManager, SessionStore
 from chimera.config import Settings, get_settings
 from chimera.core.agent import ToolActivity
 from chimera.interface import ChatSession
+from chimera.providers.gateway import SupportsComplete
 from chimera.telemetry import get_logger
 
 _log = get_logger("api.app")
@@ -51,6 +52,9 @@ class ChatRequest(BaseModel):
     message: str
     session_id: str | None = None
     stream: bool = True
+    fuse: bool = False
+    """Route THIS turn through the fusion engine (panel → judge → synthesizer), tool-free — so the
+    Fusion screen can show how the answer was composed. Off = the session's normal backend."""
 
 
 def _require_token() -> Callable[[Request], None]:
@@ -80,11 +84,16 @@ def build_api_app(
     *,
     settings: Settings | None = None,
     static_dir: Path | None = None,
+    fuse_backend: SupportsComplete | None = None,
 ) -> FastAPI:
     """Build the desktop API app over a session ``factory`` (the real agent stack).
 
     ``static_dir`` (the built SPA, ``apps/desktop/dist``) is served same-origin at ``/`` with SPA
     fallback, so the frontend needs no CORS. ``settings`` defaults to the process settings.
+
+    ``fuse_backend`` is an optional fusion engine used only for turns the client marks ``fuse=True``:
+    that turn swaps the session agent's backend for it (under the per-session lock), so the answer is
+    composed by panel → judge → synthesizer and the Fusion screen can show the real trace.
     """
     settings = settings or get_settings()
     store = SessionStore(settings.home / "sessions")
@@ -164,11 +173,23 @@ def build_api_app(
                 # Serialize turns per session: a second concurrent turn on the same session waits here
                 # rather than racing the non-thread-safe ChatSession (interleaved transcript / double save).
                 with manager.lock_for(session_id):
-                    report = session.send_verbose(
-                        req.message,
-                        on_token=on_token if req.stream else None,
-                        on_tool=on_tool,
-                    )
+                    # "Fuse this turn": swap the agent's backend for the fusion engine just for this
+                    # call (safe under the per-session lock), then restore. Fusion ignores tools, so
+                    # the turn is composed panel → judge → synthesizer and carries the trace.
+                    agent: Any = getattr(session, "agent", None)
+                    swap = bool(req.fuse) and fuse_backend is not None and hasattr(agent, "backend")
+                    original = agent.backend if swap else None
+                    if swap:
+                        agent.backend = fuse_backend
+                    try:
+                        report = session.send_verbose(
+                            req.message,
+                            on_token=on_token if (req.stream and not swap) else None,
+                            on_tool=on_tool,
+                        )
+                    finally:
+                        if swap:
+                            agent.backend = original
                     manager.persist(session_id)  # durable transcript now includes this turn
                 emit("done", _report_dict(report, session_id))
             except Exception as exc:  # noqa: BLE001 — surfaced to the client as an error event
@@ -244,6 +265,7 @@ def _report_dict(report: Any, session_id: str) -> dict[str, Any]:
         "memory_layer": report.memory_layer,
         "steps": report.steps,
         "stopped_reason": report.stopped_reason,
+        "route_meta": report.route_meta,
     }
 
 

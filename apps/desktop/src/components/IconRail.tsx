@@ -5,6 +5,7 @@ import {
   Sparkles,
   Clock,
   KanbanSquare,
+  Network,
   Settings as SettingsIcon,
   Moon,
   Sun,
@@ -13,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/BrandMark";
 import { useT } from "@/lib/i18n";
 
-export type View = "chat" | "memory" | "skills" | "cron" | "tasks" | "settings";
+export type View = "chat" | "memory" | "skills" | "cron" | "tasks" | "fusion" | "settings";
 
 const NAV: { view: View; labelKey: string; icon: ComponentType<{ className?: string }> }[] = [
   { view: "chat", labelKey: "nav.chat", icon: MessageSquare },
@@ -21,6 +22,7 @@ const NAV: { view: View; labelKey: string; icon: ComponentType<{ className?: str
   { view: "skills", labelKey: "nav.skills", icon: Sparkles },
   { view: "cron", labelKey: "nav.schedule", icon: Clock },
   { view: "tasks", labelKey: "nav.tasks", icon: KanbanSquare },
+  { view: "fusion", labelKey: "nav.fusion", icon: Network },
 ];
 
 function RailButton({

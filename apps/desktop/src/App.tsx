@@ -9,6 +9,7 @@ import { Memory } from "@/components/Memory";
 import { Skills } from "@/components/Skills";
 import { Cron } from "@/components/Cron";
 import { Tasks } from "@/components/Tasks";
+import { Fusion } from "@/components/Fusion";
 import { Activity, type Status } from "@/components/Activity";
 import { deleteSession, getSession, listSessions, streamChat } from "@/lib/api";
 import { useT } from "@/lib/i18n";
@@ -79,7 +80,7 @@ export default function App() {
   );
 
   const send = useCallback(
-    async (text: string) => {
+    async (text: string, fuse = false) => {
       setMessages((m) => [...m, { role: "user", content: text }]);
       setBusy(true);
       setStatus("thinking");
@@ -113,6 +114,7 @@ export default function App() {
           },
         },
         controller.signal,
+        fuse,
       );
       setBusy(false);
       abortRef.current = null;
@@ -157,6 +159,7 @@ export default function App() {
         {view === "skills" && <Skills />}
         {view === "cron" && <Cron />}
         {view === "tasks" && <Tasks />}
+        {view === "fusion" && <Fusion report={report} />}
         {view === "settings" && <Settings />}
       </main>
       {view === "chat" && <Activity status={status} tools={tools} report={report} />}

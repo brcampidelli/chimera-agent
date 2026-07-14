@@ -95,13 +95,14 @@ export async function streamChat(
   sessionId: string | null,
   handlers: StreamHandlers,
   signal?: AbortSignal,
+  fuse = false,
 ): Promise<void> {
   let res: Response;
   try {
     res = await fetch("/api/chat/stream", {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ message, session_id: sessionId, stream: true }),
+      body: JSON.stringify({ message, session_id: sessionId, stream: true, fuse }),
       signal,
     });
   } catch (err) {

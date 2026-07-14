@@ -51,6 +51,11 @@
       },
       "ChatRequest": {
         "properties": {
+          "fuse": {
+            "default": false,
+            "title": "Fuse",
+            "type": "boolean"
+          },
           "message": {
             "title": "Message",
             "type": "string"

@@ -22,6 +22,47 @@ export type DoctorInfo = Schemas["DoctorOut"];
 
 // --- SSE event payloads + UI-only types (not in the OpenAPI schema) ---
 
+// The per-turn fusion/cascade trace. Hand-typed to mirror the neutral dict the backend attaches to the
+// SSE `done` payload (see chimera/fusion/engine.py + cascade.py) — NOT part of the generated schema.
+
+export interface FusionPanelEntry {
+  model: string;
+  content: string;
+  error: string | null;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+}
+
+export interface FusionStage {
+  stage: string;
+  model: string;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+}
+
+export interface FusionMeta {
+  kind: "fusion";
+  aggregation: string;
+  early_stopped: boolean;
+  diversity: number | null;
+  panel: FusionPanelEntry[];
+  judge_analysis: string;
+  stages: FusionStage[];
+}
+
+export interface CascadeMeta {
+  kind: "cascade";
+  tiers_tried: string[];
+  accepted_tier: string;
+  models: Record<string, string>;
+  tokens_by_tier: Record<string, number>;
+  agreement: number | null;
+  fuse_reason: string;
+  fusion?: FusionMeta;
+}
+
+export type RouteMeta = FusionMeta | CascadeMeta;
+
 export interface TurnReport {
   session_id: string;
   answer: string;
@@ -35,6 +76,7 @@ export interface TurnReport {
   memory_layer: string | null;
   steps: number;
   stopped_reason: string;
+  route_meta?: RouteMeta | null;
 }
 
 export interface ToolEvent {

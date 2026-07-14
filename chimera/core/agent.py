@@ -149,6 +149,8 @@ class AgentResult:
     cache_write_tokens: int = 0
     usd: float | None = None
     tool_names: list[str] = field(default_factory=list)  # names of the tools actually called, in order
+    # Per-turn fusion/cascade trace from the backend (UI-ready JSON), or None for a single-model turn.
+    route_meta: dict[str, Any] | None = None
 
 
 class Agent:
@@ -223,7 +225,8 @@ class Agent:
                     continue
                 messages.append({"role": "assistant", "content": result.content})
                 return self._result(result.content, step, "final", messages, tool_calls_made,
-                                    tool_names, usage, result.model)
+                                    tool_names, usage, result.model,
+                                    route_meta=result.route_meta)
 
             messages.append(self._assistant_tool_message(result))
             tripped: str | None = None
@@ -297,6 +300,7 @@ class Agent:
         tool_names: list[str],
         usage: _UsageTally,
         model: str,
+        route_meta: dict[str, Any] | None = None,
     ) -> AgentResult:
         """Assemble the final result, pricing the summed tokens at the model's list rate."""
         from chimera.orchestration.receipts import price_delegation
@@ -314,6 +318,7 @@ class Agent:
             cache_write_tokens=usage.cache_write,
             usd=usd,
             tool_names=tool_names,
+            route_meta=route_meta,
         )
 
     def _run_tool(self, name: str, arguments: dict[str, Any]) -> str:

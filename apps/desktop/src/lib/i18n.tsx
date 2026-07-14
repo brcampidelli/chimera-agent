@@ -44,6 +44,10 @@ const en: Dict = {
   "common.search": "search…",
   "composer.placeholder": "Message Chimera…",
   "composer.hint": "Enter to send · Shift+Enter for a new line",
+  "composer.fuse": "Fuse",
+  "composer.fuseHint":
+    "Fuse this turn: several models answer, a judge synthesizes one result — then open the Fusion tab.",
+  "composer.fuseOn": "Fusion on — this turn goes through panel → judge → synthesis (no tools).",
   "composer.stop": "Stop",
   "composer.send": "Send",
   "chat.header.new": "New chat",
@@ -125,6 +129,18 @@ const en: Dict = {
   "tasks.awaitingPlan": "The initial plan needs approval before it runs.",
   "common.approve": "Approve",
   "skills.empty": "No learned skills yet — they're distilled from verified runs.",
+  "nav.fusion": "Fusion",
+  "fusion.title": "Fusion & Cascade",
+  "fusion.empty":
+    "The last turn used a single model. Turn on Fusion, or enable Cascade in Settings, to see how an answer gets composed — panel, judge, and synthesis.",
+  "fusion.panel": "Panel",
+  "fusion.judge": "Judge",
+  "fusion.synthesis": "Synthesis",
+  "fusion.route": "Route",
+  "fusion.diversity": "diversity",
+  "fusion.earlyStopped": "early-stopped",
+  "fusion.accepted": "accepted",
+  "fusion.agreement": "agreement",
 };
 
 const pt: Dict = {
@@ -146,6 +162,10 @@ const pt: Dict = {
   "common.search": "buscar…",
   "composer.placeholder": "Escreva para o Chimera…",
   "composer.hint": "Enter para enviar · Shift+Enter para nova linha",
+  "composer.fuse": "Fundir",
+  "composer.fuseHint":
+    "Fundir este turno: vários modelos respondem, um juiz sintetiza um resultado — depois abra a aba Fusion.",
+  "composer.fuseOn": "Fusão ligada — este turno passa por painel → juiz → síntese (sem ferramentas).",
   "composer.stop": "Parar",
   "composer.send": "Enviar",
   "chat.header.new": "Nova conversa",
@@ -227,6 +247,18 @@ const pt: Dict = {
   "tasks.awaitingPlan": "O plano inicial precisa de aprovação antes de rodar.",
   "common.approve": "Aprovar",
   "skills.empty": "Nenhuma habilidade aprendida ainda — são destiladas de execuções verificadas.",
+  "nav.fusion": "Fusão",
+  "fusion.title": "Fusão e Cascata",
+  "fusion.empty":
+    "O último turno usou um único modelo. Ative a Fusão, ou a Cascata nas Configurações, para ver como uma resposta é composta — painel, juiz e síntese.",
+  "fusion.panel": "Painel",
+  "fusion.judge": "Juiz",
+  "fusion.synthesis": "Síntese",
+  "fusion.route": "Rota",
+  "fusion.diversity": "diversidade",
+  "fusion.earlyStopped": "parada antecipada",
+  "fusion.accepted": "aceito",
+  "fusion.agreement": "concordância",
 };
 
 const es: Dict = {
@@ -248,6 +280,10 @@ const es: Dict = {
   "common.search": "buscar…",
   "composer.placeholder": "Escribe a Chimera…",
   "composer.hint": "Enter para enviar · Shift+Enter para una nueva línea",
+  "composer.fuse": "Fusionar",
+  "composer.fuseHint":
+    "Fusionar este turno: varios modelos responden, un juez sintetiza un resultado — luego abre la pestaña Fusion.",
+  "composer.fuseOn": "Fusión activada — este turno pasa por panel → juez → síntesis (sin herramientas).",
   "composer.stop": "Detener",
   "composer.send": "Enviar",
   "chat.header.new": "Nuevo chat",
@@ -329,6 +365,18 @@ const es: Dict = {
   "tasks.awaitingPlan": "El plan inicial necesita aprobación antes de ejecutarse.",
   "common.approve": "Aprobar",
   "skills.empty": "Aún no hay habilidades aprendidas — se destilan de ejecuciones verificadas.",
+  "nav.fusion": "Fusión",
+  "fusion.title": "Fusión y Cascada",
+  "fusion.empty":
+    "El último turno usó un solo modelo. Activa la Fusión, o la Cascada en Ajustes, para ver cómo se compone una respuesta — panel, juez y síntesis.",
+  "fusion.panel": "Panel",
+  "fusion.judge": "Juez",
+  "fusion.synthesis": "Síntesis",
+  "fusion.route": "Ruta",
+  "fusion.diversity": "diversidad",
+  "fusion.earlyStopped": "parada anticipada",
+  "fusion.accepted": "aceptado",
+  "fusion.agreement": "acuerdo",
 };
 
 const fr: Dict = {
@@ -350,6 +398,10 @@ const fr: Dict = {
   "common.search": "rechercher…",
   "composer.placeholder": "Écrire à Chimera…",
   "composer.hint": "Entrée pour envoyer · Maj+Entrée pour une nouvelle ligne",
+  "composer.fuse": "Fusion",
+  "composer.fuseHint":
+    "Fusionner ce tour : plusieurs modèles répondent, un juge synthétise un résultat — puis ouvrez l'onglet Fusion.",
+  "composer.fuseOn": "Fusion activée — ce tour passe par panel → juge → synthèse (sans outils).",
   "composer.stop": "Arrêter",
   "composer.send": "Envoyer",
   "chat.header.new": "Nouveau chat",
@@ -431,6 +483,18 @@ const fr: Dict = {
   "tasks.awaitingPlan": "Le plan initial requiert une approbation avant de s'exécuter.",
   "common.approve": "Approuver",
   "skills.empty": "Aucune compétence apprise pour l'instant — elles sont distillées d'exécutions vérifiées.",
+  "nav.fusion": "Fusion",
+  "fusion.title": "Fusion et Cascade",
+  "fusion.empty":
+    "Le dernier tour a utilisé un seul modèle. Activez la Fusion, ou la Cascade dans les Paramètres, pour voir comment une réponse est composée — panel, juge et synthèse.",
+  "fusion.panel": "Panel",
+  "fusion.judge": "Juge",
+  "fusion.synthesis": "Synthèse",
+  "fusion.route": "Route",
+  "fusion.diversity": "diversité",
+  "fusion.earlyStopped": "arrêt anticipé",
+  "fusion.accepted": "accepté",
+  "fusion.agreement": "accord",
 };
 
 const de: Dict = {
@@ -452,6 +516,10 @@ const de: Dict = {
   "common.search": "suchen…",
   "composer.placeholder": "Nachricht an Chimera…",
   "composer.hint": "Enter zum Senden · Umschalt+Enter für eine neue Zeile",
+  "composer.fuse": "Fusion",
+  "composer.fuseHint":
+    "Diesen Zug fusionieren: mehrere Modelle antworten, ein Judge synthetisiert ein Ergebnis — dann den Fusion-Tab öffnen.",
+  "composer.fuseOn": "Fusion an — dieser Zug läuft über Panel → Judge → Synthese (ohne Tools).",
   "composer.stop": "Stopp",
   "composer.send": "Senden",
   "chat.header.new": "Neuer Chat",
@@ -533,6 +601,18 @@ const de: Dict = {
   "tasks.awaitingPlan": "Der ursprüngliche Plan braucht Genehmigung, bevor er läuft.",
   "common.approve": "Genehmigen",
   "skills.empty": "Noch keine erlernten Fähigkeiten — sie werden aus verifizierten Läufen destilliert.",
+  "nav.fusion": "Fusion",
+  "fusion.title": "Fusion & Kaskade",
+  "fusion.empty":
+    "Die letzte Runde nutzte ein einzelnes Modell. Aktiviere Fusion oder Kaskade in den Einstellungen, um zu sehen, wie eine Antwort entsteht — Panel, Judge und Synthese.",
+  "fusion.panel": "Panel",
+  "fusion.judge": "Judge",
+  "fusion.synthesis": "Synthese",
+  "fusion.route": "Route",
+  "fusion.diversity": "Diversität",
+  "fusion.earlyStopped": "früh gestoppt",
+  "fusion.accepted": "akzeptiert",
+  "fusion.agreement": "Übereinstimmung",
 };
 
 const zh: Dict = {
@@ -554,6 +634,9 @@ const zh: Dict = {
   "common.search": "搜索…",
   "composer.placeholder": "给 Chimera 发消息…",
   "composer.hint": "回车发送 · Shift+回车换行",
+  "composer.fuse": "融合",
+  "composer.fuseHint": "融合本轮：多个模型作答，由裁判合成一个结果 — 然后打开 Fusion 标签页。",
+  "composer.fuseOn": "已开启融合 — 本轮走 面板 → 裁判 → 合成（无工具）。",
   "composer.stop": "停止",
   "composer.send": "发送",
   "chat.header.new": "新对话",
@@ -635,6 +718,18 @@ const zh: Dict = {
   "tasks.awaitingPlan": "初始计划在运行前需要批准。",
   "common.approve": "批准",
   "skills.empty": "还没有习得的技能——它们从已验证的运行中提炼。",
+  "nav.fusion": "融合",
+  "fusion.title": "融合与级联",
+  "fusion.empty":
+    "上一轮使用了单一模型。开启融合，或在设置中启用级联，即可查看答案是如何组成的——评审组、评判和综合。",
+  "fusion.panel": "评审组",
+  "fusion.judge": "评判",
+  "fusion.synthesis": "综合",
+  "fusion.route": "路由",
+  "fusion.diversity": "多样性",
+  "fusion.earlyStopped": "提前停止",
+  "fusion.accepted": "已采纳",
+  "fusion.agreement": "一致度",
 };
 
 const ja: Dict = {
@@ -656,6 +751,9 @@ const ja: Dict = {
   "common.search": "検索…",
   "composer.placeholder": "Chimera にメッセージ…",
   "composer.hint": "Enter で送信 · Shift+Enter で改行",
+  "composer.fuse": "融合",
+  "composer.fuseHint": "このターンを融合：複数のモデルが回答し、ジャッジが一つに統合します — その後 Fusion タブを開いてください。",
+  "composer.fuseOn": "融合オン — このターンは パネル → ジャッジ → 統合（ツールなし）で処理されます。",
   "composer.stop": "停止",
   "composer.send": "送信",
   "chat.header.new": "新しいチャット",
@@ -737,6 +835,18 @@ const ja: Dict = {
   "tasks.awaitingPlan": "実行前に初期計画の承認が必要です。",
   "common.approve": "承認",
   "skills.empty": "習得したスキルはまだありません — 検証済みの実行から抽出されます。",
+  "nav.fusion": "フュージョン",
+  "fusion.title": "フュージョンとカスケード",
+  "fusion.empty":
+    "前回のターンは単一モデルを使用しました。フュージョンを有効にするか、設定でカスケードを有効にすると、回答がどう構成されるか（パネル・ジャッジ・統合）が見えます。",
+  "fusion.panel": "パネル",
+  "fusion.judge": "ジャッジ",
+  "fusion.synthesis": "統合",
+  "fusion.route": "ルート",
+  "fusion.diversity": "多様性",
+  "fusion.earlyStopped": "早期停止",
+  "fusion.accepted": "採用",
+  "fusion.agreement": "一致度",
 };
 
 const DICTS: Record<Lang, Dict> = { en, pt, es, fr, de, zh, ja };

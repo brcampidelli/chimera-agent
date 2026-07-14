@@ -6,6 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Fusion & Cascade screen in the desktop app.** A new sidebar view shows, for the latest turn, HOW
+  the answer was composed: the fusion panel → judge → synthesis breakdown (with per-model tokens,
+  panel diversity, and aggregation mode), or the cascade tier ladder (weak → mid → fusion) with the
+  accepted tier highlighted. Shows only real per-turn data — a single-model turn gets an honest empty
+  state. Backed by a new neutral `route_meta` JSON seam threaded from the fusion/cascade backends
+  (`CompletionResult.route_meta`) through the agent, session, and API up to the SSE `done` payload (no
+  OpenAPI change — the trace rides the hand-typed SSE event). The desktop `chimera app` backend now
+  also honors the Settings **Cascade** toggle.
+- **"Fuse this turn" toggle in the composer.** Because the chat agent always carries tools and both
+  the routed and cascade backends send tool-turns to a single model, fusion never triggered in normal
+  chat. The composer now has a **Fuse** toggle: with it on, that turn is routed through the fusion
+  engine tool-free (panel → judge → synthesizer), so the Fusion screen shows the real breakdown.
+  Verified live: a fused turn produced a 3-model panel (deepseek + gpt-4o-mini + llama-3.3-70b), a
+  judge analysis, and a synthesis — all rendered on the Fusion screen.
+
 ## [0.23.0] - 2026-07-13
 
 **The desktop app speaks 7 languages.** A language selector (the same 7 languages as the README) with

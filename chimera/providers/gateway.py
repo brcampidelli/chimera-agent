@@ -97,6 +97,8 @@ class CompletionResult(BaseModel):
     """Prompt-cache HITS the provider reported (billed at the read rate). None = unknown."""
     cache_write_tokens: int | None = None
     """Prompt-cache WRITES the provider reported (billed at the write rate). None = unknown."""
+    route_meta: dict[str, Any] | None = Field(default=None, repr=False)
+    """Optional per-call fusion/cascade trace (UI-ready JSON). None for a plain single-model call."""
     raw: dict[str, Any] | None = Field(default=None, repr=False)
 
 

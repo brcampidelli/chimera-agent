@@ -109,7 +109,36 @@ class CascadeBackend:
         **kwargs: Any,
     ) -> CompletionResult:
         record = self._new_record(messages)
+        result = self._route(
+            record, messages, model=model, temperature=temperature,
+            max_tokens=max_tokens, tools=tools,
+        )
+        # Single place that attaches the cascade trace, whatever tier accepted.
+        cascade_meta: dict[str, Any] = {
+            "kind": "cascade",
+            "tiers_tried": record.tiers_tried,
+            "accepted_tier": record.accepted_tier,
+            "models": record.models,
+            "tokens_by_tier": record.tokens_by_tier,
+            "agreement": record.agreement,
+            "fuse_reason": record.fuse_reason,
+        }
+        # When the cascade escalated to fusion, preserve the inner fusion trace by nesting.
+        if result.route_meta and result.route_meta.get("kind") == "fusion":
+            cascade_meta["fusion"] = result.route_meta
+        result.route_meta = cascade_meta
+        return result
 
+    def _route(
+        self,
+        record: RouteRecord,
+        messages: list[MessageLike],
+        *,
+        model: str | None,
+        temperature: float,
+        max_tokens: int | None,
+        tools: list[dict[str, Any]] | None,
+    ) -> CompletionResult:
         # Tool turns: straight to MID single-model (weak/free models are unreliable
         # tool callers; fusion doesn't tool-call at all).
         if tools:

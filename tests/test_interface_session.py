@@ -149,6 +149,28 @@ def test_send_verbose_returns_turn_report_and_forwards_callbacks() -> None:
     assert len(session.turns) == 1  # the exchange was recorded
 
 
+class RoutedAgent:
+    """A fake agent whose result carries a fusion/cascade route_meta trace."""
+
+    def run(self, task: str, *, on_token=None, on_tool=None) -> AgentResult:  # type: ignore[no-untyped-def]
+        return AgentResult(
+            answer="ok", steps=1, stopped_reason="final",
+            route_meta={"kind": "fusion", "panel": [{"model": "m1", "content": "x"}]},
+        )
+
+
+def test_send_verbose_propagates_route_meta() -> None:
+    report = ChatSession(RoutedAgent()).send_verbose("hello")
+    assert report.route_meta is not None
+    assert report.route_meta["kind"] == "fusion"
+    assert report.route_meta["panel"][0]["model"] == "m1"
+
+
+def test_send_verbose_route_meta_is_none_for_single_model() -> None:
+    # VerboseAgent returns no route_meta -> the report surfaces None (honest empty state).
+    assert ChatSession(VerboseAgent()).send_verbose("hi").route_meta is None
+
+
 def test_send_still_returns_a_bare_string() -> None:
     # The existing contract is preserved for the REPL / gateway / messaging callers.
     assert isinstance(ChatSession(VerboseAgent()).send("hi"), str)

@@ -91,6 +91,7 @@ def test_chat_stream_emits_session_token_tool_done(tmp_path: Any) -> None:
     assert done["answer"] == "Hello"
     assert done["prompt_tokens"] == 10 and done["completion_tokens"] == 2
     assert done["usd"] == 0.001 and done["tool_names"] == ["read_file"]
+    assert "route_meta" in done and done["route_meta"] is None  # single-model turn -> honest null
 
 
 def test_chat_stream_without_streaming_still_answers(tmp_path: Any) -> None:
@@ -100,6 +101,42 @@ def test_chat_stream_without_streaming_still_answers(tmp_path: Any) -> None:
     assert "token" not in [e for e, _ in events]  # no token events when streaming is off
     done = next(d for e, d in events if e == "done")
     assert done["answer"] == "Hello"
+
+
+def test_fuse_flag_swaps_agent_backend_for_the_turn_then_restores(tmp_path: Any) -> None:
+    """`fuse=true` routes THIS turn through the provided fusion backend (so its trace surfaces),
+    and the session agent's original backend is restored afterwards."""
+    from chimera.api import build_api_app
+
+    fuse_backend = object()  # stands in for the FusionEngine
+    seen: dict[str, Any] = {}
+
+    class _SwappableAgent:
+        def __init__(self) -> None:
+            self.backend: Any = object()  # the session's normal backend
+
+        def run(self, task: str, *, on_token: Any = None, on_tool: Any = None) -> AgentResult:
+            seen["backend_during_run"] = self.backend
+            fused = self.backend is fuse_backend
+            return AgentResult(
+                answer="F",
+                steps=1,
+                stopped_reason="final",
+                route_meta={"kind": "fusion", "panel": []} if fused else None,
+            )
+
+    agent = _SwappableAgent()
+    default_backend = agent.backend
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    client = TestClient(
+        build_api_app(lambda: ChatSession(agent), settings=settings, fuse_backend=fuse_backend)
+    )
+
+    resp = client.post("/api/chat/stream", json={"message": "hard one", "fuse": True, "stream": True})
+    done = next(d for e, d in _read_sse(resp.text) if e == "done")
+    assert seen["backend_during_run"] is fuse_backend  # swapped in for the fused turn
+    assert done["route_meta"] == {"kind": "fusion", "panel": []}  # fusion trace surfaced
+    assert agent.backend is default_backend  # restored after the turn
 
 
 def test_session_is_persisted_and_listed_and_deletable(tmp_path: Any) -> None:

@@ -1081,11 +1081,17 @@ def desktop_app(
         raise typer.Exit(code=1)
 
     llm = LLMGateway()
-    backend: SupportsComplete = llm
-    if fuse:
-        from chimera.fusion import FusionEngine, RoutedBackend
+    from chimera.fusion import FusionEngine, RoutedBackend
 
-        backend = RoutedBackend(llm, FusionEngine(llm))
+    # Always available for the per-turn "Fuse this turn" toggle (cheap to construct; runs only on
+    # request). Reused as the fusion arm of RoutedBackend when the whole session runs under --fuse.
+    fuse_backend = FusionEngine(llm)
+    backend: SupportsComplete = llm
+    if settings.cascade:
+        # Honor the Settings "Cascade" toggle: tiered routing (weak -> mid -> fusion).
+        backend = _cascade_backend(llm, settings)
+    elif fuse:
+        backend = RoutedBackend(llm, fuse_backend)
 
     workspace_path = Path(workspace)
     shared_memory = None if no_memory else _memory_manager()
@@ -1104,7 +1110,7 @@ def desktop_app(
     _pkg_dist = Path(__file__).resolve().parent.parent / "_desktop_dist"
     dist = _dev_dist if (_dev_dist / "index.html").exists() else _pkg_dist
     static_dir = dist if (dist / "index.html").exists() else None
-    api = build_api_app(factory, settings=settings, static_dir=static_dir)
+    api = build_api_app(factory, settings=settings, static_dir=static_dir, fuse_backend=fuse_backend)
 
     url = f"http://{host}:{port}"
     ui_note = "" if static_dir is not None else "  [yellow](UI not built — API only; run 'pnpm --dir apps/desktop build')[/yellow]"
