@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Code screen: a git panel (status/diff/commit, explicit-path staging) and accept/discard for a run's
+  changes (git-backed revert scoped to the run's files) — honest empty-state when the folder isn't a
+  git repo.
+
 ## [0.26.0] - 2026-07-14
 
 ### Added

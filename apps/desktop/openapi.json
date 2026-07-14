@@ -555,6 +555,210 @@
         "title": "FsTreeOut",
         "type": "object"
       },
+      "GitCommitOut": {
+        "properties": {
+          "commit": {
+            "title": "Commit",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "output": {
+            "title": "Output",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "commit",
+          "output",
+          "error"
+        ],
+        "title": "GitCommitOut",
+        "type": "object"
+      },
+      "GitCommitRequest": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Paths",
+            "type": "array"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          }
+        },
+        "required": [
+          "message",
+          "paths"
+        ],
+        "title": "GitCommitRequest",
+        "type": "object"
+      },
+      "GitDiffOut": {
+        "properties": {
+          "is_repo": {
+            "title": "Is Repo",
+            "type": "boolean"
+          },
+          "patch": {
+            "title": "Patch",
+            "type": "string"
+          }
+        },
+        "required": [
+          "is_repo",
+          "patch"
+        ],
+        "title": "GitDiffOut",
+        "type": "object"
+      },
+      "GitFileOut": {
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "staged": {
+            "title": "Staged",
+            "type": "boolean"
+          },
+          "untracked": {
+            "title": "Untracked",
+            "type": "boolean"
+          },
+          "x": {
+            "title": "X",
+            "type": "string"
+          },
+          "y": {
+            "title": "Y",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "x",
+          "y",
+          "staged",
+          "untracked"
+        ],
+        "title": "GitFileOut",
+        "type": "object"
+      },
+      "GitRevertOut": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "reverted": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reverted",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ok",
+          "reverted",
+          "error"
+        ],
+        "title": "GitRevertOut",
+        "type": "object"
+      },
+      "GitRevertRequest": {
+        "properties": {
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Paths",
+            "type": "array"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          }
+        },
+        "required": [
+          "paths"
+        ],
+        "title": "GitRevertRequest",
+        "type": "object"
+      },
+      "GitStatusOut": {
+        "properties": {
+          "branch": {
+            "title": "Branch",
+            "type": "string"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/GitFileOut"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "is_repo": {
+            "title": "Is Repo",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "is_repo",
+          "branch",
+          "files"
+        ],
+        "title": "GitStatusOut",
+        "type": "object"
+      },
       "GovernanceAuditOut": {
         "properties": {
           "count": {
@@ -2575,6 +2779,200 @@
           }
         },
         "summary": "Fs Tree Endpoint"
+      }
+    },
+    "/api/git/commit": {
+      "post": {
+        "operationId": "git_commit_endpoint_api_git_commit_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitCommitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitCommitOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Git Commit Endpoint"
+      }
+    },
+    "/api/git/diff": {
+      "get": {
+        "operationId": "git_diff_endpoint_api_git_diff_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workspace"
+            }
+          },
+          {
+            "in": "query",
+            "name": "path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Path"
+            }
+          },
+          {
+            "in": "query",
+            "name": "staged",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Staged",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitDiffOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Git Diff Endpoint"
+      }
+    },
+    "/api/git/revert": {
+      "post": {
+        "operationId": "git_revert_endpoint_api_git_revert_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitRevertRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitRevertOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Git Revert Endpoint"
+      }
+    },
+    "/api/git/status": {
+      "get": {
+        "operationId": "git_status_endpoint_api_git_status_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workspace"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Git Status Endpoint"
       }
     },
     "/api/governance/audit": {

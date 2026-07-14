@@ -193,6 +193,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/git/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Git Commit Endpoint */
+        post: operations["git_commit_endpoint_api_git_commit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/git/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Git Diff Endpoint */
+        get: operations["git_diff_endpoint_api_git_diff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/git/revert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Git Revert Endpoint */
+        post: operations["git_revert_endpoint_api_git_revert_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/git/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Git Status Endpoint */
+        get: operations["git_status_endpoint_api_git_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/governance/audit": {
         parameters: {
             query?: never;
@@ -811,6 +879,71 @@ export interface components {
             path: string;
             /** Workspace */
             workspace: string;
+        };
+        /** GitCommitOut */
+        GitCommitOut: {
+            /** Commit */
+            commit: string;
+            /** Error */
+            error: string | null;
+            /** Ok */
+            ok: boolean;
+            /** Output */
+            output: string;
+        };
+        /** GitCommitRequest */
+        GitCommitRequest: {
+            /** Message */
+            message: string;
+            /** Paths */
+            paths: string[];
+            /** Workspace */
+            workspace?: string | null;
+        };
+        /** GitDiffOut */
+        GitDiffOut: {
+            /** Is Repo */
+            is_repo: boolean;
+            /** Patch */
+            patch: string;
+        };
+        /** GitFileOut */
+        GitFileOut: {
+            /** Path */
+            path: string;
+            /** Staged */
+            staged: boolean;
+            /** Untracked */
+            untracked: boolean;
+            /** X */
+            x: string;
+            /** Y */
+            y: string;
+        };
+        /** GitRevertOut */
+        GitRevertOut: {
+            /** Error */
+            error: string | null;
+            /** Ok */
+            ok: boolean;
+            /** Reverted */
+            reverted: string[];
+        };
+        /** GitRevertRequest */
+        GitRevertRequest: {
+            /** Paths */
+            paths: string[];
+            /** Workspace */
+            workspace?: string | null;
+        };
+        /** GitStatusOut */
+        GitStatusOut: {
+            /** Branch */
+            branch: string;
+            /** Files */
+            files: components["schemas"]["GitFileOut"][];
+            /** Is Repo */
+            is_repo: boolean;
         };
         /** GovernanceAuditOut */
         GovernanceAuditOut: {
@@ -1736,6 +1869,136 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FsTreeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    git_commit_endpoint_api_git_commit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GitCommitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GitCommitOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    git_diff_endpoint_api_git_diff_get: {
+        parameters: {
+            query?: {
+                workspace?: string | null;
+                path?: string | null;
+                staged?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GitDiffOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    git_revert_endpoint_api_git_revert_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GitRevertRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GitRevertOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    git_status_endpoint_api_git_status_get: {
+        parameters: {
+            query?: {
+                workspace?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GitStatusOut"];
                 };
             };
             /** @description Validation Error */

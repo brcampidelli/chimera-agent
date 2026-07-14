@@ -6,6 +6,10 @@ import type {
   FsFile,
   FsFileWritten,
   FsTree,
+  GitCommitResult,
+  GitDiff,
+  GitRevertResult,
+  GitStatus,
   GovernanceAudit,
   InjectionReport,
   Maturity,
@@ -77,6 +81,35 @@ export const saveFile = (workspace: string | null | undefined, path: string, con
     method: "PUT",
     body: JSON.stringify({ workspace: workspace || null, path, content }),
   });
+// --- Git (status / diff / commit / scoped revert for the Code screen's git panel) ---
+// All gate on `is_git_repo` server-side: a non-repo (or git-missing) folder returns the honest
+// {is_repo: false} empty-state, never a 500. Commit stages EXPLICIT paths (never `add -A`); revert is
+// git-backed and scoped to the passed paths only (never workspace-wide).
+export const getGitStatus = (workspace?: string | null) => {
+  const params = new URLSearchParams();
+  if (workspace) params.set("workspace", workspace);
+  const qs = params.toString();
+  return json<GitStatus>(`/api/git/status${qs ? `?${qs}` : ""}`);
+};
+export const getGitDiff = (workspace: string | null | undefined, path?: string | null, staged = false) => {
+  const params = new URLSearchParams();
+  if (workspace) params.set("workspace", workspace);
+  if (path) params.set("path", path);
+  if (staged) params.set("staged", "true");
+  const qs = params.toString();
+  return json<GitDiff>(`/api/git/diff${qs ? `?${qs}` : ""}`);
+};
+export const gitCommit = (workspace: string | null | undefined, message: string, paths: string[]) =>
+  json<GitCommitResult>("/api/git/commit", {
+    method: "POST",
+    body: JSON.stringify({ workspace: workspace || null, message, paths }),
+  });
+export const gitRevert = (workspace: string | null | undefined, paths: string[]) =>
+  json<GitRevertResult>("/api/git/revert", {
+    method: "POST",
+    body: JSON.stringify({ workspace: workspace || null, paths }),
+  });
+
 export const getMaturity = () => json<Maturity>("/api/maturity");
 export const patchConfig = (updates: Record<string, string>) =>
   json<{ updated: string[] }>("/api/config", { method: "PATCH", body: JSON.stringify(updates) });

@@ -326,6 +326,41 @@ class FsFileWrittenOut(BaseModel):
     bytes: int  # bytes actually written to disk (may exceed content length on a CRLF-preserved file)
 
 
+# --- git (status / diff / commit / scoped revert for the Code screen's git panel) ------------------
+
+
+class GitFileOut(BaseModel):
+    path: str  # the changed file's path relative to the repo root (rename → the new name)
+    x: str  # the index (staged) status char from porcelain XY (" " when unstaged)
+    y: str  # the worktree status char from porcelain XY (" " when the change is only staged)
+    staged: bool  # the change is present in the index (x is a real status and it isn't untracked)
+    untracked: bool  # git doesn't track this file yet (porcelain "??")
+
+
+class GitStatusOut(BaseModel):
+    is_repo: bool  # False when the folder isn't a git repo (or git is missing) — the honest empty-state
+    branch: str  # the current branch ("" when not a repo, or detached/no-commits-yet edge cases)
+    files: list[GitFileOut]  # changed files (empty when the tree is clean)
+
+
+class GitDiffOut(BaseModel):
+    is_repo: bool  # False when the folder isn't a git repo (or git is missing)
+    patch: str  # the real unified-diff body (@@ hunks, +/- lines); "" when there's no diff
+
+
+class GitCommitOut(BaseModel):
+    ok: bool  # True only after a real, non-zero-free `git commit` — explicit paths staged, never add -A
+    commit: str  # the short HEAD hash on success; "" otherwise
+    output: str  # the combined git stdout+stderr, truncated
+    error: str | None  # a short git error when ok is False; null on success
+
+
+class GitRevertOut(BaseModel):
+    ok: bool  # True when the scoped revert completed (git checkout + clean on the passed paths)
+    reverted: list[str]  # the paths the revert was scoped to (echoed back on success)
+    error: str | None  # a short git error when ok is False; null on success
+
+
 # --- governance / security (injection red-team scoreboard + audit log) -----------------------------
 
 

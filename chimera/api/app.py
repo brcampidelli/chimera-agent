@@ -40,6 +40,10 @@ from chimera.api.schemas import (
     FsFileOut,
     FsFileWrittenOut,
     FsTreeOut,
+    GitCommitOut,
+    GitDiffOut,
+    GitRevertOut,
+    GitStatusOut,
     GovernanceAuditOut,
     HealthOut,
     InjectionReportOut,
@@ -99,6 +103,21 @@ class ExecRequest(BaseModel):
     """Working directory, relative to the workspace (default: workspace root). Does NOT persist —
     each command is a fresh subprocess."""
     timeout: float = 60
+
+
+class GitCommitRequest(BaseModel):
+    workspace: str | None = None
+    """The workspace (repo) the commit is scoped to. None = the app's launch workspace."""
+    message: str
+    paths: list[str]
+    """The EXPLICIT paths to stage + commit (never `add -A`)."""
+
+
+class GitRevertRequest(BaseModel):
+    workspace: str | None = None
+    """The workspace (repo) the revert is scoped to. None = the app's launch workspace."""
+    paths: list[str]
+    """The run's changed paths to discard (git-backed revert, scoped to these only)."""
 
 
 class RunRequest(BaseModel):
@@ -430,6 +449,40 @@ def build_api_app(
                 yield {"event": item["kind"], "data": json.dumps(item)}
 
         return EventSourceResponse(events())
+
+    @app.get("/api/git/status", dependencies=[guard], response_model=GitStatusOut)
+    def git_status_endpoint(workspace: str | None = None) -> dict[str, Any]:
+        # Read-only porcelain status, gated on is_git_repo FIRST (a non-repo / git-missing folder is
+        # the honest {is_repo: False} empty-state, never a 500). Workspace-scoped like the fs reads.
+        from chimera.api.git_api import git_status
+
+        return git_status(_resolve_fs_workspace(workspace))
+
+    @app.get("/api/git/diff", dependencies=[guard], response_model=GitDiffOut)
+    def git_diff_endpoint(
+        workspace: str | None = None, path: str | None = None, staged: bool = False
+    ) -> dict[str, Any]:
+        # Read-only real unified diff (git diff [--cached] [-- path]); {is_repo: False} outside a repo.
+        from chimera.api.git_api import git_diff
+
+        return git_diff(_resolve_fs_workspace(workspace), path=path, staged=staged)
+
+    @app.post("/api/git/commit", dependencies=[guard], response_model=GitCommitOut)
+    def git_commit_endpoint(req: GitCommitRequest) -> dict[str, Any]:
+        # Stage the EXPLICIT paths (never add -A) + commit. Same side-effecting power the fs/exec
+        # endpoint already exposes, gated the same way (bearer + localhost). A non-repo / bad input
+        # returns {ok: False, error} — never a 500.
+        from chimera.api.git_api import git_commit
+
+        return git_commit(_resolve_fs_workspace(req.workspace), req.message, req.paths)
+
+    @app.post("/api/git/revert", dependencies=[guard], response_model=GitRevertOut)
+    def git_revert_endpoint(req: GitRevertRequest) -> dict[str, Any]:
+        # Discard a run's changes, SCOPED to the passed paths (git checkout + clean on those paths
+        # only — never workspace-wide). Gated on is_git_repo; {ok: False} outside a repo.
+        from chimera.api.git_api import git_revert_paths
+
+        return git_revert_paths(_resolve_fs_workspace(req.workspace), req.paths)
 
     @app.get("/api/sessions", dependencies=[guard], response_model=list[SessionMetaOut])
     def list_sessions() -> list[dict[str, Any]]:

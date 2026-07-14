@@ -2,24 +2,39 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import hljs from "highlight.js";
 import {
+  Check,
   ChevronDown,
   ChevronRight,
   File as FileIcon,
   FileCode2,
   Folder,
   FolderOpen,
+  GitBranch,
   Loader2,
   Pencil,
   Play,
   Save,
   Terminal,
+  Undo2,
   X,
 } from "lucide-react";
-import { getFsFile, getFsTree, getRuns, saveFile, streamExec, streamRun, type RunEvent } from "@/lib/api";
+import {
+  getFsFile,
+  getFsTree,
+  getGitDiff,
+  getGitStatus,
+  getRuns,
+  gitCommit,
+  gitRevert,
+  saveFile,
+  streamExec,
+  streamRun,
+  type RunEvent,
+} from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/panel";
 import { useT, type TFunc } from "@/lib/i18n";
-import type { AttemptReceipt, FileDiff, FsNode, RunReceipt } from "@/lib/types";
+import type { AttemptReceipt, FileDiff, FsNode, GitFile, RunReceipt } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const fieldCls = "field w-full px-3 text-sm";
@@ -433,6 +448,55 @@ function RunPanel({
   const [running, setRunning] = useState(false);
   const [lines, setLines] = useState<string[]>([]);
   const [receipt, setReceipt] = useState<RunReceipt | null>(null);
+  const [reverting, setReverting] = useState(false);
+  const [revertErr, setRevertErr] = useState(false);
+  // Whether the workspace is a git repo — gates the git-backed "Discard changes" control. Shares the
+  // ["git-status", workspace] cache with the GitPanel, so a commit/revert there refreshes this too.
+  const gitQ = useQuery({
+    queryKey: ["git-status", workspace],
+    queryFn: () => getGitStatus(workspace || null),
+  });
+  const isRepo = !!gitQ.data?.is_repo;
+
+  // The run's changed paths, de-duplicated across attempts — what a git-backed discard is scoped to.
+  const changedPaths = useMemo(() => {
+    if (!receipt) return [];
+    const set = new Set<string>();
+    for (const a of receipt.attempts) for (const d of a.diffs) set.add(d.path);
+    return [...set];
+  }, [receipt]);
+
+  // Accept: a successful run's changes are already on disk — just clear the pending-review UI.
+  function accept() {
+    setReceipt(null);
+    setLines([]);
+    setRevertErr(false);
+  }
+
+  // Discard: git-backed revert scoped to THIS run's paths (never workspace-wide). Enabled only in a
+  // git repo; it reverts the git-visible changes, not files git ignores/can't track.
+  async function discard() {
+    if (!isRepo || reverting || changedPaths.length === 0) return;
+    setReverting(true);
+    setRevertErr(false);
+    try {
+      const res = await gitRevert(workspace || null, changedPaths);
+      if (!res.ok) {
+        setRevertErr(true);
+        return;
+      }
+      setReceipt(null);
+      setLines([t("code.git.reverted")]);
+      void qc.invalidateQueries({ queryKey: ["fs-tree"] });
+      void qc.invalidateQueries({ queryKey: ["fs-file"] });
+      void qc.invalidateQueries({ queryKey: ["git-status"] });
+      onRan();
+    } catch {
+      setRevertErr(true);
+    } finally {
+      setReverting(false);
+    }
+  }
 
   function start() {
     if (!task.trim() || running) return;
@@ -449,9 +513,10 @@ function RunPanel({
       } catch {
         setReceipt(null);
       }
-      // The workspace may have changed (or been reverted) — refresh the tree + open file.
+      // The workspace may have changed (or been reverted) — refresh the tree + open file + git status.
       void qc.invalidateQueries({ queryKey: ["fs-tree"] });
       void qc.invalidateQueries({ queryKey: ["fs-file"] });
+      void qc.invalidateQueries({ queryKey: ["git-status"] });
       onRan();
     };
     void streamRun(
@@ -535,18 +600,45 @@ function RunPanel({
 
       <div className="min-h-0 flex-1">
         {receipt ? (
-          receipt.attempts.some((a) => a.diffs.length > 0) ? (
-            <div className="divide-y divide-white/[0.04]">
-              <div className="px-4 pt-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                {t("code.diff")}
-              </div>
-              {receipt.attempts.map((a) => (
-                <AttemptDiffs key={a.index} attempt={a} t={t} />
-              ))}
+          <>
+            <div className="flex flex-wrap items-center gap-2 border-b border-white/5 px-4 py-2">
+              <Button size="sm" variant="ghost" onClick={accept}>
+                <Check className="h-3.5 w-3.5" /> {t("code.git.accept")}
+              </Button>
+              <span title={isRepo ? undefined : t("code.git.discardNeedsGit")}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={!isRepo || reverting || changedPaths.length === 0}
+                  onClick={() => void discard()}
+                >
+                  {reverting ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Undo2 className="h-3.5 w-3.5" />
+                  )}
+                  {t("code.git.discardRun")}
+                </Button>
+              </span>
+              {revertErr ? (
+                <span className="text-[11px] text-bad">{t("code.git.revertError")}</span>
+              ) : !isRepo ? (
+                <span className="text-[11px] text-muted-foreground">{t("code.git.discardNeedsGit")}</span>
+              ) : null}
             </div>
-          ) : (
-            <div className="px-4 py-4 text-xs text-muted-foreground">{t("code.noDiff")}</div>
-          )
+            {receipt.attempts.some((a) => a.diffs.length > 0) ? (
+              <div className="divide-y divide-white/[0.04]">
+                <div className="px-4 pt-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  {t("code.diff")}
+                </div>
+                {receipt.attempts.map((a) => (
+                  <AttemptDiffs key={a.index} attempt={a} t={t} />
+                ))}
+              </div>
+            ) : (
+              <div className="px-4 py-4 text-xs text-muted-foreground">{t("code.noDiff")}</div>
+            )}
+          </>
         ) : null}
       </div>
     </aside>
@@ -644,6 +736,215 @@ function CmdRunner({ workspace }: { workspace: string }) {
   );
 }
 
+/** One changed-file row in the git panel: a clickable name (toggles its diff), its porcelain status
+ *  code, and a checkbox that selects it for the explicit-path commit. */
+function GitRow({
+  file,
+  checked,
+  active,
+  onToggleCheck,
+  onSelect,
+}: {
+  file: GitFile;
+  checked: boolean;
+  active: boolean;
+  onToggleCheck: () => void;
+  onSelect: () => void;
+}) {
+  const code = `${file.x === " " ? "·" : file.x}${file.y === " " ? "·" : file.y}`;
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-2 px-2 py-1 text-[11px]",
+        active ? "bg-accent/10" : "hover:bg-white/[0.03]",
+      )}
+    >
+      <input
+        type="checkbox"
+        className="h-3 w-3 shrink-0 accent-[hsl(var(--accent))]"
+        checked={checked}
+        onChange={onToggleCheck}
+      />
+      <button
+        onClick={onSelect}
+        title={file.path}
+        className={cn(
+          "min-w-0 flex-1 truncate text-left font-mono",
+          active ? "text-accent" : "text-foreground/80 hover:text-foreground",
+        )}
+      >
+        {file.path}
+      </button>
+      <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{code}</span>
+    </div>
+  );
+}
+
+/** The git panel: real `git status` grouped by staged / modified / untracked, a per-file diff on
+ *  click, and a commit box that stages the EXPLICITLY selected paths (never `git add -A`). When the
+ *  folder isn't a git repo (or git is missing), an honest empty-state invites `git init`. */
+function GitPanel({ workspace }: { workspace: string }) {
+  const t = useT();
+  const qc = useQueryClient();
+  const statusQ = useQuery({
+    queryKey: ["git-status", workspace],
+    queryFn: () => getGitStatus(workspace || null),
+  });
+  const status = statusQ.data;
+  const files = useMemo(() => status?.files ?? [], [status]);
+  const staged = files.filter((f) => f.staged);
+  const modified = files.filter((f) => !f.staged && !f.untracked);
+  const untracked = files.filter((f) => f.untracked);
+
+  const [message, setMessage] = useState("");
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [selected, setSelected] = useState<{ path: string; staged: boolean } | null>(null);
+  const [committing, setCommitting] = useState(false);
+  const [commitErr, setCommitErr] = useState(false);
+  const [commitHash, setCommitHash] = useState<string | null>(null);
+
+  // Default-select the modified + untracked paths whenever the changed-file set changes.
+  const filesKey = files.map((f) => `${f.path}:${f.staged}`).join("\n");
+  useEffect(() => {
+    const next: Record<string, boolean> = {};
+    for (const f of files) next[f.path] = !f.staged; // modified/untracked default-checked
+    setChecked(next);
+    setSelected(null);
+    setCommitHash(null);
+    setCommitErr(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filesKey]);
+
+  const diffQ = useQuery({
+    queryKey: ["git-diff", workspace, selected?.path, selected?.staged],
+    queryFn: () => getGitDiff(workspace || null, selected!.path, selected!.staged),
+    enabled: selected !== null,
+  });
+
+  const selectedPaths = files.filter((f) => checked[f.path]).map((f) => f.path);
+
+  async function commit() {
+    if (!message.trim() || selectedPaths.length === 0 || committing) return;
+    setCommitting(true);
+    setCommitErr(false);
+    setCommitHash(null);
+    try {
+      const res = await gitCommit(workspace || null, message.trim(), selectedPaths);
+      if (res.ok) {
+        setCommitHash(res.commit);
+        setMessage("");
+        await qc.invalidateQueries({ queryKey: ["git-status", workspace] });
+        void qc.invalidateQueries({ queryKey: ["fs-tree"] });
+      } else {
+        setCommitErr(true);
+      }
+    } catch {
+      setCommitErr(true);
+    } finally {
+      setCommitting(false);
+    }
+  }
+
+  function toggle(path: string) {
+    setChecked((prev) => ({ ...prev, [path]: !prev[path] }));
+  }
+  function pick(path: string, isStaged: boolean) {
+    setSelected((prev) => (prev?.path === path && prev.staged === isStaged ? null : { path, staged: isStaged }));
+  }
+
+  function group(label: string, list: GitFile[], isStaged: boolean) {
+    if (list.length === 0) return null;
+    return (
+      <div>
+        <div className="px-2 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          {label}
+        </div>
+        {list.map((f) => (
+          <GitRow
+            key={`${isStaged ? "s" : "w"}:${f.path}`}
+            file={f}
+            checked={!!checked[f.path]}
+            active={selected?.path === f.path && selected.staged === isStaged}
+            onToggleCheck={() => toggle(f.path)}
+            onSelect={() => pick(f.path, isStaged)}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <section className="border-t border-white/5">
+      <div className="flex items-center gap-2 px-4 pt-2.5 text-accent">
+        <GitBranch className="h-4 w-4" />
+        <h2 className="text-sm font-semibold text-foreground">{t("code.git.title")}</h2>
+        {status?.is_repo ? (
+          <span className="font-mono text-[11px] text-muted-foreground">
+            {t("code.git.branch")}: {status.branch || "—"}
+          </span>
+        ) : null}
+      </div>
+
+      {statusQ.isLoading ? (
+        <div className="flex justify-center py-4 text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+        </div>
+      ) : !status?.is_repo ? (
+        <p className="px-4 py-3 text-[11px] text-muted-foreground">{t("code.git.notRepo")}</p>
+      ) : files.length === 0 ? (
+        <p className="px-4 py-3 text-[11px] text-muted-foreground">{t("code.git.clean")}</p>
+      ) : (
+        <div className="flex flex-col gap-2 px-2 py-2 lg:flex-row lg:items-start">
+          <div className="min-w-0 flex-1 rounded-chip bg-white/[0.02] py-1">
+            {group(t("code.git.staged"), staged, true)}
+            {group(t("code.git.modified"), modified, false)}
+            {group(t("code.git.untracked"), untracked, false)}
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <input
+              className="field h-9 px-3 text-xs"
+              placeholder={t("code.git.commitMsg")}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              disabled={committing}
+            />
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                disabled={!message.trim() || selectedPaths.length === 0 || committing}
+                onClick={() => void commit()}
+              >
+                {committing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                {t("code.git.commit")} ({selectedPaths.length})
+              </Button>
+              {commitHash ? (
+                <span className="font-mono text-[11px] text-ok">
+                  {t("code.git.committed")} {commitHash}
+                </span>
+              ) : null}
+              {commitErr ? <span className="text-[11px] text-bad">{t("code.git.commitError")}</span> : null}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selected ? (
+        <div className="px-4 pb-3">
+          {diffQ.isLoading ? (
+            <div className="py-2 text-[11px] text-muted-foreground">…</div>
+          ) : diffQ.data?.patch ? (
+            <DiffLines patch={diffQ.data.patch} />
+          ) : (
+            <p className="text-[11px] text-muted-foreground">{t("code.noDiff")}</p>
+          )}
+        </div>
+      ) : null}
+
+      <p className="px-4 pb-2 text-[11px] text-muted-foreground">{t("code.git.gitNote")}</p>
+    </section>
+  );
+}
+
 export function Code() {
   const t = useT();
   const qc = useQueryClient();
@@ -666,6 +967,7 @@ export function Code() {
             setWorkspace(ws);
             setOpenFile(null);
             void qc.invalidateQueries({ queryKey: ["fs-tree"] });
+            void qc.invalidateQueries({ queryKey: ["git-status"] });
           }}
           activePath={openFile}
           onOpen={setOpenFile}
@@ -679,6 +981,7 @@ export function Code() {
           }}
         />
       </div>
+      <GitPanel workspace={workspace} />
       <CmdRunner workspace={workspace} />
       <p className="border-t border-white/5 px-5 py-2 text-[11px] text-muted-foreground">
         {t("code.phase2note")}
