@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-07-14
+
 ### Added
 - **Memory screen: layers (by kind) + provenance (clean/unverified) + by-source breakdown.** A new
   layers panel above the fact list shows total/clean/unverified tiles, per-kind counts (the full
