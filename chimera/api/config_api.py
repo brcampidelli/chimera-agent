@@ -51,6 +51,7 @@ _EDITABLE_SETTINGS = {
     "CHIMERA_AUTO_CONSOLIDATE",
     "CHIMERA_SANDBOX",
     "CHIMERA_SANDBOX_IMAGE",
+    "CHIMERA_MCP_AUTOLOAD",
 }
 ALLOWED_KEYS = _SECRET_KEYS | _EDITABLE_SETTINGS
 
@@ -95,6 +96,7 @@ def read_config(settings: Settings) -> dict[str, Any]:
         "cache": {"completion": settings.cache, "prompt": settings.prompt_cache},
         "sandbox": {"mode": settings.sandbox, "image": settings.sandbox_image},
         "server": {"token_set": bool(settings.server_token)},
+        "mcp": {"autoload": settings.mcp_autoload},
         "providers": providers,
     }
 

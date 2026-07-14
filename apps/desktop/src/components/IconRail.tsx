@@ -9,6 +9,7 @@ import {
   BarChart3,
   ListChecks,
   Wrench,
+  Plug,
   Shield,
   Gauge,
   Settings as SettingsIcon,
@@ -29,6 +30,7 @@ export type View =
   | "usage"
   | "runs"
   | "tools"
+  | "mcp"
   | "governance"
   | "maturity"
   | "settings";
@@ -43,6 +45,7 @@ const NAV: { view: View; labelKey: string; icon: ComponentType<{ className?: str
   { view: "usage", labelKey: "nav.usage", icon: BarChart3 },
   { view: "runs", labelKey: "nav.runs", icon: ListChecks },
   { view: "tools", labelKey: "nav.tools", icon: Wrench },
+  { view: "mcp", labelKey: "nav.mcp", icon: Plug },
   { view: "governance", labelKey: "nav.governance", icon: Shield },
   { view: "maturity", labelKey: "nav.maturity", icon: Gauge },
 ];

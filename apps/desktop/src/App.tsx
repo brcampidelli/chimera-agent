@@ -15,6 +15,7 @@ import { Runs } from "@/components/Runs";
 import { Governance } from "@/components/Governance";
 import { Maturity } from "@/components/Maturity";
 import { Tools } from "@/components/Tools";
+import { Mcp } from "@/components/Mcp";
 import { Onboarding } from "@/components/Onboarding";
 import { Activity, type Status } from "@/components/Activity";
 import { Spinner } from "@/components/ui/panel";
@@ -194,6 +195,7 @@ export default function App() {
         {view === "usage" && <Usage />}
         {view === "runs" && <Runs />}
         {view === "tools" && <Tools />}
+        {view === "mcp" && <Mcp />}
         {view === "governance" && <Governance />}
         {view === "maturity" && <Maturity />}
         {view === "settings" && <Settings />}

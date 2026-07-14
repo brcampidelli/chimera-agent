@@ -272,6 +272,15 @@ export function Settings() {
           </Row>
         </Card>
 
+        <Card title={t("settings.card.mcp")}>
+          <Row label={t("settings.row.mcpAutoload")} hint={t("settings.hint.mcpAutoload")}>
+            <Toggle
+              on={c.mcp.autoload}
+              onChange={(v) => save({ CHIMERA_MCP_AUTOLOAD: String(v) })}
+            />
+          </Row>
+        </Card>
+
         <Card title={t("settings.card.server")}>
           <Row label={t("settings.row.bearer")} hint={t("settings.hint.bearer")}>
             <SecretField

@@ -1103,8 +1103,31 @@ def desktop_app(
     shared_graph = _recall_graph(shared_memory)
     shared_profile = shared_memory.profile() if shared_memory is not None else ""
 
+    # Opt-in MCP autoload: connect the configured MCP servers ONCE at app start and reuse their tools
+    # across sessions. Off by default (fast, no subprocess). A broken server is skipped gracefully so
+    # it can never break boot; toggling this needs a restart to take effect. Connect eagerly here (not
+    # per-session) so the subprocesses aren't respawned for every new chat.
+    mcp_connectors = None
+    if settings.mcp_autoload:
+        from chimera.integrations import ConnectorRegistry, MCPConnector, StdioMCPSession
+        from chimera.integrations.mcp_config import load_servers
+
+        mcp_connectors = ConnectorRegistry()
+        for cfg in load_servers(settings.home / "mcp.json"):
+            try:
+                sess = StdioMCPSession(
+                    cfg.command, cfg.args or None, cfg.env or None, connect_timeout=10.0
+                ).start()
+                mcp_connectors.register(MCPConnector(cfg.name, sess, name_prefix=f"{cfg.name}_"))
+            except Exception as exc:  # noqa: BLE001 — a broken server must never break app boot
+                console.print(f"[yellow]MCP: skipping '{cfg.name}' ({type(exc).__name__})[/yellow]")
+        loaded = len(mcp_connectors.names())
+        console.print(f"[dim]MCP autoload: {loaded} server(s) connected[/dim]")
+
     def factory() -> ChatSession:
         registry = default_registry(workspace_path)
+        if mcp_connectors is not None:
+            mcp_connectors.into_tool_registry(registry)  # MCP tools alongside the builtins
         runner = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
         return ChatSession(runner, memory=shared_memory, graph=shared_graph, profile=shared_profile)
 
@@ -3396,6 +3419,109 @@ def cron_learn(
         else:
             console.print(f"  [dim]skipped[/dim] {proposal.name}")
     console.print(f"created {created} cron(s) of {len(proposals)} proposed.")
+
+
+# --- mcp subcommands ----------------------------------------------------------
+
+mcp_app = typer.Typer(
+    help="Configure MCP servers (persisted to .chimera/mcp.json). Terminal-first source of truth.",
+    no_args_is_help=True,
+)
+app.add_typer(mcp_app, name="mcp")
+
+
+def _mcp_path() -> Path:
+    return get_settings().home / "mcp.json"
+
+
+# Module-level Option singletons: repeatable list options must not be built inline in the signature
+# (ruff B008 — read the default from a module-level singleton instead).
+_MCP_ARG_OPT = typer.Option(None, "--arg", "-a", help="A command argument (repeatable).")
+_MCP_ENV_OPT = typer.Option(None, "--env", "-e", help="An env var as K=V (repeatable).")
+
+
+@mcp_app.command("add")
+def mcp_add(
+    name: str = typer.Argument(..., help="A unique name for the server (namespaces its tools)."),
+    command: str = typer.Option(..., "--command", "-c", help="The launch command (e.g. npx, uvx, python)."),
+    arg: list[str] = _MCP_ARG_OPT,
+    env: list[str] = _MCP_ENV_OPT,
+) -> None:
+    """Add (or replace-by-name) an MCP server. Persists to .chimera/mcp.json — no connect."""
+    from chimera.integrations.mcp_config import McpServerConfig, add_server
+
+    env_map: dict[str, str] = {}
+    for pair in env or []:
+        if "=" not in pair:
+            console.print(f"[red]bad --env '{pair}' (expected KEY=VALUE)[/red]")
+            raise typer.Exit(code=1)
+        key, value = pair.split("=", 1)
+        env_map[key.strip()] = value
+    cfg = McpServerConfig(name=name, command=command, args=list(arg or []), env=env_map)
+    add_server(_mcp_path(), cfg)
+    console.print(f"[green]added[/green] MCP server [cyan]{name}[/cyan] ({command})")
+
+
+@mcp_app.command("list")
+def mcp_list() -> None:
+    """List configured MCP servers (name, command + args, env key names). No connect."""
+    from chimera.integrations.mcp_config import load_servers
+
+    servers = load_servers(_mcp_path())
+    if not servers:
+        console.print("[dim]no MCP servers configured — add one with `chimera mcp add`[/dim]")
+        return
+    table = Table(title="MCP servers", show_header=True, header_style="bold")
+    for col in ("name", "command", "env"):
+        table.add_column(col)
+    for s in servers:
+        cmd = " ".join([s.command, *s.args])
+        table.add_row(s.name, cmd, ", ".join(sorted(s.env)) or "-")
+    console.print(table)
+
+
+@mcp_app.command("remove")
+def mcp_remove(name: str = typer.Argument(..., help="The server name to remove.")) -> None:
+    """Remove a configured MCP server by name."""
+    from chimera.integrations.mcp_config import remove_server
+
+    if not remove_server(_mcp_path(), name):
+        console.print(f"[yellow]no MCP server named {name}[/yellow]")
+        raise typer.Exit(code=1)
+    console.print(f"[green]removed[/green] {name}")
+
+
+@mcp_app.command("test")
+def mcp_test(
+    name: str = typer.Argument(..., help="The configured server to live-test."),
+    timeout: float = typer.Option(12.0, "--timeout", help="Connect timeout in seconds."),
+) -> None:
+    """Live-connect a configured server and print the tools it exposes (or a clear error).
+
+    This is the ONLY MCP subcommand that connects (spawns the server + runs the async handshake). It
+    is the sole honest proof a server is reachable. Needs the 'mcp' extra and the server's own runtime
+    (e.g. Node for an npx server).
+    """
+    from chimera.integrations.mcp_config import load_servers, probe_tools
+
+    cfg = next((s for s in load_servers(_mcp_path()) if s.name == name), None)
+    if cfg is None:
+        console.print(f"[yellow]no MCP server named {name}[/yellow]")
+        raise typer.Exit(code=1)
+    try:
+        tools = probe_tools(cfg, connect_timeout=timeout)
+    except Exception as exc:  # noqa: BLE001 — a graceful message, never a stack trace
+        console.print(f"[red]could not connect to {name}: {type(exc).__name__}[/red]")
+        raise typer.Exit(code=1) from exc
+    if not tools:
+        console.print(f"[yellow]{name} connected but exposed no tools[/yellow]")
+        return
+    table = Table(title=f"{name}: {len(tools)} tool(s)", show_header=True, header_style="bold")
+    table.add_column("tool")
+    table.add_column("description")
+    for tool in tools:
+        table.add_row(tool["name"], tool["description"])
+    console.print(table)
 
 
 # --- kanban subcommands -------------------------------------------------------

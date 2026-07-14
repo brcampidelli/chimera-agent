@@ -6,6 +6,8 @@ import type {
   GovernanceAudit,
   InjectionReport,
   Maturity,
+  McpServers,
+  McpTest,
   MemoryItem,
   MemoryLayers,
   ProjectState,
@@ -89,6 +91,21 @@ export const disableCron = (id: string) =>
   json<CronJob>(`/api/cron/${id}/disable`, { method: "POST" });
 export const deleteCron = (id: string) =>
   json<{ deleted: boolean }>(`/api/cron/${id}`, { method: "DELETE" });
+
+// --- MCP / Integrations ---
+// Config reads/writes are cheap and NEVER connect (env values are never returned). `testMcpServer` is
+// the ONLY connecting call — a real stdio connect + tool enumeration, the sole honest "connected" proof.
+export const getMcpServers = () => json<McpServers>("/api/mcp");
+export const addMcpServer = (body: {
+  name: string;
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+}) => json<McpServers>("/api/mcp", { method: "POST", body: JSON.stringify(body) });
+export const removeMcpServer = (name: string) =>
+  json<{ deleted: boolean }>(`/api/mcp/${encodeURIComponent(name)}`, { method: "DELETE" });
+export const testMcpServer = (name: string) =>
+  json<McpTest>(`/api/mcp/${encodeURIComponent(name)}/test`, { method: "POST" });
 
 // --- Tasks (kanban + projects, HITL) ---
 export const getKanban = () => json<Record<string, TaskCard[]>>("/api/kanban");

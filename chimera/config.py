@@ -180,6 +180,13 @@ class Settings(BaseSettings):
     auto_consolidate: bool = Field(default=False, validation_alias="CHIMERA_AUTO_CONSOLIDATE")
     memory_budget: int = Field(default=200, validation_alias="CHIMERA_MEMORY_BUDGET")
 
+    # --- Opt-in: at app start, load the tools of the MCP servers configured in `.chimera/mcp.json`
+    # into the agent's registry (each connected with a per-server timeout, a broken one skipped so it
+    # can't break boot). Off by default: boot stays fast and spawns no subprocess. Toggling it needs a
+    # restart to take effect. MCP tool output is untrusted (the `untrusted_output` flag flows to
+    # governance). Configure servers with `chimera mcp add` or the desktop MCP screen. ---
+    mcp_autoload: bool = Field(default=False, validation_alias="CHIMERA_MCP_AUTOLOAD")
+
     # --- Auto-fuse error-sensitive turns in solve/crew without an explicit --fuse.
     # Off by default (fusion costs 2-3x); when on, the cost-aware router still keeps
     # cheap/tool turns single-model and only fuses deep or error-sensitive ones. ---

@@ -30,6 +30,10 @@ export type ToolInfo = Schemas["ToolInfoOut"];
 export type Tools = Schemas["ToolsOut"];
 export type Maturity = Schemas["MaturityOut"];
 export type MaturitySurface = Schemas["MaturitySurfaceOut"];
+export type McpServer = Schemas["McpServerOut"];
+export type McpServers = Schemas["McpServersOut"];
+export type McpTool = Schemas["McpToolOut"];
+export type McpTest = Schemas["McpTestOut"];
 
 // --- SSE event payloads + UI-only types (not in the OpenAPI schema) ---
 

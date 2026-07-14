@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **MCP / Integrations: configure MCP servers (persisted to `.chimera/mcp.json` via `chimera mcp
+  add/list/remove/test` or the app), live-test them, and opt into loading their tools
+  (`CHIMERA_MCP_AUTOLOAD`).** A new terminal-first store makes MCP servers a real, persisted
+  capability instead of a code change: the `chimera mcp` subcommands (add/list/remove, and `test`
+  which does a REAL stdio connect and prints the tools it exposes) are the source of truth, and the
+  desktop **MCP** screen is a view/editor over them (add a server, remove it, and a per-server Test
+  whose green "connected · N tools" badge appears ONLY after a successful live connect — never by
+  default). Config reads never connect and never return `env` secret values (only key names); the
+  test endpoint (`POST /api/mcp/{name}/test`, `McpTestOut`) is the sole connecting one and flattens
+  every failure to a short, secret-free error. Opt-in `CHIMERA_MCP_AUTOLOAD` (off by default) loads
+  the configured servers' tools into the agent at app start — a broken server is skipped gracefully
+  so it can never break boot; toggling it needs a restart, and MCP tool output stays untrusted
+  (fenced + taint-tracked by governance).
 - **First-run onboarding wizard: the desktop app now boots without a key and guides you to add +
   live-test an OpenRouter key from the UI (`chimera app` no longer hard-exits without a key).** When
   the doctor reports no provider key, the app opens a full-screen setup screen (the GUI equivalent of

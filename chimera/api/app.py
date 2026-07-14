@@ -41,6 +41,9 @@ from chimera.api.schemas import (
     HealthOut,
     InjectionReportOut,
     MaturityOut,
+    McpAddRequest,
+    McpServersOut,
+    McpTestOut,
     NewSessionOut,
     RunReceiptOut,
     SessionDetailOut,
@@ -202,6 +205,37 @@ def build_api_app(
 
         tools = list_tools(default_registry(workspace))
         return {"tools": tools, "count": len(tools)}
+
+    @app.get("/api/mcp", dependencies=[guard], response_model=McpServersOut)
+    def mcp_list_endpoint() -> dict[str, Any]:
+        # Read-only: the configured MCP servers from the store. NO connect — a listed server means
+        # "configured", never "live". Env VALUES are never returned (only the key names).
+        from chimera.api.mcp_api import list_servers
+
+        return list_servers(settings.home)
+
+    @app.post("/api/mcp", dependencies=[guard], response_model=McpServersOut)
+    def mcp_add_endpoint(req: McpAddRequest) -> dict[str, Any]:
+        # Cheap file write (replace-by-name or append). Persists to .chimera/mcp.json; still no connect.
+        from chimera.api.mcp_api import add
+
+        return add(settings.home, req.name, req.command, req.args, req.env)
+
+    @app.delete("/api/mcp/{name}", dependencies=[guard], response_model=DeletedOut)
+    def mcp_remove_endpoint(name: str) -> dict[str, bool]:
+        from chimera.api.mcp_api import remove
+
+        return {"deleted": remove(settings.home, name)}
+
+    @app.post("/api/mcp/{name}/test", dependencies=[guard], response_model=McpTestOut)
+    def mcp_test_endpoint(name: str) -> dict[str, Any]:
+        # The ONLY connecting MCP endpoint: a real stdio connect + tool enumeration (short timeout).
+        # It is the sole honest "connected" signal. Every failure is flattened to {ok:false, tools:[],
+        # error} — never a stack trace, never an env value, never a 500. Runs the (blocking) connect on
+        # a worker thread so the async event loop isn't blocked for the connect's duration.
+        from chimera.api.mcp_api import test_server
+
+        return test_server(settings.home, name)
 
     @app.get("/api/governance/injection", dependencies=[guard], response_model=InjectionReportOut)
     def governance_injection_endpoint() -> dict[str, Any]:

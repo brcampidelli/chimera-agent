@@ -154,6 +154,9 @@
           "cache": {
             "$ref": "#/components/schemas/CacheCfgOut"
           },
+          "mcp": {
+            "$ref": "#/components/schemas/McpCfgOut"
+          },
           "memory": {
             "$ref": "#/components/schemas/MemoryCfgOut"
           },
@@ -180,6 +183,7 @@
           "cache",
           "sandbox",
           "server",
+          "mcp",
           "providers"
         ],
         "title": "ConfigOut",
@@ -665,6 +669,159 @@
           "ratio"
         ],
         "title": "MaturityWeakestOut",
+        "type": "object"
+      },
+      "McpAddRequest": {
+        "properties": {
+          "args": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Args",
+            "type": "array"
+          },
+          "command": {
+            "title": "Command",
+            "type": "string"
+          },
+          "env": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "title": "Env",
+            "type": "object"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "command"
+        ],
+        "title": "McpAddRequest",
+        "type": "object"
+      },
+      "McpCfgOut": {
+        "properties": {
+          "autoload": {
+            "title": "Autoload",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "autoload"
+        ],
+        "title": "McpCfgOut",
+        "type": "object"
+      },
+      "McpServerOut": {
+        "properties": {
+          "args": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Args",
+            "type": "array"
+          },
+          "command": {
+            "title": "Command",
+            "type": "string"
+          },
+          "env_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Env Keys",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "command",
+          "args",
+          "env_keys"
+        ],
+        "title": "McpServerOut",
+        "type": "object"
+      },
+      "McpServersOut": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "servers": {
+            "items": {
+              "$ref": "#/components/schemas/McpServerOut"
+            },
+            "title": "Servers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "servers",
+          "count"
+        ],
+        "title": "McpServersOut",
+        "type": "object"
+      },
+      "McpTestOut": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/McpToolOut"
+            },
+            "title": "Tools",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ok",
+          "tools",
+          "error"
+        ],
+        "title": "McpTestOut",
+        "type": "object"
+      },
+      "McpToolOut": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "description"
+        ],
+        "title": "McpToolOut",
         "type": "object"
       },
       "MemoryAdd": {
@@ -2138,6 +2295,138 @@
           }
         },
         "summary": "Maturity Endpoint"
+      }
+    },
+    "/api/mcp": {
+      "get": {
+        "operationId": "mcp_list_endpoint_api_mcp_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpServersOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Mcp List Endpoint"
+      },
+      "post": {
+        "operationId": "mcp_add_endpoint_api_mcp_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/McpAddRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpServersOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mcp Add Endpoint"
+      }
+    },
+    "/api/mcp/{name}": {
+      "delete": {
+        "operationId": "mcp_remove_endpoint_api_mcp__name__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mcp Remove Endpoint"
+      }
+    },
+    "/api/mcp/{name}/test": {
+      "post": {
+        "operationId": "mcp_test_endpoint_api_mcp__name__test_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpTestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mcp Test Endpoint"
       }
     },
     "/api/memory": {

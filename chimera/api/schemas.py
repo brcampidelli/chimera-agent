@@ -88,6 +88,10 @@ class ServerCfgOut(BaseModel):
     token_set: bool
 
 
+class McpCfgOut(BaseModel):
+    autoload: bool  # settings.mcp_autoload — when on, configured MCP tools load at app start
+
+
 class ProviderOut(BaseModel):
     env: str
     label: str
@@ -101,6 +105,7 @@ class ConfigOut(BaseModel):
     cache: CacheCfgOut
     sandbox: SandboxCfgOut
     server: ServerCfgOut
+    mcp: McpCfgOut
     providers: list[ProviderOut]
 
 
@@ -368,6 +373,39 @@ class ToolInfoOut(BaseModel):
 class ToolsOut(BaseModel):
     tools: list[ToolInfoOut]
     count: int
+
+
+# --- MCP / Integrations (configured servers + live test) ------------------------------------------
+
+
+class McpServerOut(BaseModel):
+    name: str
+    command: str
+    args: list[str]
+    env_keys: list[str]  # env variable NAMES only — the secret VALUES are never returned
+
+
+class McpServersOut(BaseModel):
+    servers: list[McpServerOut]
+    count: int
+
+
+class McpToolOut(BaseModel):
+    name: str
+    description: str
+
+
+class McpTestOut(BaseModel):
+    ok: bool  # True ONLY after a real stdio connect + tool enumeration — the sole "connected" signal
+    tools: list[McpToolOut]  # the tools the server exposed on a successful connect; [] otherwise
+    error: str | None  # a short, secret-free failure message when ok is False; null on success
+
+
+class McpAddRequest(BaseModel):
+    name: str
+    command: str
+    args: list[str] = []
+    env: dict[str, str] = {}  # accepted on write (stored locally), never echoed back in reads
 
 
 # --- maturity (self-eval coverage scorecard by surface) -------------------------------------------
