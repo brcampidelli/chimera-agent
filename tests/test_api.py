@@ -186,6 +186,60 @@ def test_runs_endpoint_returns_receipts_newest_first(tmp_path: Any) -> None:
     assert runs[1]["success"] is True and runs[1]["verify_command"] is None
 
 
+def test_post_runs_streams_events_done_and_persists_receipt(tmp_path: Any) -> None:
+    """The run trigger streams `event` frames + a terminal `done`, and (via the agent's run_log) a
+    receipt lands in runs.jsonl. Uses an injected factory that builds a REAL AutonomousAgent over a
+    fake worker — no LLM — so the endpoint wiring (SSE marshalling + receipt persistence) is exercised.
+    """
+    from chimera.api import build_api_app
+    from chimera.api.app import RunRequest
+    from chimera.api.runs import load_runs
+    from chimera.core.autonomous import AutonomousAgent, AutonomousConfig
+    from chimera.core.checkpoint import WorkspaceGuard
+    from chimera.core.events import EventSink
+
+    class _FakeWorker:
+        def run(self, task: str) -> AgentResult:
+            return AgentResult(answer="did it", steps=1, stopped_reason="final")
+
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+
+    def solve_factory(
+        req: RunRequest, ws: Any, on_event: EventSink, settings: Any
+    ) -> AutonomousAgent:
+        # No verifier / planner / manager: verify abstains → manager approves → success on attempt 1.
+        return AutonomousAgent(
+            _FakeWorker(),
+            guard=WorkspaceGuard(ws),
+            workspace=ws,
+            on_event=on_event,
+            run_log=settings.home / "runs.jsonl",
+            config=AutonomousConfig(max_attempts=req.max_attempts, use_planner=False, use_manager=False),
+        )
+
+    client = TestClient(
+        build_api_app(
+            lambda: ChatSession(_FakeAgent()), settings=settings, solve_agent_factory=solve_factory
+        )
+    )
+    resp = client.post("/api/runs", json={"task": "make it so", "max_attempts": 2})
+    assert resp.status_code == 200
+    events = _read_sse(resp.text)
+    kinds = [e for e, _ in events]
+    assert "event" in kinds and kinds[-1] == "done"
+    done = next(d for e, d in events if e == "done")
+    assert done["success"] is True and done["answer"] == "did it" and done["attempts"] == 1
+    # Each streamed `event` frame carries the AgentEvent kind + text (compact, no huge answer field).
+    ev = next(d for e, d in events if e == "event")
+    assert "kind" in ev and "text" in ev and "answer" not in ev
+
+    # The receipt was persisted by the agent's run_log — the read-only GET now lists it.
+    receipts = load_runs(tmp_path / "home" / "runs.jsonl")
+    assert len(receipts) == 1 and receipts[0].task == "make it so" and receipts[0].success is True
+    listed = client.get("/api/runs").json()
+    assert listed[0]["task"] == "make it so"
+
+
 def test_session_is_persisted_and_listed_and_deletable(tmp_path: Any) -> None:
     client = _client(tmp_path)
     resp = client.post("/api/chat/stream", json={"message": "remember me", "stream": True})

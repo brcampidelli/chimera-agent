@@ -683,6 +683,46 @@
         "title": "RunReceiptOut",
         "type": "object"
       },
+      "RunRequest": {
+        "properties": {
+          "max_attempts": {
+            "default": 3,
+            "title": "Max Attempts",
+            "type": "integer"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          },
+          "verify": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verify"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "title": "RunRequest",
+        "type": "object"
+      },
       "SandboxCfgOut": {
         "properties": {
           "image": {
@@ -1835,6 +1875,40 @@
           }
         },
         "summary": "Runs Endpoint"
+      },
+      "post": {
+        "operationId": "run_stream_api_runs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Stream"
       }
     },
     "/api/sessions": {

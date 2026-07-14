@@ -1,6 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
-import { ListChecks } from "lucide-react";
-import { getRuns } from "@/lib/api";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ListChecks, Loader2, Play } from "lucide-react";
+import { getRuns, streamRun, type RunEvent } from "@/lib/api";
+import { Button } from "@/components/ui/button";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
 import { useT, type TFunc } from "@/lib/i18n";
 import type { AttemptReceipt, RunReceipt } from "@/lib/types";
@@ -80,37 +82,143 @@ function RunCard({ run, t }: { run: RunReceipt; t: TFunc }) {
   );
 }
 
-export function Runs() {
-  const t = useT();
-  const q = useQuery({ queryKey: ["runs"], queryFn: getRuns });
+/** Render one streamed run event as a compact live line, or null to skip (e.g. the `final` event —
+ *  the `done` payload drives the terminal line). Backend `text` is English; map to the UI language. */
+function liveLine(e: RunEvent, t: TFunc): string | null {
+  if (e.kind === "status") return /planning/i.test(e.text) ? t("runs.planning") : e.text;
+  if (e.kind === "attempt") return `${t("runs.attempt")} ${e.index} — ${t("runs.verifying")}`;
+  if (e.kind === "result")
+    return `${t("runs.attempt")} ${e.index}: ${e.success ? t("runs.passed") : t("runs.failed")}`;
+  return null; // `final` is covered by onDone
+}
 
-  if (q.isLoading) {
-    return (
-      <Screen title={t("runs.title")} icon={<ListChecks className="h-5 w-5" />}>
-        <Panel>
-          <Spinner />
-        </Panel>
-      </Screen>
-    );
-  }
+const fieldCls = "field w-full px-3 text-sm";
 
-  const runs = q.data ?? [];
+/** The in-app trigger: launch an autonomous run (`chimera solve` semantics) and stream it live. On
+ *  finish it invalidates the receipts query so the new run appears in the list below. */
+function NewRunPanel({ t }: { t: TFunc }) {
+  const qc = useQueryClient();
+  const [task, setTask] = useState("");
+  const [verify, setVerify] = useState("");
+  const [workspace, setWorkspace] = useState("");
+  const [maxAttempts, setMaxAttempts] = useState(3);
+  const [running, setRunning] = useState(false);
+  const [lines, setLines] = useState<string[]>([]);
 
-  if (runs.length === 0) {
-    return (
-      <Screen title={t("runs.title")} icon={<ListChecks className="h-5 w-5" />}>
-        <Panel>
-          <EmptyState text={t("runs.empty")} />
-        </Panel>
-      </Screen>
+  function start() {
+    if (!task.trim() || running) return;
+    setRunning(true);
+    setLines([]);
+    const append = (s: string) => setLines((prev) => [...prev, s]);
+    const finish = () => {
+      setRunning(false);
+      void qc.invalidateQueries({ queryKey: ["runs"] });
+    };
+    void streamRun(
+      {
+        task: task.trim(),
+        verify: verify.trim() || null,
+        workspace: workspace.trim() || null,
+        max_attempts: maxAttempts,
+      },
+      {
+        onEvent: (e) => {
+          const line = liveLine(e, t);
+          if (line) append(line);
+        },
+        onDone: (d) => {
+          append(d.success ? t("runs.doneOk") : t("runs.doneFail"));
+          finish();
+        },
+        onError: () => {
+          append(t("runs.doneFail"));
+          finish();
+        },
+      },
     );
   }
 
   return (
+    <Panel title={t("runs.new")}>
+      <div className="space-y-2.5 px-4 py-3">
+        <textarea
+          className={`${fieldCls} min-h-[72px] resize-y py-2`}
+          placeholder={t("runs.taskPlaceholder")}
+          value={task}
+          onChange={(e) => setTask(e.target.value)}
+          disabled={running}
+        />
+        <input
+          className={`${fieldCls} h-9 font-mono text-xs`}
+          placeholder={t("runs.verifyPlaceholder")}
+          value={verify}
+          onChange={(e) => setVerify(e.target.value)}
+          disabled={running}
+        />
+        <input
+          className={`${fieldCls} h-9 font-mono text-xs`}
+          placeholder={t("runs.workspacePlaceholder")}
+          value={workspace}
+          onChange={(e) => setWorkspace(e.target.value)}
+          disabled={running}
+        />
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            {t("runs.maxAttempts")}
+            <input
+              type="number"
+              min={1}
+              max={10}
+              className="field h-9 w-16 px-2 text-sm"
+              value={maxAttempts}
+              onChange={(e) => setMaxAttempts(Math.min(10, Math.max(1, Number(e.target.value) || 1)))}
+              disabled={running}
+            />
+          </label>
+          <Button size="sm" disabled={!task.trim() || running} onClick={start}>
+            {running ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> {t("runs.running")}
+              </>
+            ) : (
+              <>
+                <Play className="h-4 w-4" /> {t("runs.run")}
+              </>
+            )}
+          </Button>
+        </div>
+        <p className="text-[11px] text-muted-foreground">{t("runs.safetyNote")}</p>
+        {lines.length > 0 ? (
+          <div className="mt-1 space-y-1 rounded-chip bg-white/[0.03] p-2 font-mono text-[11px] text-muted-foreground">
+            {lines.map((line, i) => (
+              <div key={i}>{line}</div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </Panel>
+  );
+}
+
+export function Runs() {
+  const t = useT();
+  const q = useQuery({ queryKey: ["runs"], queryFn: getRuns });
+  const runs = q.data ?? [];
+
+  return (
     <Screen title={t("runs.title")} icon={<ListChecks className="h-5 w-5" />}>
-      {runs.map((run, i) => (
-        <RunCard key={`${run.ts}-${i}`} run={run} t={t} />
-      ))}
+      <NewRunPanel t={t} />
+      {q.isLoading ? (
+        <Panel>
+          <Spinner />
+        </Panel>
+      ) : runs.length === 0 ? (
+        <Panel>
+          <EmptyState text={t("runs.empty")} />
+        </Panel>
+      ) : (
+        runs.map((run, i) => <RunCard key={`${run.ts}-${i}`} run={run} t={t} />)
+      )}
     </Screen>
   );
 }

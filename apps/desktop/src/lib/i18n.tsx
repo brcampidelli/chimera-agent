@@ -159,8 +159,7 @@ const en: Dict = {
   "usage.fusion": "fusion",
   "usage.cascade": "cascade",
   "runs.title": "Runs",
-  "runs.empty":
-    "No runs yet — run `chimera solve \"…\" --verify \"…\"` from the CLI (an in-app trigger is coming next).",
+  "runs.empty": "No runs yet — start one above, or run `chimera solve \"…\" --verify \"…\"` from the CLI.",
   "runs.passed": "passed",
   "runs.failed": "failed",
   "runs.paused": "paused",
@@ -170,6 +169,18 @@ const en: Dict = {
   "runs.diff": "diff",
   "runs.output": "verifier output",
   "runs.noVerify": "no verify command",
+  "runs.new": "New run",
+  "runs.taskPlaceholder": "Describe the task to solve autonomously…",
+  "runs.verifyPlaceholder": "verify command — a shell command, exit 0 = pass (optional)",
+  "runs.workspacePlaceholder": "workspace path (optional — defaults to the app's workspace)",
+  "runs.maxAttempts": "Max attempts",
+  "runs.run": "Run",
+  "runs.running": "Running…",
+  "runs.safetyNote": "Runs write files and execute the verify command in the workspace.",
+  "runs.planning": "planning…",
+  "runs.verifying": "verifying…",
+  "runs.doneOk": "done: passed",
+  "runs.doneFail": "done: failed",
 };
 
 const pt: Dict = {
@@ -306,8 +317,7 @@ const pt: Dict = {
   "usage.fusion": "fusão",
   "usage.cascade": "cascata",
   "runs.title": "Execuções",
-  "runs.empty":
-    "Nenhuma execução ainda — rode `chimera solve \"…\" --verify \"…\"` pelo CLI (um gatilho no app vem a seguir).",
+  "runs.empty": "Nenhuma execução ainda — inicie uma acima, ou rode `chimera solve \"…\" --verify \"…\"` pelo CLI.",
   "runs.passed": "aprovada",
   "runs.failed": "falhou",
   "runs.paused": "pausada",
@@ -317,6 +327,18 @@ const pt: Dict = {
   "runs.diff": "diff",
   "runs.output": "saída do verificador",
   "runs.noVerify": "sem comando de verificação",
+  "runs.new": "Nova execução",
+  "runs.taskPlaceholder": "Descreva a tarefa a resolver autonomamente…",
+  "runs.verifyPlaceholder": "comando de verificação — um comando de shell, saída 0 = passou (opcional)",
+  "runs.workspacePlaceholder": "caminho do workspace (opcional — padrão é o workspace do app)",
+  "runs.maxAttempts": "Máx. tentativas",
+  "runs.run": "Executar",
+  "runs.running": "Executando…",
+  "runs.safetyNote": "As execuções escrevem arquivos e rodam o comando de verificação no workspace.",
+  "runs.planning": "planejando…",
+  "runs.verifying": "verificando…",
+  "runs.doneOk": "concluído: aprovada",
+  "runs.doneFail": "concluído: falhou",
 };
 
 const es: Dict = {
@@ -453,8 +475,7 @@ const es: Dict = {
   "usage.fusion": "fusión",
   "usage.cascade": "cascada",
   "runs.title": "Ejecuciones",
-  "runs.empty":
-    "Aún no hay ejecuciones — ejecuta `chimera solve \"…\" --verify \"…\"` desde el CLI (un disparador en la app llega pronto).",
+  "runs.empty": "Aún no hay ejecuciones — inicia una arriba, o ejecuta `chimera solve \"…\" --verify \"…\"` desde el CLI.",
   "runs.passed": "aprobada",
   "runs.failed": "fallida",
   "runs.paused": "pausada",
@@ -464,6 +485,18 @@ const es: Dict = {
   "runs.diff": "diff",
   "runs.output": "salida del verificador",
   "runs.noVerify": "sin comando de verificación",
+  "runs.new": "Nueva ejecución",
+  "runs.taskPlaceholder": "Describe la tarea a resolver de forma autónoma…",
+  "runs.verifyPlaceholder": "comando de verificación — un comando de shell, salida 0 = aprobado (opcional)",
+  "runs.workspacePlaceholder": "ruta del workspace (opcional — por defecto el workspace de la app)",
+  "runs.maxAttempts": "Máx. intentos",
+  "runs.run": "Ejecutar",
+  "runs.running": "Ejecutando…",
+  "runs.safetyNote": "Las ejecuciones escriben archivos y ejecutan el comando de verificación en el workspace.",
+  "runs.planning": "planificando…",
+  "runs.verifying": "verificando…",
+  "runs.doneOk": "listo: aprobada",
+  "runs.doneFail": "listo: fallida",
 };
 
 const fr: Dict = {
@@ -600,8 +633,7 @@ const fr: Dict = {
   "usage.fusion": "fusion",
   "usage.cascade": "cascade",
   "runs.title": "Exécutions",
-  "runs.empty":
-    "Aucune exécution pour l'instant — lancez `chimera solve \"…\" --verify \"…\"` depuis le CLI (un déclencheur dans l'app arrive bientôt).",
+  "runs.empty": "Aucune exécution pour l'instant — lancez-en une ci-dessus, ou exécutez `chimera solve \"…\" --verify \"…\"` depuis le CLI.",
   "runs.passed": "réussie",
   "runs.failed": "échouée",
   "runs.paused": "en pause",
@@ -611,6 +643,18 @@ const fr: Dict = {
   "runs.diff": "diff",
   "runs.output": "sortie du vérificateur",
   "runs.noVerify": "aucune commande de vérification",
+  "runs.new": "Nouvelle exécution",
+  "runs.taskPlaceholder": "Décrivez la tâche à résoudre de façon autonome…",
+  "runs.verifyPlaceholder": "commande de vérification — une commande shell, code 0 = réussi (optionnel)",
+  "runs.workspacePlaceholder": "chemin du workspace (optionnel — par défaut le workspace de l'app)",
+  "runs.maxAttempts": "Tentatives max",
+  "runs.run": "Lancer",
+  "runs.running": "En cours…",
+  "runs.safetyNote": "Les exécutions écrivent des fichiers et lancent la commande de vérification dans le workspace.",
+  "runs.planning": "planification…",
+  "runs.verifying": "vérification…",
+  "runs.doneOk": "terminé : réussie",
+  "runs.doneFail": "terminé : échouée",
 };
 
 const de: Dict = {
@@ -747,8 +791,7 @@ const de: Dict = {
   "usage.fusion": "Fusion",
   "usage.cascade": "Kaskade",
   "runs.title": "Läufe",
-  "runs.empty":
-    "Noch keine Läufe — führe `chimera solve \"…\" --verify \"…\"` im CLI aus (ein In-App-Auslöser kommt als Nächstes).",
+  "runs.empty": "Noch keine Läufe — starte oben einen, oder führe `chimera solve \"…\" --verify \"…\"` im CLI aus.",
   "runs.passed": "bestanden",
   "runs.failed": "fehlgeschlagen",
   "runs.paused": "pausiert",
@@ -758,6 +801,18 @@ const de: Dict = {
   "runs.diff": "Diff",
   "runs.output": "Verifizierer-Ausgabe",
   "runs.noVerify": "kein Verifikationsbefehl",
+  "runs.new": "Neuer Lauf",
+  "runs.taskPlaceholder": "Beschreibe die autonom zu lösende Aufgabe…",
+  "runs.verifyPlaceholder": "Verifikationsbefehl — ein Shell-Befehl, Exit 0 = bestanden (optional)",
+  "runs.workspacePlaceholder": "Workspace-Pfad (optional — Standard ist der Workspace der App)",
+  "runs.maxAttempts": "Max. Versuche",
+  "runs.run": "Ausführen",
+  "runs.running": "Läuft…",
+  "runs.safetyNote": "Läufe schreiben Dateien und führen den Verifikationsbefehl im Workspace aus.",
+  "runs.planning": "plane…",
+  "runs.verifying": "verifiziere…",
+  "runs.doneOk": "fertig: bestanden",
+  "runs.doneFail": "fertig: fehlgeschlagen",
 };
 
 const zh: Dict = {
@@ -893,8 +948,7 @@ const zh: Dict = {
   "usage.fusion": "融合",
   "usage.cascade": "级联",
   "runs.title": "运行",
-  "runs.empty":
-    "还没有运行 —— 在 CLI 中执行 `chimera solve \"…\" --verify \"…\"`（应用内触发即将推出）。",
+  "runs.empty": "还没有运行 —— 在上方开始一个，或在 CLI 中执行 `chimera solve \"…\" --verify \"…\"`。",
   "runs.passed": "通过",
   "runs.failed": "失败",
   "runs.paused": "已暂停",
@@ -904,6 +958,18 @@ const zh: Dict = {
   "runs.diff": "差异",
   "runs.output": "验证输出",
   "runs.noVerify": "无验证命令",
+  "runs.new": "新建运行",
+  "runs.taskPlaceholder": "描述要自主完成的任务…",
+  "runs.verifyPlaceholder": "验证命令 —— 一条 shell 命令，退出码 0 = 通过（可选）",
+  "runs.workspacePlaceholder": "工作区路径（可选 —— 默认使用应用的工作区）",
+  "runs.maxAttempts": "最大尝试次数",
+  "runs.run": "运行",
+  "runs.running": "运行中…",
+  "runs.safetyNote": "运行会在工作区写入文件并执行验证命令。",
+  "runs.planning": "规划中…",
+  "runs.verifying": "验证中…",
+  "runs.doneOk": "完成：通过",
+  "runs.doneFail": "完成：失败",
 };
 
 const ja: Dict = {
@@ -1039,8 +1105,7 @@ const ja: Dict = {
   "usage.fusion": "融合",
   "usage.cascade": "カスケード",
   "runs.title": "実行",
-  "runs.empty":
-    "まだ実行がありません — CLI で `chimera solve \"…\" --verify \"…\"` を実行してください（アプリ内トリガーは近日対応）。",
+  "runs.empty": "まだ実行がありません — 上で開始するか、CLI で `chimera solve \"…\" --verify \"…\"` を実行してください。",
   "runs.passed": "合格",
   "runs.failed": "失敗",
   "runs.paused": "一時停止",
@@ -1050,6 +1115,18 @@ const ja: Dict = {
   "runs.diff": "差分",
   "runs.output": "検証出力",
   "runs.noVerify": "検証コマンドなし",
+  "runs.new": "新しい実行",
+  "runs.taskPlaceholder": "自律的に解決するタスクを記述…",
+  "runs.verifyPlaceholder": "検証コマンド — シェルコマンド、終了コード 0 = 合格（任意）",
+  "runs.workspacePlaceholder": "ワークスペースのパス（任意 — 既定はアプリのワークスペース）",
+  "runs.maxAttempts": "最大試行回数",
+  "runs.run": "実行",
+  "runs.running": "実行中…",
+  "runs.safetyNote": "実行はワークスペースにファイルを書き込み、検証コマンドを実行します。",
+  "runs.planning": "計画中…",
+  "runs.verifying": "検証中…",
+  "runs.doneOk": "完了：合格",
+  "runs.doneFail": "完了：失敗",
 };
 
 const DICTS: Record<Lang, Dict> = { en, pt, es, fr, de, zh, ja };

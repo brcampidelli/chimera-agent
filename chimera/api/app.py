@@ -22,7 +22,7 @@ import threading
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
@@ -46,9 +46,13 @@ from chimera.api.sessions import SessionManager, SessionStore
 from chimera.api.usage import UsageRecord, append_usage, load_usage, summarize_usage
 from chimera.config import Settings, get_settings
 from chimera.core.agent import ToolActivity
+from chimera.core.events import AgentEvent, EventSink
 from chimera.interface import ChatSession
 from chimera.providers.gateway import SupportsComplete
 from chimera.telemetry import get_logger
+
+if TYPE_CHECKING:
+    from chimera.core.autonomous import AutonomousAgent
 
 _log = get_logger("api.app")
 
@@ -60,6 +64,21 @@ class ChatRequest(BaseModel):
     fuse: bool = False
     """Route THIS turn through the fusion engine (panel → judge → synthesizer), tool-free — so the
     Fusion screen can show how the answer was composed. Off = the session's normal backend."""
+
+
+class RunRequest(BaseModel):
+    task: str
+    verify: str | None = None
+    """A shell command that judges the run (exit 0 == success); runs in the workspace. None = no
+    executable verifier (the Manager's approval is then the gate)."""
+    workspace: str | None = None
+    """The workspace root to run in. None = the workspace the desktop app was launched with."""
+    max_attempts: int = 3
+
+
+# A builder for the per-run autonomous agent, injectable so the endpoint is testable without a real
+# LLM (a test passes a factory that returns a stubbed-worker agent — see tests/test_api.py).
+SolveAgentFactory = Callable[[RunRequest, Path, EventSink, "Settings"], "AutonomousAgent"]
 
 
 def _require_token() -> Callable[[Request], None]:
@@ -90,6 +109,8 @@ def build_api_app(
     settings: Settings | None = None,
     static_dir: Path | None = None,
     fuse_backend: SupportsComplete | None = None,
+    workspace: Path | None = None,
+    solve_agent_factory: SolveAgentFactory | None = None,
 ) -> FastAPI:
     """Build the desktop API app over a session ``factory`` (the real agent stack).
 
@@ -99,8 +120,15 @@ def build_api_app(
     ``fuse_backend`` is an optional fusion engine used only for turns the client marks ``fuse=True``:
     that turn swaps the session agent's backend for it (under the per-session lock), so the answer is
     composed by panel → judge → synthesizer and the Fusion screen can show the real trace.
+
+    ``workspace`` is where the ``POST /api/runs`` trigger runs a task when the request names none — it
+    defaults to the process cwd (the ``chimera app --workspace`` value is threaded in from the CLI).
+    ``solve_agent_factory`` builds the per-run autonomous agent; it defaults to the real LLM-backed
+    builder and is injectable so the run endpoint is testable without a provider (see tests).
     """
     settings = settings or get_settings()
+    workspace = (workspace or Path.cwd()).expanduser().resolve()
+    solve_factory = solve_agent_factory or _build_solve_agent
     store = SessionStore(settings.home / "sessions")
     manager = SessionManager(factory, store)
     guard = Depends(_require_token())
@@ -138,9 +166,61 @@ def build_api_app(
 
     @app.get("/api/runs", dependencies=[guard], response_model=list[RunReceiptOut])
     def runs_endpoint() -> list[Any]:
-        # Read-only: the last 100 run receipts, most recent first. Persisting happens in the
-        # autonomous loop (CLI solve) — this surface never triggers a run (that's step 3b).
+        # Read-only: the last 100 run receipts, most recent first. Each was persisted by the
+        # autonomous loop (CLI `solve` or the POST trigger below) via its ``run_log``.
         return list(reversed(load_runs(settings.home / "runs.jsonl")))[:100]
+
+    @app.post("/api/runs", dependencies=[guard])
+    async def run_stream(req: RunRequest) -> EventSourceResponse:
+        # In-app trigger for an autonomous run (`chimera solve` semantics), streamed live as SSE.
+        # SAFETY POSTURE: this executes file-writing and (if given) a user-supplied shell verify
+        # command inside ``ws`` — the same capability the chat endpoint's file/shell tools already
+        # have, and the same as running `chimera solve` in a terminal. It stays behind the bearer
+        # guard + the localhost bind, and never runs outside ``ws``. It is the PLAIN solve core
+        # (plan → run → verify-or-revert → receipt); the advanced CLI seams are intentionally omitted.
+        ws = Path(req.workspace).expanduser().resolve() if req.workspace else workspace
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue[tuple[str, Any] | None] = asyncio.Queue()
+
+        def emit(event: str, payload: Any) -> None:
+            loop.call_soon_threadsafe(queue.put_nowait, (event, payload))
+
+        def on_event(event: AgentEvent) -> None:
+            emit("event", _event_dict(event))
+
+        def work() -> None:
+            try:
+                auto = solve_factory(req, ws, on_event, settings)
+                # The receipt persists itself via the agent's run_log at run() — no extra write here.
+                result = auto.run(req.task)
+                emit(
+                    "done",
+                    {
+                        "success": result.success,
+                        "answer": (result.answer or "")[:2000],
+                        "attempts": len(result.attempts),
+                    },
+                )
+            except Exception as exc:  # noqa: BLE001 — surfaced to the client as an error event
+                _log.warning("run failed: %s", exc)
+                emit("error", {"message": "the run failed"})
+            finally:
+                loop.call_soon_threadsafe(queue.put_nowait, None)  # sentinel: end of stream
+
+        # Each run is independent (its own agent + workspace snapshot), so no per-session lock is
+        # needed. A client disconnecting mid-run leaves the worker to finish (an LLM call can't be
+        # cleanly cancelled); the queue is drained-or-dropped, so memory stays bounded per run.
+        threading.Thread(target=work, daemon=True).start()
+
+        async def events() -> AsyncIterator[dict[str, str]]:
+            while True:
+                item = await queue.get()
+                if item is None:
+                    break
+                event, payload = item
+                yield {"event": event, "data": json.dumps(payload)}
+
+        return EventSourceResponse(events())
 
     @app.get("/api/sessions", dependencies=[guard], response_model=list[SessionMetaOut])
     def list_sessions() -> list[dict[str, Any]]:
@@ -264,6 +344,63 @@ def _index_html(index: Path, request: Request) -> Any:
         tag = f'<meta name="chimera-token" content="{escape(token, quote=True)}">'
         html = html.replace("</head>", tag + "</head>", 1)
     return HTMLResponse(html)
+
+
+def _event_dict(event: AgentEvent) -> dict[str, Any]:
+    """Serialize an ``AgentEvent`` into a small JSON dict for the SSE ``event`` frame.
+
+    ``kind`` + ``text`` + the typed extras (attempt index, success flag, …). The ``final`` event's
+    full ``answer`` is dropped here — it can be large and the ``done`` event already carries a
+    truncated copy — so the live progress frames stay compact.
+    """
+    data = {k: v for k, v in event.data.items() if k != "answer"}
+    return {"kind": event.kind, "text": event.text, **data}
+
+
+def _build_solve_agent(
+    req: RunRequest, ws: Path, on_event: EventSink, settings: Settings
+) -> AutonomousAgent:
+    """Build the PLAIN solve-core agent for the desktop trigger: plan → run → verify-or-revert → receipt.
+
+    Deliberately minimal versus the CLI ``solve`` command — none of the advanced seams (cascade,
+    taint ledger, evolution, durable threads, strong-verify, contracts, write-region). It is the
+    honest core loop, the same capability as ``chimera solve TASK --verify CMD`` in a terminal. The
+    worker's file/shell tools write inside ``ws`` and ``CommandVerifier`` runs the verify command
+    there; that side-effecting power is the same the chat endpoint already exposes, gated the same way.
+    """
+    from chimera.core import (
+        Agent,
+        AgentConfig,
+        AutonomousConfig,
+        Manager,
+        Planner,
+        WorkspaceGuard,
+    )
+    from chimera.core import (
+        AutonomousAgent as _AutonomousAgent,
+    )
+    from chimera.core.verify import CommandVerifier
+    from chimera.providers import LLMGateway
+    from chimera.tools import default_registry
+
+    gateway = LLMGateway()
+    registry = default_registry(ws)
+    # insist_on_action: solve is task completion, so a described-but-unexecuted plan is pushed back
+    # to actually run (mirrors the CLI worker config).
+    worker = Agent(gateway, registry, AgentConfig(max_steps=6, insist_on_action=True))
+    return _AutonomousAgent(
+        worker,
+        planner=Planner(gateway),
+        manager=Manager(gateway),
+        verifier=CommandVerifier(req.verify, ws) if req.verify else None,
+        guard=WorkspaceGuard(ws),
+        workspace=ws,
+        spine_workspace=ws,
+        on_event=on_event,
+        # Persist the run receipt (step 3a) to the same append-only log GET /api/runs reads.
+        run_log=settings.home / "runs.jsonl",
+        config=AutonomousConfig(max_attempts=req.max_attempts),
+    )
 
 
 def _append_usage(report: Any, session_id: str, settings: Settings) -> None:

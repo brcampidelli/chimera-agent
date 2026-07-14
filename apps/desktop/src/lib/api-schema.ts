@@ -288,7 +288,8 @@ export interface paths {
         /** Runs Endpoint */
         get: operations["runs_endpoint_api_runs_get"];
         put?: never;
-        post?: never;
+        /** Run Stream */
+        post: operations["run_stream_api_runs_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -647,6 +648,20 @@ export interface components {
             ts: string;
             /** Verify Command */
             verify_command: string | null;
+        };
+        /** RunRequest */
+        RunRequest: {
+            /**
+             * Max Attempts
+             * @default 3
+             */
+            max_attempts: number;
+            /** Task */
+            task: string;
+            /** Verify */
+            verify?: string | null;
+            /** Workspace */
+            workspace?: string | null;
         };
         /** SandboxCfgOut */
         SandboxCfgOut: {
@@ -1356,6 +1371,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunReceiptOut"][];
+                };
+            };
+        };
+    };
+    run_stream_api_runs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

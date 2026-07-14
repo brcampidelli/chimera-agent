@@ -1110,7 +1110,13 @@ def desktop_app(
     _pkg_dist = Path(__file__).resolve().parent.parent / "_desktop_dist"
     dist = _dev_dist if (_dev_dist / "index.html").exists() else _pkg_dist
     static_dir = dist if (dist / "index.html").exists() else None
-    api = build_api_app(factory, settings=settings, static_dir=static_dir, fuse_backend=fuse_backend)
+    api = build_api_app(
+        factory,
+        settings=settings,
+        static_dir=static_dir,
+        fuse_backend=fuse_backend,
+        workspace=workspace_path,
+    )
 
     url = f"http://{host}:{port}"
     ui_note = "" if static_dir is not None else "  [yellow](UI not built — API only; run 'pnpm --dir apps/desktop build')[/yellow]"

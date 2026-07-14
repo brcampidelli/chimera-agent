@@ -153,3 +153,94 @@ function dispatch(frame: string, h: StreamHandlers): void {
   else if (event === "done") h.onDone?.(payload as unknown as TurnReport);
   else if (event === "error") h.onError?.(payload.message as string);
 }
+
+// --- Runs (in-app autonomous run trigger, streamed) ---
+
+export interface RunRequestInput {
+  task: string;
+  verify?: string | null;
+  workspace?: string | null;
+  max_attempts?: number;
+}
+
+/** One live progress frame from the run loop (an AgentEvent, serialized). `kind` picks the shape. */
+export interface RunEvent {
+  kind: string;
+  text: string;
+  index?: number;
+  max_attempts?: number;
+  success?: boolean;
+  detail?: string;
+}
+
+/** The terminal `done` payload of a run. */
+export interface RunDone {
+  success: boolean;
+  answer: string;
+  attempts: number;
+}
+
+export interface RunStreamHandlers {
+  onEvent?: (e: RunEvent) => void;
+  onDone?: (d: RunDone) => void;
+  onError?: (msg: string) => void;
+}
+
+/** Trigger an autonomous run and stream its live progress. Mirrors {@link streamChat}: the API's SSE
+ *  lives on a POST, so we read the response body ourselves and parse `event`/`done`/`error` frames.
+ *  This WRITES files and runs the verify command in the workspace (same as `chimera solve`). */
+export async function streamRun(
+  req: RunRequestInput,
+  handlers: RunStreamHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch("/api/runs", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(req),
+      signal,
+    });
+  } catch (err) {
+    handlers.onError?.(err instanceof Error ? err.message : "network error");
+    return;
+  }
+  if (!res.ok || !res.body) {
+    handlers.onError?.(`HTTP ${res.status}`);
+    return;
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
+    let sep: number;
+    while ((sep = buffer.indexOf("\n\n")) !== -1) {
+      dispatchRun(buffer.slice(0, sep), handlers);
+      buffer = buffer.slice(sep + 2);
+    }
+  }
+  if (buffer.trim()) dispatchRun(buffer, handlers);
+}
+
+function dispatchRun(frame: string, h: RunStreamHandlers): void {
+  let event = "message";
+  let data = "";
+  for (const line of frame.split("\n")) {
+    if (line.startsWith("event:")) event = line.slice(6).trim();
+    else if (line.startsWith("data:")) data += line.slice(5).trim();
+  }
+  if (!data) return;
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse(data);
+  } catch {
+    return;
+  }
+  if (event === "event") h.onEvent?.(payload as unknown as RunEvent);
+  else if (event === "done") h.onDone?.(payload as unknown as RunDone);
+  else if (event === "error") h.onError?.(payload.message as string);
+}
