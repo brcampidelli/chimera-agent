@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-07-14
+
 ### Added
 - **MCP / Integrations: configure MCP servers (persisted to `.chimera/mcp.json` via `chimera mcp
   add/list/remove/test` or the app), live-test them, and opt into loading their tools
