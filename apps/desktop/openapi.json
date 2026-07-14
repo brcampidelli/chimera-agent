@@ -485,6 +485,141 @@
         "title": "InjectionReportOut",
         "type": "object"
       },
+      "MaturityOut": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "generated_for": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generated For"
+          },
+          "level": {
+            "title": "Level",
+            "type": "string"
+          },
+          "proven": {
+            "title": "Proven",
+            "type": "integer"
+          },
+          "ratio": {
+            "title": "Ratio",
+            "type": "number"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "surfaces": {
+            "items": {
+              "$ref": "#/components/schemas/MaturitySurfaceOut"
+            },
+            "title": "Surfaces",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "weakest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MaturityWeakestOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "available",
+          "source",
+          "proven",
+          "total",
+          "ratio",
+          "level",
+          "surfaces",
+          "weakest",
+          "generated_for"
+        ],
+        "title": "MaturityOut",
+        "type": "object"
+      },
+      "MaturitySurfaceOut": {
+        "properties": {
+          "level": {
+            "title": "Level",
+            "type": "string"
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "proven": {
+            "title": "Proven",
+            "type": "integer"
+          },
+          "ratio": {
+            "title": "Ratio",
+            "type": "number"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "proven",
+          "total",
+          "ratio",
+          "level",
+          "missing"
+        ],
+        "title": "MaturitySurfaceOut",
+        "type": "object"
+      },
+      "MaturityWeakestOut": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ratio": {
+            "title": "Ratio",
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "ratio"
+        ],
+        "title": "MaturityWeakestOut",
+        "type": "object"
+      },
       "MemoryAdd": {
         "properties": {
           "content": {
@@ -1900,6 +2035,24 @@
           }
         },
         "summary": "Get Kanban"
+      }
+    },
+    "/api/maturity": {
+      "get": {
+        "operationId": "maturity_endpoint_api_maturity_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaturityOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Maturity Endpoint"
       }
     },
     "/api/memory": {

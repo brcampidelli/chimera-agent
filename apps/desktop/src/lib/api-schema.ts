@@ -192,6 +192,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/maturity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Maturity Endpoint */
+        get: operations["maturity_endpoint_api_maturity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/memory": {
         parameters: {
             query?: never;
@@ -647,6 +664,48 @@ export interface components {
             undefended_asr: number;
             /** Undefended Block Rate */
             undefended_block_rate: number;
+        };
+        /** MaturityOut */
+        MaturityOut: {
+            /** Available */
+            available: boolean;
+            /** Generated For */
+            generated_for: string | null;
+            /** Level */
+            level: string;
+            /** Proven */
+            proven: number;
+            /** Ratio */
+            ratio: number;
+            /** Source */
+            source: string | null;
+            /** Surfaces */
+            surfaces: components["schemas"]["MaturitySurfaceOut"][];
+            /** Total */
+            total: number;
+            weakest: components["schemas"]["MaturityWeakestOut"] | null;
+        };
+        /** MaturitySurfaceOut */
+        MaturitySurfaceOut: {
+            /** Level */
+            level: string;
+            /** Missing */
+            missing: string[];
+            /** Name */
+            name: string;
+            /** Proven */
+            proven: number;
+            /** Ratio */
+            ratio: number;
+            /** Total */
+            total: number;
+        };
+        /** MaturityWeakestOut */
+        MaturityWeakestOut: {
+            /** Name */
+            name: string;
+            /** Ratio */
+            ratio: number;
         };
         /** MemoryAdd */
         MemoryAdd: {
@@ -1336,6 +1395,26 @@ export interface operations {
                     "application/json": {
                         [key: string]: components["schemas"]["TaskCardOut"][];
                     };
+                };
+            };
+        };
+    };
+    maturity_endpoint_api_maturity_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaturityOut"];
                 };
             };
         };

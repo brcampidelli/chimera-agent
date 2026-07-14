@@ -224,6 +224,21 @@ const en: Dict = {
   "governance.audit.title": "Audit log",
   "governance.audit.empty":
     "No audit events yet. The desktop chat isn't governed by default — `chimera run --guard` or `solve --guard/--taint` write governance decisions to `.chimera/audit.jsonl`.",
+  "nav.maturity": "Maturity",
+  "maturity.title": "Maturity",
+  "maturity.overall": "Overall",
+  "maturity.proven": "Coverage-IDs proven",
+  "maturity.level": "Level",
+  "maturity.coverage": "Coverage",
+  "maturity.bySurface": "By surface",
+  "maturity.missing": "missing:",
+  "maturity.weakest": "weakest",
+  "maturity.snapshotNote":
+    "Coverage snapshot shipped with this release (as of {version}). Run from a source checkout for a live read.",
+  "maturity.unavailable":
+    "Maturity is measured against the source test suite (present in a source checkout or CI). It isn't available in this build.",
+  "maturity.coverageNote":
+    "Coverage = a test with that stem exists (evidence presence), not that it passes; performance benchmarks are not shown.",
 };
 
 const pt: Dict = {
@@ -425,6 +440,21 @@ const pt: Dict = {
   "governance.audit.title": "Registro de auditoria",
   "governance.audit.empty":
     "Nenhum evento de auditoria ainda. O chat do desktop não é governado por padrão — `chimera run --guard` ou `solve --guard/--taint` gravam as decisões de governança em `.chimera/audit.jsonl`.",
+  "nav.maturity": "Maturidade",
+  "maturity.title": "Maturidade",
+  "maturity.overall": "Geral",
+  "maturity.proven": "Coverage-IDs comprovados",
+  "maturity.level": "Nível",
+  "maturity.coverage": "Cobertura",
+  "maturity.bySurface": "Por superfície",
+  "maturity.missing": "faltando:",
+  "maturity.weakest": "mais fraca",
+  "maturity.snapshotNote":
+    "Instantâneo de cobertura publicado com esta versão (referente a {version}). Rode a partir de um checkout do código-fonte para uma leitura ao vivo.",
+  "maturity.unavailable":
+    "A maturidade é medida contra a suíte de testes do código-fonte (presente em um checkout ou na CI). Não está disponível nesta build.",
+  "maturity.coverageNote":
+    "Cobertura = existe um teste com aquele nome (presença de evidência), não que ele passe; benchmarks de desempenho não são exibidos.",
 };
 
 const es: Dict = {
@@ -626,6 +656,21 @@ const es: Dict = {
   "governance.audit.title": "Registro de auditoría",
   "governance.audit.empty":
     "Aún no hay eventos de auditoría. El chat de escritorio no está gobernado por defecto — `chimera run --guard` o `solve --guard/--taint` escriben las decisiones de gobernanza en `.chimera/audit.jsonl`.",
+  "nav.maturity": "Madurez",
+  "maturity.title": "Madurez",
+  "maturity.overall": "General",
+  "maturity.proven": "Coverage-IDs comprobados",
+  "maturity.level": "Nivel",
+  "maturity.coverage": "Cobertura",
+  "maturity.bySurface": "Por superficie",
+  "maturity.missing": "faltan:",
+  "maturity.weakest": "más débil",
+  "maturity.snapshotNote":
+    "Instantánea de cobertura incluida en esta versión (a fecha de {version}). Ejecuta desde un checkout del código fuente para una lectura en vivo.",
+  "maturity.unavailable":
+    "La madurez se mide contra la suite de pruebas del código fuente (presente en un checkout o en CI). No está disponible en esta build.",
+  "maturity.coverageNote":
+    "Cobertura = existe una prueba con ese nombre (presencia de evidencia), no que pase; no se muestran benchmarks de rendimiento.",
 };
 
 const fr: Dict = {
@@ -827,6 +872,21 @@ const fr: Dict = {
   "governance.audit.title": "Journal d'audit",
   "governance.audit.empty":
     "Aucun événement d'audit pour l'instant. Le chat de bureau n'est pas gouverné par défaut — `chimera run --guard` ou `solve --guard/--taint` écrivent les décisions de gouvernance dans `.chimera/audit.jsonl`.",
+  "nav.maturity": "Maturité",
+  "maturity.title": "Maturité",
+  "maturity.overall": "Global",
+  "maturity.proven": "Coverage-IDs prouvés",
+  "maturity.level": "Niveau",
+  "maturity.coverage": "Couverture",
+  "maturity.bySurface": "Par surface",
+  "maturity.missing": "manquant :",
+  "maturity.weakest": "la plus faible",
+  "maturity.snapshotNote":
+    "Instantané de couverture livré avec cette version (à la date de {version}). Lancez depuis un checkout du code source pour une lecture en direct.",
+  "maturity.unavailable":
+    "La maturité est mesurée par rapport à la suite de tests du code source (présente dans un checkout ou en CI). Elle n'est pas disponible dans cette build.",
+  "maturity.coverageNote":
+    "Couverture = un test portant ce nom existe (présence de preuve), pas qu'il réussit ; les benchmarks de performance ne sont pas affichés.",
 };
 
 const de: Dict = {
@@ -1028,6 +1088,21 @@ const de: Dict = {
   "governance.audit.title": "Audit-Protokoll",
   "governance.audit.empty":
     "Noch keine Audit-Ereignisse. Der Desktop-Chat wird standardmäßig nicht überwacht — `chimera run --guard` oder `solve --guard/--taint` schreiben Governance-Entscheidungen nach `.chimera/audit.jsonl`.",
+  "nav.maturity": "Reife",
+  "maturity.title": "Reife",
+  "maturity.overall": "Gesamt",
+  "maturity.proven": "Nachgewiesene Coverage-IDs",
+  "maturity.level": "Stufe",
+  "maturity.coverage": "Abdeckung",
+  "maturity.bySurface": "Nach Bereich",
+  "maturity.missing": "fehlend:",
+  "maturity.weakest": "schwächste",
+  "maturity.snapshotNote":
+    "Mit dieser Version ausgelieferter Abdeckungs-Snapshot (Stand {version}). Für eine Live-Auswertung aus einem Quellcode-Checkout starten.",
+  "maturity.unavailable":
+    "Die Reife wird gegen die Quellcode-Testsuite gemessen (in einem Checkout oder in CI vorhanden). In diesem Build ist sie nicht verfügbar.",
+  "maturity.coverageNote":
+    "Abdeckung = ein Test mit diesem Namen existiert (Nachweis vorhanden), nicht dass er besteht; Performance-Benchmarks werden nicht angezeigt.",
 };
 
 const zh: Dict = {
@@ -1228,6 +1303,21 @@ const zh: Dict = {
   "governance.audit.title": "审计日志",
   "governance.audit.empty":
     "还没有审计事件。桌面聊天默认不受治理——`chimera run --guard` 或 `solve --guard/--taint` 会将治理决策写入 `.chimera/audit.jsonl`。",
+  "nav.maturity": "成熟度",
+  "maturity.title": "成熟度",
+  "maturity.overall": "总体",
+  "maturity.proven": "已验证的覆盖项",
+  "maturity.level": "等级",
+  "maturity.coverage": "覆盖率",
+  "maturity.bySurface": "按领域",
+  "maturity.missing": "缺少：",
+  "maturity.weakest": "最薄弱",
+  "maturity.snapshotNote":
+    "随本版本发布的覆盖率快照（截至 {version}）。从源码检出运行可获得实时读数。",
+  "maturity.unavailable":
+    "成熟度是针对源码测试套件衡量的（存在于源码检出或 CI 中）。此构建中不可用。",
+  "maturity.coverageNote":
+    "覆盖 = 存在一个以该词干命名的测试（证据存在），并不代表它通过；不展示性能基准。",
 };
 
 const ja: Dict = {
@@ -1428,6 +1518,21 @@ const ja: Dict = {
   "governance.audit.title": "監査ログ",
   "governance.audit.empty":
     "監査イベントはまだありません。デスクトップのチャットは既定ではガバナンス対象外です——`chimera run --guard` または `solve --guard/--taint` がガバナンスの判断を `.chimera/audit.jsonl` に記録します。",
+  "nav.maturity": "成熟度",
+  "maturity.title": "成熟度",
+  "maturity.overall": "全体",
+  "maturity.proven": "実証済みのカバレッジID",
+  "maturity.level": "レベル",
+  "maturity.coverage": "カバレッジ",
+  "maturity.bySurface": "領域別",
+  "maturity.missing": "不足：",
+  "maturity.weakest": "最も弱い",
+  "maturity.snapshotNote":
+    "本リリースに同梱されたカバレッジのスナップショット（{version} 時点）。ライブ読み取りにはソースチェックアウトから実行してください。",
+  "maturity.unavailable":
+    "成熟度はソースのテストスイート（ソースチェックアウトや CI に存在）に対して測定されます。このビルドでは利用できません。",
+  "maturity.coverageNote":
+    "カバレッジ = その名前のテストが存在すること（証拠の有無）であり、合格を意味しません。性能ベンチマークは表示されません。",
 };
 
 const DICTS: Record<Lang, Dict> = { en, pt, es, fr, de, zh, ja };

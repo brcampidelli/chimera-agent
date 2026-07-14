@@ -27,6 +27,8 @@ export type InjectionReport = Schemas["InjectionReportOut"];
 export type GovernanceAudit = Schemas["GovernanceAuditOut"];
 export type ToolInfo = Schemas["ToolInfoOut"];
 export type Tools = Schemas["ToolsOut"];
+export type Maturity = Schemas["MaturityOut"];
+export type MaturitySurface = Schemas["MaturitySurfaceOut"];
 
 // --- SSE event payloads + UI-only types (not in the OpenAPI schema) ---
 

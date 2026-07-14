@@ -10,6 +10,7 @@ import {
   ListChecks,
   Wrench,
   Shield,
+  Gauge,
   Settings as SettingsIcon,
   Moon,
   Sun,
@@ -29,6 +30,7 @@ export type View =
   | "runs"
   | "tools"
   | "governance"
+  | "maturity"
   | "settings";
 
 const NAV: { view: View; labelKey: string; icon: ComponentType<{ className?: string }> }[] = [
@@ -42,6 +44,7 @@ const NAV: { view: View; labelKey: string; icon: ComponentType<{ className?: str
   { view: "runs", labelKey: "nav.runs", icon: ListChecks },
   { view: "tools", labelKey: "nav.tools", icon: Wrench },
   { view: "governance", labelKey: "nav.governance", icon: Shield },
+  { view: "maturity", labelKey: "nav.maturity", icon: Gauge },
 ];
 
 function RailButton({

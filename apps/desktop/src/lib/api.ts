@@ -4,6 +4,7 @@ import type {
   DoctorInfo,
   GovernanceAudit,
   InjectionReport,
+  Maturity,
   MemoryItem,
   MemoryLayers,
   ProjectState,
@@ -49,6 +50,7 @@ export const getGovernanceInjection = () =>
   json<InjectionReport>("/api/governance/injection");
 export const getGovernanceAudit = () => json<GovernanceAudit>("/api/governance/audit");
 export const getTools = () => json<Tools>("/api/tools");
+export const getMaturity = () => json<Maturity>("/api/maturity");
 export const patchConfig = (updates: Record<string, string>) =>
   json<{ updated: string[] }>("/api/config", { method: "PATCH", body: JSON.stringify(updates) });
 

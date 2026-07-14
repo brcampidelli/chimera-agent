@@ -30,6 +30,7 @@ from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
 from chimera.api.governance import read_audit, run_injection_suite
+from chimera.api.maturity_api import maturity_report
 from chimera.api.runs import load_runs
 from chimera.api.schemas import (
     ConfigOut,
@@ -38,6 +39,7 @@ from chimera.api.schemas import (
     GovernanceAuditOut,
     HealthOut,
     InjectionReportOut,
+    MaturityOut,
     NewSessionOut,
     RunReceiptOut,
     SessionDetailOut,
@@ -198,6 +200,13 @@ def build_api_app(
         # The desktop chat doesn't write it, so an empty log is the honest, expected state.
         events = [_audit_event(e) for e in read_audit(settings.home / "audit.jsonl")]
         return {"events": events, "count": len(events), "populated": bool(events)}
+
+    @app.get("/api/maturity", dependencies=[guard], response_model=MaturityOut)
+    def maturity_endpoint() -> dict[str, Any]:
+        # Cheap + keyless: the agent's coverage scorecard by surface — a pure filesystem glob of the
+        # test suite (live), or the snapshot shipped with the release (pip installs have no tests dir).
+        # No LLM, no network, no side effects. Coverage = evidence presence, not correctness.
+        return maturity_report()
 
     @app.post("/api/runs", dependencies=[guard])
     async def run_stream(req: RunRequest) -> EventSourceResponse:

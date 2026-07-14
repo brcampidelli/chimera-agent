@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 - **Tools screen: lists the agent's registered tools with capability tags (network/read/write/exec/side-effect).**
+- **Maturity screen: the agent's coverage scorecard by surface (live from the test suite, or a shipped snapshot), with the weakest surface highlighted.**
 
 ## [0.24.0] - 2026-07-14
 

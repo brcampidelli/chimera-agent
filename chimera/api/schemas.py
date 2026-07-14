@@ -362,3 +362,32 @@ class ToolInfoOut(BaseModel):
 class ToolsOut(BaseModel):
     tools: list[ToolInfoOut]
     count: int
+
+
+# --- maturity (self-eval coverage scorecard by surface) -------------------------------------------
+
+
+class MaturitySurfaceOut(BaseModel):
+    name: str  # the surface (fusion, evolution, governance, memory, benchmarks, resilience, interop)
+    proven: int  # coverage-IDs whose evidence test-file exists (presence, NOT that it passes)
+    total: int  # coverage-IDs that constitute the surface
+    ratio: float  # proven/total, 0..1
+    level: str  # GA (>=0.9) / Beta (>=0.5) / Alpha — the maturity band
+    missing: list[str]  # coverage-IDs with no evidence test-file yet (the honest gap)
+
+
+class MaturityWeakestOut(BaseModel):
+    name: str  # the surface with the lowest coverage — the evolution loop's next objective
+    ratio: float
+
+
+class MaturityOut(BaseModel):
+    available: bool  # False when neither a live test suite nor the shipped snapshot could be read
+    source: str | None  # "live" (globbed the real tests dir) | "snapshot" (shipped fallback) | null
+    proven: int  # overall coverage-IDs proven across all surfaces
+    total: int
+    ratio: float
+    level: str
+    surfaces: list[MaturitySurfaceOut]
+    weakest: MaturityWeakestOut | None  # null when every surface is fully proven
+    generated_for: str | None  # the chimera version a snapshot was generated for (null when unavailable)
