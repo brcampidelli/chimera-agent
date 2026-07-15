@@ -304,6 +304,17 @@ const en: Dict = {
     "Maturity is measured against the source test suite (present in a source checkout or CI). It isn't available in this build.",
   "maturity.coverageNote":
     "Coverage = a test with that stem exists (evidence presence), not that it passes; performance benchmarks are not shown.",
+  "maturity.bench.title": "Benchmarks (honest)",
+  "maturity.bench.weakLift": "Weak model + Chimera vs the weak model alone",
+  "maturity.bench.external": "External benchmarks",
+  "maturity.bench.suite": "Suite",
+  "maturity.bench.n": "n",
+  "maturity.bench.ci": "95% CI",
+  "maturity.bench.notSignificant": "not statistically significant",
+  "maturity.bench.significant": "significant",
+  "maturity.bench.humbleNote":
+    "We publish the humbling external number alongside the promising internal one. Neither is yet statistically significant; we don't re-roll for significance (that would be p-hacking).",
+  "maturity.bench.empty": "No benchmark snapshot shipped with this build.",
   "onboarding.title": "Welcome to Chimera",
   "onboarding.intro":
     "Chimera needs one provider key to start — a single OpenRouter key unlocks 100+ models.",
@@ -623,6 +634,17 @@ const pt: Dict = {
     "A maturidade é medida contra a suíte de testes do código-fonte (presente em um checkout ou na CI). Não está disponível nesta build.",
   "maturity.coverageNote":
     "Cobertura = existe um teste com aquele nome (presença de evidência), não que ele passe; benchmarks de desempenho não são exibidos.",
+  "maturity.bench.title": "Benchmarks (honestos)",
+  "maturity.bench.weakLift": "Modelo fraco + Chimera vs o modelo fraco sozinho",
+  "maturity.bench.external": "Benchmarks externos",
+  "maturity.bench.suite": "Suíte",
+  "maturity.bench.n": "n",
+  "maturity.bench.ci": "IC 95%",
+  "maturity.bench.notSignificant": "não estatisticamente significativo",
+  "maturity.bench.significant": "significativo",
+  "maturity.bench.humbleNote":
+    "Publicamos o número externo humilhante ao lado do interno promissor. Nenhum é ainda estatisticamente significativo; não repetimos o teste para buscar significância (isso seria p-hacking).",
+  "maturity.bench.empty": "Nenhum snapshot de benchmark publicado nesta build.",
   "onboarding.title": "Bem-vindo ao Chimera",
   "onboarding.intro":
     "O Chimera precisa de uma chave de provedor para começar — uma única chave OpenRouter libera mais de 100 modelos.",
@@ -942,6 +964,17 @@ const es: Dict = {
     "La madurez se mide contra la suite de pruebas del código fuente (presente en un checkout o en CI). No está disponible en esta build.",
   "maturity.coverageNote":
     "Cobertura = existe una prueba con ese nombre (presencia de evidencia), no que pase; no se muestran benchmarks de rendimiento.",
+  "maturity.bench.title": "Benchmarks (honestos)",
+  "maturity.bench.weakLift": "Modelo débil + Chimera vs el modelo débil solo",
+  "maturity.bench.external": "Benchmarks externos",
+  "maturity.bench.suite": "Suite",
+  "maturity.bench.n": "n",
+  "maturity.bench.ci": "IC 95%",
+  "maturity.bench.notSignificant": "no estadísticamente significativo",
+  "maturity.bench.significant": "significativo",
+  "maturity.bench.humbleNote":
+    "Publicamos el número externo humillante junto al interno prometedor. Ninguno es aún estadísticamente significativo; no repetimos la prueba para buscar significancia (eso sería p-hacking).",
+  "maturity.bench.empty": "No se incluyó ningún snapshot de benchmark en esta build.",
   "onboarding.title": "Bienvenido a Chimera",
   "onboarding.intro":
     "Chimera necesita una clave de proveedor para empezar — una sola clave de OpenRouter desbloquea más de 100 modelos.",
@@ -1261,6 +1294,17 @@ const fr: Dict = {
     "La maturité est mesurée par rapport à la suite de tests du code source (présente dans un checkout ou en CI). Elle n'est pas disponible dans cette build.",
   "maturity.coverageNote":
     "Couverture = un test portant ce nom existe (présence de preuve), pas qu'il réussit ; les benchmarks de performance ne sont pas affichés.",
+  "maturity.bench.title": "Benchmarks (honnêtes)",
+  "maturity.bench.weakLift": "Modèle faible + Chimera vs le modèle faible seul",
+  "maturity.bench.external": "Benchmarks externes",
+  "maturity.bench.suite": "Suite",
+  "maturity.bench.n": "n",
+  "maturity.bench.ci": "IC 95 %",
+  "maturity.bench.notSignificant": "non statistiquement significatif",
+  "maturity.bench.significant": "significatif",
+  "maturity.bench.humbleNote":
+    "Nous publions le chiffre externe humiliant à côté du chiffre interne prometteur. Aucun n'est encore statistiquement significatif ; nous ne relançons pas le test pour chercher la significativité (ce serait du p-hacking).",
+  "maturity.bench.empty": "Aucun instantané de benchmark n'est fourni avec ce build.",
   "onboarding.title": "Bienvenue sur Chimera",
   "onboarding.intro":
     "Chimera a besoin d'une clé de fournisseur pour démarrer — une seule clé OpenRouter débloque plus de 100 modèles.",
@@ -1580,6 +1624,17 @@ const de: Dict = {
     "Die Reife wird gegen die Quellcode-Testsuite gemessen (in einem Checkout oder in CI vorhanden). In diesem Build ist sie nicht verfügbar.",
   "maturity.coverageNote":
     "Abdeckung = ein Test mit diesem Namen existiert (Nachweis vorhanden), nicht dass er besteht; Performance-Benchmarks werden nicht angezeigt.",
+  "maturity.bench.title": "Benchmarks (ehrlich)",
+  "maturity.bench.weakLift": "Schwaches Modell + Chimera vs. das schwache Modell allein",
+  "maturity.bench.external": "Externe Benchmarks",
+  "maturity.bench.suite": "Suite",
+  "maturity.bench.n": "n",
+  "maturity.bench.ci": "95 % KI",
+  "maturity.bench.notSignificant": "statistisch nicht signifikant",
+  "maturity.bench.significant": "signifikant",
+  "maturity.bench.humbleNote":
+    "Wir veröffentlichen die ernüchternde externe Zahl neben der vielversprechenden internen. Keine ist bislang statistisch signifikant; wir wiederholen den Test nicht, um Signifikanz zu erzwingen (das wäre p-Hacking).",
+  "maturity.bench.empty": "Mit diesem Build wurde kein Benchmark-Snapshot ausgeliefert.",
   "onboarding.title": "Willkommen bei Chimera",
   "onboarding.intro":
     "Chimera braucht einen Anbieter-Schlüssel zum Start — ein einziger OpenRouter-Schlüssel schaltet über 100 Modelle frei.",
@@ -1898,6 +1953,17 @@ const zh: Dict = {
     "成熟度是针对源码测试套件衡量的（存在于源码检出或 CI 中）。此构建中不可用。",
   "maturity.coverageNote":
     "覆盖 = 存在一个以该词干命名的测试（证据存在），并不代表它通过；不展示性能基准。",
+  "maturity.bench.title": "基准测试（诚实）",
+  "maturity.bench.weakLift": "弱模型 + Chimera 对比单独的弱模型",
+  "maturity.bench.external": "外部基准",
+  "maturity.bench.suite": "测试套件",
+  "maturity.bench.n": "n",
+  "maturity.bench.ci": "95% 置信区间",
+  "maturity.bench.notSignificant": "统计上不显著",
+  "maturity.bench.significant": "显著",
+  "maturity.bench.humbleNote":
+    "我们把令人汗颜的外部数字与令人振奋的内部数字一并公布。两者目前都还不具备统计显著性；我们不会为了追求显著性而重跑测试（那就是 p-hacking）。",
+  "maturity.bench.empty": "此版本未附带任何基准快照。",
   "onboarding.title": "欢迎使用 Chimera",
   "onboarding.intro":
     "Chimera 需要一个提供商密钥才能开始 —— 一个 OpenRouter 密钥即可解锁 100+ 模型。",
@@ -2216,6 +2282,17 @@ const ja: Dict = {
     "成熟度はソースのテストスイート（ソースチェックアウトや CI に存在）に対して測定されます。このビルドでは利用できません。",
   "maturity.coverageNote":
     "カバレッジ = その名前のテストが存在すること（証拠の有無）であり、合格を意味しません。性能ベンチマークは表示されません。",
+  "maturity.bench.title": "ベンチマーク（正直に）",
+  "maturity.bench.weakLift": "弱いモデル + Chimera 対 弱いモデル単体",
+  "maturity.bench.external": "外部ベンチマーク",
+  "maturity.bench.suite": "スイート",
+  "maturity.bench.n": "n",
+  "maturity.bench.ci": "95% 信頼区間",
+  "maturity.bench.notSignificant": "統計的に有意でない",
+  "maturity.bench.significant": "有意",
+  "maturity.bench.humbleNote":
+    "見栄えの悪い外部の数値も、有望な内部の数値と並べて公開します。どちらもまだ統計的に有意ではありません。有意性を得るために再実行はしません（それは p-hacking です）。",
+  "maturity.bench.empty": "このビルドにはベンチマークのスナップショットが含まれていません。",
   "onboarding.title": "Chimera へようこそ",
   "onboarding.intro":
     "Chimera を始めるにはプロバイダーのキーが 1 つ必要です —— OpenRouter のキー 1 つで 100 以上のモデルが使えます。",

@@ -62,6 +62,25 @@ reverse-engineering study of five leaders (OpenClaw, Hermes, nanobot, CrewAI, La
 
 **In one line: the governed, self-evolving agent — proved and governed.** It's alpha, and it says so.
 
+## Benchmarks (honest)
+
+Two recorded numbers, both true, published together on purpose — one promising, one humbling, neither
+yet statistically significant. (Also surfaced in the desktop app's **Maturity & Benchmarks** screen,
+straight from the shipped snapshot.)
+
+- **Weak-model lift (promising).** A cheap model (`mistral-small-3.2-24b`) + Chimera's retry loop vs
+  the same model alone: **16.7% → 66.7% (+50pp)**, but **n=6, 95% CI [−6.1%, +50%] — not statistically
+  significant** (the CI includes 0). Internal Docker-free suite (`local_lift`), pytest-graded — **NOT**
+  SWE-bench/Terminal-Bench. Source: [`bench/local_lift/results/paired.json`](bench/local_lift/results/paired.json).
+- **Terminal-Bench (humbling).** Pre-registered N=40 A/B on the official benchmark, same model both
+  arms (`deepseek-chat-v3.1`): **7.5% → 2.5%** with the scaffold, paired **Δ −5.0pp, 95% CI [−5.0%,
+  +1.6%] — not significant**. The scaffold **did not lift an already-competent model** (this isn't the
+  weak "goldilocks" regime where scaffolding helps); both arms sit at a variance-dominated floor.
+  Source: [`bench/terminal_bench/RESULTS.md`](bench/terminal_bench/RESULTS.md).
+
+Promising-but-not-yet-significant internally; humbling externally. We publish both and don't re-roll
+for significance — that would be p-hacking.
+
 ## Token economy — measured, not claimed
 
 Two "more models = better" instincts, stress-tested on real runs (predictions registered

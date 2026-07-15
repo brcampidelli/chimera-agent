@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Benchmarks in the app + README: the honest weak-model lift (internal suite, not-yet-significant) and
+  the external Terminal-Bench number, with n/CI/significance shown — no cherry-picking.
+
 ## [0.27.0] - 2026-07-14
 
 ### Added

@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/api/benchmarks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Benchmarks Endpoint */
+        get: operations["benchmarks_endpoint_api_benchmarks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/chat/stream": {
         parameters: {
             query?: never;
@@ -715,6 +732,62 @@ export interface components {
             summary: string;
             /** Type */
             type: string;
+        };
+        /** BenchmarkExternalOut */
+        BenchmarkExternalOut: {
+            /** Baseline Rate */
+            baseline_rate: number;
+            /** Benchmark */
+            benchmark: string;
+            /** Ci */
+            ci: number[];
+            /** Delta */
+            delta: number;
+            /** Model */
+            model: string;
+            /** N */
+            n: number;
+            /** Note */
+            note: string;
+            /** Significant */
+            significant: boolean;
+            /** Source */
+            source: string;
+            /** Treatment Rate */
+            treatment_rate: number;
+        };
+        /** BenchmarkLiftOut */
+        BenchmarkLiftOut: {
+            /** Baseline Rate */
+            baseline_rate: number;
+            /** Ci */
+            ci: number[];
+            /** Delta */
+            delta: number;
+            /** Model */
+            model: string;
+            /** N */
+            n: number;
+            /** Note */
+            note: string;
+            /** Significant */
+            significant: boolean;
+            /** Source */
+            source: string;
+            /** Suite */
+            suite: string;
+            /** Treatment Rate */
+            treatment_rate: number;
+        };
+        /** BenchmarksOut */
+        BenchmarksOut: {
+            /** Available */
+            available: boolean;
+            /** External */
+            external: components["schemas"]["BenchmarkExternalOut"][];
+            /** Generated For */
+            generated_for: string | null;
+            internal_lift: components["schemas"]["BenchmarkLiftOut"] | null;
         };
         /** CacheCfgOut */
         CacheCfgOut: {
@@ -1498,6 +1571,26 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    benchmarks_endpoint_api_benchmarks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BenchmarksOut"];
+                };
+            };
+        };
+    };
     chat_stream_api_chat_stream_post: {
         parameters: {
             query?: never;

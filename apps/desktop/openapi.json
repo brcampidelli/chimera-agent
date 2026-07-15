@@ -105,6 +105,172 @@
         "title": "AuditEventOut",
         "type": "object"
       },
+      "BenchmarkExternalOut": {
+        "properties": {
+          "baseline_rate": {
+            "title": "Baseline Rate",
+            "type": "number"
+          },
+          "benchmark": {
+            "title": "Benchmark",
+            "type": "string"
+          },
+          "ci": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Ci",
+            "type": "array"
+          },
+          "delta": {
+            "title": "Delta",
+            "type": "number"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "significant": {
+            "title": "Significant",
+            "type": "boolean"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "treatment_rate": {
+            "title": "Treatment Rate",
+            "type": "number"
+          }
+        },
+        "required": [
+          "benchmark",
+          "model",
+          "n",
+          "baseline_rate",
+          "treatment_rate",
+          "delta",
+          "ci",
+          "significant",
+          "source",
+          "note"
+        ],
+        "title": "BenchmarkExternalOut",
+        "type": "object"
+      },
+      "BenchmarkLiftOut": {
+        "properties": {
+          "baseline_rate": {
+            "title": "Baseline Rate",
+            "type": "number"
+          },
+          "ci": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Ci",
+            "type": "array"
+          },
+          "delta": {
+            "title": "Delta",
+            "type": "number"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "significant": {
+            "title": "Significant",
+            "type": "boolean"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "suite": {
+            "title": "Suite",
+            "type": "string"
+          },
+          "treatment_rate": {
+            "title": "Treatment Rate",
+            "type": "number"
+          }
+        },
+        "required": [
+          "suite",
+          "model",
+          "n",
+          "baseline_rate",
+          "treatment_rate",
+          "delta",
+          "ci",
+          "significant",
+          "source",
+          "note"
+        ],
+        "title": "BenchmarkLiftOut",
+        "type": "object"
+      },
+      "BenchmarksOut": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "external": {
+            "items": {
+              "$ref": "#/components/schemas/BenchmarkExternalOut"
+            },
+            "title": "External",
+            "type": "array"
+          },
+          "generated_for": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generated For"
+          },
+          "internal_lift": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BenchmarkLiftOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "available",
+          "internal_lift",
+          "external",
+          "generated_for"
+        ],
+        "title": "BenchmarksOut",
+        "type": "object"
+      },
       "CacheCfgOut": {
         "properties": {
           "completion": {
@@ -2309,6 +2475,24 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/benchmarks": {
+      "get": {
+        "operationId": "benchmarks_endpoint_api_benchmarks_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BenchmarksOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Benchmarks Endpoint"
+      }
+    },
     "/api/chat/stream": {
       "post": {
         "operationId": "chat_stream_api_chat_stream_post",

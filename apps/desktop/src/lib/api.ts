@@ -10,6 +10,7 @@ import type {
   GitDiff,
   GitRevertResult,
   GitStatus,
+  Benchmarks,
   GovernanceAudit,
   InjectionReport,
   Maturity,
@@ -111,6 +112,10 @@ export const gitRevert = (workspace: string | null | undefined, paths: string[])
   });
 
 export const getMaturity = () => json<Maturity>("/api/maturity");
+// The agent's REAL recorded benchmark numbers (the promising weak-model lift + the humbling external
+// Terminal-Bench), each carrying its n/CI/significance. Read-only from the shipped snapshot; an
+// unavailable snapshot returns {available:false}, never a 500.
+export const getBenchmarks = () => json<Benchmarks>("/api/benchmarks");
 export const patchConfig = (updates: Record<string, string>) =>
   json<{ updated: string[] }>("/api/config", { method: "PATCH", body: JSON.stringify(updates) });
 // The ONLY honest "key works" call: makes a real 1-token completion server-side. `ok:true` means it

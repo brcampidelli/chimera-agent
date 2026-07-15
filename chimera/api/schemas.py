@@ -505,3 +505,44 @@ class MaturityOut(BaseModel):
     surfaces: list[MaturitySurfaceOut]
     weakest: MaturityWeakestOut | None  # null when every surface is fully proven
     generated_for: str | None  # the chimera version a snapshot was generated for (null when unavailable)
+
+
+# --- benchmarks (the app's REAL, recorded performance numbers — honestly framed) -------------------
+
+
+class BenchmarkDiscordantOut(BaseModel):
+    treatment_only: int  # tasks Chimera passed that the bare model failed (the lift's real evidence)
+    baseline_only: int  # tasks the bare model passed that Chimera failed
+
+
+class BenchmarkLiftOut(BaseModel):
+    suite: str  # the suite label — makes clear this is the internal suite, NOT SWE-bench/Terminal-Bench
+    model: str  # the cheap/weak model both arms ran (Chimera's lift is over the SAME model, bare)
+    n: int  # paired-task count — SMALL; the caveat travels with the number
+    baseline_rate: float  # the bare model's pass rate (0..1)
+    treatment_rate: float  # the model + Chimera's pass rate (0..1)
+    delta: float  # treatment - baseline (0..1); the +50pp lift
+    ci: list[float]  # 95% paired CI [lo, hi] — INCLUDES 0 here, hence not significant
+    significant: bool  # False: promising but not statistically significant at this n
+    source: str  # the committed results file this block is read from
+    note: str  # the honest one-liner (promising, n=6, not significant, no re-rolling)
+
+
+class BenchmarkExternalOut(BaseModel):
+    benchmark: str  # the external benchmark's name (e.g. Terminal-Bench)
+    model: str  # the model both arms ran
+    n: int  # task count
+    baseline_rate: float  # bare model pass rate (0..1)
+    treatment_rate: float  # + Chimera scaffold pass rate (0..1)
+    delta: float  # treatment - baseline (0..1); negative here — the humbling number
+    ci: list[float]  # 95% paired CI [lo, hi] — includes 0
+    significant: bool  # False
+    source: str  # the committed RESULTS.md this block is cited from
+    note: str  # why it didn't lift (already-competent model, not the weak regime) — published anyway
+
+
+class BenchmarksOut(BaseModel):
+    available: bool  # False when the shipped snapshot couldn't be read — honest empty-state, never a 500
+    internal_lift: BenchmarkLiftOut | None  # the promising weak-model lift (null when unavailable)
+    external: list[BenchmarkExternalOut]  # recorded external results (e.g. Terminal-Bench); [] otherwise
+    generated_for: str | None  # the chimera version the snapshot was generated for (null when unavailable)

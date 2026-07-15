@@ -1,0 +1,39 @@
+{
+  "external": [
+    {
+      "baseline_rate": 0.075,
+      "benchmark": "Terminal-Bench (terminal-bench-core 0.1.1)",
+      "ci": [
+        -0.05,
+        0.016
+      ],
+      "delta": -0.05,
+      "model": "openrouter/deepseek/deepseek-chat-v3.1",
+      "n": 40,
+      "note": "Single-attempt, N=40, same model both arms. The scaffold did NOT lift here \u2014 deepseek-v3.1 is already competent, not the weak 'goldilocks' regime where scaffolding helps; both arms sit near the floor and the difference is not significant (CI includes 0). Published as measured; the point estimate is dominated by run-to-run variance at this floor.",
+      "significant": false,
+      "source": "bench/terminal_bench/RESULTS.md",
+      "treatment_rate": 0.025
+    }
+  ],
+  "generated_for": "0.27.0",
+  "internal_lift": {
+    "baseline_rate": 0.1667,
+    "ci": [
+      -0.0615,
+      0.5
+    ],
+    "delta": 0.5,
+    "discordant": {
+      "baseline_only": 0,
+      "treatment_only": 3
+    },
+    "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+    "n": 6,
+    "note": "A cheap weak model + Chimera's retry loop vs the cheap model alone. Promising (+50pp) but n=6 and NOT statistically significant \u2014 the paired CI includes 0. We don't re-roll for significance.",
+    "significant": false,
+    "source": "bench/local_lift/results/paired.json",
+    "suite": "internal Docker-free suite (local_lift), pytest-graded \u2014 NOT SWE-bench/Terminal-Bench",
+    "treatment_rate": 0.6667
+  }
+}

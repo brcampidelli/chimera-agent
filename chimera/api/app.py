@@ -29,10 +29,12 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
+from chimera.api.benchmarks_api import benchmark_report
 from chimera.api.governance import read_audit, run_injection_suite
 from chimera.api.maturity_api import maturity_report
 from chimera.api.runs import load_runs
 from chimera.api.schemas import (
+    BenchmarksOut,
     ConfigOut,
     ConfigTestOut,
     DeletedOut,
@@ -295,6 +297,14 @@ def build_api_app(
         # test suite (live), or the snapshot shipped with the release (pip installs have no tests dir).
         # No LLM, no network, no side effects. Coverage = evidence presence, not correctness.
         return maturity_report()
+
+    @app.get("/api/benchmarks", dependencies=[guard], response_model=BenchmarksOut)
+    def benchmarks_endpoint() -> dict[str, Any]:
+        # Cheap + keyless: the agent's REAL recorded benchmark numbers from the shipped snapshot — the
+        # promising weak-model lift (internal suite, n=6, not significant) AND the humbling external
+        # Terminal-Bench number, each carrying its n/CI/significance. No LLM, no network. A missing
+        # snapshot is an honest available:false, never a 500.
+        return benchmark_report()
 
     @app.post("/api/runs", dependencies=[guard])
     async def run_stream(req: RunRequest) -> EventSourceResponse:
