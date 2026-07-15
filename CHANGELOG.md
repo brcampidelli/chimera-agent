@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-07-14
+
 ### Added
 - Live per-edit diffs: during a coding run, the Code screen streams the real unified diff of each file
   the agent edits as it happens (via a new `on_edit`/`edit` event through the solve loop — the CLI
