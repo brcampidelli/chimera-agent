@@ -228,6 +228,13 @@ Prefer a lean install? Keep `pip install chimera-agent` and add only the extras 
 From here, any command in the table above just works. Full command reference with copy-paste
 examples: **[docs/usage.md](docs/usage.md)**.
 
+> **Install trouble?** Chimera itself is pure Python (a wheel for every OS), but a transitive
+> dependency can occasionally make `pip` try to build from source (asking for Rust/Cargo) if it
+> backtracks onto an older version lacking a prebuilt wheel for your platform. If you hit that:
+> upgrade pip first (`python -m pip install --upgrade pip`), and if it persists, use Python
+> 3.12/3.13 (which have the widest wheel coverage). A clean `pip install` is smoke-tested in CI
+> across Linux/macOS/Windows × Python 3.11/3.13.
+
 ## How it works
 
 Give Chimera a task; it plans (surfacing the most relevant built-in skills), thinks (blending models
