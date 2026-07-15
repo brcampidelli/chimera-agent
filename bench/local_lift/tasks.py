@@ -196,4 +196,226 @@ TASKS: list[dict[str, Any]] = [
             "    assert percentile([10, 20, 30], 25) == 15.0\n"
         ),
     },
+    # --- v3 expansion (2026-07-14): +9 neutral, standard coding tasks to raise n from 6 → 15 for
+    # a pre-registered paired re-run. Standard problems (parsing/algorithms/data structures + one
+    # multi-file bug), each graded by a strict pytest re-run independently. No bias toward the
+    # scaffold: the loop's only edge is catching a failing test and retrying, a general advantage.
+    {
+        "id": "balanced_brackets",
+        "prompt": (
+            "Create brackets.py with is_balanced(s: str) -> bool. Consider only the bracket characters "
+            "()[]{} (ignore every other character); return True iff they are correctly matched and "
+            "nested. An empty string is balanced. Examples: '(a[b]{c})' -> True, '([)]' -> False, "
+            "'(' -> False, ')(' -> False."
+        ),
+        "files": {},
+        "verify": "brackets.py",
+        "test": "test_brackets.py",
+        "test_src": (
+            "from brackets import is_balanced\n\n"
+            "def test_ok():\n"
+            "    assert is_balanced('(a[b]{c})') is True\n"
+            "    assert is_balanced('') is True\n"
+            "    assert is_balanced('x(y)z') is True\n"
+            "def test_bad():\n"
+            "    for bad in ['([)]', '(', ')(', '{[}]', '(((']:\n"
+            "        assert is_balanced(bad) is False\n"
+        ),
+    },
+    {
+        "id": "run_length",
+        "prompt": (
+            "Create rle.py with encode(s: str) -> str and decode(s: str) -> str. encode does run-length "
+            "encoding: each maximal run of a character becomes '<count><char>' (count always written, "
+            "even 1): 'aaabbc' -> '3a2b1c'. decode is the exact inverse. Both map '' to ''. The input "
+            "to encode contains no digits; decode input is always well-formed."
+        ),
+        "files": {},
+        "verify": "rle.py",
+        "test": "test_rle.py",
+        "test_src": (
+            "from rle import encode, decode\n\n"
+            "def test_encode():\n"
+            "    assert encode('aaabbc') == '3a2b1c'\n"
+            "    assert encode('') == ''\n"
+            "    assert encode('x') == '1x'\n"
+            "def test_roundtrip():\n"
+            "    for s in ['aaabbc', 'xxxxyz', 'abcabc', '']:\n"
+            "        assert decode(encode(s)) == s\n"
+        ),
+    },
+    {
+        "id": "base_convert",
+        "prompt": (
+            "Create baseconv.py with convert(digits: str, from_base: int, to_base: int) -> str. Bases "
+            "range 2..36; input digits are case-insensitive (a=10 .. z=35); the output uses lowercase "
+            "digits and has no leading zeros, except the value zero which is '0'. Examples: "
+            "convert('ff', 16, 2) -> '11111111', convert('101', 2, 10) -> '5', convert('z', 36, 10) -> "
+            "'35', convert('0', 10, 2) -> '0'."
+        ),
+        "files": {},
+        "verify": "baseconv.py",
+        "test": "test_baseconv.py",
+        "test_src": (
+            "from baseconv import convert\n\n"
+            "def test_convert():\n"
+            "    assert convert('ff', 16, 2) == '11111111'\n"
+            "    assert convert('101', 2, 10) == '5'\n"
+            "    assert convert('z', 36, 10) == '35'\n"
+            "    assert convert('0', 10, 2) == '0'\n"
+            "    assert convert('255', 10, 16) == 'ff'\n"
+        ),
+    },
+    {
+        "id": "merge_intervals",
+        "prompt": (
+            "Create intervals.py with merge(intervals: list) -> list. Each interval is a (start, end) "
+            "tuple with start <= end. Merge all overlapping OR touching intervals (so [1,2] and [2,3] "
+            "merge into [1,3]) and return the result as a list of tuples sorted by start. merge([]) is "
+            "[]. Example: merge([(1,3),(2,6),(8,10),(15,18)]) -> [(1,6),(8,10),(15,18)]."
+        ),
+        "files": {},
+        "verify": "intervals.py",
+        "test": "test_intervals.py",
+        "test_src": (
+            "from intervals import merge\n\n"
+            "def test_merge():\n"
+            "    assert merge([(1,3),(2,6),(8,10),(15,18)]) == [(1,6),(8,10),(15,18)]\n"
+            "    assert merge([(1,4),(4,5)]) == [(1,5)]\n"
+            "    assert merge([]) == []\n"
+            "    assert merge([(5,6),(1,2)]) == [(1,2),(5,6)]\n"
+        ),
+    },
+    {
+        "id": "csv_parse",
+        "prompt": (
+            "Create csvline.py with parse_line(line: str) -> list. Split one CSV line on commas into "
+            "fields. A field may be wrapped in double quotes, in which case commas inside it are "
+            "literal; a doubled quote \"\"\"\" inside a quoted field is a literal quote character. Do not "
+            "strip whitespace. Examples: parse_line('a,b,c') -> ['a','b','c']; parse_line('a,\"b,c\",d') "
+            "-> ['a','b,c','d']; parse_line('') -> ['']; parse_line('a,,c') -> ['a','','c']."
+        ),
+        "files": {},
+        "verify": "csvline.py",
+        "test": "test_csvline.py",
+        "test_src": (
+            "from csvline import parse_line\n\n"
+            "def test_plain():\n"
+            "    assert parse_line('a,b,c') == ['a', 'b', 'c']\n"
+            "    assert parse_line('') == ['']\n"
+            "    assert parse_line('a,,c') == ['a', '', 'c']\n"
+            "def test_quoted():\n"
+            "    assert parse_line('a,\"b,c\",d') == ['a', 'b,c', 'd']\n"
+            "    assert parse_line('\"he said \"\"hi\"\"\"') == ['he said \"hi\"']\n"
+        ),
+    },
+    {
+        "id": "template_render",
+        "prompt": (
+            "Create tmpl.py with render(template: str, values: dict) -> str. Replace each '{key}' with "
+            "str(values[key]). A literal brace is written doubled: '{{' -> '{' and '}}' -> '}'. If a "
+            "referenced key is missing from values, raise KeyError. Examples: render('Hi {name}!', "
+            "{'name': 'Al'}) -> 'Hi Al!'; render('{{x}}', {}) -> '{x}'; render('{a}+{b}', {'a':1,'b':2}) "
+            "-> '1+2'."
+        ),
+        "files": {},
+        "verify": "tmpl.py",
+        "test": "test_tmpl.py",
+        "test_src": (
+            "import pytest\n"
+            "from tmpl import render\n\n"
+            "def test_render():\n"
+            "    assert render('Hi {name}!', {'name': 'Al'}) == 'Hi Al!'\n"
+            "    assert render('{{x}}', {}) == '{x}'\n"
+            "    assert render('{a}+{b}', {'a': 1, 'b': 2}) == '1+2'\n"
+            "def test_missing_raises():\n"
+            "    with pytest.raises(KeyError):\n"
+            "        render('{nope}', {'a': 1})\n"
+        ),
+    },
+    {
+        "id": "lru_cache",
+        "prompt": (
+            "Create lru.py with a class LRUCache. LRUCache(capacity: int) holds up to `capacity` "
+            "key->value pairs. get(key) returns the value or -1 if absent; put(key, value) inserts or "
+            "updates. Both get and put mark the key most-recently-used. When inserting a NEW key would "
+            "exceed capacity, evict the least-recently-used key first. (Classic LRU semantics.)"
+        ),
+        "files": {},
+        "verify": "lru.py",
+        "test": "test_lru.py",
+        "test_src": (
+            "from lru import LRUCache\n\n"
+            "def test_lru():\n"
+            "    c = LRUCache(2)\n"
+            "    c.put(1, 1); c.put(2, 2)\n"
+            "    assert c.get(1) == 1\n"
+            "    c.put(3, 3)            # evicts key 2 (LRU)\n"
+            "    assert c.get(2) == -1\n"
+            "    c.put(4, 4)            # evicts key 1\n"
+            "    assert c.get(1) == -1\n"
+            "    assert c.get(3) == 3\n"
+            "    assert c.get(4) == 4\n"
+        ),
+    },
+    {
+        "id": "topo_sort",
+        "prompt": (
+            "Create topo.py with topo_sort(graph: dict) -> list. `graph` maps a node to the list of "
+            "nodes it points to (its dependencies-after edges: an edge a->b means a must come before "
+            "b). Return a topological ordering of all nodes; when several nodes are ready, pick the "
+            "smallest by normal sort order (deterministic). Raise ValueError if the graph has a cycle. "
+            "Every node appears as a key. Example: {'a':['b'],'b':['c'],'c':[]} -> ['a','b','c']."
+        ),
+        "files": {},
+        "verify": "topo.py",
+        "test": "test_topo.py",
+        "test_src": (
+            "import pytest\n"
+            "from topo import topo_sort\n\n"
+            "def test_order():\n"
+            "    assert topo_sort({'a': ['b'], 'b': ['c'], 'c': []}) == ['a', 'b', 'c']\n"
+            "def test_tiebreak_deterministic():\n"
+            "    assert topo_sort({'a': ['c'], 'b': ['c'], 'c': []}) == ['a', 'b', 'c']\n"
+            "def test_cycle_raises():\n"
+            "    with pytest.raises(ValueError):\n"
+            "        topo_sort({'a': ['b'], 'b': ['a']})\n"
+        ),
+    },
+    {
+        "id": "fix_flatten",
+        "prompt": (
+            "The package `nested` has a bug: flatten in nested/core.py only flattens ONE level instead "
+            "of fully flattening arbitrarily-deep nested lists. Fix it so flatten returns all "
+            "non-list leaves in order, recursing to any depth. Strings must NOT be split into "
+            "characters (treat a str as a leaf). Do not change the signature or the tests. Examples: "
+            "flatten([1,[2,[3,[4]]]]) -> [1,2,3,4]; flatten([['a'],'bc']) -> ['a','bc']."
+        ),
+        "files": {
+            "nested/__init__.py": "from nested.core import flatten\n\n__all__ = ['flatten']\n",
+            "nested/core.py": (
+                '"""List helpers."""\n\n\n'
+                "def flatten(items):\n"
+                '    """Flatten nested lists into a flat list of leaves."""\n'
+                "    out = []\n"
+                "    for it in items:\n"
+                "        # BUG: only one level deep — a nested list inside `it` is left unflattened.\n"
+                "        if isinstance(it, list):\n"
+                "            out.extend(it)\n"
+                "        else:\n"
+                "            out.append(it)\n"
+                "    return out\n"
+            ),
+        },
+        "verify": "nested/core.py",
+        "test": "test_flatten.py",
+        "test_src": (
+            "from nested import flatten\n\n"
+            "def test_deep():\n"
+            "    assert flatten([1, [2, [3, [4]]]]) == [1, 2, 3, 4]\n"
+            "    assert flatten([]) == []\n"
+            "def test_strings_are_leaves():\n"
+            "    assert flatten([['a'], 'bc', [['d']]]) == ['a', 'bc', 'd']\n"
+        ),
+    },
 ]
