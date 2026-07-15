@@ -46,3 +46,9 @@ bench/local_lift/results/
 bench/terminal_bench/.venv/
 bench/terminal_bench/dist/
 bench/terminal_bench/results/
+
+# Tauri desktop shell: build outputs (tracked: src-tauri config/Rust/sidecar recipe only)
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
+apps/desktop/src-tauri/sidecar-dist/
+apps/desktop/src-tauri/sidecar-build/

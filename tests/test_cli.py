@@ -325,3 +325,37 @@ def test_solve_edit_requires_answer() -> None:
     result = runner.invoke(app, ["solve", "x", "--edit", "T1"])  # no --answer -> would finalize empty
     assert result.exit_code == 1
     assert "--answer" in result.stdout
+
+
+def test_bind_app_socket_picks_and_falls_back() -> None:
+    import socket
+
+    from chimera.cli.main import _bind_app_socket
+
+    # port=0 → the OS assigns any free port
+    sock0, p0 = _bind_app_socket("127.0.0.1", 0)
+    try:
+        assert p0 != 0
+
+        # a busy fixed port no longer crashes — it falls back to a free one (the Tauri-sidecar fix)
+        busy = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        busy.bind(("127.0.0.1", 0))
+        busy.listen()
+        taken = busy.getsockname()[1]
+        try:
+            sock_fb, p_fb = _bind_app_socket("127.0.0.1", taken)
+            try:
+                assert p_fb != taken  # dropped to a different, free port
+            finally:
+                sock_fb.close()
+        finally:
+            busy.close()
+    finally:
+        sock0.close()
+
+    # a genuinely free fixed port is honored as-is
+    sock1, p1 = _bind_app_socket("127.0.0.1", p0)  # p0 is free again (sock0 closed)
+    try:
+        assert p1 == p0
+    finally:
+        sock1.close()

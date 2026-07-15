@@ -1042,16 +1042,43 @@ def serve(
             cron_stop.set()
 
 
+def _bind_app_socket(host: str, port: int) -> tuple[Any, int]:
+    """Bind the app's listening socket, falling back to a free port if ``port`` is taken.
+
+    Returns the bound socket (handed straight to uvicorn so there is no close-then-rebind race) and
+    the actual port. ``port=0`` asks the OS for any free port. A fixed port that is already in use
+    no longer crashes the app — it drops to an OS-assigned free port (so a second `chimera app`, or a
+    Tauri sidecar, just works). No ``SO_REUSEADDR`` on purpose: on Windows that would let the bind
+    succeed on a port another server already holds, defeating the busy-detection.
+    """
+    import socket
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.bind((host, port))
+    except OSError:
+        if port == 0:  # asked for any free port and still failed — surface it
+            sock.close()
+            raise
+        sock.bind((host, 0))  # requested port busy → OS picks a free one
+    return sock, sock.getsockname()[1]
+
+
 @app.command(name="app")
 def desktop_app(
     host: str = typer.Option("127.0.0.1", "--host", help="Bind host (localhost by default)."),
-    port: int = typer.Option(8765, "--port", help="Bind port."),
+    port: int = typer.Option(8765, "--port", help="Bind port (0 = any free port; a busy port falls back to free)."),
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
     max_steps: int = typer.Option(6, "--max-steps", help="Max tool-calling steps per message."),
     workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root for tools."),
     fuse: bool = typer.Option(False, "--fuse", help="Route turns through fusion (no token streaming)."),
     no_memory: bool = typer.Option(False, "--no-memory", help="Don't recall long-term memory."),
     open_browser: bool = typer.Option(True, "--open/--no-open", help="Open the app in your browser."),
+    emit_port_file: str = typer.Option(
+        None,
+        "--emit-port-file",
+        help="Write the final http://host:port URL to this file once bound (for a parent/sidecar).",
+    ),
 ) -> None:
     """Run the Chimera Desktop app: the HTTP+SSE API + the built React UI (needs the 'desktop' extra).
 
@@ -1146,7 +1173,12 @@ def desktop_app(
         workspace=workspace_path,
     )
 
+    # Bind BEFORE announcing so the URL reflects the real port (a busy 8765 falls back to a free one
+    # instead of crashing). The bound socket is handed to uvicorn, so there is no close-then-rebind gap.
+    sock, port = _bind_app_socket(host, port)
     url = f"http://{host}:{port}"
+    if emit_port_file:  # discovery channel for a parent process (the Tauri sidecar reads this)
+        Path(emit_port_file).write_text(url, encoding="utf-8")
     ui_note = "" if static_dir is not None else "  [yellow](UI not built — API only; run 'pnpm --dir apps/desktop build')[/yellow]"
     console.print(f"[bold]Chimera Desktop[/bold] on {url}  [dim](API at /api). Ctrl+C to stop.[/dim]{ui_note}")
     if open_browser and static_dir is not None:
@@ -1154,7 +1186,8 @@ def desktop_app(
         import webbrowser
 
         threading.Timer(1.0, lambda: webbrowser.open(url)).start()
-    uvicorn.run(api, host=host, port=port, log_level="warning")
+    # Server.run(sockets=[...]) uses our already-bound socket (uvicorn.run rebinds host/port itself).
+    uvicorn.Server(uvicorn.Config(api, log_level="warning")).run(sockets=[sock])
 
 
 def _start_cron_daemon(
