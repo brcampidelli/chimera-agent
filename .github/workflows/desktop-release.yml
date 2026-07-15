@@ -1,0 +1,109 @@
+name: Build desktop installers
+
+# Builds the SELF-CONTAINED native desktop app (Tauri shell + a PyInstaller-frozen backend sidecar)
+# for Windows / macOS / Linux and attaches the installers to the GitHub Release. The installers are
+# UNSIGNED for now, so first-run shows a SmartScreen/Gatekeeper warning — that is expected and called
+# out in the release notes. This is the ONLY verifier of the native build: it is not smoke-tested on
+# the maintainer's machine (no local MSVC/Rust toolchain). The PyPI wheel path is unaffected — the
+# frozen sidecar lives only in these installers, never in the wheel.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write # attach installer assets to the release
+
+jobs:
+  build:
+    name: ${{ matrix.os }} (${{ matrix.bundles }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            bundles: nsis
+          - os: macos-latest
+            bundles: dmg
+          - os: ubuntu-latest
+            bundles: appimage,deb
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: apps/desktop
+
+      - name: Build the SPA (into apps/desktop/dist)
+        run: npm --prefix apps/desktop run build
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      # The frozen sidecar bundles the real backend (chimera + [desktop] extra) + PyInstaller. Freeze
+      # it BEFORE the Tauri build, since tauri.conf bundles src-tauri/sidecar-dist as a resource.
+      # Editable install (uv sync) matches the locally-proven freeze: --collect-data chimera reads the
+      # source tree (no _desktop_dist) and --add-data supplies the built SPA — no double-include clash.
+      - name: Install the backend (editable) + PyInstaller
+        run: |
+          uv sync --extra desktop
+          uv pip install pyinstaller
+
+      - name: Freeze the backend sidecar
+        run: uv run --no-sync python apps/desktop/src-tauri/build_sidecar.py
+
+      - name: Verify the frozen sidecar exists
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            test -f apps/desktop/src-tauri/sidecar-dist/chimera-backend/chimera-backend.exe
+          else
+            test -f apps/desktop/src-tauri/sidecar-dist/chimera-backend/chimera-backend
+          fi
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+
+      - name: Linux system deps for Tauri
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Build the Tauri app (unsigned)
+        run: npm --prefix apps/desktop run tauri build -- --bundles ${{ matrix.bundles }}
+
+      - name: Attach installers to the release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            apps/desktop/src-tauri/target/release/bundle/nsis/*.exe
+            apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
+            apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage
+            apps/desktop/src-tauri/target/release/bundle/deb/*.deb
+
+      - name: Upload installers as workflow artifacts (manual runs)
+        if: github.event_name != 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: chimera-installers-${{ matrix.os }}
+          path: apps/desktop/src-tauri/target/release/bundle/**/*
+          if-no-files-found: warn
+          retention-days: 5
