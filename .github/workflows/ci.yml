@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
 
@@ -68,6 +68,34 @@ jobs:
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: uv run pytest -m integration -q
+
+  install-smoke:
+    name: clean pip install (${{ matrix.os }} · py${{ matrix.python-version }})
+    # `quality` uses `uv sync` (the locked resolution, which is clean everywhere). This job instead does
+    # a FRESH `pip install` — pip re-resolves from PyPI and can backtrack a transitive (e.g. a litellm
+    # dep) onto a version lacking a wheel for this OS/Python, falling to an sdist that needs a compiler.
+    # Testing the extremes (Windows/macOS × oldest+newest supported Python) catches that class before a
+    # user hits it. The wheel is pure-Python, so success here means "a plain `pip install` just works".
+    runs-on: ${{ matrix.os }}
+    needs: quality
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Fresh pip install of the desktop extra (no uv, no lockfile)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ".[desktop]"
+      - name: Import smoke (core + desktop API) + CLI entrypoint
+        run: |
+          python -c "import chimera, chimera.api.app; print('chimera', chimera.__version__, 'import OK')"
+          chimera --help
 
   desktop:
     name: desktop app (API types drift + build)
