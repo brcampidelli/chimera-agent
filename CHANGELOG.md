@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Live per-edit diffs: during a coding run, the Code screen streams the real unified diff of each file
+  the agent edits as it happens (via a new `on_edit`/`edit` event through the solve loop — the CLI
+  event sink gets it too), alongside the final receipt diffs.
 - Code screen: a git panel (status/diff/commit, explicit-path staging) and accept/discard for a run's
   changes (git-backed revert scoped to the run's files) — honest empty-state when the folder isn't a
   git repo.

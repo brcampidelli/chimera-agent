@@ -14,7 +14,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-EventKind = Literal["status", "attempt", "result", "final", "token"]
+EventKind = Literal["status", "attempt", "result", "final", "token", "edit"]
 
 # A sink for events. Kept as a plain callable so any consumer (print, a queue, an SSE writer)
 # plugs in without a shared base class.
@@ -51,3 +51,13 @@ def result(index: int, success: bool, detail: str = "") -> AgentEvent:
 
 def final(success: bool, answer: str) -> AgentEvent:
     return AgentEvent("final", "done" if success else "gave up", {"success": success, "answer": answer})
+
+
+def edit(path: str, patch: str) -> AgentEvent:
+    """A live per-edit event: the REAL unified diff of one file the agent just changed (mid-run).
+
+    Emitted once per write-tool call that actually changed the file, from the real on-disk content
+    read before and after the tool ran — never fabricated. ``patch`` is a bounded ``difflib``-style
+    unified diff (may be truncated); ``path`` is the workspace-relative file the tool targeted.
+    """
+    return AgentEvent("edit", f"edited {path}", {"path": path, "patch": patch})

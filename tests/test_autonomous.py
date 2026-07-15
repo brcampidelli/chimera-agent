@@ -123,6 +123,56 @@ def test_no_escalate_worker_retries_same_worker() -> None:
     assert result.success and cheap.runs == 2
 
 
+class _EditingWorker:
+    """A worker that reports one file edit through the ``on_edit`` hook the loop passes it."""
+
+    def __init__(self, answer: str = "done") -> None:
+        self.answer = answer
+        self.got_on_edit = False
+
+    def run(self, task: str, *, on_edit: Any = None) -> AgentResult:
+        if on_edit is not None:
+            self.got_on_edit = True
+            on_edit("a.txt", "--- a.txt\n+++ a.txt\n@@ -0,0 +1 @@\n+hello")
+        return AgentResult(answer=self.answer, steps=1, stopped_reason="final")
+
+
+def test_autonomous_forwards_edit_event_from_worker() -> None:
+    # A worker that supports on_edit gets it wired to the loop's sink; the edit surfaces as an event.
+    from chimera.core.events import AgentEvent
+
+    worker = _EditingWorker()
+    events: list[AgentEvent] = []
+    auto = AutonomousAgent(
+        worker,
+        on_event=events.append,
+        config=AutonomousConfig(max_attempts=1, use_planner=False, use_manager=False),
+    )
+    result = auto.run("edit a file")
+    assert result.success
+    assert worker.got_on_edit  # the loop passed on_edit to the (supporting) worker
+    edit_events = [e for e in events if e.kind == "edit"]
+    assert len(edit_events) == 1
+    assert edit_events[0].data["path"] == "a.txt"
+    assert "+hello" in edit_events[0].data["patch"]
+
+
+def test_autonomous_runs_worker_without_on_edit_support() -> None:
+    # A worker whose run() doesn't accept on_edit must still run — no crash, and no edit events.
+    from chimera.core.events import AgentEvent
+
+    worker = FakeWorker("ok")  # its run(self, task) has no on_edit parameter
+    events: list[AgentEvent] = []
+    auto = AutonomousAgent(
+        worker,
+        on_event=events.append,
+        config=AutonomousConfig(max_attempts=1, use_planner=False, use_manager=False),
+    )
+    result = auto.run("do it")
+    assert result.success and result.answer == "ok"
+    assert not any(e.kind == "edit" for e in events)
+
+
 class ScriptedBackend:
     def __init__(self, contents: list[str]) -> None:
         self._contents = list(contents)

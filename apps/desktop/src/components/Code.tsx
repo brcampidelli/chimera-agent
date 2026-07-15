@@ -423,6 +423,32 @@ function AttemptDiffs({ attempt, t }: { attempt: AttemptReceipt; t: TFunc }) {
   );
 }
 
+/** The live play-by-play: one collapsible real unified diff per file the agent edited AS it happens.
+ *  Streamed from the run's `edit` events (read off disk before/after each write — never fabricated).
+ *  Order is the true edit sequence; a path can recur if a later step overwrites an earlier edit. The
+ *  receipt's per-file diffs below stay the authoritative final view — this is the step-by-step. */
+function LiveEdits({ edits, t }: { edits: { path: string; patch: string }[]; t: TFunc }) {
+  if (edits.length === 0) return null;
+  return (
+    <div className="space-y-2 border-b border-white/5 px-4 py-3">
+      <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {t("code.liveEdits")}
+      </div>
+      {edits.map((e, i) => (
+        <details key={i} className="rounded-chip bg-white/[0.02]" open>
+          <summary className="flex cursor-pointer items-center gap-2 px-2 py-1.5 font-mono text-[11px] text-foreground/80 hover:text-foreground">
+            <span className="shrink-0 text-muted-foreground">{i + 1}.</span>
+            <span className="truncate">{e.path}</span>
+          </summary>
+          <div className="px-2 pb-2">
+            <DiffLines patch={e.patch} />
+          </div>
+        </details>
+      ))}
+    </div>
+  );
+}
+
 /** Map a live run event to a compact localized line (backend `text` is English). */
 function liveLine(e: RunEvent, t: TFunc): string | null {
   if (e.kind === "status") return /planning/i.test(e.text) ? t("code.planning") : e.text;
@@ -447,6 +473,8 @@ function RunPanel({
   const [maxAttempts, setMaxAttempts] = useState(3);
   const [running, setRunning] = useState(false);
   const [lines, setLines] = useState<string[]>([]);
+  // The live per-edit diffs streamed during THIS run, in edit order (the play-by-play).
+  const [liveEdits, setLiveEdits] = useState<{ path: string; patch: string }[]>([]);
   const [receipt, setReceipt] = useState<RunReceipt | null>(null);
   const [reverting, setReverting] = useState(false);
   const [revertErr, setRevertErr] = useState(false);
@@ -470,6 +498,7 @@ function RunPanel({
   function accept() {
     setReceipt(null);
     setLines([]);
+    setLiveEdits([]);
     setRevertErr(false);
   }
 
@@ -486,6 +515,7 @@ function RunPanel({
         return;
       }
       setReceipt(null);
+      setLiveEdits([]);
       setLines([t("code.git.reverted")]);
       void qc.invalidateQueries({ queryKey: ["fs-tree"] });
       void qc.invalidateQueries({ queryKey: ["fs-file"] });
@@ -502,6 +532,7 @@ function RunPanel({
     if (!task.trim() || running) return;
     setRunning(true);
     setLines([]);
+    setLiveEdits([]);
     setReceipt(null);
     const append = (s: string) => setLines((prev) => [...prev, s]);
     const finish = async () => {
@@ -528,6 +559,13 @@ function RunPanel({
       },
       {
         onEvent: (e) => {
+          // An `edit` frame carries a real per-file diff — collect it into the live play-by-play.
+          if (e.kind === "edit" && e.path && e.patch) {
+            const path = e.path;
+            const patch = e.patch;
+            setLiveEdits((prev) => [...prev, { path, patch }]);
+            return;
+          }
           const line = liveLine(e, t);
           if (line) append(line);
         },
@@ -599,6 +637,7 @@ function RunPanel({
       </div>
 
       <div className="min-h-0 flex-1">
+        <LiveEdits edits={liveEdits} t={t} />
         {receipt ? (
           <>
             <div className="flex flex-wrap items-center gap-2 border-b border-white/5 px-4 py-2">

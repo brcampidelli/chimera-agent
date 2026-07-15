@@ -17,7 +17,9 @@ Every dependency is injectable, so the whole loop is testable without a network.
 
 from __future__ import annotations
 
+import inspect
 import re
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -33,6 +35,7 @@ from chimera.core.checkpoint import WorkspaceGuard
 from chimera.core.contract import CompletionContract
 from chimera.core.events import AgentEvent, EventSink
 from chimera.core.events import attempt as _ev_attempt
+from chimera.core.events import edit as _ev_edit
 from chimera.core.events import final as _ev_final
 from chimera.core.events import result as _ev_result
 from chimera.core.events import status as _ev_status
@@ -78,9 +81,16 @@ def _format_requirements(requirements: list[Any]) -> str:
 
 
 class Worker(Protocol):
-    """Anything that can execute a task and return a result (the agent loop)."""
+    """Anything that can execute a task and return a result (the agent loop).
 
-    def run(self, task: str) -> AgentResult: ...
+    ``on_edit`` is optional and structural: a worker that supports it receives ``(path, patch)`` for
+    each file it edits mid-run (the live per-edit diff). The loop only passes it to workers whose
+    ``run`` actually accepts it (checked by signature), so a Worker without it is never broken.
+    """
+
+    def run(
+        self, task: str, *, on_edit: Callable[[str, str], None] | None = None
+    ) -> AgentResult: ...
 
 
 class SupportsRemember(Protocol):
@@ -225,6 +235,37 @@ class AutonomousAgent:
         except Exception as exc:  # noqa: BLE001 — a broken sink must not fail the run
             _log.warning("event sink raised, dropping event: %s", exc)
 
+    def _emit_edit(self, path: str, patch: str) -> None:
+        """Forward a live per-edit diff (from the worker) as an ``edit`` event through the sink.
+
+        The worker hands us ``(path, patch)`` — the REAL unified diff of a file it just changed, read
+        from disk before/after the write (never fabricated). No-op when no sink is attached; a broken
+        sink is swallowed by ``_emit``.
+        """
+        if self.on_event is None:
+            return
+        self._emit(_ev_edit(path, patch))
+
+    def _run_worker(self, worker: Worker, prompt: str) -> AgentResult:
+        """Run the worker, passing ``on_edit`` ONLY when it supports it and a sink is attached.
+
+        Backward-compatible: a worker whose ``run`` doesn't accept ``on_edit`` (or when no event sink
+        is set) is called exactly as before — ``worker.run(prompt)`` — so nothing breaks. The support
+        check reads the real signature; a TypeError fallback covers any wrapper that hides it.
+        """
+        if self.on_event is None:
+            return worker.run(prompt)
+        try:
+            supports_on_edit = "on_edit" in inspect.signature(worker.run).parameters
+        except (TypeError, ValueError):  # unintrospectable callable (C impl / odd wrapper)
+            supports_on_edit = False
+        if not supports_on_edit:
+            return worker.run(prompt)
+        try:
+            return worker.run(prompt, on_edit=self._emit_edit)
+        except TypeError:  # signature lied (e.g. **kwargs-only) — fall back to the plain call
+            return worker.run(prompt)
+
     def run(self, task: str, *, thread_id: str | None = None) -> AutonomousResult:
         spine = assemble_spine(self.spine_workspace, task) if self.spine_workspace else ""
         # Behavioural loop: fold lessons from PRIOR runs (recalled before this run
@@ -366,7 +407,7 @@ class AutonomousAgent:
             )
             if worker is self.escalate_worker:
                 _log.debug("attempt %d: task proved hard, escalating retry to fusion worker", index)
-            agent_result = worker.run(prompt)
+            agent_result = self._run_worker(worker, prompt)
             answer = agent_result.answer
 
             # Executable evidence is ground truth: when a verifier is present it

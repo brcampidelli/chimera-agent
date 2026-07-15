@@ -241,3 +241,86 @@ def test_run_falls_back_to_blocking_without_stream_complete() -> None:
     result = agent.run("hi", on_token=hits.append)  # backend exposes no stream_complete
     assert hits == []  # nothing streamed
     assert result.answer == "done"
+
+
+def test_on_edit_fires_with_real_unified_diff_for_write_and_edit(tmp_path: Any) -> None:
+    # The live per-edit diff is read from the file on disk before/after each write-tool call — real,
+    # never fabricated. A create (write_file) and an in-place edit (edit_file) both emit.
+    from pathlib import Path
+
+    from chimera.tools import default_registry
+
+    (Path(tmp_path) / "b.txt").write_bytes(b"hello\nworld\n")  # exists so edit_file can anchor
+    registry = default_registry(Path(tmp_path))
+    backend = ScriptedBackend(
+        [
+            CompletionResult(
+                content="", model="fake",
+                tool_calls=[ToolCall(id="c1", name="write_file",
+                                     arguments={"path": "a.txt", "content": "line1\nline2\n"})],
+            ),
+            CompletionResult(
+                content="", model="fake",
+                tool_calls=[ToolCall(id="c2", name="edit_file",
+                                     arguments={"path": "b.txt", "old": "world", "new": "earth"})],
+            ),
+            CompletionResult(content="done", model="fake"),
+        ]
+    )
+    edits: list[tuple[str, str]] = []
+    agent = Agent(backend, registry)
+    result = agent.run("change files", on_edit=lambda p, patch: edits.append((p, patch)))
+
+    assert result.answer == "done"
+    assert [p for p, _ in edits] == ["a.txt", "b.txt"]  # one event per real change, in order
+    create_patch = edits[0][1]
+    assert "@@" in create_patch and "+line1" in create_patch and "+line2" in create_patch
+    edit_patch = edits[1][1]
+    assert "@@" in edit_patch and "-world" in edit_patch and "+earth" in edit_patch
+    # The change actually landed on disk (the diff reflects a real write, not a claim).
+    assert (Path(tmp_path) / "a.txt").read_text(encoding="utf-8") == "line1\nline2\n"
+
+
+def test_on_edit_does_not_fire_on_a_no_op_write(tmp_path: Any) -> None:
+    # A write whose content equals the file's current content changes nothing → no edit event.
+    from pathlib import Path
+
+    from chimera.tools import default_registry
+
+    (Path(tmp_path) / "c.txt").write_bytes(b"same\n")
+    registry = default_registry(Path(tmp_path))
+    backend = ScriptedBackend(
+        [
+            CompletionResult(
+                content="", model="fake",
+                tool_calls=[ToolCall(id="c1", name="write_file",
+                                     arguments={"path": "c.txt", "content": "same\n"})],
+            ),
+            CompletionResult(content="done", model="fake"),
+        ]
+    )
+    edits: list[tuple[str, str]] = []
+    Agent(backend, registry).run("rewrite identically", on_edit=lambda p, patch: edits.append((p, patch)))
+    assert edits == []  # identical content is not a productive edit
+
+
+def test_on_edit_absent_makes_no_extra_reads(tmp_path: Any) -> None:
+    # Opt-in: without an on_edit callback, a write tool runs exactly as before (no diff capture path).
+    from pathlib import Path
+
+    from chimera.tools import default_registry
+
+    registry = default_registry(Path(tmp_path))
+    backend = ScriptedBackend(
+        [
+            CompletionResult(
+                content="", model="fake",
+                tool_calls=[ToolCall(id="c1", name="write_file",
+                                     arguments={"path": "d.txt", "content": "x\n"})],
+            ),
+            CompletionResult(content="done", model="fake"),
+        ]
+    )
+    result = Agent(backend, registry).run("write d")  # no on_edit
+    assert result.answer == "done"
+    assert (Path(tmp_path) / "d.txt").read_text(encoding="utf-8") == "x\n"

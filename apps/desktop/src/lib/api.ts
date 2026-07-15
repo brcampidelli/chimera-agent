@@ -264,6 +264,10 @@ export interface RunEvent {
   max_attempts?: number;
   success?: boolean;
   detail?: string;
+  // `kind === "edit"`: the REAL unified diff of a file the agent just changed this step (never
+  // fabricated — read from the file on disk before/after the write-tool call).
+  path?: string;
+  patch?: string;
 }
 
 /** The terminal `done` payload of a run. */

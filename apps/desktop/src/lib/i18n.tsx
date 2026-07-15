@@ -233,6 +233,7 @@ const en: Dict = {
   "code.attempt": "Attempt",
   "code.revertedNote": "reverted — these changes were undone after verification failed",
   "code.diff": "Changes",
+  "code.liveEdits": "Live edits",
   "code.noDiff": "This run changed nothing on disk.",
   "code.safetyNote":
     "The agent edits this workspace and runs your verify command here — the same capability as `chimera solve` in a terminal (localhost, bearer-guarded).",
@@ -551,6 +552,7 @@ const pt: Dict = {
   "code.attempt": "Tentativa",
   "code.revertedNote": "revertido — estas mudanças foram desfeitas após a verificação falhar",
   "code.diff": "Mudanças",
+  "code.liveEdits": "Edições ao vivo",
   "code.noDiff": "Esta execução não alterou nada em disco.",
   "code.safetyNote":
     "O agente edita este workspace e roda seu comando de verificação aqui — a mesma capacidade do `chimera solve` num terminal (localhost, protegido por token).",
@@ -869,6 +871,7 @@ const es: Dict = {
   "code.attempt": "Intento",
   "code.revertedNote": "revertido — estos cambios se deshicieron tras fallar la verificación",
   "code.diff": "Cambios",
+  "code.liveEdits": "Ediciones en vivo",
   "code.noDiff": "Esta ejecución no cambió nada en disco.",
   "code.safetyNote":
     "El agente edita este workspace y ejecuta tu comando de verificación aquí — la misma capacidad que `chimera solve` en una terminal (localhost, protegido por token).",
@@ -1187,6 +1190,7 @@ const fr: Dict = {
   "code.attempt": "Tentative",
   "code.revertedNote": "annulé — ces modifications ont été défaites après l'échec de la vérification",
   "code.diff": "Modifications",
+  "code.liveEdits": "Modifications en direct",
   "code.noDiff": "Cette exécution n'a rien changé sur le disque.",
   "code.safetyNote":
     "L'agent modifie ce workspace et exécute votre commande de vérification ici — la même capacité que `chimera solve` dans un terminal (localhost, protégé par token).",
@@ -1505,6 +1509,7 @@ const de: Dict = {
   "code.attempt": "Versuch",
   "code.revertedNote": "zurückgesetzt — diese Änderungen wurden nach fehlgeschlagener Verifikation rückgängig gemacht",
   "code.diff": "Änderungen",
+  "code.liveEdits": "Live-Änderungen",
   "code.noDiff": "Dieser Lauf hat auf der Festplatte nichts geändert.",
   "code.safetyNote":
     "Der Agent bearbeitet diesen Workspace und führt hier deinen Verifikationsbefehl aus — dieselbe Fähigkeit wie `chimera solve` im Terminal (localhost, per Token geschützt).",
@@ -1822,6 +1827,7 @@ const zh: Dict = {
   "code.attempt": "尝试",
   "code.revertedNote": "已回滚 —— 验证失败后这些更改已被撤销",
   "code.diff": "更改",
+  "code.liveEdits": "实时编辑",
   "code.noDiff": "本次运行未在磁盘上更改任何内容。",
   "code.safetyNote":
     "智能体会编辑此工作区并在此运行你的验证命令 —— 与在终端中运行 `chimera solve` 的能力相同（本地回环，受 bearer 令牌保护）。",
@@ -2139,6 +2145,7 @@ const ja: Dict = {
   "code.attempt": "試行",
   "code.revertedNote": "巻き戻し —— 検証失敗後にこれらの変更は取り消されました",
   "code.diff": "変更",
+  "code.liveEdits": "ライブ編集",
   "code.noDiff": "この実行はディスク上を何も変更しませんでした。",
   "code.safetyNote":
     "エージェントはこのワークスペースを編集し、ここであなたの検証コマンドを実行します —— ターミナルでの `chimera solve` と同じ機能です（localhost、bearer で保護）。",

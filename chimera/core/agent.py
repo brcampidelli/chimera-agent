@@ -12,20 +12,27 @@ toward resisting continuous-evolution degradation.
 
 from __future__ import annotations
 
+import difflib
 import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from chimera.core.tool_loop import ToolLoopDetector
+from chimera.governance.ledger import WRITE_TOOLS
 from chimera.providers.gateway import CompletionResult, MessageLike, SupportsComplete
 from chimera.telemetry import get_logger
 from chimera.tools.registry import ToolNotFoundError, ToolRegistry
+from chimera.tools.workspace import resolve_in_workspace
 
 if TYPE_CHECKING:
     from chimera.skills.registry import SkillRegistry
 
 _log = get_logger("core.agent")
+
+# Bound on a single live per-edit unified diff (chars), so a huge write can't flood the event stream.
+_MAX_EDIT_DIFF_CHARS = 4000
 
 # Cached builtin skill registry for context retrieval (name/description only — no backend, no network).
 _DEFAULT_SKILLS: SkillRegistry | None = None
@@ -190,10 +197,14 @@ class Agent:
         *,
         on_token: Callable[[str], None] | None = None,
         on_tool: Callable[[ToolActivity], None] | None = None,
+        on_edit: Callable[[str, str], None] | None = None,
     ) -> AgentResult:
         """Run the tool loop. ``on_token`` streams model text deltas as they arrive (when the backend
-        supports it); ``on_tool`` fires once per tool call with its outcome. Both are optional — with
-        neither, behaviour is exactly the pre-existing blocking run."""
+        supports it); ``on_tool`` fires once per tool call with its outcome. ``on_edit`` fires with
+        ``(path, patch)`` once per write-tool call that actually changed a file — the REAL unified diff
+        read from the file's on-disk content before and after the tool ran (never fabricated). All
+        three are optional — with none, behaviour is exactly the pre-existing blocking run, and
+        ``on_edit`` adds zero extra file reads when absent."""
         system_prompt = self.config.system_prompt
         skill_block = self._skill_context(task)
         if skill_block:
@@ -234,7 +245,12 @@ class Agent:
             for call in result.tool_calls:
                 tool_calls_made += 1
                 tool_names.append(call.name)
+                # Capture the file's real pre-write content (only when a diff sink is attached, so
+                # there is zero overhead — and no extra read — otherwise).
+                edit_before = self._edit_before(call.name, call.arguments) if on_edit is not None else None
                 observation = self._run_tool(call.name, call.arguments)
+                if on_edit is not None and edit_before is not None:
+                    self._emit_edit(edit_before, on_edit)
                 if on_tool is not None:
                     on_tool(ToolActivity(call.name, call.arguments,
                                          not observation.startswith("error:"), observation))
@@ -332,6 +348,74 @@ class Agent:
         except Exception as exc:  # tools must never crash the loop
             _log.warning("tool %s failed: %s", name, exc)
             return f"error: tool {name!r} failed: {exc}"
+
+    def _edit_before(
+        self, name: str, arguments: dict[str, Any]
+    ) -> tuple[Path, str, str] | None:
+        """Snapshot a write-tool target's real content BEFORE it runs (for a live per-edit diff).
+
+        Returns ``(resolved_path, raw_path_arg, before_text)`` for a diffable write call, or ``None``
+        when nothing should be diffed: not a write tool, no usable ``path`` arg, tool not in the
+        registry, a non-fs tool (``.workspace`` is None), a path that escapes the workspace, or a
+        binary/undecodable target. ``before_text`` is ``""`` when the file does not exist yet (a
+        create). Never raises — a diff failure must never affect the tool run or the loop.
+        """
+        try:
+            if name not in WRITE_TOOLS:
+                return None
+            raw = arguments.get("path")
+            if not isinstance(raw, str) or not raw:
+                return None
+            tool = self.tools.get(name)
+            workspace = getattr(tool, "workspace", None)
+            if not isinstance(workspace, Path):
+                return None
+            resolved = resolve_in_workspace(workspace, raw)
+            before = self._read_text_for_diff(resolved)
+            if before is None:  # binary / undecodable — skip (can't render a text diff)
+                return None
+            return resolved, raw, before
+        except Exception as exc:  # noqa: BLE001 — diff capture must never break the tool run
+            _log.debug("edit pre-read skipped for %s: %s", name, exc)
+            return None
+
+    def _emit_edit(
+        self, before_ctx: tuple[Path, str, str], on_edit: Callable[[str, str], None]
+    ) -> None:
+        """Read the target AFTER the write and, if it changed, emit its real bounded unified diff.
+
+        Fully guarded: a failure here (read error, sink raising) is logged at debug and swallowed —
+        the diff is a best-effort observability side-channel, never load-bearing for the run.
+        """
+        resolved, raw, before = before_ctx
+        try:
+            after = self._read_text_for_diff(resolved)
+            if after is None or after == before:  # unreadable now, or a genuine no-op write
+                return
+            patch = "\n".join(
+                difflib.unified_diff(
+                    before.splitlines(), after.splitlines(),
+                    fromfile=raw, tofile=raw, lineterm="",
+                )
+            )
+            if not patch:  # only line-ending churn splitlines() normalized away
+                return
+            if len(patch) > _MAX_EDIT_DIFF_CHARS:
+                patch = patch[:_MAX_EDIT_DIFF_CHARS] + "\n… [diff truncated]"
+            on_edit(raw, patch)
+        except Exception as exc:  # noqa: BLE001 — a diff failure must never affect the loop
+            _log.debug("edit diff emit skipped for %s: %s", raw, exc)
+
+    @staticmethod
+    def _read_text_for_diff(path: Path) -> str | None:
+        """Current UTF-8 text of ``path`` for diffing: ``""`` if it doesn't exist yet, ``None`` on a
+        binary/undecodable file (``read_text`` translates CRLF→LF, so before/after align)."""
+        if not path.exists():
+            return ""
+        try:
+            return path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            return None
 
     @staticmethod
     def _assistant_tool_message(result: CompletionResult) -> dict[str, Any]:
