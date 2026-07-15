@@ -9,7 +9,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "gen:api": "openapi-typescript openapi.json -o src/lib/api-schema.ts"
+    "gen:api": "openapi-typescript openapi.json -o src/lib/api-schema.ts",
+    "tauri": "tauri"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.51.11",
@@ -23,6 +24,7 @@
     "tailwind-merge": "^2.4.0"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.1.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",

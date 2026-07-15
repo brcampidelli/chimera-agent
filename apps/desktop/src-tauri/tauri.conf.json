@@ -1,0 +1,30 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Chimera",
+  "version": "0.27.0",
+  "identifier": "app.chimera.desktop",
+  "build": {
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "dmg", "appimage", "deb"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": ["sidecar-dist/chimera-backend/**/*"],
+    "category": "DeveloperTool",
+    "shortDescription": "Chimera Agent — self-evolving agent, native app",
+    "longDescription": "The Chimera Agent desktop app: a native window over the same local server the CLI runs — chat with streaming, fusion/cascade routing, memory, skills, governance, and a coding workspace. Ships a self-contained backend (no system Python needed). The terminal CLI stays fully sovereign; this app is optional."
+  }
+}

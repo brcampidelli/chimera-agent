@@ -1,0 +1,19 @@
+[package]
+name = "chimera-desktop"
+version = "0.27.0"
+description = "Chimera Agent — native desktop shell"
+authors = ["Bruno Campidelli"]
+edition = "2021"
+rust-version = "1.77"
+
+# The shell is a thin native window + tray around the SAME server the pip path runs — it launches a
+# PyInstaller-frozen `chimera-backend` sidecar (bundled as a resource), waits for the free-port URL it
+# writes, then points the webview at that localhost origin. No divergent server code lives here.
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

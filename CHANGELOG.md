@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Native desktop app (Tauri) — self-contained, opt-in.** A native window + system-tray shell that
+  launches a PyInstaller-**frozen** copy of the SAME `chimera app` server as a sidecar, so the installer
+  is **zero-dependency** (no system Python, no `pip install`). The shell picks a free port, the backend
+  writes its URL to a file (`chimera app --emit-port-file`), and the window loads that localhost origin —
+  the SPA is served same-origin so nothing in the frontend changed. Installers (`.exe`/NSIS, `.dmg`,
+  `.AppImage`/`.deb`) are built by a new `desktop-release.yml` CI matrix and attached to each GitHub
+  Release; they are **unsigned for now**, so first run shows a SmartScreen/Gatekeeper warning (called
+  out in the release notes). The **terminal CLI stays fully sovereign** — this app is optional, and the
+  lean PyPI wheel is unchanged (the 200 MB+ frozen sidecar lives only in the installers, never the wheel).
+  Foundation proven locally on Windows (the frozen backend serves the real API + bundled UI); the Rust
+  shell and the macOS/Linux installers are CI-verified.
 - Benchmarks in the app + README: the honest weak-model lift (internal suite, not-yet-significant) and
   the external Terminal-Bench number, with n/CI/significance shown — no cherry-picking.
 - **Pre-registered expansion of the internal weak-model-lift suite (6 → 15 tasks).** Rather than re-roll
@@ -20,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   panel, the README + all 6 translations now cite this n=15 number. (`bench/local_lift/RESULTS.md`.)
 
 ### Fixed
+- `chimera app`: a busy bind port no longer crashes — it falls back to an OS-assigned free port (the
+  socket is pre-bound and handed to uvicorn, so there's no rebind race). `--port 0` = any free port.
 - Install friction on a fresh Python 3.11: a CI **install-matrix smoke** (ubuntu/windows/macos ×
   py3.11/3.13, clean `pip install .[desktop]` + import/CLI smoke) now guards that a wheel-only install
   works, plus a README "install trouble?" note — after diagnosing a transient litellm-transitive
