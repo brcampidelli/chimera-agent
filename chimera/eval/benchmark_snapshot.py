@@ -4,10 +4,10 @@ Unlike the maturity scorecard (coverage = test-file presence), this carries the 
 benchmark results**, honestly framed. Two blocks, both true, kept together on purpose:
 
 - **internal_lift** — READ live from ``bench/local_lift/results/paired.json`` (so re-running the
-  local_lift suite + regenerating this snapshot auto-updates it). The promising weak-model lift: a cheap
-  model + Chimera's retry loop vs the cheap model alone. Promising (+50pp) but ``n=6`` and **not
-  statistically significant** (the paired CI includes 0). The suite label makes clear it is NOT
-  SWE-bench / Terminal-Bench.
+  local_lift suite + regenerating this snapshot auto-updates it). The weak-model lift: a cheap model +
+  Chimera's retry loop vs the cheap model alone, on a pre-registered mixed-difficulty suite. A modest
+  lift from tasks the loop RECOVERED with no regressions — but **not statistically significant** (the
+  paired CI includes 0). The suite label makes clear it is NOT SWE-bench / Terminal-Bench.
 - **external** — a recorded, cited external result (Terminal-Bench). Carried as a constant with a
   ``source`` pointing at ``bench/terminal_bench/RESULTS.md`` and the exact published numbers. It is
   HUMBLING (the scaffold did not lift an already-competent model) and also not significant at N=40.
@@ -88,9 +88,10 @@ def _internal_lift(paired_path: Path) -> dict[str, Any]:
         },
         "source": "bench/local_lift/results/paired.json",
         "note": (
-            "A cheap weak model + Chimera's retry loop vs the cheap model alone. Promising (+50pp) but "
-            "n=6 and NOT statistically significant — the paired CI includes 0. We don't re-roll for "
-            "significance."
+            "A cheap weak model + Chimera's retry loop vs the cheap model alone, on a pre-registered "
+            "mixed-difficulty suite. The lift comes from tasks the loop RECOVERED (raw fail → verified "
+            "pass) with no regressions — but it is NOT statistically significant (the paired CI includes "
+            "0; too few discordant pairs). We report it as measured and don't re-roll for significance."
         ),
     }
 

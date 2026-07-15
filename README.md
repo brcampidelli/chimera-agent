@@ -58,7 +58,7 @@ reverse-engineering study of five leaders (OpenClaw, Hermes, nanobot, CrewAI, La
 
 - 🧬 **Self-evolution with a fitness signal.** The others "learn" by appending whatever happened, or by human pull requests — nothing measures whether a learned change actually helped. Chimera keeps a change **only when a verified result proves it did**: the evolution step is gated on the real working-tree diff and an honest A/B, never the model's say-so. Independent evidence this matters: [EvoAgentBench (arXiv 2607.05202)](https://arxiv.org/abs/2607.05202) measured that *automatic*, ungated experience-encoding methods routinely produce **negative transfer** — one popular method regressed **−12.3 points** on tasks it wasn't tuned on. Chimera's gate now also runs a **transfer holdout**: a learned change must not regress a disjoint, same-capability slice before it's promoted, so it can't just memorize its own eval.
 - 🛡️ **Security by architecture.** Prompt injection is now widely considered *unpatchable*; the popular agents mitigate at the app layer or declare it out of scope (one shipped 135k publicly-exposed instances and a marketplace ~12% full of malicious skills). Chimera tracks taint provenance end-to-end, strips control tokens from untrusted content, narrows tool access on a tainted run, guards side-effecting retries, and runs untrusted code in an opt-in locked-down container.
-- 📊 **Honest, published benchmarks.** ~20% of a popular leaderboard's "solved" cases are actually wrong. Chimera reports every number with a confidence interval — **including the runs where it didn't win** — and never re-rolls for significance. A recorded paired run shows the full loop **tripling a weak model's pass rate (17% → 67%)**, reported one pair short of significance, honestly. And on the **official Terminal-Bench**, a pre-registered N=40 A/B landed at a **variance-dominated floor with no significant difference either way** — published as-is ([`bench/terminal_bench/RESULTS.md`](bench/terminal_bench/RESULTS.md)), including **retracting a wrong intermediate read** once the control arm was measured. Null results and self-corrections ship too; that's the point.
+- 📊 **Honest, published benchmarks.** ~20% of a popular leaderboard's "solved" cases are actually wrong. Chimera reports every number with a confidence interval — **including the runs where it didn't win** — and never re-rolls for significance. A recorded paired run shows the loop **lifting a weak model on a pre-registered 15-task suite — 60% → 73% (+13pp), from two tasks it recovered (raw fail → verified pass) with zero regressions** — reported honestly as not-yet-significant. And on the **official Terminal-Bench**, a pre-registered N=40 A/B landed at a **variance-dominated floor with no significant difference either way** — published as-is ([`bench/terminal_bench/RESULTS.md`](bench/terminal_bench/RESULTS.md)), including **retracting a wrong intermediate read** once the control arm was measured. Null results and self-corrections ship too; that's the point.
 
 **In one line: the governed, self-evolving agent — proved and governed.** It's alpha, and it says so.
 
@@ -68,10 +68,11 @@ Two recorded numbers, both true, published together on purpose — one promising
 yet statistically significant. (Also surfaced in the desktop app's **Maturity & Benchmarks** screen,
 straight from the shipped snapshot.)
 
-- **Weak-model lift (promising).** A cheap model (`mistral-small-3.2-24b`) + Chimera's retry loop vs
-  the same model alone: **16.7% → 66.7% (+50pp)**, but **n=6, 95% CI [−6.1%, +50%] — not statistically
-  significant** (the CI includes 0). Internal Docker-free suite (`local_lift`), pytest-graded — **NOT**
-  SWE-bench/Terminal-Bench. Source: [`bench/local_lift/results/paired.json`](bench/local_lift/results/paired.json).
+- **Weak-model lift (modest, honest).** A cheap model (`mistral-small-3.2-24b`) + Chimera's retry loop
+  vs the same model alone, on a pre-registered 15-task suite: **60.0% → 73.3% (+13.3pp)** — the lift is
+  two tasks the loop recovered (raw fail → verified pass) with **zero regressions** — but **n=15, 95%
+  CI [−4.2%, +13.3%] — not statistically significant** (the CI includes 0). Internal Docker-free suite
+  (`local_lift`), pytest-graded — **NOT** SWE-bench/Terminal-Bench. Source: [`bench/local_lift/results/paired.json`](bench/local_lift/results/paired.json).
 - **Terminal-Bench (humbling).** Pre-registered N=40 A/B on the official benchmark, same model both
   arms (`deepseek-chat-v3.1`): **7.5% → 2.5%** with the scaffold, paired **Δ −5.0pp, 95% CI [−5.0%,
   +1.6%] — not significant**. The scaffold **did not lift an already-competent model** (this isn't the

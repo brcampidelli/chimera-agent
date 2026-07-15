@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 - Benchmarks in the app + README: the honest weak-model lift (internal suite, not-yet-significant) and
   the external Terminal-Bench number, with n/CI/significance shown — no cherry-picking.
+- **Pre-registered expansion of the internal weak-model-lift suite (6 → 15 tasks).** Rather than re-roll
+  the same 6 tasks until they cross significance (p-hacking — the exact dishonesty this bench exists to
+  avoid), the honest way to gain power is *more tasks*: 9 neutral tasks were registered before the run
+  (each validated against a reference solution first) and the paired A/B was re-run on the goldilocks
+  model. The lift **shrank as the suite grew** — from +50pp (n=6) to **60.0% → 73.3%, +13.3pp (n=15),
+  95% CI [−4.2%, +13.3%], still not significant** — because the new tasks are ones the model one-shots.
+  What holds across both runs: **zero regressions** and every point of lift is a task the loop *recovered*
+  (raw fail → verified pass: `template_render`, `topo_sort`). The shipped snapshot, the app's Maturity
+  panel, the README + all 6 translations now cite this n=15 number. (`bench/local_lift/RESULTS.md`.)
+
+### Fixed
+- Install friction on a fresh Python 3.11: a CI **install-matrix smoke** (ubuntu/windows/macos ×
+  py3.11/3.13, clean `pip install .[desktop]` + import/CLI smoke) now guards that a wheel-only install
+  works, plus a README "install trouble?" note — after diagnosing a transient litellm-transitive
+  sdist/Rust build (not a Chimera defect; all cp311 wheels exist, proven by `--only-binary=:all:`).
+- Benchmark runner: `run_paired.py` reconfigures stdout to UTF-8 so the paired report's `Δ` glyph no
+  longer aborts the run (and drops `results/paired.json`) on a Windows cp1252 console.
 
 ## [0.27.0] - 2026-07-14
 

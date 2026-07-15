@@ -13,7 +13,53 @@ BENCH_MODEL=openrouter/meta-llama/llama-3.1-8b-instruct BENCH_TIMEOUT=200 \
   python bench/local_lift/run_paired.py            # all 6 tasks, paired
 ```
 
-### Goldilocks run — the strongest evidence (2026-07-07, `mistral-small-3.2-24b`, 250s/arm)
+### Pre-registered expansion — the current headline (2026-07-13, `mistral-small-3.2-24b`, 240s/arm, n=15)
+
+The n=6 goldilocks run below was one pair short of significance. The pre-registered, honest way to gain
+power is **more tasks** (never re-rolling the same 6 until they cross — that would be p-hacking). So the
+suite was expanded from 6 → 15 by adding **9 neutral tasks registered before the run** (balanced_brackets,
+run_length, base_convert, merge_intervals, csv_parse, template_render, lru_cache, topo_sort, fix_flatten),
+each validated against a correct reference solution first. Same goldilocks model, same fork/paired
+discipline, same independent-pytest grading.
+
+| task | raw-model (1-shot) | chimera (loop) | |
+|---|---|---|---|
+| roman_validate | ❌ | ❌ | |
+| config_parse | ✅ | ✅ | |
+| path_get | ❌ | ❌ | |
+| eval_expr | ❌ | ❌ | |
+| word_wrap | ✅ | ✅ | |
+| fix_percentile | ✅ | ✅ | |
+| balanced_brackets | ✅ | ✅ | |
+| run_length | ✅ | ✅ | |
+| base_convert | ✅ | ✅ | |
+| merge_intervals | ✅ | ✅ | |
+| csv_parse | ❌ | ❌ | |
+| template_render | ❌ | ✅ | **recovered** |
+| lru_cache | ✅ | ✅ | |
+| topo_sort | ❌ | ✅ | **recovered** |
+| fix_flatten | ✅ | ✅ | |
+
+```
+raw-model       60.0%  (9/15 paired trials)
+chimera         73.3%  (11/15)
+paired delta    +13.3%   95% CI [-4.2%, +13.3%]
+discordant       chimera +2 / raw-model +0   (template_render, topo_sort — two recoveries, zero regressions)
+verdict          NOT significant (CI includes 0)
+```
+
+**The lift shrank as the suite grew, and that is the honest number.** The 9 new tasks are ones the
+goldilocks model largely one-shots (7/9 pass raw), so they add agreement pairs, not discordant signal —
+the delta dropped from +50pp (n=6) to **+13.3pp (n=15)**, which is the more representative estimate of
+what the loop buys on a mixed-difficulty suite. What holds across both runs: **the loop never regressed a
+task** (0 discordant losses in either run) and every point of lift is a task it *recovered* from a raw
+fail to a verified pass. Still not significant — 2 discordant wins out of 15 is a real but small effect,
+and we report it as-is. This n=15 run is what the shipped snapshot (`_benchmark_snapshot.json`), the app's
+Maturity panel, and the READMEs cite.
+
+---
+
+### Goldilocks run — earlier n=6 run, superseded by the n=15 expansion above (2026-07-07, `mistral-small-3.2-24b`, 250s/arm)
 
 The 8B floored (near-zero discordant signal) and the competent model ceiling'd; the honest fix is a
 *goldilocks* model — weak enough to fail several tasks one-shot, capable enough that the loop

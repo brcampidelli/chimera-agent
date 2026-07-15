@@ -18,6 +18,7 @@ callables, so it is unit-testable offline; `main()` wires the real `chimera solv
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shutil
@@ -101,8 +102,6 @@ def run_paired(tasks: list[dict], *, solve: SolveFn, grade: GradeFn, root: Path)
 
 
 def _real_solve(task: dict, ws: Path, arm: str) -> None:
-    import contextlib
-
     verify = f'"{sys.executable}" -m pytest -q {task["test"]}'
     argv = ["chimera", "solve", task["prompt"], "--workspace", str(ws), "--model", _MODEL,
             "--verify", verify, *_ARM_FLAGS[arm]]
@@ -120,6 +119,10 @@ def _real_grade(task: dict, ws: Path) -> bool:
 
 
 def main() -> None:
+    # The paired report prints a Δ (delta) glyph; on a Windows cp1252 console that raised
+    # UnicodeEncodeError and aborted BEFORE results/paired.json was written. Make stdout UTF-8-safe.
+    with contextlib.suppress(Exception):  # best-effort console fix; never block the run
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
     tasks = [t for t in TASKS if not _ONLY or t["id"] in _ONLY]
     print(f"paired experiment · model={_MODEL} · tasks={len(tasks)} · timeout={_TIMEOUT}s/arm", flush=True)
     root = Path(tempfile.mkdtemp(prefix="chimpaired-"))
