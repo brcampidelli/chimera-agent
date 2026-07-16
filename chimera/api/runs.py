@@ -13,6 +13,7 @@ guard supplies the types for static checking only.
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -24,6 +25,12 @@ if TYPE_CHECKING:
     from chimera.core.autonomous import AutonomousResult
 
 _log = get_logger("api.runs")
+
+# Serializes concurrent appends to a run log. The Agent Manager runs several autonomous tasks in
+# parallel threads, each persisting a receipt to the SAME runs.jsonl; without this a large receipt
+# line (diffs) could interleave with another and be dropped as malformed on load. In-process only —
+# a single-user local app doesn't share the log across processes.
+_append_lock = threading.Lock()
 
 
 class FileDiffReceipt(BaseModel):
@@ -100,8 +107,10 @@ def append_run(path: Path, receipt: RunReceipt) -> None:
     """Append one run receipt as a JSON line."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(receipt.model_dump_json() + "\n")
+    line = receipt.model_dump_json() + "\n"
+    # One writer at a time so parallel-batch receipts can't interleave into a corrupt line.
+    with _append_lock, path.open("a", encoding="utf-8") as handle:
+        handle.write(line)
 
 
 def load_runs(path: Path) -> list[RunReceipt]:

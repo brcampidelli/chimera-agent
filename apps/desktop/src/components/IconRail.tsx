@@ -8,6 +8,7 @@ import {
   Network,
   BarChart3,
   ListChecks,
+  Boxes,
   FileCode2,
   Wrench,
   Plug,
@@ -31,6 +32,7 @@ export type View =
   | "usage"
   | "runs"
   | "code"
+  | "agents"
   | "tools"
   | "mcp"
   | "governance"
@@ -47,6 +49,7 @@ const NAV: { view: View; labelKey: string; icon: ComponentType<{ className?: str
   { view: "usage", labelKey: "nav.usage", icon: BarChart3 },
   { view: "runs", labelKey: "nav.runs", icon: ListChecks },
   { view: "code", labelKey: "nav.code", icon: FileCode2 },
+  { view: "agents", labelKey: "nav.agents", icon: Boxes },
   { view: "tools", labelKey: "nav.tools", icon: Wrench },
   { view: "mcp", labelKey: "nav.mcp", icon: Plug },
   { view: "governance", labelKey: "nav.governance", icon: Shield },

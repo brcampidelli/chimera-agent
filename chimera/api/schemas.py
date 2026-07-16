@@ -307,6 +307,31 @@ class RunReceiptOut(BaseModel):
     attempts: list[AttemptReceiptOut]  # the per-attempt verify-or-revert proof trail
 
 
+# --- agents (a parallel batch of isolated autonomous runs — the Agent Manager) --------------------
+# The terminal ``batch_done`` shape of ``POST /api/agents``. SSE can't carry a ``response_model``, so
+# these are surfaced to OpenAPI (and the generated TS types) via ``GET /api/agents/schema`` — exactly
+# how ``RunReceiptOut`` reaches the schema through ``GET /api/runs``. Every field is real, already-
+# computed evidence: the per-task ``AutonomousResult`` (success/attempts/reverted + its real per-file
+# diffs, via ``build_receipt``) and the worktree merge outcome (``conflicts``/``merged``/``is_repo``).
+
+
+class AgentResultOut(BaseModel):
+    index: int  # the task's position in the request (0-based) — tags this task's live event frames
+    task: str  # the task text, truncated
+    success: bool  # the AutonomousResult's real success flag (verify-or-revert passed)
+    attempts: int  # how many verify-or-revert attempts this task took
+    reverted: bool  # any attempt was rolled back after verification failed
+    changed_paths: list[str]  # files this task's worktree changed (merged back unless a conflict)
+    diffs: list[FileDiffOut]  # the terminal attempt's real per-file unified diffs (never fabricated)
+
+
+class AgentsBatchOut(BaseModel):
+    results: list[AgentResultOut]  # one per task, in request order
+    conflicts: list[str]  # files ≥2 successful tasks BOTH changed — left UNMERGED, surfaced, never hidden
+    merged: int  # changed files copied back to the real workspace across all tasks
+    is_repo: bool  # the workspace is a git repo — isolation is REAL only then (else in-place, no isolation)
+
+
 # --- filesystem (read-only tree + file viewer for the Code screen) --------------------------------
 
 

@@ -4,6 +4,26 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.30.0] - 2026-07-15
+
+### Added
+- **Desktop "Agent Manager" screen — parallel isolated multi-task runs.** A new screen (and
+  `POST /api/agents` SSE endpoint) that runs SEVERAL coding tasks concurrently, each in its **own git
+  worktree** — the same `chimera solve-batch` isolation machinery reused end to end. A live board shows
+  one card per task (status streamed from per-task-tagged events), then each task's real result: pass/
+  fail, attempt count, changed files, and a collapsible per-file diff — all from the actual
+  `AutonomousResult` (nothing fabricated). A batch summary bar surfaces the merged-file count and,
+  prominently, the **real cross-task conflicts**: files two or more successful tasks both changed are
+  left **unmerged** (neither version silently wins) and listed for you to resolve, never hidden.
+  - **Git-only isolation, stated honestly.** Isolation is real only inside a git repo; outside one the
+    tasks run **in-place with no isolation** (concurrent edits can collide, conflicts can't be detected).
+    The endpoint returns `is_repo`, and the UI shows an explicit banner when it's false — it never
+    implies isolation happened when it didn't.
+  - The SSE `batch_done` shape is exposed to OpenAPI (and the generated TS types) via a companion
+    `GET /api/agents/schema`, mirroring how the run-receipt types reach the schema through `GET /api/runs`.
+  - This MVP has **no mid-run cancel/pause/steer controls** (no fake buttons). Live cancel/steer of an
+    in-flight batch is future work. The existing single-run "Code" screen is unchanged.
+
 ## [0.29.0] - 2026-07-15
 
 ### Added

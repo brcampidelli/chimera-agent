@@ -1,4 +1,5 @@
 import type {
+  AgentsBatch,
   AppConfig,
   ConfigTest,
   CronJob,
@@ -361,6 +362,105 @@ function dispatchRun(frame: string, h: RunStreamHandlers): void {
   }
   if (event === "event") h.onEvent?.(payload as unknown as RunEvent);
   else if (event === "done") h.onDone?.(payload as unknown as RunDone);
+  else if (event === "error") h.onError?.(payload.message as string);
+}
+
+// --- Agents (the Agent Manager: a parallel batch of isolated autonomous runs, streamed) ---
+
+export interface AgentTaskInput {
+  task: string;
+  // A shell command that judges THIS task (exit 0 = pass), run in the task's isolated worktree.
+  verify?: string | null;
+}
+
+export interface AgentsRequestInput {
+  tasks: AgentTaskInput[];
+  workspace?: string | null;
+  max_workers?: number;
+  // The worker's model slug (omitted / null = the configured default) and the routing mode.
+  model?: string | null;
+  fuse?: boolean;
+  cascade?: boolean;
+}
+
+/** The `start` frame: the batch is underway (the task list + the resolved workspace). */
+export interface AgentsStart {
+  tasks: string[];
+  workspace: string;
+  max_workers: number;
+}
+
+/** One live progress frame, TAGGED with `index` so the board routes it to the right task card. It's a
+ *  run `event` (an AgentEvent, serialized) — same shape as {@link RunEvent}, which already carries the
+ *  optional `index`. */
+export type AgentTaggedEvent = RunEvent & { index: number };
+
+export interface AgentsStreamHandlers {
+  onStart?: (s: AgentsStart) => void;
+  onEvent?: (e: AgentTaggedEvent) => void;
+  onBatchDone?: (b: AgentsBatch) => void;
+  onError?: (msg: string) => void;
+}
+
+/** Trigger a parallel batch of autonomous runs (each in its OWN git worktree) and stream progress.
+ *  Mirrors {@link streamRun}: the SSE lives on a POST, so we read the body and parse the frames —
+ *  `start`, per-task tagged `event`s, a terminal `batch_done`, or `error`. This WRITES files and runs
+ *  each verify command in the workspace (same capability as `chimera solve-batch`). Isolation is REAL
+ *  only in a git repo; `batch_done.is_repo === false` means the tasks ran in-place, without it. */
+export async function streamAgents(
+  req: AgentsRequestInput,
+  handlers: AgentsStreamHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch("/api/agents", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(req),
+      signal,
+    });
+  } catch (err) {
+    handlers.onError?.(err instanceof Error ? err.message : "network error");
+    return;
+  }
+  if (!res.ok || !res.body) {
+    handlers.onError?.(`HTTP ${res.status}`);
+    return;
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
+    let sep: number;
+    while ((sep = buffer.indexOf("\n\n")) !== -1) {
+      dispatchAgents(buffer.slice(0, sep), handlers);
+      buffer = buffer.slice(sep + 2);
+    }
+  }
+  if (buffer.trim()) dispatchAgents(buffer, handlers);
+}
+
+function dispatchAgents(frame: string, h: AgentsStreamHandlers): void {
+  let event = "message";
+  let data = "";
+  for (const line of frame.split("\n")) {
+    if (line.startsWith("event:")) event = line.slice(6).trim();
+    else if (line.startsWith("data:")) data += line.slice(5).trim();
+  }
+  if (!data) return;
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse(data);
+  } catch {
+    return;
+  }
+  if (event === "start") h.onStart?.(payload as unknown as AgentsStart);
+  else if (event === "event") h.onEvent?.(payload as unknown as AgentTaggedEvent);
+  else if (event === "batch_done") h.onBatchDone?.(payload as unknown as AgentsBatch);
   else if (event === "error") h.onError?.(payload.message as string);
 }
 

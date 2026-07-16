@@ -13,6 +13,7 @@ import { Fusion } from "@/components/Fusion";
 import { Usage } from "@/components/Usage";
 import { Runs } from "@/components/Runs";
 import { Code } from "@/components/Code";
+import { Agents } from "@/components/Agents";
 import { Governance } from "@/components/Governance";
 import { Maturity } from "@/components/Maturity";
 import { Tools } from "@/components/Tools";
@@ -196,6 +197,7 @@ export default function App() {
         {view === "usage" && <Usage />}
         {view === "runs" && <Runs />}
         {view === "code" && <Code />}
+        {view === "agents" && <Agents />}
         {view === "tools" && <Tools />}
         {view === "mcp" && <Mcp />}
         {view === "governance" && <Governance />}

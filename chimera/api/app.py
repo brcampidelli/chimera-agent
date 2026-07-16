@@ -34,6 +34,7 @@ from chimera.api.governance import read_audit, run_injection_suite
 from chimera.api.maturity_api import maturity_report
 from chimera.api.runs import load_runs
 from chimera.api.schemas import (
+    AgentsBatchOut,
     BenchmarksOut,
     ConfigOut,
     ConfigTestOut,
@@ -72,7 +73,8 @@ from chimera.providers.gateway import SupportsComplete
 from chimera.telemetry import get_logger
 
 if TYPE_CHECKING:
-    from chimera.core.autonomous import AutonomousAgent
+    from chimera.core.autonomous import AutonomousAgent, AutonomousResult
+    from chimera.orchestration import IsolatedBatch
 
 _log = get_logger("api.app")
 
@@ -155,6 +157,37 @@ class RunRequest(BaseModel):
 # A builder for the per-run autonomous agent, injectable so the endpoint is testable without a real
 # LLM (a test passes a factory that returns a stubbed-worker agent — see tests/test_api.py).
 SolveAgentFactory = Callable[[RunRequest, Path, EventSink, "Settings"], "AutonomousAgent"]
+
+
+class AgentTaskIn(BaseModel):
+    task: str
+    verify: str | None = None
+    """A shell command that judges THIS task (exit 0 == success); runs inside the task's isolated
+    worktree. None = no executable verifier for this task (the Manager's approval is then its gate)."""
+
+
+class AgentsRequest(BaseModel):
+    """A batch of coding tasks for the Agent Manager: each runs concurrently in its OWN git worktree.
+
+    Mirrors ``chimera solve-batch``. Isolation is REAL only in a git repo — outside one the tasks run
+    in-place against ``workspace`` with no isolation (so concurrent edits can collide and conflicts
+    can't be detected); the response's ``is_repo`` flag says which happened, honestly."""
+
+    tasks: list[AgentTaskIn]
+    workspace: str | None = None
+    """The workspace root (ideally a git repo, to isolate). None = the app's launch workspace."""
+    max_workers: int = 4
+    """Max concurrent isolated workers (clamped 1..8)."""
+    model: str | None = None
+    """The model slug every task's worker runs on. None = the configured default model."""
+    fuse: bool = False
+    """Route each worker through the fusion engine (same wiring as ``chimera solve --fuse``)."""
+    cascade: bool = False
+    """Route each worker through the FrugalGPT cascade (same wiring as ``chimera solve --cascade``).
+    Takes precedence over ``fuse``."""
+
+
+_MAX_AGENT_TASKS = 8
 
 
 def _require_token() -> Callable[[Request], None]:
@@ -386,6 +419,97 @@ def build_api_app(
         # Each run is independent (its own agent + workspace snapshot), so no per-session lock is
         # needed. A client disconnecting mid-run leaves the worker to finish (an LLM call can't be
         # cleanly cancelled); the queue is drained-or-dropped, so memory stays bounded per run.
+        threading.Thread(target=work, daemon=True).start()
+
+        async def events() -> AsyncIterator[dict[str, str]]:
+            while True:
+                item = await queue.get()
+                if item is None:
+                    break
+                event, payload = item
+                yield {"event": event, "data": json.dumps(payload)}
+
+        return EventSourceResponse(events())
+
+    @app.get("/api/agents/schema", dependencies=[guard], response_model=AgentsBatchOut)
+    def agents_schema_endpoint() -> dict[str, Any]:
+        # An SSE stream can't declare a response_model, so the ``batch_done`` payload shape is surfaced
+        # to OpenAPI (and the generated TS types) HERE — exactly as ``RunReceiptOut`` reaches the schema
+        # via GET /api/runs. Returns the empty batch: an honest, side-effect-free shape sample, never
+        # fabricated results. The real batch arrives over POST /api/agents's ``batch_done`` frame.
+        return {"results": [], "conflicts": [], "merged": 0, "is_repo": False}
+
+    @app.post("/api/agents", dependencies=[guard])
+    async def agents_stream(req: AgentsRequest) -> EventSourceResponse:
+        # In-app "Agent Manager": run SEVERAL coding tasks concurrently, EACH in its own git worktree
+        # (``chimera solve-batch`` semantics), streamed live as SSE. Same safety posture as POST /api/runs
+        # — every task writes files + runs its verify command inside ``ws``, behind the bearer guard and
+        # the localhost bind. Isolation is REAL only in a git repo; outside one the tasks run in-place
+        # (no isolation, conflicts undetectable) — surfaced honestly via the terminal frame's ``is_repo``.
+        if not req.tasks:
+            raise HTTPException(status_code=400, detail="no tasks")
+        if len(req.tasks) > _MAX_AGENT_TASKS:
+            raise HTTPException(status_code=400, detail=f"too many tasks (max {_MAX_AGENT_TASKS})")
+        ws = Path(req.workspace).expanduser().resolve() if req.workspace else workspace
+        max_workers = max(1, min(8, req.max_workers))
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue[tuple[str, Any] | None] = asyncio.Queue()
+
+        def emit(event: str, payload: Any) -> None:
+            loop.call_soon_threadsafe(queue.put_nowait, (event, payload))
+
+        def make_run(index: int, spec: AgentTaskIn) -> Callable[[Path], AutonomousResult]:
+            # Reuse the exact single-run builder (``solve_factory`` == _build_solve_agent by default, or
+            # the injected test factory) per task, framing a RunRequest from the shared batch knobs. The
+            # closure receives its ISOLATED worktree path ``ws_i`` and runs the agent there.
+            sub = RunRequest(
+                task=spec.task,
+                verify=spec.verify,
+                max_attempts=3,
+                model=req.model,
+                fuse=req.fuse,
+                cascade=req.cascade,
+            )
+
+            def run(ws_i: Path) -> AutonomousResult:
+                # Tag EVERY event with this task's index so the board can route it to the right card.
+                # The task index is set LAST so it always wins: an ``attempt``/``result`` event's own
+                # ``data["index"]`` (the attempt number) must NOT clobber the task tag — the attempt
+                # number is still carried in the event's ``text`` (e.g. "attempt 2/3").
+                def on_event(event: AgentEvent) -> None:
+                    emit("event", {**_event_dict(event), "index": index})
+
+                agent = solve_factory(sub, ws_i, on_event, settings)
+                return agent.run(spec.task)
+
+            return run
+
+        def work() -> None:
+            try:
+                from chimera.orchestration import run_isolated
+
+                emit(
+                    "start",
+                    {
+                        "tasks": [t.task for t in req.tasks],
+                        "workspace": str(ws),
+                        "max_workers": max_workers,
+                    },
+                )
+                units = [(f"task{i}", make_run(i, t)) for i, t in enumerate(req.tasks)]
+                batch = run_isolated(
+                    ws, units, succeeded=lambda r: r.success, max_workers=max_workers
+                )
+                emit("batch_done", _agents_batch_dict(req, ws, batch))
+            except Exception as exc:  # noqa: BLE001 — surfaced to the client as an error event
+                _log.warning("agents batch failed: %s", exc)
+                emit("error", {"message": "the batch failed"})
+            finally:
+                loop.call_soon_threadsafe(queue.put_nowait, None)  # sentinel: end of stream
+
+        # Each task is independent (its own agent + isolated worktree). A client disconnecting mid-batch
+        # leaves the workers to finish (an LLM call can't be cleanly cancelled); the queue is drained-or-
+        # dropped, so memory stays bounded per batch.
         threading.Thread(target=work, daemon=True).start()
 
         async def events() -> AsyncIterator[dict[str, str]]:
@@ -667,6 +791,58 @@ def _event_dict(event: AgentEvent) -> dict[str, Any]:
     """
     data = {k: v for k, v in event.data.items() if k != "answer"}
     return {"kind": event.kind, "text": event.text, **data}
+
+
+def _agents_batch_dict(req: AgentsRequest, ws: Path, batch: IsolatedBatch[Any]) -> dict[str, Any]:
+    """Build the terminal ``batch_done`` payload from a real ``IsolatedBatch`` — no fabrication.
+
+    Per task, the ``AutonomousResult`` (``batch.results[i].value``) carries the true success/attempts/
+    reverted flags, and ``build_receipt`` gives its real per-file diffs (we take the terminal attempt's,
+    the final on-disk state for a success / what the last failed attempt attempted). ``changed_paths``
+    is the worktree's authoritative merged set. ``conflicts``/``merged`` come straight off the batch;
+    ``is_repo`` says whether isolation actually happened (it's a no-op outside a git repo).
+    """
+    from chimera.api.runs import build_receipt
+    from chimera.core.worktree import is_git_repo
+
+    ts = datetime.now(UTC).isoformat()
+    results: list[dict[str, Any]] = []
+    for index, (spec, isolated) in enumerate(zip(req.tasks, batch.results, strict=True)):
+        auto = isolated.value  # AutonomousResult | None (None if the unit itself crashed)
+        if auto is not None:
+            receipt = build_receipt(auto, spec.task, spec.verify, ts)
+            terminal = receipt.attempts[-1] if receipt.attempts else None
+            diffs = [d.model_dump() for d in (terminal.diffs if terminal else [])]
+            results.append(
+                {
+                    "index": index,
+                    "task": (spec.task or "")[:2000],
+                    "success": auto.success,
+                    "attempts": len(auto.attempts),
+                    "reverted": any(a.reverted for a in auto.attempts),
+                    "changed_paths": isolated.changed_paths,
+                    "diffs": diffs,
+                }
+            )
+        else:
+            # The unit crashed before returning a result (isolation caught it) — honest empty shape.
+            results.append(
+                {
+                    "index": index,
+                    "task": (spec.task or "")[:2000],
+                    "success": False,
+                    "attempts": 0,
+                    "reverted": False,
+                    "changed_paths": isolated.changed_paths,
+                    "diffs": [],
+                }
+            )
+    return {
+        "results": results,
+        "conflicts": batch.conflicts,
+        "merged": batch.merged,
+        "is_repo": is_git_repo(ws),
+    }
 
 
 def _audit_event(entry: dict[str, Any]) -> dict[str, Any]:

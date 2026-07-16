@@ -240,6 +240,145 @@ def test_post_runs_streams_events_done_and_persists_receipt(tmp_path: Any) -> No
     assert listed[0]["task"] == "make it so"
 
 
+# --- Agent Manager (POST /api/agents: parallel isolated multi-task batch) --------------------------
+
+
+def _init_repo(path: Any) -> None:
+    """Init a throwaway git repo with one committed seed file (worktree isolation needs a repo)."""
+    import subprocess
+
+    path.mkdir(parents=True, exist_ok=True)
+    for args in (
+        ["init"],
+        ["config", "user.email", "t@t.co"],
+        ["config", "user.name", "t"],
+    ):
+        subprocess.run(["git", *args], cwd=path, capture_output=True, text=True, check=True)
+    (path / "seed.txt").write_text("seed", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=path, capture_output=True, text=True, check=True)
+    subprocess.run(["git", "commit", "-m", "init"], cwd=path, capture_output=True, text=True, check=True)
+
+
+class _WritingAgent:
+    """A stub 'agent' the injected factory returns: emits one tagged event, writes ONE file into its
+    (isolated) workspace, and reports a successful single-attempt AutonomousResult. Writing a real file
+    is what makes the worktree record a changed path — so conflict detection is exercised for real."""
+
+    def __init__(self, ws: Any, on_event: Any, rel: str, content: str) -> None:
+        self.ws, self.on_event, self.rel, self.content = ws, on_event, rel, content
+
+    def run(self, task: str) -> Any:
+        from chimera.core.autonomous import Attempt, AutonomousResult
+        from chimera.core.events import AgentEvent
+
+        self.on_event(AgentEvent(kind="status", text="working"))
+        # An `attempt` event carries its OWN `index` (the attempt number) in `data`. The endpoint must
+        # still tag the frame with the TASK index — this proves the task tag isn't clobbered by it.
+        self.on_event(AgentEvent(kind="attempt", text="attempt 1/1", data={"index": 1, "max_attempts": 1}))
+        (self.ws / self.rel).write_text(self.content, encoding="utf-8")
+        return AutonomousResult(
+            answer="done",
+            success=True,
+            attempts=[
+                Attempt(
+                    index=0, answer="done", approved=True, verified=True, reverted=False, success=True
+                )
+            ],
+        )
+
+
+def _agents_client(tmp_path: Any, rel_for: Callable[[str], str]) -> TestClient:
+    """A TestClient whose injected solve factory returns a _WritingAgent writing `rel_for(task)`."""
+    from chimera.api import build_api_app
+    from chimera.api.app import RunRequest
+    from chimera.core.events import EventSink
+
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+
+    def factory(req: RunRequest, ws: Any, on_event: EventSink, _settings: Any) -> Any:
+        return _WritingAgent(ws, on_event, rel_for(req.task), req.task)
+
+    return TestClient(
+        build_api_app(lambda: ChatSession(_FakeAgent()), settings=settings, solve_agent_factory=factory)
+    )
+
+
+def test_post_agents_streams_tagged_events_and_batch_done(tmp_path: Any) -> None:
+    """Two tasks run concurrently, each in its own worktree, writing DISJOINT files. Every live `event`
+    frame is tagged with its task index, and the terminal `batch_done` reports both merged, no conflict."""
+    ws = tmp_path / "ws"
+    _init_repo(ws)
+    client = _agents_client(tmp_path, lambda task: "a.txt" if "alpha" in task else "b.txt")
+
+    resp = client.post(
+        "/api/agents",
+        json={"tasks": [{"task": "alpha work"}, {"task": "beta work"}], "workspace": str(ws)},
+    )
+    assert resp.status_code == 200
+    events = _read_sse(resp.text)
+    kinds = [e for e, _ in events]
+    assert kinds[0] == "start" and kinds[-1] == "batch_done"
+    start = events[0][1]
+    assert start["tasks"] == ["alpha work", "beta work"] and start["workspace"] == str(ws)
+
+    # Every streamed `event` frame carries a task index + the AgentEvent kind/text (compact).
+    tagged = [d for e, d in events if e == "event"]
+    assert tagged and all("index" in d and "kind" in d and "text" in d for d in tagged)
+    assert {d["index"] for d in tagged} == {0, 1}  # both tasks streamed progress, correctly tagged
+    # The `attempt` frames' own data-index (1) never clobbers the task tag: every tagged frame's
+    # index is a valid TASK index (0 or 1), and both tasks' attempt frames say "attempt 1/1".
+    attempts = [d for d in tagged if d["kind"] == "attempt"]
+    assert len(attempts) == 2 and all(d["index"] in (0, 1) and d["text"] == "attempt 1/1" for d in attempts)
+
+    bd = next(d for e, d in events if e == "batch_done")
+    assert bd["is_repo"] is True  # a git repo → isolation was REAL
+    assert bd["merged"] == 2 and bd["conflicts"] == []  # disjoint files both merged, no conflict
+    assert {r["index"] for r in bd["results"]} == {0, 1}
+    assert all(r["success"] for r in bd["results"])
+    assert sorted(p for r in bd["results"] for p in r["changed_paths"]) == ["a.txt", "b.txt"]
+    # The disjoint edits landed back in the real workspace.
+    assert (ws / "a.txt").exists() and (ws / "b.txt").exists()
+
+
+def test_post_agents_reports_same_file_conflict(tmp_path: Any) -> None:
+    """Two successful tasks that BOTH change the same file: the collision is reported in `conflicts`
+    and left UNMERGED (neither version silently wins) — the honest cross-task conflict signal."""
+    ws = tmp_path / "ws"
+    _init_repo(ws)
+    client = _agents_client(tmp_path, lambda _task: "shared.txt")  # both tasks target the same path
+
+    resp = client.post(
+        "/api/agents",
+        json={"tasks": [{"task": "one"}, {"task": "two"}], "workspace": str(ws)},
+    )
+    bd = next(d for e, d in _read_sse(resp.text) if e == "batch_done")
+    assert bd["conflicts"] == ["shared.txt"]  # both touched it → flagged
+    assert bd["merged"] == 0  # neither version merged
+    assert not (ws / "shared.txt").exists()  # left for the user to resolve, not clobbered
+
+
+def test_post_agents_non_git_repo_sets_is_repo_false(tmp_path: Any) -> None:
+    """Outside a git repo, tasks run in-place with NO isolation — the response says so honestly via
+    `is_repo: false` (and no changed_paths are tracked, since there's no worktree to diff)."""
+    ws = tmp_path / "plain"
+    ws.mkdir()
+    client = _agents_client(tmp_path, lambda _task: "x.txt")
+
+    resp = client.post("/api/agents", json={"tasks": [{"task": "t"}], "workspace": str(ws)})
+    bd = next(d for e, d in _read_sse(resp.text) if e == "batch_done")
+    assert bd["is_repo"] is False  # not a repo → ran in-place, no isolation
+    assert bd["results"][0]["changed_paths"] == []  # no worktree, nothing to diff
+    assert (ws / "x.txt").read_text(encoding="utf-8") == "t"  # the edit happened in-place
+
+
+def test_post_agents_rejects_empty_and_oversized_task_lists(tmp_path: Any) -> None:
+    """Guardrails: an empty task list is a 400; more than the cap (8) is a 400."""
+    client = _agents_client(tmp_path, lambda _task: "x.txt")
+    assert client.post("/api/agents", json={"tasks": []}).status_code == 400
+    too_many = {"tasks": [{"task": f"t{i}"} for i in range(9)]}
+    assert client.post("/api/agents", json=too_many).status_code == 400
+
+
 def test_plan_endpoint_returns_steps_and_makes_no_edits(tmp_path: Any, monkeypatch: Any) -> None:
     """POST /api/plan runs ONLY the planner (a single model call): it returns the concrete steps and
     touches nothing on disk. The planner is stubbed (no network) so the endpoint wiring is exercised."""

@@ -1,6 +1,167 @@
 {
   "components": {
     "schemas": {
+      "AgentResultOut": {
+        "properties": {
+          "attempts": {
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "changed_paths": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Changed Paths",
+            "type": "array"
+          },
+          "diffs": {
+            "items": {
+              "$ref": "#/components/schemas/FileDiffOut"
+            },
+            "title": "Diffs",
+            "type": "array"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "reverted": {
+            "title": "Reverted",
+            "type": "boolean"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          }
+        },
+        "required": [
+          "index",
+          "task",
+          "success",
+          "attempts",
+          "reverted",
+          "changed_paths",
+          "diffs"
+        ],
+        "title": "AgentResultOut",
+        "type": "object"
+      },
+      "AgentTaskIn": {
+        "properties": {
+          "task": {
+            "title": "Task",
+            "type": "string"
+          },
+          "verify": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verify"
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "title": "AgentTaskIn",
+        "type": "object"
+      },
+      "AgentsBatchOut": {
+        "properties": {
+          "conflicts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Conflicts",
+            "type": "array"
+          },
+          "is_repo": {
+            "title": "Is Repo",
+            "type": "boolean"
+          },
+          "merged": {
+            "title": "Merged",
+            "type": "integer"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/AgentResultOut"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "results",
+          "conflicts",
+          "merged",
+          "is_repo"
+        ],
+        "title": "AgentsBatchOut",
+        "type": "object"
+      },
+      "AgentsRequest": {
+        "description": "A batch of coding tasks for the Agent Manager: each runs concurrently in its OWN git worktree.\n\nMirrors ``chimera solve-batch``. Isolation is REAL only in a git repo \u2014 outside one the tasks run\nin-place against ``workspace`` with no isolation (so concurrent edits can collide and conflicts\ncan't be detected); the response's ``is_repo`` flag says which happened, honestly.",
+        "properties": {
+          "cascade": {
+            "default": false,
+            "title": "Cascade",
+            "type": "boolean"
+          },
+          "fuse": {
+            "default": false,
+            "title": "Fuse",
+            "type": "boolean"
+          },
+          "max_workers": {
+            "default": 4,
+            "title": "Max Workers",
+            "type": "integer"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/AgentTaskIn"
+            },
+            "title": "Tasks",
+            "type": "array"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          }
+        },
+        "required": [
+          "tasks"
+        ],
+        "title": "AgentsRequest",
+        "type": "object"
+      },
       "ApproveBody": {
         "properties": {
           "card": {
@@ -2557,6 +2718,60 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/agents": {
+      "post": {
+        "operationId": "agents_stream_api_agents_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Agents Stream"
+      }
+    },
+    "/api/agents/schema": {
+      "get": {
+        "operationId": "agents_schema_endpoint_api_agents_schema_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentsBatchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Agents Schema Endpoint"
+      }
+    },
     "/api/benchmarks": {
       "get": {
         "operationId": "benchmarks_endpoint_api_benchmarks_get",
