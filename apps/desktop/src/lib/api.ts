@@ -298,12 +298,16 @@ export interface RunDone {
   success: boolean;
   answer: string;
   attempts: number;
+  // "cancelled" when a cooperative Stop ended the run between attempts; "" for an ordinary finish.
+  stopped_reason?: string;
 }
 
 export interface RunStreamHandlers {
   onEvent?: (e: RunEvent) => void;
   onDone?: (d: RunDone) => void;
   onError?: (msg: string) => void;
+  // The run's id, delivered on the first `run` frame — the handle for POST /api/runs/{id}/cancel.
+  onRunId?: (id: string) => void;
 }
 
 /** Trigger an autonomous run and stream its live progress. Mirrors {@link streamChat}: the API's SSE
@@ -360,10 +364,16 @@ function dispatchRun(frame: string, h: RunStreamHandlers): void {
   } catch {
     return;
   }
-  if (event === "event") h.onEvent?.(payload as unknown as RunEvent);
+  if (event === "run") h.onRunId?.(payload.run_id as string);
+  else if (event === "event") h.onEvent?.(payload as unknown as RunEvent);
   else if (event === "done") h.onDone?.(payload as unknown as RunDone);
   else if (event === "error") h.onError?.(payload.message as string);
 }
+
+/** Cooperatively cancel an in-flight run: the loop halts BEFORE its next attempt (an in-flight model
+ *  step can't be interrupted). A finished/unknown id is a no-op {ok:false}, never an error. */
+export const cancelRun = (runId: string) =>
+  json<{ ok: boolean }>(`/api/runs/${encodeURIComponent(runId)}/cancel`, { method: "POST" });
 
 // --- Agents (the Agent Manager: a parallel batch of isolated autonomous runs, streamed) ---
 

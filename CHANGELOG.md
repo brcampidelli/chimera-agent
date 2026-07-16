@@ -4,6 +4,21 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Cooperative Stop for a single coding run (desktop "Code" screen).** While a run is in flight, a
+  **Stop** button appears next to Run. It cancels *cooperatively*: an in-flight model call cannot be
+  interrupted (the step is blocking), so the run halts **before its next attempt**, after the current
+  attempt finishes — the UI says exactly that (button tooltip + a "Stopping after this attempt…"
+  state), never implying an instant kill. Wiring: `AutonomousAgent` gains an optional `should_stop`
+  probe checked at the top of each attempt (default `None` ⇒ byte-identical to before); `POST /api/runs`
+  now emits a leading `run` frame carrying the run id and threads a per-run stop `Event` down; a new
+  `POST /api/runs/{run_id}/cancel` sets it (unknown/finished id ⇒ honest `{ok:false}`, 200, a no-op).
+  A cancelled run returns `AutonomousResult(success=False, stopped_reason="cancelled")`.
+  - **Future work:** per-task cancel in the parallel Agent Manager batch, and mid-run *steer* (this
+    change is cancel-only — no steering).
+
 ## [0.30.0] - 2026-07-15
 
 ### Added

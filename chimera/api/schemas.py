@@ -307,6 +307,11 @@ class RunReceiptOut(BaseModel):
     attempts: list[AttemptReceiptOut]  # the per-attempt verify-or-revert proof trail
 
 
+class CancelOut(BaseModel):
+    ok: bool  # True when the run_id was known and its stop flag was set; False for a finished/unknown id
+    # (a no-op — cancellation is COOPERATIVE: the run halts before its NEXT attempt, never mid model-call)
+
+
 # --- agents (a parallel batch of isolated autonomous runs — the Agent Manager) --------------------
 # The terminal ``batch_done`` shape of ``POST /api/agents``. SSE can't carry a ``response_model``, so
 # these are surfaced to OpenAPI (and the generated TS types) via ``GET /api/agents/schema`` — exactly

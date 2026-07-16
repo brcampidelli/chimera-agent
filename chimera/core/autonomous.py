@@ -158,6 +158,7 @@ class AutonomousResult:
     attempts: list[Attempt] = field(default_factory=list)
     plan: Plan | None = None
     paused: bool = False  # interrupted for human approval (see AutonomousAgent.pause_on_taint)
+    stopped_reason: str = ""  # why the loop ended early; "cancelled" on a cooperative stop, else ""
 
 
 class AutonomousAgent:
@@ -167,6 +168,7 @@ class AutonomousAgent:
         self,
         worker: Worker,
         *,
+        should_stop: Callable[[], bool] | None = None,
         escalate_worker: Worker | None = None,
         stagnation: StagnationDetector | None = None,
         progress_ledger: ProgressLedger | None = None,
@@ -198,6 +200,11 @@ class AutonomousAgent:
         config: AutonomousConfig | None = None,
     ) -> None:
         self.worker = worker
+        # Cooperative stop check (opt-in): consulted at the top of each attempt so a caller can cancel
+        # the run BETWEEN attempts. An in-flight worker call is a blocking model step that cannot be
+        # interrupted, so cancellation is honest — it halts before the NEXT attempt starts, never mid-
+        # call. None (the default) makes the loop byte-identical to before.
+        self.should_stop = should_stop
         self.escalate_worker = escalate_worker
         self.stagnation = stagnation
         self.progress_ledger = progress_ledger
@@ -402,6 +409,11 @@ class AutonomousAgent:
 
         self._emit(_ev_status("planning complete" if plan else "starting"))
         for index in range(start_index, self.config.max_attempts + 1):
+            # Cooperative cancel (checked BEFORE the attempt starts): an in-flight model call can't be
+            # interrupted, so a stop request halts the loop here — after the previous attempt finished,
+            # before this one begins. The already-completed attempts are returned intact.
+            if self.should_stop is not None and self.should_stop():
+                return self._finalize_cancelled(task, attempts, plan, thread_id)
             self._emit(_ev_attempt(index, self.config.max_attempts))
             snapshot = self.guard.snapshot() if self.guard else None
             prompt = self._compose(plan_task, plan, context, feedback)
@@ -415,6 +427,10 @@ class AutonomousAgent:
             )
             if worker is self.escalate_worker:
                 _log.debug("attempt %d: task proved hard, escalating retry to fusion worker", index)
+            # Re-check right before the (uninterruptible) worker call, so a stop that arrived while the
+            # snapshot was being taken still halts before we pay for a model step.
+            if self.should_stop is not None and self.should_stop():
+                return self._finalize_cancelled(task, attempts, plan, thread_id)
             agent_result = self._run_worker(worker, prompt)
             answer = agent_result.answer
 
@@ -649,6 +665,31 @@ class AutonomousAgent:
         last = attempts[-1].answer if attempts else ""
         self._emit(_ev_final(False, last))
         result = AutonomousResult(answer=last, success=False, attempts=attempts, plan=plan)
+        self._persist_receipt(result, task)
+        return result
+
+    def _finalize_cancelled(
+        self,
+        task: str,
+        attempts: list[Attempt],
+        plan: Plan | None,
+        thread_id: str | None,
+    ) -> AutonomousResult:
+        """Cooperative stop: the caller asked to cancel between attempts. Return a well-formed result
+        (``success=False``, ``stopped_reason="cancelled"``) carrying the attempts completed so far.
+
+        Deliberately NOT treated as a genuine failure: a user cancellation is not evidence the approach
+        was wrong, so it does NOT distill an anti-pattern card or credit a card failure (unlike the
+        budget-exhausted return above). The checkpoint is cleared — a user-cancelled run is terminal,
+        not resumable — and a receipt is persisted, mirroring the exhaustion path's construction.
+        """
+        self._emit(_ev_status("cancelled"))
+        self._clear_checkpoint(thread_id)
+        last = attempts[-1].answer if attempts else ""
+        self._emit(_ev_final(False, last))
+        result = AutonomousResult(
+            answer=last, success=False, attempts=attempts, plan=plan, stopped_reason="cancelled"
+        )
         self._persist_receipt(result, task)
         return result
 

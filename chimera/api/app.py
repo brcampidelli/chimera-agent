@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
+import uuid
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -36,6 +37,7 @@ from chimera.api.runs import load_runs
 from chimera.api.schemas import (
     AgentsBatchOut,
     BenchmarksOut,
+    CancelOut,
     ConfigOut,
     ConfigTestOut,
     DeletedOut,
@@ -77,6 +79,11 @@ if TYPE_CHECKING:
     from chimera.orchestration import IsolatedBatch
 
 _log = get_logger("api.app")
+
+# Live single-run cancel registry: run_id -> the threading.Event whose set() the run's cooperative
+# stop check polls. A run inserts its id on start and pops it on cleanup, so only in-flight runs are
+# cancellable; POST /api/runs/{id}/cancel sets the event. In-process only (a single-user local app).
+_run_cancels: dict[str, threading.Event] = {}
 
 
 class ChatRequest(BaseModel):
@@ -155,8 +162,11 @@ class RunRequest(BaseModel):
 
 
 # A builder for the per-run autonomous agent, injectable so the endpoint is testable without a real
-# LLM (a test passes a factory that returns a stubbed-worker agent — see tests/test_api.py).
-SolveAgentFactory = Callable[[RunRequest, Path, EventSink, "Settings"], "AutonomousAgent"]
+# LLM (a test passes a factory that returns a stubbed-worker agent — see tests/test_api.py). The
+# trailing ``should_stop`` is the cooperative-cancel probe (``None`` = no cancel wired, unchanged path).
+SolveAgentFactory = Callable[
+    [RunRequest, Path, EventSink, "Settings", "Callable[[], bool] | None"], "AutonomousAgent"
+]
 
 
 class AgentTaskIn(BaseModel):
@@ -390,6 +400,14 @@ def build_api_app(
         ws = Path(req.workspace).expanduser().resolve() if req.workspace else workspace
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue[tuple[str, Any] | None] = asyncio.Queue()
+        # Cooperative-cancel plumbing: a per-run id + stop Event. The frontend learns the id from the
+        # first `run` frame and hits POST /api/runs/{id}/cancel to set the Event; the run's stop check
+        # (event.is_set) then halts the loop before its NEXT attempt — an in-flight model call is never
+        # interrupted (it's a blocking step). Registered here, popped in the work() finally so the map
+        # never leaks past a finished run.
+        run_id = uuid.uuid4().hex
+        cancel = threading.Event()
+        _run_cancels[run_id] = cancel
 
         def emit(event: str, payload: Any) -> None:
             loop.call_soon_threadsafe(queue.put_nowait, (event, payload))
@@ -397,9 +415,13 @@ def build_api_app(
         def on_event(event: AgentEvent) -> None:
             emit("event", _event_dict(event))
 
+        # Tell the client its run_id immediately (its own SSE frame), so the Stop control can target
+        # this run from the first moment — before any attempt has run.
+        emit("run", {"run_id": run_id})
+
         def work() -> None:
             try:
-                auto = solve_factory(req, ws, on_event, settings)
+                auto = solve_factory(req, ws, on_event, settings, cancel.is_set)
                 # The receipt persists itself via the agent's run_log at run() — no extra write here.
                 result = auto.run(req.task)
                 emit(
@@ -408,17 +430,21 @@ def build_api_app(
                         "success": result.success,
                         "answer": (result.answer or "")[:2000],
                         "attempts": len(result.attempts),
+                        # Honest terminal reason: "cancelled" when a cooperative stop ended it, else "".
+                        "stopped_reason": getattr(result, "stopped_reason", ""),
                     },
                 )
             except Exception as exc:  # noqa: BLE001 — surfaced to the client as an error event
                 _log.warning("run failed: %s", exc)
                 emit("error", {"message": "the run failed"})
             finally:
+                _run_cancels.pop(run_id, None)  # done (or crashed): the run is no longer cancellable
                 loop.call_soon_threadsafe(queue.put_nowait, None)  # sentinel: end of stream
 
         # Each run is independent (its own agent + workspace snapshot), so no per-session lock is
-        # needed. A client disconnecting mid-run leaves the worker to finish (an LLM call can't be
-        # cleanly cancelled); the queue is drained-or-dropped, so memory stays bounded per run.
+        # needed. A client disconnecting mid-run leaves the worker to finish (an in-flight LLM call
+        # can't be interrupted; cancel only halts BETWEEN attempts); the queue is drained-or-dropped,
+        # so memory stays bounded per run.
         threading.Thread(target=work, daemon=True).start()
 
         async def events() -> AsyncIterator[dict[str, str]]:
@@ -430,6 +456,17 @@ def build_api_app(
                 yield {"event": event, "data": json.dumps(payload)}
 
         return EventSourceResponse(events())
+
+    @app.post("/api/runs/{run_id}/cancel", dependencies=[guard], response_model=CancelOut)
+    def cancel_run(run_id: str) -> dict[str, Any]:
+        # Cooperative cancel of a single in-flight run. Sets the run's stop Event, which its loop polls
+        # BETWEEN attempts (never mid model-call). A finished/unknown id is a no-op {ok: false} with a
+        # 200 — not a 404 — since a run that already ended is exactly the state a stale Stop click hits.
+        event = _run_cancels.get(run_id)
+        if event is None:
+            return {"ok": False}
+        event.set()
+        return {"ok": True}
 
     @app.get("/api/agents/schema", dependencies=[guard], response_model=AgentsBatchOut)
     def agents_schema_endpoint() -> dict[str, Any]:
@@ -479,7 +516,8 @@ def build_api_app(
                 def on_event(event: AgentEvent) -> None:
                     emit("event", {**_event_dict(event), "index": index})
 
-                agent = solve_factory(sub, ws_i, on_event, settings)
+                # Batch tasks aren't individually cancellable in this task (future work) — pass None.
+                agent = solve_factory(sub, ws_i, on_event, settings, None)
                 return agent.run(spec.task)
 
             return run
@@ -878,7 +916,11 @@ def _api_cascade_backend(gateway: SupportsComplete, settings: Settings) -> Suppo
 
 
 def _build_solve_agent(
-    req: RunRequest, ws: Path, on_event: EventSink, settings: Settings
+    req: RunRequest,
+    ws: Path,
+    on_event: EventSink,
+    settings: Settings,
+    should_stop: Callable[[], bool] | None = None,
 ) -> AutonomousAgent:
     """Build the PLAIN solve-core agent for the desktop trigger: plan → run → verify-or-revert → receipt.
 
@@ -943,6 +985,7 @@ def _build_solve_agent(
     provided_plan = Plan.from_text(req.plan) if req.plan else None
     return _AutonomousAgent(
         worker,
+        should_stop=should_stop,
         escalate_worker=escalate_worker,
         planner=Planner(planner_backend, req.model),
         plan=provided_plan,

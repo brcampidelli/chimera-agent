@@ -205,11 +205,16 @@ def test_post_runs_streams_events_done_and_persists_receipt(tmp_path: Any) -> No
     settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
 
     def solve_factory(
-        req: RunRequest, ws: Any, on_event: EventSink, settings: Any
+        req: RunRequest,
+        ws: Any,
+        on_event: EventSink,
+        settings: Any,
+        should_stop: Callable[[], bool] | None = None,
     ) -> AutonomousAgent:
         # No verifier / planner / manager: verify abstains → manager approves → success on attempt 1.
         return AutonomousAgent(
             _FakeWorker(),
+            should_stop=should_stop,
             guard=WorkspaceGuard(ws),
             workspace=ws,
             on_event=on_event,
@@ -226,9 +231,14 @@ def test_post_runs_streams_events_done_and_persists_receipt(tmp_path: Any) -> No
     assert resp.status_code == 200
     events = _read_sse(resp.text)
     kinds = [e for e, _ in events]
-    assert "event" in kinds and kinds[-1] == "done"
+    # Cancel is wired but never triggered here (default path): the stream still emits its normal frames
+    # — a leading `run` id frame, the `event` progress frames, and a terminal `done`.
+    assert kinds[0] == "run" and "event" in kinds and kinds[-1] == "done"
+    run_frame = next(d for e, d in events if e == "run")
+    assert isinstance(run_frame["run_id"], str) and run_frame["run_id"]
     done = next(d for e, d in events if e == "done")
     assert done["success"] is True and done["answer"] == "did it" and done["attempts"] == 1
+    assert done["stopped_reason"] == ""  # not cancelled — an ordinary completed run
     # Each streamed `event` frame carries the AgentEvent kind + text (compact, no huge answer field).
     ev = next(d for e, d in events if e == "event")
     assert "kind" in ev and "text" in ev and "answer" not in ev
@@ -238,6 +248,29 @@ def test_post_runs_streams_events_done_and_persists_receipt(tmp_path: Any) -> No
     assert len(receipts) == 1 and receipts[0].task == "make it so" and receipts[0].success is True
     listed = client.get("/api/runs").json()
     assert listed[0]["task"] == "make it so"
+
+
+def test_cancel_run_sets_known_event_and_noops_unknown(tmp_path: Any) -> None:
+    """POST /api/runs/{id}/cancel sets a KNOWN in-flight run's stop Event ({ok:true}); an unknown or
+    already-finished id is an honest no-op ({ok:false}, 200 — a stale Stop click is not a 404)."""
+    import threading as _threading
+
+    from chimera.api import app as app_module
+
+    client = _client(tmp_path)  # the endpoint reads the module-level run registry; no run needed
+    # Unknown id → {ok: false}, 200 (NOT 404) — a finished/unknown run is a no-op, never an error.
+    resp = client.post("/api/runs/nope/cancel")
+    assert resp.status_code == 200 and resp.json() == {"ok": False}
+    # Known in-flight id → its stop Event is set, {ok: true}. Register a stand-in event as an in-flight
+    # run would, then assert the endpoint flips it.
+    event = _threading.Event()
+    app_module._run_cancels["run-xyz"] = event
+    try:
+        resp = client.post("/api/runs/run-xyz/cancel")
+        assert resp.status_code == 200 and resp.json() == {"ok": True}
+        assert event.is_set()  # the run's cooperative-stop flag was actually raised
+    finally:
+        app_module._run_cancels.pop("run-xyz", None)
 
 
 # --- Agent Manager (POST /api/agents: parallel isolated multi-task batch) --------------------------
@@ -295,7 +328,13 @@ def _agents_client(tmp_path: Any, rel_for: Callable[[str], str]) -> TestClient:
 
     settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
 
-    def factory(req: RunRequest, ws: Any, on_event: EventSink, _settings: Any) -> Any:
+    def factory(
+        req: RunRequest,
+        ws: Any,
+        on_event: EventSink,
+        _settings: Any,
+        _should_stop: Callable[[], bool] | None = None,
+    ) -> Any:
         return _WritingAgent(ws, on_event, rel_for(req.task), req.task)
 
     return TestClient(

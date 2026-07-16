@@ -15,11 +15,13 @@ import {
   Pencil,
   Play,
   Save,
+  Square,
   Terminal,
   Undo2,
   X,
 } from "lucide-react";
 import {
+  cancelRun,
   getFsFile,
   getFsTree,
   getGitDiff,
@@ -505,6 +507,11 @@ function RunPanel({
   const [planNote, setPlanNote] = useState("");
   const [runPlan, setRunPlan] = useState<string[] | null>(null);
   const [running, setRunning] = useState(false);
+  // Cooperative Stop: the in-flight run's id (from the first `run` frame) is the cancel handle, and
+  // `stopping` marks that a Stop was requested (halts AFTER the current attempt — a model step can't
+  // be interrupted). Both clear when the run ends.
+  const [runId, setRunId] = useState<string | null>(null);
+  const [stopping, setStopping] = useState(false);
   const [lines, setLines] = useState<string[]>([]);
   // The live per-edit diffs streamed during THIS run, in edit order (the play-by-play).
   const [liveEdits, setLiveEdits] = useState<{ path: string; patch: string }[]>([]);
@@ -582,9 +589,24 @@ function RunPanel({
 
   // `plan`: when a non-empty string is passed, the run follows THIS approved plan verbatim (no
   // re-planning). `null`/undefined = the run plans for itself, as before.
+  // Cooperative Stop: ask the backend to halt this run BEFORE its next attempt. An in-flight model
+  // step can't be interrupted, so this never kills instantly — it stops after the current attempt
+  // finishes. `stopping` stays set (disabling re-click) until the run's own `done` clears the state.
+  async function stop() {
+    if (!runId || stopping) return;
+    setStopping(true);
+    try {
+      await cancelRun(runId);
+    } catch {
+      // A cancel that fails (e.g. the run just finished) is a no-op — the run's `done` clears state.
+    }
+  }
+
   function start(plan?: string | null) {
     if (!task.trim() || running) return;
     setRunning(true);
+    setRunId(null);
+    setStopping(false);
     setLines([]);
     setLiveEdits([]);
     setReceipt(null);
@@ -593,6 +615,8 @@ function RunPanel({
     const append = (s: string) => setLines((prev) => [...prev, s]);
     const finish = async () => {
       setRunning(false);
+      setRunId(null);
+      setStopping(false);
       // The stream's `done` payload has no diffs — the newest receipt carries the real per-file diffs.
       try {
         const runs = await getRuns();
@@ -618,6 +642,7 @@ function RunPanel({
         cascade: mode === "cascade",
       },
       {
+        onRunId: (id) => setRunId(id),
         onEvent: (e) => {
           // An `edit` frame carries a real per-file diff — collect it into the live play-by-play.
           if (e.kind === "edit" && e.path && e.patch) {
@@ -630,7 +655,15 @@ function RunPanel({
           if (line) append(line);
         },
         onDone: (d) => {
-          append(d.success ? t("code.doneOk") : t("code.doneFail"));
+          // A cooperative Stop ends the run with stopped_reason "cancelled" — say so honestly rather
+          // than reading as a plain failure.
+          append(
+            d.stopped_reason === "cancelled"
+              ? t("code.doneCancelled")
+              : d.success
+                ? t("code.doneOk")
+                : t("code.doneFail"),
+          );
           void finish();
         },
         onError: () => {
@@ -729,6 +762,25 @@ function RunPanel({
               </>
             )}
           </Button>
+          {running ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={!runId || stopping}
+              onClick={() => void stop()}
+              title={t("code.stopTooltip")}
+            >
+              {stopping ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> {t("code.stopping")}
+                </>
+              ) : (
+                <>
+                  <Square className="h-4 w-4" /> {t("code.stop")}
+                </>
+              )}
+            </Button>
+          ) : null}
         </div>
         {planPreviewed && !running ? (
           <div className="space-y-2 rounded-chip border border-white/10 bg-white/[0.02] p-2.5">

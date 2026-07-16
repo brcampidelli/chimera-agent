@@ -99,6 +99,39 @@ def test_retry_escalates_to_fusion_worker() -> None:
     assert cheap.runs == 1 and fused.runs == 1
 
 
+def test_cooperative_stop_halts_before_next_attempt() -> None:
+    # Cooperative cancel: a should_stop that flips True after the first attempt halts the loop BEFORE
+    # the second attempt's worker call — the completed attempt is returned, the worker isn't re-run,
+    # and the result is well-formed (success=False, stopped_reason="cancelled").
+    worker = FakeWorker("partial")
+    # True once the worker has run at least once → the attempt-2 loop-head check trips.
+    auto = AutonomousAgent(
+        worker,
+        should_stop=lambda: worker.runs >= 1,
+        verifier=FailVerifier(),  # attempt 1 fails, so without the stop it WOULD run attempt 2
+        config=AutonomousConfig(max_attempts=3, use_planner=False, use_manager=False),
+    )
+    result = auto.run("cancel me")
+    assert worker.runs == 1  # the worker was NOT called a second time
+    assert result.success is False
+    assert result.stopped_reason == "cancelled"
+    assert len(result.attempts) == 1 and result.attempts[0].answer == "partial"
+
+
+def test_no_stop_check_leaves_loop_unchanged() -> None:
+    # Default path (should_stop=None): the loop runs to the attempt budget exactly as before, and the
+    # result carries the empty stopped_reason — cancellation adds nothing when it isn't wired.
+    worker = FakeWorker("nope")
+    auto = AutonomousAgent(
+        worker,
+        verifier=FailVerifier(),
+        config=AutonomousConfig(max_attempts=2, use_planner=False, use_manager=False),
+    )
+    result = auto.run("run to budget")
+    assert worker.runs == 2  # both attempts ran — no early stop
+    assert result.success is False and result.stopped_reason == ""
+
+
 def test_first_attempt_uses_cheap_worker_not_escalate() -> None:
     cheap, fused = FakeWorker("cheap"), FakeWorker("fused")
     auto = AutonomousAgent(
