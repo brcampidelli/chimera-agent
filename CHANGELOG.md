@@ -4,9 +4,18 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.33.0] - 2026-07-16
 
 ### Added
+- **Intel Mac support.** `macos-latest` is arm64-only, so until now an Intel Mac literally could not
+  install the native app (an aarch64 `.dmg` won't run) and got no updater entry either. The release
+  matrix now also builds on `macos-15-intel`, publishing an x86_64 `.dmg` + a signed `darwin-x86_64`
+  updater artifact — so Intel Macs both install and self-update. (The frozen PyInstaller sidecar is
+  arch-specific, so a "universal" Tauri build wouldn't have fixed this: the backend has to be built
+  ON an Intel runner.) Both macOS jobs emit a plainly-named `Chimera.app.tar.gz`, so the arch is now
+  stamped into it before upload — otherwise the two jobs' assets would collide and both manifest
+  entries would point at one file. **Note:** `macos-13` was retired in Dec 2025 and `macos-15-intel`
+  is the last x86_64 image GitHub Actions offers (scheduled to go away ~Aug 2027).
 - Desktop app: a **frontend component test suite** (Vitest + Testing Library + jsdom), run in CI's
   `desktop` job before the build. Until now `tsc --noEmit` + `vite build` were the only guards, so a
   UI regression could ship silently. The 50 tests assert user-visible behaviour on the screens where
