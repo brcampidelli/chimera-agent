@@ -130,7 +130,11 @@ jobs:
           TAG: ${{ github.event.release.tag_name }}
         run: |
           set -euo pipefail
-          sig_file=$(find apps/desktop/src-tauri/target/release/bundle -name '*.sig' | head -n1)
+          # The UPDATER artifact per platform is nsis (.exe), macOS .app.tar.gz, or Linux .AppImage —
+          # NOT the .deb (Tauri also signs the deb, but the Linux updater installs the AppImage, so a
+          # deb url in latest.json would make Linux auto-update download an un-appliable package).
+          # Exclude deb/ so `head -n1` can't pick the wrong signature.
+          sig_file=$(find apps/desktop/src-tauri/target/release/bundle -name '*.sig' -not -path '*/deb/*' | head -n1)
           if [ -z "$sig_file" ]; then
             echo "ERROR: no updater .sig produced for $TARGET (createUpdaterArtifacts off, or signing env missing)" >&2
             exit 1
