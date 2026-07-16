@@ -4,6 +4,21 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Native in-place auto-update (desktop app).** The Tauri desktop shell now checks GitHub on startup
+  for a **signed** update (Minisign signature verified against the app's embedded public key — never
+  disabled) and, only if one exists, shows a native confirm prompt ("A new version (vX.Y.Z) is
+  available. Download and install now? The app will restart."). On accept it downloads, verifies,
+  installs and relaunches; on decline, or on any error (offline, no release, rate-limit, bad
+  signature), it stays silent — no nag, no crash, never a silent install. CI signs the updater bundles
+  with the repo's `TAURI_SIGNING_PRIVATE_KEY` secret and publishes a `latest.json` manifest to each
+  GitHub Release. This complements — does not replace — the existing pip/web "update available" signal
+  (`VersionBadge` + `/api/version`), which stays for pip users. *Activates for users on the **next**
+  release onward* (a build must ship the updater client + a `latest.json` before an install can find an
+  update).
+
 ## [0.31.0] - 2026-07-15
 
 ### Added

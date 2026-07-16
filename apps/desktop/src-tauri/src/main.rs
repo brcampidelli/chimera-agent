@@ -18,6 +18,8 @@ use std::time::{Duration, Instant};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
+use tauri_plugin_updater::UpdaterExt;
 
 /// Holds the sidecar child so it can be killed when the app exits.
 struct Sidecar(Mutex<Option<Child>>);
@@ -109,9 +111,53 @@ fn kill_sidecar(app: &tauri::AppHandle) {
     }
 }
 
+/// Check GitHub for a signed update and, if the user consents, install it and relaunch.
+///
+/// Honest-by-construction: the signature is verified against the embedded pubkey by the updater
+/// plugin (we never disable it); nothing installs without the explicit confirm dialog; and every
+/// failure path (offline, no release, rate-limit, bad signature) returns `Err` so the caller can
+/// stay silent — the user is never nagged and the app never crashes over an update check.
+async fn check_for_update(app: tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    // `check()` fetches the manifest and verifies the signature; `None` = already up to date.
+    let Some(update) = app.updater()?.check().await? else {
+        return Ok(());
+    };
+
+    let confirmed = app
+        .dialog()
+        .message(format!(
+            "A new version (v{}) is available. Download and install now? The app will restart.",
+            update.version
+        ))
+        .title("Chimera update available")
+        .buttons(MessageDialogButtons::OkCancelCustom(
+            "Update & Restart".to_string(),
+            "Later".to_string(),
+        ))
+        // Safe here: this runs inside `tauri::async_runtime::spawn` (a worker thread), not the main
+        // thread, so blocking for the answer doesn't freeze the UI.
+        .blocking_show();
+
+    if !confirmed {
+        return Ok(());
+    }
+
+    // Download (signature already verified by `check`) then install. No-op progress callbacks — the
+    // native install dialog conveys progress; we keep the flow minimal.
+    update
+        .download_and_install(|_chunk, _total| {}, || {})
+        .await?;
+
+    // `restart()` diverges (`-> !`): it fires ExitRequested/Exit, so the run-loop hook below still
+    // kills the sidecar before the fresh process launches.
+    app.restart();
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(Sidecar(Mutex::new(None)))
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             // Bring up the backend, then open the window at its origin.
             let (child, url) = start_sidecar(app).map_err(|e| -> Box<dyn std::error::Error> {
@@ -139,6 +185,14 @@ fn main() {
                 }
             })
             .build(app)?;
+
+            // Fire-and-forget update check. Any error (offline, no update, verification failure) is
+            // swallowed — the check must never nag or crash. The pip/web "update signal" is separate
+            // and unaffected; this is the native in-place path.
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let _ = check_for_update(handle).await;
+            });
 
             Ok(())
         })

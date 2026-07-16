@@ -12,8 +12,17 @@
       "csp": null
     }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEUyNUVENzIzOTM3REVGNjYKUldSbTczMlRJOWRlNHN1eDlQQU9vSEsydStyZndPM0VQcEtDcnpxdGh3dGVZSTQ2VzhTRXN1eVQK",
+      "endpoints": [
+        "https://github.com/brcampidelli/chimera-agent/releases/latest/download/latest.json"
+      ]
+    }
+  },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": ["nsis", "dmg", "appimage", "deb"],
     "icon": [
       "icons/32x32.png",

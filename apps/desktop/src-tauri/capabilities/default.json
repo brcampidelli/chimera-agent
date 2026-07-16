@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "The Chimera window loads the local sidecar's origin and does not call Tauri IPC; core defaults only.",
+  "description": "The Chimera window loads the local sidecar's origin and does not call Tauri IPC; core defaults plus the updater/dialog permissions the native in-place auto-updater uses (driven from Rust, not the webview).",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "updater:default", "dialog:default"]
 }
