@@ -22,6 +22,7 @@ import type {
   PlanResult,
   ProjectState,
   RunReceipt,
+  Screenshot,
   SessionMeta,
   SkillStat,
   TaskCard,
@@ -277,6 +278,17 @@ export const getPlan = (workspace: string | null | undefined, task: string) =>
   json<PlanResult>("/api/plan", {
     method: "POST",
     body: JSON.stringify({ task, workspace: workspace || null }),
+  });
+
+/** Capture a browser screenshot verification artifact of `url`: the headless browser navigates there
+ *  and a full-page PNG is stored server-side, fetched back via `/api/artifacts/{id}`. It's an HONEST
+ *  capture of whatever the URL renders — NOT a claim the agent verified anything. If the browser
+ *  runtime is missing (or navigation fails), returns `{ok:false, error}` (the honest install hint),
+ *  never a fake image and never an HTTP error. */
+export const captureScreenshot = (url: string, workspace?: string | null) =>
+  json<Screenshot>("/api/verify/screenshot", {
+    method: "POST",
+    body: JSON.stringify({ url, workspace: workspace || null }),
   });
 
 /** One live progress frame from the run loop (an AgentEvent, serialized). `kind` picks the shape. */

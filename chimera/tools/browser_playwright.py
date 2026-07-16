@@ -85,6 +85,9 @@ class PlaywrightDriver:
     def page_text(self) -> str:
         return str(self._page.inner_text("body"))  # visible text; fallback + basis for find
 
+    def screenshot(self, path: str) -> None:
+        self._page.screenshot(path=path, full_page=True)  # a real full-page PNG of the current page
+
     def close(self) -> None:
         from contextlib import suppress
 

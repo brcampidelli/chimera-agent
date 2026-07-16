@@ -27,6 +27,7 @@ export type AttemptReceipt = Schemas["AttemptReceiptOut"];
 export type AgentsBatch = Schemas["AgentsBatchOut"];
 export type AgentResult = Schemas["AgentResultOut"];
 export type PlanResult = Schemas["PlanOut"];
+export type Screenshot = Schemas["ScreenshotOut"];
 export type FileDiff = Schemas["FileDiffOut"];
 export type FsTree = Schemas["FsTreeOut"];
 export type FsNode = Schemas["FsNodeOut"];

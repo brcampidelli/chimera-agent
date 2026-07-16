@@ -312,6 +312,15 @@ class CancelOut(BaseModel):
     # (a no-op — cancellation is COOPERATIVE: the run halts before its NEXT attempt, never mid model-call)
 
 
+# --- verify (browser screenshot verification artifact) --------------------------------------------
+
+
+class ScreenshotOut(BaseModel):
+    ok: bool  # True ONLY after a real full-page PNG of the given URL was captured and saved
+    id: str | None  # the artifact id (uuid hex) to fetch via GET /api/artifacts/{id}; null on failure
+    error: str | None  # a short honest message when ok is False (e.g. the missing-browser install hint)
+
+
 # --- agents (a parallel batch of isolated autonomous runs — the Agent Manager) --------------------
 # The terminal ``batch_done`` shape of ``POST /api/agents``. SSE can't carry a ``response_model``, so
 # these are surfaced to OpenAPI (and the generated TS types) via ``GET /api/agents/schema`` — exactly

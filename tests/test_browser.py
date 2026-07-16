@@ -48,6 +48,13 @@ class _FakeDriver:
         self.calls.append("page_text")
         return "Docs\nHello world body text.\nContact us at support@example.com."
 
+    def screenshot(self, path: str) -> None:
+        # Write a tiny stub PNG so the tool's success path is exercised fully offline (no Chromium).
+        from pathlib import Path
+
+        self.calls.append(f"screenshot:{path}")
+        Path(path).write_bytes(b"\x89PNG\r\n\x1a\nstub")
+
     def close(self) -> None:
         self.calls.append("close")
 
@@ -169,7 +176,47 @@ def test_find_needs_a_query() -> None:
 
 def test_new_actions_are_advertised() -> None:
     actions = BrowserTool.parameters["properties"]["action"]["enum"]
-    assert "read_text" in actions and "find" in actions
+    assert "read_text" in actions and "find" in actions and "screenshot" in actions
+
+
+# --- screenshot -------------------------------------------------------------------------
+
+
+def test_screenshot_saves_file_and_confirms(tmp_path: pytest.TempPathFactory) -> None:
+    import pathlib
+
+    tool, driver = _tool()
+    dest = pathlib.Path(str(tmp_path)) / "shot.png"
+    out = tool.run(action="screenshot", path=str(dest))
+    assert "saved screenshot to" in out and str(dest) in out
+    assert dest.is_file() and dest.read_bytes().startswith(b"\x89PNG")  # a real (stub) capture
+    assert f"screenshot:{dest}" in driver.calls
+    assert FENCE_OPEN in out  # confirmation is fenced like the other browser outputs
+
+
+def test_screenshot_with_url_navigates_first(tmp_path: pytest.TempPathFactory) -> None:
+    import pathlib
+
+    tool, driver = _tool()
+    dest = pathlib.Path(str(tmp_path)) / "shot.png"
+    tool.run(action="screenshot", url="https://example.com", path=str(dest))
+    assert driver.calls[0] == "navigate:https://example.com"
+    assert any(c.startswith("screenshot:") for c in driver.calls)
+
+
+def test_screenshot_needs_a_path() -> None:
+    tool, _ = _tool()
+    assert tool.run(action="screenshot").startswith("error:")
+
+
+def test_screenshot_blocks_ssrf_url(tmp_path: pytest.TempPathFactory) -> None:
+    import pathlib
+
+    tool, driver = _tool()
+    dest = pathlib.Path(str(tmp_path)) / "shot.png"
+    out = tool.run(action="screenshot", url="http://169.254.169.254/latest/", path=str(dest))
+    assert out.startswith("error:") and "blocked" in out
+    assert driver.calls == [] and not dest.exists()  # never navigated, never captured
 
 
 # --- first-use Chromium auto-provisioning -----------------------------------------------
@@ -243,3 +290,16 @@ def test_read_text_blocks_ssrf_url() -> None:
     out = tool.run(action="read_text", url="http://127.0.0.1/admin")
     assert out.startswith("error:") and "blocked" in out
     assert driver.calls == []
+
+
+def test_capture_local_allows_localhost_rejects_non_http(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """The user-initiated capture path (desktop 'Verify in browser') MUST reach the user's own
+    localhost app — unlike the SSRF-guarded `run(action=screenshot)` agent path — while still
+    rejecting non-http(s) schemes and an empty path. This is the localhost regression guard."""
+    tool, _driver = _tool()
+    png = tmp_path / "shot.png"
+    ok = tool.capture_local("http://localhost:5173", str(png))
+    assert "saved screenshot" in ok
+    assert png.exists()
+    assert "http(s)" in tool.capture_local("file:///etc/passwd", str(tmp_path / "x.png"))
+    assert "needs a path" in tool.capture_local("http://localhost:5173", "")

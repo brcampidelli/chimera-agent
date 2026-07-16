@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import threading
 import uuid
 from collections.abc import AsyncIterator, Callable
@@ -59,6 +60,7 @@ from chimera.api.schemas import (
     NewSessionOut,
     PlanOut,
     RunReceiptOut,
+    ScreenshotOut,
     SessionDetailOut,
     SessionMetaOut,
     ToolsOut,
@@ -139,6 +141,15 @@ class PlanRequest(BaseModel):
     itself reads no files — it is a pure model call — but the field mirrors the run request's shape.)"""
 
 
+class ScreenshotRequest(BaseModel):
+    url: str
+    """The URL to capture — the browser navigates here and saves a full-page PNG. It is an HONEST
+    capture of whatever the URL renders (the agent did not autonomously verify anything)."""
+    workspace: str | None = None
+    """Present for shape-parity with the other requests; the capture itself is workspace-independent
+    (the artifact is stored under the app's home, not the workspace)."""
+
+
 class RunRequest(BaseModel):
     task: str
     verify: str | None = None
@@ -198,6 +209,47 @@ class AgentsRequest(BaseModel):
 
 
 _MAX_AGENT_TASKS = 8
+
+# The honest degradation message when the browser runtime isn't available — the UI surfaces this
+# verbatim; no placeholder image is ever fabricated.
+_BROWSER_MISSING_HINT = "Browser not installed — run: playwright install chromium"
+
+# Artifact ids are uuid4 hex (32 hex chars). This strict allowlist (hex only — no '.', '/', '\\')
+# is the primary guard on GET /api/artifacts/{id}: a traversal id can't match, so the endpoint can
+# never be coaxed into an arbitrary-file read.
+_ARTIFACT_ID_RE = re.compile(r"^[0-9a-f]{8,64}$")
+
+
+def _capture_screenshot(url: str, path: Path) -> str | None:
+    """Drive the real browser to ``url`` and save a full-page PNG to ``path``.
+
+    Returns ``None`` on success, or a short, honest error message on failure — NEVER raises and
+    never fabricates an image. Honest degradation: if Playwright is absent, or the Chromium binary
+    can't be provisioned (the capture fails with a "playwright install" hint), the caller-facing
+    message is the install hint. Kept module-level so a test can monkeypatch it (offline, no Chromium).
+    """
+    import importlib.util
+
+    if importlib.util.find_spec("playwright") is None:
+        return _BROWSER_MISSING_HINT
+    from chimera.config import get_settings
+    from chimera.tools.browser import BrowserTool
+
+    tool = BrowserTool(headless=get_settings().browser_headless)
+    try:
+        # capture_local (not the run() screenshot action) — a user-initiated capture of the URL they
+        # typed, so it may hit their own localhost app. The agent-facing screenshot action keeps the
+        # full SSRF guard; this Python-only path allows private hosts but still enforces http(s).
+        result = tool.capture_local(url, str(path))
+    finally:
+        tool.close()
+    if not result.startswith("error:"):
+        return None  # a fenced "saved screenshot to …" confirmation — success
+    # A failure. A missing Chromium binary (or a broken Playwright install) maps to the friendly
+    # install hint; any other failure (e.g. the navigation was blocked/failed) is surfaced honestly.
+    if "playwright install" in result.lower():
+        return _BROWSER_MISSING_HINT
+    return "the screenshot could not be captured (the page did not load)"
 
 
 def _require_token() -> Callable[[Request], None]:
@@ -388,6 +440,45 @@ def build_api_app(
                 return {"steps": [], "text": "", "note": "the planner call did not complete"}
 
         return await asyncio.get_running_loop().run_in_executor(None, work)
+
+    @app.post("/api/verify/screenshot", dependencies=[guard], response_model=ScreenshotOut)
+    async def verify_screenshot_endpoint(req: ScreenshotRequest) -> dict[str, Any]:
+        # HONEST screenshot verification artifact: point the headless browser at ``url`` and save a
+        # real full-page PNG under ``home/artifacts/<uuid>.png``, served back via GET /api/artifacts/{id}.
+        # It is a capture of whatever the URL renders — NOT a claim that the agent verified anything.
+        # Missing browser runtime OR a failed navigation degrades to {ok:false, error} (a clean 200,
+        # never a 500) — no placeholder image. The (blocking) capture runs on a worker thread so the
+        # event loop isn't blocked (mirrors how POST /api/plan runs the planner on a thread).
+        artifacts = settings.home / "artifacts"
+
+        def work() -> dict[str, Any]:
+            artifacts.mkdir(parents=True, exist_ok=True)
+            artifact_id = uuid.uuid4().hex
+            path = artifacts / f"{artifact_id}.png"
+            error = _capture_screenshot(req.url, path)
+            if error is not None:
+                return {"ok": False, "id": None, "error": error}
+            if not path.is_file():  # defensive: no error but nothing on disk -> honest failure, not a lie
+                return {"ok": False, "id": None, "error": _BROWSER_MISSING_HINT}
+            return {"ok": True, "id": artifact_id, "error": None}
+
+        return await asyncio.get_running_loop().run_in_executor(None, work)
+
+    @app.get("/api/artifacts/{artifact_id}")
+    def get_artifact(artifact_id: str) -> FileResponse:
+        # Serve a stored screenshot PNG. Deliberately UNGUARDED so a same-origin <img src> can load it
+        # (a browser <img> can't send the bearer header); safety rests on the localhost bind, the
+        # unguessable uuid id, and the strict id allowlist below. SECURITY: the id must be hex-only
+        # (^[0-9a-f]{8,64}$ — no '.', '/', '\\'), so a traversal id can't match; then, as defense in
+        # depth, the resolved path must live inside the artifacts dir. Anything else is a 404 — this
+        # is NOT an arbitrary-file read.
+        if not _ARTIFACT_ID_RE.match(artifact_id):
+            raise HTTPException(status_code=404, detail="not found")
+        artifacts = (settings.home / "artifacts").resolve()
+        path = (artifacts / f"{artifact_id}.png").resolve()
+        if artifacts not in path.parents or not path.is_file():
+            raise HTTPException(status_code=404, detail="not found")
+        return FileResponse(path, media_type="image/png")
 
     @app.post("/api/runs", dependencies=[guard])
     async def run_stream(req: RunRequest) -> EventSourceResponse:

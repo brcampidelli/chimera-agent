@@ -467,6 +467,71 @@ def test_plan_endpoint_degrades_to_empty_steps_on_model_error(tmp_path: Any, mon
     assert body["steps"] == [] and body["text"] == "" and body["note"]
 
 
+def test_screenshot_endpoint_captures_and_serves(tmp_path: Any, monkeypatch: Any) -> None:
+    """POST /api/verify/screenshot captures a PNG (the driver mocked offline — no Chromium) and returns
+    an id; GET /api/artifacts/{id} then serves the stored bytes as image/png."""
+    from pathlib import Path
+
+    import chimera.api.app as app_mod
+    from chimera.api import build_api_app
+
+    def fake_capture(url: str, path: Path) -> None:
+        Path(path).write_bytes(b"\x89PNG\r\n\x1a\nfake")  # a real (stub) PNG on disk, no browser
+        return None
+
+    monkeypatch.setattr(app_mod, "_capture_screenshot", fake_capture)
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    client = TestClient(build_api_app(lambda: ChatSession(_FakeAgent()), settings=settings))
+
+    resp = client.post("/api/verify/screenshot", json={"url": "http://localhost:5173"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ok"] is True and body["error"] is None
+    artifact_id = body["id"]
+    assert artifact_id
+
+    got = client.get(f"/api/artifacts/{artifact_id}")
+    assert got.status_code == 200
+    assert got.headers["content-type"] == "image/png"
+    assert got.content.startswith(b"\x89PNG")
+
+
+def test_screenshot_endpoint_missing_browser_degrades(tmp_path: Any, monkeypatch: Any) -> None:
+    """No browser runtime → a clean 200 {ok:false, id:null} carrying the honest install hint — no 500,
+    no fake image."""
+    import chimera.api.app as app_mod
+    from chimera.api import build_api_app
+
+    monkeypatch.setattr(app_mod, "_capture_screenshot", lambda url, path: app_mod._BROWSER_MISSING_HINT)
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    client = TestClient(build_api_app(lambda: ChatSession(_FakeAgent()), settings=settings))
+
+    resp = client.post("/api/verify/screenshot", json={"url": "http://localhost:5173"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ok"] is False and body["id"] is None
+    assert "playwright install chromium" in body["error"]
+
+
+def test_artifact_id_validation_rejects_traversal(tmp_path: Any) -> None:
+    """GET /api/artifacts/{id} is hex-only: a traversal / dotted / non-hex id is a 404 — it is NOT an
+    arbitrary-file read. A secret planted outside the artifacts dir is never served."""
+    from chimera.api import build_api_app
+
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    secret = tmp_path / "home" / "secret.txt"
+    secret.parent.mkdir(parents=True, exist_ok=True)
+    secret.write_text("TOP-SECRET-CONTENT", encoding="utf-8")
+    client = TestClient(build_api_app(lambda: ChatSession(_FakeAgent()), settings=settings))
+
+    # Ids that reach the route param and must fail the hex allowlist (dots, non-hex, uppercase), plus
+    # a well-formed-but-nonexistent id. None may 200 or leak the secret.
+    for bad in ["..", "abc.txt", "nothexvalue", "ABCDEF01", "0123456789abcdef"]:
+        r = client.get(f"/api/artifacts/{bad}")
+        assert r.status_code == 404, bad
+        assert "TOP-SECRET-CONTENT" not in r.text
+
+
 def test_run_request_plan_injection_skips_the_planner(tmp_path: Any) -> None:
     """When a plan is provided, the AutonomousAgent uses it verbatim and NEVER calls the planner —
     the seam the desktop 'plan mode' relies on (the human-approved plan drives the run)."""

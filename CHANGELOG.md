@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Browser screenshot verification artifact (desktop "Code" screen).** A new **"Verify in browser"**
+  panel: type a URL, hit **Capture**, and the headless browser navigates there and saves a real
+  full-page PNG that is stored server-side (`<home>/artifacts/<uuid>.png`) and shown inline. It is
+  *honest by construction* — a screenshot of exactly the URL you gave, captioned as such; it never
+  claims the agent autonomously verified anything. If the browser runtime is missing (or the page
+  fails to load) it degrades to the honest install hint (`Browser not installed — run: playwright
+  install chromium`), never a placeholder image. Wiring: the `browser` tool gains a `screenshot`
+  action (full-page PNG to a path; the agent can use it during a run too); `POST /api/verify/screenshot`
+  captures on a worker thread and returns `{ok,id,error}` (a clean 200 on failure, never a 500); the
+  PNG is served by `GET /api/artifacts/{id}`, whose id is validated against a strict hex-only allowlist
+  (`^[0-9a-f]{8,64}$`) plus a path-containment check, so it can never become an arbitrary-file read.
+  - **Future work:** session recording / video capture, and autonomous self-verification during a run
+    (this MVP is a user-driven capture of a URL the user provides).
 - **Cooperative Stop for a single coding run (desktop "Code" screen).** While a run is in flight, a
   **Stop** button appears next to Run. It cancels *cooperatively*: an in-flight model call cannot be
   interrupted (the step is blocking), so the run halts **before its next attempt**, after the current

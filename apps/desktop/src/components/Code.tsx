@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import hljs from "highlight.js";
 import {
+  Camera,
   Check,
   ChevronDown,
   ChevronRight,
@@ -22,6 +23,7 @@ import {
 } from "lucide-react";
 import {
   cancelRun,
+  captureScreenshot,
   getFsFile,
   getFsTree,
   getGitDiff,
@@ -484,6 +486,89 @@ function planStepsOf(text: string): string[] {
     .filter(Boolean);
 }
 
+/** A user-driven browser screenshot VERIFICATION ARTIFACT: type a URL, Capture, and the headless
+ *  browser saves a full-page PNG server-side that's shown inline (same-origin `<img>`). It is an
+ *  honest capture of the URL you gave — NOT a claim the agent verified anything. If the browser
+ *  runtime is missing (or the page fails to load), the honest error text is shown (e.g. the
+ *  "playwright install chromium" hint) — never a placeholder image. */
+function VerifyPanel({ workspace }: { workspace: string }) {
+  const t = useT();
+  const [url, setUrl] = useState("");
+  const [capturing, setCapturing] = useState(false);
+  const [shot, setShot] = useState<{ id: string; url: string; at: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function capture() {
+    const target = url.trim();
+    if (!target || capturing) return;
+    setCapturing(true);
+    setError(null);
+    try {
+      const res = await captureScreenshot(target, workspace || null);
+      if (res.ok && res.id) {
+        setShot({ id: res.id, url: target, at: new Date().toLocaleString() });
+      } else {
+        setShot(null);
+        setError(res.error || t("code.verify.failed"));
+      }
+    } catch {
+      setShot(null);
+      setError(t("code.verify.failed"));
+    } finally {
+      setCapturing(false);
+    }
+  }
+
+  return (
+    <section className="space-y-2.5 border-t border-white/5 p-3">
+      <div className="flex items-center gap-2 text-accent">
+        <Camera className="h-4 w-4" />
+        <h2 className="text-sm font-semibold text-foreground">{t("code.verify.title")}</h2>
+      </div>
+      <p className="text-[11px] text-muted-foreground">{t("code.verify.note")}</p>
+      <div className="flex flex-wrap gap-2">
+        <input
+          className={`${fieldCls} h-9 min-w-0 flex-1 font-mono text-xs`}
+          placeholder={t("code.verify.urlPlaceholder")}
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              void capture();
+            }
+          }}
+          disabled={capturing}
+        />
+        <Button size="sm" disabled={!url.trim() || capturing} onClick={() => void capture()}>
+          {capturing ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" /> {t("code.verify.capturing")}
+            </>
+          ) : (
+            <>
+              <Camera className="h-4 w-4" /> {t("code.verify.capture")}
+            </>
+          )}
+        </Button>
+      </div>
+      {error ? <p className="text-[11px] text-bad">{error}</p> : null}
+      {shot ? (
+        <figure className="space-y-1.5">
+          <img
+            src={`/api/artifacts/${shot.id}`}
+            alt={t("code.verify.alt")}
+            className="max-w-full rounded-chip border border-white/10"
+          />
+          <figcaption className="text-[11px] text-muted-foreground">
+            {t("code.verify.caption")} <span className="break-all font-mono">{shot.url}</span> · {shot.at}
+          </figcaption>
+        </figure>
+      ) : null}
+    </section>
+  );
+}
+
 /** The right/bottom column: instruct + verify-or-revert run, then the newest run's real diffs. */
 function RunPanel({
   workspace,
@@ -889,6 +974,7 @@ function RunPanel({
           </>
         ) : null}
       </div>
+      <VerifyPanel workspace={workspace} />
     </aside>
   );
 }
