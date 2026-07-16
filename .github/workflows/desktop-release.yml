@@ -32,6 +32,15 @@ jobs:
           - os: macos-latest
             bundles: app,dmg
             updater_target: darwin-aarch64
+          # Intel Macs. `macos-latest` is arm64-only, so without this an Intel Mac literally cannot
+          # install (an aarch64 dmg won't run) and gets no updater entry. The frozen PyInstaller
+          # sidecar is arch-specific, so a "universal" Tauri build wouldn't help — the backend must
+          # be built ON an Intel runner. NOTE: macos-13 was retired (Dec 2025); `macos-15-intel` is
+          # the last x86_64 image and is scheduled to go away ~Aug 2027, after which GitHub Actions
+          # drops macOS x86_64 entirely. Revisit before then.
+          - os: macos-15-intel
+            bundles: app,dmg
+            updater_target: darwin-x86_64
           - os: ubuntu-latest
             bundles: appimage,deb
             updater_target: linux-x86_64
@@ -101,6 +110,28 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      # BOTH macOS jobs (arm64 + Intel) emit an updater bundle named plainly `Chimera.app.tar.gz` —
+      # the nsis (.exe) and AppImage names already carry their arch, but this one doesn't. Two jobs
+      # uploading the same filename would collide as release assets and make both manifest entries
+      # (darwin-aarch64 / darwin-x86_64) point at one file. Stamp the arch in before upload.
+      - name: Stamp the arch into the macOS updater artifact
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          TARGET: ${{ matrix.updater_target }}
+        run: |
+          set -euo pipefail
+          d=apps/desktop/src-tauri/target/release/bundle/macos
+          arch="${TARGET#darwin-}" # aarch64 | x86_64
+          for f in "$d"/*.app.tar.gz; do
+            [ -e "$f" ] || continue
+            base=$(basename "$f" .app.tar.gz)
+            case "$base" in *_"$arch") continue ;; esac # already stamped
+            mv "$f" "$d/${base}_${arch}.app.tar.gz"
+            [ -e "${f}.sig" ] && mv "${f}.sig" "$d/${base}_${arch}.app.tar.gz.sig"
+          done
+          ls -1 "$d"
 
       - name: Attach installers + signed updater artifacts to the release
         if: github.event_name == 'release'
