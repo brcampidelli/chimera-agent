@@ -268,6 +268,15 @@ class UsageSummaryOut(BaseModel):
     route_mix: dict[str, int]  # {"single", "fusion", "cascade"} turn counts
 
 
+# --- plan (planner preview — zero-edit dry run of the planner only) --------------------------------
+
+
+class PlanOut(BaseModel):
+    steps: list[str]  # the planner's concrete numbered steps (empty when the model produced none)
+    text: str  # the same steps rendered as numbered lines — the seed for the editable preview
+    note: str  # "" on success; a short, secret-free message when the planner call degraded (no 500)
+
+
 # --- runs (autonomous run receipts) ---------------------------------------------------------------
 
 

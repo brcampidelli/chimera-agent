@@ -181,6 +181,7 @@ class AutonomousAgent:
         contract: CompletionContract | None = None,
         taint: SupportsRunTainted | None = None,
         planner: Planner | None = None,
+        plan: Plan | None = None,
         manager: Manager | None = None,
         verifier: Verifier | None = None,
         probe_log: ProbeLog | None = None,
@@ -211,6 +212,10 @@ class AutonomousAgent:
         self.contract = contract
         self.taint = taint
         self.planner = planner
+        # A pre-built plan supplied by the caller (e.g. the desktop "plan mode": the user previewed
+        # and approved/edited the planner's output). When set, it is used verbatim INSTEAD of calling
+        # the planner — the run follows the exact plan the human reviewed, and no planning call is made.
+        self.provided_plan = plan
         self.manager = manager
         self.verifier = verifier
         self.probe_log = probe_log
@@ -334,11 +339,14 @@ class AutonomousAgent:
         # normalized — the raw `task` stays the identity used for memory keys / experience below, so a
         # normalized run still dedups against the same task. Deterministic no-op on non-bug or short tasks.
         plan_task = normalize_task(task) if self.config.normalize_task else task
-        plan = (
-            self.planner.plan(plan_task, context=context)
-            if self.planner and self.config.use_planner
-            else None
-        )
+        # A caller-supplied plan (plan mode) is used as-is and skips the planning call entirely — the
+        # run executes the exact steps the human approved. Otherwise plan normally (when enabled).
+        if self.provided_plan is not None:
+            plan = self.provided_plan
+        elif self.planner and self.config.use_planner:
+            plan = self.planner.plan(plan_task, context=context)
+        else:
+            plan = None
         # Outer-loop ledger (Magentic-One): accumulates *why* attempts fail so a re-plan on
         # stall is smarter than the first plan. Only when re-planning is enabled and there's a
         # planner to re-run — otherwise the stall path keeps the cheap advisory pivot.

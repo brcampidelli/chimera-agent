@@ -484,6 +484,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Plan Endpoint */
+        post: operations["plan_endpoint_api_plan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects": {
         parameters: {
             query?: never;
@@ -1287,6 +1304,22 @@ export interface components {
             /** Id */
             id: string;
         };
+        /** PlanOut */
+        PlanOut: {
+            /** Note */
+            note: string;
+            /** Steps */
+            steps: string[];
+            /** Text */
+            text: string;
+        };
+        /** PlanRequest */
+        PlanRequest: {
+            /** Task */
+            task: string;
+            /** Workspace */
+            workspace?: string | null;
+        };
         /** ProjectDetailOut */
         ProjectDetailOut: {
             /** Columns */
@@ -1348,10 +1381,24 @@ export interface components {
         /** RunRequest */
         RunRequest: {
             /**
+             * Cascade
+             * @default false
+             */
+            cascade: boolean;
+            /**
+             * Fuse
+             * @default false
+             */
+            fuse: boolean;
+            /**
              * Max Attempts
              * @default 3
              */
             max_attempts: number;
+            /** Model */
+            model?: string | null;
+            /** Plan */
+            plan?: string | null;
             /** Task */
             task: string;
             /** Verify */
@@ -2445,6 +2492,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeletedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plan_endpoint_api_plan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanOut"];
                 };
             };
             /** @description Validation Error */

@@ -1676,6 +1676,56 @@
         "title": "NewSessionOut",
         "type": "object"
       },
+      "PlanOut": {
+        "properties": {
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "steps",
+          "text",
+          "note"
+        ],
+        "title": "PlanOut",
+        "type": "object"
+      },
+      "PlanRequest": {
+        "properties": {
+          "task": {
+            "title": "Task",
+            "type": "string"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "title": "PlanRequest",
+        "type": "object"
+      },
       "ProjectDetailOut": {
         "properties": {
           "columns": {
@@ -1845,10 +1895,42 @@
       },
       "RunRequest": {
         "properties": {
+          "cascade": {
+            "default": false,
+            "title": "Cascade",
+            "type": "boolean"
+          },
+          "fuse": {
+            "default": false,
+            "title": "Fuse",
+            "type": "boolean"
+          },
           "max_attempts": {
             "default": 3,
             "title": "Max Attempts",
             "type": "integer"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan"
           },
           "task": {
             "title": "Task",
@@ -3551,6 +3633,44 @@
           }
         },
         "summary": "Delete Memory"
+      }
+    },
+    "/api/plan": {
+      "post": {
+        "operationId": "plan_endpoint_api_plan_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Plan Endpoint"
       }
     },
     "/api/projects": {

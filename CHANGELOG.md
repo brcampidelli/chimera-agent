@@ -4,6 +4,24 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.29.0] - 2026-07-15
+
+### Added
+- **Desktop "Code" screen — three honest-by-construction upgrades.**
+  - **Real verify output in the run receipt.** Each attempt now surfaces the verifier's actual captured
+    stdout/stderr (the concrete test/assert output) in a collapsed panel — shown only when non-empty,
+    never fabricated. It's the real command output the loop already recorded.
+  - **Plan preview + optional plan injection ("plan mode").** A new `POST /api/plan` endpoint runs ONLY
+    the planner — no edits, no tools, no agent loop — and returns the concrete steps. The UI shows them
+    as a numbered checklist you can review and edit, then **Run with this plan** (the approved/edited plan
+    is used verbatim, skipping re-planning) or **Run without a plan** (unchanged behaviour). The preview
+    makes zero file changes; a model hiccup degrades to empty steps, never an error. Backed by a small
+    core seam: `AutonomousAgent` accepts an injected `plan` that, when set, is used instead of calling the
+    planner (covered by a test asserting the planner isn't invoked when a plan is provided).
+  - **Model + mode (single / fuse / cascade) per run.** The run panel now takes an optional model slug and
+    a routing toggle, reproducing `chimera solve --fuse` / `--cascade` wiring for the in-app trigger. The
+    default (no model, single mode, no plan) run is byte-identical to before.
+
 ## [0.28.0] - 2026-07-15
 
 ### Added

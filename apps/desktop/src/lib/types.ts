@@ -24,6 +24,7 @@ export type ConfigTest = Schemas["ConfigTestOut"];
 export type UsageSummary = Schemas["UsageSummaryOut"];
 export type RunReceipt = Schemas["RunReceiptOut"];
 export type AttemptReceipt = Schemas["AttemptReceiptOut"];
+export type PlanResult = Schemas["PlanOut"];
 export type FileDiff = Schemas["FileDiffOut"];
 export type FsTree = Schemas["FsTreeOut"];
 export type FsNode = Schemas["FsNodeOut"];

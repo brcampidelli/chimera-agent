@@ -10,6 +10,7 @@ import {
   Folder,
   FolderOpen,
   GitBranch,
+  ListChecks,
   Loader2,
   Pencil,
   Play,
@@ -23,6 +24,7 @@ import {
   getFsTree,
   getGitDiff,
   getGitStatus,
+  getPlan,
   getRuns,
   gitCommit,
   gitRevert,
@@ -396,7 +398,8 @@ function DiffLines({ patch }: { patch: string }) {
 /** One attempt's diffs, honestly labeled: if the attempt was reverted, a banner says the changes
  *  were undone after verification failed (they are what it ATTEMPTED, not what is on disk). */
 function AttemptDiffs({ attempt, t }: { attempt: AttemptReceipt; t: TFunc }) {
-  if (attempt.diffs.length === 0) return null;
+  // Render when there's something real to show: a diff, or the verifier's captured output.
+  if (attempt.diffs.length === 0 && !attempt.verify_output) return null;
   return (
     <div className="space-y-2 px-4 py-3">
       <div className="flex items-center gap-2">
@@ -419,6 +422,18 @@ function AttemptDiffs({ attempt, t }: { attempt: AttemptReceipt; t: TFunc }) {
           </div>
         </details>
       ))}
+      {/* The verifier's REAL captured stdout/stderr for this attempt (the concrete test/assert
+          output). Collapsed by default; shown only when non-empty — never fabricated. */}
+      {attempt.verify_output ? (
+        <details className="rounded-chip bg-white/[0.02]">
+          <summary className="cursor-pointer px-2 py-1.5 text-[11px] text-muted-foreground hover:text-foreground">
+            {t("code.verifyOutput")}
+          </summary>
+          <pre className="overflow-x-auto rounded-chip bg-white/[0.03] px-2 py-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
+            <code className="whitespace-pre-wrap break-all">{attempt.verify_output}</code>
+          </pre>
+        </details>
+      ) : null}
     </div>
   );
 }
@@ -458,6 +473,15 @@ function liveLine(e: RunEvent, t: TFunc): string | null {
   return null;
 }
 
+/** Parse plan text into display steps (strip a leading "N." / "N)"), mirroring the backend parser.
+ *  Used only to render the approved plan as a numbered checklist — the backend re-parses the raw text. */
+function planStepsOf(text: string): string[] {
+  return text
+    .split("\n")
+    .map((l) => l.replace(/^\s*\d+[.)]\s*/, "").trim())
+    .filter(Boolean);
+}
+
 /** The right/bottom column: instruct + verify-or-revert run, then the newest run's real diffs. */
 function RunPanel({
   workspace,
@@ -471,6 +495,15 @@ function RunPanel({
   const [task, setTask] = useState("");
   const [verify, setVerify] = useState("");
   const [maxAttempts, setMaxAttempts] = useState(3);
+  const [model, setModel] = useState("");
+  const [mode, setMode] = useState<"single" | "fuse" | "cascade">("single");
+  // Plan preview (makes ZERO edits): the editable plan text, whether a preview has been fetched, its
+  // loading state + honest degrade note, and the steps the in-progress run is actually following.
+  const [planDraft, setPlanDraft] = useState("");
+  const [planPreviewed, setPlanPreviewed] = useState(false);
+  const [planning, setPlanning] = useState(false);
+  const [planNote, setPlanNote] = useState("");
+  const [runPlan, setRunPlan] = useState<string[] | null>(null);
   const [running, setRunning] = useState(false);
   const [lines, setLines] = useState<string[]>([]);
   // The live per-edit diffs streamed during THIS run, in edit order (the play-by-play).
@@ -528,12 +561,35 @@ function RunPanel({
     }
   }
 
-  function start() {
+  // Preview the plan: a pure planner call (NO edits, NO tools) so the steps can be reviewed/edited
+  // before any real run. A degrade returns empty steps + a note, never throws to the user.
+  async function previewPlan() {
+    if (!task.trim() || planning || running) return;
+    setPlanning(true);
+    setPlanNote("");
+    try {
+      const res = await getPlan(workspace || null, task.trim());
+      setPlanDraft(res.text);
+      setPlanNote(res.note);
+      setPlanPreviewed(true);
+    } catch {
+      setPlanNote(t("code.planError"));
+      setPlanPreviewed(true);
+    } finally {
+      setPlanning(false);
+    }
+  }
+
+  // `plan`: when a non-empty string is passed, the run follows THIS approved plan verbatim (no
+  // re-planning). `null`/undefined = the run plans for itself, as before.
+  function start(plan?: string | null) {
     if (!task.trim() || running) return;
     setRunning(true);
     setLines([]);
     setLiveEdits([]);
     setReceipt(null);
+    // Only surface a task list when we injected a real plan — never fabricate steps for a plain run.
+    setRunPlan(plan && plan.trim() ? planStepsOf(plan) : null);
     const append = (s: string) => setLines((prev) => [...prev, s]);
     const finish = async () => {
       setRunning(false);
@@ -556,6 +612,10 @@ function RunPanel({
         verify: verify.trim() || null,
         workspace: workspace || null,
         max_attempts: maxAttempts,
+        plan: plan && plan.trim() ? plan : null,
+        model: model.trim() || null,
+        fuse: mode === "fuse",
+        cascade: mode === "cascade",
       },
       {
         onEvent: (e) => {
@@ -602,7 +662,34 @@ function RunPanel({
           onChange={(e) => setVerify(e.target.value)}
           disabled={running}
         />
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            className={`${fieldCls} h-9 min-w-0 flex-1 font-mono text-xs`}
+            placeholder={t("code.modelPlaceholder")}
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            disabled={running}
+          />
+          <div className="flex shrink-0 overflow-hidden rounded-chip border border-white/10">
+            {(["single", "fuse", "cascade"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMode(m)}
+                disabled={running}
+                className={cn(
+                  "px-2.5 py-1.5 text-[11px] transition-colors disabled:opacity-50",
+                  mode === m
+                    ? "bg-accent/20 text-accent"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {t(`code.mode.${m}` as const)}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
             {t("code.maxAttempts")}
             <input
@@ -615,7 +702,23 @@ function RunPanel({
               disabled={running}
             />
           </label>
-          <Button size="sm" disabled={!task.trim() || running} onClick={start}>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={!task.trim() || running || planning}
+            onClick={() => void previewPlan()}
+          >
+            {planning ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> {t("code.planning")}
+              </>
+            ) : (
+              <>
+                <ListChecks className="h-4 w-4" /> {t("code.previewPlan")}
+              </>
+            )}
+          </Button>
+          <Button size="sm" disabled={!task.trim() || running} onClick={() => start()}>
             {running ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" /> {t("code.running")}
@@ -627,6 +730,60 @@ function RunPanel({
             )}
           </Button>
         </div>
+        {planPreviewed && !running ? (
+          <div className="space-y-2 rounded-chip border border-white/10 bg-white/[0.02] p-2.5">
+            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <ListChecks className="h-3.5 w-3.5" /> {t("code.planTitle")}
+            </div>
+            <p className="text-[11px] text-muted-foreground">{t("code.planNote")}</p>
+            {planStepsOf(planDraft).length > 0 ? (
+              <ol className="space-y-1 pl-1">
+                {planStepsOf(planDraft).map((step, i) => (
+                  <li key={i} className="flex gap-2 text-[11px] text-foreground/80">
+                    <span className="shrink-0 font-mono text-muted-foreground">{i + 1}.</span>
+                    <span>{step}</span>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">{t("code.planEmpty")}</p>
+            )}
+            {planNote ? <p className="text-[11px] text-bad">{planNote}</p> : null}
+            <textarea
+              className={`${fieldCls} min-h-[80px] resize-y py-2 font-mono text-[11px]`}
+              placeholder={t("code.planEditPlaceholder")}
+              value={planDraft}
+              onChange={(e) => setPlanDraft(e.target.value)}
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                disabled={!task.trim() || !planDraft.trim()}
+                onClick={() => start(planDraft)}
+              >
+                <Play className="h-3.5 w-3.5" /> {t("code.runWithPlan")}
+              </Button>
+              <Button size="sm" variant="ghost" disabled={!task.trim()} onClick={() => start()}>
+                {t("code.runPlain")}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+        {running && runPlan && runPlan.length > 0 ? (
+          <div className="space-y-1 rounded-chip border border-white/10 bg-white/[0.02] p-2.5">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {t("code.planForRun")}
+            </div>
+            <ol className="space-y-1 pl-1">
+              {runPlan.map((step, i) => (
+                <li key={i} className="flex gap-2 text-[11px] text-foreground/80">
+                  <span className="shrink-0 font-mono text-muted-foreground">{i + 1}.</span>
+                  <span>{step}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        ) : null}
         {lines.length > 0 ? (
           <div className="space-y-1 rounded-chip bg-white/[0.03] p-2 font-mono text-[11px] text-muted-foreground">
             {lines.map((line, i) => (
@@ -665,7 +822,7 @@ function RunPanel({
                 <span className="text-[11px] text-muted-foreground">{t("code.git.discardNeedsGit")}</span>
               ) : null}
             </div>
-            {receipt.attempts.some((a) => a.diffs.length > 0) ? (
+            {receipt.attempts.some((a) => a.diffs.length > 0 || a.verify_output) ? (
               <div className="divide-y divide-white/[0.04]">
                 <div className="px-4 pt-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   {t("code.diff")}

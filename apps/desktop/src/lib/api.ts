@@ -18,6 +18,7 @@ import type {
   McpTest,
   MemoryItem,
   MemoryLayers,
+  PlanResult,
   ProjectState,
   RunReceipt,
   SessionMeta,
@@ -259,7 +260,23 @@ export interface RunRequestInput {
   verify?: string | null;
   workspace?: string | null;
   max_attempts?: number;
+  // An approved/edited plan (raw text from the preview). When set, the run uses THIS plan verbatim
+  // instead of re-planning. Omitted = the run plans for itself (current behaviour).
+  plan?: string | null;
+  // The worker's model slug (omitted / null = the configured default) and the routing mode.
+  model?: string | null;
+  fuse?: boolean;
+  cascade?: boolean;
 }
+
+/** Preview a plan for a task: runs ONLY the planner (a single model call) — NO edits, NO tools, no
+ *  workspace changes. Returns the concrete steps so the user can review/edit before approving a run.
+ *  A model hiccup degrades to empty steps + a `note`, never an HTTP error. */
+export const getPlan = (workspace: string | null | undefined, task: string) =>
+  json<PlanResult>("/api/plan", {
+    method: "POST",
+    body: JSON.stringify({ task, workspace: workspace || null }),
+  });
 
 /** One live progress frame from the run loop (an AgentEvent, serialized). `kind` picks the shape. */
 export interface RunEvent {

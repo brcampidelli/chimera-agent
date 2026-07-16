@@ -54,6 +54,7 @@ from chimera.api.schemas import (
     McpServersOut,
     McpTestOut,
     NewSessionOut,
+    PlanOut,
     RunReceiptOut,
     SessionDetailOut,
     SessionMetaOut,
@@ -122,6 +123,13 @@ class GitRevertRequest(BaseModel):
     """The run's changed paths to discard (git-backed revert, scoped to these only)."""
 
 
+class PlanRequest(BaseModel):
+    task: str
+    workspace: str | None = None
+    """The workspace root the plan is framed for. None = the app's launch workspace. (The planner
+    itself reads no files — it is a pure model call — but the field mirrors the run request's shape.)"""
+
+
 class RunRequest(BaseModel):
     task: str
     verify: str | None = None
@@ -130,6 +138,18 @@ class RunRequest(BaseModel):
     workspace: str | None = None
     """The workspace root to run in. None = the workspace the desktop app was launched with."""
     max_attempts: int = 3
+    plan: str | None = None
+    """An approved/edited plan (the raw text from the plan preview). When set, the run uses THIS plan
+    verbatim instead of re-planning — the worker follows the exact steps the human reviewed. None =
+    the run plans for itself as before."""
+    model: str | None = None
+    """The model slug the worker runs on. None = the configured default model (unchanged behaviour)."""
+    fuse: bool = False
+    """Route the worker through the fusion engine (panel → judge → synthesizer), with fusion on the
+    retry/plan path — the same wiring as ``chimera solve --fuse``. Off = single-model (default)."""
+    cascade: bool = False
+    """Route the worker through the FrugalGPT cascade (weak → gate → mid → gate → fusion), the same
+    wiring as ``chimera solve --cascade``. Takes precedence over ``fuse``. Off = single-model."""
 
 
 # A builder for the per-run autonomous agent, injectable so the endpoint is testable without a real
@@ -305,6 +325,26 @@ def build_api_app(
         # Terminal-Bench number, each carrying its n/CI/significance. No LLM, no network. A missing
         # snapshot is an honest available:false, never a 500.
         return benchmark_report()
+
+    @app.post("/api/plan", dependencies=[guard], response_model=PlanOut)
+    async def plan_endpoint(req: PlanRequest) -> dict[str, Any]:
+        # Plan-only preview: runs ONLY the planner (a single tool-free model call) — NO edits, NO
+        # tools, NO agent loop, nothing touches the workspace. Returns the concrete steps so the user
+        # can review/edit them before approving a real run. The (blocking) model call runs on a worker
+        # thread so the event loop isn't blocked; a model hiccup degrades to empty steps + a note,
+        # never a 500 (mirrors how /api/config/test and the MCP test endpoint flatten failures).
+        def work() -> dict[str, Any]:
+            from chimera.core import Planner
+            from chimera.providers import LLMGateway
+
+            try:
+                plan = Planner(LLMGateway()).plan(req.task, context="")
+                return {"steps": list(plan.steps), "text": plan.as_text(), "note": ""}
+            except Exception as exc:  # noqa: BLE001 — a model hiccup is an honest empty plan, never a 500
+                _log.warning("plan preview failed: %s", exc)
+                return {"steps": [], "text": "", "note": "the planner call did not complete"}
+
+        return await asyncio.get_running_loop().run_in_executor(None, work)
 
     @app.post("/api/runs", dependencies=[guard])
     async def run_stream(req: RunRequest) -> EventSourceResponse:
@@ -641,16 +681,41 @@ def _audit_event(entry: dict[str, Any]) -> dict[str, Any]:
     return {"seq": int(seq) if isinstance(seq, int) else 0, "type": etype, "summary": " ".join(parts)}
 
 
+def _api_cascade_backend(gateway: SupportsComplete, settings: Settings) -> SupportsComplete:
+    """The FrugalGPT cascade (weak → gate → mid → gate → fusion) over the tier ladder.
+
+    A local mirror of the CLI's ``_cascade_backend`` (chimera/cli/main.py) so the desktop run uses the
+    exact same routing without importing the whole CLI. Route decisions are appended to
+    ``<home>/routes.jsonl`` (hash+tokens only, never prompt text), as in the CLI.
+    """
+    from chimera.fusion import FusionEngine
+    from chimera.fusion.cascade import CascadeBackend, CascadeConfig
+
+    ladder = settings.tier_ladder()
+    config = CascadeConfig(
+        weak=ladder.weak,
+        mid=ladder.mid,
+        entry=ladder.entry,
+        log_path=settings.home / "routes.jsonl",
+    )
+    return CascadeBackend(gateway, FusionEngine(gateway), config)
+
+
 def _build_solve_agent(
     req: RunRequest, ws: Path, on_event: EventSink, settings: Settings
 ) -> AutonomousAgent:
     """Build the PLAIN solve-core agent for the desktop trigger: plan → run → verify-or-revert → receipt.
 
-    Deliberately minimal versus the CLI ``solve`` command — none of the advanced seams (cascade,
-    taint ledger, evolution, durable threads, strong-verify, contracts, write-region). It is the
-    honest core loop, the same capability as ``chimera solve TASK --verify CMD`` in a terminal. The
-    worker's file/shell tools write inside ``ws`` and ``CommandVerifier`` runs the verify command
-    there; that side-effecting power is the same the chat endpoint already exposes, gated the same way.
+    Deliberately minimal versus the CLI ``solve`` command — none of the advanced seams (taint
+    ledger, evolution, durable threads, strong-verify, contracts, write-region). It is the honest
+    core loop, the same capability as ``chimera solve TASK --verify CMD`` in a terminal. The worker's
+    file/shell tools write inside ``ws`` and ``CommandVerifier`` runs the verify command there; that
+    side-effecting power is the same the chat endpoint already exposes, gated the same way.
+
+    Three per-run knobs mirror the CLI: ``req.model`` (the worker's model), ``req.fuse`` / ``req.cascade``
+    (the backend routing, reproducing ``chimera solve --fuse`` / ``--cascade``), and ``req.plan`` (an
+    approved/edited plan injected verbatim, skipping the planning call). With none set, the build is
+    byte-identical to the plain single-model core loop.
     """
     from chimera.core import (
         Agent,
@@ -663,19 +728,49 @@ def _build_solve_agent(
     from chimera.core import (
         AutonomousAgent as _AutonomousAgent,
     )
+    from chimera.core.planner import Plan
     from chimera.core.verify import CommandVerifier
     from chimera.providers import LLMGateway
     from chimera.tools import default_registry
 
     gateway = LLMGateway()
+    # Backend selection, mirroring the CLI's solve wiring (main.py). Default = plain gateway on every
+    # rung (single-model). --cascade takes precedence over --fuse (the cascade's top rung is fusion).
+    backend: SupportsComplete = gateway
+    planner_backend: SupportsComplete = gateway
+    escalate_backend: SupportsComplete | None = None
+    if req.cascade:
+        from chimera.fusion import FusionEngine, RoutedBackend, RoutingPolicy
+
+        backend = _api_cascade_backend(gateway, settings)
+        escalate_backend = RoutedBackend(gateway, FusionEngine(gateway), RoutingPolicy(mode="always"))
+    elif req.fuse:
+        from chimera.fusion import FusionEngine, RoutedBackend, RoutingPolicy
+
+        engine = FusionEngine(gateway)
+        backend = RoutedBackend(gateway, engine)
+        # Observed-difficulty escalation: a retry (the task already proved hard) fuses always.
+        escalate_backend = RoutedBackend(gateway, engine, RoutingPolicy(mode="always"))
+        # Planning is a deep, tool-free reasoning turn — route the plan through fusion under --fuse.
+        planner_backend = engine
+
     registry = default_registry(ws)
     # insist_on_action: solve is task completion, so a described-but-unexecuted plan is pushed back
     # to actually run (mirrors the CLI worker config).
-    worker = Agent(gateway, registry, AgentConfig(max_steps=6, insist_on_action=True))
+    cfg = AgentConfig(model=req.model, max_steps=6, insist_on_action=True)
+    worker = Agent(backend, registry, cfg)
+    escalate_worker = (
+        Agent(escalate_backend, registry, cfg) if escalate_backend is not None else None
+    )
+    # Plan mode: an approved/edited plan is injected verbatim (parsed the same way the planner parses
+    # its own output), so the run follows the human-reviewed steps and makes no planning call.
+    provided_plan = Plan.from_text(req.plan) if req.plan else None
     return _AutonomousAgent(
         worker,
-        planner=Planner(gateway),
-        manager=Manager(gateway),
+        escalate_worker=escalate_worker,
+        planner=Planner(planner_backend, req.model),
+        plan=provided_plan,
+        manager=Manager(gateway, req.model),
         verifier=CommandVerifier(req.verify, ws) if req.verify else None,
         guard=WorkspaceGuard(ws),
         workspace=ws,

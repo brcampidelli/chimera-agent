@@ -240,6 +240,127 @@ def test_post_runs_streams_events_done_and_persists_receipt(tmp_path: Any) -> No
     assert listed[0]["task"] == "make it so"
 
 
+def test_plan_endpoint_returns_steps_and_makes_no_edits(tmp_path: Any, monkeypatch: Any) -> None:
+    """POST /api/plan runs ONLY the planner (a single model call): it returns the concrete steps and
+    touches nothing on disk. The planner is stubbed (no network) so the endpoint wiring is exercised."""
+    from chimera.api import build_api_app
+    from chimera.core.planner import Plan
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "sentinel.txt").write_text("untouched\n", encoding="utf-8")
+    before = sorted(p.name for p in ws.iterdir())
+
+    monkeypatch.setattr(
+        "chimera.core.planner.Planner.plan",
+        lambda self, task, *, context="": Plan(
+            steps=["Read the file", "Fix the bug"], raw="1. Read the file\n2. Fix the bug"
+        ),
+    )
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    client = TestClient(
+        build_api_app(lambda: ChatSession(_FakeAgent()), settings=settings, workspace=ws)
+    )
+
+    resp = client.post("/api/plan", json={"task": "fix the bug"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["steps"] == ["Read the file", "Fix the bug"]
+    assert "1. Read the file" in body["text"] and body["note"] == ""
+    # No edits: the workspace is unchanged (the planner only makes a model call, never touches files).
+    assert sorted(p.name for p in ws.iterdir()) == before
+    assert (ws / "sentinel.txt").read_text(encoding="utf-8") == "untouched\n"
+
+
+def test_plan_endpoint_degrades_to_empty_steps_on_model_error(tmp_path: Any, monkeypatch: Any) -> None:
+    """A planner/model hiccup returns empty steps + an honest note — never a 500."""
+    from chimera.api import build_api_app
+
+    def _boom(self: Any, task: str, *, context: str = "") -> Any:
+        raise RuntimeError("model unavailable")
+
+    monkeypatch.setattr("chimera.core.planner.Planner.plan", _boom)
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    client = TestClient(build_api_app(lambda: ChatSession(_FakeAgent()), settings=settings))
+
+    resp = client.post("/api/plan", json={"task": "do a thing"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["steps"] == [] and body["text"] == "" and body["note"]
+
+
+def test_run_request_plan_injection_skips_the_planner(tmp_path: Any) -> None:
+    """When a plan is provided, the AutonomousAgent uses it verbatim and NEVER calls the planner —
+    the seam the desktop 'plan mode' relies on (the human-approved plan drives the run)."""
+    from chimera.core.autonomous import AutonomousAgent, AutonomousConfig
+    from chimera.core.checkpoint import WorkspaceGuard
+    from chimera.core.planner import Plan
+
+    class _SpyPlanner:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def plan(self, task: str, *, context: str = "") -> Plan:
+            self.calls += 1
+            return Plan(steps=["planner ran"], raw="planner ran")
+
+    class _RecordingWorker:
+        def __init__(self) -> None:
+            self.prompt = ""
+
+        def run(self, task: str) -> AgentResult:
+            self.prompt = task
+            return AgentResult(answer="did it", steps=1, stopped_reason="final")
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    spy = _SpyPlanner()
+    worker = _RecordingWorker()
+    agent = AutonomousAgent(
+        worker,
+        planner=spy,  # would be called if no plan were injected...
+        plan=Plan.from_text("1. Approved step one\n2. Approved step two"),  # ...but this wins
+        guard=WorkspaceGuard(ws),
+        workspace=ws,
+        config=AutonomousConfig(max_attempts=1, use_manager=False),
+    )
+    result = agent.run("do the task")
+    assert result.success is True
+    assert spy.calls == 0  # the injected plan was used; the planner was NOT invoked
+    assert result.plan is not None and result.plan.steps == ["Approved step one", "Approved step two"]
+    assert "Approved step one" in worker.prompt  # the approved plan reached the worker's prompt
+
+
+def test_build_solve_agent_default_path_and_model_mode_plumbing(tmp_path: Any) -> None:
+    """The default (no flags) build is a plain single-model loop — no escalate worker, no injected
+    plan; model/plan plumb through, and --fuse/--cascade each wire a fusion escalate worker."""
+    from chimera.api.app import RunRequest, _build_solve_agent
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+
+    def _sink(_e: Any) -> None:
+        return None
+
+    default_agent = _build_solve_agent(RunRequest(task="t"), ws, _sink, settings)
+    assert default_agent.escalate_worker is None  # single-model: no fusion retry path
+    assert default_agent.provided_plan is None  # plans for itself, as before
+
+    fuse_agent = _build_solve_agent(RunRequest(task="t", fuse=True), ws, _sink, settings)
+    assert fuse_agent.escalate_worker is not None  # fusion escalate worker wired
+
+    cascade_agent = _build_solve_agent(RunRequest(task="t", cascade=True), ws, _sink, settings)
+    assert cascade_agent.escalate_worker is not None  # cascade tops out in fusion too
+
+    planned = _build_solve_agent(
+        RunRequest(task="t", model="vendor/model", plan="1. do it\n2. verify it"), ws, _sink, settings
+    )
+    assert planned.provided_plan is not None
+    assert planned.provided_plan.steps == ["do it", "verify it"]
+    assert planned.worker.config.model == "vendor/model"
+
+
 def test_fs_tree_and_file_endpoints_scope_to_the_workspace(tmp_path: Any) -> None:
     """The read-only fs endpoints list a workspace's tree and read a file, guarded by the app's
     workspace and the path-escape check (a `..` → 400; an invalid workspace param → 400)."""
