@@ -213,6 +213,7 @@ Prefer a lean install? Keep `pip install chimera-agent` and add only the extras 
 | **Chat that remembers you** | — | `chimera chat` |
 | **Ask one question** | — | `chimera run "explain X in 3 bullets"` |
 | **Full-screen terminal app** | — | `chimera tui` |
+| **Desktop app** (chat, cost, memory, governance, coding — all optional) | `[desktop]` or a download | `chimera app`, or grab a native installer (`.exe`/`.dmg`/`.AppImage`/`.deb`) from [Releases](https://github.com/brcampidelli/chimera-agent/releases) |
 | **Do a task, keep it only if a check passes** | — | `chimera solve "add hello() to app.py + a test" --verify "pytest -q"` |
 | **Blend several models into one answer** | — | `chimera fuse "your question" --show-panel` |
 | **A team of specialist agents** | — | `chimera crew "your task" --mode supervisor` |
