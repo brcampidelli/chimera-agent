@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.31.0] - 2026-07-15
 
 ### Added
 - **Update-available signal + prompt (desktop app chrome).** A low-key version indicator sits in the
