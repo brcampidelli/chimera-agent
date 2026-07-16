@@ -1,6 +1,6 @@
 [package]
 name = "chimera-desktop"
-version = "0.32.1"
+version = "0.32.2"
 description = "Chimera Agent — native desktop shell"
 authors = ["Bruno Campidelli"]
 edition = "2021"

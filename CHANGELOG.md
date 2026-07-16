@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.32.2] - 2026-07-16
+
+### Fixed
+- Updater manifest: the Linux entry in `latest.json` pointed at the `.deb` instead of the `.AppImage`
+  (Tauri signs the deb too, and the fragment step's `.sig` search picked it first). The Linux updater
+  installs the AppImage, so a deb URL would make Linux auto-update download an un-appliable package.
+  The `.sig` search now excludes `deb/`; Windows/macOS were already correct. Verified against the live
+  published `latest.json`.
+
 ## [0.32.1] - 2026-07-16
 
 ### Fixed
