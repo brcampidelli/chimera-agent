@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.32.1] - 2026-07-16
+
+### Fixed
+- CI: the macOS updater artifact needs the `app` bundle target (`--bundles app,dmg`) so
+  `createUpdaterArtifacts` emits the signed `.app.tar.gz(.sig)`; without it the v0.32.0 release's
+  macOS fragment step failed and no `latest.json` was published. This patch re-runs the full signed
+  pipeline so the updater manifest ships — the in-place auto-updater is now live.
+
 ## [0.32.0] - 2026-07-16
 
 ### Added
