@@ -15,6 +15,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   cooperative and NOT an instant kill** — a task finishes its current attempt and then halts, because
   an in-flight model call can't be interrupted. The UI says exactly that ("Stopping after this
   attempt…"), in all 7 locales.
+- Desktop app: **frontend tests for the Code screen's remaining sub-components** (57 → 91 tests).
+  The suite covered the run receipt, plan preview, Stop and the git panel; the file **Viewer**, the
+  **command runner**, the **browser-screenshot** panel and the **live per-edit diff stream** had no
+  tests at all. The 34 new ones assert user-visible behaviour, weighted to where a regression would
+  be *dishonest* rather than merely ugly: the Viewer (opens read-only; Save PUTs the draft to the
+  open path and leaves edit mode; "unsaved" appears only on a real difference; Discard writes
+  nothing; a **truncated** or **binary** file offers no Edit, since saving the shown text would
+  clobber the part never loaded; a failed save surfaces the error and keeps the draft instead of
+  claiming "Saved"), the command runner (the typed command + cwd are what get run; streamed lines
+  keep their order; a non-zero exit is reported as such; a stream error surfaces rather than ending
+  silently; the copy states each Run is a fresh subprocess and not an interactive terminal), the
+  screenshot panel (`ok:true` renders the real artifact with the honest "of the URL you gave"
+  caption; `ok:false` or a thrown call shows the backend's real error and **no `<img>`** — never a
+  fake or broken image), and the live edit stream (one real diff per edit, in true edit order, with
+  a re-edited path kept as its own later step rather than deduped; no live-edits section is invented
+  when a run streamed none). Each honesty guard was verified by mutation — breaking it in the
+  component makes the matching test fail.
+
+### Changed
+- Desktop app (a11y): the command runner's **Run** button carries an explicit "Run command" label
+  (localized in all 7 locales). The Code screen has a second, unrelated Run (the agent run panel),
+  and an icon plus the word "Run" alone left a screen reader unable to tell the two apart.
 
 ## [0.33.0] - 2026-07-16
 
@@ -30,7 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   is the last x86_64 image GitHub Actions offers (scheduled to go away ~Aug 2027).
 - Desktop app: a **frontend component test suite** (Vitest + Testing Library + jsdom), run in CI's
   `desktop` job before the build. Until now `tsc --noEmit` + `vite build` were the only guards, so a
-  UI regression could ship silently. The 50 tests assert user-visible behaviour on the screens where
+  UI regression could ship silently. The tests assert user-visible behaviour on the screens where
   a regression would be dishonest rather than merely ugly: `VersionBadge` (an update is signalled
   only when confirmed; an offline/failed check shows nothing; a dismissed version is persisted and
   never re-prompted), the `Code` run receipt (real `verify_output` shown only when non-empty; a

@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { AttemptReceipt, FsTree, GitStatus, RunReceipt } from "@/lib/types";
+import type { AttemptReceipt, FsFile, FsNode, FsTree, GitStatus, RunReceipt } from "@/lib/types";
 
 /** The `@/lib/api` surface the Code screen touches. Used as the `vi.mock` factory (via a dynamic
  *  import, so it survives the factory hoisting) — the network is never reached from a test. */
@@ -25,6 +25,22 @@ export function makeCodeApiMock() {
 
 export function emptyTree(): FsTree {
   return { workspace: "/repo", path: "", entries: [], capped: false };
+}
+
+/** One file leaf in the lazy tree (the viewer opens whatever leaf you click). */
+export function fsNode(over: Partial<FsNode> = {}): FsNode {
+  return { is_dir: false, name: "app.py", path: "src/app.py", ...over };
+}
+
+/** A root tree listing the given nodes — defaults to a single clickable `src/app.py`. */
+export function treeWith(entries: FsNode[] = [fsNode()]): FsTree {
+  return { workspace: "/repo", path: "", entries, capped: false };
+}
+
+/** A file read: clean + whole text by default. `truncated: true` (clipped at the read cap) or a
+ *  non-empty `note` (binary/non-text) are the two honesty cases the viewer must refuse to edit. */
+export function fsFile(over: Partial<FsFile> = {}): FsFile {
+  return { path: "src/app.py", content: "print('hi')\n", note: "", truncated: false, ...over };
 }
 
 export function gitStatus(over: Partial<GitStatus> = {}): GitStatus {

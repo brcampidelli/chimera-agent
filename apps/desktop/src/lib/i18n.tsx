@@ -254,6 +254,7 @@ const en: Dict = {
   "code.cmdRunner": "Command runner",
   "code.cmdPlaceholder": "a command to run in this workspace — e.g. npm test",
   "code.cwd": "cwd (optional, relative to the workspace)",
+  "code.cmdRun": "Run command",
   "code.exit": "exit",
   "code.freshProcNote":
     "Each command is a fresh subprocess — cwd and env don't persist between commands (no cd/export state).",
@@ -667,6 +668,7 @@ const pt: Dict = {
   "code.cmdRunner": "Executor de comandos",
   "code.cmdPlaceholder": "um comando para rodar neste workspace — ex.: npm test",
   "code.cwd": "cwd (opcional, relativo ao workspace)",
+  "code.cmdRun": "Executar comando",
   "code.exit": "saída",
   "code.freshProcNote":
     "Cada comando é um subprocesso novo — cwd e env não persistem entre comandos (sem estado de cd/export).",
@@ -1080,6 +1082,7 @@ const es: Dict = {
   "code.cmdRunner": "Ejecutor de comandos",
   "code.cmdPlaceholder": "un comando para ejecutar en este workspace — p. ej. npm test",
   "code.cwd": "cwd (opcional, relativo al workspace)",
+  "code.cmdRun": "Ejecutar comando",
   "code.exit": "salida",
   "code.freshProcNote":
     "Cada comando es un subproceso nuevo — cwd y env no persisten entre comandos (sin estado de cd/export).",
@@ -1493,6 +1496,7 @@ const fr: Dict = {
   "code.cmdRunner": "Exécuteur de commandes",
   "code.cmdPlaceholder": "une commande à exécuter dans ce workspace — ex. npm test",
   "code.cwd": "cwd (optionnel, relatif au workspace)",
+  "code.cmdRun": "Exécuter la commande",
   "code.exit": "code",
   "code.freshProcNote":
     "Chaque commande est un sous-processus neuf — cwd et env ne persistent pas entre les commandes (pas d'état cd/export).",
@@ -1906,6 +1910,7 @@ const de: Dict = {
   "code.cmdRunner": "Befehls-Runner",
   "code.cmdPlaceholder": "ein Befehl, der in diesem Workspace läuft — z. B. npm test",
   "code.cwd": "cwd (optional, relativ zum Workspace)",
+  "code.cmdRun": "Befehl ausführen",
   "code.exit": "Exit",
   "code.freshProcNote":
     "Jeder Befehl ist ein frischer Subprozess — cwd und env bleiben zwischen Befehlen nicht erhalten (kein cd/export-Zustand).",
@@ -2317,6 +2322,7 @@ const zh: Dict = {
   "code.cmdRunner": "命令执行器",
   "code.cmdPlaceholder": "在此工作区运行的命令 —— 例如 npm test",
   "code.cwd": "cwd（可选，相对于工作区）",
+  "code.cmdRun": "运行命令",
   "code.exit": "退出码",
   "code.freshProcNote":
     "每条命令都是全新子进程 —— cwd 和 env 不会在命令间保留（无 cd/export 状态）。",
@@ -2725,6 +2731,7 @@ const ja: Dict = {
   "code.cmdRunner": "コマンドランナー",
   "code.cmdPlaceholder": "このワークスペースで実行するコマンド —— 例: npm test",
   "code.cwd": "cwd（任意、ワークスペースからの相対）",
+  "code.cmdRun": "コマンドを実行",
   "code.exit": "終了コード",
   "code.freshProcNote":
     "各コマンドは新しいサブプロセスです —— cwd と env はコマンド間で保持されません（cd/export の状態なし）。",

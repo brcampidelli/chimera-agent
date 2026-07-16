@@ -1038,7 +1038,14 @@ function CmdRunner({ workspace }: { workspace: string }) {
           onChange={(e) => setCwd(e.target.value)}
           disabled={running}
         />
-        <Button size="sm" disabled={!command.trim() || running} onClick={run}>
+        {/* Labelled "Run command": the screen has a second, unrelated Run (the agent RunPanel), and
+            an icon+"Run" alone is ambiguous to a screen reader (and to a test) about which it is. */}
+        <Button
+          size="sm"
+          aria-label={t("code.cmdRun")}
+          disabled={!command.trim() || running}
+          onClick={run}
+        >
           {running ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" /> {t("code.running")}
