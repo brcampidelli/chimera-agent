@@ -30,7 +30,7 @@ jobs:
             bundles: nsis
             updater_target: windows-x86_64
           - os: macos-latest
-            bundles: dmg
+            bundles: app,dmg
             updater_target: darwin-aarch64
           - os: ubuntu-latest
             bundles: appimage,deb
