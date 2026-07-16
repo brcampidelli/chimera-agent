@@ -4,6 +4,22 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Desktop app: a **frontend component test suite** (Vitest + Testing Library + jsdom), run in CI's
+  `desktop` job before the build. Until now `tsc --noEmit` + `vite build` were the only guards, so a
+  UI regression could ship silently. The 50 tests assert user-visible behaviour on the screens where
+  a regression would be dishonest rather than merely ugly: `VersionBadge` (an update is signalled
+  only when confirmed; an offline/failed check shows nothing; a dismissed version is persisted and
+  never re-prompted), the `Code` run receipt (real `verify_output` shown only when non-empty; a
+  reverted attempt labelled attempted-and-undone, never applied; a cancelled run reported as
+  cancelled, not failed), plan preview (previewing makes no run; the approved/edited plan is what
+  reaches the run request; the plain Run path injects no plan), cooperative Stop, the git panel's
+  non-repo empty state and explicit-path commit, and `Agents` (per-task pass/fail, prominent
+  conflicts, and the "ran in-place WITHOUT isolation" banner outside a git repo).
+  Run with `npm --prefix apps/desktop run test`.
+
 ## [0.32.2] - 2026-07-16
 
 ### Fixed
