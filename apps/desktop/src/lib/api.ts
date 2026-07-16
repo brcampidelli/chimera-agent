@@ -30,6 +30,7 @@ import type {
   ToolEvent,
   Tools,
   UsageSummary,
+  VersionInfo,
 } from "@/lib/types";
 
 // The backend injects the bearer token into the page (as a meta tag) only for a loopback client, when
@@ -55,6 +56,11 @@ export const getSession = (id: string) =>
   json<{ id: string; turns: { user: string; assistant: string }[] }>(`/api/sessions/${id}`);
 export const deleteSession = (id: string) =>
   json<{ deleted: boolean }>(`/api/sessions/${id}`, { method: "DELETE" });
+
+// The running version + an HONEST update signal: `update_available` is true ONLY when GitHub confirms
+// a strictly-newer release. Offline / any error → {latest:null, update_available:false} (never a false
+// "update available"). The backend caches the GitHub result, so polling this is cheap.
+export const getVersion = () => json<VersionInfo>("/api/version");
 
 export const getConfig = () => json<AppConfig>("/api/config");
 export const getDoctor = () => json<DoctorInfo>("/api/doctor");

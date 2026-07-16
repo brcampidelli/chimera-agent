@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Update-available signal + prompt (desktop app chrome).** A low-key version indicator sits in the
+  bottom corner (like the Hermes app's) showing the running `v{version}`. On load the app asks the new
+  `GET /api/version`, which checks GitHub's public releases API for the newest tag and returns
+  `{version, latest, update_available, notes_url}`. When — and ONLY when — a **strictly-newer** release
+  is confirmed, the indicator becomes an accent "**v{latest} available**" pill that opens a small
+  dismissible prompt: a link to **View release** and a copy-able `pip install -U 'chimera-agent[desktop]'`
+  line. *Honest by construction:* offline or on any error (timeout, rate-limit, parse) the check
+  degrades to the quiet current version — it can never show a false "update available". Dismissing a
+  version persists in `localStorage`, so a version the user chose to skip doesn't nag every launch.
+  Wiring: `chimera/api/version_api.py` fetches with stdlib `urllib` on a worker thread (short timeout,
+  a `User-Agent` header) and caches the result for an hour so repeated GETs don't hammer the API; the
+  version comparison parses `MAJOR.MINOR.PATCH` into int tuples (so `0.9.0 < 0.10.0`, not a string
+  compare). It's a plain GET of the public releases API — no user data is sent.
+  - **Future work:** the Tauri in-place auto-updater (download + install the new version from within
+    the app). This change is signal-only — it links to the release and shows the pip command, it does
+    not install anything.
 - **Browser screenshot verification artifact (desktop "Code" screen).** A new **"Verify in browser"**
   panel: type a URL, hit **Capture**, and the headless browser navigates there and saves a real
   full-page PNG that is stored server-side (`<home>/artifacts/<uuid>.png`) and shown inline. It is

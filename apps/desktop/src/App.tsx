@@ -19,6 +19,7 @@ import { Maturity } from "@/components/Maturity";
 import { Tools } from "@/components/Tools";
 import { Mcp } from "@/components/Mcp";
 import { Onboarding } from "@/components/Onboarding";
+import { VersionBadge } from "@/components/VersionBadge";
 import { Activity, type Status } from "@/components/Activity";
 import { Spinner } from "@/components/ui/panel";
 import { deleteSession, getDoctor, getSession, listSessions, streamChat } from "@/lib/api";
@@ -205,6 +206,11 @@ export default function App() {
         {view === "settings" && <Settings />}
       </main>
       {view === "chat" && <Activity status={status} tools={tools} report={report} />}
+      {/* Low-key version indicator in the bottom corner (like the Hermes app's). Shows the running
+          version, and an accent "update available" pill only when GitHub confirms a newer release. */}
+      <div className="fixed bottom-2 right-3 z-40">
+        <VersionBadge />
+      </div>
     </div>
   );
 }

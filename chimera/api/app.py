@@ -66,6 +66,7 @@ from chimera.api.schemas import (
     ToolsOut,
     UpdatedOut,
     UsageSummaryOut,
+    VersionOut,
 )
 from chimera.api.sessions import SessionManager, SessionStore
 from chimera.api.usage import UsageRecord, append_usage, load_usage, summarize_usage
@@ -330,6 +331,17 @@ def build_api_app(
         from chimera.api.config_api import doctor
 
         return doctor(get_settings())
+
+    @app.get("/api/version", dependencies=[guard], response_model=VersionOut)
+    async def version_endpoint() -> dict[str, Any]:
+        # Report the running version and, ONLY when GitHub confirms a strictly-newer release, signal an
+        # update. Honest/fail-silent: offline or any error → latest=None, update_available=False (never a
+        # false "update available"). PRIVACY: a plain GET of GitHub's PUBLIC releases API — no user data
+        # is sent. The blocking urllib fetch runs on a worker thread (like POST /api/plan) and its result
+        # is cached for an hour so repeated GETs don't hammer the API.
+        from chimera.api.version_api import check_version
+
+        return await asyncio.get_running_loop().run_in_executor(None, check_version)
 
     @app.post("/api/config/test", dependencies=[guard], response_model=ConfigTestOut)
     def config_test_endpoint(req: ConfigTestRequest) -> dict[str, Any]:

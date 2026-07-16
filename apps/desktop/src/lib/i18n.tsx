@@ -421,6 +421,14 @@ const en: Dict = {
   "settings.card.mcp": "MCP",
   "settings.row.mcpAutoload": "Autoload MCP tools",
   "settings.hint.mcpAutoload": "load configured servers at app start (needs a restart)",
+  "update.available": "v{latest} available",
+  "update.prompt": "A new version (v{latest}) is available. Update?",
+  "update.howto":
+    "There's no in-place auto-update yet — update with the command below, or read the release notes.",
+  "update.copy": "Copy",
+  "update.copied": "Copied",
+  "update.viewRelease": "View release",
+  "update.dismiss": "Dismiss",
 };
 
 const pt: Dict = {
@@ -819,6 +827,14 @@ const pt: Dict = {
   "settings.card.mcp": "MCP",
   "settings.row.mcpAutoload": "Autoload de ferramentas MCP",
   "settings.hint.mcpAutoload": "carrega os servidores configurados ao iniciar o app (requer reinício)",
+  "update.available": "v{latest} disponível",
+  "update.prompt": "Uma nova versão (v{latest}) está disponível. Atualizar?",
+  "update.howto":
+    "Ainda não há atualização automática no lugar — atualize com o comando abaixo, ou leia as notas da versão.",
+  "update.copy": "Copiar",
+  "update.copied": "Copiado",
+  "update.viewRelease": "Ver versão",
+  "update.dismiss": "Dispensar",
 };
 
 const es: Dict = {
@@ -1217,6 +1233,14 @@ const es: Dict = {
   "settings.card.mcp": "MCP",
   "settings.row.mcpAutoload": "Autoload de herramientas MCP",
   "settings.hint.mcpAutoload": "carga los servidores configurados al iniciar la app (requiere reinicio)",
+  "update.available": "v{latest} disponible",
+  "update.prompt": "Hay una nueva versión (v{latest}) disponible. ¿Actualizar?",
+  "update.howto":
+    "Aún no hay actualización automática en el sitio — actualiza con el comando de abajo, o lee las notas de la versión.",
+  "update.copy": "Copiar",
+  "update.copied": "Copiado",
+  "update.viewRelease": "Ver versión",
+  "update.dismiss": "Descartar",
 };
 
 const fr: Dict = {
@@ -1615,6 +1639,14 @@ const fr: Dict = {
   "settings.card.mcp": "MCP",
   "settings.row.mcpAutoload": "Autoload des outils MCP",
   "settings.hint.mcpAutoload": "charge les serveurs configurés au démarrage de l'app (nécessite un redémarrage)",
+  "update.available": "v{latest} disponible",
+  "update.prompt": "Une nouvelle version (v{latest}) est disponible. Mettre à jour ?",
+  "update.howto":
+    "Pas encore de mise à jour automatique sur place — mettez à jour avec la commande ci-dessous, ou lisez les notes de version.",
+  "update.copy": "Copier",
+  "update.copied": "Copié",
+  "update.viewRelease": "Voir la version",
+  "update.dismiss": "Ignorer",
 };
 
 const de: Dict = {
@@ -2013,6 +2045,14 @@ const de: Dict = {
   "settings.card.mcp": "MCP",
   "settings.row.mcpAutoload": "MCP-Tools automatisch laden",
   "settings.hint.mcpAutoload": "lädt konfigurierte Server beim App-Start (Neustart nötig)",
+  "update.available": "v{latest} verfügbar",
+  "update.prompt": "Eine neue Version (v{latest}) ist verfügbar. Aktualisieren?",
+  "update.howto":
+    "Es gibt noch kein automatisches In-Place-Update — aktualisiere mit dem Befehl unten oder lies die Release-Notes.",
+  "update.copy": "Kopieren",
+  "update.copied": "Kopiert",
+  "update.viewRelease": "Release ansehen",
+  "update.dismiss": "Verwerfen",
 };
 
 const zh: Dict = {
@@ -2409,6 +2449,13 @@ const zh: Dict = {
   "settings.card.mcp": "MCP",
   "settings.row.mcpAutoload": "自动加载 MCP 工具",
   "settings.hint.mcpAutoload": "在应用启动时加载已配置的服务器（需重启）",
+  "update.available": "v{latest} 可用",
+  "update.prompt": "有新版本（v{latest}）可用。要更新吗？",
+  "update.howto": "暂无原地自动更新——请使用下方命令更新，或查看发行说明。",
+  "update.copy": "复制",
+  "update.copied": "已复制",
+  "update.viewRelease": "查看发行版",
+  "update.dismiss": "忽略",
 };
 
 const ja: Dict = {
@@ -2805,6 +2852,13 @@ const ja: Dict = {
   "settings.card.mcp": "MCP",
   "settings.row.mcpAutoload": "MCP ツールを自動読み込み",
   "settings.hint.mcpAutoload": "アプリ起動時に設定済みサーバーを読み込む（再起動が必要）",
+  "update.available": "v{latest} が利用可能",
+  "update.prompt": "新しいバージョン（v{latest}）が利用可能です。更新しますか？",
+  "update.howto": "その場での自動更新はまだありません——下のコマンドで更新するか、リリースノートをご覧ください。",
+  "update.copy": "コピー",
+  "update.copied": "コピーしました",
+  "update.viewRelease": "リリースを見る",
+  "update.dismiss": "閉じる",
 };
 
 const DICTS: Record<Lang, Dict> = { en, pt, es, fr, de, zh, ja };

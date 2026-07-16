@@ -2783,6 +2783,48 @@
         ],
         "title": "ValidationError",
         "type": "object"
+      },
+      "VersionOut": {
+        "properties": {
+          "latest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest"
+          },
+          "notes_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes Url"
+          },
+          "update_available": {
+            "title": "Update Available",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "latest",
+          "update_available",
+          "notes_url"
+        ],
+        "title": "VersionOut",
+        "type": "object"
       }
     }
   },
@@ -4535,6 +4577,24 @@
           }
         },
         "summary": "Verify Screenshot Endpoint"
+      }
+    },
+    "/api/version": {
+      "get": {
+        "operationId": "version_endpoint_api_version_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Version Endpoint"
       }
     }
   }

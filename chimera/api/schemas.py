@@ -22,6 +22,13 @@ class HealthOut(BaseModel):
     sessions: int
 
 
+class VersionOut(BaseModel):
+    version: str  # the running chimera version (from installed package metadata)
+    latest: str | None  # the newest GitHub release tag (no leading "v"); null when the check couldn't run
+    update_available: bool  # True ONLY when GitHub confirms a strictly-newer release (honest, fail-silent)
+    notes_url: str | None  # the release page to read about the update; null when no update is available
+
+
 class SessionMetaOut(BaseModel):
     id: str
     title: str
