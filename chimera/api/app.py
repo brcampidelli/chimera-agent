@@ -37,6 +37,7 @@ from chimera.api.maturity_api import maturity_report
 from chimera.api.runs import load_runs
 from chimera.api.schemas import (
     AgentsBatchOut,
+    BatchCancelOut,
     BenchmarksOut,
     CancelOut,
     ConfigOut,
@@ -87,6 +88,12 @@ _log = get_logger("api.app")
 # stop check polls. A run inserts its id on start and pops it on cleanup, so only in-flight runs are
 # cancellable; POST /api/runs/{id}/cancel sets the event. In-process only (a single-user local app).
 _run_cancels: dict[str, threading.Event] = {}
+
+# Live BATCH cancel registry: batch_id -> {task index -> that task's stop Event}. Exactly the
+# single-run mechanism above, one Event per task, so POST /api/agents/{batch_id}/cancel can halt one
+# task (index) or every task in the batch (index=null). A batch inserts its id on start and pops it on
+# cleanup, so only in-flight batches are cancellable. In-process only (a single-user local app).
+_agents_cancels: dict[str, dict[int, threading.Event]] = {}
 
 
 class ChatRequest(BaseModel):
@@ -207,6 +214,13 @@ class AgentsRequest(BaseModel):
     cascade: bool = False
     """Route each worker through the FrugalGPT cascade (same wiring as ``chimera solve --cascade``).
     Takes precedence over ``fuse``."""
+
+
+class BatchCancelRequest(BaseModel):
+    """Which of a batch's tasks to cooperatively stop."""
+
+    index: int | None = None
+    """The 0-based task index to cancel. None = cancel EVERY task in the batch."""
 
 
 _MAX_AGENT_TASKS = 8
@@ -594,9 +608,22 @@ def build_api_app(
         max_workers = max(1, min(8, req.max_workers))
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue[tuple[str, Any] | None] = asyncio.Queue()
+        # Cooperative-cancel plumbing, per task: a batch id + one stop Event per task index. The
+        # frontend learns the id from the first `batch` frame and hits POST /api/agents/{id}/cancel to
+        # set one task's Event (index) or all of them (index=null); each task's stop check
+        # (event.is_set) then halts THAT task's loop before its NEXT attempt — an in-flight model call
+        # is never interrupted. Registered here, popped in the work() finally so the map never leaks
+        # past a finished batch.
+        batch_id = uuid.uuid4().hex
+        cancels = {i: threading.Event() for i in range(len(req.tasks))}
+        _agents_cancels[batch_id] = cancels
 
         def emit(event: str, payload: Any) -> None:
             loop.call_soon_threadsafe(queue.put_nowait, (event, payload))
+
+        # Tell the client its batch_id immediately (its own SSE frame), so the per-task Stop controls
+        # can target this batch from the first moment — before any task has run.
+        emit("batch", {"batch_id": batch_id})
 
         def make_run(index: int, spec: AgentTaskIn) -> Callable[[Path], AutonomousResult]:
             # Reuse the exact single-run builder (``solve_factory`` == _build_solve_agent by default, or
@@ -619,8 +646,9 @@ def build_api_app(
                 def on_event(event: AgentEvent) -> None:
                     emit("event", {**_event_dict(event), "index": index})
 
-                # Batch tasks aren't individually cancellable in this task (future work) — pass None.
-                agent = solve_factory(sub, ws_i, on_event, settings, None)
+                # This task's OWN cooperative-stop probe: the Event registered for THIS index, so a
+                # Stop on one card halts only that task (the batch's other workers run on).
+                agent = solve_factory(sub, ws_i, on_event, settings, cancels[index].is_set)
                 return agent.run(spec.task)
 
             return run
@@ -646,6 +674,8 @@ def build_api_app(
                 _log.warning("agents batch failed: %s", exc)
                 emit("error", {"message": "the batch failed"})
             finally:
+                # done (or crashed): the batch is no longer cancellable
+                _agents_cancels.pop(batch_id, None)
                 loop.call_soon_threadsafe(queue.put_nowait, None)  # sentinel: end of stream
 
         # Each task is independent (its own agent + isolated worktree). A client disconnecting mid-batch
@@ -662,6 +692,27 @@ def build_api_app(
                 yield {"event": event, "data": json.dumps(payload)}
 
         return EventSourceResponse(events())
+
+    @app.post("/api/agents/{batch_id}/cancel", dependencies=[guard], response_model=BatchCancelOut)
+    def cancel_agents(batch_id: str, req: BatchCancelRequest) -> dict[str, Any]:
+        # Cooperative cancel inside an in-flight batch: sets ONE task's stop Event (``index``) or every
+        # task's (``index`` null). Each task's loop polls its Event BETWEEN attempts (never mid
+        # model-call), so this halts a task after its current attempt — it never kills instantly.
+        # An unknown/finished batch id (or an out-of-range index) is a no-op {ok:false, cancelled:0}
+        # with a 200 — not a 404 — since a batch that already ended is exactly the state a stale Stop
+        # click hits. ``cancelled`` counts the events actually set (already-set ones don't recount).
+        events = _agents_cancels.get(batch_id)
+        if events is None:
+            return {"ok": False, "cancelled": 0}
+        if req.index is None:
+            targets = list(events.values())  # whole batch: every task's stop flag
+        else:
+            target = events.get(req.index)  # one task; an out-of-range index targets nothing
+            targets = [target] if target is not None else []
+        fresh = [e for e in targets if not e.is_set()]
+        for event in fresh:
+            event.set()
+        return {"ok": bool(targets), "cancelled": len(fresh)}
 
     def _resolve_fs_workspace(ws_param: str | None) -> Path:
         # Which workspace the read-only fs endpoints are scoped to: the request's ``workspace`` query

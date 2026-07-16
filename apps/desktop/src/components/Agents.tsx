@@ -7,10 +7,11 @@ import {
   Loader2,
   Play,
   Plus,
+  Square,
   Trash2,
   XCircle,
 } from "lucide-react";
-import { streamAgents, type AgentTaggedEvent } from "@/lib/api";
+import { cancelAgents, streamAgents, type AgentTaggedEvent } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/panel";
 import { useT, type TFunc } from "@/lib/i18n";
@@ -117,6 +118,9 @@ function AgentCard({
   result,
   conflicts,
   running,
+  canStop,
+  stopping,
+  onStop,
   t,
 }: {
   index: number;
@@ -125,6 +129,11 @@ function AgentCard({
   result: AgentResult | null;
   conflicts: string[];
   running: boolean;
+  // Whether this card can offer a Stop: the batch is in flight AND has reported its id (the cancel
+  // handle). A task with a result has already finished — it never gets one.
+  canStop: boolean;
+  stopping: boolean;
+  onStop: () => void;
   t: TFunc;
 }) {
   // Which of this task's changed files collided with another task (left unmerged).
@@ -137,6 +146,21 @@ function AgentCard({
         <span className="min-w-0 flex-1 truncate text-xs text-foreground" title={label}>
           {label || t("agents.untitled")}
         </span>
+        {/* Cooperative per-task Stop, offered only while the batch is in flight: it halts THIS task
+            before its next attempt (never mid model-call), leaving the batch's others running. */}
+        {!done && running ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 shrink-0 px-1.5 text-[11px]"
+            disabled={!canStop || stopping}
+            onClick={onStop}
+            title={t("agents.stopTooltip")}
+          >
+            <Square className="h-3 w-3" />
+            {stopping ? t("agents.stopping") : t("agents.stop")}
+          </Button>
+        ) : null}
         {!done && running ? (
           <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-accent" />
         ) : done && result.success ? (
@@ -235,6 +259,11 @@ export function Agents() {
   const [live, setLive] = useState<Record<number, string[]>>({});
   const [batch, setBatch] = useState<AgentsBatch | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Cooperative Stop: the in-flight batch's id (from the first `batch` frame) is the cancel handle,
+  // and `stopping[i]` marks that task i's Stop was requested (it halts AFTER its current attempt — a
+  // model step can't be interrupted). Both clear when the next batch starts.
+  const [batchId, setBatchId] = useState<string | null>(null);
+  const [stopping, setStopping] = useState<Record<number, boolean>>({});
 
   const canRun = !running && tasks.some((r) => r.task.trim());
 
@@ -249,6 +278,31 @@ export function Agents() {
     setTasks((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));
   }
 
+  // Cooperative Stop, per task: ask the backend to halt task `index` BEFORE its next attempt. An
+  // in-flight model step can't be interrupted, so this never kills instantly — the task stops after
+  // its current attempt finishes. `stopping[index]` stays set (disabling re-click) until the batch's
+  // own `batch_done` clears the state.
+  async function stopTask(index: number) {
+    if (!batchId || stopping[index]) return;
+    setStopping((prev) => ({ ...prev, [index]: true }));
+    try {
+      await cancelAgents(batchId, index);
+    } catch {
+      // A cancel that fails (e.g. the batch just finished) is a no-op — `batch_done` clears state.
+    }
+  }
+
+  // The same cooperative Stop, aimed at EVERY task in the batch (index omitted = all).
+  async function stopAllTasks() {
+    if (!batchId) return;
+    setStopping(Object.fromEntries(labels.map((_, i) => [i, true])));
+    try {
+      await cancelAgents(batchId, null);
+    } catch {
+      // A cancel that fails (e.g. the batch just finished) is a no-op — `batch_done` clears state.
+    }
+  }
+
   function runAll() {
     const submitted = tasks.filter((r) => r.task.trim());
     if (submitted.length === 0 || running) return;
@@ -256,6 +310,8 @@ export function Agents() {
     setBatch(null);
     setError(null);
     setLive({});
+    setBatchId(null);
+    setStopping({});
     setLabels(submitted.map((r) => r.task.trim()));
     const append = (index: number, line: string) =>
       setLive((prev) => ({ ...prev, [index]: [...(prev[index] ?? []), line] }));
@@ -270,6 +326,7 @@ export function Agents() {
         cascade: mode === "cascade",
       },
       {
+        onBatchId: (id) => setBatchId(id),
         onStart: (s) => setLabels(s.tasks),
         onEvent: (e) => {
           const line = liveLine(e, t);
@@ -278,10 +335,14 @@ export function Agents() {
         onBatchDone: (b) => {
           setBatch(b);
           setRunning(false);
+          setBatchId(null);
+          setStopping({});
         },
         onError: (msg) => {
           setError(msg);
           setRunning(false);
+          setBatchId(null);
+          setStopping({});
         },
       },
     );
@@ -389,6 +450,18 @@ export function Agents() {
                 </>
               )}
             </Button>
+            {/* Cooperative Stop for the WHOLE batch: every task halts before its next attempt. */}
+            {running ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={!batchId}
+                onClick={() => void stopAllTasks()}
+                title={t("agents.stopAllTooltip")}
+              >
+                <Square className="h-4 w-4" /> {t("agents.stopAll")}
+              </Button>
+            ) : null}
             {error ? <span className="text-[11px] text-bad">{error}</span> : null}
           </div>
         </div>
@@ -444,6 +517,9 @@ export function Agents() {
                 result={c.result}
                 conflicts={batch?.conflicts ?? []}
                 running={running}
+                canStop={batchId !== null}
+                stopping={stopping[c.index] === true}
+                onStop={() => void stopTask(c.index)}
                 t={t}
               />
             ))}

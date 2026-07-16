@@ -428,6 +428,9 @@ export interface AgentsStreamHandlers {
   onEvent?: (e: AgentTaggedEvent) => void;
   onBatchDone?: (b: AgentsBatch) => void;
   onError?: (msg: string) => void;
+  // The batch's id, delivered on the first `batch` frame — the handle for
+  // POST /api/agents/{id}/cancel (mirrors {@link RunStreamHandlers.onRunId}).
+  onBatchId?: (id: string) => void;
 }
 
 /** Trigger a parallel batch of autonomous runs (each in its OWN git worktree) and stream progress.
@@ -486,11 +489,21 @@ function dispatchAgents(frame: string, h: AgentsStreamHandlers): void {
   } catch {
     return;
   }
-  if (event === "start") h.onStart?.(payload as unknown as AgentsStart);
+  if (event === "batch") h.onBatchId?.(payload.batch_id as string);
+  else if (event === "start") h.onStart?.(payload as unknown as AgentsStart);
   else if (event === "event") h.onEvent?.(payload as unknown as AgentTaggedEvent);
   else if (event === "batch_done") h.onBatchDone?.(payload as unknown as AgentsBatch);
   else if (event === "error") h.onError?.(payload.message as string);
 }
+
+/** Cooperatively cancel tasks in an in-flight batch: `index` stops just that task, omitting it (null)
+ *  stops every task. Each task halts BEFORE its next attempt (an in-flight model step can't be
+ *  interrupted). A finished/unknown batch is a no-op {ok:false, cancelled:0}, never an error. */
+export const cancelAgents = (batchId: string, index?: number | null) =>
+  json<{ ok: boolean; cancelled: number }>(`/api/agents/${encodeURIComponent(batchId)}/cancel`, {
+    method: "POST",
+    body: JSON.stringify({ index: index ?? null }),
+  });
 
 // --- Command runner (workspace-scoped, streamed; fresh subprocess per command — NOT a terminal) ---
 

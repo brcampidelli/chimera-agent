@@ -319,6 +319,14 @@ class CancelOut(BaseModel):
     # (a no-op — cancellation is COOPERATIVE: the run halts before its NEXT attempt, never mid model-call)
 
 
+class BatchCancelOut(BaseModel):
+    ok: bool  # True when the batch_id was known AND the request named real task(s); False for a
+    # finished/unknown batch or an out-of-range index (a no-op, 200 — never a 404)
+    cancelled: int  # how many task stop flags this call actually RAISED (already-stopping tasks don't
+    # recount). Cancellation is COOPERATIVE: each task halts before its NEXT attempt, never mid
+    # model-call — so this is a count of requests made, not of workers already stopped.
+
+
 # --- verify (browser screenshot verification artifact) --------------------------------------------
 
 

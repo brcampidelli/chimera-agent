@@ -4,6 +4,18 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Desktop app: **cooperative cancel in the Agent Manager** — every still-running task card now has its
+  own **Stop**, plus a **Stop all** for the whole batch. Until now only the single coding run could be
+  stopped; a parallel batch had to be waited out. Backed by `POST /api/agents/{batch_id}/cancel`
+  (`{index}` — an int stops just that task, null stops every one), the same mechanism the single run
+  already uses: one stop Event per task, threaded into that task's agent. **Cancellation is
+  cooperative and NOT an instant kill** — a task finishes its current attempt and then halts, because
+  an in-flight model call can't be interrupted. The UI says exactly that ("Stopping after this
+  attempt…"), in all 7 locales.
+
 ## [0.33.0] - 2026-07-16
 
 ### Added

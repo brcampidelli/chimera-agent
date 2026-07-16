@@ -38,6 +38,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/agents/{batch_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Agents */
+        post: operations["cancel_agents_api_agents__batch_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/artifacts/{artifact_id}": {
         parameters: {
             query?: never;
@@ -917,6 +934,21 @@ export interface components {
             summary: string;
             /** Type */
             type: string;
+        };
+        /** BatchCancelOut */
+        BatchCancelOut: {
+            /** Cancelled */
+            cancelled: number;
+            /** Ok */
+            ok: boolean;
+        };
+        /**
+         * BatchCancelRequest
+         * @description Which of a batch's tasks to cooperatively stop.
+         */
+        BatchCancelRequest: {
+            /** Index */
+            index?: number | null;
         };
         /** BenchmarkExternalOut */
         BenchmarkExternalOut: {
@@ -1867,6 +1899,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentsBatchOut"];
+                };
+            };
+        };
+    };
+    cancel_agents_api_agents__batch_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchCancelRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchCancelOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

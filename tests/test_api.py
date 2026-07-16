@@ -356,8 +356,10 @@ def test_post_agents_streams_tagged_events_and_batch_done(tmp_path: Any) -> None
     assert resp.status_code == 200
     events = _read_sse(resp.text)
     kinds = [e for e, _ in events]
-    assert kinds[0] == "start" and kinds[-1] == "batch_done"
-    start = events[0][1]
+    # Per-task cancel is wired but never triggered here (default path): the stream still emits its
+    # normal frames — a leading `batch` id frame, then `start`, the tagged events, and `batch_done`.
+    assert kinds[:2] == ["batch", "start"] and kinds[-1] == "batch_done"
+    start = next(d for e, d in events if e == "start")
     assert start["tasks"] == ["alpha work", "beta work"] and start["workspace"] == str(ws)
 
     # Every streamed `event` frame carries a task index + the AgentEvent kind/text (compact).
@@ -408,6 +410,146 @@ def test_post_agents_non_git_repo_sets_is_repo_false(tmp_path: Any) -> None:
     assert bd["is_repo"] is False  # not a repo → ran in-place, no isolation
     assert bd["results"][0]["changed_paths"] == []  # no worktree, nothing to diff
     assert (ws / "x.txt").read_text(encoding="utf-8") == "t"  # the edit happened in-place
+
+
+def test_post_agents_emits_batch_id_frame_and_leaves_no_cancel_path_untouched(tmp_path: Any) -> None:
+    """The batch stream leads with a `batch` frame carrying its id (the cancel handle), and the DEFAULT
+    path — no cancel requested — still streams exactly as before: start → tagged events → batch_done,
+    every task succeeding. The registry is popped when the batch ends, so it never leaks."""
+    from chimera.api import app as app_module
+
+    ws = tmp_path / "ws"
+    _init_repo(ws)
+    client = _agents_client(tmp_path, lambda task: "a.txt" if "alpha" in task else "b.txt")
+
+    resp = client.post(
+        "/api/agents",
+        json={"tasks": [{"task": "alpha work"}, {"task": "beta work"}], "workspace": str(ws)},
+    )
+    events = _read_sse(resp.text)
+    kinds = [e for e, _ in events]
+    assert kinds[0] == "batch"  # the id lands FIRST, before any task runs
+    batch_frame = events[0][1]
+    assert isinstance(batch_frame["batch_id"], str) and batch_frame["batch_id"]
+    # Unchanged default path: the ordinary frames still follow, and every task still passed.
+    assert kinds[1] == "start" and "event" in kinds and kinds[-1] == "batch_done"
+    bd = next(d for e, d in events if e == "batch_done")
+    assert all(r["success"] for r in bd["results"]) and bd["merged"] == 2
+    # The finished batch is no longer cancellable — its registry entry was popped.
+    assert batch_frame["batch_id"] not in app_module._agents_cancels
+
+
+def test_cancel_agents_all_tasks_sets_every_event(tmp_path: Any) -> None:
+    """POST /api/agents/{id}/cancel with index=null raises EVERY task's stop flag, and reports how many
+    it actually raised."""
+    import threading as _threading
+
+    from chimera.api import app as app_module
+
+    client = _client(tmp_path)  # the endpoint reads the module-level batch registry; no batch needed
+    events = {0: _threading.Event(), 1: _threading.Event(), 2: _threading.Event()}
+    app_module._agents_cancels["batch-all"] = events
+    try:
+        resp = client.post("/api/agents/batch-all/cancel", json={"index": None})
+        assert resp.status_code == 200 and resp.json() == {"ok": True, "cancelled": 3}
+        assert all(e.is_set() for e in events.values())  # every task's cooperative-stop flag raised
+        # Re-cancelling is idempotent: still ok, but nothing NEW was raised.
+        assert client.post("/api/agents/batch-all/cancel", json={"index": None}).json() == {
+            "ok": True,
+            "cancelled": 0,
+        }
+    finally:
+        app_module._agents_cancels.pop("batch-all", None)
+
+
+def test_cancel_agents_one_index_sets_only_that_task(tmp_path: Any) -> None:
+    """An int index cancels JUST that task — the batch's other workers keep running (their flags stay
+    down). An out-of-range index targets nothing: an honest no-op, not a crash."""
+    import threading as _threading
+
+    from chimera.api import app as app_module
+
+    client = _client(tmp_path)
+    events = {0: _threading.Event(), 1: _threading.Event(), 2: _threading.Event()}
+    app_module._agents_cancels["batch-one"] = events
+    try:
+        resp = client.post("/api/agents/batch-one/cancel", json={"index": 1})
+        assert resp.status_code == 200 and resp.json() == {"ok": True, "cancelled": 1}
+        assert events[1].is_set()  # only the named task
+        assert not events[0].is_set() and not events[2].is_set()  # the others run on
+        # An index outside the batch matches no task — {ok:false, cancelled:0}, still a 200.
+        assert client.post("/api/agents/batch-one/cancel", json={"index": 9}).json() == {
+            "ok": False,
+            "cancelled": 0,
+        }
+    finally:
+        app_module._agents_cancels.pop("batch-one", None)
+
+
+def test_cancel_agents_noops_unknown_batch(tmp_path: Any) -> None:
+    """An unknown or already-finished batch id is an honest no-op ({ok:false, cancelled:0}, 200 — a
+    stale Stop click is not a 404), for both a whole-batch and a single-index cancel."""
+    client = _client(tmp_path)
+
+    resp = client.post("/api/agents/nope/cancel", json={"index": None})
+    assert resp.status_code == 200 and resp.json() == {"ok": False, "cancelled": 0}
+    resp = client.post("/api/agents/nope/cancel", json={"index": 0})
+    assert resp.status_code == 200 and resp.json() == {"ok": False, "cancelled": 0}
+
+
+def test_agents_batch_wires_each_task_stop_flag_to_its_registry_event(tmp_path: Any) -> None:
+    """THE wiring test — the half the other cancel tests can't see.
+
+    They plant Events into `_agents_cancels` by hand and prove the endpoint raises them: that is
+    bookkeeping. It stays green even if the batch hands its agents NO stop flag at all — i.e. every
+    card's Stop silently does nothing. This closes that gap by running a REAL batch and asserting the
+    flag each task's agent actually polls IS one of the live registry Events the endpoint raises, and
+    that the two tasks get DISTINCT flags (so stopping one can't halt the other).
+    """
+    from chimera.api import app as app_module
+    from chimera.api import build_api_app
+    from chimera.api.app import RunRequest
+    from chimera.core.events import EventSink
+
+    ws = tmp_path / "ws"
+    _init_repo(ws)
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    seen: list[dict[str, Any]] = []
+
+    def factory(
+        req: RunRequest,
+        ws_i: Any,
+        on_event: EventSink,
+        _settings: Any,
+        should_stop: Callable[[], bool] | None = None,
+    ) -> Any:
+        # Runs mid-batch, so the batch's registry entry is still alive here. A bound `Event.is_set`
+        # compares equal only to the same Event's, so this is real identity, not shape-matching.
+        wired = should_stop is not None and any(
+            should_stop == ev.is_set
+            for events in app_module._agents_cancels.values()
+            for ev in events.values()
+        )
+        seen.append({"task": req.task, "stop": should_stop, "wired": wired})
+        return _WritingAgent(ws_i, on_event, "a.txt" if "alpha" in req.task else "b.txt", req.task)
+
+    client = TestClient(
+        build_api_app(lambda: ChatSession(_FakeAgent()), settings=settings, solve_agent_factory=factory)
+    )
+    resp = client.post(
+        "/api/agents",
+        json={"tasks": [{"task": "alpha work"}, {"task": "beta work"}], "workspace": str(ws)},
+    )
+    assert resp.status_code == 200
+
+    assert len(seen) == 2
+    # Each task got a REAL flag (None here = Stop is a dead button), and it is a registry Event's.
+    assert all(s["stop"] is not None for s in seen)
+    assert all(s["wired"] for s in seen)
+    # Distinct flags: cancelling one index must not stop the other task.
+    assert seen[0]["stop"] != seen[1]["stop"]
+    # Nothing was cancelled, so no flag was ever raised.
+    assert all(s["stop"]() is False for s in seen)
 
 
 def test_post_agents_rejects_empty_and_oversized_task_lists(tmp_path: Any) -> None:

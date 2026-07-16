@@ -266,6 +266,42 @@
         "title": "AuditEventOut",
         "type": "object"
       },
+      "BatchCancelOut": {
+        "properties": {
+          "cancelled": {
+            "title": "Cancelled",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "cancelled"
+        ],
+        "title": "BatchCancelOut",
+        "type": "object"
+      },
+      "BatchCancelRequest": {
+        "description": "Which of a batch's tasks to cooperatively stop.",
+        "properties": {
+          "index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index"
+          }
+        },
+        "title": "BatchCancelRequest",
+        "type": "object"
+      },
       "BenchmarkExternalOut": {
         "properties": {
           "baseline_rate": {
@@ -2886,6 +2922,55 @@
           }
         },
         "summary": "Agents Schema Endpoint"
+      }
+    },
+    "/api/agents/{batch_id}/cancel": {
+      "post": {
+        "operationId": "cancel_agents_api_agents__batch_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchCancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchCancelOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Agents"
       }
     },
     "/api/artifacts/{artifact_id}": {
