@@ -1,4 +1,4 @@
-"""Local weak-model-lift task set v2 — harder, Docker-free, pytest-verified coding tasks.
+"""Local weak-model-lift task set v3 — harder, Docker-free, pytest-verified coding tasks.
 
 v1 was too easy: the cheap model one-shot every task (7/7 baseline), leaving no headroom for the
 scaffolding to matter (a ceiling effect). v2 raises the difficulty — multi-rule specs a one-shot
@@ -6,8 +6,21 @@ tends to under-satisfy, a `^`-power/integer-division calculator that defeats a l
 shortcut, and a subtle multi-file numeric bug — so there is real room between "raw model, one shot"
 and "the full Chimera loop (plan + verify-or-revert + M14 scaffolding)".
 
+v3 takes the suite to **n=100**, per ``PREREGISTRATION.md`` (written and committed before these
+tasks were authored, and before any model call of the run). The 15 v2 tasks below are kept
+verbatim — *including the 7 this model one-shots*. They cost us power and contribute nothing to
+McNemar, and dropping them after seeing that they produced no signal would be post-hoc exclusion,
+which inflates the effect. They stay.
+
+The 85 new ones live in sibling modules by domain and are appended at the bottom of this file:
+``tasks_parsing`` (28), ``tasks_algorithms`` (29), ``tasks_bugfix`` (28). Each was authored to the
+a-priori difficulty spec and never run through either arm — selection by intrinsic complexity only,
+never by outcome. Each ships a test proven to pass a correct reference and *fail* a plausible naive
+shortcut: a test a naive implementation passes grades nothing.
+
 Ground truth is a strict pytest file; the runner re-runs it independently. NOT the official
-Terminal-Bench / SWE-bench — a local proxy for the same build/fix-graded-by-tests shape.
+Terminal-Bench / SWE-bench — a local proxy for the same build/fix-graded-by-tests shape, on small
+self-contained Python tasks. The result does not generalise beyond that population.
 """
 
 from __future__ import annotations
@@ -419,3 +432,23 @@ TASKS: list[dict[str, Any]] = [
         ),
     },
 ]
+
+# --- v3: the 85 new tasks (see PREREGISTRATION.md) -------------------------------------------
+# Split by domain into sibling modules so the fixed domain mix is visible in the file layout rather
+# than asserted in prose. Imported at the bottom because the runners all do `from tasks import TASKS`
+# and must keep seeing one flat list.
+#
+# Duplicate `test`/`verify` filenames across domains are harmless and deliberate-by-omission: every
+# task is restored into its OWN workspace keyed by its (unique) id, so two tasks named `titlecase.py`
+# never share a directory. Verified, not assumed.
+from tasks_algorithms import TASKS_ALGORITHMS  # noqa: E402
+from tasks_bugfix import TASKS_BUGFIX  # noqa: E402
+from tasks_parsing import TASKS_PARSING  # noqa: E402
+
+TASKS.extend(TASKS_PARSING)
+TASKS.extend(TASKS_ALGORITHMS)
+TASKS.extend(TASKS_BUGFIX)
+
+_ids = [t["id"] for t in TASKS]
+if len(_ids) != len(set(_ids)):  # a silent id collision would overwrite a workspace mid-run
+    raise AssertionError("duplicate task ids across the suite modules")
