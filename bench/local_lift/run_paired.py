@@ -14,6 +14,13 @@ self-report; both the paired and unpaired numbers are printed so the reader sees
 Configure via env: BENCH_MODEL (a cheap tool-capable model), BENCH_TIMEOUT (per-solve seconds, per
 arm), BENCH_TASKS (comma ids). The orchestration core `run_paired` takes injected solve/grade
 callables, so it is unit-testable offline; `main()` wires the real `chimera solve` subprocess.
+
+Long runs are resumable (`results/journal.jsonl`), and the resume rule is a *scientific* constraint,
+not a convenience: a **completed pair is never re-run**. The journal is append-only and the first
+complete result for a task wins for good. Re-running a pair you have already seen is exactly how you
+would roll a task until it passes, which is the p-hacking this bench exists to refuse. A pair
+interrupted *between* its two arms is discarded whole and replayed from a fresh restore — the
+half-finished arm's result is thrown away too, so no outcome is ever selected after the fact.
 """
 
 from __future__ import annotations
@@ -66,15 +73,57 @@ def _fresh_workspace(task: dict, root: Path) -> Path:
     return ws
 
 
-def run_paired(tasks: list[dict], *, solve: SolveFn, grade: GradeFn, root: Path):  # type: ignore[no-untyped-def]
+def _load_journal(journal: Path | None, *, model: str) -> dict[str, dict[str, bool]]:
+    """Completed pairs from an earlier, interrupted run of this same suite+model.
+
+    Only *complete* pairs are ever written (see :func:`_append_journal`), so anything here is a
+    finished, immutable observation. Records from a different model are ignored rather than reused —
+    a cached cell is only a valid resume if it was produced under the same conditions.
+    """
+    done: dict[str, dict[str, bool]] = {}
+    if journal is None or not journal.exists():
+        return done
+    for line in journal.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        with contextlib.suppress(json.JSONDecodeError):
+            rec = json.loads(line)
+            if not isinstance(rec, dict) or rec.get("model") != model:
+                continue
+            if {"task", "baseline", "chimera"} <= rec.keys():
+                done[str(rec["task"])] = {"baseline": bool(rec["baseline"]), "chimera": bool(rec["chimera"])}
+    return done
+
+
+def _append_journal(journal: Path | None, *, task_id: str, model: str, base: bool, treat: bool) -> None:
+    """Commit one *finished pair*. Written only once both arms are in — never a half pair."""
+    if journal is None:
+        return
+    journal.parent.mkdir(parents=True, exist_ok=True)
+    rec = {"task": task_id, "model": model, "baseline": base, "chimera": treat}
+    with journal.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(rec) + "\n")
+
+
+def run_paired(  # type: ignore[no-untyped-def]
+    tasks: list[dict], *, solve: SolveFn, grade: GradeFn, root: Path,
+    journal: Path | None = None, model: str = "",
+):
     """Run both arms from the identical restored state per task; return the paired result + rows.
 
     Uses :func:`chimera.eval.paired.run_paired_experiment` so the discipline (restore before each
     arm) and the statistic (McNemar/Wilson) are the tested B1 code, not re-implemented here.
+
+    With a `journal`, pairs already completed by an earlier process are replayed from the record
+    instead of being re-run — see the module docstring for why that direction (never re-run a
+    finished pair) is the honest one.
     """
     from chimera.eval.paired import run_paired_experiment
 
     rows: list[dict] = []
+    done = _load_journal(journal, model=model)
+    # A baseline result held until its treatment lands, so the pair is journalled atomically.
+    pending: dict[str, bool] = {}
 
     def restore(task: dict) -> None:
         _fresh_workspace(task, root)
@@ -85,13 +134,24 @@ def run_paired(tasks: list[dict], *, solve: SolveFn, grade: GradeFn, root: Path)
         return grade(task, ws)
 
     def baseline(task: dict) -> bool:
-        ok = _arm(task, "baseline")
-        rows.append({"task": task["id"], "arm": "baseline", "passed": ok})
+        tid = str(task["id"])
+        if tid in done:
+            ok = done[tid]["baseline"]  # resumed — NOT re-run
+        else:
+            ok = _arm(task, "baseline")
+            pending[tid] = ok
+        rows.append({"task": tid, "arm": "baseline", "passed": ok})
         return ok
 
     def treatment(task: dict) -> bool:
-        ok = _arm(task, "chimera")
-        rows.append({"task": task["id"], "arm": "chimera", "passed": ok})
+        tid = str(task["id"])
+        if tid in done:
+            ok = done[tid]["chimera"]  # resumed — NOT re-run
+        else:
+            ok = _arm(task, "chimera")
+            # Both arms are in: the pair is now a finished observation, so record it for good.
+            _append_journal(journal, task_id=tid, model=model, base=pending.pop(tid, False), treat=ok)
+        rows.append({"task": tid, "arm": "chimera", "passed": ok})
         return ok
 
     result = run_paired_experiment(
@@ -124,10 +184,18 @@ def main() -> None:
     with contextlib.suppress(Exception):  # best-effort console fix; never block the run
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
     tasks = [t for t in TASKS if not _ONLY or t["id"] in _ONLY]
+    out = HERE / "results"
+    journal = out / "journal.jsonl"
+    resumed = len(_load_journal(journal, model=_MODEL))
     print(f"paired experiment · model={_MODEL} · tasks={len(tasks)} · timeout={_TIMEOUT}s/arm", flush=True)
+    if resumed:
+        # Say it out loud: part of this verdict was observed by an earlier process, not this one.
+        print(f"resuming · {resumed} pair(s) replayed from {journal.name} (finished pairs are never re-run)", flush=True)
     root = Path(tempfile.mkdtemp(prefix="chimpaired-"))
     try:
-        result, rows = run_paired(tasks, solve=_real_solve, grade=_real_grade, root=root)
+        result, rows = run_paired(
+            tasks, solve=_real_solve, grade=_real_grade, root=root, journal=journal, model=_MODEL
+        )
     finally:
         shutil.rmtree(root, ignore_errors=True)
 
@@ -154,10 +222,12 @@ def main() -> None:
         flush=True,
     )
 
-    out = HERE / "results"
     out.mkdir(exist_ok=True)
     (out / "paired.json").write_text(
-        json.dumps({"model": _MODEL, "summary": result.summary(), "by_task": by_task}, indent=2),
+        json.dumps(
+            {"model": _MODEL, "summary": result.summary(), "by_task": by_task, "resumed_pairs": resumed},
+            indent=2,
+        ),
         encoding="utf-8",
     )
 
