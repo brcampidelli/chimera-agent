@@ -9,6 +9,7 @@ from chimera.core import AutonomousAgent, AutonomousConfig
 from chimera.core.agent import AgentResult
 from chimera.core.autonomous import Attempt, AutonomousResult
 from chimera.core.verify import VerificationResult
+from chimera.evolution.diff_gate import FileDiff
 
 
 class _FakeWorker:
@@ -125,6 +126,142 @@ def test_build_receipt_maps_attempts_and_truncates_bounded_fields() -> None:
     assert len(first.feedback) == 1000  # feedback truncated to 1000
     second = receipt.attempts[1]
     assert second.success is True and second.diff_summary == "added: bar.py"
+
+
+def test_build_receipt_maps_the_per_file_diffs_and_bounds_them() -> None:
+    """The per-file diffs ARE the machine truth of what an attempt changed, so the receipt has to
+    carry them — and bound them, so one big run can't bloat runs.jsonl."""
+    result = AutonomousResult(
+        answer="a",
+        success=True,
+        attempts=[
+            Attempt(
+                index=1,
+                answer="x",
+                approved=True,
+                verified=True,
+                reverted=False,
+                success=True,
+                diffs=[
+                    FileDiff(path="over.py", patch="P" * 4001, truncated=False),
+                    FileDiff(path="flagged.py", patch="short", truncated=True),
+                    FileDiff(path="exact.py", patch="C" * 4000, truncated=False),
+                    FileDiff(path="empty.py", patch="", truncated=False),
+                ],
+            )
+        ],
+    )
+    diffs = build_receipt(result, "t", None, "ts").attempts[0].diffs
+
+    assert [d.path for d in diffs] == ["over.py", "flagged.py", "exact.py", "empty.py"]
+    # An over-long patch is clipped to the bound and marked truncated even though its source said False.
+    assert len(diffs[0].patch) == 4000
+    assert diffs[0].truncated is True
+    # A patch the source ALREADY marked truncated keeps that flag even though it is short.
+    assert diffs[1].patch == "short"
+    assert diffs[1].truncated is True
+    # Exactly at the bound is a complete patch, not a truncated one (the boundary is `>`, not `>=`).
+    assert len(diffs[2].patch) == 4000
+    assert diffs[2].truncated is False
+    # An empty patch stays empty — never backfilled with invented text.
+    assert diffs[3].patch == ""
+    assert diffs[3].truncated is False
+
+
+def test_build_receipt_caps_the_per_file_diffs_at_twenty() -> None:
+    result = AutonomousResult(
+        answer="a",
+        success=True,
+        attempts=[
+            Attempt(
+                index=1,
+                answer="x",
+                approved=True,
+                verified=True,
+                reverted=False,
+                success=True,
+                diffs=[FileDiff(path=f"f{i:02d}.py", patch="x") for i in range(25)],
+            )
+        ],
+    )
+    diffs = build_receipt(result, "t", None, "ts").attempts[0].diffs
+    assert len(diffs) == 20
+    assert [d.path for d in diffs] == [f"f{i:02d}.py" for i in range(20)]
+
+
+def test_build_receipt_tolerates_an_attempt_with_no_diffs_attribute() -> None:
+    """build_receipt duck-types its result (it cannot import `autonomous` without a cycle), so an
+    attempt object with no `diffs` at all must yield an empty list rather than raising."""
+
+    class _BareAttempt:
+        index = 1
+        verified = True
+        reverted = False
+        success = True
+        verify_output = "ok"
+        diff_summary = ""
+        feedback = ""
+
+    class _BareResult:
+        answer = "a"
+        success = True
+        paused = False
+        attempts = [_BareAttempt()]
+
+    receipt = build_receipt(_BareResult(), "t", None, "ts")  # type: ignore[arg-type]
+    assert receipt.attempts[0].diffs == []
+    assert receipt.attempts[0].verify_output == "ok"
+
+
+def test_build_receipt_coerces_absent_text_to_empty_strings() -> None:
+    # Empty in → empty out. The receipt shows the empty string, never invented detail.
+    result = AutonomousResult(
+        answer="",
+        success=False,
+        attempts=[
+            Attempt(
+                index=1,
+                answer="",
+                approved=False,
+                verified=False,
+                reverted=True,
+                success=False,
+                feedback="",
+                verify_output="",
+                diff_summary="",
+            )
+        ],
+    )
+    receipt = build_receipt(result, "", None, "ts")
+    assert receipt.task == "" and receipt.answer == ""
+    attempt = receipt.attempts[0]
+    assert attempt.verify_output == ""
+    assert attempt.diff_summary == ""
+    assert attempt.feedback == ""
+
+
+def test_build_receipt_carries_the_paused_flag() -> None:
+    # A run paused for human approval is not a finished run — the receipt must not report it as one.
+    result = AutonomousResult(answer="a", success=False, attempts=[], paused=True)
+    assert build_receipt(result, "t", None, "ts").paused is True
+
+
+def test_append_run_creates_missing_parent_directories(tmp_path: Path) -> None:
+    # Two missing levels: this only works if the parent mkdir is recursive.
+    path = tmp_path / "deep" / "nested" / "runs.jsonl"
+    append_run(path, RunReceipt(ts="t", task="a"))
+    assert [r.task for r in load_runs(path)] == ["a"]
+
+
+def test_load_skips_blank_lines_without_dropping_later_receipts(tmp_path: Path) -> None:
+    # A blank line must be SKIPPED, not read as end-of-file: stopping there would silently truncate
+    # the run history and quietly under-report what the agent did.
+    path = tmp_path / "runs.jsonl"
+    append_run(path, RunReceipt(ts="t1", task="first"))
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write("\n")
+    append_run(path, RunReceipt(ts="t2", task="second"))
+    assert [r.task for r in load_runs(path)] == ["first", "second"]
 
 
 def test_agent_writes_a_receipt_on_success(tmp_path: Path) -> None:

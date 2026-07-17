@@ -153,6 +153,9 @@ dev = [
     "mypy>=1.10",
     "types-pyyaml>=6.0",
     "types-croniter>=2.0",
+    # Mutation testing for the "if this is wrong, we're lying" modules — see MUTATION.md.
+    # POSIX-only (it forks per mutant): on Windows run it under WSL. CI runs it on Linux.
+    "mutmut>=3.3",
 ]
 
 [project.scripts]
@@ -205,3 +208,36 @@ addopts = "-m 'not integration'"
 markers = [
     "integration: live test that calls a real provider API (needs OPENROUTER_API_KEY)",
 ]
+
+# Mutation testing — proves the tests for the modules that, if wrong, make Chimera LIE.
+# Scope is deliberately narrow (see MUTATION.md): mutating all of `chimera` would take hours and
+# nobody would read the result. `only_mutate` is the real scope gate; `source_paths` just bounds the
+# tree mutmut walks.
+#
+# VIABILITY: mutmut re-runs tests per mutant, so the test universe below is restricted to the focused
+# test files for these five modules (~5s in total) instead of the full ~95s suite. tests/test_api.py
+# is deliberately EXCLUDED: it alone takes ~65s, and every runs.py entry point it covers
+# (build_receipt / append_run / load_runs) is tested directly by tests/test_runs.py.
+[tool.mutmut]
+source_paths = ["chimera"]
+only_mutate = [
+    "chimera/eval/paired.py",       # McNemar/Wilson stats behind every published benchmark number
+    "chimera/api/version_api.py",   # the update-available signal
+    "chimera/core/verify.py",       # the pass/fail authority of verify-or-revert
+    "chimera/evolution/diff_gate.py",  # the "did it actually change anything" gate
+    "chimera/api/runs.py",          # receipt building: the reverted/success flags the UI reports
+]
+pytest_add_cli_args_test_selection = [
+    "tests/test_paired.py",       # -> chimera/eval/paired.py
+    "tests/test_run_paired.py",   # -> chimera/eval/paired.py (CLI path)
+    "tests/test_version_api.py",  # -> chimera/api/version_api.py
+    "tests/test_verify.py",       # -> chimera/core/verify.py
+    "tests/test_checkpoint.py",   # -> chimera/core/verify.py (CommandVerifier/NullVerifier)
+    "tests/test_diff_gate.py",    # -> chimera/evolution/diff_gate.py
+    "tests/test_runs.py",         # -> chimera/api/runs.py
+]
+# mutmut runs the tests from a copied `mutants/` tree. tests/test_run_paired.py loads the paired
+# runner by path out of bench/, so that tree has to come along or the run can't even collect.
+also_copy = ["bench/"]
+# Mutating a log call only proves the logger was called — noise, not a real gap.
+do_not_mutate_patterns = ['_log\.\w+']

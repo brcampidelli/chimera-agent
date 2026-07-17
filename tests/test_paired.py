@@ -6,7 +6,7 @@ from pathlib import Path
 
 from chimera.core.runstate import RunCheckpointer
 from chimera.eval.bench_ab import compare as compare_ab
-from chimera.eval.paired import compare_paired, run_paired_experiment
+from chimera.eval.paired import compare_paired, format_report, run_paired_experiment
 
 # --- the paired statistic -----------------------------------------------------------------
 
@@ -59,6 +59,23 @@ def test_length_mismatch_raises() -> None:
 
     with pytest.raises(ValueError, match="same length"):
         compare_paired([True], [True, False])
+    # The message must also explain WHY the lengths must match — the pairing discipline is the whole
+    # point of the statistic, so the error names it rather than just reporting a size mismatch.
+    with pytest.raises(ValueError, match="same task replayed from the same fork"):
+        compare_paired([True], [True, False])
+
+
+def test_arm_names_default_to_baseline_and_treatment() -> None:
+    # The names are reported in summary()/format_report, so the defaults are part of the contract.
+    r = compare_paired([True], [True])
+    assert r.baseline_name == "baseline"
+    assert r.treatment_name == "treatment"
+
+
+def test_arm_names_are_carried_onto_the_result() -> None:
+    r = compare_paired([True], [False], baseline_name="fusion-off", treatment_name="fusion-on")
+    assert r.baseline_name == "fusion-off"
+    assert r.treatment_name == "fusion-on"
 
 
 def test_summary_and_empty() -> None:
@@ -86,6 +103,54 @@ def test_run_paired_experiment_restores_before_each_arm() -> None:
     # restore called twice per item (once per arm) → both arms start from the identical state.
     assert restores == ["easy", "easy", "hard", "hard", "hard", "hard", "easy", "easy"]
     assert result.treatment_only == 2 and result.baseline_only == 0
+
+
+def test_run_paired_experiment_defaults_and_forwards_the_arm_names() -> None:
+    kw: dict[str, object] = {
+        "restore": lambda _i: None,
+        "baseline": lambda _i: True,
+        "treatment": lambda _i: True,
+    }
+    default = run_paired_experiment(["a"], **kw)  # type: ignore[arg-type]
+    assert default.baseline_name == "baseline"
+    assert default.treatment_name == "treatment"
+
+    named = run_paired_experiment(
+        ["a"], **kw, baseline_name="greedy", treatment_name="fused"
+    )  # type: ignore[arg-type]
+    assert named.baseline_name == "greedy"  # forwarded, not silently defaulted
+    assert named.treatment_name == "fused"
+
+
+# --- the CLI rendering ---------------------------------------------------------------------
+
+
+def test_format_report_renders_the_paired_numbers_and_a_significant_verdict() -> None:
+    # 8 both-pass, 8 both-fail, 4 treatment-only wins → baseline 40%, treatment 60%, delta +20%.
+    base = [True] * 8 + [False] * 8 + [False] * 4
+    treat = [True] * 8 + [False] * 8 + [True] * 4
+    result = compare_paired(base, treat, baseline_name="v1", treatment_name="v2")
+    lines = format_report(result).split("\n")
+
+    assert len(lines) == 5  # one line per fact — no narrative
+    assert lines[0].startswith("v1")
+    assert "40.0%" in lines[0] and "(20 paired trials)" in lines[0]
+    assert lines[1].startswith("v2")
+    assert "60.0%" in lines[1]
+    assert lines[2].startswith("paired delta") and "+20.0%" in lines[2] and "95% CI" in lines[2]
+    # The discordant line names which arm won which pairs — concordant pairs are called out as noise.
+    assert lines[3] == (
+        "discordant pairs       v2 +4 / v1 +0  (concordant carry no signal)"
+    )
+    assert lines[4] == "verdict                significant (CI excludes 0)"
+
+
+def test_format_report_reports_a_non_significant_verdict_honestly() -> None:
+    # One pair each way → the CI includes zero, and the report must say so rather than imply a lift.
+    result = compare_paired([True, False], [False, True])
+    assert result.significant is False
+    lines = format_report(result).split("\n")
+    assert lines[4] == "verdict                not significant (CI includes 0)"
 
 
 # --- the checkpoint fork that supplies the identical state ---------------------------------

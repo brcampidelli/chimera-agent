@@ -74,6 +74,33 @@ def test_empty_diff_is_not_productive() -> None:
     assert ProductiveDiff().is_productive is False
 
 
+def test_an_empty_added_file_does_not_hide_later_real_adds() -> None:
+    # The empty-file skip must not abandon the rest of the scan: "a_empty.py" sorts FIRST, so a
+    # `break` here would swallow the real edit behind it and read the step as unproductive.
+    before = _snap({})
+    after = _snap({"a_empty.py": "  \n\n", "b_real.py": "x = 1"})
+    d = diff_snapshots(before, after)
+    assert d.added == ["b_real.py"]
+    assert d.is_productive is True
+
+
+def test_a_file_that_turns_binary_is_skipped_not_crashed_on() -> None:
+    # Text before, binary after: with no content on one side there is nothing to compare, so the
+    # path is skipped rather than normalized (which would blow up on the missing side).
+    before = _snap({"f.dat": "text"})
+    after = _snap({}, binaries={"f.dat"})
+    d = diff_snapshots(before, after)
+    assert d.modified == []
+    assert d.is_productive is False
+
+
+def test_a_binary_file_does_not_hide_later_modified_files() -> None:
+    # "a_img.png" (binary, unjudgeable) sorts before "z_text.py" — the scan must continue past it.
+    before = _snap({"z_text.py": "old"}, binaries={"a_img.png"})
+    after = _snap({"z_text.py": "new"}, binaries={"a_img.png"})
+    assert diff_snapshots(before, after).modified == ["z_text.py"]
+
+
 # --- unified per-file diffs (the Code screen's real patch) --------------------------------
 
 
@@ -126,6 +153,71 @@ def test_unified_diffs_skips_whitespace_only_change() -> None:
     before = _snap({"a.py": "def f():\n    return 1"})
     after = _snap({"a.py": "def f():   \n    return 1\n\n"})  # whitespace only
     assert unified_diffs(before, after) == []
+
+
+def test_the_patch_header_names_the_file_on_both_sides() -> None:
+    # The header is what the Code screen labels the patch with. `lineterm=""` keeps the header lines
+    # bare, so the rendered patch has no stray blank lines between them.
+    diffs = unified_diffs(_snap({"m.py": "old"}), _snap({"m.py": "new"}))
+    lines = diffs[0].patch.split("\n")
+    assert lines[0] == "--- m.py"
+    assert lines[1] == "+++ m.py"
+
+
+def test_an_added_file_diffs_against_empty_so_every_body_line_is_an_addition() -> None:
+    diffs = unified_diffs(_snap({}), _snap({"new.py": "a = 1\nb = 2"}))
+    body = [
+        line
+        for line in diffs[0].patch.split("\n")
+        if line[:1] in "+-" and not line.startswith(("---", "+++"))
+    ]
+    assert body == ["+a = 1", "+b = 2"]  # nothing removed: it diffs against ""
+
+
+def test_a_removed_file_diffs_against_empty_so_every_body_line_is_a_deletion() -> None:
+    diffs = unified_diffs(_snap({"gone.py": "a = 1"}), _snap({}))
+    body = [
+        line
+        for line in diffs[0].patch.split("\n")
+        if line[:1] in "+-" and not line.startswith(("---", "+++"))
+    ]
+    assert body == ["-a = 1"]
+
+
+def test_unified_diffs_caps_at_twenty_files_by_default() -> None:
+    after = _snap({f"f{i:02d}.py": f"x = {i}" for i in range(25)})
+    diffs = unified_diffs(_snap({}), after)
+    assert len(diffs) == 20  # the documented default bound
+    assert [d.path for d in diffs] == [f"f{i:02d}.py" for i in range(20)]  # sorted → deterministic
+
+
+def test_unified_diffs_truncates_at_the_default_char_bound() -> None:
+    big_after = _snap({"big.py": "\n".join(f"line {i}" for i in range(2000))})
+    diffs = unified_diffs(_snap({}), big_after)
+    marker = "\n… [diff truncated]"
+    assert diffs[0].truncated is True
+    assert diffs[0].patch.endswith(marker)
+    assert len(diffs[0].patch) == 4000 + len(marker)  # clipped at the documented 4000-char default
+
+
+def test_a_patch_exactly_at_the_char_bound_is_not_truncated() -> None:
+    # The boundary is `> max_chars`, not `>=`: a patch that exactly fits is complete.
+    before, after = _snap({"a.py": ""}), _snap({"a.py": "x = 1"})
+    exact = len(unified_diffs(before, after, max_chars=10_000)[0].patch)
+    diffs = unified_diffs(before, after, max_chars=exact)
+    assert diffs[0].truncated is False
+    assert not diffs[0].patch.endswith("[diff truncated]")
+
+
+def test_a_binary_note_is_untruncated_and_does_not_stop_the_scan() -> None:
+    # "b.png" (binary) sorts before "z.py", so a `break` on the binary branch would drop the real
+    # patch behind it.
+    before = _snap({"z.py": "old"}, binaries={"a.png"})
+    after = _snap({"z.py": "new"}, binaries={"a.png", "b.png"})
+    by_path = {d.path: d for d in unified_diffs(before, after)}
+    assert by_path["b.png"].patch == "(binary or non-text file: b.png)"
+    assert by_path["b.png"].truncated is False  # a note is not a clipped patch
+    assert by_path["z.py"].patch.startswith("--- z.py")  # the scan continued past the binary
 
 
 # --- the rejection-sampling gate ---------------------------------------------------------

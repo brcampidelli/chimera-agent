@@ -1,0 +1,42 @@
+# Mutation-testing allowlist — survivors that are genuinely EQUIVALENT mutants.
+#
+# `scripts/mutation_gate.py` fails CI if a mutant survives that is NOT listed here, AND fails if an
+# entry here is stale (the mutant is now killed or was renamed). So this file cannot rot into a
+# blanket exemption: every entry must still correspond to a live, justified survivor.
+#
+# Each entry below was classified by reading the source (and, for the two non-obvious ones, an
+# empirical check) — not by "the test didn't catch it, oh well". A mutant belongs here ONLY when it
+# cannot change observable behaviour. If you add code and a NEW mutant survives, the honest move is
+# almost always to write the test that kills it; reach for this file only when the mutation is truly
+# equivalent, and say why in one line.
+#
+# Run: `mutmut run` then `python scripts/mutation_gate.py`. See MUTATION.md.
+
+[allowed]
+# --- version_api: HTTP header names are case-insensitive (RFC 7230 §3.2); GitHub treats these identically.
+"chimera.api.version_api.x__fetch_latest__mutmut_7"  = "HTTP header name case: 'User-Agent' -> 'user-agent'. Header names are case-insensitive (RFC 7230 3.2); the server behaves identically."
+"chimera.api.version_api.x__fetch_latest__mutmut_8"  = "HTTP header name case: 'User-Agent' -> 'USER-AGENT'. Case-insensitive per RFC 7230 3.2."
+"chimera.api.version_api.x__fetch_latest__mutmut_10" = "HTTP header name case: 'Accept' -> 'accept'. Case-insensitive per RFC 7230 3.2."
+"chimera.api.version_api.x__fetch_latest__mutmut_11" = "HTTP header name case: 'Accept' -> 'ACCEPT'. Case-insensitive per RFC 7230 3.2."
+"chimera.api.version_api.x__fetch_latest__mutmut_22" = "Codec alias: decode('utf-8') -> decode('UTF-8'). Python codec names are case-insensitive aliases; identical bytes."
+"chimera.api.version_api.x_check_version__mutmut_11" = "Dead branch: `bool(latest) and _is_newer(latest or \"\", current)` short-circuits when latest is falsy, so `_is_newer` never sees the `or` fallback; mutating \"\" -> \"XXXX\" is unreachable."
+
+# --- runs: file encoding. On the CI platform (Linux, UTF-8 locale) the default IS utf-8, so these are
+#     indistinguishable there. The explicit encoding='utf-8' is correct defensive code for a non-UTF-8
+#     default locale (e.g. Windows cp1252) but the gate's platform cannot kill it without locale hacking.
+"chimera.api.runs.x_append_run__mutmut_13" = "encoding='utf-8' -> None. Identical on the CI Linux/UTF-8 default; explicit form protects non-UTF-8 locales (Windows) but is unkillable on this platform."
+"chimera.api.runs.x_append_run__mutmut_15" = "encoding kwarg omitted -> platform default. Same as _13: identical on Linux/UTF-8, unkillable here."
+"chimera.api.runs.x_append_run__mutmut_19" = "Codec alias: 'utf-8' -> 'UTF-8'. Case-insensitive codec name; identical."
+"chimera.api.runs.x_load_runs__mutmut_5"   = "encoding='utf-8' -> None on read. Identical on the CI Linux/UTF-8 default; unkillable here (see append_run _13)."
+"chimera.api.runs.x_load_runs__mutmut_7"   = "Codec alias: 'utf-8' -> 'UTF-8'. Case-insensitive codec name; identical."
+
+# --- paired: the statistic behind every published benchmark number.
+"chimera.eval.paired.x_compare_paired__mutmut_7"  = "Mutates the text of a ValueError message ('each index...' -> 'XXeach...XX'). Asserting on error-message wording is a bad test; the raise itself is tested."
+"chimera.eval.paired.x_compare_paired__mutmut_13" = "zip(strict=True) -> strict=None. The `len(baseline) != len(treatment)` check raises BEFORE the zip, so lengths are equal by the time we zip; strict= has no observable effect."
+"chimera.eval.paired.x_compare_paired__mutmut_16" = "zip(strict=True) -> strict omitted. Redundant with the length guard above; equivalent."
+"chimera.eval.paired.x_compare_paired__mutmut_17" = "zip(strict=True) -> strict=False. Redundant with the length guard above; equivalent."
+
+# --- diff_gate: the 'did it actually change anything' authority.
+"chimera.evolution.diff_gate.x__normalize__mutmut_13"      = "join separator '\\n' -> 'XX\\nXX'. _normalize's only callers (diff_gate.py:87 `== \"\"`, :99 `!=`) compare its output; the separator cancels in both, so no observable behaviour changes. Verified by reading every caller."
+"chimera.evolution.diff_gate.x_diff_snapshots__mutmut_18"  = "set op `after.present & before.present` -> `|`. Files added by the union exist on only one side, so `before/after.files.get()` returns None and the None-guard `continue`s them; the `modified` list is identical. Verified empirically."
+"chimera.evolution.diff_gate.x_unified_diffs__mutmut_33"    = "FileDiff(..., truncated=False) -> kwarg omitted. FileDiff.truncated defaults to False, so omitting it is identical."
