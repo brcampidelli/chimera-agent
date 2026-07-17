@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  schedule:
+    # Weekly mutation-testing run (Mondays 06:00 UTC). The mutation job self-gates to this + manual
+    # dispatch; every other job below runs on push/PR as usual.
+    - cron: "0 6 * * 1"
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -148,3 +152,36 @@ jobs:
 
       - name: Build the frontend (tsc + vite — proves the UI matches the generated types)
         run: npm --prefix apps/desktop run build
+
+  mutation:
+    name: mutation testing (critical modules)
+    runs-on: ubuntu-latest
+    # Slow (hundreds of mutants). Weekly + on demand only — NOT on every push/PR. The gate is that
+    # every surviving mutant is a justified allowlist entry (see MUTATION.md / scripts/mutation_gate.py).
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Placeholder SPA dist
+        # Hatchling force-includes apps/desktop/dist for the [desktop] packaging; the mutation gate
+        # only touches chimera/*.py, so a placeholder satisfies the include without building the UI.
+        run: mkdir -p apps/desktop/dist && touch apps/desktop/dist/.gitkeep
+
+      - name: Install deps (dev provides mutmut; desktop provides FastAPI for the api modules)
+        run: uv sync --extra dev --extra desktop
+
+      - name: Run mutmut on the critical modules
+        # Mutates only the five modules in [tool.mutmut].only_mutate, against their focused tests.
+        # mutmut always exits 0 — the gate below is what turns survivors into a failure.
+        run: uv run mutmut run
+
+      - name: Gate — every survivor must be a justified allowlist entry
+        run: uv run python scripts/mutation_gate.py
