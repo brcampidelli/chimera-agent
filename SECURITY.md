@@ -95,6 +95,14 @@ Treat secrets as server-only. **The default `local` sandbox is not isolated** â€
 or autonomous work run with `CHIMERA_SANDBOX=docker` (ephemeral, network-off by default),
 ideally in a throwaway account or VM rather than your main one.
 
+**Host execution is gated by default.** Because most installs have no Docker, a command the model
+chooses to run would otherwise execute on your machine. `CHIMERA_HOST_EXEC=ask` (the default) confirms
+each host command in an interactive terminal before it runs; `deny` refuses host execution outright
+(use the docker sandbox); `allow` runs without asking (explicit opt-in). Headless runs (cron, CI) are
+not blocked â€” they proceed with a one-time warning, so set `docker` or `allow`/`deny` deliberately for
+unattended work. A docker sandbox that silently fell back to local (Docker absent) is treated as host
+execution and gated too, so "configured docker" never quietly becomes "ran on the host".
+
 A plain container isn't a full VM: a container escape typically rides a host-kernel bug, so
 hostile input still has a path to local privilege escalation. To harden that boundary without
 paying for a full VM, set **`CHIMERA_SANDBOX_RUNTIME=runsc`** to run the docker sandbox under

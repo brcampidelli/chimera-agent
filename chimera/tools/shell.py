@@ -14,6 +14,7 @@ from chimera.tools.base import Tool
 
 if TYPE_CHECKING:
     from chimera.sandbox.base import Sandbox
+    from chimera.sandbox.confirm import HostExecConfirm
 
 _MAX_OUTPUT_CHARS = 20_000
 _DEFAULT_TIMEOUT = 60
@@ -46,11 +47,25 @@ class RunShellTool(Tool):
         *,
         default_timeout: int = _DEFAULT_TIMEOUT,
         max_timeout: int = _MAX_TIMEOUT,
+        confirm: HostExecConfirm | None = None,
     ) -> None:
         self.workspace = (workspace or Path.cwd()).resolve()
         self._sandbox = sandbox
         self.default_timeout = default_timeout
         self.max_timeout = max_timeout
+        # Optional gate consulted before running on the host; None = run as before (isolated sandbox,
+        # explicit allow, or a caller that opts out). See chimera.sandbox.confirm.
+        self._confirm = confirm
+
+    @staticmethod
+    def _sandbox_is_isolated(sandbox: Sandbox) -> bool:
+        """True when the sandbox genuinely isolates from the host (so no host-exec confirm is needed).
+
+        Duck-typed: a backend that runs in a real container reports ``is_isolated() -> True``. A
+        DockerSandbox that has fallen back to local (no Docker) reports False — so its host execution
+        is still gated, closing the "docker configured but silently ran on the host" gap.
+        """
+        return bool(getattr(sandbox, "is_isolated", lambda: False)())
 
     def _resolve_cwd(self, rel: str | None) -> Path | str:
         """Resolve a per-call ``cwd`` under the workspace, or an ``error:`` string if it escapes."""
@@ -71,6 +86,12 @@ class RunShellTool(Tool):
         if isinstance(cwd, str):  # escape error
             return cwd
         sandbox = self._sandbox or LocalSandbox()
+        if (
+            self._confirm is not None
+            and not self._sandbox_is_isolated(sandbox)
+            and not self._confirm(command)
+        ):
+            return "error: host execution declined (CHIMERA_HOST_EXEC). Not run."
         result = sandbox.run(command, timeout=timeout, cwd=cwd)
         if result.timed_out:
             return f"error: command timed out after {timeout}s"

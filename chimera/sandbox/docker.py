@@ -44,6 +44,10 @@ class DockerSandbox:
         self.fallback: Sandbox = fallback or LocalSandbox()
         self._available: bool | None = None
 
+    def is_isolated(self) -> bool:
+        """Isolated only when Docker is actually reachable; otherwise this falls back to the host."""
+        return self.available()
+
     def available(self) -> bool:
         """Whether the Docker CLI/daemon is reachable (checked once, then cached)."""
         if self._available is None:

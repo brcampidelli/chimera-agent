@@ -22,6 +22,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   a completed pair is never re-run (re-running a seen pair is how you'd roll for a pass), and a pair
   interrupted between its arms is discarded whole.
 
+### Security
+- **The agent asks before running a command on your host.** With `sandbox=local` (the default — most
+  `pip install` users have no Docker), a command the model chose to run used to execute on the machine
+  silently. Now `CHIMERA_HOST_EXEC=ask` (default) confirms each host command in an interactive terminal;
+  `allow` restores the old run-without-asking (explicit opt-in); `deny` refuses host execution and points
+  at `CHIMERA_SANDBOX=docker`. Headless contexts (cron, CI, the benchmark harness) keep running with a
+  one-time warning, so nothing is broken. Declining returns a clean tool error, never a crash. A
+  `DockerSandbox` that has silently fallen back to local (no Docker) is now correctly treated as host
+  execution and gated too. (Desktop/API keep their own approval flow — a follow-up wires this there.)
+
 ### Fixed
 - **verify-or-revert can no longer delete files inside a git repository root.** `WorkspaceGuard.restore()`'s
   delete-new pass removes files present-now-but-not-in-snapshot; if a workspace ever resolves to a real

@@ -275,6 +275,15 @@ class Settings(BaseSettings):
     )
     # Optional OCI runtime for the docker sandbox (e.g. runsc = gVisor); empty = daemon default.
     sandbox_runtime: str = Field(default="", validation_alias="CHIMERA_SANDBOX_RUNTIME")
+    # Posture for running the agent's commands/code ON THE HOST (i.e. sandbox=local). Because most
+    # `pip install` users have no Docker, host execution is the common path — so the model deciding to
+    # run a shell command must not silently execute on the machine. Values:
+    #   ask   (default) — in an interactive terminal, confirm each host command; headless, run with a
+    #                     one-time warning (so cron/CI/bench are not broken).
+    #   allow           — run on the host without asking (the pre-2026-07 behaviour; explicit opt-in).
+    #   deny            — never run on the host; require CHIMERA_SANDBOX=docker.
+    # Ignored when the sandbox is an isolated container (nothing to confirm).
+    host_exec: str = Field(default="ask", validation_alias="CHIMERA_HOST_EXEC")
 
     # Per-session tool allowlist/denylist (names). Empty allowlist = no restriction (all
     # tools); a non-empty allowlist grants only those. Denylist removes even if allowed.

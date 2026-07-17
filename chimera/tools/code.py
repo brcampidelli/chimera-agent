@@ -18,6 +18,7 @@ from chimera.tools.base import Tool
 
 if TYPE_CHECKING:
     from chimera.sandbox.base import Sandbox
+    from chimera.sandbox.confirm import HostExecConfirm
 
 _MAX_OUTPUT_CHARS = 20_000
 _DEFAULT_TIMEOUT = 30
@@ -75,9 +76,16 @@ class ExecuteCodeTool(Tool):
         "required": ["code"],
     }
 
-    def __init__(self, workspace: Path | None = None, sandbox: Sandbox | None = None) -> None:
+    def __init__(
+        self,
+        workspace: Path | None = None,
+        sandbox: Sandbox | None = None,
+        *,
+        confirm: HostExecConfirm | None = None,
+    ) -> None:
         self.workspace = (workspace or Path.cwd()).resolve()
         self._sandbox = sandbox
+        self._confirm = confirm  # gate before host execution; None = run as before
 
     def run(self, **kwargs: Any) -> str:
         from chimera.sandbox import LocalSandbox
@@ -85,6 +93,12 @@ class ExecuteCodeTool(Tool):
         code = str(kwargs["code"])
         timeout = int(kwargs.get("timeout") or _DEFAULT_TIMEOUT)
         sandbox = self._sandbox or LocalSandbox()
+        if self._confirm is not None and not bool(
+            getattr(sandbox, "is_isolated", lambda: False)()
+        ):
+            summary = code.strip().splitlines()[0][:120] if code.strip() else "(empty)"
+            if not self._confirm(f"execute_code: {summary}"):
+                return "error: host execution declined (CHIMERA_HOST_EXEC). Not run."
         script = self.workspace / f".chimera_exec_{os.getpid()}.py"
         try:
             script.write_text(code, encoding="utf-8")

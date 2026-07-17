@@ -7,7 +7,7 @@ on. Higher-level, *learned* procedures live in :mod:`chimera.skills`.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from chimera.tools.base import Tool
 from chimera.tools.edit import ApplyPatchTool, EditFileTool
@@ -17,6 +17,17 @@ from chimera.tools.registry import ToolRegistry
 from chimera.tools.search import GlobTool, GrepTool
 from chimera.tools.shell import RunShellTool
 from chimera.tools.write_region import WriteRegion
+
+if TYPE_CHECKING:
+    from chimera.sandbox.confirm import HostExecConfirm
+
+
+class _Unset:
+    """Sentinel distinguishing "host_exec_confirm not passed" (resolve from settings) from an
+    explicit ``None`` (caller opts out of the host-exec gate)."""
+
+
+_UNSET = _Unset()
 
 
 class EchoTool(Tool):
@@ -35,7 +46,10 @@ class EchoTool(Tool):
 
 
 def default_registry(
-    workspace: Path | None = None, *, write_region: WriteRegion | None = None
+    workspace: Path | None = None,
+    *,
+    write_region: WriteRegion | None = None,
+    host_exec_confirm: HostExecConfirm | None | _Unset = _UNSET,
 ) -> ToolRegistry:
     """Build a registry pre-populated with the built-in native tools.
 
@@ -43,8 +57,16 @@ def default_registry(
     ``write_region`` is given, the file-writing tools refuse a write outside its declared globs
     (M18-3) — the capability boundary that blocks an injected instruction from rewriting an
     unrelated file.
+
+    ``host_exec_confirm`` gates the shell/code tools before they run on the host. Left unset, it is
+    resolved from settings + whether stdin is a TTY (see :func:`resolve_host_exec_confirm`): an
+    interactive terminal confirms each host command, headless runs with a one-time warning. Pass
+    ``None`` to force no gate (e.g. a server that must never block on stdin), or a custom callback.
     """
     from chimera.sandbox import get_sandbox
+    from chimera.sandbox.confirm import resolve_host_exec_confirm
+
+    confirm = resolve_host_exec_confirm() if isinstance(host_exec_confirm, _Unset) else host_exec_confirm
 
     registry = ToolRegistry()
     registry.register(EchoTool())
@@ -55,7 +77,7 @@ def default_registry(
     registry.register(ListDirTool(workspace))
     registry.register(GrepTool(workspace))
     registry.register(GlobTool(workspace))
-    registry.register(RunShellTool(workspace, get_sandbox()))
+    registry.register(RunShellTool(workspace, get_sandbox(), confirm=confirm))
     registry.register(HttpGetTool())
 
     # Always-on reference tools (no credential needed).
@@ -63,7 +85,7 @@ def default_registry(
     from chimera.tools.documents import ReadDocumentTool
     from chimera.tools.research import ArxivSearchTool, YouTubeTranscriptTool
 
-    registry.register(ExecuteCodeTool(workspace, get_sandbox()))
+    registry.register(ExecuteCodeTool(workspace, get_sandbox(), confirm=confirm))
     registry.register(CodeInterpreterTool())
     registry.register(ReadDocumentTool(workspace))
     registry.register(ArxivSearchTool())

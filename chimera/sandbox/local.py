@@ -45,6 +45,11 @@ _NONINTERACTIVE_ENV = {
 
 
 class LocalSandbox:
+    @staticmethod
+    def is_isolated() -> bool:
+        """The local sandbox runs on the host — no isolation from it."""
+        return False
+
     def run(self, command: str, *, timeout: int = 60, cwd: Path | None = None) -> SandboxResult:
         posix = os.name == "posix"
         # start_new_session puts the command in its own process GROUP so a timeout can kill the whole
