@@ -22,6 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   a completed pair is never re-run (re-running a seen pair is how you'd roll for a pass), and a pair
   interrupted between its arms is discarded whole.
 
+### Fixed
+- **verify-or-revert can no longer delete files inside a git repository root.** `WorkspaceGuard.restore()`'s
+  delete-new pass removes files present-now-but-not-in-snapshot; if a workspace ever resolves to a real
+  repo root with a snapshot predating its files, it would delete them. Now the destructive pass is skipped
+  whenever a `.git` entry sits at the workspace root (a throwaway task workspace never has one), mirroring
+  the existing truncated-snapshot guard. Content restore is unaffected; normal scratch-workspace cleanup
+  still works.
+
 ### Changed
 - **Release cadence: one stable a week, `rc` prereleases any day** (`RELEASING.md`), after nine
   releases in a single day. The manifest-assembly job now runs on a manual dry run too, so the updater
