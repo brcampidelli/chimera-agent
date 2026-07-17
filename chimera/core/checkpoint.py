@@ -7,6 +7,11 @@ files created since, rewrites changed ones, and recreates deleted ones.
 
 Binary files are tracked for presence (so they are not deleted) but their contents
 are not snapshotted. Large files and common build/VCS dirs are skipped.
+
+The "delete files created since" pass is destructive, so it is skipped whenever it
+cannot be done safely: when the snapshot was truncated at the file cap, and when the
+workspace is a real git repository root (verify-or-revert must never delete a repo's
+files — a task workspace is a throwaway dir, never a repo root).
 """
 
 from __future__ import annotations
@@ -80,15 +85,29 @@ class WorkspaceGuard:
     def restore(self, snapshot: FileSnapshot) -> int:
         """Restore the workspace to ``snapshot``. Returns the number of changes."""
         changes = 0
-        # A snapshot that hit the file cap is TRUNCATED: some pre-existing files were never captured,
-        # so we cannot tell "created since" from "existed but uncaptured". Deleting the difference
-        # would destroy untouched user data — the exact opposite of verify-or-revert's job. In that
-        # case skip the delete pass entirely and only restore the content we did capture.
+        # Two conditions make the destructive delete-new pass unsafe; in either case we skip it and
+        # only restore the content we captured (never worse than the pre-restore state):
+        #
+        #  1. TRUNCATED snapshot (hit the file cap): some pre-existing files were never captured, so we
+        #     cannot tell "created since" from "existed but uncaptured". Deleting the difference would
+        #     destroy untouched user data — the opposite of verify-or-revert's job.
+        #  2. The workspace is a REAL GIT REPOSITORY ROOT (a `.git` entry sits at its root). verify-or
+        #     -revert's delete pass exists to clean up files an agent CREATED in a throwaway workspace;
+        #     a task workspace never has a `.git` at its root. If a path/config bug ever points the
+        #     guard at an actual repo, "files not in my snapshot" spans the user's untracked work and —
+        #     if the snapshot predates them — committed files, so a revert could wipe the repo. It has
+        #     (bench harness, 2026-07-17). Refuse to delete inside a repo root, unconditionally.
         truncated = len(snapshot.present) >= self.max_files
+        is_repo_root = (self.workspace / ".git").exists()
         if truncated:
             _log.warning(
                 "snapshot truncated at %d files; skipping delete-new pass on restore to avoid "
                 "removing uncaptured pre-existing files", self.max_files,
+            )
+        elif is_repo_root:
+            _log.warning(
+                "workspace %s is a git repository root; skipping delete-new pass on restore so "
+                "verify-or-revert can never delete tracked or untracked repo files", self.workspace,
             )
         else:
             current = {p.relative_to(self.workspace).as_posix() for p in self._iter_files()}
