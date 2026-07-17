@@ -7,6 +7,12 @@ name: Build desktop installers
 # `bundle.createUpdaterArtifacts: true` the build emits per-platform update bundles + Minisign `.sig`
 # files (using the TAURI_SIGNING_PRIVATE_KEY secret), and a final job assembles a `latest.json` manifest
 # and publishes it to the Release so the app's in-place auto-updater can find + verify updates.
+#
+# A manual `gh workflow run desktop-release.yml` is a full DRY RUN: it builds every platform, signs,
+# and assembles latest.json as an artifact WITHOUT publishing anything. Do that before every release
+# (see RELEASING.md) — the manifest path used to be release-only, which is why v0.32.0-v0.32.2 were
+# three patch releases spent debugging it in public.
+#
 # This CI is the ONLY verifier of the native build: it is not smoke-tested on the maintainer's machine
 # (no local MSVC/Rust toolchain). The PyPI wheel path is unaffected — the frozen sidecar and the
 # updater live only in these installers, never in the wheel.
@@ -153,12 +159,15 @@ jobs:
       # Emit a one-platform fragment { "<target>": { signature, url } } for latest.json. The `url` is
       # pinned to THIS release's tag (not /latest/) so the signature always matches the binary it names;
       # only the manifest filename itself is fetched via the stable /latest/download/latest.json endpoint.
+      # Runs on BOTH triggers so a dispatch can dry-run the whole manifest path (see the job below).
       - name: Assemble updater manifest fragment
-        if: github.event_name == 'release'
         shell: bash
         env:
           TARGET: ${{ matrix.updater_target }}
-          TAG: ${{ github.event.release.tag_name }}
+          # A real release pins the urls to ITS tag. A manual dry run has no tag, so it uses a
+          # placeholder: the manifest still assembles and gets uploaded for inspection, but is never
+          # published — the point is to exercise this path WITHOUT cutting a release.
+          TAG: ${{ github.event.release.tag_name || 'v0.0.0-dryrun' }}
         run: |
           set -euo pipefail
           # The UPDATER artifact per platform is nsis (.exe), macOS .app.tar.gz, or Linux .AppImage —
@@ -179,7 +188,6 @@ jobs:
           cat "manifest-fragments/${TARGET}.json"
 
       - name: Upload manifest fragment
-        if: github.event_name == 'release'
         uses: actions/upload-artifact@v4
         with:
           name: manifest-fragment-${{ matrix.updater_target }}
@@ -202,7 +210,12 @@ jobs:
   manifest:
     name: Assemble & publish latest.json
     needs: build
-    if: github.event_name == 'release'
+    # Runs on BOTH triggers on purpose. A release publishes the manifest; a manual dispatch assembles
+    # it and uploads it as an artifact instead — so the whole path (per-platform .sig -> fragment ->
+    # merge -> JSON shape) is verifiable WITHOUT cutting a release. This job used to be release-only,
+    # which meant the only way to test it was to publish: v0.32.0-v0.32.2 were three patch releases
+    # burned debugging it in public (a macOS build that emitted no .sig, then a Linux url pointing at
+    # the .deb instead of the AppImage). A dry run would have caught both before any user saw them.
     runs-on: ubuntu-latest
     permissions:
       contents: write # attach latest.json to the release
@@ -217,8 +230,8 @@ jobs:
       - name: Build latest.json
         shell: bash
         env:
-          TAG: ${{ github.event.release.tag_name }}
-          NOTES: ${{ github.event.release.name }}
+          TAG: ${{ github.event.release.tag_name || 'v0.0.0-dryrun' }}
+          NOTES: ${{ github.event.release.name || 'dry run — not published' }}
         run: |
           set -euo pipefail
           version="${TAG#v}" # updater compares MAJOR.MINOR.PATCH ints, so strip any leading 'v'
@@ -238,6 +251,20 @@ jobs:
           cat latest.json
 
       - name: Publish latest.json to the release
+        if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
           files: latest.json
+
+      # A dry run stops here: the manifest is uploaded for inspection, never published. Download it
+      # (or read the `--- latest.json ---` dump above) and check each platform points at the right
+      # updater artifact — .exe (nsis), .app.tar.gz (macOS, one per arch), .AppImage (Linux, NOT the
+      # .deb) — before cutting a release.
+      - name: Upload latest.json for inspection (dry run — not published)
+        if: github.event_name != 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: latest-json-dryrun
+          path: latest.json
+          if-no-files-found: error
+          retention-days: 5
