@@ -8,6 +8,25 @@ design discussion are especially welcome.
 - **[Extending guide](docs/extending.md)** — how to add your own **tool, skill, or recipe** with
   complete, copy-paste examples — the fastest way to make your first contribution.
 
+## Good first issues — where to start
+
+Issues labelled [`good first issue`](https://github.com/brcampidelli/chimera-agent/labels/good%20first%20issue)
+are self-contained, have a clear finish line, and touch code with an existing pattern to copy. If the
+label list is empty, these areas are reliably newcomer-friendly and each is a real, wanted contribution
+— open an issue proposing one and it'll be labelled:
+
+| Area | What | Pattern to copy |
+|---|---|---|
+| **A new reference tool** | Add a small, credential-free tool (e.g. a units/temperature converter), register it in `default_registry` | `EchoTool` / `HttpGetTool` in [`chimera/tools/`](chimera/tools/), `docs/extending.md` |
+| **Grow a tool's tests** | Pick a tool in `chimera/tools/` with thin coverage and add edge-case tests | any `tests/test_*.py` — small, isolated, `tmp_path`-based |
+| **A worked recipe** | Add an end-to-end example under `examples/` (e.g. "summarise an RSS feed to a file") | the existing dirs in [`examples/`](examples/) + `docs/recipes.md` |
+| **A local-model quickstart** | Document running Chimera against a local **Ollama** model via the existing LiteLLM routing | `docs/recipes.md`, `chimera/providers/gateway.py` model resolution |
+| **Friendlier errors / `--help`** | Improve a confusing CLI message or command help string | `chimera/cli/main.py` |
+| **Extend the mutation gate** | Add a 6th critical module to `[tool.mutmut]` and kill/allowlist its survivors | [`MUTATION.md`](MUTATION.md) + `scripts/mutation_gate.py` |
+
+Every one ships with the same quality gate below (lint + type + a test). Ask in the issue if you're
+unsure about scope — narrowing it down *is* part of the help.
+
 ## Dev setup
 
 ```bash
