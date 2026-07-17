@@ -18,22 +18,22 @@
   ],
   "generated_for": "0.34.0",
   "internal_lift": {
-    "baseline_rate": 0.6,
+    "baseline_rate": 0.09,
     "ci": [
-      -0.042,
-      0.1333
+      0.0132,
+      0.06
     ],
-    "delta": 0.1333,
+    "delta": 0.06,
     "discordant": {
       "baseline_only": 0,
-      "treatment_only": 2
+      "treatment_only": 6
     },
     "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
-    "n": 15,
-    "note": "A cheap weak model + Chimera's retry loop vs the cheap model alone, on a pre-registered mixed-difficulty suite. The lift comes from tasks the loop RECOVERED (raw fail \u2192 verified pass) with no regressions \u2014 but it is NOT statistically significant (the paired CI includes 0; too few discordant pairs). We report it as measured and don't re-roll for significance.",
-    "significant": false,
+    "n": 100,
+    "note": "A cheap weak model + Chimera's retry loop vs the cheap model alone, on a pre-registered n=100 suite (design + tasks committed before any model call). SIGNIFICANT: the paired 95% CI excludes zero. The lift is 6 tasks the loop RECOVERED (raw fail \u2192 verified pass) with 0 regressions. Absolute rates are low (9%/15%) because 85 of the 100 tasks are hard enough to fail both arms \u2014 a deliberate floor so the loop has headroom; the lift is real where the model has a chance. One model, one seed/task, small self-contained Python tasks \u2014 NOT SWE-bench, does not generalise to real repos. One run, no re-roll.",
+    "significant": true,
     "source": "bench/local_lift/results/paired.json",
     "suite": "internal Docker-free suite (local_lift), pytest-graded \u2014 NOT SWE-bench/Terminal-Bench",
-    "treatment_rate": 0.7333
+    "treatment_rate": 0.15
   }
 }

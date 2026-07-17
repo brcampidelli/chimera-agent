@@ -58,29 +58,34 @@ reverse-engineering study of five leaders (OpenClaw, Hermes, nanobot, CrewAI, La
 
 - 🧬 **Self-evolution with a fitness signal.** The others "learn" by appending whatever happened, or by human pull requests — nothing measures whether a learned change actually helped. Chimera keeps a change **only when a verified result proves it did**: the evolution step is gated on the real working-tree diff and an honest A/B, never the model's say-so. Independent evidence this matters: [EvoAgentBench (arXiv 2607.05202)](https://arxiv.org/abs/2607.05202) measured that *automatic*, ungated experience-encoding methods routinely produce **negative transfer** — one popular method regressed **−12.3 points** on tasks it wasn't tuned on. Chimera's gate now also runs a **transfer holdout**: a learned change must not regress a disjoint, same-capability slice before it's promoted, so it can't just memorize its own eval.
 - 🛡️ **Security by architecture.** Prompt injection is now widely considered *unpatchable*; the popular agents mitigate at the app layer or declare it out of scope (one shipped 135k publicly-exposed instances and a marketplace ~12% full of malicious skills). Chimera tracks taint provenance end-to-end, strips control tokens from untrusted content, narrows tool access on a tainted run, guards side-effecting retries, and runs untrusted code in an opt-in locked-down container.
-- 📊 **Honest, published benchmarks.** ~20% of a popular leaderboard's "solved" cases are actually wrong. Chimera reports every number with a confidence interval — **including the runs where it didn't win** — and never re-rolls for significance. A recorded paired run shows the loop **lifting a weak model on a pre-registered 15-task suite — 60% → 73% (+13pp), from two tasks it recovered (raw fail → verified pass) with zero regressions** — reported honestly as not-yet-significant. And on the **official Terminal-Bench**, a pre-registered N=40 A/B landed at a **variance-dominated floor with no significant difference either way** — published as-is ([`bench/terminal_bench/RESULTS.md`](bench/terminal_bench/RESULTS.md)), including **retracting a wrong intermediate read** once the control arm was measured. Null results and self-corrections ship too; that's the point.
+- 📊 **Honest, published benchmarks.** ~20% of a popular leaderboard's "solved" cases are actually wrong. Chimera reports every number with a confidence interval — **including the runs where it didn't win** — and never re-rolls for significance. A recorded paired run shows the loop **lifting a weak model on a pre-registered 100-task suite — 9% → 15% (+6pp), 95% CI [+1.3%, +6.0%] — statistically significant** (the CI excludes zero), from **6 tasks it recovered** (raw fail → verified pass) with **zero regressions**; the absolute rates are low by design, because 85 of the 100 tasks are hard enough to fail both arms (a deliberate floor, so the loop has headroom). One run, no re-roll. And on the **official Terminal-Bench**, a pre-registered N=40 A/B landed at a **variance-dominated floor with no significant difference either way** — published as-is ([`bench/terminal_bench/RESULTS.md`](bench/terminal_bench/RESULTS.md)), including **retracting a wrong intermediate read** once the control arm was measured. Null results and self-corrections ship too; that's the point.
 
 **In one line: the governed, self-evolving agent — proved and governed.** It's alpha, and it says so.
 
 ## Benchmarks (honest)
 
-Two recorded numbers, both true, published together on purpose — one promising, one humbling, neither
-yet statistically significant. (Also surfaced in the desktop app's **Maturity & Benchmarks** screen,
-straight from the shipped snapshot.)
+Two recorded numbers, both true, published together on purpose — one now significant, one humbling.
+(Also surfaced in the desktop app's **Maturity & Benchmarks** screen, straight from the shipped
+snapshot.)
 
-- **Weak-model lift (modest, honest).** A cheap model (`mistral-small-3.2-24b`) + Chimera's retry loop
-  vs the same model alone, on a pre-registered 15-task suite: **60.0% → 73.3% (+13.3pp)** — the lift is
-  two tasks the loop recovered (raw fail → verified pass) with **zero regressions** — but **n=15, 95%
-  CI [−4.2%, +13.3%] — not statistically significant** (the CI includes 0). Internal Docker-free suite
-  (`local_lift`), pytest-graded — **NOT** SWE-bench/Terminal-Bench. Source: [`bench/local_lift/results/paired.json`](bench/local_lift/results/paired.json).
+- **Weak-model lift (significant).** A cheap model (`mistral-small-3.2-24b`) + Chimera's retry loop vs
+  the same model alone, on a **pre-registered n=100 suite** (design + tasks committed and pushed before
+  any model call): **9.0% → 15.0% (+6.0pp)**, paired **95% CI [+1.3%, +6.0%] — statistically
+  significant** (the CI excludes 0). The lift is **6 tasks the loop recovered** (raw fail → verified
+  pass) with **0 regressions**, on 6 discordant pairs (0 for the raw model). The absolute rates are low
+  because 85 of the 100 tasks are hard enough to fail both arms — a deliberate floor, so the loop has
+  headroom; the hard tail is kept in, not dropped after the fact. One model, one seed/task, small
+  self-contained Python tasks — **NOT** SWE-bench, does not generalise to real repos. One run, no
+  re-roll. Source: [`bench/local_lift/results/paired.json`](bench/local_lift/results/paired.json), [`PREREGISTRATION.md`](bench/local_lift/PREREGISTRATION.md).
 - **Terminal-Bench (humbling).** Pre-registered N=40 A/B on the official benchmark, same model both
   arms (`deepseek-chat-v3.1`): **7.5% → 2.5%** with the scaffold, paired **Δ −5.0pp, 95% CI [−5.0%,
   +1.6%] — not significant**. The scaffold **did not lift an already-competent model** (this isn't the
   weak "goldilocks" regime where scaffolding helps); both arms sit at a variance-dominated floor.
   Source: [`bench/terminal_bench/RESULTS.md`](bench/terminal_bench/RESULTS.md).
 
-Promising-but-not-yet-significant internally; humbling externally. We publish both and don't re-roll
-for significance — that would be p-hacking.
+Significant internally (on our own hard suite), humbling externally (on an already-competent model
+where the scaffold doesn't help). We publish both and don't re-roll for significance — that would be
+p-hacking.
 
 ## Token economy — measured, not claimed
 

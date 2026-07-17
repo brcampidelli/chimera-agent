@@ -4,6 +4,29 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Weak-model lift is now statistically significant.** The project's central claim — driving a weak
+  model through the full loop beats the same model answering once — cleared significance on a
+  **pre-registered n=100 suite**: `9.0% → 15.0% (+6.0pp)`, paired 95% CI `[+1.3%, +6.0%]` (excludes
+  zero), 6 tasks recovered, 0 regressions. Design and all 100 tasks were committed and pushed before
+  any model call (`bench/local_lift/PREREGISTRATION.md`); the run is one-shot, no re-roll. Absolute
+  rates are low by design — 85 of the 100 tasks are hard enough to fail both arms, a deliberate floor.
+  The shipped snapshot, the app's Maturity screen, and all seven READMEs now cite it.
+- **Mutation testing on the modules that, if wrong, make Chimera lie** (`chimera/eval/paired.py`,
+  `api/version_api.py`, `core/verify.py`, `evolution/diff_gate.py`, `api/runs.py`): a narrow `mutmut`
+  scope + a gate that fails on any survivor outside a justified allowlist, so a stale allowlist can't
+  rot into a blanket exemption. Weekly CI job.
+- **Resumable n=100 benchmark run** (`results/journal.jsonl`) with the honest rule enforced in code:
+  a completed pair is never re-run (re-running a seen pair is how you'd roll for a pass), and a pair
+  interrupted between its arms is discarded whole.
+
+### Changed
+- **Release cadence: one stable a week, `rc` prereleases any day** (`RELEASING.md`), after nine
+  releases in a single day. The manifest-assembly job now runs on a manual dry run too, so the updater
+  `latest.json` can be tested without publishing — the friction that caused three of those nine.
+
 ## [0.34.0] - 2026-07-16
 
 ### Added

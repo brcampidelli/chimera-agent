@@ -13,7 +13,42 @@ BENCH_MODEL=openrouter/meta-llama/llama-3.1-8b-instruct BENCH_TIMEOUT=200 \
   python bench/local_lift/run_paired.py            # all 6 tasks, paired
 ```
 
-### Pre-registered expansion — the current headline (2026-07-13, `mistral-small-3.2-24b`, 240s/arm, n=15)
+### THE HEADLINE — pre-registered n=100 (2026-07-17, `mistral-small-3.2-24b`, 240s/arm) — **SIGNIFICANT**
+
+The project's central claim — *driving a weak model through the full loop beats the same model
+answering once* — was **unproven** until this run: every earlier run was one discordant pair short
+of significance. This one clears it, on a suite pre-registered (design + tasks committed, publicly
+pushed) **before any model call**. See [`PREREGISTRATION.md`](PREREGISTRATION.md).
+
+```
+raw-model              9.0%  (9/100 paired trials)
+chimera               15.0%  (15/100)
+paired delta (Δ)      +6.0%   95% CI [+1.3%, +6.0%]
+discordant pairs       chimera +6 / raw-model +0   (0 regressions)
+verdict                SIGNIFICANT — the 95% CI excludes zero
+```
+
+The 6 tasks the loop **recovered** from a raw fail to a verified pass: `eval_expr`, `fix_percentile`,
+`csv_parse`, `topo_sort`, `query_string_parse`, `query_string_build`. Zero tasks regressed. Every
+point of the +6pp is a recovery; not one is the loop breaking something the raw model got right.
+
+**Read the low absolute rates honestly.** 9% and 15% are far below the n=15 run's 60%/73% because the
+85 tasks added to reach n=100 are genuinely **hard** for a 24B model — 85 of the 100 fail *both* arms.
+That is a floor, not a bug: the suite was authored to an a-priori difficulty spec (each task ships a
+test that a naive implementation fails), specifically so the loop has headroom to matter. The lift is
+measured where the model has a fighting chance, and the hard tail is kept in (dropping it after seeing
+it produced no signal would be post-hoc exclusion). What made this run significant is **more discordant
+pairs** — 2 at n=15 → 6 here — never a re-roll: this is one run, and its number is the number.
+
+**What it is not.** One model, one seed per task, a suite of *small self-contained Python tasks with
+strict tests*. It is **not** SWE-bench and does **not** generalise to real-world repos — the label says
+so. Cost of the run: ~US$0.10, ~2h. Raw per-task grid: `results/paired.json` + `results/journal.jsonl`.
+
+---
+
+### Superseded — pre-registered n=15 expansion (2026-07-13, `mistral-small-3.2-24b`, 240s/arm)
+
+Superseded by the significant n=100 run above; kept for the record. At n=15 the CI still included zero.
 
 The n=6 goldilocks run below was one pair short of significance. The pre-registered, honest way to gain
 power is **more tasks** (never re-rolling the same 6 until they cross — that would be p-hacking). So the
