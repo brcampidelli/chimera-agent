@@ -63,4 +63,9 @@ class ToolRegistry:
 
     def run(self, name: str, **kwargs: Any) -> str:
         """Look up and execute a tool by name."""
-        return self.get(name).run(**kwargs)
+        from chimera.obs import span
+
+        with span("tool.run", **{"tool.name": name}) as sp:
+            out = self.get(name).run(**kwargs)
+            sp.set(**{"tool.ok": not out.startswith("error:"), "tool.output_chars": len(out)})
+            return out

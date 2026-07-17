@@ -117,6 +117,13 @@ full = [
 # 'chimera-agent[browser]'` still works but installs nothing extra. The Chromium binary is
 # auto-downloaded on first browser use.
 browser = []
+# Observability: opt-in OpenTelemetry. With this installed and CHIMERA_OTEL=1 (or the standard
+# OTEL_EXPORTER_OTLP_ENDPOINT set), Chimera exports OTLP spans (tool calls) + metrics (tokens/cost)
+# to any OTLP backend (Jaeger/Tempo/Grafana). Off and zero-overhead without it.
+otel = [
+    "opentelemetry-sdk>=1.20",
+    "opentelemetry-exporter-otlp-proto-http>=1.20",
+]
 # Standard-benchmark grounding: the terminal-bench harness for the honest weak-model-lift A/B.
 # Opt-in and heavy (Docker-based); the adapter gives an install hint when absent. The A/B stats
 # engine (chimera bench-compare) needs no extra. Marker: terminal-bench requires Python >=3.12,

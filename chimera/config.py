@@ -285,6 +285,11 @@ class Settings(BaseSettings):
     # Ignored when the sandbox is an isolated container (nothing to confirm).
     host_exec: str = Field(default="ask", validation_alias="CHIMERA_HOST_EXEC")
 
+    # Opt-in OpenTelemetry: export OTLP spans (tool calls) + metrics (tokens/cost) so an autonomous
+    # run is observable in Jaeger/Tempo/Grafana. Off by default and zero-overhead; needs the [otel]
+    # extra. Also auto-enabled when the standard OTEL_EXPORTER_OTLP_ENDPOINT is set.
+    otel: bool = Field(default=False, validation_alias="CHIMERA_OTEL")
+
     # Per-session tool allowlist/denylist (names). Empty allowlist = no restriction (all
     # tools); a non-empty allowlist grants only those. Denylist removes even if allowed.
     tool_allowlist: list[str] = Field(default_factory=list, validation_alias="CHIMERA_TOOL_ALLOWLIST")

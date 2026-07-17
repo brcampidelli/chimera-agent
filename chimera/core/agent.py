@@ -320,9 +320,13 @@ class Agent:
         route_meta: dict[str, Any] | None = None,
     ) -> AgentResult:
         """Assemble the final result, pricing the summed tokens at the model's list rate."""
+        from chimera.obs import record_llm_metrics
         from chimera.orchestration.receipts import price_delegation
 
         usd = price_delegation(self.config.model or model, usage.prompt, usage.completion)
+        record_llm_metrics(
+            model=model, prompt_tokens=usage.prompt, completion_tokens=usage.completion, usd=usd
+        )
         return AgentResult(
             answer=answer,
             steps=steps,

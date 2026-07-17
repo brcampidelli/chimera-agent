@@ -31,6 +31,15 @@ def configure_logging(level: str = "INFO") -> None:
     root.propagate = False
     _CONFIGURED = True
 
+    # Initialise optional OpenTelemetry once logging is up (no-op unless enabled + the [otel] extra is
+    # installed). Local import breaks the telemetry<->obs cycle; guarded so a failure never blocks logs.
+    try:
+        from chimera.obs import configure_otel
+
+        configure_otel()
+    except Exception:  # noqa: BLE001 — observability must never break logging/startup
+        pass
+
 
 def get_logger(name: str) -> logging.Logger:
     """Return a namespaced child logger (``chimera.<name>``).

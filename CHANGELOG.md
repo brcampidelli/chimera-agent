@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Opt-in OpenTelemetry observability** (`pip install 'chimera-agent[otel]'` + `CHIMERA_OTEL=1`, or set
+  the standard `OTEL_EXPORTER_OTLP_ENDPOINT`). Exports OTLP spans for every tool call (`tool.run` with
+  `tool.name` / `tool.ok` / output size) and metrics for every agent run (`chimera.llm.prompt_tokens`,
+  `completion_tokens`, `cost_usd`, tagged by model) to any OTLP backend (Jaeger/Tempo/Grafana) — so an
+  autonomous run stops being a black box. Off by default and zero-overhead: nothing imports
+  `opentelemetry` and `span()` / `record_llm_metrics()` are inert until you turn it on. Unknown model
+  price emits no cost datapoint (never a guessed number). New spans are one line on the same seam.
 - **Weak-model lift is now statistically significant.** The project's central claim — driving a weak
   model through the full loop beats the same model answering once — cleared significance on a
   **pre-registered n=100 suite**: `9.0% → 15.0% (+6.0pp)`, paired 95% CI `[+1.3%, +6.0%]` (excludes
