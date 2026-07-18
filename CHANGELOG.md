@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **First-class local models (Ollama) — fully local, no API key.** `CHIMERA_MODEL=ollama/llama3` now
+  runs out of the box: the credential gate recognises `ollama/…` / `ollama_chat/…` as a keyless local
+  runtime and no longer demands a provider key, and the gateway points LiteLLM at your Ollama server
+  (`CHIMERA_OLLAMA_BASE_URL`, default `http://localhost:11434`; a value you already set is respected).
+  Reinforces the self-hostable, offline path. See the "Fully local" recipe in `docs/recipes.md`.
 - **Opt-in OpenTelemetry observability** (`pip install 'chimera-agent[otel]'` + `CHIMERA_OTEL=1`, or set
   the standard `OTEL_EXPORTER_OTLP_ENDPOINT`). Exports OTLP spans for every tool call (`tool.run` with
   `tool.name` / `tool.ok` / output size) and metrics for every agent run (`chimera.llm.prompt_tokens`,

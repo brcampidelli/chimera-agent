@@ -290,6 +290,13 @@ class Settings(BaseSettings):
     # extra. Also auto-enabled when the standard OTEL_EXPORTER_OTLP_ENDPOINT is set.
     otel: bool = Field(default=False, validation_alias="CHIMERA_OTEL")
 
+    # Base URL for a local Ollama server. A model like `ollama/llama3` runs on your machine with no
+    # API key — set this only if Ollama listens somewhere other than the default. Reinforces the
+    # fully-local, self-hostable path: `CHIMERA_MODEL=ollama/llama3` and no key needed.
+    ollama_base_url: str = Field(
+        default="http://localhost:11434", validation_alias="CHIMERA_OLLAMA_BASE_URL"
+    )
+
     # Per-session tool allowlist/denylist (names). Empty allowlist = no restriction (all
     # tools); a non-empty allowlist grants only those. Denylist removes even if allowed.
     tool_allowlist: list[str] = Field(default_factory=list, validation_alias="CHIMERA_TOOL_ALLOWLIST")

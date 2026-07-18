@@ -47,6 +47,15 @@ _KEY_ENV_VARS = {
     "deepseek_api_key": "DEEPSEEK_API_KEY",
 }
 
+# LiteLLM prefixes that route to a local, keyless runtime (Ollama). A model named with one of these
+# runs on the user's machine and needs no API key — the credential gate must let it through.
+_LOCAL_MODEL_PREFIXES = ("ollama/", "ollama_chat/")
+
+
+def _is_local_model(model: str) -> bool:
+    """True when the model routes to a local, keyless runtime (e.g. ``ollama/llama3``)."""
+    return (model or "").lower().startswith(_LOCAL_MODEL_PREFIXES)
+
 
 def _image_to_url(ref: str) -> str:
     """A URL/data-URI passes through; a local path is read and base64 data-encoded."""
@@ -209,9 +218,29 @@ class LLMGateway:
             value = getattr(self.settings, field, None)
             if value and not os.environ.get(env_var):
                 os.environ[env_var] = value
+        # Point LiteLLM's Ollama provider at the configured local server (default localhost:11434), so
+        # `CHIMERA_MODEL=ollama/llama3` works out of the box — and a remote Ollama is one env var away.
+        ollama_base = getattr(self.settings, "ollama_base_url", "") or ""
+        if ollama_base and not os.environ.get("OLLAMA_API_BASE"):
+            os.environ["OLLAMA_API_BASE"] = ollama_base
 
     def _resolve_model(self, model: str | None) -> str:
         return model or self.settings.default_model
+
+    def _require_credentials(self, resolved: str) -> None:
+        """Raise unless a key is configured — except for local runtimes (Ollama), which need none.
+
+        A local model like ``ollama/llama3`` runs on your machine with no API key, so the credential
+        gate must not block it. This is what makes a fully-local, zero-key setup first-class.
+        """
+        if _is_local_model(resolved):
+            return
+        if not self.settings.has_any_key():
+            raise MissingCredentialsError(
+                "No provider key configured. Set one of "
+                f"{list(_KEY_ENV_VARS.values())} in your environment or .env "
+                "(or use a local model, e.g. CHIMERA_MODEL=ollama/llama3, which needs no key)."
+            )
 
     def _provider_kwargs(self) -> dict[str, Any]:
         """Extra litellm kwargs — a custom endpoint for self-hosted/compatible servers."""
@@ -257,11 +286,7 @@ class LLMGateway:
         import litellm  # lazy: heavy import, keep CLI startup fast
 
         resolved = self._resolve_model(model)
-        if not self.settings.has_any_key():
-            raise MissingCredentialsError(
-                "No provider key configured. Set one of "
-                f"{list(_KEY_ENV_VARS.values())} in your environment or .env."
-            )
+        self._require_credentials(resolved)
 
         extra = self._provider_kwargs()
         message_dicts = _to_message_dicts(messages)
@@ -382,11 +407,7 @@ class LLMGateway:
         import litellm
 
         resolved = self._resolve_model(model)
-        if not self.settings.has_any_key():
-            raise MissingCredentialsError(
-                "No provider key configured. Set one of "
-                f"{list(_KEY_ENV_VARS.values())} in your environment or .env."
-            )
+        self._require_credentials(resolved)
 
         call_kwargs: dict[str, Any] = dict(self._provider_kwargs(), **kwargs)
         keys = self._key_order(resolved.split("/", 1)[0])
@@ -427,11 +448,7 @@ class LLMGateway:
         import litellm  # lazy: heavy import, keep CLI startup fast
 
         resolved = self._resolve_model(model)
-        if not self.settings.has_any_key():
-            raise MissingCredentialsError(
-                "No provider key configured. Set one of "
-                f"{list(_KEY_ENV_VARS.values())} in your environment or .env."
-            )
+        self._require_credentials(resolved)
         call_kwargs = dict(self._provider_kwargs(), **kwargs)
         keys = self._key_order(resolved.split("/", 1)[0])
         if keys:
@@ -471,11 +488,7 @@ class LLMGateway:
         import litellm  # lazy: heavy import, keep CLI startup fast
 
         resolved = self._resolve_model(model)
-        if not self.settings.has_any_key():
-            raise MissingCredentialsError(
-                "No provider key configured. Set one of "
-                f"{list(_KEY_ENV_VARS.values())} in your environment or .env."
-            )
+        self._require_credentials(resolved)
         call_kwargs = dict(self._provider_kwargs(), **kwargs)
         keys = self._key_order(resolved.split("/", 1)[0])
         if keys:
@@ -527,11 +540,7 @@ class LLMGateway:
         if not texts:
             return []
         resolved = model or self.settings.embed_model
-        if not self.settings.has_any_key():
-            raise MissingCredentialsError(
-                "No provider key configured. Set one of "
-                f"{list(_KEY_ENV_VARS.values())} in your environment or .env."
-            )
+        self._require_credentials(resolved)
         call_kwargs = self._provider_kwargs()
         provider = resolved.split("/", 1)[0]
         keys = self._key_order(provider)
