@@ -581,14 +581,14 @@ class BenchmarkDiscordantOut(BaseModel):
 class BenchmarkLiftOut(BaseModel):
     suite: str  # the suite label — makes clear this is the internal suite, NOT SWE-bench/Terminal-Bench
     model: str  # the cheap/weak model both arms ran (Chimera's lift is over the SAME model, bare)
-    n: int  # paired-task count — SMALL; the caveat travels with the number
+    n: int  # paired-task count — the caveat travels with the number
     baseline_rate: float  # the bare model's pass rate (0..1)
     treatment_rate: float  # the model + Chimera's pass rate (0..1)
-    delta: float  # treatment - baseline (0..1); the +50pp lift
-    ci: list[float]  # 95% paired CI [lo, hi] — INCLUDES 0 here, hence not significant
-    significant: bool  # False: promising but not statistically significant at this n
+    delta: float  # treatment - baseline (0..1) — the lift, as measured
+    ci: list[float]  # 95% paired CI [lo, hi] — significance is exactly "does this exclude 0"
+    significant: bool  # carried verbatim from the results file; never asserted independently of the CI
     source: str  # the committed results file this block is read from
-    note: str  # the honest one-liner (promising, n=6, not significant, no re-rolling)
+    note: str  # the honest one-liner about THIS run (scope, limits, no re-rolling)
 
 
 class BenchmarkExternalOut(BaseModel):

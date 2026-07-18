@@ -8,7 +8,7 @@ missing or malformed snapshot degrades to an honest ``available=False`` payload 
 Both blocks carry their ``n`` / ``ci`` / ``significant`` fields so every consumer shows the caveat
 alongside the number:
 
-- **internal_lift** — the promising weak-model lift (+50pp, but n=6, not significant).
+- **internal_lift** — the weak-model lift (9% → 15%, +6pp at n=100; significant, CI excludes 0).
 - **external** — the humbling Terminal-Bench number (scaffold didn't lift a competent model, not
   significant at N=40). Published alongside the internal one on purpose — that pairing is the integrity.
 """

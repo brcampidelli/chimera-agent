@@ -5,17 +5,18 @@ benchmark results**, honestly framed. Two blocks, both true, kept together on pu
 
 - **internal_lift** — READ live from ``bench/local_lift/results/paired.json`` (so re-running the
   local_lift suite + regenerating this snapshot auto-updates it). The weak-model lift: a cheap model +
-  Chimera's retry loop vs the cheap model alone, on a pre-registered mixed-difficulty suite. A modest
-  lift from tasks the loop RECOVERED with no regressions — but **not statistically significant** (the
-  paired CI includes 0). The suite label makes clear it is NOT SWE-bench / Terminal-Bench.
+  Chimera's retry loop vs the cheap model alone, on a pre-registered suite. At n=100 the lift IS
+  significant (the paired 95% CI excludes 0) and comes entirely from tasks the loop RECOVERED with
+  zero regressions — but it is one model on small self-contained tasks, and the suite label makes
+  clear it is NOT SWE-bench / Terminal-Bench.
 - **external** — a recorded, cited external result (Terminal-Bench). Carried as a constant with a
   ``source`` pointing at ``bench/terminal_bench/RESULTS.md`` and the exact published numbers. It is
   HUMBLING (the scaffold did not lift an already-competent model) and also not significant at N=40.
   Published anyway — the integrity story is exactly this pairing.
 
 HONESTY BY CONSTRUCTION: every number here traces to a committed results file. The ``significant``
-flag and the ``n`` / ``ci`` fields travel WITH each number so no surface can show a lift without its
-"not-yet-significant" caveat. Nothing is rounded to flatter; nothing is re-rolled for significance.
+flag and the ``n`` / ``ci`` fields travel WITH each number so no surface can show a lift without the
+caveats that qualify it. Nothing is rounded to flatter; nothing is re-rolled for significance.
 
 Running ``python -m chimera.eval.benchmark_snapshot`` writes ``chimera/_benchmark_snapshot.json`` (the
 shipped data — the ``bench/`` dir is not packaged in the wheel, so the app reads this snapshot). The
@@ -68,7 +69,8 @@ def _internal_lift(paired_path: Path) -> dict[str, Any]:
 
     Reads the real file so a re-run of local_lift + a regenerate auto-updates the shipped number. The
     ``significant`` flag and the ``n`` / ``ci`` fields are carried through verbatim so the caveat can't
-    be dropped downstream.
+    be dropped downstream. The ``note`` is prose ABOUT the current recorded run — if a re-run changes
+    the verdict (e.g. significance flips), update it here, never by hand-editing the shipped JSON.
     """
     data = json.loads(paired_path.read_text(encoding="utf-8"))
     summary = data["summary"]
@@ -89,9 +91,12 @@ def _internal_lift(paired_path: Path) -> dict[str, Any]:
         "source": "bench/local_lift/results/paired.json",
         "note": (
             "A cheap weak model + Chimera's retry loop vs the cheap model alone, on a pre-registered "
-            "mixed-difficulty suite. The lift comes from tasks the loop RECOVERED (raw fail → verified "
-            "pass) with no regressions — but it is NOT statistically significant (the paired CI includes "
-            "0; too few discordant pairs). We report it as measured and don't re-roll for significance."
+            "n=100 suite (design + tasks committed before any model call). SIGNIFICANT: the paired 95% "
+            "CI excludes zero. The lift is 6 tasks the loop RECOVERED (raw fail → verified pass) with 0 "
+            "regressions. Absolute rates are low (9%/15%) because 85 of the 100 tasks are hard enough to "
+            "fail both arms — a deliberate floor so the loop has headroom; the lift is real where the "
+            "model has a chance. One model, one seed/task, small self-contained Python tasks — NOT "
+            "SWE-bench, does not generalise to real repos. One run, no re-roll."
         ),
     }
 

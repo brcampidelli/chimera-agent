@@ -442,7 +442,7 @@ def build_api_app(
     @app.get("/api/benchmarks", dependencies=[guard], response_model=BenchmarksOut)
     def benchmarks_endpoint() -> dict[str, Any]:
         # Cheap + keyless: the agent's REAL recorded benchmark numbers from the shipped snapshot — the
-        # promising weak-model lift (internal suite, n=6, not significant) AND the humbling external
+        # weak-model lift (internal suite, n=100, CI excludes 0) AND the humbling external
         # Terminal-Bench number, each carrying its n/CI/significance. No LLM, no network. A missing
         # snapshot is an honest available:false, never a 500.
         return benchmark_report()
