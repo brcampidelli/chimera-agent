@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 import shutil
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,11 @@ from arms import Spend, run_baseline, run_chimera_solve
 from datasets import gsm8k_reference
 
 _NUMBER = re.compile(r"-?\d[\d,]*\.?\d*")
+
+# The agent's gate: an answer file exists and holds a number. It deliberately cannot check
+# correctness — that would need the gold answer, which the agent must never see. So this arm's loop
+# gets a *structural* signal only, which is the honest ceiling for a benchmark with a hidden answer.
+_ANSWER_GATE = "float(open('answer.txt').read().strip().replace(',',''))"
 
 _BASELINE_PROMPT = """Solve this problem. Think it through, then give the final numeric answer on \
 the last line in exactly this format:
@@ -75,9 +81,9 @@ def run_chimera_task(problem: dict[str, Any], *, model: str, spend: Spend, root:
         _SOLVE_TASK,
         workspace=workspace,
         model=model,
-        # Structural check only — that an answer was actually produced. It cannot check correctness
-        # (that would require the gold answer, which the agent must never see).
-        verify=f'"{Path(shutil.which("python") or "python")}" -c "assert open(\'answer.txt\').read().strip()"',
+        # Structural check only — that an answer was actually produced and parses as a number. It
+        # cannot check correctness (that would need the gold answer, which the agent must never see).
+        verify=f'"{sys.executable}" -B -c "{_ANSWER_GATE}"',
         spend=spend,
         max_attempts=2,
         timeout=240,

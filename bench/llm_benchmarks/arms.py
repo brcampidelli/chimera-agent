@@ -112,6 +112,10 @@ def run_chimera_solve(
     spend: Spend,
     timeout: int = 300,
     max_attempts: int = 3,
+    # 15, not the CLI default of 8. One attempt needs read -> edit -> verify -> diagnose -> re-edit
+    # -> re-verify; 8 is below the floor for two iterations, so attempts were failing mechanically
+    # rather than for want of ability (Amendment 1 in PREREGISTRATION.md). Fixed; not tuned again.
+    max_steps: int = 15,
 ) -> bool:
     """Run the full loop in ``workspace``. Returns whether the CLI reported success.
 
@@ -130,6 +134,8 @@ def run_chimera_solve(
         model,
         "--max-attempts",
         str(max_attempts),
+        "--max-steps",
+        str(max_steps),
         "--repo-map",
         "--progress-ledger",
         "--checklist",

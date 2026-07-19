@@ -68,6 +68,51 @@ def test_solution_cannot_pass_by_reading_the_test_file() -> None:
     assert humaneval.grade(sneaky, _PROBLEM) is True  # passes *because* it found no test files
 
 
+def test_doctest_gate_actually_discriminates(tmp_path: Path) -> None:
+    """The agent's own gate must PASS a correct impl and FAIL a wrong one.
+
+    Both halves matter and both were broken before this test existed:
+      * `python -m doctest solution.py` exits 0 even when examples fail — a gate that never fails
+        gives the loop no signal at all, and every chimera-arm result was noise.
+      * without `-B`, an edit of the SAME SIZE within the same mtime second reuses the cached .pyc,
+        so the gate grades the PREVIOUS version. `a + b` -> `a * b` is exactly that shape, which is
+        exactly the shape of an agent iterating on one function.
+    """
+    import subprocess
+
+    def gate(body: str) -> int:
+        (tmp_path / "solution.py").write_text(
+            f'def add(a, b):\n    """Add.\n\n    >>> add(1,2)\n    3\n    """\n{body}\n', encoding="utf-8"
+        )
+        return subprocess.run(  # noqa: S603
+            [sys.executable, "-B", "-c", humaneval._DOCTEST_GATE],
+            cwd=str(tmp_path),
+            capture_output=True,
+            timeout=30,
+        ).returncode
+
+    assert gate("    return a + b") == 0  # correct
+    assert gate("    return a * b") == 1  # wrong — same byte length as the line above, on purpose
+    assert gate("    pass") == 1  # stub
+
+
+def test_doctest_gate_does_not_fail_a_docstring_without_examples(tmp_path: Path) -> None:
+    # Absence of examples is not failure. Scoring it as one would make the chimera arm auto-FAIL
+    # every HumanEval task whose docstring has no `>>>` block — a harness artifact, not a result.
+    import subprocess
+
+    (tmp_path / "solution.py").write_text(
+        'def add(a, b):\n    """Add two numbers."""\n    return a + b\n', encoding="utf-8"
+    )
+    proc = subprocess.run(  # noqa: S603
+        [sys.executable, "-B", "-c", humaneval._DOCTEST_GATE],
+        cwd=str(tmp_path),
+        capture_output=True,
+        timeout=30,
+    )
+    assert proc.returncode == 0
+
+
 def test_solve_task_prompt_never_contains_the_hidden_test() -> None:
     # The prompt handed to the agent must not leak the grader, even by accident.
     assert "check(" not in humaneval._SOLVE_TASK

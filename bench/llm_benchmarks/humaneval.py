@@ -23,6 +23,19 @@ from arms import Spend, extract_code, run_baseline, run_chimera_solve
 
 _GRADE_TIMEOUT = 30
 
+# The agent's own gate: run the docstring examples the prompt already contained.
+#
+# Two bugs this command exists to avoid, both found by testing the gate itself against known-correct
+# and known-wrong implementations before spending a cent:
+#   * `python -m doctest solution.py` exits 0 even when examples FAIL — it is a no-op as a gate.
+#     `doctest.testmod` + an explicit exit code is what actually reports failure.
+#   * `-B` is load-bearing. Without it, an edit that keeps the file the same SIZE within the same
+#     mtime second reuses the cached .pyc, so the gate silently grades the PREVIOUS version. That is
+#     exactly the shape of an agent iterating on one function, which would have poisoned every run.
+# `r.failed` only — a docstring with no examples yields 0 attempted and 0 failed, and absence of
+# examples must not be scored as failure.
+_DOCTEST_GATE = "import doctest,sys,solution; sys.exit(1 if doctest.testmod(solution).failed else 0)"
+
 _BASELINE_PROMPT = """Complete the following Python function. Reply with the complete function \
 (including the signature and any imports it needs) inside a single ```python code block. \
 Do not write tests or explanations.
@@ -53,7 +66,7 @@ def grade(solution_src: str, problem: dict[str, Any]) -> bool:
         script.write_text(runner, encoding="utf-8")
         try:
             proc = subprocess.run(  # noqa: S603 — fixed argv, isolated dir
-                [sys.executable, str(script)],
+                [sys.executable, "-B", str(script)],  # -B: never grade a stale .pyc
                 cwd=str(grade_dir),
                 capture_output=True,
                 text=True,
@@ -88,7 +101,7 @@ def run_chimera_task(problem: dict[str, Any], *, model: str, spend: Spend, root:
         model=model,
         # The agent's only verification signal is the docstring it was already given. This uses zero
         # information the baseline did not also receive.
-        verify=f'"{sys.executable}" -m doctest solution.py',
+        verify=f'"{sys.executable}" -B -c "{_DOCTEST_GATE}"',
         spend=spend,
     )
 

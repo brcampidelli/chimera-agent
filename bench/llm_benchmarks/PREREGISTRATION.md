@@ -89,6 +89,34 @@ extrapolating a curve from two points would not be.
 5. **A negative result is live.** If the loop costs ~10x the tokens and returns no significant lift on
    a standard benchmark, that is the finding, and it gets published with the same prominence as a win.
 
+## Amendment 1 — 2026-07-19, after the smoke run, BEFORE the measured run
+
+A 5-task smoke run on the weak tier exposed **three harness bugs**. All smoke data is **discarded**
+under the discard rule below, the journal was deleted, and the run restarts from zero. Disclosed here
+rather than quietly fixed, because the fixes were informed by seeing bad numbers — which is exactly
+the situation where silent tuning becomes p-hacking.
+
+1. **The agent's gate never failed.** `python -m doctest solution.py` exits 0 even when the examples
+   fail. The chimera arm was running with no verification signal at all. Fixed to
+   `doctest.testmod(...)` with an explicit exit code, and tested against known-correct / known-wrong
+   / stub / no-examples inputs before re-running.
+2. **Stale bytecode.** Without `-B`, an edit that keeps the file the same *size* within the same
+   mtime second reuses the cached `.pyc`, so the gate grades the **previous** version. `return a + b`
+   → `return a * b` is that exact shape — and so is an agent iterating on one function. This would
+   have silently corrupted every chimera-arm run.
+3. **`--max-steps` was left at the CLI default of 8**, below the floor for a single read → edit →
+   verify → diagnose → re-edit → re-verify cycle. Attempts were failing mechanically, for want of
+   steps rather than want of ability. Set to **15** for the measured run: enough for two full
+   iterations, not unbounded. This value is fixed now and will not be touched again.
+
+**A finding the smoke made concrete, kept as a live hypothesis rather than a fix:** a failed attempt
+**reverts the workspace** ([autonomous.py:530](../../chimera/core/autonomous.py)), so the chimera arm
+can be graded on a pristine stub while the baseline always produces *something*. That asymmetry is
+real, it is verify-or-revert working as designed, and it may well mean the loop scores **below** the
+raw model on HumanEval. We are not "fixing" it — grading the agent's discarded artifact would measure
+something no user ever gets. If the loop loses because it throws away work it cannot verify, that is
+the result, and it gets published.
+
 ## What would make us discard a run (declared now, not after seeing results)
 
 * Harness bug proven by a reference implementation disagreeing on a task both arms should pass.
