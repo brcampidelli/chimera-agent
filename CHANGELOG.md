@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **OpenAI-compatible endpoint — point any LLM client or benchmark at the agent.**
+  `POST /v1/chat/completions` and `GET /v1/models` (in the `[desktop]` extra) speak the OpenAI wire
+  format, but the thing behind them is the whole Chimera loop — tools, steps, retries — not one model
+  call. So `OpenAI(base_url="http://127.0.0.1:8000/v1")` works unchanged, and every harness built for
+  LLMs (LiveBench, lm-eval-harness, anything on the `openai` SDK) can now measure the *agent*. Verified
+  against a live server with the real SDK: non-streaming, streaming (`data: [DONE]`), `models.list()`,
+  and the sampling params harnesses send. `model` selects the underlying slug (`chimera/<slug>`;
+  a bare `chimera` uses your configured default).
+  Two deliberate honesty properties: `usage` reports the tokens the **entire turn** spent (a multi-step
+  loop legitimately costs more than one completion — reporting only the last call would understate the
+  price of the answer), and requests are **stateless**, each getting a fresh ephemeral session, so a
+  benchmark's items stay independent instead of a shared transcript quietly making later items easier.
+  Unsupported sampling knobs are accepted and ignored rather than faked.
 - **First-class local models (Ollama) — fully local, no API key.** `CHIMERA_MODEL=ollama/llama3` now
   runs out of the box: the credential gate recognises `ollama/…` / `ollama_chat/…` as a keyless local
   runtime and no longer demands a provider key, and the gateway points LiteLLM at your Ollama server

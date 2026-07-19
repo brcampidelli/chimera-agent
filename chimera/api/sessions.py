@@ -159,6 +159,16 @@ class SessionManager:
         """Mint a fresh empty session id (nothing is written until its first turn)."""
         return uuid4().hex[:12]
 
+    def ephemeral(self) -> ChatSession:
+        """A fresh session that is neither cached nor persisted — for stateless callers.
+
+        The OpenAI-compatible endpoint gets one of these per request: nothing to evict from the LRU,
+        no transcript file per benchmark item, and no chance of history leaking between independent
+        requests (which would quietly make later benchmark items easier).
+        """
+        session: ChatSession = self._factory()  # type: ignore[operator]
+        return session
+
     def get(self, session_id: str) -> ChatSession:
         """Return the live session for ``session_id``, hydrating from disk on first use (LRU-bounded)."""
         with self._mutex:
