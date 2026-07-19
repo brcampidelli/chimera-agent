@@ -290,6 +290,14 @@ class Settings(BaseSettings):
     # extra. Also auto-enabled when the standard OTEL_EXPORTER_OTLP_ENDPOINT is set.
     otel: bool = Field(default=False, validation_alias="CHIMERA_OTEL")
 
+    # Are the files in the workspace trusted? Default True: `chimera solve` usually runs on YOUR OWN
+    # repo, and tainting every `read_file` would make `--taint` fire on every run (unusable). Set
+    # False when running against code you do NOT control — a third-party repo, a PR branch, anything
+    # downloaded — so a `read_file` of a poisoned source file taints the run like a fetched page does,
+    # arming the same tool-narrowing gate. Only takes effect under `--taint`. (The sandbox is still the
+    # real boundary for hostile code — see SECURITY.md.)
+    trust_workspace: bool = Field(default=True, validation_alias="CHIMERA_TRUST_WORKSPACE")
+
     # Base URL for a local Ollama server. A model like `ollama/llama3` runs on your machine with no
     # API key — set this only if Ollama listens somewhere other than the default. Reinforces the
     # fully-local, self-hostable path: `CHIMERA_MODEL=ollama/llama3` and no key needed.

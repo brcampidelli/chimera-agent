@@ -88,5 +88,10 @@ def test_real_default_registry_is_readable_and_native(tmp_path: Any) -> None:
     assert by_name["write_file"]["tags"] == ["write"]
     assert by_name["run_shell"]["tags"] == ["exec"]
     assert by_name["http_get"]["tags"] == ["network"]
-    # The native registry has no MCP tools, so nothing is flagged untrusted.
-    assert all(i["untrusted_output"] is False for i in infos)
+    # read_document reads external files (PDF/DOCX/HTML) that can carry an injection, so it flags its
+    # output untrusted — the one native tool that does. Everything else in the native registry is
+    # trusted (MCP/OpenAPI tools, added separately, are the other untrusted sources).
+    assert by_name["read_document"]["untrusted_output"] is True
+    assert all(
+        i["untrusted_output"] is False for i in infos if i["name"] != "read_document"
+    )

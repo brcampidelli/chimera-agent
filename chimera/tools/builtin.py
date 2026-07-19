@@ -63,14 +63,20 @@ def default_registry(
     interactive terminal confirms each host command, headless runs with a one-time warning. Pass
     ``None`` to force no gate (e.g. a server that must never block on stdin), or a custom callback.
     """
+    from chimera.config import get_settings
     from chimera.sandbox import get_sandbox
     from chimera.sandbox.confirm import resolve_host_exec_confirm
 
     confirm = resolve_host_exec_confirm() if isinstance(host_exec_confirm, _Unset) else host_exec_confirm
+    settings = get_settings()
+    # When the workspace holds code you don't control (CHIMERA_TRUST_WORKSPACE=0), read_file's output
+    # is untrusted input and must taint the run — closing the "poisoned source file → unmarked → gate
+    # never fires" bypass. Defaults to trusting your own repo so --taint isn't tripped by every read.
+    trust_workspace = settings.trust_workspace
 
     registry = ToolRegistry()
     registry.register(EchoTool())
-    registry.register(ReadFileTool(workspace))
+    registry.register(ReadFileTool(workspace, trust_workspace=trust_workspace))
     registry.register(WriteFileTool(workspace, write_region=write_region))
     registry.register(EditFileTool(workspace, write_region=write_region))
     registry.register(ApplyPatchTool(workspace, write_region=write_region))
@@ -107,9 +113,6 @@ def default_registry(
     registry.register(CrawlTool())
 
     # Key-gated optional tools light up when their credential is set.
-    from chimera.config import get_settings
-
-    settings = get_settings()
     if settings.tavily_api_key:
         from chimera.tools.web import WebSearchTool
 

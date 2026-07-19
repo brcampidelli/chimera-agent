@@ -29,6 +29,21 @@ class ReadFileTool(_WorkspaceTool):
         "required": ["path"],
     }
 
+    def __init__(
+        self,
+        workspace: Path | None = None,
+        *,
+        write_region: WriteRegion | None = None,
+        trust_workspace: bool = True,
+    ) -> None:
+        super().__init__(workspace, write_region=write_region)
+        # When the workspace is NOT trusted (running on third-party code), a file's contents are
+        # untrusted external input — a poisoned source/README can carry a prompt injection. Marking
+        # the output untrusted routes it through the taint ledger + fence (ledger_tool.py reads this
+        # attribute), so the run taints and the dangerous-tool gate arms, just like a fetched page.
+        # Default trusts the workspace (your own repo) so `--taint` isn't tripped by every file read.
+        self.untrusted_output = not trust_workspace
+
     def run(self, **kwargs: Any) -> str:
         path = resolve_in_workspace(self.workspace, str(kwargs["path"]))
         if not path.is_file():

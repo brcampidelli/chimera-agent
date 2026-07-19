@@ -165,7 +165,19 @@ class ChatSession:
             if self.gate is not None:
                 items = self.gate.filter(items, message)  # admission gate (trust boundary)
             if items:
-                facts = [item.content for item in items]
+                # Surface trust provenance on recall, exactly as the autonomous readback and the
+                # persona preamble do: a fact learned from untrusted content must not read to the
+                # model as verified. Dropping the label here (taking .content raw) was a taint leak —
+                # a poisoned memory could re-enter the next turn's prompt looking clean.
+                facts = [
+                    item.content
+                    + (
+                        " [unverified: learned from untrusted content]"
+                        if getattr(item, "provenance", "clean") == "tainted"
+                        else ""
+                    )
+                    for item in items
+                ]
                 if "layer" in captured:
                     layers.append(captured["layer"])
         if self.graph is not None:

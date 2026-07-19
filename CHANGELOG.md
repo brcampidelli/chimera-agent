@@ -35,6 +35,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   interrupted between its arms is discarded whole.
 
 ### Security
+- **Taint tracking: honest claims + three closed source gaps.** An audit + an internal red-team of the
+  prompt-injection defence found the layer was real but narrower than the README said, and that some
+  untrusted-content entry points never marked the run tainted. Fixes:
+  - `read_document` and `transcribe_audio` now flag their output untrusted (a document or recording is
+    external content that can carry an injection) — they route through the taint ledger + fence like a
+    fetched page, instead of returning verbatim in "clean".
+  - `read_file` taints the run when the workspace is declared untrusted (**`CHIMERA_TRUST_WORKSPACE=0`**
+    — set it when running `chimera solve` against code you don't control: a third-party repo, a PR
+    branch, anything downloaded). Default trusts your own repo, so `--taint` isn't tripped by every
+    file read. The red-team showed that without this, a poisoned local file read under `--taint`
+    reached a dangerous tool ungated (the same payload was blocked via `scrape`); regression tests now
+    encode it.
+  - Recalled memory learned from untrusted content keeps its `[unverified]` label through the
+    interactive session path (it was dropped on keyword recall).
+  - **The public claim now matches the code** (README + all six translations + `SECURITY.md`): the
+    layer is opt-in (`--taint`), *heuristic* verbatim-flow (not true dataflow — paraphrase launders
+    it), the measured number is `100% → ~14%` on an **n=7** corpus, and `SECURITY.md` names exactly
+    what still gets through (sub-agent hand-offs, fusion/summarisation, non-CLI entry points). "Taint
+    tracking end-to-end" is gone.
 - **The agent asks before running a command on your host.** With `sandbox=local` (the default — most
   `pip install` users have no Docker), a command the model chose to run used to execute on the machine
   silently. Now `CHIMERA_HOST_EXEC=ask` (default) confirms each host command in an interactive terminal;

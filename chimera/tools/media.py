@@ -190,6 +190,11 @@ class TranscribeAudioTool(Tool):
     hosted OpenAI Whisper API. Wave/mp3/m4a etc."""
 
     name = "transcribe_audio"
+    # An audio file is external content just like a document or a web page — a transcript can carry a
+    # "ignore your instructions" payload spoken aloud. Mark its output untrusted so it taints the run
+    # and fences, exactly like read_document (ledger_tool.py honours `untrusted_output`). Without this
+    # a poisoned recording transcribes in "clean" and the taint gate never arms.
+    untrusted_output = True
     description = (
         "Transcribe an audio file to text (speech-to-text). Args: path (audio file: wav/mp3/m4a/…); "
         "optional language (e.g. 'en', 'pt'). Uses local faster-whisper if installed, else the OpenAI "

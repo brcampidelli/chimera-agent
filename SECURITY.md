@@ -30,10 +30,14 @@ environment** when you grant autonomy:
 
 > **Measured, not asserted.** `chimera redteam` runs a corpus of injection attacks (a
 > malicious page/email trying to steer the agent into a harmful tool call) through the
-> governance stack. On the built-in corpus, the taint layer cuts the **attack success
-> rate from 100% to ~14%** (blocks destructive shell, backdoor writes, self-modification,
-> and email exfiltration; the remaining leak is exfiltration through an *allowed* tool like
-> `http_get`, which it names rather than hides). This measures whether an already-injected
+> governance stack. On the built-in corpus (**n=7, illustrative — not a sample size to
+> generalise from**), the taint-adaptive allowlist cuts the **attack success rate from 100%
+> to ~14% (6/7 blocked)** (destructive shell, backdoor writes, self-modification, and email
+> exfiltration; the remaining leak is exfiltration through an *allowed* tool like `http_get`,
+> which it names rather than hides). Read the number precisely: every block here comes from
+> the **coarse dangerous-tool narrowing** (`DANGEROUS_WHEN_TAINTED`), not the per-action flow
+> matcher — so the rate tracks *which tools the corpus attacks*, and a corpus weighted toward
+> allowed tools would score worse. It measures whether an already-injected
 > agent's harmful action is *stopped* — not whether the model can be injected at all, which
 > is the harder, still-open half of #5.
 
@@ -52,10 +56,25 @@ environment** when you grant autonomy:
   fetched, written, read and executed (a replayable JSONL), marks web/external content as
   **tainted**, propagates that taint into files it flows into, and escalates to **review** when
   an action *executes or self-modifies on tainted input* (the "downloaded X, then ran X" flow a
-  memoryless lexical rule misses). **Honest limits:** this is heuristic reference/verbatim-flow
-  taint, not true dataflow — a model laundering the content (paraphrase, re-encode) defeats it;
-  it is sequence-aware *review* and observability, never a hard block, and it does **not** solve
-  the data-vs-instructions problem. The sandbox is still the containment boundary. (h/t
+  memoryless lexical rule misses). **Honest limits — what still gets through:** this is heuristic
+  reference/verbatim-flow taint, not true dataflow — a model laundering the content (paraphrase,
+  re-encode) defeats it; it is sequence-aware *review* and observability, never a hard block, and
+  it does **not** solve the data-vs-instructions problem. Concretely, taint is **dropped** across:
+  a **sub-agent hand-off** (each worker gets its own ledger; cross-worker collusion is caught by a
+  *post-hoc* monitor that warns, it does not prevent), the **fusion engine** and any
+  **summarisation/compaction** (a synthesiser's whole job is to paraphrase, which erases a verbatim
+  match), and it is **not wired at all** outside the `solve`/`crew`/`hierarchy` CLI paths — the API
+  server, TUI, and scheduler have no taint tracking. It also only *escalates to review*, so with no
+  approver present a tainted action is refused, not silently run, but nothing is hard-blocked.
+  **Untrusted local files:** by default the workspace is *trusted* — `read_file` does not taint,
+  because `chimera solve` usually runs on your own repo and tainting every file read would make
+  `--taint` fire on everything. If you run against code you do **not** control (a third-party repo, a
+  PR branch, anything downloaded), set **`CHIMERA_TRUST_WORKSPACE=0`** so a `read_file` of a poisoned
+  source file taints the run like a fetched page does. (A red-team found in 2026-07 that without this,
+  a poisoned local file read under `--taint` reached a dangerous tool ungated — the same payload was
+  blocked when it arrived via `scrape`. `read_document` and `transcribe_audio` always taint, since a
+  document or recording is external by nature.) The sandbox is still the real boundary for hostile
+  code — run it under `CHIMERA_SANDBOX=docker`. This layer is defence-in-depth on top of it. (h/t
   u/Dependent_Policy1307, u/Far-Stable2591, u/zoharel on r/AI_Agents.)
 - **Quarantined reader (dual-LLM / CaMeL)** — the structural answer to injection: untrusted
   content is read by a *tool-less* model that can only emit schema-validated JSON

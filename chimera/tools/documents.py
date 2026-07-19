@@ -42,6 +42,14 @@ class _WorkspaceTool(Tool):
 
 class ReadDocumentTool(_WorkspaceTool):
     name = "read_document"
+    # A document (PDF/DOCX/HTML/…) can carry a prompt injection exactly like a fetched web page —
+    # the run() body already fences+sanitizes it for that reason. But fencing is cosmetic: without
+    # this flag the taint ledger never learns the run touched untrusted content, so the downstream
+    # gates (tool-narrowing, provenance on durable writes, pause-on-taint) stay dormant. Marking the
+    # output untrusted routes it through the SAME provenance path as MCP/OpenAPI results
+    # (ledger_tool.py honours `untrusted_output`), so a poisoned document taints the run like a
+    # poisoned URL does. (Under `--taint`; off by default, like the rest of the ledger.)
+    untrusted_output = True
     description = (
         "Read a document (PDF, DOCX, PPTX, XLSX, HTML, CSV, JSON, EPUB) from the workspace and "
         "return its text as Markdown. Use this for formats read_file cannot handle."
