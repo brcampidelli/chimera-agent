@@ -9,8 +9,8 @@ command the model chose to run executes on the host. ``CHIMERA_HOST_EXEC`` decid
 * ``deny`` — never run on the host; the command is refused with a pointer to ``CHIMERA_SANDBOX=docker``.
 
 :func:`resolve_host_exec_confirm` returns the callback the shell / code tools consult before executing
-on the host. It is ``None`` when no gate applies (isolated container, or ``allow``), so those paths keep
-their exact previous behaviour.
+on the host. It is ``None`` only under ``allow`` — the *isolated container* case is decided later, at
+the tool, from the real :func:`sandbox_is_isolated` (a docker *config* is not proof of isolation).
 """
 
 from __future__ import annotations
@@ -29,7 +29,18 @@ _log = get_logger("sandbox.confirm")
 # Given the command (shell) or a one-line summary (code), return True to run it on the host.
 HostExecConfirm = Callable[[str], bool]
 
-_warned_headless = False
+
+def sandbox_is_isolated(sandbox: object) -> bool:
+    """True when the sandbox genuinely isolates from the host (so no host-exec confirm is needed).
+
+    Duck-typed and shared by every host-exec consumer, so they cannot drift apart: a backend that
+    runs in a real container reports ``is_isolated() -> True``. A DockerSandbox that has fallen back
+    to local (no daemon) reports False — its host execution stays gated, closing the "docker
+    configured but silently ran on the host" gap. A backend whose ``is_isolated`` is not callable
+    counts as host (the safe direction) instead of crashing.
+    """
+    fn = getattr(sandbox, "is_isolated", None)
+    return bool(fn()) if callable(fn) else False
 
 
 def _deny(command: str) -> bool:
@@ -58,17 +69,29 @@ def _prompt(command: str) -> bool:
         return False
 
 
-def _headless_allow(command: str) -> bool:
-    """Non-interactive ``ask``: run, but warn ONCE so the risk is visible in logs (non-breaking)."""
-    global _warned_headless
-    if not _warned_headless:
-        _warned_headless = True
+def _make_headless_allow() -> HostExecConfirm:
+    """Non-interactive ``ask``: run, but warn once per *resolve* so the risk stays visible in logs.
+
+    The flag lives in this closure, not at module level: a long-lived process (``chimera serve``, the
+    API, a cron daemon) resolves the gate per run, so run #2 onward still records that it executed the
+    agent's commands on the host. A module-global flag would warn once for the life of the process and
+    silently host-execute forever after — which would defeat the "visible in logs" rationale.
+    """
+    warned = False
+
+    def _headless_allow(command: str) -> bool:
+        nonlocal warned
+        if warned:
+            return True
+        warned = True
         _log.warning(
             "running the agent's commands on the host without confirmation (no TTY, "
             "CHIMERA_HOST_EXEC=ask). For isolation set CHIMERA_SANDBOX=docker; to silence this, "
             "set CHIMERA_HOST_EXEC=allow (accepts the risk) or =deny (refuses)."
         )
-    return True
+        return True
+
+    return _headless_allow
 
 
 def resolve_host_exec_confirm(
@@ -76,8 +99,9 @@ def resolve_host_exec_confirm(
 ) -> HostExecConfirm | None:
     """Return the host-exec confirmation callback, or ``None`` when no gate applies.
 
-    ``None`` means "run as before" — used for an isolated container sandbox and for ``allow``. A
-    non-None callback is consulted by the shell/code tools before host execution; returning False
+    ``None`` means "run as before", and is returned **only** for ``allow``. Isolation is *not*
+    decided here (see the NOTE below); the tools skip a non-None callback themselves when
+    :func:`sandbox_is_isolated` says the container is genuinely up. Returning False from the callback
     turns into a clean ``error:`` tool result, never a crash.
     """
     from chimera.config import get_settings
@@ -99,4 +123,4 @@ def resolve_host_exec_confirm(
     # posture == "ask" (or anything unrecognised → treat as ask, the safe default)
     if interactive is None:
         interactive = bool(getattr(sys.stdin, "isatty", lambda: False)())
-    return _prompt if interactive else _headless_allow
+    return _prompt if interactive else _make_headless_allow()

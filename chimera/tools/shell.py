@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from chimera.sandbox.confirm import sandbox_is_isolated
 from chimera.tools.base import Tool
 
 if TYPE_CHECKING:
@@ -57,17 +58,7 @@ class RunShellTool(Tool):
         # explicit allow, or a caller that opts out). See chimera.sandbox.confirm.
         self._confirm = confirm
 
-    @staticmethod
-    def _sandbox_is_isolated(sandbox: Sandbox) -> bool:
-        """True when the sandbox genuinely isolates from the host (so no host-exec confirm is needed).
-
-        Duck-typed: a backend that runs in a real container reports ``is_isolated() -> True``. A
-        DockerSandbox that has fallen back to local (no Docker) reports False — so its host execution
-        is still gated, closing the "docker configured but silently ran on the host" gap. A backend
-        without a callable ``is_isolated`` counts as host (the safe direction) instead of crashing.
-        """
-        fn = getattr(sandbox, "is_isolated", None)
-        return bool(fn()) if callable(fn) else False
+    _sandbox_is_isolated = staticmethod(sandbox_is_isolated)  # shared with code.py; see confirm.py
 
     def _resolve_cwd(self, rel: str | None) -> Path | str:
         """Resolve a per-call ``cwd`` under the workspace, or an ``error:`` string if it escapes."""

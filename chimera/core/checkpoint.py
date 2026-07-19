@@ -10,8 +10,14 @@ are not snapshotted. Large files and common build/VCS dirs are skipped.
 
 The "delete files created since" pass is destructive, so it is skipped whenever it
 cannot be done safely: when the snapshot was truncated at the file cap, and when the
-workspace is a real git repository root (verify-or-revert must never delete a repo's
-files — a task workspace is a throwaway dir, never a repo root).
+workspace is anywhere inside a git repository (``.git`` at the workspace **or any
+ancestor**) — verify-or-revert must never delete a repo's files.
+
+That last guard is deliberately broad, and the trade-off is explicit: running against
+a workspace inside a repo (``chimera solve -w .`` in your own project, or a scratch dir
+under a git-managed ``$HOME``) keeps files a failed attempt created, instead of pruning
+them. Leftover junk is recoverable; deleting a developer's tracked files is not. Content
+*restoration* is unaffected — only the deletion pass is skipped.
 """
 
 from __future__ import annotations

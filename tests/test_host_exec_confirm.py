@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from chimera.sandbox.base import SandboxResult
 from chimera.sandbox.confirm import resolve_host_exec_confirm
-from chimera.tools.code import ExecuteCodeTool
+from chimera.tools.code import CodeInterpreterTool, ExecuteCodeTool
 from chimera.tools.shell import RunShellTool
 
 
@@ -101,13 +103,73 @@ def test_resolver_does_not_special_case_docker_config() -> None:
 
 
 def test_fallen_back_docker_is_gated_not_isolated(tmp_path: Path) -> None:
-    # The HIGH the review found end-to-end: sandbox=docker but the daemon is down → not isolated →
-    # the host-exec gate MUST fire (deny → refused), not silently run on the host.
+    # The HIGH the review found, end-to-end through the REAL resolver: sandbox=docker but the daemon
+    # is down → not isolated → the gate must fire. Building the callback with resolve_host_exec_confirm
+    # (not a hand-written lambda) is what makes this non-vacuous: with the docker short-circuit back
+    # in place the resolver returns None, no gate is passed, and this test fails as it should.
+    gate = resolve_host_exec_confirm(_Settings("docker", "deny"), interactive=False)
     sb = _RecordingSandbox(isolated=False)  # a docker sandbox that fell back to local
-    tool = RunShellTool(tmp_path, sb, confirm=lambda _cmd: False)  # a deny-style gate
+    tool = RunShellTool(tmp_path, sb, confirm=gate)
     out = tool.run(command="echo PWNED")
     assert sb.ran is False
     assert "declined" in out.lower()
+
+
+def test_code_interpreter_honours_host_exec_deny() -> None:
+    # REGRESSION (adversarial review 2026-07-18, HIGH): code_interpreter exec()s in-process, so it is
+    # host execution by construction and used to be registered with no gate at all. `deny` was
+    # therefore bypassable — the model just picks this tool instead of run_shell. Proven live:
+    # run_shell/execute_code refused while code_interpreter printed PWNED_VIA_INTERPRETER.
+    gate = resolve_host_exec_confirm(_Settings("docker", "deny"), interactive=False)
+    tool = CodeInterpreterTool(confirm=gate)
+    out = tool.run(code="print('PWNED_VIA_INTERPRETER')")
+    assert "declined" in out.lower()
+    assert "PWNED" not in out
+
+
+def test_default_registry_gates_every_host_exec_door(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The wiring, not just the class: it is default_registry() that the agent actually gets. The
+    # class-level test above passes even with `CodeInterpreterTool()` registered ungated, so only
+    # this one proves the door is shut in production. deny+docker must block ALL THREE doors —
+    # a gap in any one of them makes CHIMERA_HOST_EXEC=deny meaningless, since the model just
+    # picks whichever tool is not gated.
+    from chimera.config import get_settings
+    from chimera.tools.builtin import default_registry
+
+    monkeypatch.setenv("CHIMERA_HOST_EXEC", "deny")
+    monkeypatch.setenv("CHIMERA_SANDBOX", "docker")  # a config that is NOT proof of isolation
+    get_settings.cache_clear()
+    try:
+        registry = default_registry()
+        calls = {
+            "run_shell": {"command": "id"},
+            "execute_code": {"code": "import os; os.system('id')"},
+            "code_interpreter": {"code": "print('PWNED_VIA_INTERPRETER')"},
+        }
+        for name, kwargs in calls.items():
+            out = registry.get(name).run(**kwargs)
+            assert "declined" in out.lower(), f"{name} ran on the host under deny"
+            assert "PWNED" not in out
+    finally:
+        get_settings.cache_clear()
+
+
+def test_code_interpreter_gate_ignores_sandbox_isolation() -> None:
+    # There is deliberately no is_isolated() escape here: the interpreter never uses the sandbox, so
+    # a container being up must NOT excuse it. Under `ask`+headless it runs (non-breaking); the point
+    # is that the gate is consulted at all.
+    seen: list[str] = []
+    tool = CodeInterpreterTool(confirm=lambda summary: seen.append(summary) or True)
+    out = tool.run(code="x = 41\nprint(x + 1)")
+    assert out == "42"
+    assert seen and seen[0].startswith("code_interpreter: x = 41")
+
+
+def test_code_interpreter_without_gate_is_unchanged() -> None:
+    # confirm=None (library callers, allow posture) keeps the exact prior behaviour, including state.
+    tool = CodeInterpreterTool()
+    tool.run(code="counter = 1")
+    assert tool.run(code="print(counter + 1)") == "2"  # session state persists
 
 
 def test_non_callable_is_isolated_does_not_crash(tmp_path: Path) -> None:
@@ -139,6 +201,60 @@ def test_resolver_ask_headless_runs_with_warning() -> None:
     gate = resolve_host_exec_confirm(_Settings("local", "ask"), interactive=False)
     assert gate is not None
     assert gate("echo hi") is True
+
+
+def test_execute_code_non_callable_is_isolated_does_not_crash(tmp_path: Path) -> None:
+    # REGRESSION (review MED): the shell half of the non-callable fix had a test, the code.py half had
+    # none — the suite was byte-identical with it reverted. Both now share sandbox_is_isolated().
+    class _BadSandbox:
+        is_isolated = True  # attribute, not a method
+
+        def run(self, command: str, *, timeout: int = 60, cwd: Path | None = None) -> SandboxResult:
+            return SandboxResult(exit_code=0, stdout="ran")
+
+    tool = ExecuteCodeTool(tmp_path, _BadSandbox(), confirm=lambda _s: False)
+    assert "declined" in tool.run(code="print(1)").lower()  # treated as host → gated, no TypeError
+
+
+def test_execute_code_isolated_sandbox_skips_confirm(tmp_path: Path) -> None:
+    # The other direction of the shared helper: a genuinely isolated container is not gated.
+    called = False
+
+    def confirm(_s: str) -> bool:
+        nonlocal called
+        called = True
+        return False
+
+    sb = _RecordingSandbox(isolated=True)
+    ExecuteCodeTool(tmp_path, sb, confirm=confirm).run(code="print(1)")
+    assert called is False
+    assert sb.ran is True
+
+
+def test_headless_warning_is_per_resolve_not_per_process() -> None:
+    # REGRESSION (review MED): the warn-once flag was module-global, so a long-lived process
+    # (chimera serve / the API / a cron daemon) logged ONE warning ever and then host-executed
+    # silently forever — defeating the "the risk is visible in logs" rationale. Each resolve (i.e.
+    # each run) must get a fresh flag: two runs → two warnings.
+    logged: list[str] = []
+
+    import chimera.sandbox.confirm as confirm_mod
+
+    class _Rec:
+        def warning(self, msg: str, *args: object) -> None:
+            logged.append(msg)
+
+    original = confirm_mod._log
+    confirm_mod._log = _Rec()  # type: ignore[assignment]
+    try:
+        for _run in range(2):
+            gate = resolve_host_exec_confirm(_Settings("local", "ask"), interactive=False)
+            assert gate is not None
+            for _cmd in range(3):  # repeated commands inside one run warn once
+                assert gate("echo hi") is True
+    finally:
+        confirm_mod._log = original
+    assert len(logged) == 2  # one per run, not one per process and not one per command
 
 
 def test_resolver_ask_interactive_returns_a_prompt() -> None:

@@ -78,6 +78,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   execution and gated too. (Desktop/API keep their own approval flow — a follow-up wires this there.)
 
 ### Fixed
+- **`CHIMERA_HOST_EXEC=deny` is now actually enforceable — `code_interpreter` was an ungated third
+  door.** The shell and `execute_code` tools honoured the posture, but `code_interpreter` `exec()`s
+  in-process on the host, bypasses the sandbox entirely, and was registered with no gate: under
+  `deny` + `docker`, the first two refused while the third ran host commands. A model that wants to
+  execute simply picks the ungated tool, so the guarantee was only as strong as its weakest door. It
+  now consults the same gate unconditionally — no `is_isolated()` escape, because in-process
+  execution is host execution by construction. `sandbox_is_isolated()` moved to
+  `chimera.sandbox.confirm` so every consumer shares one definition, and a test drives
+  `default_registry()` itself, since a per-class test passes even when the wiring is missing.
+- **The headless host-exec warning is emitted per run, not once per process.** The warn-once flag was
+  module-global, so a long-lived process (`chimera serve`, the API, a cron daemon) logged one warning
+  ever and then executed the agent's host commands silently — defeating the "the risk stays visible in
+  logs" rationale. The flag now lives per resolved gate.
 - **verify-or-revert can no longer delete files inside a git repository root.** `WorkspaceGuard.restore()`'s
   delete-new pass removes files present-now-but-not-in-snapshot; if a workspace ever resolves to a real
   repo root with a snapshot predating its files, it would delete them. Now the destructive pass is skipped

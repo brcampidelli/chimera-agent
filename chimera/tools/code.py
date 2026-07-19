@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from chimera.sandbox.confirm import sandbox_is_isolated
 from chimera.tools.base import Tool
 
 if TYPE_CHECKING:
@@ -27,9 +28,11 @@ _DEFAULT_TIMEOUT = 30
 class CodeInterpreterTool(Tool):
     """A *stateful* Python session: variables, imports and definitions persist across calls.
 
-    Runs in-process (state persistence rules out a fresh subprocess each call), so it is
-    powerful — use ``execute_code`` for isolated one-shots and the governance kernel to gate
-    this when needed. Ideal for iterative data work: define once, build up, inspect.
+    Runs in-process (state persistence rules out a fresh subprocess each call), so it is powerful —
+    and it **never** touches the sandbox: it is host execution by construction. It therefore honours
+    ``CHIMERA_HOST_EXEC`` unconditionally (no ``is_isolated`` escape), because otherwise ``deny``
+    would be trivially bypassable — the model would simply pick this tool over ``run_shell``.
+    Ideal for iterative data work: define once, build up, inspect.
     """
 
     name = "code_interpreter"
@@ -46,11 +49,17 @@ class CodeInterpreterTool(Tool):
         "required": ["code"],
     }
 
-    def __init__(self) -> None:
+    def __init__(self, *, confirm: HostExecConfirm | None = None) -> None:
         self._namespace: dict[str, Any] = {}
+        self._confirm = confirm  # gate before in-process host execution; None = run as before
 
     def run(self, **kwargs: Any) -> str:
         code = str(kwargs["code"])
+        if self._confirm is not None:
+            # No is_isolated() escape: exec() runs in THIS process, so it is always host execution.
+            summary = code.strip().splitlines()[0][:120] if code.strip() else "(empty)"
+            if not self._confirm(f"code_interpreter: {summary}"):
+                return "error: host execution declined (CHIMERA_HOST_EXEC). Not run."
         if kwargs.get("reset"):
             self._namespace.clear()
         buffer = io.StringIO()
@@ -93,9 +102,7 @@ class ExecuteCodeTool(Tool):
         code = str(kwargs["code"])
         timeout = int(kwargs.get("timeout") or _DEFAULT_TIMEOUT)
         sandbox = self._sandbox or LocalSandbox()
-        _iso = getattr(sandbox, "is_isolated", None)
-        isolated = bool(_iso()) if callable(_iso) else False
-        if self._confirm is not None and not isolated:
+        if self._confirm is not None and not sandbox_is_isolated(sandbox):
             summary = code.strip().splitlines()[0][:120] if code.strip() else "(empty)"
             if not self._confirm(f"execute_code: {summary}"):
                 return "error: host execution declined (CHIMERA_HOST_EXEC). Not run."
