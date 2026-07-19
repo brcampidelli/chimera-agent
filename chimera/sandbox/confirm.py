@@ -84,10 +84,12 @@ def resolve_host_exec_confirm(
 
     settings = settings or get_settings()
 
-    # An isolated container needs no host-exec gate.
-    if (settings.sandbox or "local").lower() == "docker":
-        return None
-
+    # NOTE: do NOT short-circuit on `settings.sandbox == "docker"` here. A docker *config* is not
+    # proof of isolation — DockerSandbox falls back to the host when the daemon is down. Whether to
+    # skip the gate must be decided from the ACTUAL sandbox at call time: the shell/code tools consult
+    # `sandbox.is_isolated()` and skip confirm only when the container is really up (docker up → True →
+    # skipped; docker down → host → gated). Returning None here would make `deny` a no-op and let a
+    # fallen-back docker run on the host ungated — the exact hole SECURITY.md says is closed.
     posture = (settings.host_exec or "ask").lower()
     if posture == "allow":
         return None

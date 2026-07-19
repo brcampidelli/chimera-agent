@@ -2645,7 +2645,7 @@ def solve_batch(
         WorkspaceGuard,
     )
     from chimera.core.autonomous import AutonomousResult
-    from chimera.governance import SharedTaint, TaintLedger, ledger_registry
+    from chimera.governance import TaintLedger, ledger_registry
     from chimera.orchestration import run_isolated
     from chimera.providers import LLMGateway, MissingCredentialsError
 
@@ -2667,17 +2667,17 @@ def solve_batch(
     # and changes no behaviour; the monitor only escalates a review note at the end. --taint additionally
     # arms each worker's adaptive allowlist (dangerous-when-tainted tools require approval).
     ledgers: dict[str, TaintLedger] = {}
-    # One shared taint view across the whole fan-out: the instant any worker fetches untrusted
-    # content, every worker's `run_tainted()` flips True, so the dangerous-tool narrowing arms against
-    # a split flow (A fetches, B sinks) *live*, not just in the post-hoc monitor. Racy at the exact
-    # instant of concurrency — the AggregateMonitor backstops that tail.
-    shared_taint = SharedTaint()
+    # NO shared taint view here: solve-batch runs INDEPENDENT tasks in SEPARATE workspaces. Worker B
+    # cannot see worker A's fetched content, so arming B's narrowing because A fetched (even benign)
+    # content would block B's legitimate work for zero security benefit. Each worker's ledger is its
+    # own; the AggregateMonitor still runs post-hoc for observability + the non-zero exit below. (The
+    # live cross-worker gate is for crew-isolated, where workers collaborate on ONE task + workspace.)
 
     def make_runner(name: str, one_task: str) -> Callable[[Path], AutonomousResult]:
         def run(ws: Path) -> AutonomousResult:
             from chimera.tools import default_registry
 
-            ledger = TaintLedger(shared=shared_taint)
+            ledger = TaintLedger()
             ledgers[name] = ledger
             registry = ledger_registry(default_registry(ws), ledger, narrow_on_taint=taint)
             worker = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
@@ -2761,8 +2761,11 @@ def crew_isolated(
         backend = RoutedBackend(gateway, FusionEngine(gateway))
 
     # Per-worker capability ledgers for the aggregate cross-agent monitor — always on for fan-out
-    # (pure observability; --taint additionally arms each worker's adaptive allowlist). One shared
-    # taint view so a fetch in any worker arms the narrowing in all of them live (cross-agent gate).
+    # (pure observability; --taint additionally arms each worker's adaptive allowlist). ONE shared
+    # taint view here (unlike solve-batch): crew workers COLLABORATE on a single task and merge into a
+    # shared workspace, so untrusted content one worker fetched can flow to another — a fetch in any
+    # worker arms the narrowing in all of them live, the cross-agent gate. (Batch tasks are
+    # independent, so sharing there would only false-block; that's why it's crew-only.)
     ledgers: dict[str, Any] = {}
     shared_taint = SharedTaint()
 

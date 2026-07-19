@@ -91,22 +91,25 @@ class WorkspaceGuard:
         #  1. TRUNCATED snapshot (hit the file cap): some pre-existing files were never captured, so we
         #     cannot tell "created since" from "existed but uncaptured". Deleting the difference would
         #     destroy untouched user data — the opposite of verify-or-revert's job.
-        #  2. The workspace is a REAL GIT REPOSITORY ROOT (a `.git` entry sits at its root). verify-or
-        #     -revert's delete pass exists to clean up files an agent CREATED in a throwaway workspace;
-        #     a task workspace never has a `.git` at its root. If a path/config bug ever points the
-        #     guard at an actual repo, "files not in my snapshot" spans the user's untracked work and —
-        #     if the snapshot predates them — committed files, so a revert could wipe the repo. It has
-        #     (bench harness, 2026-07-17). Refuse to delete inside a repo root, unconditionally.
+        #  2. The workspace is INSIDE A GIT REPOSITORY (a `.git` entry sits at it or any ancestor).
+        #     verify-or-revert's delete pass exists to clean up files an agent CREATED in a throwaway
+        #     workspace; a task workspace is never inside a repo. If a path/config bug ever points the
+        #     guard at a real repo (or a SUBDIR of one), "files not in my snapshot" spans the user's
+        #     untracked work and — if the snapshot predates them — committed files, so a revert could
+        #     wipe the repo. It has (bench harness, 2026-07-17). Refuse to delete anywhere inside a repo,
+        #     unconditionally — checking ancestors too, not just the immediate directory.
         truncated = len(snapshot.present) >= self.max_files
-        is_repo_root = (self.workspace / ".git").exists()
+        in_git_repo = any(
+            (parent / ".git").exists() for parent in (self.workspace, *self.workspace.parents)
+        )
         if truncated:
             _log.warning(
                 "snapshot truncated at %d files; skipping delete-new pass on restore to avoid "
                 "removing uncaptured pre-existing files", self.max_files,
             )
-        elif is_repo_root:
+        elif in_git_repo:
             _log.warning(
-                "workspace %s is a git repository root; skipping delete-new pass on restore so "
+                "workspace %s is inside a git repository; skipping delete-new pass on restore so "
                 "verify-or-revert can never delete tracked or untracked repo files", self.workspace,
             )
         else:

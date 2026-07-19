@@ -88,8 +88,40 @@ class _Settings:
         self.host_exec = host_exec
 
 
-def test_resolver_docker_is_ungated() -> None:
-    assert resolve_host_exec_confirm(_Settings("docker", "ask"), interactive=True) is None
+def test_resolver_does_not_special_case_docker_config() -> None:
+    # REGRESSION (adversarial review 2026-07-18): a docker *config* is NOT proof of isolation —
+    # DockerSandbox falls back to the host when the daemon is down. The resolver must return the
+    # posture callback regardless of `sandbox`; whether to skip is decided by the actual sandbox's
+    # is_isolated() at the tool. Returning None here (the old bug) made `deny` a no-op and let a
+    # fallen-back docker run on the host ungated.
+    assert resolve_host_exec_confirm(_Settings("docker", "deny"), interactive=True) is not None
+    assert resolve_host_exec_confirm(_Settings("docker", "deny"), interactive=True)("x") is False
+    # ask under a docker config still resolves to a real callback (the tool skips it only if isolated).
+    assert resolve_host_exec_confirm(_Settings("docker", "ask"), interactive=True) is not None
+
+
+def test_fallen_back_docker_is_gated_not_isolated(tmp_path: Path) -> None:
+    # The HIGH the review found end-to-end: sandbox=docker but the daemon is down → not isolated →
+    # the host-exec gate MUST fire (deny → refused), not silently run on the host.
+    sb = _RecordingSandbox(isolated=False)  # a docker sandbox that fell back to local
+    tool = RunShellTool(tmp_path, sb, confirm=lambda _cmd: False)  # a deny-style gate
+    out = tool.run(command="echo PWNED")
+    assert sb.ran is False
+    assert "declined" in out.lower()
+
+
+def test_non_callable_is_isolated_does_not_crash(tmp_path: Path) -> None:
+    # REGRESSION (review LOW): a backend exposing is_isolated as a truthy ATTRIBUTE (not a method)
+    # must be treated as host (the safe direction), not crash with `TypeError: 'bool' not callable`.
+    class _BadSandbox:
+        is_isolated = True  # attribute, not a method
+
+        def run(self, command: str, *, timeout: int = 60, cwd: Path | None = None) -> SandboxResult:
+            return SandboxResult(exit_code=0, stdout="ran")
+
+    tool = RunShellTool(tmp_path, _BadSandbox(), confirm=lambda _cmd: False)
+    out = tool.run(command="echo hi")  # must not raise
+    assert "declined" in out.lower()  # treated as host → gated
 
 
 def test_resolver_allow_is_ungated() -> None:

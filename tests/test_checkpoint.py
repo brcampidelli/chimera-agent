@@ -54,6 +54,24 @@ def test_repo_root_workspace_is_never_delete_pruned(tmp_path: Path) -> None:
     assert (tmp_path / "tracked.py").exists()
 
 
+def test_repo_subdirectory_is_also_guarded(tmp_path: Path) -> None:
+    # REGRESSION (adversarial review 2026-07-18): the guard checked only for `.git` at the workspace
+    # ROOT, so a workspace pointed at a SUBDIR of a repo (.git at an ancestor) still ran the delete
+    # pass and wiped tracked files. The guard must scan ancestors, not just the immediate directory.
+    (tmp_path / ".git").mkdir()  # repo root
+    sub = tmp_path / "src" / "pkg"
+    sub.mkdir(parents=True)
+    (sub / "tracked.py").write_text("committed = True", encoding="utf-8")
+    guard = WorkspaceGuard(sub)  # workspace is a subdir, not the repo root
+    snap = guard.snapshot()
+
+    (sub / "appeared_after.py").write_text("x = 1", encoding="utf-8")
+
+    guard.restore(snap)
+    assert (sub / "appeared_after.py").exists()  # delete pass skipped — inside a repo
+    assert (sub / "tracked.py").exists()
+
+
 def test_non_repo_workspace_still_prunes_new_files(tmp_path: Path) -> None:
     # The guard above must NOT weaken the normal case: without a `.git` root, the delete-new pass still
     # cleans up files the agent created (that is verify-or-revert doing its job in a scratch workspace).

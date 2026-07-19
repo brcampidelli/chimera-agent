@@ -63,9 +63,11 @@ class RunShellTool(Tool):
 
         Duck-typed: a backend that runs in a real container reports ``is_isolated() -> True``. A
         DockerSandbox that has fallen back to local (no Docker) reports False — so its host execution
-        is still gated, closing the "docker configured but silently ran on the host" gap.
+        is still gated, closing the "docker configured but silently ran on the host" gap. A backend
+        without a callable ``is_isolated`` counts as host (the safe direction) instead of crashing.
         """
-        return bool(getattr(sandbox, "is_isolated", lambda: False)())
+        fn = getattr(sandbox, "is_isolated", None)
+        return bool(fn()) if callable(fn) else False
 
     def _resolve_cwd(self, rel: str | None) -> Path | str:
         """Resolve a per-call ``cwd`` under the workspace, or an ``error:`` string if it escapes."""

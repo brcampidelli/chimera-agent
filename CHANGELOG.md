@@ -35,14 +35,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   interrupted between its arms is discarded whole.
 
 ### Security
-- **Cross-agent taint is now a live gate, not just a post-hoc warning.** Under fan-out
-  (`solve-batch` / `crew-isolated`) each worker kept its own ledger, so the split flow (worker A
-  fetches untrusted content, worker B runs the sink) was invisible to B's per-worker narrowing — the
-  `AggregateMonitor` could only warn *after* B already ran. Workers now share one `SharedTaint` view:
-  the instant any worker consumes untrusted content, every worker's `run_tainted()` flips True, so B's
-  dangerous-tool narrowing arms **before** B can sink it. Honest limit: workers run in parallel, so B's
-  sink can still precede A's publish by a scheduling instant — the aggregate monitor stays the backstop,
-  and under `--taint` a collusion finding now exits the run non-zero (a real consequence, not a note).
+- **Cross-agent taint is now a live gate for a collaborating crew.** When workers split ONE task and
+  merge into a shared workspace (`crew-isolated`), a split flow (worker A fetches untrusted content,
+  worker B runs the sink) was invisible to B's per-worker narrowing — the `AggregateMonitor` could only
+  warn *after* B already ran. Crew workers now share one `SharedTaint` view: the instant any worker
+  consumes untrusted content, every worker's `run_tainted()` flips True, so B's dangerous-tool narrowing
+  arms **before** B can sink it. `solve-batch` deliberately does NOT share (its tasks are independent,
+  in separate workspaces — arming B because A fetched would only false-block legitimate work); it keeps
+  the post-hoc aggregate monitor. Honest limit: crew workers run in parallel, so B's sink can still
+  precede A's publish by a scheduling instant — the aggregate monitor stays the backstop, and under
+  `--taint` a collusion finding now exits the run non-zero (a real consequence, not a note).
 - **The API `solve` path now has taint tracking** (it ran a bare registry before): untrusted
   fetch/document output is fenced + sanitized (control tokens stripped) and the capability trail is
   recorded. Narrowing stays off there (a headless server has no tool-level approver — wiring that to the

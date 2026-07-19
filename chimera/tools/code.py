@@ -93,9 +93,9 @@ class ExecuteCodeTool(Tool):
         code = str(kwargs["code"])
         timeout = int(kwargs.get("timeout") or _DEFAULT_TIMEOUT)
         sandbox = self._sandbox or LocalSandbox()
-        if self._confirm is not None and not bool(
-            getattr(sandbox, "is_isolated", lambda: False)()
-        ):
+        _iso = getattr(sandbox, "is_isolated", None)
+        isolated = bool(_iso()) if callable(_iso) else False
+        if self._confirm is not None and not isolated:
             summary = code.strip().splitlines()[0][:120] if code.strip() else "(empty)"
             if not self._confirm(f"execute_code: {summary}"):
                 return "error: host execution declined (CHIMERA_HOST_EXEC). Not run."
