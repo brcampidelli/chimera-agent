@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -33,6 +34,34 @@ from chimera.governance.policy import Decision
 from chimera.telemetry import get_logger
 
 _log = get_logger("governance.ledger")
+
+
+class SharedTaint:
+    """A thread-safe cross-agent taint view for a fan-out of sub-agents.
+
+    Each worker in a ``solve-batch`` / ``crew-isolated`` run gets its own :class:`TaintLedger`, but they
+    all hold ONE ``SharedTaint``. The moment any worker consumes untrusted content, every worker's
+    :meth:`TaintLedger.run_tainted` flips True — so the dangerous-tool narrowing (``narrow_on_taint``)
+    arms in worker B *before* B runs its sink, even though B's own ledger never saw the fetch.
+
+    That converts the canonical split flow (A fetches untrusted, B exfiltrates it) from something the
+    post-hoc :class:`~chimera.governance.aggregate_monitor.AggregateMonitor` could only *warn* about into
+    a live gate. Honest limit: workers run in parallel, so B's sink can still precede A's ``publish`` by
+    a scheduling instant — the aggregate monitor stays as the backstop for that racy tail.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._tainted = False
+
+    def publish_tainted(self) -> None:
+        with self._lock:
+            self._tainted = True
+
+    @property
+    def tainted(self) -> bool:
+        with self._lock:
+            return self._tainted
 
 # Tool-name → capability-kind classification. Overridable, but these are the built-ins.
 FETCH_TOOLS = frozenset(
@@ -118,11 +147,14 @@ class SequenceAssessment:
 class TaintLedger:
     """Records capability use across a run and tracks tainted artifacts within it."""
 
-    def __init__(self, *, snippet_chars: int = 2000) -> None:
+    def __init__(self, *, snippet_chars: int = 2000, shared: SharedTaint | None = None) -> None:
         self.events: list[CapabilityEvent] = []
         self.snippet_chars = snippet_chars
         self._tainted: set[str] = set()  # normalized tainted refs (urls, paths, hashes)
         self._snippets: list[str] = []  # bounded tainted content, for verbatim-flow detection
+        # Optional cross-agent taint view: siblings in a fan-out share one, so a fetch here arms the
+        # tainted-tool narrowing in every worker (not just this one). None = a standalone run.
+        self._shared = shared
 
     # --- recording -------------------------------------------------------------------
 
@@ -130,6 +162,10 @@ class TaintLedger:
              provenance: list[str] | None = None) -> CapabilityEvent:
         event = CapabilityEvent(len(self.events), kind, ref, tainted, detail, provenance or [])
         self.events.append(event)
+        if tainted and self._shared is not None:
+            # Publish to siblings the instant this run consumes untrusted content, so their narrowing
+            # arms before they can sink it — the live half of the cross-agent gate.
+            self._shared.publish_tainted()
         return event
 
     def record_fetch(self, source: str, content: str = "") -> str:
@@ -187,8 +223,13 @@ class TaintLedger:
         Coarse by design: it gates *provenance* of durable artifacts (memories, learned
         skills) produced during the run — the "Zombie Agents" self-reinforcing-injection
         surface — not per-action policy, which stays with :func:`assess_action`.
+
+        Under a shared cross-agent view, this is also True when a *sibling* worker consumed untrusted
+        content — so this worker's dangerous-tool narrowing arms against a split flow it never saw.
         """
-        return any(event.tainted for event in self.events)
+        if any(event.tainted for event in self.events):
+            return True
+        return self._shared is not None and self._shared.tainted
 
     def is_tainted(self, ref: str) -> bool:
         return bool(ref) and ref.strip() in self._tainted

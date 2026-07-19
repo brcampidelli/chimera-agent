@@ -26,6 +26,7 @@ from chimera.governance.kernel import TrustKernel
 from chimera.governance.ledger import (
     CapabilityEvent,
     SequenceAssessment,
+    SharedTaint,
     TaintLedger,
     assess_action,
 )
@@ -66,6 +67,7 @@ __all__ = [
     "govern_registry",
     "restrict_registry",
     "TaintLedger",
+    "SharedTaint",
     "CapabilityEvent",
     "SequenceAssessment",
     "assess_action",

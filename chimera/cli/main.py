@@ -2594,25 +2594,28 @@ def solve(
         raise typer.Exit(code=1)
 
 
-def _report_collusion(ledgers: dict[str, Any]) -> None:
-    """Run the aggregate cross-agent monitor over per-worker capability events; print findings.
+def _report_collusion(ledgers: dict[str, Any]) -> bool:
+    """Run the aggregate cross-agent monitor over per-worker events; print findings. Returns True if
+    any collusion was flagged.
 
     A per-worker monitor is blind to a split flow under fan-out (one worker fetches untrusted, a
-    different worker sinks it — the fetch and the sink live in separate ledgers). This closes that
-    gap at the orchestrator level: it only escalates to review, never blocks. No-op without ledgers.
+    different worker sinks it — the fetch and the sink live in separate ledgers). The shared taint view
+    now arms narrowing *live* for that flow; this monitor is the aggregate backstop (and the only place
+    the fan-out-volume pattern is visible). No-op without ledgers.
     """
     if not ledgers:
-        return
+        return False
     from chimera.governance import AggregateMonitor
 
     findings = AggregateMonitor().assess({name: led.events for name, led in ledgers.items()})
     if not findings:
         console.print("[dim]cross-agent monitor: no collusion signals across workers[/dim]")
-        return
+        return False
     console.print("[yellow]⚠ cross-agent monitor flagged (review):[/yellow]")
     for finding in findings:
         agents = f" — agents: {', '.join(finding.agents)}" if finding.agents else ""
         console.print(f"  [yellow]- {finding.kind}[/yellow]: {finding.detail}{agents}")
+    return True
 
 
 @app.command(name="solve-batch")
@@ -2642,7 +2645,7 @@ def solve_batch(
         WorkspaceGuard,
     )
     from chimera.core.autonomous import AutonomousResult
-    from chimera.governance import TaintLedger, ledger_registry
+    from chimera.governance import SharedTaint, TaintLedger, ledger_registry
     from chimera.orchestration import run_isolated
     from chimera.providers import LLMGateway, MissingCredentialsError
 
@@ -2664,12 +2667,17 @@ def solve_batch(
     # and changes no behaviour; the monitor only escalates a review note at the end. --taint additionally
     # arms each worker's adaptive allowlist (dangerous-when-tainted tools require approval).
     ledgers: dict[str, TaintLedger] = {}
+    # One shared taint view across the whole fan-out: the instant any worker fetches untrusted
+    # content, every worker's `run_tainted()` flips True, so the dangerous-tool narrowing arms against
+    # a split flow (A fetches, B sinks) *live*, not just in the post-hoc monitor. Racy at the exact
+    # instant of concurrency — the AggregateMonitor backstops that tail.
+    shared_taint = SharedTaint()
 
     def make_runner(name: str, one_task: str) -> Callable[[Path], AutonomousResult]:
         def run(ws: Path) -> AutonomousResult:
             from chimera.tools import default_registry
 
-            ledger = TaintLedger()
+            ledger = TaintLedger(shared=shared_taint)
             ledgers[name] = ledger
             registry = ledger_registry(default_registry(ws), ledger, narrow_on_taint=taint)
             worker = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
@@ -2702,7 +2710,12 @@ def solve_batch(
     )
     if batch.conflicts:
         console.print(f"[yellow]conflicts (not merged):[/yellow] {', '.join(batch.conflicts)}")
-    _report_collusion(ledgers)
+    colluded = _report_collusion(ledgers)
+    # Under --taint the aggregate finding is a real consequence, not just a note: the run exits
+    # non-zero so a caller/CI treats the fan-out as needing review before its merged output is trusted.
+    if colluded and taint:
+        console.print("[red]cross-agent collusion under --taint — exiting non-zero for review.[/red]")
+        raise typer.Exit(code=2)
     if not batch.ok:
         raise typer.Exit(code=1)
 
@@ -2727,7 +2740,7 @@ def crew_isolated(
     merge back, files two workers both changed are flagged as conflicts, and a worker whose
     check fails is rejected (its edits discarded). Needs a git repo to isolate.
     """
-    from chimera.governance import TaintLedger, ledger_registry
+    from chimera.governance import SharedTaint, TaintLedger, ledger_registry
     from chimera.orchestration import IsolatedCrew, IsolatedWorker, Role, RoleAgent
     from chimera.providers import LLMGateway, MissingCredentialsError
     from chimera.tools import default_registry
@@ -2748,12 +2761,14 @@ def crew_isolated(
         backend = RoutedBackend(gateway, FusionEngine(gateway))
 
     # Per-worker capability ledgers for the aggregate cross-agent monitor — always on for fan-out
-    # (pure observability; --taint additionally arms each worker's adaptive allowlist).
+    # (pure observability; --taint additionally arms each worker's adaptive allowlist). One shared
+    # taint view so a fetch in any worker arms the narrowing in all of them live (cross-agent gate).
     ledgers: dict[str, Any] = {}
+    shared_taint = SharedTaint()
 
     def make_factory(wname: str) -> Callable[[Path], Any]:
         def factory(ws: Path) -> Any:
-            ledger = TaintLedger()
+            ledger = TaintLedger(shared=shared_taint)
             ledgers[wname] = ledger
             return ledger_registry(default_registry(ws), ledger, narrow_on_taint=taint)
 
@@ -2793,7 +2808,10 @@ def crew_isolated(
     console.print(f"[dim]merged {result.merged} file(s) from {len(result.transcript)} worker(s)[/dim]")
     if result.summary:
         console.print(Panel(result.summary, title="unified report", border_style="cyan"))
-    _report_collusion(ledgers)
+    colluded = _report_collusion(ledgers)
+    if colluded and taint:
+        console.print("[red]cross-agent collusion under --taint — exiting non-zero for review.[/red]")
+        raise typer.Exit(code=2)
     if not result.ok:
         raise typer.Exit(code=1)
 

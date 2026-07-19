@@ -1126,7 +1126,16 @@ def _build_solve_agent(
         # Planning is a deep, tool-free reasoning turn — route the plan through fusion under --fuse.
         planner_backend = engine
 
-    registry = default_registry(ws)
+    # Taint tracking on the API solve path (the CLI's `solve` has had it; the server previously ran a
+    # bare registry). ledger_registry fences + sanitizes untrusted fetch/document output (strips
+    # control tokens so a hidden instruction can't spoof a turn) and records the capability trail.
+    # narrow_on_taint stays OFF here: the server is headless with no tool-level approver, so arming the
+    # dangerous-tool gate would just refuse legitimate work — wiring that to the desktop's approval UI
+    # is a follow-up. This closes "the API path has no taint tracking" for the fencing + observability
+    # half; provenance-gated durable writes remain a CLI feature for now.
+    from chimera.governance import TaintLedger, ledger_registry
+
+    registry = ledger_registry(default_registry(ws), TaintLedger(), narrow_on_taint=False)
     # insist_on_action: solve is task completion, so a described-but-unexecuted plan is pushed back
     # to actually run (mirrors the CLI worker config).
     cfg = AgentConfig(model=req.model, max_steps=6, insist_on_action=True)
