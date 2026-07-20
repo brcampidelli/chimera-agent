@@ -138,6 +138,14 @@ def test_default_registry_gates_every_host_exec_door(monkeypatch: pytest.MonkeyP
 
     monkeypatch.setenv("CHIMERA_HOST_EXEC", "deny")
     monkeypatch.setenv("CHIMERA_SANDBOX", "docker")  # a config that is NOT proof of isolation
+    # ...and pin that "not proof" rather than inheriting it from the machine. `sandbox_is_isolated`
+    # asks the Docker daemon at runtime, so without this the test asserts different things in
+    # different places: on a box with no daemon the sandbox falls back to the host and the gate
+    # fires (what we want to prove), while on one WITH a daemon the command runs contained and the
+    # gate is correctly skipped — so this failed only on CI runners, which have Docker. Forcing the
+    # not-isolated answer tests the gap that matters: docker configured, isolation absent.
+    monkeypatch.setattr(RunShellTool, "_sandbox_is_isolated", staticmethod(lambda _s: False))
+    monkeypatch.setattr("chimera.tools.code.sandbox_is_isolated", lambda _s: False)
     get_settings.cache_clear()
     try:
         registry = default_registry()
@@ -150,6 +158,34 @@ def test_default_registry_gates_every_host_exec_door(monkeypatch: pytest.MonkeyP
             out = registry.get(name).run(**kwargs)
             assert "declined" in out.lower(), f"{name} ran on the host under deny"
             assert "PWNED" not in out
+    finally:
+        get_settings.cache_clear()
+
+
+def test_real_isolation_lets_the_sandboxed_doors_run_but_not_the_interpreter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The other half of the contract, which no test covered: isolation ACTUALLY present.
+
+    `deny` means "never on the host" — not "never". When the daemon is genuinely reachable, the
+    shell/code doors run inside the container and the gate is rightly skipped; only
+    ``code_interpreter`` stays shut, because it ``exec()``s in this process and a container being up
+    never excuses it. Pinning this stops a future change from silently turning the isolation escape
+    into a bypass of `deny` for the interpreter too — the case the CI failure made visible.
+    """
+    from chimera.config import get_settings
+
+    monkeypatch.setenv("CHIMERA_HOST_EXEC", "deny")
+    monkeypatch.setenv("CHIMERA_SANDBOX", "docker")
+    monkeypatch.setattr(RunShellTool, "_sandbox_is_isolated", staticmethod(lambda _s: True))
+    monkeypatch.setattr("chimera.tools.code.sandbox_is_isolated", lambda _s: True)
+    get_settings.cache_clear()
+    try:
+        gate = resolve_host_exec_confirm(_Settings("docker", "deny"), interactive=False)
+        # The interpreter has no isolation escape: still refused, container or not.
+        out = CodeInterpreterTool(confirm=gate).run(code="print('PWNED_VIA_INTERPRETER')")
+        assert "declined" in out.lower()
+        assert "PWNED" not in out
     finally:
         get_settings.cache_clear()
 
