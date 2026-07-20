@@ -4,6 +4,34 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.34.1] - 2026-07-20
+
+Patch release: as of 0.34.0, installing Chimera was broken on Windows and macOS, and building it
+from a clone was broken everywhere. Both are fixed here. No feature changes — everything else on
+`main` waits for the next scheduled minor.
+
+### Fixed
+- **`pip install chimera-agent` works again on Windows and macOS.** litellm 1.92 (2026-07-12) moved to
+  a compiled Rust core and publishes wheels **only** for manylinux — no Windows, no macOS, no
+  pure-Python fallback. Since our dependency had no upper bound, pip resolved to 1.93.0 on every
+  platform, found no usable wheel off Linux, fell back to the sdist and demanded a Rust toolchain +
+  maturin. Anyone on Windows or macOS installing since 2026-07-12 hit a compiler error. Pinned to
+  `litellm>=1.40,<1.92` — 1.91.4 is the last release with a `py3-none-any` wheel, so it installs
+  anywhere. The ceiling comes off as soon as upstream ships Windows/macOS wheels again.
+  Note this means Python 3.11–3.13 in practice (litellm 1.91.4 requires `<3.14`).
+- **Building from a clone works again** — `pip install -e .`, `pip install .`, `uv sync` and
+  `docker build`. The wheel config force-included `apps/desktop/dist`, a gitignored build artifact
+  absent from every fresh checkout, and Hatchling aborts with `Forced include not found` when a
+  forced include is missing — so the build backend died before anything else ran. It was invisible to
+  us because a dev machine has that directory built and PyPI wheels are produced after the SPA is
+  built. Now declared in a build hook that applies only when the SPA actually exists; a wheel without
+  it degrades as designed (the CLI falls back to a source-checkout dist, then to API-only).
+
+### Changed
+- `uv.lock` is now committed. Chimera is an application, so a pinned resolution is what makes a CI run
+  reproducible; without it every job re-resolved from PyPI and silently picked up litellm 1.92 the day
+  it landed, turning the whole matrix red with no change of ours.
+
 ## [0.34.0] - 2026-07-16
 
 ### Added
