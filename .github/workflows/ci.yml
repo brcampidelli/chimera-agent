@@ -71,9 +71,10 @@ jobs:
 
   install-smoke:
     name: clean pip install (${{ matrix.os }} · py${{ matrix.python-version }})
-    # `quality` uses `uv sync` (the locked resolution, which is clean everywhere). This job instead does
-    # a FRESH `pip install` — pip re-resolves from PyPI and can backtrack a transitive (e.g. a litellm
-    # dep) onto a version lacking a wheel for this OS/Python, falling to an sdist that needs a compiler.
+    # `quality` uses `uv sync` against the committed uv.lock — a pinned resolution, identical on every
+    # run. This job instead does a FRESH `pip install`, which re-resolves from PyPI and can land on a
+    # version lacking a wheel for this OS/Python, falling to an sdist that needs a compiler. That is not
+    # hypothetical: litellm 1.92 went manylinux-only, which is why the dependency now carries a ceiling.
     # Testing the extremes (Windows/macOS × oldest+newest supported Python) catches that class before a
     # user hits it. The wheel is pure-Python, so success here means "a plain `pip install` just works".
     runs-on: ${{ matrix.os }}

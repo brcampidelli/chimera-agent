@@ -27,7 +27,12 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-    "litellm>=1.40",
+    # Ceiling, not preference: 1.92 moved litellm to a compiled Rust core and publishes wheels ONLY
+    # for manylinux (x86_64/aarch64) — no Windows, no macOS. On those platforms pip falls back to the
+    # sdist, which needs a Rust toolchain + maturin and fails on a normal machine. 1.91.4 is the last
+    # release with a pure-Python `py3-none-any` wheel, so it installs everywhere. Lift this the moment
+    # upstream ships Windows/macOS wheels again.
+    "litellm>=1.40,<1.92",
     "pydantic>=2.7",
     "pydantic-settings>=2.3",
     "typer>=0.12",
