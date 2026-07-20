@@ -9,7 +9,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/chimera-agent.svg?color=blue&label=PyPI)](https://pypi.org/project/chimera-agent/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
+[![Python 3.11-3.13](https://img.shields.io/badge/python-3.11--3.13-blue.svg)](https://www.python.org/)
 [![CI](https://github.com/brcampidelli/chimera-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/brcampidelli/chimera-agent/actions/workflows/ci.yml)
 [![Checked with mypy](https://img.shields.io/badge/mypy-strict-2a6db2.svg)](https://mypy-lang.org/)
 [![Linted with Ruff](https://img.shields.io/badge/lint-ruff-261230.svg)](https://github.com/astral-sh/ruff)
@@ -129,7 +129,7 @@ Dollar-Zahl auszugeben.
 
 ## Schnellstart
 
-Du brauchst **Python 3.11+** und [uv](https://docs.astral.sh/uv/) (einen schnellen Python-Installer).
+Du brauchst **Python 3.11–3.13** und [uv](https://docs.astral.sh/uv/) (einen schnellen Python-Installer).
 
 **1. Installieren** — von PyPI:
 ```bash
@@ -227,7 +227,7 @@ Spalte „Braucht"). **Docker? Das offizielle Image enthält bereits alles unten
 > Beispiel: `pip install 'chimera-agent[documents,stt]'`.
 
 ### Zum ersten Mal? Sechs Schritte für Einsteiger
-1. **Installiere Python 3.11+** ([python.org](https://www.python.org/downloads/)); prüfe mit `python --version`.
+1. **Installiere Python 3.11–3.13** ([python.org](https://www.python.org/downloads/)); prüfe mit `python --version`.
 2. **Installiere Chimera:** `pip install 'chimera-agent[full]'` (oder nur `chimera-agent` für den schlanken Kern).
 3. **Hol dir einen KI-Schlüssel** — ein [OpenRouter](https://openrouter.ai)-Schlüssel ist am einfachsten (ein Schlüssel → 100+ Modelle).
 4. **Gib Chimera den Schlüssel:** kopiere `.env.example` nach `.env`, setze `CHIMERA_OPENROUTER_KEYS=sk-or-...`.
