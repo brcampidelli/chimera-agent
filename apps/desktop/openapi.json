@@ -499,6 +499,48 @@
         "title": "CancelOut",
         "type": "object"
       },
+      "ChatCompletionRequest": {
+        "additionalProperties": true,
+        "description": "The subset of the OpenAI request we act on.\n\n``extra=\"allow\"`` is deliberate: real clients send ``temperature``, ``top_p``, ``seed``,\n``max_tokens``, ``stream_options`` and more. Rejecting unknown fields with a 422 would break every\nharness for no benefit, so unsupported knobs are accepted and ignored rather than faked \u2014 the loop\ndecides its own sampling per step, and pretending to honour ``temperature`` would be a lie.",
+        "properties": {
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            },
+            "title": "Messages",
+            "type": "array"
+          },
+          "model": {
+            "default": "chimera",
+            "title": "Model",
+            "type": "string"
+          },
+          "stream": {
+            "default": false,
+            "title": "Stream",
+            "type": "boolean"
+          }
+        },
+        "title": "ChatCompletionRequest",
+        "type": "object"
+      },
+      "ChatMessage": {
+        "additionalProperties": true,
+        "description": "One OpenAI chat message. ``content`` may be a string or the multimodal part list.",
+        "properties": {
+          "content": {
+            "default": "",
+            "title": "Content"
+          },
+          "role": {
+            "default": "user",
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "title": "ChatMessage",
+        "type": "object"
+      },
       "ChatRequest": {
         "properties": {
           "fuse": {
@@ -4680,6 +4722,65 @@
           }
         },
         "summary": "Version Endpoint"
+      }
+    },
+    "/v1/chat/completions": {
+      "post": {
+        "operationId": "chat_completions_v1_chat_completions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatCompletionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Chat Completions V1 Chat Completions Post"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Chat Completions"
+      }
+    },
+    "/v1/models": {
+      "get": {
+        "description": "The catalog, as OpenAI-shaped model ids \u2014 so `client.models.list()` works.",
+        "operationId": "list_models_v1_models_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Models V1 Models Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Models"
       }
     }
   }

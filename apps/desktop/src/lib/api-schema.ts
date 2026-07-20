@@ -827,6 +827,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/chat/completions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Chat Completions */
+        post: operations["chat_completions_v1_chat_completions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Models
+         * @description The catalog, as OpenAI-shaped model ids — so `client.models.list()` works.
+         */
+        get: operations["list_models_v1_models_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1017,6 +1054,49 @@ export interface components {
         CancelOut: {
             /** Ok */
             ok: boolean;
+        };
+        /**
+         * ChatCompletionRequest
+         * @description The subset of the OpenAI request we act on.
+         *
+         *     ``extra="allow"`` is deliberate: real clients send ``temperature``, ``top_p``, ``seed``,
+         *     ``max_tokens``, ``stream_options`` and more. Rejecting unknown fields with a 422 would break every
+         *     harness for no benefit, so unsupported knobs are accepted and ignored rather than faked — the loop
+         *     decides its own sampling per step, and pretending to honour ``temperature`` would be a lie.
+         */
+        ChatCompletionRequest: {
+            /** Messages */
+            messages?: components["schemas"]["ChatMessage"][];
+            /**
+             * Model
+             * @default chimera
+             */
+            model: string;
+            /**
+             * Stream
+             * @default false
+             */
+            stream: boolean;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * ChatMessage
+         * @description One OpenAI chat message. ``content`` may be a string or the multimodal part list.
+         */
+        ChatMessage: {
+            /**
+             * Content
+             * @default
+             */
+            content: unknown;
+            /**
+             * Role
+             * @default user
+             */
+            role: string;
+        } & {
+            [key: string]: unknown;
         };
         /** ChatRequest */
         ChatRequest: {
@@ -3367,6 +3447,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VersionOut"];
+                };
+            };
+        };
+    };
+    chat_completions_v1_chat_completions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatCompletionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_models_v1_models_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };

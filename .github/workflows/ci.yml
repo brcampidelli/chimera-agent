@@ -66,7 +66,10 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: uv sync --extra dev --extra mcp
+        # `desktop` is needed even though this job only runs `-m integration`: pytest IMPORTS every
+        # test module before the marker filter selects any, so the FastAPI-dependent suites make
+        # collection die with ModuleNotFoundError before a single integration test is chosen.
+        run: uv sync --extra dev --extra mcp --extra desktop
 
       - name: Integration smoke test
         env:
