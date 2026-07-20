@@ -10,7 +10,9 @@ dist/
 # Virtual envs / uv
 .venv/
 .uv/
-uv.lock
+# uv.lock IS tracked: Chimera is an application, so a committed lock is what makes a CI run
+# reproducible. Without it every job re-resolved from PyPI, and an upstream release could turn the
+# whole matrix red with no change of ours (litellm 1.92 did exactly that).
 
 # Env / secrets
 .env
