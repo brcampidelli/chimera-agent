@@ -116,6 +116,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   releases in a single day. The manifest-assembly job now runs on a manual dry run too, so the updater
   `latest.json` can be tested without publishing — the friction that caused three of those nine.
 
+## [0.34.1] - 2026-07-20
+
+Patch cut from the `v0.34.0` tag (branch `release/v0.34.1`), carrying only the two install fixes so
+the features above wait for the next scheduled minor. Both fixes are already on `main` — this entry
+exists so the published history has no gap.
+
+### Fixed
+- **`pip install chimera-agent` works again on Windows and macOS.** litellm 1.92 (2026-07-12) went
+  manylinux-only; with no upper bound, pip resolved to 1.93.0 everywhere, found no usable wheel off
+  Linux and fell back to an sdist needing Rust + maturin. Capped at `litellm>=1.40,<1.92` (1.91.4 is
+  the last `py3-none-any` wheel). Implies Python 3.11–3.13 in practice.
+- **Building from a clone works again** (`pip install -e .`, `uv sync`, `docker build`): the wheel
+  force-included `apps/desktop/dist`, a gitignored artifact absent from every checkout, so Hatchling
+  aborted with `Forced include not found`. Now a build hook that applies only when the SPA exists.
+
 ## [0.34.0] - 2026-07-16
 
 ### Added
