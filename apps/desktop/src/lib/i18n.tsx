@@ -103,6 +103,8 @@ const en: Dict = {
   "settings.row.backend": "Backend",
   "settings.row.semantic": "Semantic recall",
   "settings.hint.semantic": "embeddings, falls back to FTS",
+  "settings.row.rememberChat": "Remember from chat",
+  "settings.hint.rememberChat": "an explicit \"remember that…\" saves a durable fact",
   "settings.row.completionCache": "Completion cache",
   "settings.hint.completionCache": "deterministic (temp=0) requests only",
   "settings.row.sandbox": "Sandbox",
@@ -130,7 +132,7 @@ const en: Dict = {
   "memory.layers.semanticOff":
     "Semantic embeddings layer is off (opt-in) — these are per-kind fact counts, not a vector index.",
   "memory.layers.empty":
-    "Memory fills from a manual \"Add Fact\" or from the CLI (solve / consolidation) sharing this home — the desktop chat itself doesn't write durable memory.",
+    "Memory fills from a manual \"Add Fact\", from the CLI (solve / consolidation) sharing this home, or — with \"Remember from chat\" on in Settings — from an explicit \"remember that…\" in a conversation.",
   "skills.title": "Skills",
   "skills.learned": "Learned skills",
   "skills.retire": "Retire",
@@ -528,6 +530,8 @@ const pt: Dict = {
   "settings.row.backend": "Backend",
   "settings.row.semantic": "Recuperação semântica",
   "settings.hint.semantic": "embeddings, com fallback para FTS",
+  "settings.row.rememberChat": "Lembrar do chat",
+  "settings.hint.rememberChat": "um \"lembre que…\" explícito grava um fato duradouro",
   "settings.row.completionCache": "Cache de respostas",
   "settings.hint.completionCache": "apenas requisições determinísticas (temp=0)",
   "settings.row.sandbox": "Sandbox",
@@ -555,7 +559,7 @@ const pt: Dict = {
   "memory.layers.semanticOff":
     "Camada de embeddings semânticos desativada (opt-in) — os números são por tipo de fato, não um índice vetorial.",
   "memory.layers.empty":
-    "A memória é preenchida por um \"Adicionar um fato\" manual ou pela CLI (solve / consolidação) que compartilham este home — o chat do desktop em si não grava memória duradoura.",
+    "A memória é preenchida por um \"Adicionar um fato\" manual, pela CLI (solve / consolidação) que compartilha este home, ou — com \"Lembrar do chat\" ativo nas Configurações — por um \"lembre que…\" explícito numa conversa.",
   "skills.title": "Habilidades",
   "skills.learned": "Habilidades aprendidas",
   "skills.retire": "Aposentar",

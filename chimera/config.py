@@ -301,6 +301,12 @@ class Settings(BaseSettings):
     # after reading the web (and accept that a laundered injection could steer those tools).
     taint_narrow: bool = Field(default=True, validation_alias="CHIMERA_TAINT_NARROW")
 
+    # Let the chat build durable memory when the user explicitly asks ("remember that…"). Opt-in for
+    # privacy: chatting should not silently persist unless you asked it to. Off = the prior behaviour
+    # where the desktop chat never wrote memory. Only explicit requests are captured — never automatic
+    # extraction, which would pollute the store.
+    remember_from_chat: bool = Field(default=False, validation_alias="CHIMERA_CHAT_MEMORY")
+
     # Run the cron daemon inside `chimera app` (the desktop backend), so scheduled jobs fire while
     # the app is open — the whole point of a proactive assistant. Defaults ON: a "briefing at 7am"
     # should just work once you've scheduled it, without a separate `chimera serve --cron` terminal

@@ -205,3 +205,42 @@ def test_send_verbose_surfaces_the_memory_layer(tmp_path: Path) -> None:
     report = session.send_verbose("what does Alex prefer?")
     assert report.memory_facts_used >= 1
     assert report.memory_layer == "keyword"  # the layer that produced the hit, surfaced honestly
+
+
+class _VerboseAgent:
+    """A fake agent whose run() accepts the send_verbose callbacks (on_token/on_tool)."""
+
+    def run(self, task: str, **_kwargs: object) -> AgentResult:
+        return AgentResult(answer="ok", steps=1, stopped_reason="final")
+
+
+def test_chat_writes_durable_memory_on_an_explicit_request(tmp_path: Path) -> None:
+    # Opt-in ON: "remember that…" persists a fact and the report says what was saved.
+    memory = MemoryManager(MemoryStore(tmp_path / "m.json"))
+    session = ChatSession(_VerboseAgent(), memory=memory, remember_from_chat=True)
+
+    report = session.send_verbose("remember that I'm allergic to peanuts")
+
+    assert report.memory_saved == "I'm allergic to peanuts"
+    assert any("allergic to peanuts" in it.content for it in memory.store.all())
+
+
+def test_chat_does_not_write_memory_when_the_toggle_is_off(tmp_path: Path) -> None:
+    memory = MemoryManager(MemoryStore(tmp_path / "m.json"))
+    session = ChatSession(_VerboseAgent(), memory=memory, remember_from_chat=False)
+
+    report = session.send_verbose("remember that I'm allergic to peanuts")
+
+    assert report.memory_saved is None
+    assert memory.store.all() == []  # nothing persisted
+
+
+def test_chat_ignores_ordinary_turns_even_with_the_toggle_on(tmp_path: Path) -> None:
+    # A normal message must not persist — only explicit requests do.
+    memory = MemoryManager(MemoryStore(tmp_path / "m.json"))
+    session = ChatSession(_VerboseAgent(), memory=memory, remember_from_chat=True)
+
+    report = session.send_verbose("what's the weather like?")
+
+    assert report.memory_saved is None
+    assert memory.store.all() == []

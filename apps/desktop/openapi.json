@@ -1720,6 +1720,10 @@
             "title": "Backend",
             "type": "string"
           },
+          "remember_from_chat": {
+            "title": "Remember From Chat",
+            "type": "boolean"
+          },
           "semantic": {
             "title": "Semantic",
             "type": "boolean"
@@ -1728,7 +1732,8 @@
         "required": [
           "backend",
           "semantic",
-          "auto_consolidate"
+          "auto_consolidate",
+          "remember_from_chat"
         ],
         "title": "MemoryCfgOut",
         "type": "object"

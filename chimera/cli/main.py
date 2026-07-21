@@ -1016,7 +1016,13 @@ def serve(
         if http_send_tool is not None:
             registry.register(http_send_tool)
         runner = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
-        return ChatSession(runner, memory=shared_memory, graph=shared_graph, profile=shared_profile)
+        return ChatSession(
+            runner,
+            memory=shared_memory,
+            graph=shared_graph,
+            profile=shared_profile,
+            remember_from_chat=settings.remember_from_chat,
+        )
 
     message_gateway = MessageGateway(factory)
     a2a_pair = _build_a2a(backend, model, max_steps, workspace_path, host, port) if a2a else None
@@ -1173,7 +1179,13 @@ def desktop_app(
         if mcp_connectors is not None:
             mcp_connectors.into_tool_registry(registry)  # MCP tools alongside the builtins
         runner = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
-        return ChatSession(runner, memory=shared_memory, graph=shared_graph, profile=shared_profile)
+        return ChatSession(
+            runner,
+            memory=shared_memory,
+            graph=shared_graph,
+            profile=shared_profile,
+            remember_from_chat=settings.remember_from_chat,
+        )
 
     # The built SPA, if present, is served same-origin (no CORS). Absent = API-only (dev uses Vite).
     # Prefer a source-checkout build (live `npm run build` output); fall back to the copy bundled in the

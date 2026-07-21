@@ -1525,6 +1525,8 @@ export interface components {
             auto_consolidate: boolean;
             /** Backend */
             backend: string;
+            /** Remember From Chat */
+            remember_from_chat: boolean;
             /** Semantic */
             semantic: boolean;
         };

@@ -77,6 +77,9 @@ class TurnReport:
     stopped_reason: str = ""
     # Per-turn fusion/cascade trace from the backend (UI-ready JSON), or None for a single-model turn.
     route_meta: dict[str, Any] | None = None
+    # The fact this turn saved to durable memory (an explicit "remember that…"), or None. Lets a UI
+    # confirm "remembered" honestly — set only when a fact was actually written.
+    memory_saved: str | None = None
 
 
 @dataclass
@@ -90,6 +93,10 @@ class ChatSession:
     profile: str = ""  # persistent user-profile preamble (persona facts), applied every turn
     max_history: int = 6
     memory_k: int = 3
+    # When True, an explicit "remember that…" in a message writes a durable fact (opt-in for privacy:
+    # chatting should not silently persist unless the user asked for it). Off keeps the prior
+    # behaviour where the desktop chat never wrote memory.
+    remember_from_chat: bool = False
     turns: list[ChatTurn] = field(default_factory=list)
 
     def send(self, message: str) -> str:
@@ -111,8 +118,10 @@ class ChatSession:
         facts, layer = self._recall(message)
         result = self.agent.run(self._assemble(message, facts), on_token=on_token, on_tool=on_tool)
         self._record(message, result.answer)
+        saved = self._maybe_remember(message)
         return TurnReport(
             answer=result.answer,
+            memory_saved=saved,
             prompt_tokens=result.prompt_tokens,
             completion_tokens=result.completion_tokens,
             cache_read_tokens=result.cache_read_tokens,
@@ -126,6 +135,27 @@ class ChatSession:
             stopped_reason=result.stopped_reason,
             route_meta=result.route_meta,
         )
+
+    def _maybe_remember(self, message: str) -> str | None:
+        """If enabled and the user explicitly asked to remember something, write it durably.
+
+        Conservative by design: only an explicit "remember that…" instruction is captured (see
+        :func:`chimera.memory.capture.parse_remember_request`) — never automatic extraction, which
+        would pollute memory. Duck-typed on ``remember`` so a search-only memory backend is simply
+        skipped; the write is deduped by the MemoryManager. Returns the fact saved, or None.
+        """
+        if not self.remember_from_chat or self.memory is None:
+            return None
+        write = getattr(self.memory, "remember", None)
+        if not callable(write):
+            return None
+        from chimera.memory.capture import parse_remember_request
+
+        fact = parse_remember_request(message)
+        if fact is None:
+            return None
+        write(fact, source="chat")  # deduped; clean provenance (the user asked for it directly)
+        return fact
 
     def _record(self, message: str, answer: str) -> None:
         self.turns.append(ChatTurn(user=message, assistant=answer))

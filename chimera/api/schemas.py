@@ -79,6 +79,7 @@ class MemoryCfgOut(BaseModel):
     backend: str
     semantic: bool
     auto_consolidate: bool
+    remember_from_chat: bool
 
 
 class CacheCfgOut(BaseModel):

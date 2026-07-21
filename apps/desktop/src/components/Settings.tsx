@@ -257,6 +257,12 @@ export function Settings() {
               onChange={(v) => save({ CHIMERA_SEMANTIC_MEMORY: String(v) })}
             />
           </Row>
+          <Row label={t("settings.row.rememberChat")} hint={t("settings.hint.rememberChat")}>
+            <Toggle
+              on={c.memory.remember_from_chat}
+              onChange={(v) => save({ CHIMERA_CHAT_MEMORY: String(v) })}
+            />
+          </Row>
         </Card>
 
         <Card title={t("settings.card.cacheSandbox")}>

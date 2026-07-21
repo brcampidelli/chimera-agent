@@ -92,6 +92,7 @@ def read_config(settings: Settings) -> dict[str, Any]:
             "backend": settings.memory_backend,
             "semantic": settings.semantic_memory,
             "auto_consolidate": settings.auto_consolidate,
+            "remember_from_chat": settings.remember_from_chat,
         },
         "cache": {"completion": settings.cache, "prompt": settings.prompt_cache},
         "sandbox": {"mode": settings.sandbox, "image": settings.sandbox_image},
