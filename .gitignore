@@ -25,6 +25,10 @@ dist/
 .ruff_cache/
 .cache/
 
+# mutmut's generated mutant tree (a full copy of the package with every mutant inlined). Rebuilt by
+# `mutmut run`; committing it would add tens of thousands of machine-written lines to the repo.
+mutants/
+
 # Chimera runtime data (state lives outside the LLM context)
 .chimera/
 data/
