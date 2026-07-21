@@ -247,6 +247,12 @@ only_mutate = [
     "chimera/core/verify.py",       # the pass/fail authority of verify-or-revert
     "chimera/evolution/diff_gate.py",  # the "did it actually change anything" gate
     "chimera/api/runs.py",          # receipt building: the reverted/success flags the UI reports
+    # Security enforcement, not just credibility: this module decides whether a command the
+    # model chose runs on YOUR machine. A silent bug here is a security bug, strictly worse
+    # than a wrong benchmark number — so it belongs inside the one gate that proves the
+    # tests can actually fail. (Adding it immediately found that the TTY auto-detection
+    # had no test at all: every mutant of that line survived.)
+    "chimera/sandbox/confirm.py",   # the host-exec gate: run on the host, or refuse
 ]
 pytest_add_cli_args_test_selection = [
     "tests/test_paired.py",       # -> chimera/eval/paired.py
@@ -256,6 +262,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_checkpoint.py",   # -> chimera/core/verify.py (CommandVerifier/NullVerifier)
     "tests/test_diff_gate.py",    # -> chimera/evolution/diff_gate.py
     "tests/test_runs.py",         # -> chimera/api/runs.py
+    "tests/test_host_exec_confirm.py",  # -> chimera/sandbox/confirm.py
 ]
 # mutmut runs the tests from a copied `mutants/` tree. tests/test_run_paired.py loads the paired
 # runner by path out of bench/, so that tree has to come along or the run can't even collect.

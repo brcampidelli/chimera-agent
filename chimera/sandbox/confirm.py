@@ -60,8 +60,16 @@ def _prompt(command: str) -> bool:
     try:
         import typer
 
+        # The three lines below are presentation: wording and terminal colour. Their mutants are
+        # allowlisted (see scripts/mutation_allowlist.toml) rather than asserted on, because pinning
+        # prose makes a brittle test. What IS asserted in tests/test_host_exec_confirm.py: the
+        # command being approved is shown, the human's answer is returned faithfully, the prompt
+        # defaults to NO, and a failure to ask refuses. The `confirm` call is NOT in that exemption —
+        # its `default=False` is the fail-safe (Enter must refuse, never approve), not decoration.
         typer.echo("")
-        typer.secho("⚠  The agent wants to run this on your machine (host, not a sandbox):", fg="yellow")
+        typer.secho(
+            "⚠  The agent wants to run this on your machine (host, not a sandbox):", fg="yellow"
+        )
         typer.secho(f"    {command}", fg="cyan")
         return bool(typer.confirm("Run it?", default=False))
     except Exception:  # noqa: BLE001 — no TTY / typer missing: fail safe (do not run)

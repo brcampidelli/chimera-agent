@@ -227,9 +227,17 @@ def test_resolver_allow_is_ungated() -> None:
 
 
 def test_resolver_deny_refuses() -> None:
+    import chimera.sandbox.confirm as confirm_mod
+
     gate = resolve_host_exec_confirm(_Settings("local", "deny"), interactive=True)
     assert gate is not None
     assert gate("anything") is False  # deny never runs on the host
+    # ...and it must be THE deny gate, not merely something that happens to return False. Mutation
+    # testing showed the behavioural assertion alone was vacuous: mutating the "deny" literal makes
+    # the posture fall through to `ask`, which interactively resolves to `_prompt` — and `_prompt`
+    # with no TTY also returns False, so the old test passed against a broken gate. Interactively,
+    # `deny` must refuse outright, never prompt.
+    assert gate is confirm_mod._deny
 
 
 def test_resolver_ask_headless_refuses() -> None:
@@ -305,3 +313,122 @@ def test_resolver_ask_interactive_returns_a_prompt() -> None:
     # We can't drive a real TTY here; assert it resolves to a (non-None) prompt callback.
     gate = resolve_host_exec_confirm(_Settings("local", "ask"), interactive=True)
     assert gate is not None
+
+
+# --- _prompt: the interactive confirmation itself -----------------------------------------------
+# Mutation testing (2026-07-20) reported every _prompt mutant as "[no tests]" — the function that
+# actually asks the human was exercised by nothing. The message wording is not worth asserting on,
+# but its BEHAVIOUR is: it must return what the human answered, and it must fail SAFE.
+
+
+def _fake_typer(
+    monkeypatch: pytest.MonkeyPatch, *, answer: bool | Exception
+) -> tuple[list[str], dict[str, object]]:
+    """Install a stand-in typer. Returns (what would have been shown, the confirm() kwargs)."""
+    import typer
+
+    shown: list[str] = []
+    seen_kwargs: dict[str, object] = {}
+    monkeypatch.setattr(typer, "echo", lambda *a, **k: shown.append(str(a[0]) if a else ""))
+    monkeypatch.setattr(typer, "secho", lambda *a, **k: shown.append(str(a[0]) if a else ""))
+
+    def _confirm(*_a: object, **kwargs: object) -> bool:
+        seen_kwargs.update(kwargs)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    monkeypatch.setattr(typer, "confirm", _confirm)
+    return shown, seen_kwargs
+
+
+def test_prompt_returns_the_human_answer(monkeypatch: pytest.MonkeyPatch) -> None:
+    import chimera.sandbox.confirm as confirm_mod
+
+    shown, kwargs = _fake_typer(monkeypatch, answer=True)
+    assert confirm_mod._prompt("rm -rf /tmp/x") is True
+    # The command itself must be shown — the human is approving THAT, not a generic question.
+    assert any("rm -rf /tmp/x" in line for line in shown)
+    # And the prompt must default to NO. This is the fail-safe at the UI level: someone who just
+    # hits Enter (or holds it down through a batch) must not thereby approve running a command on
+    # their machine. Mutation testing flagged `default=True` as an undetected change — it is the
+    # difference between "Enter refuses" and "Enter approves", and nothing was asserting it.
+    assert kwargs.get("default") is False
+
+    _, _ = _fake_typer(monkeypatch, answer=False)
+    assert confirm_mod._prompt("rm -rf /tmp/x") is False
+
+
+def test_prompt_fails_safe_when_it_cannot_ask(monkeypatch: pytest.MonkeyPatch) -> None:
+    # No TTY (or any other failure inside typer) must refuse, never fall through to running the
+    # command. This is the single most important property of the interactive gate.
+    import chimera.sandbox.confirm as confirm_mod
+
+    _, _ = _fake_typer(monkeypatch, answer=RuntimeError("no tty"))
+    assert confirm_mod._prompt("anything") is False
+
+
+# --- TTY auto-detection (interactive=None): the production path --------------------------------
+# Mutation testing (2026-07-20) showed EVERY mutant of the isatty line surviving: every test passed
+# `interactive=` explicitly, so the auto-detection was never executed. That line decides
+# confirm-vs-refuse whenever a caller does not pass the flag — i.e. in production — and a mutant
+# flipping its default (lambda: True) or misspelling the attribute would have shipped unnoticed.
+
+
+class _FakeStdin:
+    """A stdin stand-in whose isatty answer (or absence) we control."""
+
+    def __init__(self, tty: bool) -> None:
+        self._tty = tty
+
+    def isatty(self) -> bool:
+        return self._tty
+
+
+def test_auto_detect_tty_resolves_to_the_interactive_prompt(monkeypatch: pytest.MonkeyPatch) -> None:
+    import chimera.sandbox.confirm as confirm_mod
+
+    monkeypatch.setattr(confirm_mod.sys, "stdin", _FakeStdin(tty=True))
+    gate = resolve_host_exec_confirm(_Settings("local", "ask"))  # no explicit `interactive`
+    assert gate is confirm_mod._prompt
+
+
+def test_auto_detect_no_tty_refuses(monkeypatch: pytest.MonkeyPatch) -> None:
+    import chimera.sandbox.confirm as confirm_mod
+
+    monkeypatch.setattr(confirm_mod.sys, "stdin", _FakeStdin(tty=False))
+    gate = resolve_host_exec_confirm(_Settings("local", "ask"))
+    assert gate is not None
+    assert gate("echo hi") is False  # the headless refusal, resolved without being told
+
+
+def test_auto_detect_stdin_without_isatty_is_treated_as_headless(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A stdin replacement lacking isatty entirely (a captured/piped stream, some test harnesses)
+    # must fall to the SAFE side — non-interactive, therefore refuse — and never raise.
+    import chimera.sandbox.confirm as confirm_mod
+
+    class _NoIsatty:
+        pass
+
+    monkeypatch.setattr(confirm_mod.sys, "stdin", _NoIsatty())
+    gate = resolve_host_exec_confirm(_Settings("local", "ask"))
+    assert gate is not None
+    assert gate("echo hi") is False
+    # Identity matters here for the same reason as in the deny test: if the missing-isatty default
+    # flipped to True we would resolve to the interactive `_prompt`, which ALSO returns False
+    # without a TTY — so only checking the return value would pass against the wrong gate.
+    assert gate is not confirm_mod._prompt
+
+
+def test_sandbox_without_is_isolated_is_treated_as_host(tmp_path: Path) -> None:
+    # Companion gap the same mutation run found: `getattr(sandbox, "is_isolated", None)` loses its
+    # default under mutation, so a sandbox object with NO is_isolated attribute would raise instead
+    # of being treated as host. The existing test only covered a non-CALLABLE attribute.
+    class _Bare:
+        def run(self, command: str, *, timeout: int = 60, cwd: Path | None = None) -> SandboxResult:
+            return SandboxResult(exit_code=0, stdout="ran")
+
+    tool = RunShellTool(tmp_path, _Bare(), confirm=lambda _cmd: False)
+    assert "declined" in tool.run(command="echo hi").lower()  # host → gated, no AttributeError

@@ -40,3 +40,37 @@
 "chimera.evolution.diff_gate.x__normalize__mutmut_13"      = "join separator '\\n' -> 'XX\\nXX'. _normalize's only callers (diff_gate.py:87 `== \"\"`, :99 `!=`) compare its output; the separator cancels in both, so no observable behaviour changes. Verified by reading every caller."
 "chimera.evolution.diff_gate.x_diff_snapshots__mutmut_18"  = "set op `after.present & before.present` -> `|`. Files added by the union exist on only one side, so `before/after.files.get()` returns None and the None-guard `continue`s them; the `modified` list is identical. Verified empirically."
 "chimera.evolution.diff_gate.x_unified_diffs__mutmut_33"    = "FileDiff(..., truncated=False) -> kwarg omitted. FileDiff.truncated defaults to False, so omitting it is identical."
+
+# --- sandbox.confirm: the host-execution gate (the posture that decides run-vs-refuse).
+"chimera.sandbox.confirm.x_resolve_host_exec_confirm__mutmut_6" = "Default posture string 'ask' -> 'XXaskXX'. The branch order is allow / deny / else-ask, so ANY unrecognised value already falls through to the ask path — mutating the default cannot change the resolved gate. Equivalent by construction (and that fall-through is itself tested)."
+"chimera.sandbox.confirm.x_resolve_host_exec_confirm__mutmut_7" = "Default posture string 'ask' -> 'ASK'. `.lower()` is applied on the next expression, so the two are the same value. Equivalent."
+"chimera.sandbox.confirm.x_resolve_host_exec_confirm__mutmut_25" = "getattr default `lambda: False` -> `lambda: None`. The call is wrapped in bool(), and bool(None) == bool(False) == False, so the resolved posture is identical. Equivalent."
+# _prompt's terminal output: wording, capitalisation and colour. All 14 are presentation-only —
+# none changes what the function RETURNS. The behavioural mutants of this same function (return
+# True, bool(None), default=True, dropping the confirm text) are all KILLED by
+# tests/test_host_exec_confirm.py, which asserts the command is shown, the answer is returned, the
+# prompt defaults to NO, and that failing to ask refuses. Asserting on prose instead would pin
+# wording and break on every copy edit.
+"chimera.sandbox.confirm.x__prompt__mutmut_1"  = "typer.echo('') -> echo(None): the blank spacer line. Cosmetic."
+"chimera.sandbox.confirm.x__prompt__mutmut_2"  = "typer.echo('') -> echo('XXXX'): the blank spacer line. Cosmetic."
+"chimera.sandbox.confirm.x__prompt__mutmut_3"  = "Warning text -> None. Presentation; the command being approved is printed by the NEXT secho and IS asserted."
+"chimera.sandbox.confirm.x__prompt__mutmut_4"  = "Warning colour fg='yellow' -> None. Terminal colour only."
+"chimera.sandbox.confirm.x__prompt__mutmut_5"  = "Warning text argument dropped (colour kept). Presentation; the command line still prints and is asserted."
+"chimera.sandbox.confirm.x__prompt__mutmut_6"  = "Warning colour argument dropped. Terminal colour only."
+"chimera.sandbox.confirm.x__prompt__mutmut_7"  = "Warning text wrapped in mutmut's XX..XX marker. Wording only."
+"chimera.sandbox.confirm.x__prompt__mutmut_8"  = "Warning text lower-cased. Wording only."
+"chimera.sandbox.confirm.x__prompt__mutmut_9"  = "Warning text upper-cased. Wording only."
+"chimera.sandbox.confirm.x__prompt__mutmut_11" = "Warning colour 'yellow' -> 'YELLOW'. Colour name case; click/typer resolves it the same, and colour is not behaviour."
+"chimera.sandbox.confirm.x__prompt__mutmut_13" = "Command line colour fg='cyan' -> None. Colour only; the command text itself is asserted."
+"chimera.sandbox.confirm.x__prompt__mutmut_15" = "Command line colour argument dropped. Colour only; the command text itself is asserted."
+"chimera.sandbox.confirm.x__prompt__mutmut_16" = "Command line colour 'cyan' -> 'XXcyanXX'. Colour only."
+"chimera.sandbox.confirm.x__prompt__mutmut_17" = "Command line colour 'cyan' -> 'CYAN'. Colour name case only."
+"chimera.sandbox.confirm.x__make_headless_deny__mutmut_1" = "warn-once flag initialised `warned = False` -> `None`. The only read is `if not warned`, and both are falsy, so the first call still warns and later ones still do not. Equivalent."
+# The confirm QUESTION's wording/colour. Note every one of these keeps `default=False` — the
+# fail-safe is asserted by test_prompt_returns_the_human_answer, so what remains here is prose.
+"chimera.sandbox.confirm.x__prompt__mutmut_10" = "Warning colour 'yellow' -> 'XXyellowXX'. Terminal colour only."
+"chimera.sandbox.confirm.x__prompt__mutmut_19" = "Confirm question text -> None. Wording only; the default (False) and the returned answer are asserted."
+"chimera.sandbox.confirm.x__prompt__mutmut_21" = "Confirm question text argument dropped. Wording only; default=False preserved and asserted."
+"chimera.sandbox.confirm.x__prompt__mutmut_23" = "Confirm question wrapped in mutmut's XX..XX marker. Wording only."
+"chimera.sandbox.confirm.x__prompt__mutmut_24" = "Confirm question lower-cased. Wording only."
+"chimera.sandbox.confirm.x__prompt__mutmut_25" = "Confirm question upper-cased. Wording only."
