@@ -94,11 +94,30 @@ def run_isolated(
 
     results: dict[str, IsolatedResult[T]] = {}
     try:
-        with ThreadPoolExecutor(max_workers=min(max_workers, len(units))) as pool:
+        # `timeout` is a deadline for the WHOLE batch, not per unit: it must be passed to
+        # as_completed, which is what actually waits. Passing it only to future.result() (the old
+        # code) bounded nothing — as_completed yields futures that have ALREADY finished, so its
+        # result() never waits and the TimeoutError branch was unreachable. A single hung unit
+        # blocked the iteration forever, which is precisely what this parameter exists to prevent.
+        pool = ThreadPoolExecutor(max_workers=min(max_workers, len(units)))
+        try:
             futures = {pool.submit(fn, paths[name]): name for name, fn in units}
-            for future in as_completed(futures):
-                name = futures[future]
-                results[name] = _collect(name, future, trees[name], succeeded, timeout)
+            try:
+                for future in as_completed(futures, timeout=timeout):
+                    name = futures[future]
+                    results[name] = _collect(name, future, trees[name], succeeded, timeout)
+            except TimeoutError:
+                for future, name in futures.items():
+                    if name in results:
+                        continue
+                    future.cancel()  # only helps if it has not started
+                    results[name] = IsolatedResult(name, ok=False, error=f"timed out after {timeout}s")
+        finally:
+            # Do NOT wait here. Python cannot kill a running thread, so waiting on a hung unit is
+            # the very hang the timeout exists to prevent — the batch would return late or never.
+            # Queued units are cancelled; a unit already running is abandoned to die with the
+            # process, and its slot is reported as a timeout above.
+            pool.shutdown(wait=False, cancel_futures=True)
         conflicts, merged = _merge_back(workspace, trees, results)
     finally:
         for tree in trees.values():
@@ -171,14 +190,25 @@ def run_in_processes(
     if not units:
         return []
     out: dict[str, IsolatedResult[T]] = {}
-    with ProcessPoolExecutor(max_workers=min(max_workers, len(units))) as pool:
+    # As in run_isolated: the deadline belongs on as_completed (the call that waits), not on
+    # future.result() of an already-finished future. Without it the documented "hangs past timeout
+    # becomes a failed result" was not true — the batch simply blocked forever.
+    pool = ProcessPoolExecutor(max_workers=min(max_workers, len(units)))
+    try:
         futures = {pool.submit(fn): name for name, fn in units}
-        for future in as_completed(futures):
-            name = futures[future]
-            try:
-                out[name] = IsolatedResult(name, ok=True, value=future.result(timeout=timeout))
-            except TimeoutError:
+        try:
+            for future in as_completed(futures, timeout=timeout):
+                name = futures[future]
+                try:
+                    out[name] = IsolatedResult(name, ok=True, value=future.result())
+                except Exception as exc:  # noqa: BLE001 — worker crash stays contained
+                    out[name] = IsolatedResult(name, ok=False, error=f"{type(exc).__name__}: {exc}")
+        except TimeoutError:
+            for future, name in futures.items():
+                if name in out:
+                    continue
+                future.cancel()
                 out[name] = IsolatedResult(name, ok=False, error=f"timed out after {timeout}s")
-            except Exception as exc:  # noqa: BLE001 — worker crash stays contained
-                out[name] = IsolatedResult(name, ok=False, error=f"{type(exc).__name__}: {exc}")
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
     return [out[name] for name, _ in units]

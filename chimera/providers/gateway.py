@@ -243,8 +243,22 @@ class LLMGateway:
             )
 
     def _provider_kwargs(self) -> dict[str, Any]:
-        """Extra litellm kwargs — a custom endpoint for self-hosted/compatible servers."""
-        return {"api_base": self.settings.api_base} if self.settings.api_base else {}
+        """Extra litellm kwargs — a custom endpoint, plus the per-request deadline.
+
+        The timeout lives here so every call site inherits it (sync, async and both streaming
+        paths). Without it a provider that accepts the connection and then never answers stalls the
+        agent indefinitely: ``max_steps``/``max_attempts`` bound how MANY calls happen, not how long
+        one may take, and a cooperative stop is only checked between attempts — so nothing else in
+        the stack can break a hung request. Bounding it at the HTTP layer (rather than abandoning a
+        watchdog thread) is what actually frees the worker, and it turns a hang into a normal
+        provider error the existing failover taxonomy already knows how to retry or fall back.
+        """
+        kwargs: dict[str, Any] = {}
+        if self.settings.api_base:
+            kwargs["api_base"] = self.settings.api_base
+        if self.settings.request_timeout and self.settings.request_timeout > 0:
+            kwargs["timeout"] = self.settings.request_timeout
+        return kwargs
 
     def _model_candidates(self, resolved: str) -> list[str]:
         """The primary model followed by any configured fallbacks, in order, deduped."""

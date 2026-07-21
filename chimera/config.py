@@ -288,6 +288,12 @@ class Settings(BaseSettings):
     # Ignored when the sandbox is an isolated container (nothing to confirm).
     host_exec: str = Field(default="ask", validation_alias="CHIMERA_HOST_EXEC")
 
+    # Per-request deadline (seconds) for every model call. A provider that accepts the connection
+    # and then never answers would otherwise stall a run forever — step/attempt budgets bound how
+    # many calls happen, not how long one may take. Generous by default so a long legitimate
+    # completion is not cut short; 0 disables the bound (the pre-2026-07 behaviour).
+    request_timeout: float = Field(default=600.0, validation_alias="CHIMERA_REQUEST_TIMEOUT")
+
     # Arm the taint-adaptive tool narrowing on the API server (`chimera app` / `chimera serve`).
     # Once a run consumes untrusted content, DANGEROUS_WHEN_TAINTED tools need approval; the server
     # has no tool-level approver yet, so that resolves to a refusal with an explanatory result —

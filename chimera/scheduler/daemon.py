@@ -72,12 +72,18 @@ class CronDaemon:
         tick_seconds: float = 30.0,
         clock: Callable[[], float] = time.time,
         sleep: Callable[[float], None] = time.sleep,
+        job_timeout: float | None = 1800.0,
     ) -> None:
         self.scheduler = scheduler
         self.dispatch = dispatch
         self.tick_seconds = tick_seconds
         self._clock = clock
         self._sleep = sleep
+        # Wall-clock ceiling per job. Dispatch is sequential, so an unbounded job starves every
+        # other due job and stalls the next tick — on a 24/7 deployment one stuck provider call
+        # silently stops the whole schedule. 30 min is generous for an agent job and still bounded;
+        # None restores the old unbounded behaviour for a caller that truly wants it.
+        self.job_timeout = job_timeout
 
     def tick(self, now: float | None = None) -> list[CronJob]:
         """One scheduler tick: dispatch every job due at ``now`` (defaults to the real clock).
@@ -89,7 +95,9 @@ class CronDaemon:
             self.scheduler.store.reload_if_changed()
         except Exception as exc:  # noqa: BLE001 — a bad reload must not skip the tick
             _log.warning("cron store reload failed: %s", exc)
-        return self.scheduler.run_due(self._clock() if now is None else now, self.dispatch)
+        return self.scheduler.run_due(
+            self._clock() if now is None else now, self.dispatch, job_timeout=self.job_timeout
+        )
 
     def run_forever(self, *, stop: threading.Event | None = None) -> None:
         """Tick, sleep, repeat until ``stop`` is set. A bad tick is logged, never fatal."""

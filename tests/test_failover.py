@@ -133,3 +133,42 @@ def test_unknown_error_still_falls_back(monkeypatch: pytest.MonkeyPatch) -> None
     result = LLMGateway().complete([Message(role="user", content="hi")], model="prov/primary")
     assert result.content == "ok-from-backup"
     assert seen == ["prov/primary", "prov/backup"]
+
+
+# --- per-request deadline ------------------------------------------------------------------
+
+
+def test_request_timeout_is_passed_to_every_provider_call() -> None:
+    """REGRESSION (audit 2026-07-20): no model call had a deadline.
+
+    Step/attempt budgets bound how MANY calls a run makes, not how long one may take, and the
+    cooperative stop is only checked between attempts — so a provider that accepted the connection
+    and never answered stalled the agent with nothing able to break it. The bound lives in
+    ``_provider_kwargs`` so all four call sites (sync, async, and both streaming paths) inherit it.
+    """
+    from chimera.config import Settings
+    from chimera.providers.gateway import LLMGateway
+
+    # Constructed via the env alias (the field carries validation_alias), which also pins the
+    # variable name operators actually set.
+    gateway = LLMGateway(Settings(CHIMERA_REQUEST_TIMEOUT=42.0))
+    assert gateway._provider_kwargs()["timeout"] == 42.0
+
+
+def test_request_timeout_has_a_bounded_default() -> None:
+    # The point of the fix is that the DEFAULT is bounded — an operator who sets nothing must still
+    # not be exposed to an infinite stall.
+    from chimera.config import Settings
+    from chimera.providers.gateway import LLMGateway
+
+    assert LLMGateway(Settings())._provider_kwargs()["timeout"] == 600.0
+
+
+def test_request_timeout_zero_disables_the_bound() -> None:
+    # 0 restores the pre-2026-07 unbounded behaviour for a caller that genuinely wants it, rather
+    # than forcing a deadline onto e.g. a very long local-model generation.
+    from chimera.config import Settings
+    from chimera.providers.gateway import LLMGateway
+
+    gateway = LLMGateway(Settings(CHIMERA_REQUEST_TIMEOUT=0))
+    assert "timeout" not in gateway._provider_kwargs()

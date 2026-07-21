@@ -187,3 +187,32 @@ def test_disabled_job_not_due(tmp_path: Path) -> None:
     sched.store.add(job)
     assert job.next_run is not None
     assert sched.due(job.next_run) == []
+
+
+def test_run_due_job_timeout_does_not_starve_the_schedule(tmp_path: Path) -> None:
+    """REGRESSION (audit 2026-07-20): dispatch was sequential and unbounded.
+
+    One hung job blocked every other due job AND the next tick — on a deployment running dozens of
+    agent-jobs round the clock, a single stuck provider call silently stopped the whole schedule.
+    With a per-job deadline the stuck job is abandoned and the healthy ones still run. Without the
+    fix this test does not fail; it hangs.
+    """
+    import time
+
+    sched = _scheduler(tmp_path)
+    dispatched: list[str] = []
+
+    def dispatch(job: CronJob) -> None:
+        if job.name == "hung":
+            time.sleep(600)
+        dispatched.append(job.name)
+
+    hung = sched.schedule_cron("hung", "* * * * *", "x", now=NOW)
+    healthy = sched.schedule_cron("healthy", "* * * * *", "x", now=NOW)
+    due_at = max(hung.next_run or NOW, healthy.next_run or NOW)
+
+    ran = sched.run_due(due_at, dispatch, job_timeout=1.5)
+
+    # Both are advanced (so neither re-fires immediately), but only the healthy one completed.
+    assert {j.name for j in ran} == {"hung", "healthy"}
+    assert dispatched == ["healthy"]

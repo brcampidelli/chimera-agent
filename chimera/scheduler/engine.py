@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 
 from croniter import croniter
@@ -18,6 +19,26 @@ from chimera.scheduler.store import CronStore
 from chimera.telemetry import get_logger
 
 _log = get_logger("scheduler.engine")
+
+
+def _dispatch_bounded(
+    job: CronJob, dispatch: Callable[[CronJob], None], timeout: float | None
+) -> None:
+    """Run ``dispatch(job)``, raising :class:`TimeoutError` if it overruns ``timeout``.
+
+    ``None`` runs it inline (the previous, unbounded behaviour) so nothing pays for a thread when
+    no deadline is set. With a deadline the call runs in a throwaway worker and the pool is shut
+    down WITHOUT waiting: an overrunning job cannot be killed in Python, so waiting for it here
+    would reproduce the very stall the timeout exists to prevent.
+    """
+    if timeout is None:
+        dispatch(job)
+        return
+    pool = ThreadPoolExecutor(max_workers=1)
+    try:
+        pool.submit(dispatch, job).result(timeout=timeout)
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
 
 
 def _next_after(cron_expr: str, after_epoch: float) -> float:
@@ -157,13 +178,31 @@ class Scheduler:
             job.next_run = _next_after(job.schedule, now)
         self.store.add(job)
 
-    def run_due(self, now: float, dispatch: Callable[[CronJob], None]) -> list[CronJob]:
-        """Dispatch every due cron job and advance its schedule. Returns those run."""
+    def run_due(
+        self,
+        now: float,
+        dispatch: Callable[[CronJob], None],
+        *,
+        job_timeout: float | None = None,
+    ) -> list[CronJob]:
+        """Dispatch every due cron job and advance its schedule. Returns those run.
+
+        Dispatch is sequential, so without ``job_timeout`` one slow or hung job starves every other
+        due job AND delays the next tick indefinitely — on a deployment running dozens of agent-jobs
+        round the clock, a single stuck provider call silently stops the whole schedule. With it, a
+        job that overruns is abandoned (Python cannot kill a running thread), logged, and its
+        schedule is still advanced so the tick moves on instead of re-firing it immediately.
+        """
         ran: list[CronJob] = []
         for job in self.due(now):
             _log.debug("dispatching cron job %s (%s)", job.name, job.id)
             try:
-                dispatch(job)
+                _dispatch_bounded(job, dispatch, job_timeout)
+            except TimeoutError:
+                _log.warning(
+                    "cron job %s (%s) exceeded %ss and was abandoned; the schedule continues",
+                    job.name, job.id, job_timeout,
+                )
             except Exception as exc:  # a failing job must not break the scheduler
                 _log.warning("cron job %s failed: %s", job.id, exc)
             self.mark_ran(job, now)
