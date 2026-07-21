@@ -1073,6 +1073,12 @@ def desktop_app(
     workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root for tools."),
     fuse: bool = typer.Option(False, "--fuse", help="Route turns through fusion (no token streaming)."),
     no_memory: bool = typer.Option(False, "--no-memory", help="Don't recall long-term memory."),
+    cron: bool = typer.Option(
+        None,
+        "--cron/--no-cron",
+        help="Fire scheduled jobs while the app is open (proactivity). Default: the CHIMERA_APP_CRON "
+        "setting (on). --no-cron makes the app purely reactive.",
+    ),
     open_browser: bool = typer.Option(True, "--open/--no-open", help="Open the app in your browser."),
     emit_port_file: str = typer.Option(
         None,
@@ -1129,6 +1135,17 @@ def desktop_app(
     shared_memory = None if no_memory else _memory_manager()
     shared_graph = _recall_graph(shared_memory)
     shared_profile = shared_memory.profile() if shared_memory is not None else ""
+
+    # Proactivity: fire scheduled jobs while the app is open. The reactive gateway alone never runs
+    # the clock, so a "briefing at 7am" would need a separate `chimera serve --cron` terminal. Reuses
+    # the exact daemon the serve path uses; the flag overrides the CHIMERA_APP_CRON setting (default
+    # on). A keyless boot has no backend to run jobs, so skip until a key exists.
+    run_cron = settings.app_cron if cron is None else cron
+    cron_stop = (
+        _start_cron_daemon(backend, model, max_steps, workspace_path, 30)
+        if run_cron and settings.has_any_key()
+        else None
+    )
 
     # Opt-in MCP autoload: connect the configured MCP servers ONCE at app start and reuse their tools
     # across sessions. Off by default (fast, no subprocess). A broken server is skipped gracefully so
@@ -1187,7 +1204,11 @@ def desktop_app(
 
         threading.Timer(1.0, lambda: webbrowser.open(url)).start()
     # Server.run(sockets=[...]) uses our already-bound socket (uvicorn.run rebinds host/port itself).
-    uvicorn.Server(uvicorn.Config(api, log_level="warning")).run(sockets=[sock])
+    try:
+        uvicorn.Server(uvicorn.Config(api, log_level="warning")).run(sockets=[sock])
+    finally:
+        if cron_stop is not None:
+            cron_stop.set()  # stop the cron daemon thread on Ctrl+C / shutdown
 
 
 def _start_cron_daemon(

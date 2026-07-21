@@ -301,6 +301,12 @@ class Settings(BaseSettings):
     # after reading the web (and accept that a laundered injection could steer those tools).
     taint_narrow: bool = Field(default=True, validation_alias="CHIMERA_TAINT_NARROW")
 
+    # Run the cron daemon inside `chimera app` (the desktop backend), so scheduled jobs fire while
+    # the app is open — the whole point of a proactive assistant. Defaults ON: a "briefing at 7am"
+    # should just work once you've scheduled it, without a separate `chimera serve --cron` terminal
+    # running 24/7. Set CHIMERA_APP_CRON=0 (or `chimera app --no-cron`) for a purely reactive app.
+    app_cron: bool = Field(default=True, validation_alias="CHIMERA_APP_CRON")
+
     # Opt-in OpenTelemetry: export OTLP spans (tool calls) + metrics (tokens/cost) so an autonomous
     # run is observable in Jaeger/Tempo/Grafana. Off by default and zero-overhead; needs the [otel]
     # extra. Also auto-enabled when the standard OTEL_EXPORTER_OTLP_ENDPOINT is set.
