@@ -69,29 +69,34 @@ def _prompt(command: str) -> bool:
         return False
 
 
-def _make_headless_allow() -> HostExecConfirm:
-    """Non-interactive ``ask``: run, but warn once per *resolve* so the risk stays visible in logs.
+def _make_headless_deny() -> HostExecConfirm:
+    """Non-interactive ``ask``: REFUSE, explaining once how to proceed deliberately.
 
-    The flag lives in this closure, not at module level: a long-lived process (``chimera serve``, the
-    API, a cron daemon) resolves the gate per run, so run #2 onward still records that it executed the
-    agent's commands on the host. A module-global flag would warn once for the life of the process and
-    silently host-execute forever after — which would defeat the "visible in logs" rationale.
+    ``ask`` means "a human decides". Unattended there is no human, so the honest resolution of that
+    posture is to refuse, not to assume consent — the previous behaviour ran the agent's chosen host
+    commands after a single log line, which made the shipped default for every unattended surface
+    (``chimera serve``, cron, CI, systemd) effectively ``allow``. An operator who genuinely wants
+    host execution says so with ``CHIMERA_HOST_EXEC=allow``; one who wants the work to run *safely*
+    sets ``CHIMERA_SANDBOX=docker``, where the gate is skipped because the container really isolates.
+
+    The warning fires once per *resolve*, not per module: a long-lived process resolves the gate per
+    run, so each run still explains why its host commands were refused instead of going silent.
     """
     warned = False
 
-    def _headless_allow(command: str) -> bool:
+    def _headless_deny(command: str) -> bool:
         nonlocal warned
-        if warned:
-            return True
-        warned = True
-        _log.warning(
-            "running the agent's commands on the host without confirmation (no TTY, "
-            "CHIMERA_HOST_EXEC=ask). For isolation set CHIMERA_SANDBOX=docker; to silence this, "
-            "set CHIMERA_HOST_EXEC=allow (accepts the risk) or =deny (refuses)."
-        )
-        return True
+        if not warned:
+            warned = True
+            _log.warning(
+                "refusing to run the agent's commands on the host: no TTY to confirm and "
+                "CHIMERA_HOST_EXEC=ask. Set CHIMERA_SANDBOX=docker to run them isolated, or "
+                "CHIMERA_HOST_EXEC=allow to accept host execution unattended."
+            )
+        _log.debug("host execution refused (headless ask). Command: %s", command[:200])
+        return False
 
-    return _headless_allow
+    return _headless_deny
 
 
 def resolve_host_exec_confirm(
@@ -123,4 +128,4 @@ def resolve_host_exec_confirm(
     # posture == "ask" (or anything unrecognised → treat as ask, the safe default)
     if interactive is None:
         interactive = bool(getattr(sys.stdin, "isatty", lambda: False)())
-    return _prompt if interactive else _make_headless_allow()
+    return _prompt if interactive else _make_headless_deny()

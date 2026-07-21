@@ -124,10 +124,19 @@ through the agent when it's due. A failing job is logged and never stops the dae
 - **Backups:** back up the `chimera-data` volume (Docker) or `CHIMERA_HOME` dir (systemd) —
   that's all the durable state. Example: `docker run --rm -v chimera-data:/d -v $PWD:/b busybox tar czf /b/chimera-state.tgz -C /d .`
 - **Secrets:** keep keys in `.env` (git-ignored); never bake them into the image.
-- **Exposure:** bind the gateway to `0.0.0.0` only behind a firewall/reverse proxy. The HTTP
-  gateway has no auth — restrict the port, or only expose the specific webhook path via your proxy.
+- **Exposure:** bind the gateway to `0.0.0.0` only behind a firewall/reverse proxy. Set
+  **`CHIMERA_SERVER_TOKEN`** to require `Authorization: Bearer <token>` on the HTTP gateway and the
+  desktop API (the desktop UI is handed the token automatically only for loopback clients, so a
+  remotely-exposed instance stays behind your own auth). Auth is opt-in and empty by default, so
+  without that variable there is none — restrict the port, or expose only the webhook path.
 - **Sandboxing:** set `CHIMERA_SANDBOX=docker` to run the shell/code tools in a throwaway
   container instead of the host.
+- **Unattended host execution:** since 2026-07-20 a headless run **refuses** host commands under the
+  default `CHIMERA_HOST_EXEC=ask` (there is no TTY to confirm on). A deployment that genuinely needs
+  the agent to run shell on the host sets `CHIMERA_HOST_EXEC=allow` deliberately; the safer option is
+  `CHIMERA_SANDBOX=docker`, where the gate is skipped because the container really isolates. Likewise
+  the API server arms taint narrowing (`CHIMERA_TAINT_NARROW=1`): after the agent reads untrusted
+  content, execution/write/outbound tools fail closed. Set it to `0` to keep acting autonomously.
 
 ---
 

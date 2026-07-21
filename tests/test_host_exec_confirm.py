@@ -232,11 +232,15 @@ def test_resolver_deny_refuses() -> None:
     assert gate("anything") is False  # deny never runs on the host
 
 
-def test_resolver_ask_headless_runs_with_warning() -> None:
-    # Non-interactive `ask` must not break cron/CI/bench: it returns a callback that permits the run.
+def test_resolver_ask_headless_refuses() -> None:
+    # `ask` means A HUMAN DECIDES. Unattended there is no human, so the honest resolution is to
+    # refuse — previously this returned a callback that PERMITTED the run after one log line, which
+    # made the shipped default effectively `allow` on every server/cron/CI surface (i.e. exactly
+    # where host execution matters most). An unattended deployment that wants it opts in with
+    # CHIMERA_HOST_EXEC=allow; one that wants the work to run safely sets CHIMERA_SANDBOX=docker.
     gate = resolve_host_exec_confirm(_Settings("local", "ask"), interactive=False)
     assert gate is not None
-    assert gate("echo hi") is True
+    assert gate("echo hi") is False
 
 
 def test_execute_code_non_callable_is_isolated_does_not_crash(tmp_path: Path) -> None:
@@ -269,9 +273,10 @@ def test_execute_code_isolated_sandbox_skips_confirm(tmp_path: Path) -> None:
 
 def test_headless_warning_is_per_resolve_not_per_process() -> None:
     # REGRESSION (review MED): the warn-once flag was module-global, so a long-lived process
-    # (chimera serve / the API / a cron daemon) logged ONE warning ever and then host-executed
+    # (chimera serve / the API / a cron daemon) logged ONE warning ever and then acted on the host
     # silently forever — defeating the "the risk is visible in logs" rationale. Each resolve (i.e.
-    # each run) must get a fresh flag: two runs → two warnings.
+    # each run) must get a fresh flag: two runs → two warnings. Still true now that headless refuses:
+    # each run must explain WHY its commands were refused rather than failing silently.
     logged: list[str] = []
 
     import chimera.sandbox.confirm as confirm_mod
@@ -280,6 +285,9 @@ def test_headless_warning_is_per_resolve_not_per_process() -> None:
         def warning(self, msg: str, *args: object) -> None:
             logged.append(msg)
 
+        def debug(self, msg: str, *args: object) -> None:
+            pass  # the per-command refusal line; only the once-per-run warning is counted here
+
     original = confirm_mod._log
     confirm_mod._log = _Rec()  # type: ignore[assignment]
     try:
@@ -287,7 +295,7 @@ def test_headless_warning_is_per_resolve_not_per_process() -> None:
             gate = resolve_host_exec_confirm(_Settings("local", "ask"), interactive=False)
             assert gate is not None
             for _cmd in range(3):  # repeated commands inside one run warn once
-                assert gate("echo hi") is True
+                assert gate("echo hi") is False
     finally:
         confirm_mod._log = original
     assert len(logged) == 2  # one per run, not one per process and not one per command

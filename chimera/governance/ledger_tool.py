@@ -75,9 +75,18 @@ def _idempotency_key(name: str, args: Mapping[str, Any]) -> str:
 # Tools that get NARROWED once a run is tainted: high-consequence side effects that a
 # laundered injection (paraphrased past the ref/flow matcher) could still steer. The
 # grant shrinks for the rest of the run, catching what per-action assessment misses.
+#
+# EXECUTION + WRITE sinks, then EXFILTRATION sinks. The exfil half was missing until an audit
+# noticed the set gated `send_email` but not the other five outbound channels already classified
+# as SIDE_EFFECT_TOOLS — so a tainted run could still post the data it just read to an attacker's
+# webhook or chat, unnarrowed. `browser` is included because it is not only a fetch tool: it types
+# and clicks, so it can carry data out through a form just as an http_post can.
 DANGEROUS_WHEN_TAINTED = frozenset(
     {"run_shell", "execute_code", "code_interpreter", "write_file", "edit_file",
-     "apply_patch", "send_email"}
+     "apply_patch",
+     # exfiltration channels — everything in SIDE_EFFECT_TOOLS, plus the browser
+     "send_email", "send_message", "send_sms", "http_post", "post_webhook", "create_issue",
+     "browser"}
 )
 
 

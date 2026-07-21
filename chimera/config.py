@@ -278,12 +278,22 @@ class Settings(BaseSettings):
     # Posture for running the agent's commands/code ON THE HOST (i.e. sandbox=local). Because most
     # `pip install` users have no Docker, host execution is the common path — so the model deciding to
     # run a shell command must not silently execute on the machine. Values:
-    #   ask   (default) — in an interactive terminal, confirm each host command; headless, run with a
-    #                     one-time warning (so cron/CI/bench are not broken).
-    #   allow           — run on the host without asking (the pre-2026-07 behaviour; explicit opt-in).
+    #   ask   (default) — in an interactive terminal, confirm each host command; headless (no TTY),
+    #                     REFUSE, explaining how to opt in. "Ask" means a human decides, and
+    #                     unattended there is no human — assuming consent made `ask` mean `allow`
+    #                     on every server/cron/CI surface, which is where it matters most.
+    #   allow           — run on the host without asking (the pre-2026-07 behaviour; explicit opt-in,
+    #                     and what an unattended deployment that genuinely needs host exec should set).
     #   deny            — never run on the host; require CHIMERA_SANDBOX=docker.
     # Ignored when the sandbox is an isolated container (nothing to confirm).
     host_exec: str = Field(default="ask", validation_alias="CHIMERA_HOST_EXEC")
+
+    # Arm the taint-adaptive tool narrowing on the API server (`chimera app` / `chimera serve`).
+    # Once a run consumes untrusted content, DANGEROUS_WHEN_TAINTED tools need approval; the server
+    # has no tool-level approver yet, so that resolves to a refusal with an explanatory result —
+    # fail closed. Set CHIMERA_TAINT_NARROW=0 on a deployment that must keep acting autonomously
+    # after reading the web (and accept that a laundered injection could steer those tools).
+    taint_narrow: bool = Field(default=True, validation_alias="CHIMERA_TAINT_NARROW")
 
     # Opt-in OpenTelemetry: export OTLP spans (tool calls) + metrics (tokens/cost) so an autonomous
     # run is observable in Jaeger/Tempo/Grafana. Off by default and zero-overhead; needs the [otel]

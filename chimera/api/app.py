@@ -1132,13 +1132,19 @@ def _build_solve_agent(
     # Taint tracking on the API solve path (the CLI's `solve` has had it; the server previously ran a
     # bare registry). ledger_registry fences + sanitizes untrusted fetch/document output (strips
     # control tokens so a hidden instruction can't spoof a turn) and records the capability trail.
-    # narrow_on_taint stays OFF here: the server is headless with no tool-level approver, so arming the
-    # dangerous-tool gate would just refuse legitimate work — wiring that to the desktop's approval UI
-    # is a follow-up. This closes "the API path has no taint tracking" for the fencing + observability
-    # half; provenance-gated durable writes remain a CLI feature for now.
+    #
+    # narrow_on_taint is now ARMED here by default (CHIMERA_TAINT_NARROW). It used to be hard-coded
+    # off because the server has no tool-level approver, so narrowing resolves to a refusal — but
+    # "no one can approve it" is an argument for refusing a dangerous tool after untrusted input, not
+    # for allowing it. Leaving it off meant the headless product surface was the one place the
+    # advertised defence did not run. A deployment that must keep acting autonomously after reading
+    # the web sets CHIMERA_TAINT_NARROW=0 deliberately. Routing the approval to the desktop's HITL UI
+    # (so it can be answered rather than only refused) is the follow-up.
     from chimera.governance import TaintLedger, ledger_registry
 
-    registry = ledger_registry(default_registry(ws), TaintLedger(), narrow_on_taint=False)
+    registry = ledger_registry(
+        default_registry(ws), TaintLedger(), narrow_on_taint=settings.taint_narrow
+    )
     # insist_on_action: solve is task completion, so a described-but-unexecuted plan is pushed back
     # to actually run (mirrors the CLI worker config).
     cfg = AgentConfig(model=req.model, max_steps=6, insist_on_action=True)

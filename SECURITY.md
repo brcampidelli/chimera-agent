@@ -63,9 +63,10 @@ environment** when you grant autonomy:
   a **sub-agent hand-off** (each worker gets its own ledger; cross-worker collusion is caught by a
   *post-hoc* monitor that warns, it does not prevent), the **fusion engine** and any
   **summarisation/compaction** (a synthesiser's whole job is to paraphrase, which erases a verbatim
-  match), and it is **not wired at all** outside the `solve`/`crew`/`hierarchy` CLI paths — the API
-  server, TUI, and scheduler have no taint tracking. It also only *escalates to review*, so with no
-  approver present a tainted action is refused, not silently run, but nothing is hard-blocked.
+  match). Coverage by surface: the `solve`/`crew`/`hierarchy` CLI paths and the **API server** track
+  taint (the server arms the narrowing gate by default — see `CHIMERA_TAINT_NARROW` below); the **TUI
+  and scheduler still do not**. It also only *escalates to review*, so with no approver present a
+  tainted action is refused, not silently run, but nothing is hard-blocked.
   **Untrusted local files:** by default the workspace is *trusted* — `read_file` does not taint,
   because `chimera solve` usually runs on your own repo and tainting every file read would make
   `--taint` fire on everything. If you run against code you do **not** control (a third-party repo, a
@@ -114,13 +115,26 @@ Treat secrets as server-only. **The default `local` sandbox is not isolated** �
 or autonomous work run with `CHIMERA_SANDBOX=docker` (ephemeral, network-off by default),
 ideally in a throwaway account or VM rather than your main one.
 
-**Host execution is gated by default.** Because most installs have no Docker, a command the model
-chooses to run would otherwise execute on your machine. `CHIMERA_HOST_EXEC=ask` (the default) confirms
-each host command in an interactive terminal before it runs; `deny` refuses host execution outright
-(use the docker sandbox); `allow` runs without asking (explicit opt-in). Headless runs (cron, CI) are
-not blocked — they proceed with a one-time warning, so set `docker` or `allow`/`deny` deliberately for
-unattended work. A docker sandbox that silently fell back to local (Docker absent) is treated as host
+**Host execution is gated by default, including unattended.** Because most installs have no Docker, a
+command the model chooses to run would otherwise execute on your machine. `CHIMERA_HOST_EXEC=ask` (the
+default) confirms each host command in an interactive terminal; **headless (no TTY) it refuses**, since
+`ask` means a human decides and unattended there is nobody to ask. `allow` runs without asking (the
+explicit opt-in an unattended deployment that genuinely needs host execution should set); `deny`
+refuses outright. A docker sandbox that silently fell back to local (Docker absent) is treated as host
 execution and gated too, so "configured docker" never quietly becomes "ran on the host".
+
+> Changed 2026-07-20 (was: headless proceeded after a one-time warning). That made the shipped default
+> effectively `allow` on every server/cron/CI surface — the place host execution matters most. If an
+> unattended deployment stopped running shell commands after this change, that is the fix working: set
+> `CHIMERA_SANDBOX=docker` to run them isolated, or `CHIMERA_HOST_EXEC=allow` to accept host execution.
+
+**Taint narrowing is armed on the API server.** Once a run consumes untrusted content, the tools in
+`DANGEROUS_WHEN_TAINTED` — execution, file writes, **and every outbound channel** (`send_email`,
+`send_message`, `send_sms`, `http_post`, `post_webhook`, `create_issue`, `browser`) — require approval.
+The server has no tool-level approver yet, so this resolves to a refusal with an explanatory result:
+fail closed. Set `CHIMERA_TAINT_NARROW=0` on a deployment that must keep acting autonomously after
+reading the web, accepting that a laundered injection could steer those tools. Routing the approval to
+the desktop's human-in-the-loop UI (so it can be *answered*, not only refused) is the follow-up.
 
 A plain container isn't a full VM: a container escape typically rides a host-kernel bug, so
 hostile input still has a path to local privilege escalation. To harden that boundary without
