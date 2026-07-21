@@ -22,6 +22,7 @@ import { Onboarding } from "@/components/Onboarding";
 import { VersionBadge } from "@/components/VersionBadge";
 import { Activity, type Status } from "@/components/Activity";
 import { Spinner } from "@/components/ui/panel";
+import { ErrorState } from "@/components/ui/async";
 import { deleteSession, getDoctor, getSession, listSessions, streamChat } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import type { Message, ToolEvent, TurnReport } from "@/lib/types";
@@ -145,11 +146,21 @@ export default function App() {
   }, []);
 
   // Gate the first render on the doctor's key check (all hooks above always run, so this stays a
-  // safe early return). While loading, a spinner; no key + not skipped => the setup wizard.
+  // safe early return). This is also the app's readiness gate: `doctor` is the first backend call,
+  // so while the sidecar is still booting it retries (fast, per the QueryClient backoff) behind one
+  // "starting…" screen — every inner screen then mounts against a warm backend.
   if (doctor.isLoading) {
     return (
-      <div className="flex h-full items-center justify-center">
+      <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
         <Spinner />
+        <span className="text-sm">{t("app.starting")}</span>
+      </div>
+    );
+  }
+  if (doctor.isError) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <ErrorState error={doctor.error} onRetry={() => doctor.refetch()} />
       </div>
     );
   }

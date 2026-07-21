@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Clock, Plus, Trash2 } from "lucide-react";
 import { createCron, deleteCron, disableCron, enableCron, getCron } from "@/lib/api";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
+import { ErrorState } from "@/components/ui/async";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/i18n";
 
@@ -110,7 +111,9 @@ export function Cron() {
     <Screen title={t("cron.title")} icon={<Clock className="h-5 w-5" />}>
       <AddSchedule />
       <Panel title={t("cron.jobs")}>
-        {jobs.isLoading ? (
+        {jobs.isError ? (
+          <ErrorState error={jobs.error} onRetry={() => jobs.refetch()} />
+        ) : jobs.isLoading ? (
           <Spinner />
         ) : !jobs.data || jobs.data.length === 0 ? (
           <EmptyState text={t("cron.empty")} />

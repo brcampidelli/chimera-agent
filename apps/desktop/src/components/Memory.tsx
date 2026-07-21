@@ -4,6 +4,7 @@ import { Brain, Search, Trash2, Plus } from "lucide-react";
 import { addMemory, deleteMemory, getMemory, getMemoryLayers } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
+import { ErrorState } from "@/components/ui/async";
 import { useT, type TFunc } from "@/lib/i18n";
 import type { MemoryLayers } from "@/lib/types";
 
@@ -51,7 +52,9 @@ function LayersPanel({ t }: { t: TFunc }) {
 
   return (
     <Panel title={t("memory.layers.title")}>
-      {q.isLoading || !data ? (
+      {q.isError ? (
+        <ErrorState error={q.error} onRetry={() => q.refetch()} />
+      ) : q.isLoading || !data ? (
         <Spinner />
       ) : data.total === 0 ? (
         <EmptyState text={t("memory.layers.empty")} />
@@ -155,7 +158,9 @@ export function Memory() {
           </form>
         }
       >
-        {facts.isLoading ? (
+        {facts.isError ? (
+          <ErrorState error={facts.error} onRetry={() => facts.refetch()} />
+        ) : facts.isLoading ? (
           <Spinner />
         ) : !facts.data || facts.data.length === 0 ? (
           <EmptyState text={term ? t("memory.emptySearch") : t("memory.empty")} />

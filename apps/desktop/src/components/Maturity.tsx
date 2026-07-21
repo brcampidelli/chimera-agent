@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Gauge } from "lucide-react";
 import { getBenchmarks, getMaturity } from "@/lib/api";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
+import { ErrorState } from "@/components/ui/async";
 import { useT, type TFunc } from "@/lib/i18n";
 import type {
   BenchmarkExternal,
@@ -178,6 +179,15 @@ export function Maturity() {
   const t = useT();
   const q = useQuery({ queryKey: ["maturity"], queryFn: getMaturity });
 
+  if (q.isError) {
+    return (
+      <Screen title={t("maturity.title")} icon={<Gauge className="h-5 w-5" />}>
+        <Panel>
+          <ErrorState error={q.error} onRetry={() => q.refetch()} />
+        </Panel>
+      </Screen>
+    );
+  }
   if (q.isLoading) {
     return (
       <Screen title={t("maturity.title")} icon={<Gauge className="h-5 w-5" />}>

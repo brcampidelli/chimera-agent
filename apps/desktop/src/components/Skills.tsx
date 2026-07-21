@@ -3,6 +3,7 @@ import { Sparkles } from "lucide-react";
 import { approveSkill, getSkills, retireSkill } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
+import { ErrorState } from "@/components/ui/async";
 import { useT } from "@/lib/i18n";
 import type { SkillStat } from "@/lib/types";
 
@@ -27,7 +28,9 @@ export function Skills() {
   return (
     <Screen title={t("skills.title")} icon={<Sparkles className="h-5 w-5" />}>
       <Panel title={t("skills.learned")}>
-        {skills.isLoading ? (
+        {skills.isError ? (
+          <ErrorState error={skills.error} onRetry={() => skills.refetch()} />
+        ) : skills.isLoading ? (
           <Spinner />
         ) : rows.length === 0 ? (
           <EmptyState text={t("skills.empty")} />

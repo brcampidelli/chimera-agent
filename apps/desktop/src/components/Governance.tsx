@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ShieldCheck } from "lucide-react";
 import { getGovernanceAudit, getGovernanceInjection } from "@/lib/api";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
+import { ErrorState } from "@/components/ui/async";
 import { useT, type TFunc } from "@/lib/i18n";
 import type { GovernanceAudit, InjectionReport } from "@/lib/types";
 
@@ -179,7 +180,11 @@ export function Governance() {
 
   return (
     <Screen title={t("governance.title")} icon={<ShieldCheck className="h-5 w-5" />}>
-      {injection.isLoading || !injection.data ? (
+      {injection.isError ? (
+        <Panel title={t("governance.injection.title")}>
+          <ErrorState error={injection.error} onRetry={() => injection.refetch()} />
+        </Panel>
+      ) : injection.isLoading || !injection.data ? (
         <Panel title={t("governance.injection.title")}>
           <Spinner />
         </Panel>
@@ -187,7 +192,11 @@ export function Governance() {
         <InjectionPanel data={injection.data} t={t} />
       )}
 
-      {audit.isLoading || !audit.data ? (
+      {audit.isError ? (
+        <Panel title={t("governance.audit.title")}>
+          <ErrorState error={audit.error} onRetry={() => audit.refetch()} />
+        </Panel>
+      ) : audit.isLoading || !audit.data ? (
         <Panel title={t("governance.audit.title")}>
           <Spinner />
         </Panel>

@@ -9,6 +9,7 @@ import {
   testMcpServer,
 } from "@/lib/api";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
+import { ErrorState } from "@/components/ui/async";
 import { Button } from "@/components/ui/button";
 import { useT, type TFunc } from "@/lib/i18n";
 import type { McpServer, McpTest } from "@/lib/types";
@@ -222,6 +223,15 @@ export function Mcp() {
 
   const autoloadOff = config.data ? !config.data.mcp.autoload : false;
 
+  if (servers.isError) {
+    return (
+      <Screen title={t("mcp.title")} icon={<Plug className="h-5 w-5" />}>
+        <Panel>
+          <ErrorState error={servers.error} onRetry={() => servers.refetch()} />
+        </Panel>
+      </Screen>
+    );
+  }
   if (servers.isLoading || !servers.data) {
     return (
       <Screen title={t("mcp.title")} icon={<Plug className="h-5 w-5" />}>

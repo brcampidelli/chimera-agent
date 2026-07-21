@@ -103,4 +103,24 @@ describe("Tools", () => {
     expect(screen.getByText("git_commit")).toBeInTheDocument();
     expect(screen.queryByText("read_file")).not.toBeInTheDocument();
   });
+
+  it("shows an error with a retry when the request fails — never an endless spinner", async () => {
+    mockGetTools.mockRejectedValue(new Error("HTTP 500"));
+    renderWithProviders(<Tools />);
+
+    // The terminal error state, not a spinner that hangs forever on `!data`.
+    expect(await screen.findByText("Couldn't load this.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
+  });
+
+  it("recovers when the user hits Try again after a transient failure", async () => {
+    const user = userEvent.setup();
+    mockGetTools.mockRejectedValueOnce(new Error("HTTP 503"));
+    mockGetTools.mockResolvedValueOnce(toolsOut([tool({ name: "read_file" })]));
+    renderWithProviders(<Tools />);
+
+    await user.click(await screen.findByRole("button", { name: /try again/i }));
+
+    expect(await screen.findByText("read_file")).toBeInTheDocument();
+  });
 });
