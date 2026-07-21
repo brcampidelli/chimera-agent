@@ -8,6 +8,11 @@ design discussion are especially welcome.
 - **[Extending guide](docs/extending.md)** — how to add your own **tool, skill, or recipe** with
   complete, copy-paste examples — the fastest way to make your first contribution.
 
+**Want more than a one-off PR?** Chimera has exactly one maintainer, which is its largest risk.
+**[GOVERNANCE.md](GOVERNANCE.md)** says so plainly and describes how decisions get made, how to
+become a maintainer (there is no application process — land a few changes and ask), which areas most
+need a second pair of hands, and what happens to the project if the maintainer disappears.
+
 ## Good first issues — where to start
 
 Issues labelled [`good first issue`](https://github.com/brcampidelli/chimera-agent/labels/good%20first%20issue)

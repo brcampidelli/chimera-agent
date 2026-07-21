@@ -21,7 +21,18 @@ Please include:
 - steps to reproduce (a minimal command or repo state),
 - the Chimera version (`chimera version`) and your environment.
 
-We aim to acknowledge reports within a few days and to coordinate a fix and disclosure.
+Response targets (from a single maintainer — see `GOVERNANCE.md` for why that is the project's
+largest risk, and what would change it):
+
+| Stage | Target |
+|---|---|
+| Acknowledge the report | 3 business days |
+| Initial assessment (severity, affected versions) | 7 days |
+| Fix or documented mitigation for a critical issue | 30 days |
+| Public disclosure | coordinated with you, after a fix ships |
+
+These are commitments of intent, not an organisation-backed SLA. If you need a guaranteed response
+window, Chimera cannot honestly offer one today.
 
 ## Built-in safeguards (and their limits)
 
