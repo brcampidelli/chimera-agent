@@ -157,6 +157,8 @@ export const retireSkill = (name: string) =>
 
 // --- Cron ---
 export const getCron = () => json<CronJob[]>("/api/cron");
+export const createCron = (body: { name: string; schedule: string; action: string }) =>
+  json<CronJob>("/api/cron", { method: "POST", body: JSON.stringify(body) });
 export const enableCron = (id: string) => json<CronJob>(`/api/cron/${id}/enable`, { method: "POST" });
 export const disableCron = (id: string) =>
   json<CronJob>(`/api/cron/${id}/disable`, { method: "POST" });

@@ -18,6 +18,7 @@ from pydantic import BaseModel
 
 from chimera.api.schemas import (
     ApprovedOut,
+    CronCreateIn,
     CronJobOut,
     DeletedOut,
     MemoryAddOut,
@@ -196,6 +197,20 @@ def register_features(app: FastAPI, guard: params.Depends) -> None:
     @app.get("/api/cron", dependencies=[guard], response_model=list[CronJobOut])
     def list_cron() -> list[dict[str, Any]]:
         return [_job_dict(j) for j in _cron_store().list()]
+
+    @app.post("/api/cron", dependencies=[guard], response_model=CronJobOut)
+    def create_cron(body: CronCreateIn) -> dict[str, Any]:
+        """Schedule a job from the UI — the CLI's `chimera cron add`, over HTTP. A human-created job
+        is enabled immediately (unlike an agent-proposed one, which the scheduler starts disabled)."""
+        from chimera.scheduler import Scheduler
+
+        try:
+            job = Scheduler(_cron_store()).schedule_cron(
+                body.name, body.schedule, body.action, now=time.time(), created_by="human"
+            )
+        except ValueError as exc:  # an invalid cron expression is a client error, not a 500
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return _job_dict(job)
 
     @app.post("/api/cron/{job_id}/enable", dependencies=[guard], response_model=CronJobOut)
     def enable_cron(job_id: str) -> dict[str, Any]:

@@ -662,6 +662,30 @@
         "title": "ConfigTestRequest",
         "type": "object"
       },
+      "CronCreateIn": {
+        "description": "Create a scheduled job from the UI (the CLI's `chimera cron add`, over HTTP).",
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "schedule": {
+            "title": "Schedule",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "schedule",
+          "action"
+        ],
+        "title": "CronCreateIn",
+        "type": "object"
+      },
       "CronJobOut": {
         "properties": {
           "action": {
@@ -3222,6 +3246,43 @@
           }
         },
         "summary": "List Cron"
+      },
+      "post": {
+        "description": "Schedule a job from the UI \u2014 the CLI's `chimera cron add`, over HTTP. A human-created job\nis enabled immediately (unlike an agent-proposed one, which the scheduler starts disabled).",
+        "operationId": "create_cron_api_cron_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CronCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CronJobOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Cron"
       }
     },
     "/api/cron/{job_id}": {

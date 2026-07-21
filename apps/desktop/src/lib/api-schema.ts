@@ -151,7 +151,12 @@ export interface paths {
         /** List Cron */
         get: operations["list_cron_api_cron_get"];
         put?: never;
-        post?: never;
+        /**
+         * Create Cron
+         * @description Schedule a job from the UI — the CLI's `chimera cron add`, over HTTP. A human-created job
+         *     is enabled immediately (unlike an agent-proposed one, which the scheduler starts disabled).
+         */
+        post: operations["create_cron_api_cron_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1139,6 +1144,18 @@ export interface components {
         ConfigTestRequest: {
             /** Model */
             model?: string | null;
+        };
+        /**
+         * CronCreateIn
+         * @description Create a scheduled job from the UI (the CLI's `chimera cron add`, over HTTP).
+         */
+        CronCreateIn: {
+            /** Action */
+            action: string;
+            /** Name */
+            name: string;
+            /** Schedule */
+            schedule: string;
         };
         /** CronJobOut */
         CronJobOut: {
@@ -2206,6 +2223,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CronJobOut"][];
+                };
+            };
+        };
+    };
+    create_cron_api_cron_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CronCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CronJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

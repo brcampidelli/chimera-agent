@@ -990,3 +990,37 @@ def test_skills_list_and_approve(monkeypatch: Any, tmp_path: Any) -> None:
     assert client.post("/api/skills/reread/approve").json() == {"approved": True}
     assert client.post("/api/skills/nope/approve").status_code == 404
     get_settings.cache_clear()
+
+
+def test_create_cron_from_the_ui_schedules_an_enabled_job(monkeypatch: Any, tmp_path: Any) -> None:
+    # The desktop app can now create a schedule (the CLI's `chimera cron add`, over HTTP). A
+    # human-created job is enabled immediately, so it will fire — unlike an agent-proposed one.
+    from chimera.config import get_settings
+
+    client = _feature_client(monkeypatch, tmp_path)
+    assert client.get("/api/cron").json() == []  # empty to start
+
+    created = client.post(
+        "/api/cron",
+        json={"name": "morning brief", "schedule": "0 7 * * *", "action": "summarise my day"},
+    )
+    assert created.status_code == 200, created.text
+    body = created.json()
+    assert body["name"] == "morning brief"
+    assert body["enabled"] is True  # human-created ⇒ enabled, so it actually runs
+    assert body["created_by"] == "human"
+    assert body["next_run"] is not None  # scheduled forward on the clock
+
+    listed = client.get("/api/cron").json()
+    assert [j["id"] for j in listed] == [body["id"]]
+    get_settings.cache_clear()
+
+
+def test_create_cron_rejects_an_invalid_expression(monkeypatch: Any, tmp_path: Any) -> None:
+    from chimera.config import get_settings
+
+    client = _feature_client(monkeypatch, tmp_path)
+    bad = client.post("/api/cron", json={"name": "x", "schedule": "not a cron", "action": "y"})
+    assert bad.status_code == 400  # a client error, not a 500
+    assert client.get("/api/cron").json() == []  # nothing was created
+    get_settings.cache_clear()

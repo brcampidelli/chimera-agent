@@ -198,6 +198,14 @@ class CronJobOut(BaseModel):
     created_by: str
 
 
+class CronCreateIn(BaseModel):
+    """Create a scheduled job from the UI (the CLI's `chimera cron add`, over HTTP)."""
+
+    name: str
+    schedule: str  # a 5-field cron expression, e.g. "0 7 * * *" for 07:00 daily
+    action: str  # the task/prompt the agent runs when it fires
+
+
 # --- tasks (kanban + projects) --------------------------------------------------------------------
 
 
