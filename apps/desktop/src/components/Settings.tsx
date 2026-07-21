@@ -1,7 +1,14 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, KeyRound, Loader2 } from "lucide-react";
-import { getConfig, getDoctor, patchConfig } from "@/lib/api";
+import {
+  getConfig,
+  getDoctor,
+  getMessaging,
+  patchConfig,
+  startMessaging,
+  stopMessaging,
+} from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { LANGS, useI18n, useT } from "@/lib/i18n";
 import type { AppConfig, DoctorInfo, ProviderCfg } from "@/lib/types";
@@ -159,6 +166,86 @@ function SecretField({ provider, onSave }: { provider: ProviderCfg; onSave: (v: 
   );
 }
 
+export function MessagingCard({ save }: { save: (u: Record<string, string>) => void }) {
+  const t = useT();
+  const qc = useQueryClient();
+  const status = useQuery({ queryKey: ["messaging"], queryFn: getMessaging });
+  const [editing, setEditing] = useState(false);
+  const [token, setToken] = useState("");
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["messaging"] });
+  const toggle = useMutation({
+    mutationFn: (on: boolean) => (on ? startMessaging("discord") : stopMessaging("discord")),
+    onSuccess: invalidate,
+  });
+
+  const d = status.data?.discord;
+  const running = !!d?.running;
+  const configured = !!d?.configured;
+
+  return (
+    <Card title={t("settings.card.messaging")}>
+      <Row label={t("settings.row.discordToken")} hint={t("settings.hint.discordToken")}>
+        {editing ? (
+          <>
+            <input
+              className={inputCls}
+              type="password"
+              autoFocus
+              placeholder={t("settings.pasteKey")}
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+            />
+            <Button
+              size="sm"
+              disabled={!token.trim()}
+              onClick={() => {
+                save({ CHIMERA_DISCORD_BOT_TOKEN: token.trim() });
+                setEditing(false);
+                setToken("");
+                setTimeout(invalidate, 300); // refresh "configured" after the save lands
+              }}
+            >
+              {t("common.save")}
+            </Button>
+          </>
+        ) : (
+          <>
+            {configured ? (
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Check className="h-3.5 w-3.5 text-ok" /> {t("settings.isSet")}
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground">{t("settings.notSet")}</span>
+            )}
+            <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+              {configured ? t("common.replace") : t("common.set")}
+            </Button>
+          </>
+        )}
+      </Row>
+      <Row label={t("settings.row.discordRun")} hint={t("settings.hint.discordRun")}>
+        <div className="flex items-center gap-2">
+          {d?.error && !running && (
+            <span className="max-w-[16rem] truncate text-xs text-bad" title={d.error}>
+              {d.error}
+            </span>
+          )}
+          <Toggle
+            on={running}
+            onChange={(v) => {
+              save({ CHIMERA_APP_MESSAGING: String(v) }); // persist for boot auto-start
+              toggle.mutate(v); // start/stop now
+            }}
+          />
+        </div>
+      </Row>
+      {!configured && (
+        <div className="px-4 pb-3 text-xs text-muted-foreground">{t("settings.messaging.note")}</div>
+      )}
+    </Card>
+  );
+}
+
 export function Settings() {
   const t = useT();
   const qc = useQueryClient();
@@ -264,6 +351,8 @@ export function Settings() {
             />
           </Row>
         </Card>
+
+        <MessagingCard save={save} />
 
         <Card title={t("settings.card.cacheSandbox")}>
           <Row label={t("settings.row.completionCache")} hint={t("settings.hint.completionCache")}>

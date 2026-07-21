@@ -58,6 +58,7 @@ from chimera.api.schemas import (
     McpAddRequest,
     McpServersOut,
     McpTestOut,
+    MessagingPlatformOut,
     NewSessionOut,
     PlanOut,
     RunReceiptOut,
@@ -81,6 +82,7 @@ from chimera.telemetry import get_logger
 if TYPE_CHECKING:
     from chimera.core.autonomous import AutonomousAgent, AutonomousResult
     from chimera.orchestration import IsolatedBatch
+    from chimera.server import MessagingManager
 
 _log = get_logger("api.app")
 
@@ -297,6 +299,7 @@ def build_api_app(
     fuse_backend: SupportsComplete | None = None,
     workspace: Path | None = None,
     solve_agent_factory: SolveAgentFactory | None = None,
+    messaging_manager: MessagingManager | None = None,
 ) -> FastAPI:
     """Build the desktop API app over a session ``factory`` (the real agent stack).
 
@@ -365,6 +368,37 @@ def build_api_app(
         from chimera.api.config_test import test_provider
 
         return test_provider(req.model)
+
+    # --- Messaging: reach the user on Discord/Telegram, controlled from the UI --------------------
+    @app.get("/api/messaging", dependencies=[guard], response_model=dict[str, MessagingPlatformOut])
+    def messaging_status() -> dict[str, Any]:
+        # No manager (API-only build) → nothing is available; the UI shows the card as unavailable.
+        return messaging_manager.status() if messaging_manager is not None else {}
+
+    @app.post(
+        "/api/messaging/{platform}/start",
+        dependencies=[guard],
+        response_model=dict[str, MessagingPlatformOut],
+    )
+    def messaging_start(platform: str) -> dict[str, Any]:
+        if messaging_manager is None:
+            raise HTTPException(status_code=503, detail="messaging is not available in this build")
+        try:
+            messaging_manager.start(platform)
+        except ValueError as exc:  # unknown platform or no token configured
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return messaging_manager.status()
+
+    @app.post(
+        "/api/messaging/{platform}/stop",
+        dependencies=[guard],
+        response_model=dict[str, MessagingPlatformOut],
+    )
+    def messaging_stop(platform: str) -> dict[str, Any]:
+        if messaging_manager is None:
+            raise HTTPException(status_code=503, detail="messaging is not available in this build")
+        messaging_manager.stop(platform)
+        return messaging_manager.status()
 
     @app.get("/api/usage", dependencies=[guard], response_model=UsageSummaryOut)
     def usage_endpoint() -> dict[str, Any]:

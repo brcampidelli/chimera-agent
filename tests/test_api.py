@@ -1044,3 +1044,58 @@ def test_patch_config_allows_the_proactive_toggles(monkeypatch: Any, tmp_path: A
     written = env.read_text(encoding="utf-8")
     assert "CHIMERA_CHAT_MEMORY=true" in written
     assert "CHIMERA_APP_CRON=false" in written
+
+
+class _FakeMessaging:
+    """A stand-in MessagingManager for the endpoint tests: records start/stop, no threads."""
+
+    def __init__(self) -> None:
+        self.state: dict[str, dict[str, Any]] = {
+            "discord": {"configured": True, "running": False, "error": None}
+        }
+
+    def status(self) -> dict[str, dict[str, Any]]:
+        return self.state
+
+    def start(self, platform: str) -> None:
+        if platform not in self.state:
+            raise ValueError(f"unknown messaging platform: {platform!r}")
+        if not self.state[platform]["configured"]:
+            raise ValueError(f"{platform} is not configured (no token set)")
+        self.state[platform]["running"] = True
+
+    def stop(self, platform: str) -> None:
+        if platform in self.state:
+            self.state[platform]["running"] = False
+
+
+def _messaging_client(tmp_path: Any, manager: Any) -> TestClient:
+    from chimera.api import build_api_app
+
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    return TestClient(
+        build_api_app(lambda: ChatSession(_FakeAgent()), settings=settings, messaging_manager=manager)
+    )
+
+
+def test_messaging_status_start_stop_roundtrip(tmp_path: Any) -> None:
+    client = _messaging_client(tmp_path, _FakeMessaging())
+
+    assert client.get("/api/messaging").json()["discord"]["running"] is False
+    assert client.post("/api/messaging/discord/start").json()["discord"]["running"] is True
+    assert client.get("/api/messaging").json()["discord"]["running"] is True
+    assert client.post("/api/messaging/discord/stop").json()["discord"]["running"] is False
+
+
+def test_messaging_start_unconfigured_is_400(tmp_path: Any) -> None:
+    mgr = _FakeMessaging()
+    mgr.state["discord"]["configured"] = False
+    client = _messaging_client(tmp_path, mgr)
+    assert client.post("/api/messaging/discord/start").status_code == 400
+
+
+def test_messaging_unavailable_without_a_manager(tmp_path: Any) -> None:
+    # An API-only build (no manager) reports nothing and refuses start with a 503, never a crash.
+    client = _messaging_client(tmp_path, None)
+    assert client.get("/api/messaging").json() == {}
+    assert client.post("/api/messaging/discord/start").status_code == 503

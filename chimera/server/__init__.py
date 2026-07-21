@@ -14,6 +14,7 @@ from chimera.server.gateway import (
     run_with_indicator,
 )
 from chimera.server.http import WebhookHandler, handle, make_server
+from chimera.server.manager import MessagingManager
 from chimera.server.mcp_server import CHIMERA_MCP_TOOLS, ChimeraMCP
 from chimera.server.signal_adapter import SignalAdapter
 from chimera.server.slack_adapter import SlackAdapter
@@ -23,6 +24,7 @@ from chimera.server.whatsapp import WhatsAppSender, WhatsAppWebhook
 __all__ = [
     "InboundMessage",
     "MessageGateway",
+    "MessagingManager",
     "Adapter",
     "LocalAdapter",
     "DiscordAdapter",

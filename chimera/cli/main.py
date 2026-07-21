@@ -1153,6 +1153,26 @@ def desktop_app(
         else None
     )
 
+    # Messaging: let the agent reach the user on Discord/Telegram, started/stopped from the UI. The
+    # manager runs each adapter in a background thread (the app already owns the main thread for the
+    # HTTP server). Auto-start configured platforms at boot only when CHIMERA_APP_MESSAGING is on.
+    from chimera.server import MessagingManager
+
+    messaging = MessagingManager(
+        settings=settings,
+        backend=backend,
+        model=model,
+        max_steps=max_steps,
+        workspace=workspace_path,
+        memory=shared_memory,
+        graph=shared_graph,
+    )
+    if settings.app_messaging:
+        for _platform in messaging.platforms():
+            if messaging.configured(_platform):
+                messaging.start(_platform)
+                console.print(f"[dim]messaging: {_platform} adapter started[/dim]")
+
     # Opt-in MCP autoload: connect the configured MCP servers ONCE at app start and reuse their tools
     # across sessions. Off by default (fast, no subprocess). A broken server is skipped gracefully so
     # it can never break boot; toggling this needs a restart to take effect. Connect eagerly here (not
@@ -1200,6 +1220,7 @@ def desktop_app(
         static_dir=static_dir,
         fuse_backend=fuse_backend,
         workspace=workspace_path,
+        messaging_manager=messaging,
     )
 
     # Bind BEFORE announcing so the URL reflects the real port (a busy 8765 falls back to a free one
@@ -1221,6 +1242,7 @@ def desktop_app(
     finally:
         if cron_stop is not None:
             cron_stop.set()  # stop the cron daemon thread on Ctrl+C / shutdown
+        messaging.stop_all()  # close any running messaging adapters
 
 
 def _start_cron_daemon(

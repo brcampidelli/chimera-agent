@@ -34,7 +34,10 @@ _PROVIDER_LABELS = {
     "ELEVENLABS_API_KEY": "ElevenLabs (TTS)",
     "STABILITY_API_KEY": "Stability (images)",
 }
-_SECRET_KEYS = set(_PROVIDER_LABELS) | {"CHIMERA_SERVER_TOKEN"}
+# Messaging bot tokens — secret (masked on read), settable so the UI can configure a channel the
+# agent reaches you on without editing .env by hand.
+_MESSAGING_SECRETS = {"CHIMERA_DISCORD_BOT_TOKEN", "CHIMERA_TELEGRAM_BOT_TOKEN"}
+_SECRET_KEYS = set(_PROVIDER_LABELS) | {"CHIMERA_SERVER_TOKEN"} | _MESSAGING_SECRETS
 _EDITABLE_SETTINGS = {
     "CHIMERA_DEFAULT_MODEL",
     "CHIMERA_WEAK_MODEL",
@@ -51,6 +54,7 @@ _EDITABLE_SETTINGS = {
     "CHIMERA_AUTO_CONSOLIDATE",
     "CHIMERA_CHAT_MEMORY",  # the "Remember from chat" toggle (opt-in durable memory from chat)
     "CHIMERA_APP_CRON",  # run the cron daemon inside the desktop app (proactivity)
+    "CHIMERA_APP_MESSAGING",  # auto-start messaging adapters in the desktop app at boot
     "CHIMERA_SANDBOX",
     "CHIMERA_SANDBOX_IMAGE",
     "CHIMERA_MCP_AUTOLOAD",

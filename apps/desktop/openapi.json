@@ -1882,6 +1882,36 @@
         "title": "MemorySourceOut",
         "type": "object"
       },
+      "MessagingPlatformOut": {
+        "description": "Per-platform messaging status: is a token set, is the adapter running, did it die.",
+        "properties": {
+          "configured": {
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "running": {
+            "title": "Running",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "configured",
+          "running"
+        ],
+        "title": "MessagingPlatformOut",
+        "type": "object"
+      },
       "ModelsCfgOut": {
         "properties": {
           "api_base": {
@@ -4194,6 +4224,114 @@
           }
         },
         "summary": "Delete Memory"
+      }
+    },
+    "/api/messaging": {
+      "get": {
+        "operationId": "messaging_status_api_messaging_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "$ref": "#/components/schemas/MessagingPlatformOut"
+                  },
+                  "title": "Response Messaging Status Api Messaging Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Messaging Status"
+      }
+    },
+    "/api/messaging/{platform}/start": {
+      "post": {
+        "operationId": "messaging_start_api_messaging__platform__start_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "platform",
+            "required": true,
+            "schema": {
+              "title": "Platform",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "$ref": "#/components/schemas/MessagingPlatformOut"
+                  },
+                  "title": "Response Messaging Start Api Messaging  Platform  Start Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Messaging Start"
+      }
+    },
+    "/api/messaging/{platform}/stop": {
+      "post": {
+        "operationId": "messaging_stop_api_messaging__platform__stop_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "platform",
+            "required": true,
+            "schema": {
+              "title": "Platform",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "$ref": "#/components/schemas/MessagingPlatformOut"
+                  },
+                  "title": "Response Messaging Stop Api Messaging  Platform  Stop Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Messaging Stop"
       }
     },
     "/api/plan": {

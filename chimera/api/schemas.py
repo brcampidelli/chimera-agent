@@ -199,6 +199,14 @@ class CronJobOut(BaseModel):
     created_by: str
 
 
+class MessagingPlatformOut(BaseModel):
+    """Per-platform messaging status: is a token set, is the adapter running, did it die."""
+
+    configured: bool
+    running: bool
+    error: str | None = None
+
+
 class CronCreateIn(BaseModel):
     """Create a scheduled job from the UI (the CLI's `chimera cron add`, over HTTP)."""
 

@@ -313,6 +313,12 @@ class Settings(BaseSettings):
     # running 24/7. Set CHIMERA_APP_CRON=0 (or `chimera app --no-cron`) for a purely reactive app.
     app_cron: bool = Field(default=True, validation_alias="CHIMERA_APP_CRON")
 
+    # Auto-start the messaging adapters (Discord/Telegram) inside `chimera app` at boot, so the agent
+    # can reach you on chat without a separate `chimera serve --discord` terminal. OFF by default: it
+    # opens a network bot, so it's a deliberate opt-in. The desktop UI's Messaging toggle sets this
+    # and also starts/stops the adapter live; only a configured platform (token present) starts.
+    app_messaging: bool = Field(default=False, validation_alias="CHIMERA_APP_MESSAGING")
+
     # Opt-in OpenTelemetry: export OTLP spans (tool calls) + metrics (tokens/cost) so an autonomous
     # run is observable in Jaeger/Tempo/Grafana. Off by default and zero-overhead; needs the [otel]
     # extra. Also auto-enabled when the standard OTEL_EXPORTER_OTLP_ENDPOINT is set.

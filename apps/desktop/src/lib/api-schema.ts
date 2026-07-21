@@ -557,6 +557,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/messaging": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Messaging Status */
+        get: operations["messaging_status_api_messaging_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messaging/{platform}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Messaging Start */
+        post: operations["messaging_start_api_messaging__platform__start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messaging/{platform}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Messaging Stop */
+        post: operations["messaging_stop_api_messaging__platform__stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/plan": {
         parameters: {
             query?: never;
@@ -1582,6 +1633,18 @@ export interface components {
             count: number;
             /** Source */
             source: string;
+        };
+        /**
+         * MessagingPlatformOut
+         * @description Per-platform messaging status: is a token set, is the adapter running, did it die.
+         */
+        MessagingPlatformOut: {
+            /** Configured */
+            configured: boolean;
+            /** Error */
+            error?: string | null;
+            /** Running */
+            running: boolean;
         };
         /** ModelsCfgOut */
         ModelsCfgOut: {
@@ -2975,6 +3038,94 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeletedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    messaging_status_api_messaging_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: components["schemas"]["MessagingPlatformOut"];
+                    };
+                };
+            };
+        };
+    };
+    messaging_start_api_messaging__platform__start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                platform: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: components["schemas"]["MessagingPlatformOut"];
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    messaging_stop_api_messaging__platform__stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                platform: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: components["schemas"]["MessagingPlatformOut"];
+                    };
                 };
             };
             /** @description Validation Error */

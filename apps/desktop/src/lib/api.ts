@@ -155,6 +155,15 @@ export const approveSkill = (name: string) =>
 export const retireSkill = (name: string) =>
   json<{ retired: boolean }>(`/api/skills/${name}/retire`, { method: "POST" });
 
+// --- Messaging (reach the user on Discord/Telegram) ---
+export type MessagingPlatform = { configured: boolean; running: boolean; error: string | null };
+export type MessagingStatus = Record<string, MessagingPlatform>;
+export const getMessaging = () => json<MessagingStatus>("/api/messaging");
+export const startMessaging = (platform: string) =>
+  json<MessagingStatus>(`/api/messaging/${platform}/start`, { method: "POST" });
+export const stopMessaging = (platform: string) =>
+  json<MessagingStatus>(`/api/messaging/${platform}/stop`, { method: "POST" });
+
 // --- Cron ---
 export const getCron = () => json<CronJob[]>("/api/cron");
 export const createCron = (body: { name: string; schedule: string; action: string }) =>
