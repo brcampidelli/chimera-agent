@@ -5,13 +5,6 @@ merge imported memory without overwriting existing history. The graph layer
 (:mod:`chimera.memory.graph`) extracts entity-relation triples for recall by entity.
 """
 
-from chimera.memory.dreaming import (
-    PromotionDecision,
-    PromotionGate,
-    RecallStats,
-    should_promote,
-    stats_from_item,
-)
 from chimera.memory.gate import MemoryGate
 from chimera.memory.graph import MemoryGraph, Relation, build_graph, extract_relations
 from chimera.memory.manager import MemoryManager
@@ -39,9 +32,4 @@ __all__ = [
     "value",
     "rank",
     "ValueWeights",
-    "PromotionGate",
-    "PromotionDecision",
-    "RecallStats",
-    "should_promote",
-    "stats_from_item",
 ]

@@ -1084,7 +1084,7 @@ def desktop_app(
 
     Serves the same-origin SPA (``apps/desktop/dist``) and a streaming chat API over the real agent
     stack. Install with ``pip install 'chimera-agent[desktop]'`` and build the UI once with
-    ``pnpm --dir apps/desktop build``.
+    ``npm --prefix apps/desktop run build``.
     """
     try:
         import uvicorn
@@ -1159,7 +1159,7 @@ def desktop_app(
         return ChatSession(runner, memory=shared_memory, graph=shared_graph, profile=shared_profile)
 
     # The built SPA, if present, is served same-origin (no CORS). Absent = API-only (dev uses Vite).
-    # Prefer a source-checkout build (live `pnpm build` output); fall back to the copy bundled in the
+    # Prefer a source-checkout build (live `npm run build` output); fall back to the copy bundled in the
     # wheel (chimera/_desktop_dist) so a pip-installed `[desktop]` user gets the UI, not just the API.
     _dev_dist = Path(__file__).resolve().parents[2] / "apps" / "desktop" / "dist"
     _pkg_dist = Path(__file__).resolve().parent.parent / "_desktop_dist"
@@ -1179,7 +1179,7 @@ def desktop_app(
     url = f"http://{host}:{port}"
     if emit_port_file:  # discovery channel for a parent process (the Tauri sidecar reads this)
         Path(emit_port_file).write_text(url, encoding="utf-8")
-    ui_note = "" if static_dir is not None else "  [yellow](UI not built — API only; run 'pnpm --dir apps/desktop build')[/yellow]"
+    ui_note = "" if static_dir is not None else "  [yellow](UI not built — API only; run 'npm --prefix apps/desktop run build')[/yellow]"
     console.print(f"[bold]Chimera Desktop[/bold] on {url}  [dim](API at /api). Ctrl+C to stop.[/dim]{ui_note}")
     if open_browser and static_dir is not None:
         import threading

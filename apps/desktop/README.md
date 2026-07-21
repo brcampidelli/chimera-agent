@@ -45,15 +45,19 @@ npm --prefix apps/desktop run dev   # terminal 2: Vite dev server (proxies /api 
 
 `npm run build` runs `tsc --noEmit` then `vite build` → `dist/` (what `chimera app` serves).
 
-## What it shows (Fase A)
+## What it shows
 
 - **Chat** — three panes mirroring the TUI: a Markdown transcript with syntax-highlighted code, a
   live token buffer streaming as the model writes, and an **activity** sidebar fed by real per-turn
   signals only (tools called with ✓/✗, tokens in/out + cache, `~ $cost` or "unavailable", memory
   facts recalled + which layer). Nothing is fabricated.
 - **Sessions** — a persisted conversation list (new / switch / delete); transcripts survive restarts.
+- **Settings** (models / API keys / cache), **Memory**, **Skills**, **Cron**, **Tasks**, **Fusion**,
+  **Usage**, **Runs**, **Code**, **Agents**, **Governance**, **Maturity**, **Tools**, **Mcp**, and an
+  **Onboarding** flow — all wired in `src/App.tsx` and reachable from the icon rail.
 
-Settings (models / API keys / cache / MCP), Memory, Skills, Cron and Tasks screens are Fase B/C.
+> This list used to say Settings/Memory/Skills/Cron/Tasks were "Fase B/C" (not yet built) long after
+> they shipped, which read as half the app being missing. If you add a screen, add it here too.
 
 ## Typed API client (no drift)
 
