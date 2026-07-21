@@ -4,6 +4,7 @@ import { ListChecks, Loader2, Play } from "lucide-react";
 import { getRuns, streamRun, type RunEvent } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
+import { ErrorState } from "@/components/ui/async";
 import { useT, type TFunc } from "@/lib/i18n";
 import type { AttemptReceipt, RunReceipt } from "@/lib/types";
 
@@ -208,7 +209,11 @@ export function Runs() {
   return (
     <Screen title={t("runs.title")} icon={<ListChecks className="h-5 w-5" />}>
       <NewRunPanel t={t} />
-      {q.isLoading ? (
+      {q.isError ? (
+        <Panel>
+          <ErrorState error={q.error} onRetry={() => q.refetch()} />
+        </Panel>
+      ) : q.isLoading ? (
         <Panel>
           <Spinner />
         </Panel>

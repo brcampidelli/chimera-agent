@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Wrench, Search } from "lucide-react";
 import { getTools } from "@/lib/api";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
+import { ErrorState } from "@/components/ui/async";
 import { useT, type TFunc } from "@/lib/i18n";
 import type { ToolInfo } from "@/lib/types";
 
@@ -72,6 +73,15 @@ export function Tools() {
     [all, term],
   );
 
+  if (q.isError) {
+    return (
+      <Screen title={t("tools.title")} icon={<Wrench className="h-5 w-5" />}>
+        <Panel>
+          <ErrorState error={q.error} onRetry={() => q.refetch()} />
+        </Panel>
+      </Screen>
+    );
+  }
   if (q.isLoading || !q.data) {
     return (
       <Screen title={t("tools.title")} icon={<Wrench className="h-5 w-5" />}>

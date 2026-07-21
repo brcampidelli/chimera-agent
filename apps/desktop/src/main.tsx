@@ -7,7 +7,20 @@ import "highlight.js/styles/github-dark.css";
 import "@/index.css";
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { refetchOnWindowFocus: false, staleTime: 5_000 } },
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      // Keep a screen's data "fresh" for 30s so revisiting it doesn't refetch (and re-spin). The old
+      // 5s meant any tab you came back to after a few seconds fired a fresh request.
+      staleTime: 30_000,
+      // A booting backend — especially the frozen desktop sidecar, which unpacks + imports the whole
+      // agent stack — refuses connections for the first few seconds. React Query's default backoff is
+      // 1s → 2s → 4s, so the very first screen would spin ~7s waiting that out. Retry quickly with a
+      // bounded delay instead, so the startup spinner clears in ~1–2s.
+      retry: 6,
+      retryDelay: (attempt) => Math.min(250 * 2 ** attempt, 1500),
+    },
+  },
 });
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { BarChart3 } from "lucide-react";
 import { getUsage } from "@/lib/api";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
+import { ErrorState } from "@/components/ui/async";
 import { useT, type TFunc } from "@/lib/i18n";
 import type { UsageSummary } from "@/lib/types";
 
@@ -129,6 +130,15 @@ export function Usage() {
   const t = useT();
   const q = useQuery({ queryKey: ["usage"], queryFn: getUsage });
 
+  if (q.isError) {
+    return (
+      <Screen title={t("usage.title")} icon={<BarChart3 className="h-5 w-5" />}>
+        <Panel>
+          <ErrorState error={q.error} onRetry={() => q.refetch()} />
+        </Panel>
+      </Screen>
+    );
+  }
   if (q.isLoading) {
     return (
       <Screen title={t("usage.title")} icon={<BarChart3 className="h-5 w-5" />}>

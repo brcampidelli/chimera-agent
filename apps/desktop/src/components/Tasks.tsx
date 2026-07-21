@@ -3,6 +3,7 @@ import { KanbanSquare, ShieldAlert } from "lucide-react";
 import { approveProject, denyProject, getKanban, getProjects } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
+import { ErrorState } from "@/components/ui/async";
 import { useT } from "@/lib/i18n";
 import type { ProjectState, TaskCard } from "@/lib/types";
 
@@ -104,7 +105,9 @@ export function Tasks() {
   return (
     <Screen title={t("tasks.title")} icon={<KanbanSquare className="h-5 w-5" />}>
       <Panel title={t("tasks.projects")}>
-        {projects.isLoading ? (
+        {projects.isError ? (
+          <ErrorState error={projects.error} onRetry={() => projects.refetch()} />
+        ) : projects.isLoading ? (
           <Spinner />
         ) : !projects.data || projects.data.length === 0 ? (
           <EmptyState text={t("tasks.projectsEmpty")} />
@@ -114,7 +117,13 @@ export function Tasks() {
       </Panel>
 
       <Panel title={t("tasks.board")}>
-        {kanban.isLoading ? <Spinner /> : <Board columns={kanban.data ?? {}} />}
+        {kanban.isError ? (
+          <ErrorState error={kanban.error} onRetry={() => kanban.refetch()} />
+        ) : kanban.isLoading ? (
+          <Spinner />
+        ) : (
+          <Board columns={kanban.data ?? {}} />
+        )}
       </Panel>
     </Screen>
   );

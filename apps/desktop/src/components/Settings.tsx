@@ -10,6 +10,7 @@ import {
   stopMessaging,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/ui/async";
 import { LANGS, useI18n, useT } from "@/lib/i18n";
 import type { AppConfig, DoctorInfo, ProviderCfg } from "@/lib/types";
 
@@ -260,6 +261,13 @@ export function Settings() {
   });
   const save = (updates: Record<string, string>) => mutation.mutate(updates);
 
+  if (config.isError) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <ErrorState error={config.error} onRetry={() => config.refetch()} />
+      </div>
+    );
+  }
   if (config.isLoading || !config.data) {
     return (
       <div className="flex flex-1 items-center justify-center text-muted-foreground">
