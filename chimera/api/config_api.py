@@ -49,6 +49,8 @@ _EDITABLE_SETTINGS = {
     "CHIMERA_MEMORY_BACKEND",
     "CHIMERA_SEMANTIC_MEMORY",
     "CHIMERA_AUTO_CONSOLIDATE",
+    "CHIMERA_CHAT_MEMORY",  # the "Remember from chat" toggle (opt-in durable memory from chat)
+    "CHIMERA_APP_CRON",  # run the cron daemon inside the desktop app (proactivity)
     "CHIMERA_SANDBOX",
     "CHIMERA_SANDBOX_IMAGE",
     "CHIMERA_MCP_AUTOLOAD",

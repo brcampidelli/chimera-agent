@@ -1024,3 +1024,23 @@ def test_create_cron_rejects_an_invalid_expression(monkeypatch: Any, tmp_path: A
     assert bad.status_code == 400  # a client error, not a 500
     assert client.get("/api/cron").json() == []  # nothing was created
     get_settings.cache_clear()
+
+
+def test_patch_config_allows_the_proactive_toggles(monkeypatch: Any, tmp_path: Any) -> None:
+    # REGRESSION: the "Remember from chat" and in-app cron toggles PATCH these keys — they must be in
+    # the allowlist or the toggle silently 400s ("Couldn't save") even though the setting exists.
+    from chimera.api.config_api import patch_config
+
+    # patch_config also writes to the live os.environ (so a change takes effect without a restart).
+    # Own these keys via monkeypatch first so that side effect is reverted at teardown and cannot
+    # leak into another test (e.g. the app-cron default test, which reads CHIMERA_APP_CRON).
+    monkeypatch.setenv("CHIMERA_CHAT_MEMORY", "")
+    monkeypatch.setenv("CHIMERA_APP_CRON", "")
+    env = tmp_path / ".env"
+    result = patch_config(
+        {"CHIMERA_CHAT_MEMORY": "true", "CHIMERA_APP_CRON": "false"}, env_path=env
+    )
+    assert set(result["updated"]) == {"CHIMERA_CHAT_MEMORY", "CHIMERA_APP_CRON"}
+    written = env.read_text(encoding="utf-8")
+    assert "CHIMERA_CHAT_MEMORY=true" in written
+    assert "CHIMERA_APP_CRON=false" in written
