@@ -105,6 +105,10 @@ class FakeCollective:
     def __init__(self, candidate: LearnedSkill, counts: tuple[int, int]) -> None:
         self.candidate = candidate
         self.counts = counts
+        # Mirrors the real evolver's shape so the unsatisfiable-gate check runs here too, instead
+        # of being skipped by a stub that happens to lack the attribute.
+        self.panel_models = ["m1"]
+        self.transfer_models = [f"m{i}" for i in range(counts[1])]
 
     def propose_collective(self, task: str, solution: str) -> list[LearnedSkill]:
         return [self.candidate]

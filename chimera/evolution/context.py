@@ -130,7 +130,12 @@ def build_evolution_context(
             audit=audit,
             provisional=settings.provisional_skills,
             collective=(
-                CollectiveSkillEvolver(gateway, settings.fusion_panel, validator=SkillValidator())
+                CollectiveSkillEvolver(
+                    gateway,
+                    settings.fusion_panel,
+                    transfer_models=settings.transfer_panel,
+                    validator=SkillValidator(),
+                )
                 if panel_evolution
                 else None
             ),

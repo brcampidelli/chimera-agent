@@ -14,6 +14,7 @@ stdlib ``math`` only.
 from __future__ import annotations
 
 import math
+from statistics import NormalDist
 
 Z95 = 1.959963984540054  # standard normal quantile for a 95% two-sided interval
 
@@ -36,6 +37,43 @@ def wilson_bounds(successes: int, n: int, z: float = Z95) -> tuple[float, float]
 def wilson_lower(successes: int, n: int, z: float = Z95) -> float:
     """Lower Wilson bound — the honest 'at least this good' estimate of a pass rate."""
     return wilson_bounds(successes, n, z)[0]
+
+
+def z_for(alpha: float) -> float:
+    """Two-sided normal quantile for confidence ``1 - alpha`` (``alpha=0.05`` gives ``Z95``)."""
+    if not 0.0 < alpha < 1.0:
+        raise ValueError(f"alpha must be in (0, 1), got {alpha}")
+    return NormalDist().inv_cdf(1.0 - alpha / 2.0)
+
+
+def wilson_lower_best_of(successes: int, n: int, k: int, alpha: float = 0.05) -> float:
+    """Wilson lower bound for a candidate that was picked as the **best of k**.
+
+    Scoring k candidates and keeping the top one is not the same as scoring one: the maximum of k
+    noisy estimates is biased upward (the winner's curse), so a plain bound taken on the winner
+    overstates it, and the overstatement grows with k. Measured on Chimera's own default gate —
+    3 candidates, 3 trials each, threshold 0.5 — best-of-3 accepted a candidate whose true pass
+    rate was 0.3 **51.8%** of the time, against 21.6% for a single candidate.
+
+    The correction is a Bonferroni split of the error budget: spend ``alpha / k`` instead of
+    ``alpha``, which tightens the bound as k grows. This costs **no extra model calls** — it only
+    moves the quantile — which is what makes it worth doing here, unlike the anytime-valid
+    machinery this module deliberately skips (see the module docstring).
+
+    ``k <= 1`` returns the ordinary bound.
+    """
+    if k <= 1:
+        return wilson_lower(successes, n, z_for(alpha))
+    return wilson_lower(successes, n, z_for(alpha / k))
+
+
+def best_possible_wilson(n: int, k: int = 1, alpha: float = 0.05) -> float:
+    """The bound a **perfect** ``n/n`` run would earn — the ceiling of a Wilson-mode gate.
+
+    Use it to catch an unsatisfiable configuration before it silently rejects everything: at n=3 a
+    flawless 3/3 scores only 0.439, so a 0.5 threshold can never be met by any result at all.
+    """
+    return wilson_lower_best_of(n, n, k, alpha)
 
 
 def proportion_diff_ci(
