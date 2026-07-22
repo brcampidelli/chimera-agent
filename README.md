@@ -58,7 +58,7 @@ reverse-engineering study of five leaders (OpenClaw, Hermes, nanobot, CrewAI, La
 
 - 🧬 **Self-evolution with a fitness signal.** The others "learn" by appending whatever happened, or by human pull requests — nothing measures whether a learned change actually helped. Chimera keeps a change **only when a verified result proves it did**: the evolution step is gated on the real working-tree diff and an honest A/B, never the model's say-so. Independent evidence this matters: [EvoAgentBench (arXiv 2607.05202)](https://arxiv.org/abs/2607.05202) measured that *automatic*, ungated experience-encoding methods routinely produce **negative transfer** — one popular method regressed **−12.3 points** on tasks it wasn't tuned on. Chimera's gate now also runs a **transfer holdout**: a learned change must not regress a disjoint, same-capability slice before it's promoted, so it can't just memorize its own eval.
 - 🛡️ **Security by architecture.** Prompt injection is now widely considered *unpatchable*; the popular agents mitigate at the app layer or declare it out of scope (one shipped 135k publicly-exposed instances and a marketplace ~12% full of malicious skills). Chimera ships a real defence layer — **opt-in with `--taint`, off by default**: it tracks taint provenance *heuristically* (verbatim reference/content flow, **not** true dataflow — a model that paraphrases tainted text launders it), strips control tokens from untrusted content, narrows dangerous-tool access for the rest of a tainted run, and guards side-effecting retries; untrusted code runs in an opt-in locked-down container. Measured, not asserted: on the built-in **7-attack** corpus this cuts attack success **100% → ~14%** ([`chimera/eval/injection.py`](chimera/eval/injection.py)). [`SECURITY.md`](SECURITY.md) states plainly what still gets through (sub-agent hand-offs, fusion/summarisation, non-CLI entry points) — the containment boundary is the sandbox, this layer is defence-in-depth on top of it.
-- 📊 **Honest, published benchmarks.** ~20% of a popular leaderboard's "solved" cases are actually wrong. Chimera reports every number with a confidence interval — **including the runs where it didn't win** — and never re-rolls for significance. A recorded paired run shows the loop **lifting a weak model on a pre-registered 100-task suite — 9% → 15% (+6pp), 95% CI [+1.3%, +6.0%] — statistically significant** (the CI excludes zero), from **6 tasks it recovered** (raw fail → verified pass) with **zero regressions**; the absolute rates are low by design, because 85 of the 100 tasks are hard enough to fail both arms (a deliberate floor, so the loop has headroom). One run, no re-roll. And on the **official Terminal-Bench**, a pre-registered N=40 A/B landed at a **variance-dominated floor with no significant difference either way** — published as-is ([`bench/terminal_bench/RESULTS.md`](bench/terminal_bench/RESULTS.md)), including **retracting a wrong intermediate read** once the control arm was measured. Null results and self-corrections ship too; that's the point.
+- 📊 **Honest, published benchmarks.** ~20% of a popular leaderboard's "solved" cases are actually wrong. Chimera reports every number with a confidence interval — **including the runs where it didn't win** — and never re-rolls for significance. A recorded paired run shows the loop **lifting a weak model on a pre-registered 100-task suite — 48% → 71% (+23pp), 95% CI [+12.6%, +28.6%] — statistically significant** (the CI excludes zero), from **28 tasks it recovered** (raw fail → verified pass) against 5 regressions. One run, no re-roll. This **supersedes an earlier run of the same suite** (9% → 15%, +6pp) whose harness graded with a test file the agent could edit — and which, on re-run, it did edit once. The direction and significance replicated and strengthened once grading was hardened; the erratum, the preserved tampering evidence, and why the original's absolute rates were so much lower are all in [`bench/local_lift/RESULTS.md`](bench/local_lift/RESULTS.md). And on the **official Terminal-Bench**, a pre-registered N=40 A/B landed at a **variance-dominated floor with no significant difference either way** — published as-is ([`bench/terminal_bench/RESULTS.md`](bench/terminal_bench/RESULTS.md)), including **retracting a wrong intermediate read** once the control arm was measured. Null results and self-corrections ship too; that's the point.
 
 **In one line: the governed, self-evolving agent — proved and governed.** It's alpha, and it says so.
 
@@ -70,13 +70,27 @@ snapshot.)
 
 - **Weak-model lift (significant).** A cheap model (`mistral-small-3.2-24b`) + Chimera's retry loop vs
   the same model alone, on a **pre-registered n=100 suite** (design + tasks committed and pushed before
-  any model call): **9.0% → 15.0% (+6.0pp)**, paired **95% CI [+1.3%, +6.0%] — statistically
-  significant** (the CI excludes 0). The lift is **6 tasks the loop recovered** (raw fail → verified
-  pass) with **0 regressions**, on 6 discordant pairs (0 for the raw model). The absolute rates are low
-  because 85 of the 100 tasks are hard enough to fail both arms — a deliberate floor, so the loop has
-  headroom; the hard tail is kept in, not dropped after the fact. One model, one seed/task, small
-  self-contained Python tasks — **NOT** SWE-bench, does not generalise to real repos. One run, no
-  re-roll. Source: [`bench/local_lift/results/paired.json`](bench/local_lift/results/paired.json), [`PREREGISTRATION.md`](bench/local_lift/PREREGISTRATION.md).
+  any model call): **48.0% → 71.0% (+23.0pp)**, paired **95% CI [+12.6%, +28.6%] — statistically
+  significant** (the CI excludes 0), from **28 tasks the loop recovered** (raw fail → verified pass)
+  against 5 regressions. One model, one seed/task, small self-contained Python tasks — **NOT**
+  SWE-bench, does not generalise to real repos. One run, no re-roll.
+  **This supersedes an earlier run of the same suite** (9.0% → 15.0%, +6.0pp) whose harness graded
+  with a test file the agent under test could edit. Re-running with the pristine test restored caught
+  the agent rewriting its own grading test on one task — so the hole was real — and the lift
+  replicated *larger*, not smaller. The earlier run's claim that "85 of the 100 tasks are hard enough
+  to fail both arms" also did not hold: the re-run measures 24. The full erratum, the preserved
+  tampering evidence, and what could not be re-verified are in
+  [`bench/local_lift/RESULTS.md`](bench/local_lift/RESULTS.md).
+  Source: [`bench/local_lift/_reverify_n100/paired.json`](bench/local_lift/_reverify_n100/paired.json), [`PREREGISTRATION.md`](bench/local_lift/PREREGISTRATION.md).
+- **Does accumulated learning help? (unproven).** The flywheel — skills gated on recurrence + a
+  transfer test, anti-pattern cards, persistent memory — had **never been measured**: the lift bench
+  above disables learning in both arms on purpose, and the continuous-evolution bench measures whether
+  performance *holds*, not whether it improves. A first pre-registered attempt (30 same-family tasks,
+  learning on vs off, difference-in-differences) returned **exactly 0.0pp**, with 31 skills genuinely
+  learned — but the control arm scored **100% on the first half**, so the design had no headroom to
+  detect an improvement. Null and **uninformative**, published as such:
+  [`bench/learning_lift/RESULTS.md`](bench/learning_lift/RESULTS.md). "It gets better the more you use
+  it" remains unevidenced — now as a measured absence rather than an untested assumption.
 - **Terminal-Bench (humbling).** Pre-registered N=40 A/B on the official benchmark, same model both
   arms (`deepseek-chat-v3.1`): **7.5% → 2.5%** with the scaffold, paired **Δ −5.0pp, 95% CI [−5.0%,
   +1.6%] — not significant**. The scaffold **did not lift an already-competent model** (this isn't the

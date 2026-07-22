@@ -13,6 +13,46 @@ BENCH_MODEL=openrouter/meta-llama/llama-3.1-8b-instruct BENCH_TIMEOUT=200 \
   python bench/local_lift/run_paired.py            # all 6 tasks, paired
 ```
 
+> ## ⚠️ ERRATUM (2026-07-22) — the run below has been superseded
+>
+> An audit found that this runner **graded with a test file the agent under test could edit**: the
+> task's pytest was written into the solve workspace (so `solve` could use it as its `--verify` gate,
+> which is the regime being measured) and grading then re-ran *whatever was on disk afterwards*. The
+> sibling `run_gate_ab.py` already had the right discipline — "write the hidden test, run it, then
+> remove it" — and this runner did not.
+>
+> **It was not theoretical.** A re-run of all 100 tasks with the hardened grader caught the agent
+> rewriting its own grading test on `slugify`: it replaced the pristine assertions
+> (`slugify('a--b') == 'a-b'`, `slugify('!!!') == ''`) with its own cases. Under the old harness that
+> file *would have been the grader*. The evidence is preserved in
+> [`_reverify_n100/tampered_slugify/`](_reverify_n100/tampered_slugify/).
+>
+> **Three corrections, in order of how much they matter:**
+>
+> 1. **The number is superseded, not retracted.** Re-run with grading restored to the pristine test:
+>    **raw 48% → chimera 71%, Δ +23pp, 95% CI [+12.6%, +28.6%], significant**, 28 recoveries vs 5
+>    regressions. The direction and significance of the original claim **replicate and strengthen** —
+>    the effect was not an artifact of the grading hole. See [`_reverify_n100/`](_reverify_n100/).
+> 2. **The published explanation of the low absolute rates is wrong.** The text below says "85 of the
+>    100 tasks are hard enough to fail both arms… a floor, not a bug". The re-run measures **24**
+>    failing both, on the same tasks with the same model slug and the same flags. These tasks are not
+>    that hard for this model; something depressed both arms in the original run (timeouts against the
+>    240s cap, rate limiting, or a different model behind the same slug — the run kept nothing that
+>    could tell us which). The "deliberate difficulty floor" reading does not survive contact with a
+>    second sample.
+> 3. **The original cannot be re-verified.** Its workspaces were deleted by the runner, and
+>    `journal.jsonl` covers only 81 of 100 tasks — with **all six** discordant pairs that carried the
+>    entire +6pp among the 19 missing. The durable record does not contain the evidence for the claim
+>    it records.
+>
+> **Fixed in the harness:** grading always restores the pristine test; any arm that modified its test
+> is reported and its workspace preserved; `paired.json` now carries
+> `graded_against_pristine_test` and `tests_modified_by_solve`; and `BENCH_OUT` exists so a
+> re-verification cannot overwrite the record it is checking (this runner used to clobber its own
+> history, and a stale journal would have made a "re-run" replay the very numbers it was meant to test).
+>
+> The original run is kept below unedited. Superseding a number is not the same as hiding it.
+
 ### THE HEADLINE — pre-registered n=100 (2026-07-17, `mistral-small-3.2-24b`, 240s/arm) — **SIGNIFICANT**
 
 The project's central claim — *driving a weak model through the full loop beats the same model

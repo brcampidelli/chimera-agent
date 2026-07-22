@@ -6,7 +6,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **The weak-model-lift bench graded with a test the agent under test could edit — and it did.** The
+  task's pytest was written into the solve workspace (deliberately: `solve` uses it as its `--verify`
+  gate, which is the regime being measured), and grading then re-ran *whatever was on disk*. The
+  sibling `run_gate_ab.py` already withheld the test and restored it only to grade; this runner did
+  not. Re-running all 100 tasks with the hardened grader caught the agent rewriting its own grading
+  test on `slugify`, replacing the pristine assertions with its own — under the old harness that file
+  would have been the grader. Grading now always restores the pristine test, records any arm that
+  modified it, preserves that workspace as evidence, and stamps `graded_against_pristine_test` into
+  the result. `BENCH_OUT` was added so a re-verification cannot overwrite the record it is checking —
+  the runner used to clobber its own history, and a stale journal would have made a "re-run" silently
+  replay the numbers it was meant to test.
+
 ### Changed
+- **The headline weak-model-lift number is superseded: 48% → 71% (+23pp), 95% CI [+12.6%, +28.6%].**
+  The earlier 9% → 15% (+6pp) came from the run with the grading hole above. Re-run with integrity
+  restored, the effect **replicated and roughly quadrupled** — it was not an artifact. Two further
+  corrections ship with it: the published explanation that "85 of the 100 tasks are hard enough to
+  fail both arms — a deliberate floor" does not survive a second sample (the re-run measures **24**),
+  so something depressed both arms in the original run rather than the tasks being that hard; and the
+  original cannot be re-verified at all, because its workspaces were deleted and its journal covers 81
+  of 100 tasks with **all six** discordant pairs that carried the entire +6pp among the missing 19.
+  The original run is kept unedited alongside the erratum — superseding a number is not hiding it.
+
+### Added
+- **A benchmark for the claim the project had never tested: does accumulated learning help?**
+  ([`bench/learning_lift/`](bench/learning_lift/)) The self-evolution machinery was unmeasured — the
+  lift bench disables learning in both arms on purpose, and the continuous-evolution bench measures
+  whether performance *holds*, not whether it improves. Pre-registered before any model call: 30
+  same-family tasks, learning on vs off, difference-in-differences (arm A's own half-to-half change is
+  the drift from task ordering, so subtracting it isolates accumulation). **First result: exactly
+  0.0pp**, with 31 skills genuinely learned — so this is not the "nothing to measure" case. But the
+  control arm scored **100% on the first half**, leaving no headroom to detect an improvement, so the
+  null is **uninformative** rather than negative, and is published that way. A post-hoc reading (the
+  learning arm was worse overall, 80% vs 93%) is reported *and labelled post-hoc*: McNemar p = 0.29,
+  entirely compatible with noise. "It gets better the more you use it" — shipped in seven languages —
+  remains unevidenced, now as a measured absence.
 - **The backend boots ~26% faster — four package `__init__` files stopped importing the world.**
   `chimera.eval`, `chimera.governance`, `chimera.tools` and `chimera.core` re-exported their whole
   surface eagerly. Python runs a package's `__init__` before *any* submodule, so
