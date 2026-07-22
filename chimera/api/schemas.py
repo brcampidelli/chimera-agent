@@ -461,8 +461,11 @@ class InjectionAttackOut(BaseModel):
 
 class InjectionReportOut(BaseModel):
     total_attacks: int
-    defended_asr: float  # overall attack-success-rate WITH defenses (fraction still getting through)
-    undefended_asr: float  # overall ASR WITHOUT defenses (the honest baseline)
+    defended_asr: float  # fraction of harmful calls that still execute WITH the defenses
+    # WITHOUT the defenses this is 1.0 by construction — an unwrapped tool always runs — so it is the
+    # definitional floor this layer is compared against, NOT a measured baseline system. Both figures
+    # assume an agent that is already injected; neither says how easily a model gets injected.
+    undefended_asr: float
     defended_block_rate: float
     undefended_block_rate: float
     by_category: list[InjectionCategoryOut]
