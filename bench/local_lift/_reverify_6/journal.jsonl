@@ -1,0 +1,6 @@
+{"task": "eval_expr", "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct", "baseline": false, "chimera": false}
+{"task": "fix_percentile", "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct", "baseline": true, "chimera": true}
+{"task": "csv_parse", "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct", "baseline": false, "chimera": false}
+{"task": "topo_sort", "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct", "baseline": true, "chimera": true}
+{"task": "query_string_parse", "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct", "baseline": false, "chimera": true}
+{"task": "query_string_build", "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct", "baseline": true, "chimera": true}
