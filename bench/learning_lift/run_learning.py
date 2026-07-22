@@ -4,7 +4,8 @@
 measured whether it *improves*, and the flagship weak-model-lift bench disables learning in both arms
 (`--no-remember --no-collect --no-evolve-skills`), so it deliberately says nothing about accumulation.
 
-This runs the same 30 same-family tasks twice, in the same committed order:
+This runs one committed same-family suite twice, in the same committed order (`BENCH_SUITE=hard`, the
+40 tasks authored for run 2, is the default; `fix` reproduces run 1):
 
   cold      — learning off, and a FRESH agent home per task: nothing survives from task to task
   learning  — learning on, and ONE agent home for the whole sequence: skills and memory accumulate
@@ -39,9 +40,25 @@ _MODEL = os.environ.get("BENCH_MODEL", "openrouter/mistralai/mistral-small-3.2-2
 _TIMEOUT = int(os.environ.get("BENCH_TIMEOUT", "240"))
 _OUT = Path(os.environ.get("BENCH_OUT", str(HERE / "results")))
 
-# The committed suite: the one family with enough shared structure for transfer to be possible.
-# Order is `tasks.py` order and is NOT re-shuffled — see PREREGISTRATION.md.
-SUITE = [t for t in TASKS if str(t["id"]).startswith("fix_")]
+def _suite() -> tuple[str, list[dict]]:
+    """The committed suite. Order is committed and is NOT re-shuffled — see PREREGISTRATION.md.
+
+    ``fix``  — run 1: the one family in `local_lift` with shared structure. Kept so run 1 stays
+               reproducible; its control arm hit the ceiling (15/15 first half), which is why run 2
+               exists at all.
+    ``hard`` — run 2: 40 tasks authored for this bench to a difficulty spec fixed before authoring.
+    """
+    name = os.environ.get("BENCH_SUITE", "hard").lower()
+    if name == "fix":
+        return name, [t for t in TASKS if str(t["id"]).startswith("fix_")]
+    if name == "hard":
+        from tasks_hard_fix import HARD_FIX_TASKS
+
+        return name, list(HARD_FIX_TASKS)
+    raise SystemExit(f"unknown BENCH_SUITE={name!r} (expected 'hard' or 'fix')")
+
+
+SUITE_NAME, SUITE = _suite()
 HALF = len(SUITE) // 2
 
 _SCAFFOLD = ["--repo-map", "--progress-ledger", "--checklist", "--replan", "--max-attempts", "3"]
@@ -141,8 +158,8 @@ def main() -> None:
     with contextlib.suppress(Exception):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
     _OUT.mkdir(parents=True, exist_ok=True)
-    print(f"learning-lift · model={_MODEL} · tasks={len(SUITE)} (halves {HALF}/{len(SUITE) - HALF})"
-          f" · timeout={_TIMEOUT}s", flush=True)
+    print(f"learning-lift · suite={SUITE_NAME} · model={_MODEL} · tasks={len(SUITE)}"
+          f" (halves {HALF}/{len(SUITE) - HALF}) · timeout={_TIMEOUT}s", flush=True)
 
     root = Path(tempfile.mkdtemp(prefix="chimlearn-ws-"))
     homes = Path(tempfile.mkdtemp(prefix="chimlearn-home-"))
@@ -170,12 +187,27 @@ def main() -> None:
               flush=True)
     print(f"  grading integrity: {'TAMPERED: ' + ', '.join(sorted(tampered)) if tampered else 'no arm modified its own test'}",
           flush=True)
-    print("\n  n=30 in halves of 15 is small: a null here is UNDERPOWERED, not 'no effect'"
-          " (PREREGISTRATION.md).", flush=True)
+
+    # Pre-registered: a control arm pinned at the ceiling (or floor) leaves the DiD no room to move,
+    # so the number is reported but must not be interpreted. This is what run 1 hit.
+    cold_first = halves["cold"][0]
+    if cold_first >= 0.9 or cold_first <= 0.1:
+        print(f"\n  !! UNINFORMATIVE BY CONSTRUCTION — the control arm's first half is {cold_first:.1%}."
+              "\n     With the control at the ceiling/floor the DiD cannot move regardless of whether"
+              "\n     learning works. Reported, not interpreted (PREREGISTRATION.md, run-2 amendment).",
+              flush=True)
+    elif not 0.4 <= cold_first <= 0.6:
+        print(f"\n  note: the control arm's first half is {cold_first:.1%}, outside the 40–60% target"
+              "\n  fixed before authoring. Stated up front; the suite was NOT re-authored to hit it.",
+              flush=True)
+
+    print(f"\n  n={len(SUITE)} in halves of {HALF} is small: a null here is UNDERPOWERED, not"
+          " 'no effect' (PREREGISTRATION.md).", flush=True)
 
     (_OUT / "learning.json").write_text(
         json.dumps({
-            "model": _MODEL, "tasks": [str(t["id"]) for t in SUITE], "half": HALF,
+            "suite": SUITE_NAME, "model": _MODEL,
+            "tasks": [str(t["id"]) for t in SUITE], "half": HALF,
             "by_arm": {a: {"passed": r, "first_half": halves[a][0], "second_half": halves[a][1]}
                        for a, r in arms.items()},
             "did": did, "skills_learned": learned,
