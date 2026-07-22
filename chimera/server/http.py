@@ -34,6 +34,33 @@ def _bearer_ok(headers: Mapping[str, str] | None, token: str) -> bool:
     return auth.startswith(prefix) and hmac.compare_digest(auth[len(prefix) :], token)
 
 
+def _needs_bearer(method: str, route: str) -> bool:
+    """Routes that drive the agent or change state, and so require the bearer when one is set.
+
+    ``/whatsapp`` is excluded on purpose — Meta cannot send our bearer, so it is authenticated by
+    HMAC signature instead (see the ``x-hub-signature-256`` check below).
+    """
+    return method == "POST" and (route in ("/a2a", "/chat") or route.startswith("/webhook/"))
+
+
+def authorized(
+    method: str, path: str, headers: Mapping[str, str] | None, token: str | None
+) -> bool:
+    """The single authorisation decision for this server. No transport may route around it.
+
+    This exists as one function rather than an inline condition because it previously *was* an
+    inline condition inside :func:`handle`, and the A2A ``message/stream`` path — which cannot use
+    ``handle`` (SSE streams many bodies, ``handle`` returns one) — short-circuited ahead of it and
+    served an unauthenticated agent to anyone who used the streaming method name. Any new transport
+    branch must call this first; that is the whole point of it being here.
+    """
+    if not token:  # auth is opt-in: no token configured means no check
+        return True
+    if not _needs_bearer(method, urlparse(path).path):
+        return True
+    return _bearer_ok(headers, token)
+
+
 def handle(
     gateway: MessageGateway,
     method: str,
@@ -48,14 +75,7 @@ def handle(
 ) -> tuple[int, dict[str, Any] | str]:
     """Pure request handler returning ``(status, body)`` — body is a dict (JSON) or a str (text)."""
     route = urlparse(path).path
-    # Auth (opt-in): when a token is configured, the state-changing POST endpoints require a bearer.
-    # /whatsapp is excluded — Meta can't send our bearer; it's authenticated by HMAC signature below.
-    if (
-        token
-        and method == "POST"
-        and (route in ("/a2a", "/chat") or route.startswith("/webhook/"))
-        and not _bearer_ok(headers, token)
-    ):
+    if not authorized(method, path, headers, token):
         return 401, {"error": "unauthorized"}
     if method == "GET" and route == "/health":
         return 200, {"status": "ok", "active_chats": gateway.active_chats}
@@ -163,6 +183,12 @@ def make_server(
                 self._send(400, {"error": "invalid Content-Length"})
                 return
             body = self.rfile.read(length) if length else b""
+            # Authorise BEFORE choosing a transport. The SSE branch below cannot go through
+            # `handle`, so if the check lived only there, picking the streaming method name would
+            # skip it entirely — which is exactly the hole this ordering closes.
+            if not authorized(method, self.path, dict(self.headers.items()), token):
+                self._send(401, {"error": "unauthorized"})
+                return
             # A2A message/stream is Server-Sent Events — it can't go through the pure `handle`
             # (which returns one body), so stream it directly off the A2AServer's iterator.
             if method == "POST" and a2a is not None and self._is_a2a_stream(body):

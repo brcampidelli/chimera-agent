@@ -27,15 +27,23 @@ rides the next weekly — CI is not a shipped artifact.
 
 ### Why `rc` is safe (verified, not assumed)
 
+All three claims were checked against the live services **after** cutting `v0.36.0rc1` — the first rc
+this project ever published — not merely predicted:
+
 - **The updater ignores it.** The desktop updater reads
   `releases/latest/download/latest.json`, and GitHub's *latest* is by definition "the most recent
   **non-prerelease**, non-draft release". A prerelease never becomes *latest*, so an `rc` is never
-  offered to installed apps. (Checked against the live API: `releases/latest` → `v0.34.0`,
+  offered to installed apps. (With `v0.36.0rc1` published, `releases/latest` still returned `v0.35.0`,
   `prerelease: false`.)
-- **pip ignores it.** `pip install chimera-agent` will not resolve to `0.35.0rc1`; only
-  `--pre` or an exact pin does.
+- **pip ignores it.** With `0.36.0rc1` live on PyPI, `pip install chimera-agent` still resolved to
+  `0.35.0`; only `--pre` or an exact pin reaches the rc.
 - The release CI still runs for a prerelease and attaches installers + a `latest.json` **to that rc's
-  own release page** — useful for testing, invisible to everyone else.
+  own release page** — useful for testing, invisible to everyone else. (All four platforms plus the
+  `.sig` files landed on the rc's page.)
+
+An rc is also the cheapest place to discover that a *release mechanism* is broken. `v0.36.0rc1` is what
+proved the semver prerelease spelling survives a real Cargo/Tauri build — a thing no local check in this
+repo can tell you, since the desktop is only ever built in CI.
 
 ## Before cutting a stable release
 
@@ -68,13 +76,18 @@ rides the next weekly — CI is not a shipped artifact.
 ## Cutting it
 
 ```bash
-# 1. bump all three version strings (they must agree)
-#    pyproject.toml · apps/desktop/src-tauri/Cargo.toml · apps/desktop/src-tauri/tauri.conf.json
+# 1. bump all three version strings — they must agree on the VERSION, not on the literal text.
+#    Python and Rust disagree on how a prerelease is spelled, and neither will accept the other's:
+#      pyproject.toml                       PEP 440   0.36.0   ·  0.36.0rc1
+#      apps/desktop/src-tauri/Cargo.toml    semver    0.36.0   ·  0.36.0-rc.1
+#      apps/desktop/src-tauri/tauri.conf.json  semver 0.36.0   ·  0.36.0-rc.1
+#    (For a stable the three strings do end up identical; only prereleases diverge.)
 # 2. refresh the installed metadata, then regenerate the shipped snapshots (they embed __version__)
 uv pip install -e . --no-deps
 uv run --no-sync python -m chimera.eval.maturity_snapshot
 uv run --no-sync python -m chimera.eval.benchmark_snapshot
-# 3. CHANGELOG: rename [Unreleased] -> [X.Y.Z] - <date>
+# 3. CHANGELOG: rename [Unreleased] -> [X.Y.Z] - <date>   (STABLE ONLY — an rc previews the
+#    [Unreleased] section and leaves it alone; the stable is what names and dates it)
 # 4. commit, push, then:
 gh release create vX.Y.0 --title "..." --notes "..."            # stable
 gh release create vX.Y.0rc1 --prerelease --title "..." --notes "..."   # rc
