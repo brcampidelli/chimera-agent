@@ -6,7 +6,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-07-22
+
 ### Added
+- **The desktop app is proactive — it wakes up on a schedule.** `chimera app` now runs the cron daemon
+  in-process (previously only `chimera serve --cron` did), so a job you schedule actually fires while
+  the app is open, runs a real agent turn, and appends the result to
+  `<home>/scheduler/cron_results.jsonl` — a durable sink, so nothing is silently lost. On by default
+  (`CHIMERA_APP_CRON`; `--no-cron` makes the app purely reactive). Verified end-to-end: a job set two
+  minutes out fired on the minute and its answer landed in the results file. **Note:** cron expressions
+  are evaluated in **UTC**, not local time.
+- **Create a schedule from the UI — no terminal.** The Agenda screen could only toggle and delete;
+  creating one meant `chimera cron add`. It now has a form (name · what Chimera should do · when) with
+  quick picks for the common cases, on a new `POST /api/cron`. Jobs created by a human come back
+  enabled, matching the scheduler's own invariant.
+- **The chat can build durable memory — opt-in and explicit-only.** With "Lembrar do chat" on
+  (`CHIMERA_CHAT_MEMORY`, **off** by default), an explicit "remember that …" in a conversation writes a
+  lasting fact through the same consolidation path the CLI uses. Deliberately conservative: only an
+  explicit request is captured, never ambient extraction from whatever you happened to type — automatic
+  memory is a privacy decision, so it is yours to make, and visible when it happens.
+- **The agent can reach you on Discord — configured and run from the app.** The adapters existed but
+  were CLI/env-only. Settings now has a Messaging card (bot token + a run toggle), backed by a
+  `MessagingManager` that runs the adapter in a background thread inside the app process, plus
+  `GET/POST /api/messaging`. Starting a platform with no token fails with a clear message instead of a
+  crash, and a dead adapter surfaces its error in the UI. Auto-starts with the app when
+  `CHIMERA_APP_MESSAGING` is on. Discord is wired end-to-end; Telegram is a small extension of the same
+  manager.
 - **OpenAI-compatible endpoint — point any LLM client or benchmark at the agent.**
   `POST /v1/chat/completions` and `GET /v1/models` (in the `[desktop]` extra) speak the OpenAI wire
   format, but the thing behind them is the whole Chimera loop — tools, steps, retries — not one model
@@ -91,6 +116,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   execution and gated too. (Desktop/API keep their own approval flow — a follow-up wires this there.)
 
 ### Fixed
+- **The desktop app no longer spins for seconds on nearly every screen — and never spins forever.**
+  The endpoints were never the problem (measured: `/api/tools` ~9ms, almost everything under 20ms, one
+  request per screen — no refetch loop). Two things stretched the wait: React Query's default retry
+  backoff is 1s → 2s → 4s, so while the frozen backend sidecar was still booting the first screen sat
+  there ~7s waiting it out; and twelve screens gated their spinner on `isLoading || !data`, which on an
+  *error* leaves `isLoading` false and `data` undefined — so the spinner stayed up forever, with no
+  message and no way to retry. Now: a bounded fast retry (250ms → 1.5s) behind a single "Starting
+  Chimera…" gate, `staleTime` raised 5s → 30s so revisiting a screen doesn't refetch-and-respin, and a
+  shared error state (message + "try again") on every screen that loads data. Verified live: with the
+  backend killed a screen showed the error and its retry, and recovered on click once it was back.
+  The sidecar's own cold-boot cost is untouched — this makes the wait short and honest, not zero.
 - **`CHIMERA_HOST_EXEC=deny` is now actually enforceable — `code_interpreter` was an ungated third
   door.** The shell and `execute_code` tools honoured the posture, but `code_interpreter` `exec()`s
   in-process on the host, bypasses the sandbox entirely, and was registered with no gate: under
