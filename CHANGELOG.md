@@ -6,6 +6,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **The backend boots ~26% faster — four package `__init__` files stopped importing the world.**
+  `chimera.eval`, `chimera.governance`, `chimera.tools` and `chimera.core` re-exported their whole
+  surface eagerly. Python runs a package's `__init__` before *any* submodule, so
+  `from chimera.eval.benchmark_snapshot import snapshot_path` — a module whose own imports are `json`
+  and `pathlib` — dragged in `chained` → `continuous` → `evolution` → `governance` → `core` →
+  `autonomous` → `ecosystem`. The desktop sidecar paid all of it on every cold boot to serve screens
+  that never touch those modules. The re-exports are now resolved on first attribute access (PEP 562)
+  and cached, so `from chimera.core import Agent` still works and costs the same *when you use it*;
+  `TYPE_CHECKING` blocks keep mypy's view exact. Measured A/B (minimum of repeated runs, changes
+  stashed between sides): `import chimera.api.app` **836ms → 452ms (-46%)**, launch-to-`/api/health`
+  **1234ms → 915ms (-26%)**, and 627 → 554 modules loaded. The cost doesn't vanish, it moves: the
+  first request that genuinely needs a heavy module pays for it once (`/api/tools`, the worst case,
+  took 77ms on its first call and single-digit ms after).
+- **Fixed a real import cycle that the eager imports were hiding.** Making `chimera.governance` lazy
+  broke the app outright: `governance.ledger_tool` imports `chimera.tools.base`, which ran
+  `chimera/tools/__init__.py`, which imported `browser`/`documents`/`scrape` — each of which imports
+  `fence` back from the half-initialised `ledger_tool`. The cycle was always there; the *order* of a
+  sibling package's eager imports happened to mask it. Making `chimera.tools` lazy removes it at the
+  source rather than papering over it with a function-local import.
+
 ## [0.35.0] - 2026-07-22
 
 ### Added
