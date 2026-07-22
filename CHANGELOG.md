@@ -6,6 +6,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+- **The A2A SSE stream was a way around the bearer token.** `POST /a2a` with
+  `{"method": "message/stream"}` reached the agent with no `CHIMERA_SERVER_TOKEN` at all. The cause
+  was structural rather than an oversight: SSE emits many bodies and the pure `handle()` returns one,
+  so the streaming path had to branch before it — and `handle()` was the only place the bearer was
+  checked. Picking the streaming method name skipped auth entirely, on the one surface whose whole
+  purpose is exposing the agent to other agents over a network. The decision now lives in a single
+  `authorized()` function consulted **before** any transport branch, so no future transport can route
+  around it. Found by an internal audit; no evidence of exploitation, but anyone running
+  `serve --a2a` with a token should update.
+- **`--guard --taint` — the documented recipe for untrusted content — silently disarmed the taint
+  layer.** That combination composes the registry as `LedgeredTool(GovernedTool(tool))`, and the
+  ledger read the `untrusted_output` marker off its immediate `.inner`, which is the `GovernedTool`,
+  which did not copy it. Two defences fell together: document/media/file output stopped being
+  data-fenced and sanitised, **and** the run never became tainted, so taint-adaptive narrowing never
+  armed. The safest-looking invocation was the undefended one. The marker is now declared on the
+  `Tool` interface and resolved through the whole wrapper chain (`is_untrusted_output`), so wrapper
+  order no longer matters and a future wrapper that forgets to mirror it cannot reopen the hole.
+
 ### Changed
 - **The backend boots ~26% faster — four package `__init__` files stopped importing the world.**
   `chimera.eval`, `chimera.governance`, `chimera.tools` and `chimera.core` re-exported their whole

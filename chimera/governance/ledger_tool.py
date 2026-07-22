@@ -32,7 +32,7 @@ from chimera.governance.ledger import (
 )
 from chimera.governance.policy import Decision
 from chimera.governance.sanitize import sanitize_untrusted
-from chimera.tools.base import Tool
+from chimera.tools.base import Tool, is_untrusted_output
 from chimera.tools.registry import ToolRegistry
 
 ApproveFn = Callable[[SequenceAssessment], bool]
@@ -175,8 +175,12 @@ class LedgeredTool(Tool):
     def _is_fetch(self) -> bool:
         """A tool whose output is untrusted external content — by builtin name OR by an
         ``untrusted_output`` marker on the wrapped tool (MCP / OpenAPI connectors, whose names come
-        from a remote server and so can't be listed statically in FETCH_TOOLS)."""
-        return self.name in FETCH_TOOLS or bool(getattr(self.inner, "untrusted_output", False))
+        from a remote server and so can't be listed statically in FETCH_TOOLS).
+
+        Resolved through the whole wrapper chain, not just ``self.inner``: under ``--guard --taint``
+        the inner tool is a :class:`GovernedTool`, and reading one level deep lost the marker.
+        """
+        return self.name in FETCH_TOOLS or is_untrusted_output(self.inner)
 
     def _record_effect(self, args: Mapping[str, Any], result: str) -> None:
         name = self.name
