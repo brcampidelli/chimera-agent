@@ -6,6 +6,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **The strict skill-acceptance gate could never accept anything.** `accept_mode="wilson"` scores a
+  learned skill by the Wilson *lower bound* instead of the raw pass fraction — the honest upgrade.
+  But the transfer panel is 3 models, so n=3, and the lower bound of a **flawless 3/3** at n=3 is
+  **0.439** against a `min_transfer` of **0.5**. No possible result could clear it. The mode sat
+  there as the careful option, silently rejecting everything, while the log said "no transferable
+  auto-skill kept" — which reads as *nothing was good enough* rather than *this gate is impossible*.
+  A gate that cannot pass is the same class of defect as a test that cannot fail; both look like they
+  are working. The evolver now computes the gate's ceiling and warns, naming the numbers, when the
+  configuration is unsatisfiable.
+- **Picking the best of k candidates inflated the acceptance rate.** The loop scores k proposals and
+  puts the winner against the threshold — that is not k independent tests, it is a maximum, and the
+  maximum of k noisy estimates is biased upward. Measured on the shipped defaults (3 candidates,
+  3 trials each, threshold 0.5): a candidate whose true pass rate is 0.3 was accepted **51.8%** of
+  the time, against **21.6%** if it had been the only candidate — picking the best roughly doubled
+  the false-accept rate. `wilson_lower_best_of` now spends `α/k` (Bonferroni) on the bound, which
+  costs **no extra model calls** — only a tighter quantile — and is why it was worth doing here when
+  the paper's anytime-valid machinery was deliberately not.
+
+### Added
+- **A separate, cheap panel for skill-transfer testing** (`CHIMERA_TRANSFER_PANEL`). Sample size for
+  the acceptance statistic had been quietly tied to `fusion_panel` — three *frontier* models — so the
+  only way to make the gate statistically meaningful was to widen the most expensive operation in the
+  system. Those are different jobs: proposing a skill wants strong models, while testing whether it
+  transfers only asks "does this run and pass somewhere else", which cheap models answer just as well
+  — arguably better, since a skill that survives a weak model is stronger evidence of generality.
+  Proposals still come from `fusion_panel`; testing now runs on nine cheap models, taking the gate's
+  ceiling from 0.344 to ~0.61 without changing what a fused turn costs.
+
+### Security
+- **The audit log is now hash-chained.** Each entry carries the digest of the one before it and its
+  own digest over that. Append-only had been a convention — the file was ordered by a counter and
+  nothing else, so anyone who could edit it could rewrite history leaving no trace. Tampering is now
+  detectable: changing, reordering or deleting an entry breaks every digest from that point, and
+  `AuditLog.verify()` reports exactly where. Stated plainly in the module: this **detects** tampering,
+  it does not **prevent** it — an attacker who rewrites the whole file can recompute the chain, so
+  pinning the head digest somewhere they do not control is what closes that gap. Entries written
+  before this change are reported as *unchained* rather than as passing: an honest "cannot say".
+
 ### Changed
 - **The backend boots ~26% faster — four package `__init__` files stopped importing the world.**
   `chimera.eval`, `chimera.governance`, `chimera.tools` and `chimera.core` re-exported their whole

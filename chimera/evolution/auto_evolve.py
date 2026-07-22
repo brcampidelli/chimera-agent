@@ -19,7 +19,7 @@ from __future__ import annotations
 import string
 from typing import TYPE_CHECKING
 
-from chimera.eval.anytime import wilson_lower
+from chimera.eval.anytime import best_possible_wilson, wilson_lower_best_of
 from chimera.evolution.evolver import SkillEvolver
 from chimera.evolution.learned_skill import LearnedSkill
 from chimera.evolution.skill_store import SkillStore
@@ -69,6 +69,29 @@ class AutoSkillEvolver:
         # "point" (raw pass fraction) or "wilson" (lower confidence bound on the
         # fraction) — the honesty upgrade that stops a lucky small-sample pass counting.
         self.accept_mode = accept_mode
+
+    def _warn_if_gate_unsatisfiable(self, k: int) -> None:
+        """Say so, loudly, when no result can ever clear the Wilson gate.
+
+        A lower confidence bound on a handful of trials is far below the point estimate, so a
+        threshold chosen for a raw fraction can be unreachable: with the default 3-model panel a
+        flawless 3/3 scores only 0.439, and a 0.5 threshold rejects it. Left silent, that reads in
+        the log as "nothing was good enough" forever, when the truth is that the gate is impossible.
+        """
+        assert self.collective is not None
+        # Defensive on purpose: `collective` is duck-typed (tests and embedders pass stubs), and a
+        # helper whose only job is to emit a warning must never be the thing that breaks the run.
+        models = getattr(self.collective, "transfer_models", None)
+        if not models:
+            return
+        n = len(models)
+        ceiling = best_possible_wilson(n, k)
+        if ceiling < self.min_transfer:
+            _log.warning(
+                "accept_mode='wilson' can never accept: a perfect %d/%d scores %.3f (best of k=%d), "
+                "below min_transfer=%.2f. Lower min_transfer, enlarge the panel, or use 'point'.",
+                n, n, ceiling, k, self.min_transfer,
+            )
 
     def _mark_and_store(self, skill: LearnedSkill, *, tainted: bool) -> LearnedSkill:
         """Store a skill with anti-poisoning provenance (Zombie Agents defense).
@@ -188,7 +211,13 @@ class AutoSkillEvolver:
         best: LearnedSkill | None = None
         best_score = -1.0
         best_frac = 0.0
-        for candidate in self.collective.propose_collective(task, solution):
+        # Materialise the panel's proposals so the selection size is known: the winner is the best
+        # of k, and a bound taken on a winner has to pay for that choice (see wilson_lower_best_of).
+        candidates = list(self.collective.propose_collective(task, solution))
+        k = len(candidates)
+        if self.accept_mode == "wilson":
+            self._warn_if_gate_unsatisfiable(k)
+        for candidate in candidates:
             if candidate.name in self.store:
                 continue
             if self.validator is not None and not self.validator.validate(candidate.to_dict()).accepted:
@@ -198,9 +227,10 @@ class AutoSkillEvolver:
                 candidate, test_input, lambda out: bool(out.strip())
             )
             frac = passed / n if n else 0.0
-            # "wilson" gates on the lower confidence bound, so a 2/3 fluke (frac 0.67 but
-            # bound ~0.21) no longer clears a 0.5 threshold; "point" is the raw fraction.
-            score = wilson_lower(passed, n) if self.accept_mode == "wilson" else frac
+            # "wilson" gates on the lower confidence bound, corrected for having picked the best of
+            # k, so neither a 2/3 fluke nor the winner's curse clears the threshold; "point" is the
+            # raw fraction and pays neither cost.
+            score = wilson_lower_best_of(passed, n, k) if self.accept_mode == "wilson" else frac
             _log.debug(
                 "collective candidate %s: %d/%d (frac=%.2f gate=%.2f mode=%s)",
                 candidate.name, passed, n, frac, score, self.accept_mode,

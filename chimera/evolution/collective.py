@@ -28,10 +28,16 @@ class CollectiveSkillEvolver:
         backend: SupportsComplete,
         panel_models: list[str],
         *,
+        transfer_models: list[str] | None = None,
         validator: SkillValidator | None = None,
     ) -> None:
         self.backend = backend
         self.panel_models = panel_models
+        # Proposing and testing are different jobs with different budgets. Strong models write
+        # better candidates; testing only asks "does it run and pass elsewhere", which cheap models
+        # answer just as well — and more of them is what makes the acceptance statistic mean
+        # anything (n=3 cannot support a 0.5 lower-bound gate; see chimera.eval.anytime).
+        self.transfer_models = list(transfer_models) if transfer_models else list(panel_models)
         self.validator = validator
 
     def propose_collective(self, task: str, solution: str) -> list[LearnedSkill]:
@@ -48,16 +54,24 @@ class CollectiveSkillEvolver:
     def transfer_counts(
         self, skill: LearnedSkill, test_input: dict[str, str], check: Callable[[str], bool]
     ) -> tuple[int, int]:
-        """(passed, n): how many panel models the skill runs+passes on, out of the panel."""
-        if not self.panel_models:
+        """(passed, n): how many transfer models the skill runs+passes on, out of that panel.
+
+        A model that is unreachable (deprecated, rate-limited, no credit) fails its call, and
+        :meth:`Skill.execute` turns every exception into ``ok=False`` — so infrastructure trouble is
+        indistinguishable here from a skill that genuinely did not transfer. That is deliberate: it
+        can only make the gate *stricter*, never more permissive, so the worst case is rejecting a
+        good skill rather than accepting a bad one. Excluding failed calls from ``n`` would be worse
+        — a skill that runs on 1 of 9 models would score a perfect 1/1.
+        """
+        if not self.transfer_models:
             return (0, 0)
         passed = 0
-        for model in self.panel_models:
+        for model in self.transfer_models:
             variant = LearnedSkill.from_dict(skill.to_dict(), backend=self.backend, model=model)
             result = variant.execute(**test_input)
             if result.ok and check(result.output):
                 passed += 1
-        return passed, len(self.panel_models)
+        return passed, len(self.transfer_models)
 
     def transferability(
         self, skill: LearnedSkill, test_input: dict[str, str], check: Callable[[str], bool]

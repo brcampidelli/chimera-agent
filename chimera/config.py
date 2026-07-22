@@ -24,6 +24,24 @@ _DEFAULT_PANEL = [
 ]
 _DEFAULT_JUDGE = "openrouter/anthropic/claude-opus-4-8"
 
+# Panel used only to TEST whether a learned skill transfers — never to reason. Transfer asks
+# "does this run and pass somewhere else?", which is a diversity question, not a capability one:
+# a skill that survives a cheap model is better evidence of generality than one that needs a
+# frontier model. Kept separate from `fusion_panel` so widening the statistical sample does not
+# multiply the cost of every fused turn. Nine models give a usable n; three do not (a flawless
+# 3/3 earns a 0.344 lower bound, so a 0.5 gate can never be met by any result at all).
+_DEFAULT_TRANSFER_PANEL = [
+    "openrouter/deepseek/deepseek-chat-v3.1",
+    "openrouter/deepseek/deepseek-r1",
+    "openrouter/google/gemini-2.5-flash",
+    "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+    "openrouter/moonshotai/kimi-k2",
+    "openrouter/openai/gpt-5.5-mini",
+    "openrouter/qwen/qwen-max",
+    "openrouter/qwen/qwen3-coder",
+    "openrouter/z-ai/glm-4.6",
+]
+
 
 class Settings(BaseSettings):
     """Process-wide configuration, populated from env / ``.env``."""
@@ -110,6 +128,12 @@ class Settings(BaseSettings):
     # --- Fusion engine (panel -> judge -> synthesizer) ---
     fusion_panel: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: list(_DEFAULT_PANEL), validation_alias="CHIMERA_FUSION_PANEL"
+    )
+    # Skill-transfer test panel. Proposals still come from `fusion_panel` (strong models write
+    # better skills); only the pass/fail sampling happens here, on cheap models.
+    transfer_panel: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: list(_DEFAULT_TRANSFER_PANEL),
+        validation_alias="CHIMERA_TRANSFER_PANEL",
     )
     fusion_judge: str = Field(default=_DEFAULT_JUDGE, validation_alias="CHIMERA_FUSION_JUDGE")
     fusion_synthesizer: str = Field(
@@ -346,6 +370,7 @@ class Settings(BaseSettings):
 
     @field_validator(
         "fusion_panel",
+        "transfer_panel",
         "fallback_models",
         "openrouter_keys",
         "openai_keys",
