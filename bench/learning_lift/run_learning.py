@@ -42,6 +42,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -135,16 +136,27 @@ def _fresh_workspace(task: dict, root: Path) -> Path:
     return ws
 
 
-def _solve(task: dict, ws: Path, arm: str, home: Path) -> None:
-    """One attempt. ``home`` is what carries (or does not carry) learning between tasks."""
+def _solve(task: dict, ws: Path, arm: str, home: Path) -> tuple[float, bool]:
+    """One attempt; returns (elapsed_seconds, timed_out). ``home`` is what carries learning between tasks.
+
+    Timing is NOT decoration. A silently-swallowed timeout grades as a plain failure, which makes a
+    LATENCY collapse indistinguishable from a CAPABILITY collapse — exactly how run 7's learning arm
+    hid an 11-task contiguous failure block. Recording elapsed time and the timeout flag makes the two
+    tellable apart.
+    """
     env = {**os.environ, "CHIMERA_HOME": str(home)}
     if _SEMANTIC and arm == "learning":  # semantic recall for memory facts + cards, learning arm only
         env["CHIMERA_SEMANTIC_MEMORY"] = "1"
     verify = f'"{sys.executable}" -m pytest -q {task["test"]}'
     argv = ["chimera", "solve", str(task["prompt"]), "--workspace", str(ws), "--model", _MODEL,
             "--verify", verify, *_ARMS[arm]]
-    with contextlib.suppress(subprocess.TimeoutExpired):
+    started = time.monotonic()
+    timed_out = False
+    try:
         subprocess.run(argv, capture_output=True, text=True, timeout=_TIMEOUT, check=False, env=env)
+    except subprocess.TimeoutExpired:
+        timed_out = True
+    return time.monotonic() - started, timed_out
 
 
 def _grade(task: dict, ws: Path, tampered: set[str]) -> bool:
@@ -225,7 +237,7 @@ def _skill_stats(home: Path) -> list[dict[str, object]]:
 
 
 def _run_arm(arm: str, seed: int, root: Path, homes: Path, tampered: set[str],
-             accum: list[dict[str, object]]) -> list[bool]:
+             accum: list[dict[str, object]], timings: list[dict[str, object]]) -> list[bool]:
     """Run the whole committed sequence, in order, for one arm of one seed."""
     arm_home = homes / arm
     arm_home.mkdir(parents=True, exist_ok=True)
@@ -235,15 +247,19 @@ def _run_arm(arm: str, seed: int, root: Path, homes: Path, tampered: set[str],
         home = arm_home / f"t{index}" if arm == "cold" else arm_home
         home.mkdir(parents=True, exist_ok=True)
         ws = _fresh_workspace(task, root)
-        _solve(task, ws, arm, home)
+        elapsed, timed_out = _solve(task, ws, arm, home)
         ok = _grade(task, ws, tampered)
         results.append(ok)
+        timings.append({"seed": seed, "arm": arm, "i": index, "secs": round(elapsed, 1),
+                        "timeout": timed_out, "pass": ok})
         # Snapshot the learning arm's accumulated state AFTER each task (cold carries nothing).
         if arm == "learning":
             accum.append({"seed": seed, "i": index, "pass": ok, **_accumulation(home)})
         half = "1st" if index <= HALF else "2nd"
         tag = f"s{seed}" if _SEEDS > 1 else ""
-        print(f"  [{arm:8}{tag:>3}] {index:2}/{len(SUITE)} {half} {str(task['id']):<22} {'PASS' if ok else 'fail'}", flush=True)
+        mark = " TIMEOUT" if timed_out else ""
+        print(f"  [{arm:8}{tag:>3}] {index:2}/{len(SUITE)} {half} {str(task['id']):<22} "
+              f"{'PASS' if ok else 'fail'}{mark} {elapsed:5.0f}s", flush=True)
     return results
 
 
@@ -287,6 +303,7 @@ def main() -> None:
     homes_root = Path(tempfile.mkdtemp(prefix="chimlearn-home-"))
     tampered: set[str] = set()
     accum: list[dict[str, object]] = []
+    timings: list[dict[str, object]] = []
     # Pooled paired pairs across all seeds: item = the SAME task in the SAME seed, both arms from an
     # identical fresh workspace. `pool_cold[i]`/`pool_learn[i]` are that pair — what compare_paired needs.
     pool_cold: list[bool] = []
@@ -299,7 +316,7 @@ def main() -> None:
             if _SEEDS > 1:
                 print(f"\n--- seed {seed}/{_SEEDS} ---", flush=True)
             homes = homes_root / f"seed{seed}"
-            arms = {arm: _run_arm(arm, seed, root, homes, tampered, accum)
+            arms = {arm: _run_arm(arm, seed, root, homes, tampered, accum, timings)
                     for arm in ("cold", "learning")}
             pool_cold.extend(arms["cold"])
             pool_learn.extend(arms["learning"])
@@ -337,6 +354,25 @@ def main() -> None:
     print(f"  skills kept (per seed): {[s['skills_learned'] for s in per_seed]}", flush=True)
     print(f"  grading integrity: {'TAMPERED: ' + ', '.join(sorted(tampered)) if tampered else 'no arm modified its own test'}",
           flush=True)
+
+    # Latency / timeout audit: a swallowed timeout grades as a plain failure, so without this a LATENCY
+    # collapse reads as a CAPABILITY collapse. Report timeouts and median seconds per arm, and flag when
+    # one arm times out far more than the other (that is an infrastructure result, not a learning one).
+    for arm in ("cold", "learning"):
+        rows = [t for t in timings if t["arm"] == arm]
+        if not rows:
+            continue
+        secs = sorted(float(r["secs"]) for r in rows)
+        outs = sum(1 for r in rows if r["timeout"])
+        med = secs[len(secs) // 2]
+        print(f"  latency [{arm:8}]: median {med:5.0f}s   timeouts {outs}/{len(rows)}"
+              f"   max {secs[-1]:5.0f}s", flush=True)
+    lt = sum(1 for t in timings if t["arm"] == "learning" and t["timeout"])
+    ct = sum(1 for t in timings if t["arm"] == "cold" and t["timeout"])
+    if lt + ct and abs(lt - ct) >= max(3, (lt + ct) // 3):
+        print(f"     !! ASYMMETRIC TIMEOUTS (learning {lt} vs cold {ct}) — the arms differ in LATENCY, so"
+              "\n        this run measures infrastructure, not learning. Treat the comparison as invalid.",
+              flush=True)
 
     # Within-family transfer (recurring suite, pre-registered secondary): the learning arm only holds a
     # family's card AFTER its first member, so if accumulated learning helps at all the paired lift is
@@ -397,7 +433,7 @@ def main() -> None:
             "tasks": [str(t["id"]) for t in SUITE], "half": HALF,
             "paired": paired.summary(), "family_transfer": family_transfer,
             "mean_did": mean_did, "per_seed": per_seed,
-            "skill_card_uses": total_uses, "skill_stats_last_seed": skill_stats_last, "accumulation": accum,
+            "timings": timings, "skill_card_uses": total_uses, "skill_stats_last_seed": skill_stats_last, "accumulation": accum,
             "graded_against_pristine_test": True, "tests_modified_by_solve": sorted(tampered),
         }, indent=2),
         encoding="utf-8",
