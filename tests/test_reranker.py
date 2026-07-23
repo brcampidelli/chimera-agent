@@ -78,3 +78,33 @@ def test_injectable_similarity_is_used():
     # both neighbours weighted equally (1 success, 1 failure) -> 0.5
     assert r.score("t", "c") == 0.5
     assert calls["n"] == 2
+
+
+def _fake_embed(mapping):
+    """A deterministic fake embedder: each text -> a fixed 2-D vector (unknown -> orthogonal)."""
+
+    def embed(texts):
+        return [mapping.get(t, [0.0, 1.0]) for t in texts]
+
+    return embed
+
+
+def test_semantic_mode_ranks_by_cosine_not_tokens():
+    # 'alpha' and 'beta' share NO tokens but embed to the SAME direction (a paraphrase); lexical would
+    # miss it, semantic should treat the beta-success record as the near neighbour of an alpha query.
+    embed = _fake_embed({
+        "alpha task\nalpha solution": [1.0, 0.0],  # the query embeds here
+        "beta task\nbeta solution": [1.0, 0.0],     # a success, same direction (paraphrase)
+        "gamma task\ngamma solution": [0.0, 1.0],   # a failure, orthogonal
+    })
+    r = SuccessReranker(
+        [("beta task\nbeta solution", True), ("gamma task\ngamma solution", False)],
+        k=2, embed=embed,
+    )
+    # query shares no TOKENS with 'beta' but is semantically identical -> should score high
+    assert r.score("alpha task", "alpha solution") > 0.5
+
+
+def test_semantic_empty_history_returns_prior():
+    r = SuccessReranker([], embed=_fake_embed({}), prior=0.5)
+    assert r.score("t", "c") == 0.5
