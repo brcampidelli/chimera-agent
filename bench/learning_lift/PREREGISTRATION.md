@@ -481,3 +481,34 @@ estimator, hardened grader, cold untouched. Only the suite and seed count change
 Authored synthetic families, one weak 24B model, single seed per cell. One run, no re-rolls, a null (or
 a retraction) ships. n=125 is better than 75 but still modest — a not-significant pooled result is
 underpowered, not "no effect". The families make transfer *possible*, not *guaranteed*.
+
+## Run 7a — DISCARDED as infrastructure-contaminated (recorded, not hidden)
+
+The first execution of run 7 was **stopped after 3 of 5 seeds and discarded**. This is recorded here
+rather than silently re-run, because an undocumented discard is indistinguishable from a re-roll.
+
+**Evidence it measured infrastructure, not learning** (same 25 tasks, same order, every seed):
+
+| seed | cold | learning | discordant | contiguous learning failures at end |
+|---|---:|---:|---|---:|
+| 1 | 84% | 84% | L+1 / C+1 | 0 |
+| 2 | **96%** | **52%** | L+0 / C+11 | **11** |
+| 3 | **52%** | **88%** | L+10 / C+1 | 0 |
+
+The decisive tell is the **`cold` arm**: it carries a fresh home per task and accumulates nothing, so
+it should be stable — yet it swung **96% → 52%** across seeds on identical tasks. No capability effect
+does that. Seed 2 additionally shows an 11-task *contiguous* learning-arm collapse. Both are the
+signature of API-latency variation converting into **silently-swallowed timeouts** (`_solve` suppressed
+`TimeoutExpired`, so a timed-out task graded as a plain failure). Per-seed swings of ±36 pp dwarf any
+plausible learning effect, so the pooled Δ is uninterpretable.
+
+**This discard follows the rule already pre-committed for the 402 case** ("if it appears, the run is
+discarded as contaminated") — the same class of fault: the run measures the harness, not the agent.
+No result from run 7a is reported or carried forward.
+
+**Fixes before re-running (run 7b):** (1) `_solve` now returns `(elapsed, timed_out)`, every task line
+prints its duration and a `TIMEOUT` marker, a per-arm latency audit reports median/max/timeout-count,
+and an **ASYMMETRIC TIMEOUTS** warning declares a run invalid when one arm times out far more than the
+other; (2) the per-task budget is raised **240s → 480s**, because the learning arm is structurally
+slower (larger prompt + embedding calls + playbook curation) and the tight budget is what converted
+latency into fake capability failures. Suite, arms, metrics, seeds and predictions are unchanged.
