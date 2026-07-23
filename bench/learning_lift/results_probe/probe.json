@@ -1,0 +1,288 @@
+{
+  "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+  "suite": "hard_fix",
+  "arm": "cold",
+  "rows": [
+    {
+      "id": "hfix_merge_ranges",
+      "attempts": 3,
+      "passed": true,
+      "timed_out": false,
+      "seconds": 40.8
+    },
+    {
+      "id": "hfix_lru_cache",
+      "attempts": 2,
+      "passed": true,
+      "timed_out": false,
+      "seconds": 20.7
+    },
+    {
+      "id": "hfix_deep_update",
+      "attempts": 3,
+      "passed": false,
+      "timed_out": false,
+      "seconds": 23.9
+    },
+    {
+      "id": "hfix_stable_sort_by",
+      "attempts": 3,
+      "passed": true,
+      "timed_out": false,
+      "seconds": 23.0
+    },
+    {
+      "id": "hfix_paginate",
+      "attempts": 3,
+      "passed": false,
+      "timed_out": false,
+      "seconds": 23.0
+    },
+    {
+      "id": "hfix_word_wrap",
+      "attempts": 1,
+      "passed": true,
+      "timed_out": false,
+      "seconds": 12.5
+    },
+    {
+      "id": "hfix_retry_backoff",
+      "attempts": 1,
+      "passed": true,
+      "timed_out": false,
+      "seconds": 12.1
+    },
+    {
+      "id": "hfix_group_consecutive",
+      "attempts": 2,
+      "passed": true,
+      "timed_out": false,
+      "seconds": 22.1
+    },
+    {
+      "id": "hfix_parse_duration",
+      "attempts": 3,
+      "passed": false,
+      "timed_out": false,
+      "seconds": 39.2
+    },
+    {
+      "id": "hfix_flatten_depth",
+      "attempts": 1,
+      "passed": true,
+      "timed_out": false,
+      "seconds": 10.8
+    },
+    {
+      "id": "hfix_top_n",
+      "attempts": 1,
+      "passed": true,
+      "timed_out": false,
+      "seconds": 11.1
+    },
+    {
+      "id": "hfix_csv_quotes",
+      "attempts": 3,
+      "passed": false,
+      "timed_out": false,
+      "seconds": 39.6
+    },
+    {
+      "id": "hfix_normalize_path",
+      "attempts": 3,
+      "passed": false,
+      "timed_out": false,
+      "seconds": 31.0
+    },
+    {
+      "id": "hfix_diff_keys",
+      "attempts": 3,
+      "passed": false,
+      "timed_out": false,
+      "seconds": 25.5
+    },
+    {
+      "id": "hfix_running_median",
+      "attempts": 1,
+      "passed": true,
+      "timed_out": false,
+      "seconds": 10.8
+    },
+    {
+      "id": "hfix_template_render",
+      "attempts": 3,
+      "passed": false,
+      "timed_out": false,
+      "seconds": 50.5
+    },
+    {
+      "id": "hfix_batch_by_size",
+      "attempts": 3,
+      "passed": false,
+      "timed_out": false,
+      "seconds": 46.5
+    },
+    {
+      "id": "hfix_case_insensitive_dict",
+      "attempts": 1,
+      "passed": true,
+      "timed_out": false,
+      "seconds": 10.7
+    },
+    {
+      "id": "hfix_split_sentences",
+      "attempts": 3,
+      "passed": false,
+      "timed_out": false,
+      "seconds": 52.2
+    },
+    {
+      "id": "hfix_env_expand",
+      "attempts": 3,
+      "passed": false,
+      "timed_out": false,
+      "seconds": 26.8
+    },
+    {
+      "id": "hfix_url_join",
+      "attempts": 1,
+      "passed": true,
+      "timed_out": false,
+      "seconds": 12.4
+    },
+    {
+      "id": "hfix_moving_window",
+      "attempts": 1,
+      "passed": true,
+      "timed_out": false,
+      "seconds": 11.1
+    },
+    {
+      "id": "hfix_partition_by",
+      "attempts": 1,
+      "passed": true,
+      "timed_out": false,
+      "seconds": 13.8
+    },
+    {
+      "id": "hfix_dedupe_keep_last",
+      "attempts": 1,
+      "passed": true,
+      "timed_out": false,
+      "seconds": 13.8
+    },
+    {
+      "id": "hfix_clamp_range",
+      "attempts": 1,
+      "passed": true,
+      "timed_out": false,
+      "seconds": 10.4
+    },
+    {
+      "id": "hfix_count_leaves",
+      "attempts": 2,
+      "passed": true,
+      "timed_out": false,
+      "seconds": 18.3
+    },
+    {
+      "id": "hfix_safe_divide",
+      "attempts": 3,
+      "passed": false,
+      "timed_out": false,
+      "seconds": 20.2
+    },
+    {
+      "id": "hfix_strip_comments",
+      "attempts": 1,
+      "passed": true,
+      "timed_out": false,
+      "seconds": 37.4
+    },
+    {
+      "id": "hfix_merge_sorted",
+      "attempts": 1,
+      "passed": true,
+      "timed_out": false,
+      "seconds": 28.5
+    },
+    {
+      "id": "hfix_indent_block",
+      "attempts": 2,
+      "passed": true,
+      "timed_out": false,
+      "seconds": 20.6
+    },
+    {
+      "id": "hfix_percent_change",
+      "attempts": 1,
+      "passed": true,
+      "timed_out": false,
+      "seconds": 16.4
+    },
+    {
+      "id": "hfix_title_words",
+      "attempts": 1,
+      "passed": true,
+      "timed_out": false,
+      "seconds": 22.1
+    },
+    {
+      "id": "hfix_rate_limit",
+      "attempts": 2,
+      "passed": true,
+      "timed_out": false,
+      "seconds": 17.1
+    },
+    {
+      "id": "hfix_bool_env",
+      "attempts": 1,
+      "passed": true,
+      "timed_out": false,
+      "seconds": 16.3
+    },
+    {
+      "id": "hfix_columnize",
+      "attempts": 1,
+      "passed": true,
+      "timed_out": false,
+      "seconds": 7.9
+    },
+    {
+      "id": "hfix_slug_unique",
+      "attempts": 3,
+      "passed": false,
+      "timed_out": false,
+      "seconds": 57.9
+    },
+    {
+      "id": "hfix_nested_get",
+      "attempts": 3,
+      "passed": false,
+      "timed_out": false,
+      "seconds": 54.4
+    },
+    {
+      "id": "hfix_truncate_words",
+      "attempts": 1,
+      "passed": true,
+      "timed_out": false,
+      "seconds": 12.6
+    },
+    {
+      "id": "hfix_sum_by",
+      "attempts": 1,
+      "passed": true,
+      "timed_out": false,
+      "seconds": 8.7
+    },
+    {
+      "id": "hfix_next_weekday",
+      "attempts": 3,
+      "passed": true,
+      "timed_out": false,
+      "seconds": 41.3
+    }
+  ],
+  "tampered": []
+}
