@@ -1,17 +1,22 @@
-# Does accumulated learning actually help? — four pre-registered runs
+# Does accumulated learning actually help? — five pre-registered runs
 
 Design, task order, metric and predictions were fixed in [`PREREGISTRATION.md`](PREREGISTRATION.md)
 **before any model call** of each run, and each amendment was committed before the run it governs. Read
 the power caveats there before reading any null below.
 
-**Bottom line up front.** After four runs, the honest answer on this authored synthetic suite is:
-with the learn→use loop **fully connected** and **error-seeded**, measured with a **properly-powered
-paired estimator (n=120)**, accumulated learning is **statistically indistinguishable from no
-learning** (paired Δ = −0.8%, 95% CI [−8.7%, +7.2%]). The machinery is real and demonstrably wired
-(113 skill-card retrievals, a 50-bullet playbook); its benefit is simply not measurable here. The
-project's README claim — *"it gets better the more you use it"* — remains **unevidenced on this suite**.
+**Bottom line up front.** After five runs, the honest answer on this authored synthetic suite is a
+**null with a diagnosed cause**. With the learn→use loop fully connected, error-seeded, AND upgraded
+from lexical to **semantic retrieval** (a change independently proven to bridge paraphrases: keyword
+recall 0% → semantic 94% on `memory_bench`), measured with a properly-powered paired estimator (n=120),
+accumulated learning is still **statistically indistinguishable from no learning** (run 5 paired
+Δ = +1.7%, 95% CI [−5.3%, +8.1%]; run 4 was −0.8% [−8.7%, +7.2%]). Because semantic retrieval —
+the thing that fixes retrieval *quality* — did not move the number either, the ceiling is not
+retrieval quality. **It is transfer-poverty: on a suite of surface-disjoint tasks there are too few
+similar past tasks to transfer from, no matter how well retrieval finds them.** The machinery works;
+the *suite* is the ceiling. The README claim — *"it gets better the more you use it"* — remains
+**unevidenced on this suite**, and the next test must move to a suite where transfer is possible.
 
-All four runs used `openrouter/mistralai/mistral-small-3.2-24b-instruct`, the hardened grader (pristine
+All five runs used `openrouter/mistralai/mistral-small-3.2-24b-instruct`, the hardened grader (pristine
 test restored before every verdict), and a 240 s per-task timeout.
 
 ---
@@ -125,25 +130,61 @@ honestly-evaluated" thesis: agents *do* try to game verifiers, and Chimera's gat
 
 ---
 
+## Run 5 (2026-07-23) — semantic recall: retrieval quality was not the blocker
+
+Run 4's leading explanation for the null was retrieval *quality*: cards (BM25) and memory facts
+(keyword) matched injected neighbours lexically, so on a surface-disjoint suite they were rarely
+relevant. `memory_bench` made that concrete — keyword paraphrase recall **0%**, semantic **94%**
+(+0.938, `text-embedding-3-small`). Run 5 turned semantic recall on in the learning arm (both cards and
+memory facts ranked by embedding cosine), everything else identical to run 4.
+
+```
+POOLED PAIRED (n=120 = 40 tasks × 3 seeds)   [semantic recall]
+  cold      58.3%
+  learning  60.0%
+  paired Δ  +1.7%   95% CI [-5.3%, +8.1%]   ->  NOT significant (CI includes 0)
+  discordant: learning +11 / cold +9        DiD/seed [-0.10, +0.05, +0.05]  mean +0.0%
+  skills kept/seed: [14, 16, 16]            connection: 69 card retrievals, 50 bullets
+```
+
+The paired delta moved from −0.8% (lexical) to +1.7% (semantic) — a ~2.5 pp nudge toward positive that
+is **well inside the noise** (the CI half-width is ~7 pp; the cold arm alone swung 66.7% → 58.3% between
+runs on sampling luck). It is still a null: the CI comfortably includes zero.
+
+**This is the pre-committed second null-meaning.** Semantic retrieval — proven to fix retrieval quality
+(0→94% paraphrase recall) — did not produce a significant lift, so **retrieval quality was not the sole
+blocker.** What remains is **transfer-poverty**: on surface-disjoint tasks there are too few similar past
+tasks to transfer from, however well retrieval finds them. A detail that *strengthens* this reading:
+skills kept jumped from run 4's [1,1,2] to **[14,16,16]** — *more* learned artifacts, semantic
+(relevant) retrieval, and still a null. The problem is neither artifact quantity nor retrieval quality;
+it is that a disjoint suite offers nothing to transfer. Raw: `results_hard_semantic/learning.json`.
+
+---
+
 ## What the series establishes — and does not
 
 **Establishes.** The self-improvement machinery runs, mints and (once fixed) injects artifacts, and
 holds grading integrity even against an agent that rewrote a test. The learn→use loop was found to be
-disconnected by default and was reconnected. And the honest measurement now exists where none did: on
-this suite, at n=120 with the right estimator, the connected + error-seeded learning loop shows **no
-measurable lift** over a no-learning control, and the earlier +10 pp hint was noise.
+disconnected by default and was reconnected; retrieval was then upgraded from lexical to semantic. And
+the honest measurement now exists where none did: at n=120 with the right estimator, the connected +
+error-seeded loop shows **no measurable lift** whether retrieval is lexical (run 4) or semantic
+(run 5), and the earlier +10 pp hint was noise.
 
-**Does not.** It does not prove learning *cannot* help. The CI [−8.7%, +7.2%] rules out a **large**
-effect, not a small one — a real +3 pp would still be invisible. And the scope is narrow: one authored
-synthetic suite of **surface-disjoint** tasks (each a different function, so cross-task transfer is
-intrinsically limited), one weak 24B model, single seed per cell within each run.
+**Does not.** It does not prove learning *cannot* help. The CIs rule out a **large** effect, not a
+small one — a real +3 pp would still be invisible. And the scope is narrow: one authored synthetic
+suite of **surface-disjoint** tasks (each a different function, so cross-task transfer is intrinsically
+limited), one weak 24B model, single seed per cell within each run.
 
-**The most likely mechanism, and it is actionable.** Card and memory retrieval are **lexical**
-(keyword / BM25; semantic recall off by default) — so the "neighbours" the loop injects are matched on
-surface tokens, not meaning, and on a disjoint-domain suite they are rarely genuinely relevant. That
-is a strong candidate for *why* nothing transfers, and it points at a concrete next move: **embedded
-semantic memory (`sqlite-vec`)** so retrieval returns relevant neighbours, which would also sharpen
-the new inference-time k-NN reranker.
+**The cause is now diagnosed, and it moves the effort elsewhere.** Runs 4→5 were a controlled test of
+the two candidate causes. Lexical retrieval (run 4) *could* have been the blocker — but semantic
+retrieval (run 5), independently proven to fix retrieval quality (paraphrase recall 0→94% on
+`memory_bench`), did **not** move the number either. So the ceiling is **not** retrieval quality. It is
+**transfer-poverty**: a suite of surface-disjoint tasks offers too few similar past tasks to transfer
+from, regardless of how well retrieval finds them or how many skills accumulate (run 5 kept 14–16 per
+seed and still nulled). The next move is therefore **not** more retrieval work on this suite — it is a
+suite where transfer is *possible* (recurring task families / real repos). The retrieval infrastructure
+built here (semantic cards + memory, the k-NN reranker, the planned local embedder + `sqlite-vec`) is
+not wasted — it pays off exactly *there*, where similar past tasks exist.
 
 ## Methodological notes (why to trust these nulls)
 
@@ -156,9 +197,16 @@ the new inference-time k-NN reranker.
 
 ## Next
 
-Not more of the same loop. The leads the series points to: **semantic retrieval (`sqlite-vec`)** so
-injected neighbours are relevant; the **inference-time success reranker** (changes candidate
-*selection*, not just injected context, which did not move the needle here); and a **less synthetic,
-transfer-richer suite** — toward the SWE-bench Verified number the project needs to be taken seriously.
+The diagnosis points at one move: **a suite where transfer is possible.** This synthetic disjoint suite
+has taught what it can — it is saturated as a learning-transfer instrument. Two directions, in order:
+
+1. **A recurring-pattern learning-lift suite** ([`tasks_recurring.py`](tasks_recurring.py)): authored
+   task *families* where members share a solution approach, so solving one genuinely helps the next.
+   This is the clean controlled closer — *when transfer is possible, does the (now semantic) loop
+   help?* — and it isolates the effect the disjoint suite structurally could not.
+2. **SWE-bench Verified** (`chimera/eval/swe_bench.py`): the recognized real-repo number the competitive
+   study says the project needs, and a naturally transfer-rich setting (real codebases repeat patterns).
+
 Until one of those moves a properly-powered number, the honest statement stands: the flywheel is built,
-connected, gated, and **unproven** on this suite.
+connected, semantic, gated — and **unproven**, because the only suite it has been measured on cannot,
+by construction, show transfer.
