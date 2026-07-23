@@ -144,6 +144,11 @@ class FusionConfig:
     synthesizer: str
     max_workers: int = 4
     temperature: float = 0.3
+    # Per-panelist decode spread (diversity sampling): when non-empty, panelist i samples at
+    # panel_temperatures[i % len] instead of the single ``temperature`` — one low-temp correctness
+    # anchor + higher-temp explorers widen the candidate set the judge/synthesizer selects from, at
+    # near-zero extra cost. Empty (default) = every panelist at ``temperature`` (behaviour-preserving).
+    panel_temperatures: list[float] = field(default_factory=list)
     mode: Literal["full", "selective"] = "full"
     probe_k: int = 2
     agreement_threshold: float = 0.8
@@ -153,6 +158,17 @@ class FusionConfig:
     # every other task, and any logic task without a majority, still uses judge -> synthesizer.
     task_typed: bool = False
     vote_threshold: float = 0.85
+
+    def temperature_for(self, model: str) -> float:
+        """Sampling temperature for one panelist — its slot in the spread, else the single default.
+
+        Keyed by the model's position in the FULL ``panel`` (not the sublist a call may receive in
+        selective mode's probe/rest split), so the same panelist always samples at the same
+        temperature regardless of which stage requested it.
+        """
+        if not self.panel_temperatures or model not in self.panel:
+            return self.temperature
+        return self.panel_temperatures[self.panel.index(model) % len(self.panel_temperatures)]
 
     @classmethod
     def from_settings(cls) -> FusionConfig:
@@ -168,6 +184,7 @@ class FusionConfig:
             probe_k=s.fusion_probe_k,
             agreement_threshold=s.fusion_agreement_threshold,
             task_typed=s.fusion_task_typed,
+            panel_temperatures=list(s.fusion_panel_temperatures),
         )
 
 
@@ -333,6 +350,7 @@ class FusionEngine:
                     "error": r.error,
                     "prompt_tokens": r.prompt_tokens,
                     "completion_tokens": r.completion_tokens,
+                    "temperature": self.config.temperature_for(r.model),
                 }
                 for r in trace.panel
             ],
@@ -364,7 +382,7 @@ class FusionEngine:
         def call(model: str) -> PanelResponse:
             try:
                 result = self.backend.complete(
-                    messages, model=model, temperature=self.config.temperature
+                    messages, model=model, temperature=self.config.temperature_for(model)
                 )
                 return PanelResponse(
                     model=model,
