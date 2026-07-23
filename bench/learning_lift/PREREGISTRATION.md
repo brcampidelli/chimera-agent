@@ -425,3 +425,59 @@ n=25 (75 paired trials) is small; a null is underpowered, not "no effect". Autho
 one weak 24B model, single seed per cell. One run, no re-rolls, a null ships, ceiling/floor and
 grading-integrity gates apply. The families make transfer *possible*, not *guaranteed* — a card must
 still be minted and retrieved and obeyed for the lift to appear.
+
+---
+
+# Amendment — run 7, the hard recurring suite (confirm the run-6 signal on the primary metric)
+
+**Committed before any model call of run 7.** Runs 1–6 stand unchanged.
+
+## Why run 7
+
+Run 6 produced the series' first positive: on a transfer-possible suite the pre-registered within-family
+transfer metric went positive and significant (later-member paired Δ +6.7% [+0.1%, +6.7%], vs +0.0% on
+first members). But two caveats kept it from a closed proof: the *pooled* primary was **ceiling-limited**
+(the easy recurring families gave cold 90.7%, bench-flagged uninformative), and the significant signal
+rested on **thin discordant counts** (n=75, 6 disagreements). Run 7 attacks both.
+
+## The single change: a harder recurring suite + more seeds
+
+`bench/learning_lift/tasks_recurring_hard.py` — the SAME five families (`hguard_`/`hcopy_`/`hincl_`/
+`hcase_`/`hreset_`), but every member rebuilt with the four difficulty inversions of the `hfix_*` suite,
+applied **family-specifically so the trap RECURS within a family** (a card learned on member 1 still
+transfers): e.g. every `hincl_` member has two inclusive bounds so a single-site patch leaves a second
+checked case failing; every `hguard_` member's emptiness arises after a filter so a naive guard breaks a
+second case. Difficulty target, fixed before authoring: the control lands **40–60%** (off the run-6
+ceiling). Validated mechanically (25/25 committed tests fail against their buggy source), no tuning
+against any pass rate. Ordered family-by-family, 5 × 5 = 25 tasks.
+
+**Seeds: 5** (up from run 6's 3) → **n=125 paired trials**, and the harder suite naturally produces more
+discordant pairs (arms disagree more away from the ceiling) — directly answering run 6's thin-n caveat.
+
+Everything else = run 6: connected loop + P3 + semantic recall on the learning arm, pooled paired
+estimator, hardened grader, cold untouched. Only the suite and seed count change.
+
+## Pre-registered predictions
+
+1. **Primary (the confirmation):** pooled paired Δ (learning − cold) **> 0 with 95% CI excluding 0** —
+   this time with the control OFF the ceiling, so a positive would confirm on the primary metric what
+   run 6 showed only on the secondary split.
+2. **Secondary (transfer, carried over):** the within-family transfer gap stays **positive** — later-
+   member paired Δ > first-member paired Δ. Run 6's headline signal must replicate on the harder suite.
+3. **Validity:** control first-half in 40–60% (else the bench flags ceiling/floor and the pooled metric
+   is reported-not-interpreted, as in runs 1 and 6).
+
+## The pre-committed readings
+
+- **Pooled Δ > 0 significant AND transfer gap > 0** → the run-6 signal is confirmed on the primary
+  metric at power: accumulated learning helps when transfer is possible. The strongest close available.
+- **Transfer gap > 0 but pooled Δ ns** → the effect is real on the transfer lens but the pooled metric
+  is still underpowered; report both, and the family split remains the primary evidence.
+- **Both null on a hard transfer-possible suite** → run 6 was a fluke of a ceiling-easy suite; the
+  honest retraction, reported with the same prominence.
+
+## Caveats (carry over)
+
+Authored synthetic families, one weak 24B model, single seed per cell. One run, no re-rolls, a null (or
+a retraction) ships. n=125 is better than 75 but still modest — a not-significant pooled result is
+underpowered, not "no effect". The families make transfer *possible*, not *guaranteed*.

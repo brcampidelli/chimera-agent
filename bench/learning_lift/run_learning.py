@@ -81,7 +81,14 @@ def _suite() -> tuple[str, list[dict]]:
         from tasks_recurring import RECURRING_TASKS
 
         return name, list(RECURRING_TASKS)
-    raise SystemExit(f"unknown BENCH_SUITE={name!r} (expected 'hard', 'fix' or 'recurring')")
+    if name == "recurring_hard":
+        # run 7: the same families, but each member built with the four difficulty inversions (family-
+        # specific so the trap recurs), to pull the control off the ceiling run 6 hit — so the POOLED
+        # metric has room to confirm what run 6's within-family split already showed.
+        from tasks_recurring_hard import RECURRING_HARD_TASKS
+
+        return name, list(RECURRING_HARD_TASKS)
+    raise SystemExit(f"unknown BENCH_SUITE={name!r} (expected hard/fix/recurring/recurring_hard)")
 
 
 SUITE_NAME, SUITE = _suite()
