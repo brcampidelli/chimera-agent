@@ -34,6 +34,7 @@ if TYPE_CHECKING:
         run_continuous,
         run_evolution,
     )
+    from chimera.eval.env import EnvState, TaskEnv, Verifier
     from chimera.eval.evoclaw import (
         EvoComparison,
         EvoStep,
@@ -151,6 +152,9 @@ _LAZY: dict[str, tuple[str, str]] = {
     "parse_report": ("swe_bench", "parse_report"),
     "report_to_trials": ("swe_bench", "report_to_trials"),
     "swe_build_solve_command": ("swe_bench", "build_solve_command"),
+    "TaskEnv": ("env", "TaskEnv"),
+    "EnvState": ("env", "EnvState"),
+    "Verifier": ("env", "Verifier"),
 }
 
 
@@ -202,6 +206,9 @@ __all__ = [
     "hard_chain",
     "HARD_CHAIN_START",
     "HARD_CHAIN_OPS",
+    "TaskEnv",
+    "EnvState",
+    "Verifier",
     "InjectionAttack",
     "AttackOutcome",
     "RedTeamReport",
