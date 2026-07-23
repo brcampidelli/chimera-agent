@@ -70,6 +70,20 @@ def test_semantic_min_similarity_floor_injects_nothing_on_weak_match(tmp_path: P
     assert retriever.last_retrieved == []
 
 
+def test_semantic_embed_failure_falls_back_to_bm25(tmp_path: Path) -> None:
+    # An embeddings outage must NOT crash a run — it falls back to keyword/BM25 recall.
+    store = SkillStore(tmp_path / "skills.json")
+    for card in _cards():
+        store.add(card)
+
+    def broken_embed(texts: list[str]) -> list[list[float]]:
+        raise RuntimeError("embeddings endpoint down")
+
+    retriever = CardRetriever(store, k=1, embed=broken_embed)
+    block = retriever.card_context("find a pair in a sorted array summing to a target")
+    assert "two_pointer" in block  # BM25 still returned the right card
+
+
 def test_context_block_has_template_and_instruction() -> None:
     block = cards_context_block(_cards()[:1])
     assert "Retrieved reasoning skills:" in block

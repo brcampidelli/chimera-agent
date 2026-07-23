@@ -9,6 +9,7 @@ with a zero-dependency token-overlap fallback when FTS5 is not compiled in.
 
 from __future__ import annotations
 
+import logging
 import re
 import sqlite3
 
@@ -16,6 +17,7 @@ from chimera.evolution.learned_skill import LearnedSkill
 from chimera.evolution.skill_store import SkillStore
 from chimera.memory.semantic import EmbedFn, cosine
 
+_log = logging.getLogger(__name__)
 _TOKEN = re.compile(r"[a-z0-9]+")
 _INSTRUCTION = (
     "Prefer the most directly applicable skill; ignore irrelevant or contradictory "
@@ -143,9 +145,13 @@ class CardRetriever:
         if not cards:
             self.last_retrieved = []
             return ""
+        hits: list[LearnedSkill] | None = None
         if self._embed is not None:
-            hits = self._semantic_hits(cards, task)
-        else:
+            try:
+                hits = self._semantic_hits(cards, task)
+            except Exception as exc:  # noqa: BLE001 — never hard-fail a run because embeddings are down
+                _log.warning("semantic card recall failed, falling back to BM25: %s", exc)
+        if hits is None:
             with CardIndex(cards) as index:  # close the in-memory SQLite connection after the search
                 hits = index.search(task, k=self.k, min_overlap=self.min_overlap)
         self.last_retrieved = [card.name for card in hits]
