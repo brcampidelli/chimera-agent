@@ -214,6 +214,16 @@ class Settings(BaseSettings):
         default=False, validation_alias="CHIMERA_SKILL_CARDS_READ"
     )
 
+    # --- ACE playbook curation from errors (Level-2 P3): when curating the playbook after a run,
+    # feed the curator the actual error evidence — the failing verifier output and the diff that
+    # fixed it — not just verdict+final-answer. Blind-to-failure curation produces platitudes; the
+    # evidence lets it distill process pitfalls ("run the failing test first", "re-check a second
+    # case", "re-read the docstring for quiet clauses"). On by default: strictly more signal for a
+    # curator already instructed to generalise. Set 0 to ablate against the verdict-only baseline. ---
+    playbook_curate_from_errors: bool = Field(
+        default=True, validation_alias="CHIMERA_PLAYBOOK_CURATE_FROM_ERRORS"
+    )
+
     # --- How the collective skill-accept gate scores cross-model transfer: "point" (the
     # raw pass fraction, default) or "wilson" (the lower Wilson confidence bound, so a
     # lucky small-sample pass no longer clears the threshold). "wilson" is strict on tiny

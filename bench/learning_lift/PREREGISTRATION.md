@@ -241,3 +241,80 @@ Whether a connected loop helps at adequate power, on real repos, with a stronger
 richer error-seeded content of P3/P4. Run 3 answers exactly one question: **with the wire connected,
 does the counted learning move the number on this suite?** — and, if not, **which failure mode**
 (never-retrieved vs retrieved-but-no-transfer) the attribution log points to.
+
+---
+
+# Amendment — run 4, the right meter (pooled paired) at power, + P3 error-seeded curation
+
+**Committed before any model call of run 4.** Runs 1–3 stand unchanged.
+
+## Why run 4, and the honest metric change
+
+Run 3 **connected the loop** (validity check green: 35 skill-card retrievals credited, 50 playbook
+bullets — run 2 was 0 by construction). Yet the DiD stayed ~0 **while the learning arm sat +10pp
+above cold in BOTH halves** (55 vs 45, 85 vs 75). That pattern is a **level shift**, and the DiD is a
+**slope** estimator — it asks whether the second half improves *more* than the first, and subtracts
+any constant offset to zero. A connected loop whose useful bullets are learned early and then help
+roughly equally is exactly a level shift the DiD cannot see.
+
+So run 4's **primary meter is the pooled paired estimate**, not the DiD:
+
+- **Paired, not unpaired:** both arms solve the SAME task from an identical fresh workspace, so each
+  task is a matched pair. McNemar + a Wilson interval on the discordant pairs
+  (`chimera/eval/paired.py`) gives a difference CI that **can** detect a constant offset and is
+  tighter than an unpaired interval on the same data.
+- **Pooled across seeds for power:** `BENCH_SEEDS=3` runs the whole cold+learning suite 3×; the model
+  is sampled with temperature>0 (runs 2 vs 3 already differ on identical tasks), so the 3 repetitions
+  are independent draws and their per-task pairs pool to **n = 120 paired trials**.
+- **The DiD is still reported** (per seed + mean) for continuity with runs 1–3.
+
+**Integrity — is this moving the goalposts?** Stated plainly so it can't be retrofitted: the paired /
+overall-rate comparison was **already named in the original design section** ("Reported alongside:
+per-arm overall pass rate … and the paired per-task grid") as a reported secondary. Promoting it to
+primary is a **disclosed methodological update with a structural reason** (a level shift is invisible
+to a slope estimator) — not "it gave a nicer number". AND, less comfortably: run 4 is a
+**confirmation attempt of a run-3 observation** (the +10pp), which is epistemically weaker than a
+virgin pre-registration. If the run-3 +10pp was noise, run 4 with 3× the sample should fail to clear
+zero; that is the test, and a null is the honest possible outcome.
+
+## The other change in run 4 — P3 (error-seeded playbook curation)
+
+The ACE playbook curator was **blind to why a task failed** — it received only verdict + final
+answer (`chimera/cli/main.py`). P3 feeds it the real error evidence already in `result.attempts`: the
+failing verifier output from the last failed attempt and the diff that ultimately passed, so it
+distils **process pitfalls** ("run the given test first", "re-check a second case", "re-read the
+docstring for quiet clauses") instead of platitudes. On by product default
+(`CHIMERA_PLAYBOOK_CURATE_FROM_ERRORS`, default True).
+
+**Bundling disclosure:** run 4 therefore measures **P1+P5+P3 together**. It **cannot** attribute any
+lift to P3 alone — the isolated ablation (`CHIMERA_PLAYBOOK_CURATE_FROM_ERRORS=0`) is future work.
+What run 4 tests is whether the **best connected+seeded loop** beats the no-learning control at power.
+
+## What changes, and what does not
+
+| | run 3 | run 4 |
+|---|---|---|
+| primary meter | DiD (slope) | **pooled paired delta + 95% CI** (McNemar/Wilson) |
+| seeds | 1 | **3 (pooled → n=120 paired trials)** |
+| playbook curation | verdict-only | **error-seeded (P3)** |
+| arms, suite, order, grader, connection check | — | **identical** |
+
+## Pre-registered predictions for run 4
+
+1. **Primary:** pooled paired delta (learning − cold) **> 0 with 95% CI excluding 0** (learning
+   significantly above control). This is the confirmation test of the run-3 +10pp level shift.
+2. **Secondary:** the DiD stays ~0 (the benefit is a level, not an accelerating slope).
+3. **Validity:** the connection check stays green (skill-card uses > 0 and/or playbook bullets grow).
+   If it goes zero, the run is the disconnected null, not a transfer result.
+
+## Rules that carry over
+
+- **One run** = the single 3-seed invocation. No re-rolls, no post-hoc exclusion, a null ships with
+  equal prominence.
+- **Underpowered ≠ no effect.** 120 paired trials beats 40 but a ~10pp effect can still fail to clear
+  zero; a not-significant CI is labelled underpowered. **More seeds can be added** (cost is ~$0.25 per
+  full run — money is not the constraint; wall-clock is) if a follow-up is warranted.
+- **Ceiling/floor rule** carries over on the pooled cold rate.
+- **Grading integrity** gate carries over (any arm that edits its own test is recorded, workspace
+  preserved).
+- **Token accounting still not captured**; the connection is asserted via `skill_card_uses`/bullets.

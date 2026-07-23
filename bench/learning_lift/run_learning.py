@@ -21,6 +21,13 @@ a loop with the wire cut; run 3 measures it connected. `BENCH_CONNECT=0` reprodu
 disconnected baseline. Per-card attribution (uses/successes) is logged so a null tells 'never
 retrieved' apart from 'retrieved but did not transfer'.
 
+Run 4 (`BENCH_SEEDS=N`): run 3 showed the DiD stayed ~0 while learning sat +10pp above cold in BOTH
+halves — a LEVEL shift the slope-based DiD subtracts to zero. So the primary meter is now a POOLED
+PAIRED estimate (McNemar + Wilson on discordant pairs, chimera/eval/paired): both arms solve the SAME
+task from an identical workspace, so per-task pairs across N seeds pool into one difference CI that
+CAN see a constant offset. The DiD is still reported per seed for continuity. P3 (error-seeded
+playbook curation) rides in the product default and is measured together with P1+P5 here.
+
 Design, order, metric and predictions are fixed in PREREGISTRATION.md, committed before any model
 call. Read the power caveat there before reading a null as "learning does not help".
 """
@@ -46,6 +53,12 @@ from tasks import TASKS  # noqa: E402
 _MODEL = os.environ.get("BENCH_MODEL", "openrouter/mistralai/mistral-small-3.2-24b-instruct")
 _TIMEOUT = int(os.environ.get("BENCH_TIMEOUT", "240"))
 _OUT = Path(os.environ.get("BENCH_OUT", str(HERE / "results")))
+# Multiple seeds (run 4): the whole cold+learning paired suite, repeated N times. The model is
+# sampled with temperature>0, so each repetition is an independent draw (runs 2 vs 3 already differ
+# on identical tasks) — pooling the per-task paired pairs across seeds is what buys the power the
+# single-seed DiD lacked. A level-shift benefit (learning uniformly above cold) is invisible to the
+# slope-based DiD but shows in the pooled paired delta + its CI (McNemar/Wilson, chimera/eval/paired).
+_SEEDS = max(1, int(os.environ.get("BENCH_SEEDS", "1")))
 
 def _suite() -> tuple[str, list[dict]]:
     """The committed suite. Order is committed and is NOT re-shuffled — see PREREGISTRATION.md.
@@ -190,9 +203,9 @@ def _skill_stats(home: Path) -> list[dict[str, object]]:
     return []
 
 
-def _run_arm(arm: str, root: Path, homes: Path, tampered: set[str],
+def _run_arm(arm: str, seed: int, root: Path, homes: Path, tampered: set[str],
              accum: list[dict[str, object]]) -> list[bool]:
-    """Run the whole committed sequence, in order, for one arm."""
+    """Run the whole committed sequence, in order, for one arm of one seed."""
     arm_home = homes / arm
     arm_home.mkdir(parents=True, exist_ok=True)
     results: list[bool] = []
@@ -206,9 +219,10 @@ def _run_arm(arm: str, root: Path, homes: Path, tampered: set[str],
         results.append(ok)
         # Snapshot the learning arm's accumulated state AFTER each task (cold carries nothing).
         if arm == "learning":
-            accum.append({"i": index, "pass": ok, **_accumulation(home)})
+            accum.append({"seed": seed, "i": index, "pass": ok, **_accumulation(home)})
         half = "1st" if index <= HALF else "2nd"
-        print(f"  [{arm:8}] {index:2}/{len(SUITE)} {half} {str(task['id']):<22} {'PASS' if ok else 'fail'}", flush=True)
+        tag = f"s{seed}" if _SEEDS > 1 else ""
+        print(f"  [{arm:8}{tag:>3}] {index:2}/{len(SUITE)} {half} {str(task['id']):<22} {'PASS' if ok else 'fail'}", flush=True)
     return results
 
 
@@ -216,90 +230,110 @@ def _rate(flags: list[bool]) -> float:
     return sum(flags) / len(flags) if flags else 0.0
 
 
+def _did(cold: list[bool], learning: list[bool]) -> float:
+    """Difference-in-differences for one seed: (learn 2nd-1st) − (cold 2nd-1st)."""
+    lh = (_rate(learning[:HALF]), _rate(learning[HALF:]))
+    ch = (_rate(cold[:HALF]), _rate(cold[HALF:]))
+    return (lh[1] - lh[0]) - (ch[1] - ch[0])
+
+
 def main() -> None:
     with contextlib.suppress(Exception):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
     _OUT.mkdir(parents=True, exist_ok=True)
     print(f"learning-lift · suite={SUITE_NAME} · learn->use {'CONNECTED' if _CONNECT else 'DISCONNECTED'}"
-          f" · model={_MODEL} · tasks={len(SUITE)}"
+          f" · seeds={_SEEDS} · model={_MODEL} · tasks={len(SUITE)}"
           f" (halves {HALF}/{len(SUITE) - HALF}) · timeout={_TIMEOUT}s", flush=True)
 
     root = Path(tempfile.mkdtemp(prefix="chimlearn-ws-"))
-    homes = Path(tempfile.mkdtemp(prefix="chimlearn-home-"))
+    homes_root = Path(tempfile.mkdtemp(prefix="chimlearn-home-"))
     tampered: set[str] = set()
     accum: list[dict[str, object]] = []
+    # Pooled paired pairs across all seeds: item = the SAME task in the SAME seed, both arms from an
+    # identical fresh workspace. `pool_cold[i]`/`pool_learn[i]` are that pair — what compare_paired needs.
+    pool_cold: list[bool] = []
+    pool_learn: list[bool] = []
+    per_seed: list[dict[str, object]] = []
+    total_uses = 0
+    skill_stats_last: list[dict[str, object]] = []
     try:
-        arms = {arm: _run_arm(arm, root, homes, tampered, accum) for arm in ("cold", "learning")}
-        learned = _skills_learned(homes / "learning")
-        # Capture the attribution table BEFORE the home is deleted below.
-        skill_stats = _skill_stats(homes / "learning")
+        for seed in range(1, _SEEDS + 1):
+            if _SEEDS > 1:
+                print(f"\n--- seed {seed}/{_SEEDS} ---", flush=True)
+            homes = homes_root / f"seed{seed}"
+            arms = {arm: _run_arm(arm, seed, root, homes, tampered, accum)
+                    for arm in ("cold", "learning")}
+            pool_cold.extend(arms["cold"])
+            pool_learn.extend(arms["learning"])
+            stats = _skill_stats(homes / "learning")
+            skill_stats_last = stats
+            total_uses += sum(int(s.get("uses", 0)) for s in stats)
+            per_seed.append({
+                "seed": seed,
+                "cold": arms["cold"], "learning": arms["learning"],
+                "did": _did(arms["cold"], arms["learning"]),
+                "skills_learned": _skills_learned(homes / "learning"),
+            })
     finally:
         shutil.rmtree(root, ignore_errors=True)
-        shutil.rmtree(homes, ignore_errors=True)
+        shutil.rmtree(homes_root, ignore_errors=True)
 
-    halves = {a: (_rate(r[:HALF]), _rate(r[HALF:])) for a, r in arms.items()}
-    did = (halves["learning"][1] - halves["learning"][0]) - (halves["cold"][1] - halves["cold"][0])
+    from chimera.eval.paired import compare_paired  # McNemar + Wilson on discordant pairs
 
-    print("\n" + "=" * 62, flush=True)
-    for arm, (first, second) in halves.items():
-        print(f"  {arm:8}  1st half {first:6.1%}   2nd half {second:6.1%}   Δ {second - first:+6.1%}"
-              f"   overall {_rate(arms[arm]):6.1%}", flush=True)
-    print(f"\n  difference-in-differences: {did:+.1%}", flush=True)
-    print(f"  skills kept by the learning arm: {learned}", flush=True)
-    if learned == 0:
-        print("\n  !! NO LEARNING OCCURRED — the learning arm kept zero skills, so this run measured\n"
-              "     nothing about accumulation. Per PREREGISTRATION.md this is NOT evidence that\n"
-              "     learning does not help; it means the acceptance path produced no artifact to test.",
-              flush=True)
+    paired = compare_paired(pool_cold, pool_learn, baseline_name="cold", treatment_name="learning")
+    ci_lo, ci_hi = paired.diff_ci
+    mean_did = sum(float(s["did"]) for s in per_seed) / len(per_seed)
+
+    print("\n" + "=" * 66, flush=True)
+    print(f"  POOLED PAIRED (n={paired.n} = {len(SUITE)} tasks x {_SEEDS} seed(s)) — the level-shift meter:",
+          flush=True)
+    print(f"    cold      {paired.baseline_rate:6.1%}", flush=True)
+    print(f"    learning  {paired.treatment_rate:6.1%}", flush=True)
+    print(f"    paired Δ  {paired.delta:+.1%}   95% CI [{ci_lo:+.1%}, {ci_hi:+.1%}]   "
+          f"-> {'SIGNIFICANT (CI excludes 0)' if paired.significant else 'not significant (CI includes 0)'}",
+          flush=True)
+    print(f"    discordant pairs: learning +{paired.treatment_only} / cold +{paired.baseline_only}"
+          f"  (concordant {paired.both_pass + paired.both_fail} carry no signal)", flush=True)
+    print(f"\n  difference-in-differences (slope meter, per seed): "
+          f"{[round(float(s['did']), 3) for s in per_seed]}  mean {mean_did:+.1%}", flush=True)
+    print(f"  skills kept (per seed): {[s['skills_learned'] for s in per_seed]}", flush=True)
     print(f"  grading integrity: {'TAMPERED: ' + ', '.join(sorted(tampered)) if tampered else 'no arm modified its own test'}",
           flush=True)
 
-    # learn->use connection check (P5): the whole point of run 3. `uses` is credited only when a card
-    # actually reached a prompt on a verified run, so total uses == 0 means the loop is STILL open and
-    # the DiD says nothing about skills — exactly the run-2 condition. A non-zero total is the first
-    # proof the fix connected; the per-card rate then tells transfer (helped) from noise (retrieved,
-    # didn't move outcomes).
-    total_uses = sum(int(s.get("uses", 0)) for s in skill_stats)
-    used = sorted((s for s in skill_stats if int(s.get("uses", 0)) > 0),
+    # learn->use connection check (P5): `uses` is credited only when a card actually reached a prompt
+    # on a verified run, so total uses == 0 means the loop is STILL open. A non-zero total is the proof
+    # the fix connected; the per-card rate then tells transfer (helped) from noise (retrieved, didn't).
+    used = sorted((s for s in skill_stats_last if int(s.get("uses", 0)) > 0),
                   key=lambda s: -int(s.get("uses", 0)))
     end_bullets = int(accum[-1]["playbook_bullets"]) if accum else 0
     print(f"\n  learn->use connection ({'CONNECTED' if _CONNECT else 'DISCONNECTED'}): "
-          f"skill-card retrievals credited = {total_uses}; playbook bullets at end = {end_bullets}",
+          f"skill-card retrievals credited = {total_uses} (all seeds); last-seed playbook bullets = {end_bullets}",
           flush=True)
     if _CONNECT and total_uses == 0 and end_bullets == 0:
         print("     !! STILL ZERO INJECTION — neither channel reached a prompt; the loop did not\n"
               "        connect (check flags/env). A null here is the disconnected null, not transfer.",
               flush=True)
     if used:
-        print("  per-card attribution (name: uses/successes rate — rate<0.5 = retrieved but weak):", flush=True)
+        print("  last-seed per-card attribution (name: uses/successes rate — rate<0.5 = retrieved but weak):",
+              flush=True)
         for s in used[:12]:
             print(f"      {str(s.get('name','')):<28} {s.get('uses')}/{s.get('successes')}  rate={s.get('rate')}",
                   flush=True)
 
-    # Pre-registered: a control arm pinned at the ceiling (or floor) leaves the DiD no room to move,
-    # so the number is reported but must not be interpreted. This is what run 1 hit.
-    cold_first = halves["cold"][0]
-    if cold_first >= 0.9 or cold_first <= 0.1:
-        print(f"\n  !! UNINFORMATIVE BY CONSTRUCTION — the control arm's first half is {cold_first:.1%}."
-              "\n     With the control at the ceiling/floor the DiD cannot move regardless of whether"
-              "\n     learning works. Reported, not interpreted (PREREGISTRATION.md, run-2 amendment).",
-              flush=True)
-    elif not 0.4 <= cold_first <= 0.6:
-        print(f"\n  note: the control arm's first half is {cold_first:.1%}, outside the 40–60% target"
-              "\n  fixed before authoring. Stated up front; the suite was NOT re-authored to hit it.",
-              flush=True)
-
-    print(f"\n  n={len(SUITE)} in halves of {HALF} is small: a null here is UNDERPOWERED, not"
-          " 'no effect' (PREREGISTRATION.md).", flush=True)
+    if paired.baseline_rate >= 0.9 or paired.baseline_rate <= 0.1:
+        print(f"\n  !! UNINFORMATIVE BY CONSTRUCTION — cold's pooled rate is {paired.baseline_rate:.1%}"
+              " (ceiling/floor). Reported, not interpreted (PREREGISTRATION.md).", flush=True)
+    if paired.n < 80:
+        print(f"\n  note: n={paired.n} paired trials is small — a not-significant result is UNDERPOWERED,"
+              " not 'no effect' (PREREGISTRATION.md). More seeds tighten the CI.", flush=True)
 
     (_OUT / "learning.json").write_text(
         json.dumps({
-            "suite": SUITE_NAME, "model": _MODEL, "learn_use_connected": _CONNECT,
+            "suite": SUITE_NAME, "model": _MODEL, "learn_use_connected": _CONNECT, "seeds": _SEEDS,
             "tasks": [str(t["id"]) for t in SUITE], "half": HALF,
-            "by_arm": {a: {"passed": r, "first_half": halves[a][0], "second_half": halves[a][1]}
-                       for a, r in arms.items()},
-            "did": did, "skills_learned": learned,
-            "skill_card_uses": total_uses, "skill_stats": skill_stats, "accumulation": accum,
+            "paired": paired.summary(),
+            "mean_did": mean_did, "per_seed": per_seed,
+            "skill_card_uses": total_uses, "skill_stats_last_seed": skill_stats_last, "accumulation": accum,
             "graded_against_pristine_test": True, "tests_modified_by_solve": sorted(tampered),
         }, indent=2),
         encoding="utf-8",

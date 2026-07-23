@@ -37,6 +37,7 @@ from chimera.config import get_settings
 if TYPE_CHECKING:
     from chimera.config import Settings
     from chimera.core import AgentEvent
+    from chimera.core.autonomous import AutonomousResult
     from chimera.ecosystem import TrajectoryCollector
     from chimera.evolution import Playbook
     from chimera.kanban import KanbanBoard
@@ -2388,7 +2389,6 @@ def solve(
         StrongVerifier,
         WorkspaceGuard,
     )
-    from chimera.core.autonomous import AutonomousResult
     from chimera.core.verify import CommandVerifier
     from chimera.evolution import build_evolution_context
     from chimera.fusion.probe_log import ProbeLog as _ProbeLog
@@ -2639,11 +2639,9 @@ def solve(
     if stored_playbook is not None:
         from chimera.evolution import BackendDeltaProposer, PlaybookCurator
 
-        verdict = "succeeded" if result.success else "failed"
-        outcome_text = (
-            f"The task {verdict} after {len(result.attempts)} attempt(s). "
-            f"Final answer: {result.answer[:500]}"
-        )
+        # Level-2 P3: seed curation from the run's error evidence (failing verifier output + the
+        # fixing diff), not just verdict+final-answer — so the curator distils process pitfalls.
+        outcome_text = _curation_outcome(result, from_errors=settings.playbook_curate_from_errors)
         applied = PlaybookCurator(BackendDeltaProposer(gateway, model)).curate(
             stored_playbook, task, outcome_text
         )
@@ -2706,7 +2704,6 @@ def solve_batch(
         Planner,
         WorkspaceGuard,
     )
-    from chimera.core.autonomous import AutonomousResult
     from chimera.governance import TaintLedger, ledger_registry
     from chimera.orchestration import run_isolated
     from chimera.providers import LLMGateway, MissingCredentialsError
@@ -3243,6 +3240,29 @@ def _save_playbook(playbook: Playbook) -> None:
     from chimera.evolution.wiring import save_playbook
 
     save_playbook(get_settings(), playbook)
+
+
+def _curation_outcome(result: AutonomousResult, *, from_errors: bool) -> str:
+    """Build the reflect-step text the ACE curator sees after a run.
+
+    Baseline = verdict + final answer. With ``from_errors`` (Level-2 P3) also feed the concrete error
+    evidence the curator was previously blind to: the failing verifier output from the last failed
+    attempt (why it failed) and the diff that ultimately passed (what worked). A curator instructed to
+    generalise turns that into process pitfalls ("run the given test first", "re-check a second case")
+    rather than platitudes. Bounded so the curation prompt stays small.
+    """
+    verdict = "succeeded" if result.success else "failed"
+    parts = [f"The task {verdict} after {len(result.attempts)} attempt(s)."]
+    if from_errors and result.attempts:
+        failed = [a for a in result.attempts if not a.success and (a.verify_output or a.feedback)]
+        if failed:
+            why = (failed[-1].verify_output or failed[-1].feedback).strip()
+            if why:
+                parts.append(f"What went wrong (verifier output from a failed attempt):\n{why[:400]}")
+        if result.success and (fix := (result.attempts[-1].diff_summary or "").strip()):
+            parts.append(f"What fixed it (the diff that passed):\n{fix[:400]}")
+    parts.append(f"Final answer: {result.answer[:300]}")
+    return "\n\n".join(parts)
 
 
 @playbook_app.command("show")
