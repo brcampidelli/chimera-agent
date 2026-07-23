@@ -366,3 +366,62 @@ control.
   behaviour change, not a token-accounted number.
 - All run-4 rules carry over: one run (the 3-seed invocation), no re-rolls, a null ships, the
   ceiling/floor and grading-integrity gates apply, connection asserted via card uses / bullets.
+
+---
+
+# Amendment — run 6, a transfer-POSSIBLE suite (recurring families)
+
+**Committed before any model call of run 6.** Runs 1–5 stand unchanged.
+
+## Why run 6
+
+Runs 1–5 nulled and the cause is diagnosed: the `hfix_*` suite is surface-DISJOINT, so there is nothing
+to transfer between tasks — run 5 proved even semantic retrieval (which fixes retrieval *quality*) does
+not move the number, isolating **transfer-poverty** as the ceiling. Run 6 removes that ceiling by
+construction: a suite where solving one task genuinely teaches the next.
+
+## The suite
+
+`bench/learning_lift/tasks_recurring.py` — **25 tasks, 5 families × 5 members**, ordered family-by-
+family. Each family shares ONE nameable, transferable fix a distilled card can capture: **guard_**
+(empty input → return the default, guard at top), **copy_** (never mutate the input), **incl_** (the
+range end is inclusive), **case_** (compare/group case-insensitively), **reset_** (reset the per-group
+accumulator). Every task states the CONTRACT not the symptom, so the model must diagnose — but within a
+family the diagnosis recurs. Validated mechanically (all 25 committed tests fail against their committed
+buggy source), no model involved, no tuning against any pass rate; families/patterns fixed before
+authoring.
+
+**This is the *friendliest* possible suite for the hypothesis, stated plainly here so a positive result
+is read with that in mind** (same disclosure discipline as run 2). It is engineered so transfer is
+possible; that is the point — the disjoint suite was engineered so it was not, and both are honest
+instruments for different questions.
+
+## Config — identical to run 5
+
+Connected loop (`--playbook --skill-cards`) + P3 error-seeded curation + **semantic recall on the
+learning arm** (`BENCH_SEMANTIC=1`), pooled paired estimator, **3 seeds → n=75 paired trials**, same
+hardened grader, `cold` untouched. Only the SUITE changes (`BENCH_SUITE=recurring`).
+
+## Pre-registered predictions
+
+1. **Primary:** pooled paired Δ (learning − cold) **> 0 with 95% CI excluding 0.**
+2. **Secondary — the sharp transfer test:** the learning arm only carries a family's card AFTER its
+   first member, so if accumulated learning helps at all, the paired lift on the **later members**
+   (n=60, 4 per family) must exceed the lift on the **first members** (n=15) — a **positive transfer
+   gap** (`later Δ − first Δ`). This is the metric the disjoint suite structurally could not produce.
+
+## The three outcomes, pre-committed
+
+- **Pooled Δ > 0 AND transfer gap > 0** → accumulated learning DOES help when transfer is possible; the
+  five prior nulls were the suite, not the machinery. The strongest positive the series can produce.
+- **Still null on a transfer-possible suite** → learning does not help even when transfer is available —
+  a stronger negative than the disjoint nulls, pointing past retrieval/suite to the loop itself.
+- **Transfer gap > 0 but pooled Δ ns** → real but weak/diluted transfer; motivates more power (seeds)
+  and the first-vs-later split as the primary lens.
+
+## Caveats (carry over)
+
+n=25 (75 paired trials) is small; a null is underpowered, not "no effect". Authored synthetic families,
+one weak 24B model, single seed per cell. One run, no re-rolls, a null ships, ceiling/floor and
+grading-integrity gates apply. The families make transfer *possible*, not *guaranteed* — a card must
+still be minted and retrieved and obeyed for the lift to appear.

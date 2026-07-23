@@ -75,7 +75,13 @@ def _suite() -> tuple[str, list[dict]]:
         from tasks_hard_fix import HARD_FIX_TASKS
 
         return name, list(HARD_FIX_TASKS)
-    raise SystemExit(f"unknown BENCH_SUITE={name!r} (expected 'hard' or 'fix')")
+    if name == "recurring":
+        # run 6: task FAMILIES that share a transferable fix, so learning a pattern on one member
+        # helps the next — the transfer-POSSIBLE instrument the disjoint hard suite could not be.
+        from tasks_recurring import RECURRING_TASKS
+
+        return name, list(RECURRING_TASKS)
+    raise SystemExit(f"unknown BENCH_SUITE={name!r} (expected 'hard', 'fix' or 'recurring')")
 
 
 SUITE_NAME, SUITE = _suite()
@@ -245,6 +251,23 @@ def _did(cold: list[bool], learning: list[bool]) -> float:
     return (lh[1] - lh[0]) - (ch[1] - ch[0])
 
 
+def _family_later_mask() -> list[bool]:
+    """Per SUITE task, in order: is it a NON-FIRST member of its family (id prefix before '_')?
+
+    The learning arm can only carry a family's card AFTER its first member, so transfer — if it happens
+    — shows on the LATER members. This is the pre-registered secondary for the recurring suite: the
+    paired lift should be larger on later members than on first members. All-False for a suite with no
+    real families (every id a distinct prefix), where the split is meaningless.
+    """
+    seen: set[str] = set()
+    mask: list[bool] = []
+    for task in SUITE:
+        family = str(task["id"]).split("_")[0]
+        mask.append(family in seen)
+        seen.add(family)
+    return mask
+
+
 def main() -> None:
     with contextlib.suppress(Exception):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
@@ -308,6 +331,31 @@ def main() -> None:
     print(f"  grading integrity: {'TAMPERED: ' + ', '.join(sorted(tampered)) if tampered else 'no arm modified its own test'}",
           flush=True)
 
+    # Within-family transfer (recurring suite, pre-registered secondary): the learning arm only holds a
+    # family's card AFTER its first member, so if accumulated learning helps at all the paired lift is
+    # larger on LATER members than on first members. Split the pooled pairs by family position.
+    later_flags = _family_later_mask() * _SEEDS  # SUITE-order mask repeated once per seed == pool order
+    family_transfer: dict[str, object] | None = None
+    if any(later_flags):
+        first_c = [c for c, lt in zip(pool_cold, later_flags, strict=True) if not lt]
+        first_l = [v for v, lt in zip(pool_learn, later_flags, strict=True) if not lt]
+        later_c = [c for c, lt in zip(pool_cold, later_flags, strict=True) if lt]
+        later_l = [v for v, lt in zip(pool_learn, later_flags, strict=True) if lt]
+        first_p = compare_paired(first_c, first_l, baseline_name="cold", treatment_name="learning")
+        later_p = compare_paired(later_c, later_l, baseline_name="cold", treatment_name="learning")
+        family_transfer = {
+            "first_member": first_p.summary(), "later_member": later_p.summary(),
+            "transfer_gap": round(later_p.delta - first_p.delta, 4),
+        }
+        print("\n  WITHIN-FAMILY TRANSFER (learning beats cold MORE on later members, if learning helps):",
+              flush=True)
+        print(f"    first members (n={first_p.n}):  paired Δ {first_p.delta:+.1%}  [{first_p.diff_ci[0]:+.1%}, {first_p.diff_ci[1]:+.1%}]",
+              flush=True)
+        print(f"    later members (n={later_p.n}):  paired Δ {later_p.delta:+.1%}  [{later_p.diff_ci[0]:+.1%}, {later_p.diff_ci[1]:+.1%}]"
+              f"  {'SIGNIFICANT' if later_p.significant else 'ns'}", flush=True)
+        print(f"    transfer gap (later Δ − first Δ): {later_p.delta - first_p.delta:+.1%}"
+              "  (positive = the family card helped)", flush=True)
+
     # learn->use connection check (P5): `uses` is credited only when a card actually reached a prompt
     # on a verified run, so total uses == 0 means the loop is STILL open. A non-zero total is the proof
     # the fix connected; the per-card rate then tells transfer (helped) from noise (retrieved, didn't).
@@ -340,7 +388,7 @@ def main() -> None:
             "suite": SUITE_NAME, "model": _MODEL, "learn_use_connected": _CONNECT,
             "semantic_recall": _SEMANTIC, "seeds": _SEEDS,
             "tasks": [str(t["id"]) for t in SUITE], "half": HALF,
-            "paired": paired.summary(),
+            "paired": paired.summary(), "family_transfer": family_transfer,
             "mean_did": mean_did, "per_seed": per_seed,
             "skill_card_uses": total_uses, "skill_stats_last_seed": skill_stats_last, "accumulation": accum,
             "graded_against_pristine_test": True, "tests_modified_by_solve": sorted(tampered),
