@@ -14,6 +14,7 @@ import sqlite3
 
 from chimera.evolution.learned_skill import LearnedSkill
 from chimera.evolution.skill_store import SkillStore
+from chimera.memory.semantic import EmbedFn, cosine
 
 _TOKEN = re.compile(r"[a-z0-9]+")
 _INSTRUCTION = (
@@ -113,12 +114,25 @@ class CardRetriever:
     """Retrieves and formats skill-card context for a task from a SkillStore."""
 
     def __init__(
-        self, store: SkillStore, *, k: int = 3, min_overlap: int = 0, max_lines: int = 4
+        self,
+        store: SkillStore,
+        *,
+        k: int = 3,
+        min_overlap: int = 0,
+        max_lines: int = 4,
+        embed: EmbedFn | None = None,
+        min_similarity: float = 0.3,
     ) -> None:
         self.store = store
         self.k = k
-        self.min_overlap = min_overlap  # relevance gate: 0 = inject any match; higher = strong match only
+        self.min_overlap = min_overlap  # lexical relevance gate: 0 = inject any match; higher = strong only
         self.max_lines = max_lines  # render budget per card (fewer lines = cheaper injection)
+        # Semantic recall (memory_bench proved keyword misses paraphrases 0% -> semantic 94%): when an
+        # embedder is supplied, rank cards by embedding cosine instead of BM25, so a card matches a task
+        # by MEANING not shared tokens. ``min_similarity`` is the cosine floor (the semantic analogue of
+        # ``min_overlap``) so a weak match injects nothing rather than dragging in noise.
+        self._embed = embed
+        self.min_similarity = min_similarity
         self.last_retrieved: list[str] = []
 
     def card_context(self, task: str) -> str:
@@ -129,10 +143,26 @@ class CardRetriever:
         if not cards:
             self.last_retrieved = []
             return ""
-        with CardIndex(cards) as index:  # close the in-memory SQLite connection after the search
-            hits = index.search(task, k=self.k, min_overlap=self.min_overlap)
+        if self._embed is not None:
+            hits = self._semantic_hits(cards, task)
+        else:
+            with CardIndex(cards) as index:  # close the in-memory SQLite connection after the search
+                hits = index.search(task, k=self.k, min_overlap=self.min_overlap)
         self.last_retrieved = [card.name for card in hits]
         return cards_context_block(hits, max_lines_per_card=self.max_lines)
+
+    def _semantic_hits(self, cards: list[LearnedSkill], task: str) -> list[LearnedSkill]:
+        """Top-k cards by embedding cosine to the task, gated by the ``min_similarity`` floor."""
+        embed = self._embed
+        assert embed is not None
+        vecs = embed([_doc(card) for card in cards] + [task])
+        query_vec = vecs[-1]
+        scored = sorted(
+            ((cosine(query_vec, vec), card) for card, vec in zip(cards, vecs[:-1], strict=True)),
+            key=lambda pair: pair[0],
+            reverse=True,
+        )
+        return [card for sim, card in scored[: self.k] if sim >= self.min_similarity]
 
     def record_outcome(self, success: bool) -> None:
         """Credit the run's outcome to the cards that were injected into it.
