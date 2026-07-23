@@ -36,6 +36,7 @@ from chimera.evolution.refine_bridge import (
     instances_from_trajectories,
     refine_skill,
 )
+from chimera.evolution.reranker import SuccessReranker
 from chimera.evolution.rollback import RollbackDecision, apply_rollback, assess_rollback
 from chimera.evolution.skill_nudges import SkillNudge, detect_skill_nudges
 from chimera.evolution.skill_store import SkillStore
@@ -50,6 +51,7 @@ __all__ = [
     "Experience",
     "ExperienceBuffer",
     "format_lessons",
+    "SuccessReranker",
     "LearnedSkill",
     "SkillStore",
     "SkillLifecyclePolicy",
