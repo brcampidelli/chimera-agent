@@ -88,6 +88,12 @@ HALF = len(SUITE) // 2
 # (no lexical gate), --skill-cards reads learned skill cards back into context. BENCH_CONNECT=0
 # reproduces the run-2 disconnected baseline from the same code.
 _CONNECT = os.environ.get("BENCH_CONNECT", "1").strip().lower() not in ("0", "false", "no", "")
+# Semantic recall (run 5): with BENCH_SEMANTIC=1, the LEARNING arm sets CHIMERA_SEMANTIC_MEMORY so
+# both memory facts AND skill cards are retrieved by embedding cosine, not keyword/BM25. memory_bench
+# proved keyword misses paraphrases (0% -> 94% semantic); run 4's likely null cause was irrelevant
+# lexical neighbours, and this tests whether relevant retrieval moves the connected loop. Learning-arm
+# only: cold carries no facts/cards, so semantic there is a no-op (kept a true no-learning control).
+_SEMANTIC = os.environ.get("BENCH_SEMANTIC", "0").strip().lower() not in ("0", "false", "no", "")
 _SCAFFOLD = ["--repo-map", "--progress-ledger", "--checklist", "--replan", "--max-attempts", "3"]
 # The read flags go on the LEARNING arm only. On `cold` they would be pure no-ops (its fresh
 # home-per-task carries no playbook/skills to inject) AND --playbook would fire a wasted curation call
@@ -119,6 +125,8 @@ def _fresh_workspace(task: dict, root: Path) -> Path:
 def _solve(task: dict, ws: Path, arm: str, home: Path) -> None:
     """One attempt. ``home`` is what carries (or does not carry) learning between tasks."""
     env = {**os.environ, "CHIMERA_HOME": str(home)}
+    if _SEMANTIC and arm == "learning":  # semantic recall for memory facts + cards, learning arm only
+        env["CHIMERA_SEMANTIC_MEMORY"] = "1"
     verify = f'"{sys.executable}" -m pytest -q {task["test"]}'
     argv = ["chimera", "solve", str(task["prompt"]), "--workspace", str(ws), "--model", _MODEL,
             "--verify", verify, *_ARMS[arm]]
@@ -242,8 +250,8 @@ def main() -> None:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
     _OUT.mkdir(parents=True, exist_ok=True)
     print(f"learning-lift · suite={SUITE_NAME} · learn->use {'CONNECTED' if _CONNECT else 'DISCONNECTED'}"
-          f" · seeds={_SEEDS} · model={_MODEL} · tasks={len(SUITE)}"
-          f" (halves {HALF}/{len(SUITE) - HALF}) · timeout={_TIMEOUT}s", flush=True)
+          f" · recall={'SEMANTIC' if _SEMANTIC else 'lexical'} · seeds={_SEEDS} · model={_MODEL}"
+          f" · tasks={len(SUITE)} (halves {HALF}/{len(SUITE) - HALF}) · timeout={_TIMEOUT}s", flush=True)
 
     root = Path(tempfile.mkdtemp(prefix="chimlearn-ws-"))
     homes_root = Path(tempfile.mkdtemp(prefix="chimlearn-home-"))
@@ -329,7 +337,8 @@ def main() -> None:
 
     (_OUT / "learning.json").write_text(
         json.dumps({
-            "suite": SUITE_NAME, "model": _MODEL, "learn_use_connected": _CONNECT, "seeds": _SEEDS,
+            "suite": SUITE_NAME, "model": _MODEL, "learn_use_connected": _CONNECT,
+            "semantic_recall": _SEMANTIC, "seeds": _SEEDS,
             "tasks": [str(t["id"]) for t in SUITE], "half": HALF,
             "paired": paired.summary(),
             "mean_did": mean_did, "per_seed": per_seed,

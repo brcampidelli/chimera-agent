@@ -318,3 +318,51 @@ What run 4 tests is whether the **best connected+seeded loop** beats the no-lear
 - **Grading integrity** gate carries over (any arm that edits its own test is recorded, workspace
   preserved).
 - **Token accounting still not captured**; the connection is asserted via `skill_card_uses`/bullets.
+
+---
+
+# Amendment — run 5, semantic recall: the retrieval-quality test
+
+**Committed before any model call of run 5.** Runs 1–4 stand unchanged.
+
+## Why run 5
+
+Run 4 was a well-powered null: connected + error-seeded, n=120 paired, Δ −0.8% [−8.7%, +7.2%]. The
+leading explanation for *why* the injected learning didn't help is retrieval quality: cards (BM25) and
+memory facts (keyword) are matched **lexically**, so on a surface-disjoint suite the injected
+"neighbours" rarely share meaning with the task. A separate measurement makes that concrete —
+`memory_bench` (paraphrase corpus): **keyword paraphrase recall 0%, semantic 94%** (a +0.938 gap,
+`text-embedding-3-small`, dim 1536). Semantic recall bridges exactly the synonyms lexical retrieval
+cannot. Run 5 asks the decisive question: **with relevant (semantic) neighbours, does the connected
+loop finally move?**
+
+## The single change
+
+The **learning arm** sets `CHIMERA_SEMANTIC_MEMORY=1` (bench flag `BENCH_SEMANTIC=1`), so BOTH memory
+facts and skill cards are retrieved by **embedding cosine** instead of keyword/BM25 (new semantic path
+in `CardRetriever`, gated by the same flag the memory-fact recall already used). Everything else is
+run 4: connected loop (`--playbook --skill-cards`) + P3 error-seeded curation, the **pooled paired**
+estimator, **3 seeds → n=120**, same suite, same committed order, same hardened grader. `cold` is
+untouched — it carries no facts/cards, so semantic there is a no-op, keeping it a true no-learning
+control.
+
+## Pre-registered predictions — and the two distinct null-meanings
+
+1. **Primary:** pooled paired Δ (learning − cold) **> 0 with 95% CI excluding 0**. A positive move means
+   **retrieval quality was the blocker** — relevant neighbours are what the loop needed.
+2. **If still null**, it is pre-committed to mean something specific and different from run 4:
+   **relevant retrieval is necessary but not sufficient on this suite** — the ceiling is
+   *transfer-poverty* (few genuinely similar past TASKS exist regardless of how well retrieval finds
+   them, because the suite is disjoint by construction), which points the next effort at a
+   recurring-pattern / real-repo suite, not at more retrieval work. Run 5 thus separates
+   "retrieval quality" from "nothing to retrieve" as the cause of the null.
+
+## Honest caveats
+
+- `memory_bench`'s +0.938 gap is on a **clean synonym corpus** favourable to semantic; it does not
+  guarantee that real minted cards embed to task-relevant neighbours. Run 5 is the end-to-end test of
+  exactly that.
+- Embeddings now cost per solve (card docs + query embedded each task) — small, and recorded as a
+  behaviour change, not a token-accounted number.
+- All run-4 rules carry over: one run (the 3-seed invocation), no re-rolls, a null ships, the
+  ceiling/floor and grading-integrity gates apply, connection asserted via card uses / bullets.
