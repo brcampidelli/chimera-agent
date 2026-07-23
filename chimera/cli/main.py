@@ -2329,6 +2329,9 @@ def solve(
     playbook: bool = typer.Option(
         False, "--playbook", help="Inject the stored ACE strategy playbook into context, then curate it from this run's outcome (closed loop)."
     ),
+    skill_cards: bool | None = typer.Option(
+        None, "--skill-cards/--no-skill-cards", help="Read learned skill cards back into context (the learn->use loop). Default follows settings.skill_cards; this overrides it per run."
+    ),
     agreement: int = typer.Option(
         1, "--agreement", help="With --fuse: sample K cheap answers per turn; escalate to fusion when they disagree (free confidence signal)."
     ),
@@ -2539,6 +2542,10 @@ def solve(
             audit=allow_audit,
             memory=None if no_remember else _memory_manager(),
             playbook=stored_playbook,
+            # --skill-cards/--no-skill-cards: per-run override of settings.skill_cards, so the
+            # learn->use loop can be turned on for an experiment (learning-lift) without flipping
+            # the global default. None keeps the settings default (today: off).
+            skill_cards=skill_cards,
         )
 
         auto = AutonomousAgent(

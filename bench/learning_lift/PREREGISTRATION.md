@@ -172,3 +172,72 @@ Whether learning helps outside this authored family, on real repos, or with a st
 tasks are synthetic and written by the same party running the experiment — the mitigation is that the
 difficulty spec and the no-tuning rule were fixed in writing before the first model call, and this
 paragraph is the disclosure that the mitigation is not the same thing as independence.
+
+---
+
+# Amendment — run 3, the same suite with the learn→use loop CONNECTED
+
+**Committed before any model call of run 3.** Runs 1 and 2 are finished and are not touched; their
+numbers stand. Run 3 is a new run on the **same 40-task hard suite, same committed order**.
+
+## Why run 3 exists — run 2's null was a cut wire, not a verdict
+
+Run 2 returned DiD −5.0% with **39 skills minted**. A grounded 29-agent study of the code
+(`LEARNING_ROADMAP.md`) found why the artifacts changed nothing: **the learn→use loop is disconnected
+by default.** Skill cards inject only when `settings.skill_cards` is true — it defaults **False**
+(`chimera/config.py:199`) — `chimera solve` exposed no flag to turn it on, and the bench set no env,
+so `cards=None → card_ctx=''` (`chimera/core/autonomous.py:291`). The ACE playbook injects only with
+`--playbook`, which the scaffold never passed. **So run 2 minted 39 skills and injected zero of
+them.** Its DiD measured a learning loop with the wire cut; a null was the only possible honest read
+of skill accumulation, regardless of skill quality.
+
+## The single change in run 3
+
+The learning arm now carries **`--playbook`** (injects curated cross-task strategy, ungated) and
+**`--skill-cards`** (reads learned skill cards back into context). That is the whole change. A new
+`--skill-cards/--no-skill-cards` option was added to `chimera solve` to override `settings.skill_cards`
+per run **without flipping the global default** (the default stays off — the prior curated card A/B
+showed +300% tokens for non-significant accuracy, and flipping it globally is out of scope here).
+
+| | run 2 | run 3 |
+|---|---|---|
+| learn→use loop in the learning arm | **disconnected** (cards off, playbook off) | **connected** (`--playbook --skill-cards`) |
+| tasks / halves / order | 40 / 20-20 / committed | **identical** |
+| arms / DiD metric / hardened grader / grading integrity rule | — | **identical** |
+| control (`cold`) arm | fresh home, no write | **unchanged** — still no write, no carry, no read |
+
+The read flags are on the **learning arm only** — on `cold` they would be pure no-ops (its
+fresh-home-per-task carries nothing to inject) and `--playbook` would waste a curation call on all 40
+control tasks. Because the flags can only act **through survived state**, of which `cold` has none,
+this keeps the contrast exactly "does accumulated, now-readable state help?". `BENCH_CONNECT=0`
+reproduces run 2's disconnected arms from the same code.
+
+## New pre-registered rule specific to run 3 — the connection check
+
+Because "connected" is the entire hypothesis, the run **verifies the wire is live** and reports it:
+
+- **`skill_card_uses` (credited only when a card actually reached a prompt on a verified run) and the
+  end-of-run playbook bullet count are logged.** If **both are zero**, the loop did **not** connect and
+  the result is labelled the *disconnected null* (same status as run 2), **not** a transfer result.
+- **Per-card attribution (`uses`/`successes`/`rate`) is reported**, so a connected-but-still-null DiD
+  is diagnosable: `uses>0, rate low` = retrieved but did not transfer; `uses=0` = never retrieved.
+- **This check is a validity gate, not a success criterion.** A live wire with a null DiD is a real,
+  reportable outcome (it motivates the Level-2 content proposals P3/P4 in `LEARNING_ROADMAP.md`).
+
+## What carries over unchanged
+
+- **Predictions 1–3 and the power caveat carry over.** n=40 in halves of 20 is still small; a null is
+  underpowered, not "no effect". Single seed per cell; the −5pp of run 2 sat inside that noise and a
+  new small DiD will too — a claimed effect must survive multiple seeds (not run here).
+- **The ceiling/floor rule carries over.** If `cold`'s first half is ≥90% or ≤10%, uninformative by
+  construction; DiD reported, not interpreted.
+- **Still one run.** No re-rolls, no post-hoc exclusion, a null ships with equal prominence.
+- **Token accounting remains not captured** (as in runs 1–2); the connection is asserted via
+  `skill_card_uses`/playbook growth, not token deltas.
+
+## What run 3 still cannot answer
+
+Whether a connected loop helps at adequate power, on real repos, with a stronger model, or with the
+richer error-seeded content of P3/P4. Run 3 answers exactly one question: **with the wire connected,
+does the counted learning move the number on this suite?** — and, if not, **which failure mode**
+(never-retrieved vs retrieved-but-no-transfer) the attribution log points to.

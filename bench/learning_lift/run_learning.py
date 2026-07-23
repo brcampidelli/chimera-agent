@@ -14,6 +14,13 @@ and reports a difference-in-differences, because arm `cold`'s own first-half/sec
 drift caused by task ordering and noise. Subtracting it is what isolates the part attributable to
 accumulation.
 
+Run 3 (LEARNING_ROADMAP.md P1+P5): the learn->use loop is CONNECTED by default — the learning arm now
+carries `--playbook` (injects curated cross-task strategy unconditionally) and `--skill-cards` (reads
+learned skill cards back into context). Run 2 minted 39 skills and injected zero, so its DiD measured
+a loop with the wire cut; run 3 measures it connected. `BENCH_CONNECT=0` reproduces run 2's
+disconnected baseline. Per-card attribution (uses/successes) is logged so a null tells 'never
+retrieved' apart from 'retrieved but did not transfer'.
+
 Design, order, metric and predictions are fixed in PREREGISTRATION.md, committed before any model
 call. Read the power caveat there before reading a null as "learning does not help".
 """
@@ -61,11 +68,24 @@ def _suite() -> tuple[str, list[dict]]:
 SUITE_NAME, SUITE = _suite()
 HALF = len(SUITE) // 2
 
+# Connect the learn->use loop (run 3 / LEARNING_ROADMAP.md P1+P5). The grounded study found the
+# machinery is write-only by DEFAULT: skill cards inject only when settings.skill_cards is true (off,
+# config.py:199) and the ACE playbook only with --playbook — so run 2 minted 39 skills and injected
+# ZERO. These two flags close the loop: --playbook injects curated cross-task strategy unconditionally
+# (no lexical gate), --skill-cards reads learned skill cards back into context. BENCH_CONNECT=0
+# reproduces the run-2 disconnected baseline from the same code.
+_CONNECT = os.environ.get("BENCH_CONNECT", "1").strip().lower() not in ("0", "false", "no", "")
 _SCAFFOLD = ["--repo-map", "--progress-ledger", "--checklist", "--replan", "--max-attempts", "3"]
+# The read flags go on the LEARNING arm only. On `cold` they would be pure no-ops (its fresh
+# home-per-task carries no playbook/skills to inject) AND --playbook would fire a wasted curation call
+# on all 40 cold tasks. Because the flags can only matter THROUGH survived state — of which cold has
+# none — putting them on learning alone keeps the contrast exactly "does accumulated state help?"
+# while avoiding that cost. (Cold stays the true no-learning control: no write, no carry, no read.)
+_LEARN_CONNECT = ["--playbook", "--skill-cards"] if _CONNECT else []
 _ARMS = {
-    # Identical scaffolding; the ONLY difference is whether anything survives between tasks.
+    # The ONLY operative difference is whether learned state survives (and is read) between tasks.
     "cold": [*_SCAFFOLD, "--no-remember", "--no-collect", "--no-evolve-skills"],
-    "learning": [*_SCAFFOLD],
+    "learning": [*_SCAFFOLD, *_LEARN_CONNECT],
 }
 
 
@@ -132,7 +152,46 @@ def _skills_learned(home: Path) -> int:
     return len(data) if isinstance(data, list) else 0
 
 
-def _run_arm(arm: str, root: Path, homes: Path, tampered: set[str]) -> list[bool]:
+def _accumulation(home: Path) -> dict[str, int]:
+    """What the learning arm has accumulated so far — the accumulation curve (P1 how-to-measure).
+
+    Reads the persisted stores the loop writes: retrievable skills (active+provisional) and active
+    ACE-playbook bullets. Best-effort: a missing/odd file counts as zero, never crashes the run.
+    """
+    skills = 0
+    store = home / "skills.json"
+    if store.exists():
+        with contextlib.suppress(OSError, json.JSONDecodeError):
+            data = json.loads(store.read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                skills = sum(1 for s in data if isinstance(s, dict)
+                             and str(s.get("status", "active")) in ("active", "provisional"))
+    bullets = 0
+    pb = home / "playbook.json"
+    if pb.exists():
+        with contextlib.suppress(Exception):
+            from chimera.evolution.playbook import Playbook
+
+            bullets = len(Playbook.from_dict(json.loads(pb.read_text(encoding="utf-8"))).active())
+    return {"skills_retrievable": skills, "playbook_bullets": bullets}
+
+
+def _skill_stats(home: Path) -> list[dict[str, object]]:
+    """Per-card attribution (P5): name/uses/successes/rate. uses>0 means the card actually reached a
+    prompt (credited only on verified, diff-productive runs), so uses==0 across all skills means the
+    learn->use loop is still disconnected — the diagnostic that tells a null 'never retrieved' apart
+    from 'retrieved but did not transfer'."""
+    if not (home / "skills.json").exists():
+        return []
+    with contextlib.suppress(Exception):
+        from chimera.evolution.skill_store import SkillStore
+
+        return SkillStore(home / "skills.json").stats()
+    return []
+
+
+def _run_arm(arm: str, root: Path, homes: Path, tampered: set[str],
+             accum: list[dict[str, object]]) -> list[bool]:
     """Run the whole committed sequence, in order, for one arm."""
     arm_home = homes / arm
     arm_home.mkdir(parents=True, exist_ok=True)
@@ -145,6 +204,9 @@ def _run_arm(arm: str, root: Path, homes: Path, tampered: set[str]) -> list[bool
         _solve(task, ws, arm, home)
         ok = _grade(task, ws, tampered)
         results.append(ok)
+        # Snapshot the learning arm's accumulated state AFTER each task (cold carries nothing).
+        if arm == "learning":
+            accum.append({"i": index, "pass": ok, **_accumulation(home)})
         half = "1st" if index <= HALF else "2nd"
         print(f"  [{arm:8}] {index:2}/{len(SUITE)} {half} {str(task['id']):<22} {'PASS' if ok else 'fail'}", flush=True)
     return results
@@ -158,15 +220,19 @@ def main() -> None:
     with contextlib.suppress(Exception):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
     _OUT.mkdir(parents=True, exist_ok=True)
-    print(f"learning-lift · suite={SUITE_NAME} · model={_MODEL} · tasks={len(SUITE)}"
+    print(f"learning-lift · suite={SUITE_NAME} · learn->use {'CONNECTED' if _CONNECT else 'DISCONNECTED'}"
+          f" · model={_MODEL} · tasks={len(SUITE)}"
           f" (halves {HALF}/{len(SUITE) - HALF}) · timeout={_TIMEOUT}s", flush=True)
 
     root = Path(tempfile.mkdtemp(prefix="chimlearn-ws-"))
     homes = Path(tempfile.mkdtemp(prefix="chimlearn-home-"))
     tampered: set[str] = set()
+    accum: list[dict[str, object]] = []
     try:
-        arms = {arm: _run_arm(arm, root, homes, tampered) for arm in ("cold", "learning")}
+        arms = {arm: _run_arm(arm, root, homes, tampered, accum) for arm in ("cold", "learning")}
         learned = _skills_learned(homes / "learning")
+        # Capture the attribution table BEFORE the home is deleted below.
+        skill_stats = _skill_stats(homes / "learning")
     finally:
         shutil.rmtree(root, ignore_errors=True)
         shutil.rmtree(homes, ignore_errors=True)
@@ -188,6 +254,28 @@ def main() -> None:
     print(f"  grading integrity: {'TAMPERED: ' + ', '.join(sorted(tampered)) if tampered else 'no arm modified its own test'}",
           flush=True)
 
+    # learn->use connection check (P5): the whole point of run 3. `uses` is credited only when a card
+    # actually reached a prompt on a verified run, so total uses == 0 means the loop is STILL open and
+    # the DiD says nothing about skills — exactly the run-2 condition. A non-zero total is the first
+    # proof the fix connected; the per-card rate then tells transfer (helped) from noise (retrieved,
+    # didn't move outcomes).
+    total_uses = sum(int(s.get("uses", 0)) for s in skill_stats)
+    used = sorted((s for s in skill_stats if int(s.get("uses", 0)) > 0),
+                  key=lambda s: -int(s.get("uses", 0)))
+    end_bullets = int(accum[-1]["playbook_bullets"]) if accum else 0
+    print(f"\n  learn->use connection ({'CONNECTED' if _CONNECT else 'DISCONNECTED'}): "
+          f"skill-card retrievals credited = {total_uses}; playbook bullets at end = {end_bullets}",
+          flush=True)
+    if _CONNECT and total_uses == 0 and end_bullets == 0:
+        print("     !! STILL ZERO INJECTION — neither channel reached a prompt; the loop did not\n"
+              "        connect (check flags/env). A null here is the disconnected null, not transfer.",
+              flush=True)
+    if used:
+        print("  per-card attribution (name: uses/successes rate — rate<0.5 = retrieved but weak):", flush=True)
+        for s in used[:12]:
+            print(f"      {str(s.get('name','')):<28} {s.get('uses')}/{s.get('successes')}  rate={s.get('rate')}",
+                  flush=True)
+
     # Pre-registered: a control arm pinned at the ceiling (or floor) leaves the DiD no room to move,
     # so the number is reported but must not be interpreted. This is what run 1 hit.
     cold_first = halves["cold"][0]
@@ -206,11 +294,12 @@ def main() -> None:
 
     (_OUT / "learning.json").write_text(
         json.dumps({
-            "suite": SUITE_NAME, "model": _MODEL,
+            "suite": SUITE_NAME, "model": _MODEL, "learn_use_connected": _CONNECT,
             "tasks": [str(t["id"]) for t in SUITE], "half": HALF,
             "by_arm": {a: {"passed": r, "first_half": halves[a][0], "second_half": halves[a][1]}
                        for a, r in arms.items()},
             "did": did, "skills_learned": learned,
+            "skill_card_uses": total_uses, "skill_stats": skill_stats, "accumulation": accum,
             "graded_against_pristine_test": True, "tests_modified_by_solve": sorted(tampered),
         }, indent=2),
         encoding="utf-8",
