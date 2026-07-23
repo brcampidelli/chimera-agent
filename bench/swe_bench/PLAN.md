@@ -49,9 +49,11 @@ pre-registration predicted this honestly ("probably NOT significant… both arms
 | All `solve` flags the prereg names | **All present**, including `--collect/--no-collect` (declared as a paired flag), `--no-remember`, `--no-evolve-skills`, `--repo-map`, `--progress-ledger`, `--replan`, `--checklist`, `--verify`, `--max-attempts`. |
 | `PREREGISTRATION.md` | **Committed 2026-07-20**, Q1/Q2 kept apart, stopping + reporting rules fixed. |
 | Docker | CLI 29.3.0 installed, **daemon not running**; 559 GB free on C:. |
-| `datasets>=2.19` | Already a dependency. |
+| `datasets>=2.19` | Already a dependency. `swebench` is **not** — it is the one package to add. |
+| Repo checkout at `base_commit` | **Provided by the harness's prebuilt instance images** (§3.3) — this was expected to be the biggest build item and is not. |
 
-**The whole scoring half is done.** What is missing is the half that *produces* the reports.
+**The whole scoring half is done, and the workspace half turns out to be donated by the harness.** What
+is missing is the glue that produces the predictions.
 
 ## 3. What is missing — and the design decisions inside it
 
@@ -113,26 +115,125 @@ That leaves a real trade-off to decide explicitly:
 **Recommendation: (b)**, falling back to (a) where a repo's suite is too slow. Either way the choice
 goes in the amendment *before* the run, because it changes what is being measured.
 
-### 3.3 The per-instance runner — the actual build (nothing exists)
+### 3.3 The per-instance runner — the actual build
 
-`build_solve_command` produces the argv for *one* instance. Everything around it is missing:
+`build_solve_command` produces the argv for *one* instance. Everything around it is missing — but a
+source-level audit of `swebench` 4.1.0 found that **the expensive piece is already solved by the
+harness itself**, which changes the build materially.
 
-1. **Fetch** — `MariusHobbhahn/...` or `SWE-bench/SWE-bench_Verified` → the JSONL shape `load_instances`
-   expects, printing the difficulty/repo distribution for §3.1. *(small)*
-2. **Per-instance workspace** — `git clone` the repo, `git checkout base_commit`, fresh per instance
-   **per arm** (the prereg requires both arms start from the same base commit in a fresh checkout).
-   Needs a local git cache or this re-clones large repos 100+ times. *(medium)*
-3. **Run both arms** — baseline `--no-plan --no-manager --max-attempts 1`, treatment `_DEFAULT_FLAGS
-   --max-attempts 3`; both with `--no-remember --no-collect --no-evolve-skills` for Q1 hygiene. *(small)*
-4. **Extract the patch** — `git diff` the workspace after each solve → `predictions.jsonl` in the
-   harness's schema. **Nothing in the repo does patch extraction today.** *(medium — the format must
-   match the official harness exactly)*
-5. **Grade** — run the official SWE-bench harness in Docker over each arm's predictions → report JSON →
-   feed to the existing `chimera swe-bench-compare`. *(infra, not code)*
+**The workspace problem is solved by reusing the official instance images.** The naive approach —
+`git clone` + `git checkout base_commit` per instance per arm — is both slow (re-cloning large repos
+100+ times) and **subtly unsafe**: the harness's own setup script does more than a checkout, and for a
+reason. From `make_repo_script_list_py` (`test_spec/python.py`):
 
-Pieces 2 and 4 are the real work; 1, 3 and 5 are glue.
+```bash
+git clone -o origin --single-branch https://github.com/{repo} {dir}
+cd {dir} && git reset --hard {base_commit}
+git remote remove origin                          # the agent cannot see future commits
+# delete tags newer than base_commit's timestamp
+git reflog expire --expire=now --all && git gc --prune=now --aggressive
+# assert zero commits reachable after base_commit, else exit 1
+```
 
-### 3.4 The prereg's own reporting rules need plumbing
+Skip any of that and the agent can reach the actual fix through the reflog or a tag, and the whole run
+is garbage. Rather than re-implement this correctly, **use the prebuilt instance image**
+(`swebench/sweb.eval.x86_64.{instance_id}`, `__` → `_1776_` in the tag): the repo is already at
+`base_commit` in `/testbed`, history already sanitized, conda environment already installed. Chimera
+runs *inside* that container. This deletes the hardest item from the build and removes a whole class of
+contamination bug.
+
+So the remaining build is:
+
+1. **Fetch** — `SWE-bench/SWE-bench_Verified` → the JSONL shape `load_instances` expects, printing the
+   difficulty × repo distribution that §3.1 needs to freeze a slice. *(small)*
+2. **Run both arms inside the instance container** — baseline `--no-plan --no-manager --max-attempts 1`,
+   treatment `_DEFAULT_FLAGS --max-attempts 3`; both with `--no-remember --no-collect
+   --no-evolve-skills` for Q1 hygiene. Needs the chimera wheel installed into the container — the
+   `terminal_bench` adapter already does exactly this and is the template. *(medium)*
+3. **Extract the patch** — `git diff` in `/testbed` after each solve → `predictions.jsonl`. *(small,
+   now that the schema is confirmed — see §3.4)*
+4. **Grade** — the official harness over each arm's predictions → report JSON → the existing
+   `chimera swe-bench-compare`. *(infra, not code)*
+
+### 3.4 The harness: confirmed invocation, and two documented bugs to route around
+
+Verified against the source of `swebench` 4.1.0, **not** the docs — which are wrong in two places that
+would each have cost a debugging session.
+
+**Install.** `pip install swebench` (4.1.0). Requires **Python ≥ 3.10** — the README badge saying 3.8+
+is stale. Our project is `>=3.11`, so no conflict. Run it **from WSL2**: the classifier says "OS
+Independent" but evaluation is Linux containers throughout, and the official Windows guide is Docker
+Desktop + WSL 2. **`x86_64` only** — `arch` is hardcoded in `make_test_spec` with no autodetection and
+no CLI flag; arm64 is labelled experimental.
+
+**Invoke.**
+
+```bash
+python -m swebench.harness.run_evaluation \
+    --dataset_name SWE-bench/SWE-bench_Verified \
+    --predictions_path preds.jsonl \
+    --run_id <arm>_<date> \
+    --max_workers 8 \
+    --cache_level env
+```
+
+`--predictions_path` and `--run_id` are the only required arguments. `--namespace` defaults to
+`swebench`, which is what makes it **pull prebuilt images** rather than build locally — leave it alone
+(passing `--namespace none` switches to a local 3-layer build, and combining a namespace with
+`--force_rebuild` raises). `sb-cli` does **not** replace this; it is for cloud evaluation of *private*
+splits only. The `--parallelism` flag shown in the evaluation guide **does not exist**; it is
+`--max_workers`.
+
+**Bug 1 — `--report_dir` does not work.** It is parsed and the directory is created, but it is never
+passed to `make_run_report`. The report always lands in the **current working directory**, named
+`{model_name_or_path with "/" → "__"}.{run_id}.json`. Workaround: `cd` into the output directory before
+invoking, or glob `*.{run_id}.json`.
+
+**Bug 2 (ours, latent) — the report shape.** The aggregate report emits **`resolved_ids` /
+`unresolved_ids` lists**, never a per-instance map. Our `parse_report` accepts both shapes, so it works
+— but the per-instance branch is dead code for this file and must not be relied on. (A per-instance map
+*does* exist, at `logs/run_evaluation/{run_id}/{model}/{instance_id}/report.json`, one file each.)
+
+**Predictions schema** (constants in `swebench/harness/constants/__init__.py`) — `.json` or `.jsonl`
+only:
+
+```json
+{"instance_id": "sympy__sympy-20590", "model_name_or_path": "chimera-baseline", "model_patch": "diff --git a/...\n"}
+```
+
+Only `instance_id` is validated, but `model_name_or_path` is *de facto* required — the report filename
+and log paths are derived from it (`KeyError` without it). An empty `model_patch` is not an error; the
+instance lands in `empty_patch_ids`, which is **exactly the bucket §3.6's infra-failure accounting
+needs to read.**
+
+**Free dry-run before spending anything:** `--predictions_path gold` runs the reference patches. If gold
+does not come back ~100% resolved, the setup is broken and no model call should be made yet.
+
+**Disk:** official figures are for the full 500 — `cache_level=env` (default) ≈ 100 GB, `base`/`none`
+≈ 120 GB, `instance` ≈ **2 TB** (never use it on a subset without checking disk first). For ~50
+instances there is no official number; a reasonable estimate is 30–60 GB with `env` + prebuilt pulls.
+Against 559 GB free this is comfortable, but the estimate is unverified and the run should watch disk.
+
+### 3.5 Two submission rules that constrain the design
+
+The [official submission checklist](https://github.com/SWE-bench/experiments/blob/main/checklist.md)
+states requirements that our design must satisfy or explicitly disclaim:
+
+- **No `PASS_TO_PASS`, no `FAIL_TO_PASS`, and no `hints_text`.** The first two are §3.2's leakage ban.
+  `hints_text` is new here and worth pinning down: the dataset ships it, and our `_INSTRUCTION` uses
+  only `problem_statement` — so we are already clean, and that must stay a deliberate constraint rather
+  than an accident. (The harness enforces the test half mechanically: at eval time it `git checkout`s
+  the base version of every file the `test_patch` touches and deletes new ones *before* applying the
+  patch, so an agent that edits a graded test file has those edits discarded. Reassuring, given this
+  project has already caught an agent rewriting a verification test.)
+- **pass@1** — "does not attempt the same task instance more than once", and any selection among
+  attempts must not use SWE-bench evaluation or its tests. Chimera's `--max-attempts 3` is an *internal*
+  verify-or-revert loop that emits **one** patch, judged without any SWE-bench artifact, so it is
+  pass@1 in the sense that matters. But this is exactly the kind of claim that should be stated in
+  RESULTS rather than assumed — and if we ever run the pipeline N times and pick a winner, that is
+  `Best@k` and must be labelled so.
+
+### 3.6 The prereg's own reporting rules need plumbing
 
 Two of the five stopping/reporting rules currently have nothing that satisfies them:
 
@@ -141,15 +242,18 @@ Two of the five stopping/reporting rules currently have nothing that satisfies t
   patch, or an outage silently becomes a capability result. **This is exactly the class of bug that
   killed learning-lift run 7a** (a swallowed timeout made latency collapse look like capability
   collapse) — that lesson transfers directly and should be built in from the start, not retrofitted.
+  The harness helps: it separates `empty_patch_ids` and `error_ids` from `unresolved_ids`, so the
+  report already distinguishes "produced nothing" from "produced a patch that failed". The runner still
+  has to record the *reason* for each empty patch on our side.
 - **Rule 4 — cost reporting.** Total tokens and USD per arm. Needs to be captured per solve.
 
-### 3.5 Environment
+### 3.7 Environment
 
-The harness is Docker/Linux. Docker Desktop's daemon is currently stopped and its WSL integration is
-off (`docker` is not on PATH inside WSL). Since every Python invocation in this project already runs
-through WSL, **enabling Docker Desktop's WSL integration is the path of least resistance** — otherwise
-the runner straddles two environments. Disk is not a constraint (559 GB free vs ~5 GB for a 50-instance
-subset per the mini's dataset card; the full 500 is ~130 GB).
+Docker Desktop's daemon is currently **stopped**, and its WSL integration is **off** (`docker` is not on
+PATH inside WSL). Since every Python invocation in this project already runs through WSL, and the
+harness's own Windows guidance is Docker Desktop + WSL 2, **enabling WSL integration is the path of
+least resistance** — otherwise the runner straddles two environments. Host must be `x86_64` (§3.4).
+Disk is comfortable: 559 GB free against an estimated 30–60 GB for a 50-instance slice.
 
 ## 4. Cost
 
@@ -179,16 +283,27 @@ its own headline result without embarrassment.
 ## 6. Sequencing
 
 ```
+setup    : Docker Desktop daemon + WSL2 integration; pip install swebench (>=3.10)
+gold     : run the harness with --predictions_path gold on the candidate slice.
+           costs ZERO model calls and proves the whole grading path end to end.
+           if gold does not come back ~100% resolved, stop — the setup is broken.
 probe    : fetch dataset -> print difficulty x repo distribution -> pick slice
            cost probe on 2-3 instances (real tokens, real USD)
 amend    : commit the prereg amendment (slice, --verify policy, model, Q1-only)
-build    : runner (clone/checkout cache -> both arms -> git diff -> predictions.jsonl)
-           + infra-failure and cost accounting from the start (rule 3/4)
-grade    : official harness in Docker -> report JSON -> `chimera swe-bench-compare`
+build    : runner (chimera inside the prebuilt instance image -> both arms ->
+           git diff /testbed -> predictions.jsonl) + infra-failure and cost
+           accounting from the start (rule 3/4)
+grade    : cd into the output dir (--report_dir is broken), run the harness per arm,
+           feed both reports to `chimera swe-bench-compare`
 publish  : RESULTS.md with the table, CIs, failure accounting and cost — win, loss or null
 then     : flip --remember/--collect/--evolve-skills back on = the learning-lift question,
            on an instrument that can actually discriminate
 ```
+
+The **`gold` step is the cheapest risk reduction available** and should run before anything else: it
+exercises Docker, the image pulls, the predictions format, the report location and our parser, for the
+price of zero model calls. Given that the docs were wrong about the report location and about a flag
+that does not exist, validating the pipeline against a known-good input first is not optional.
 
 **Nothing above has been executed.** Per the pre-registration's own rule, if the run is abandoned for
 cost or a broken harness, that fact gets recorded here rather than the files quietly disappearing.
