@@ -682,3 +682,41 @@ def test_memory_readback_never_fails_the_run() -> None:
         FakeWorker("ok"), memory=BrokenMemory(), config=AutonomousConfig(use_planner=False)
     )
     assert auto.run("t").success is True  # advisory recall degrades, never crashes
+
+
+# --- --diff-feedback: show a failed attempt its own reverted diff (bench/retry_lift, I1) ---
+
+
+def test_rendered_diff_joins_files_and_labels_paths() -> None:
+    from chimera.core.autonomous import _rendered_diff
+    from chimera.evolution.diff_gate import FileDiff
+
+    body = _rendered_diff([FileDiff("a.py", "@@ -1 +1 @@\n-x\n+y"), FileDiff("b.py", "@@ -2 +2 @@\n-p\n+q")])
+    assert "--- a.py" in body and "--- b.py" in body
+    assert "+y" in body and "+q" in body
+
+
+def test_rendered_diff_truncation_is_explicit_not_silent() -> None:
+    """A clipped body must SAY it is clipped, or the model reads half a diff as the whole change."""
+    from chimera.core.autonomous import _DIFF_FEEDBACK_MAX_CHARS, _rendered_diff
+    from chimera.evolution.diff_gate import FileDiff
+
+    body = _rendered_diff([FileDiff("big.py", "+" + "z" * (_DIFF_FEEDBACK_MAX_CHARS * 2))])
+    assert body.endswith("... [diff truncated]")
+    assert len(body) <= _DIFF_FEEDBACK_MAX_CHARS + len("\n... [diff truncated]")
+
+
+def test_rendered_diff_skips_files_with_empty_patches() -> None:
+    from chimera.core.autonomous import _rendered_diff
+    from chimera.evolution.diff_gate import FileDiff
+
+    assert _rendered_diff([FileDiff("untouched.py", "")]) == ""
+
+
+def test_diff_feedback_defaults_off() -> None:
+    """Opt-in: the registered counter-hypothesis is that showing a wrong patch ANCHORS the model,
+    so this must not become the default until a run says otherwise."""
+    from chimera.core.autonomous import AutonomousAgent
+
+    agent = AutonomousAgent(FakeWorker())
+    assert agent.diff_feedback is False

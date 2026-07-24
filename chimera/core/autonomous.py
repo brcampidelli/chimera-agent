@@ -59,9 +59,31 @@ from chimera.telemetry import get_logger
 
 _log = get_logger("core.autonomous")
 
+# --diff-feedback wording and bound. Fixed in bench/retry_lift/PREREGISTRATION.md BEFORE the run that
+# measures it, because framing and truncation are the most temptingly tunable knobs in the whole
+# experiment — "it didn't work, let me reword the prompt" is how a null becomes a fabricated win.
+# Changing either is an amendment, committed before the run that uses it.
+_DIFF_FEEDBACK_HEADER = "You already tried this and it FAILED verification. This exact change was reverted:"
+_DIFF_FEEDBACK_FOOTER = (
+    "Do not re-derive this edit. Diagnose why it was wrong, then take a different approach."
+)
+_DIFF_FEEDBACK_MAX_CHARS = 2000
+
 
 def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:80]
+
+
+def _rendered_diff(diffs: list[FileDiff]) -> str:
+    """Render per-file diffs as one bounded patch body for retry feedback.
+
+    Truncation is explicit rather than silent: a clipped body says so, so the model does not read a
+    half-diff as the whole change it made.
+    """
+    body = "\n".join(f"--- {d.path}\n{d.patch}".rstrip() for d in diffs if d.patch)
+    if len(body) > _DIFF_FEEDBACK_MAX_CHARS:
+        body = body[:_DIFF_FEEDBACK_MAX_CHARS] + "\n... [diff truncated]"
+    return body
 
 
 def _format_requirements(requirements: list[Any]) -> str:
@@ -188,6 +210,7 @@ class AutonomousAgent:
         verifier: Verifier | None = None,
         probe_log: ProbeLog | None = None,
         guard: WorkspaceGuard | None = None,
+        diff_feedback: bool = False,
         experience: ExperienceBuffer | None = None,
         trajectories: TrajectoryCollector | None = None,
         memory: SupportsRemember | None = None,
@@ -227,6 +250,7 @@ class AutonomousAgent:
         self.verifier = verifier
         self.probe_log = probe_log
         self.guard = guard
+        self.diff_feedback = diff_feedback
         self.experience = experience
         self.trajectories = trajectories
         self.memory = memory
@@ -585,6 +609,19 @@ class AutonomousAgent:
             feedback = "\n\n".join(p for p in (fb, _verify_fb) if p) or (
                 "The attempt did not pass verification."
             )
+            # Retry-conditioning (--diff-feedback): the agent already captured what this attempt
+            # ACTUALLY wrote (above, pre-revert) and every consumer of it is telemetry — it never
+            # re-enters a prompt. So the retry is told THAT it failed but never shown the code it
+            # wrote, and since the workspace was just reverted, nothing on disk records the wrong
+            # path either: re-deriving the same patch is unobstructed. Feeding the diff back closes
+            # that. Opt-in and measured, not assumed — showing a wrong patch can also ANCHOR a model
+            # on it, which is the registered counter-hypothesis (see bench/retry_lift).
+            if self.diff_feedback and attempt.diffs and (body := _rendered_diff(attempt.diffs)):
+                feedback = f"{feedback}\n\n{_DIFF_FEEDBACK_HEADER}\n{body}\n{_DIFF_FEEDBACK_FOOTER}"
+                # Emitted so a bench can COUNT injections: a run where this never fires measured a
+                # plumbing failure, not the idea (learning-lift runs 1-2 were lost to exactly that,
+                # and the retry_lift pre-registration makes it a hard validity gate).
+                self._emit(_ev_status(f"diff-feedback injected {len(body)} chars (attempt {index})"))
             # Step-level failure attribution (SkillAdaptor): if a tool step errored,
             # point the retry at the FIRST faulty step instead of letting one early
             # error diffuse across the whole next attempt.
@@ -639,6 +676,9 @@ class AutonomousAgent:
                     else:
                         _log.debug("attempt %d: stagnation detected; injecting pivot advice", index)
                         feedback = f"{feedback}\n\n{self.stagnation.advice()}"
+                        # Countable for the same reason as the diff injection above: a bench arm
+                        # whose pivot never fires measured nothing, and must say so.
+                        self._emit(_ev_status(f"stagnation pivot injected (attempt {index})"))
 
             # Durable checkpoint: this attempt failed, so persist the state to resume from the
             # NEXT attempt if the process dies. (A successful attempt returns above and clears

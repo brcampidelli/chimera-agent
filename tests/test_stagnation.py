@@ -155,3 +155,52 @@ def test_autonomous_loop_injects_pivot_advice_on_repeated_failure() -> None:
     assert not result.success
     # By the 3rd attempt the same failure has repeated → the prompt carries the pivot advice.
     assert any("pivot" in p.lower() for p in worker.prompts)
+
+
+# --- approximate signature matching (bench/retry_lift, intervention I2) ---------------
+
+
+def test_exact_mode_misses_same_cause_with_different_assertion_text() -> None:
+    """The default is strict: same root cause, different wording -> no pivot.
+
+    This is the behaviour I2 exists to change, pinned as a test so the gap is documented
+    rather than folklore.
+    """
+    det = StagnationDetector(window=2)
+    det.record_signature("assertionerror: expected the list to contain 'a'")
+    det.record_signature("assertionerror: expected the list to contain 'b'")
+    assert det.assess().stagnant is False
+
+
+def test_fuzzy_mode_flags_same_cause_with_different_assertion_text() -> None:
+    det = StagnationDetector(window=2, signature_similarity=0.8)
+    det.record_signature("assertionerror: expected the list to contain 'a'")
+    det.record_signature("assertionerror: expected the list to contain 'b'")
+    report = det.assess()
+    assert report.stagnant is True
+    assert report.signal >= 0.8
+
+
+def test_fuzzy_mode_still_separates_genuinely_different_failures() -> None:
+    """Looser must not mean indiscriminate — an unrelated failure still reads as progress."""
+    det = StagnationDetector(window=2, signature_similarity=0.8)
+    det.record_signature("assertionerror: expected the list to contain 'a'")
+    det.record_signature("modulenotfounderror: no module named requests")
+    assert det.assess().stagnant is False
+
+
+def test_fuzzy_mode_ignores_empty_signatures() -> None:
+    det = StagnationDetector(window=2, signature_similarity=0.8)
+    det.record_signature("")
+    det.record_signature("")
+    assert det.assess().stagnant is False
+
+
+def test_default_similarity_preserves_exact_behaviour() -> None:
+    """The historical path must be byte-for-byte unchanged when the knob is untouched."""
+    det = StagnationDetector(window=2)
+    det.record_signature("tool grep failed on attempt 1: no such file /tmp/run_17")
+    det.record_signature("tool grep failed on attempt 2: no such file /tmp/run_42")
+    report = det.assess()
+    assert report.stagnant is True
+    assert report.signal == 1.0

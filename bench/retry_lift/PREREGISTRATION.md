@@ -160,3 +160,39 @@ Nothing here generalises to real repositories; that is
 5. If the run is abandoned, **this file stays** and RESULTS.md records that it was not completed.
 
 **Status: registered, not yet run. None of the code in §3 exists yet.**
+
+---
+
+# Amendment 1 — I2 is approximate matching only, and the threshold is fixed here
+
+**Committed before any model call.** §3 described I2 as "fire earlier and match approximately".
+Implementing it showed the first half is not available, and the fix is smaller than described:
+
+- **"Fire earlier" is already at its floor.** `StagnationDetector.__init__` clamps `self.window =
+  max(2, window)`, and the call site already passes `window=2`. Two recorded signatures is also the
+  logical minimum — "the retries keep failing the *same* way" is undefined with one sample. So with
+  `max_attempts=3` the pivot's only possible firing point is before attempt 3, which it already has.
+  Nothing to change; the earlier wording was wrong about the code.
+- **So I2 = approximate signature matching only**, which the audit says is the actual blocker: the
+  default requires byte-identical signatures after normalization, so two attempts failing from the
+  same cause with different assertion text never match.
+
+**The threshold is fixed now at `signature_similarity = 0.8`** (`difflib.SequenceMatcher` ratio on
+the normalized signature, the weakest pairwise resemblance in the window decides). Fixed here for the
+same reason as I1's prompt text: it is tunable, and tuning it after seeing a result is how a null
+becomes a fabricated win. Changing it is a further amendment.
+
+A test pins the gap being closed (`test_exact_mode_misses_same_cause_with_different_assertion_text`)
+so the default's blind spot is documented behaviour rather than folklore, and another pins that the
+default path is byte-for-byte unchanged.
+
+**Consequence for §8's readings:** unchanged. "I1 null, I2 positive" still means the headroom was a
+latent matching bug rather than a missing capability — the amendment narrows what I2 *is*, not what
+its result would mean.
+
+## Implementation note — both interventions are countable
+
+§7's first validity gate requires proving the wire is live. Both arms now emit a status event when
+they act (`diff-feedback injected N chars (attempt K)`, `stagnation pivot injected (attempt K)`),
+and the runner passes `--stream` to all three arms so the counts are parseable from stdout.
+`--stream` only prints; it is identical across arms and cannot bias the comparison.

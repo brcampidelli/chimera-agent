@@ -22,6 +22,7 @@ from __future__ import annotations
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from difflib import SequenceMatcher
 from math import sqrt
 
 from chimera.telemetry import get_logger
@@ -36,6 +37,15 @@ def _normalize_signature(text: str) -> str:
     """Lowercase, collapse whitespace and volatile digits so equivalent faults match."""
     text = re.sub(r"\d+", "#", (text or "").lower())
     return re.sub(r"\s+", " ", text).strip()[:400]
+
+
+def _similarity(a: str, b: str) -> float:
+    """Resemblance of two normalized signatures in [0, 1] (1.0 = identical)."""
+    if a == b:
+        return 1.0
+    if not a or not b:
+        return 0.0
+    return SequenceMatcher(None, a, b).ratio()
 
 
 def pearson(a: Sequence[float], b: Sequence[float]) -> float:
@@ -76,7 +86,9 @@ class StagnationReport:
     """The verdict for the recent window of rounds."""
 
     stagnant: bool
-    signal: float = 0.0  # mean correlation (vector mode) or 1.0/0.0 (signature mode)
+    # mean correlation (vector mode); signature mode reports 1.0/0.0 when matching exactly, or the
+    # weakest pairwise similarity in the window when matching approximately.
+    signal: float = 0.0
     reason: str = ""
     persistent_failures: list[int] = field(default_factory=list)  # item indices, vector mode
 
@@ -84,10 +96,27 @@ class StagnationReport:
 class StagnationDetector:
     """Flags when recent improvement rounds keep making the same mistakes."""
 
-    def __init__(self, *, window: int = 3, corr_threshold: float = 0.9, min_items: int = 4) -> None:
+    def __init__(
+        self,
+        *,
+        window: int = 3,
+        corr_threshold: float = 0.9,
+        min_items: int = 4,
+        signature_similarity: float = 1.0,
+    ) -> None:
+        """``signature_similarity`` < 1.0 makes signature mode match APPROXIMATELY.
+
+        At the default 1.0 two signatures must be byte-identical after normalization. That is
+        strict enough to miss the common case: two attempts failing from the same cause but with
+        different assertion text ("expected 3, got 5" vs "expected [] to contain 'a'") never match,
+        so the pivot never fires and the loop keeps refining a dead end. Lowering the threshold
+        compares them by ``difflib`` ratio instead. Default preserves the historical behaviour
+        exactly; the looser setting is opt-in (see ``bench/retry_lift``, intervention I2).
+        """
         self.window = max(2, window)
         self.corr_threshold = corr_threshold
         self.min_items = min_items
+        self.signature_similarity = signature_similarity
         self._vectors: list[list[float]] = []
         self._signatures: list[str] = []
 
@@ -129,13 +158,21 @@ class StagnationDetector:
         recent = self._signatures[-self.window :]
         if len(recent) < self.window:
             return StagnationReport(False, reason="not enough rounds yet")
-        stagnant = all(sig and sig == recent[0] for sig in recent)
+        if self.signature_similarity >= 1.0:
+            stagnant = all(sig and sig == recent[0] for sig in recent)
+            score = 1.0 if stagnant else 0.0
+        else:
+            # Approximate mode: the weakest pairwise resemblance to the first signature decides,
+            # so one genuinely different failure in the window is enough to say "not stuck".
+            ratios = [_similarity(recent[0], sig) for sig in recent[1:]]
+            score = min(ratios) if ratios else 0.0
+            stagnant = bool(recent[0]) and all(sig for sig in recent) and score >= self.signature_similarity
         reason = (
-            f"last {self.window} attempts failed with the same signature"
+            f"last {self.window} attempts failed with the same signature (similarity {score:.2f})"
             if stagnant
-            else "recent failure signatures differ"
+            else f"recent failure signatures differ (similarity {score:.2f})"
         )
-        return StagnationReport(stagnant, 1.0 if stagnant else 0.0, reason)
+        return StagnationReport(stagnant, round(score, 3), reason)
 
     def advice(self) -> str:
         """A pivot instruction to fold into the next round's context."""

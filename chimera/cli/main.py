@@ -2342,6 +2342,12 @@ def solve(
     replan: bool = typer.Option(
         False, "--replan", help="On a stall, rebuild the plan from accumulated failure causes (dual-ledger) instead of just nudging."
     ),
+    diff_feedback: bool = typer.Option(
+        False, "--diff-feedback", help="Show a failed attempt its own reverted diff, as a path not to retake."
+    ),
+    stagnation_fuzzy: bool = typer.Option(
+        False, "--stagnation-fuzzy", help="Match repeated-failure signatures approximately, not byte-identically."
+    ),
     contract: str = typer.Option(
         None, "--contract", help="Machine-checkable success clauses, comma-separated: file_exists:PATH | file_contains:PATH:REGEX | answer_matches:REGEX."
     ),
@@ -2552,7 +2558,10 @@ def solve(
             worker,
             escalate_worker=escalate_worker,
             # Pivot the retry when attempts keep failing the same way (short budget → window 2).
-            stagnation=StagnationDetector(window=2),
+            # --stagnation-fuzzy loosens the match: byte-identical signatures are strict enough to
+            # miss two attempts failing from the same cause with different assertion text, so the
+            # pivot never fires and the loop refines a dead end (bench/retry_lift, I2).
+            stagnation=StagnationDetector(window=2, signature_similarity=0.8 if stagnation_fuzzy else 1.0),
             # Structured per-attempt self-check (Magentic-One): turns "it failed" into a concrete
             # next_focus for the retry — the lift for weak models. Opt-in via --progress-ledger.
             progress_ledger=ProgressLedger(gateway, model) if progress_ledger else None,
@@ -2590,6 +2599,9 @@ def solve(
             # PROBE (M18-5): record (arm, cheap manager proxy, verified reward) per attempt.
             probe_log=_ProbeLog(settings.home / "probe.jsonl") if probe_log else None,
             guard=WorkspaceGuard(ws),
+            # Retry conditioning (--diff-feedback): feed the failed attempt's own reverted diff back
+            # so the retry is told what it wrote, not just that it failed (bench/retry_lift, I1).
+            diff_feedback=diff_feedback,
             # The six learning seams (experience, trajectories, memory, auto_evolver, cards, playbook)
             # from the shared factory above (M19-A0).
             **evo.apply_to(),
