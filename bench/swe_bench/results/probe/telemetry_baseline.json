@@ -1,0 +1,26 @@
+[
+  {
+    "instance_id": "django__django-16569",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/forms/formsets.py b/django/forms/formsets.py\nindex 235aaf844c..02d040ee03 100644\n--- a/django/forms/formsets.py\n+++ b/django/forms/formsets.py\n@@ -490,7 +490,7 @@ class BaseFormSet(RenderableFormMixin):\n                     required=False,\n                     widget=self.get_ordering_widget(),\n                 )\n-        if self.can_delete and (self.can_delete_extra or index < initial_form_count):\n+        if self.can_delete and (self.can_delete_extra or (index is not None and index < initial_form_count)):\n             form.fields[DELETION_FIELD_NAME] = BooleanField(\n                 label=_(\"Delete\"),\n                 required=False,\n",
+    "_seconds": 58.4,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-16595",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/db/migrations/operations/fields.py b/django/db/migrations/operations/fields.py\nindex cd3aab43ad..e2682aeac0 100644\n--- a/django/db/migrations/operations/fields.py\n+++ b/django/db/migrations/operations/fields.py\n@@ -264,6 +264,10 @@ class AlterField(FieldOperation):\n                     field=self.field,\n                 ),\n             ]\n+        elif isinstance(operation, AlterField) and self.is_same_field_operation(\n+            operation\n+        ):\n+            return [operation]\n         return super().reduce(operation, app_label)\n \n \n",
+    "_seconds": 74.2,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-16642",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "",
+    "_seconds": 43.2,
+    "_timed_out": false,
+    "_empty": true
+  }
+]

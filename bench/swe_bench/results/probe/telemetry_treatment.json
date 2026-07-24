@@ -1,0 +1,26 @@
+[
+  {
+    "instance_id": "django__django-16569",
+    "model_name_or_path": "chimera-treatment",
+    "model_patch": "",
+    "_seconds": 165.6,
+    "_timed_out": false,
+    "_empty": true
+  },
+  {
+    "instance_id": "django__django-16595",
+    "model_name_or_path": "chimera-treatment",
+    "model_patch": "diff --git a/django/db/migrations/operations/fields.py b/django/db/migrations/operations/fields.py\nindex cd3aab43ad..e2682aeac0 100644\n--- a/django/db/migrations/operations/fields.py\n+++ b/django/db/migrations/operations/fields.py\n@@ -264,6 +264,10 @@ class AlterField(FieldOperation):\n                     field=self.field,\n                 ),\n             ]\n+        elif isinstance(operation, AlterField) and self.is_same_field_operation(\n+            operation\n+        ):\n+            return [operation]\n         return super().reduce(operation, app_label)\n \n \n",
+    "_seconds": 252.9,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-16642",
+    "model_name_or_path": "chimera-treatment",
+    "model_patch": "",
+    "_seconds": 109.9,
+    "_timed_out": false,
+    "_empty": true
+  }
+]
