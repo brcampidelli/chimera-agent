@@ -1,62 +1,71 @@
-# Resume note — retry-lift run 1b (session restart 2026-07-24)
+# Resume note — retry-lift, paused at a decision point (2026-07-24)
 
-Bruno restarted Claude mid-run. This is how to pick up without re-explaining anything.
+Bruno chose "stop here, decide later" after run 1c completed as a **pre-registered measurement
+failure**. Nothing is written to a RESULTS.md yet; that decision is still open. This note is the
+full state so it can be picked up cold.
 
-## State when the session ended
-- Run **1b** was live: `bench/retry_lift/run_retry.py`, 3 arms × 40 hard tasks × 3 seeds = 360 solves.
-- **~255 of 360 solves done** (through seed 2 complete, into seed 3). The background process was a
-  child of the old session and almost certainly **died on restart**.
-- The runner only writes `results/retry.json` at the very end, so the in-progress run left **no JSON**.
-  Its stdout was salvaged to **`results/run1b_stdout.log`** (committed) — that is the only record of
-  the ~255 completed solves. Do not delete it.
+## The question (unchanged)
+Does conditioning a retry on its own failed attempt help? Two interventions, separate arms:
+- **I1 `--diff-feedback`** — feed the failed attempt's reverted diff back, framed as a path not to retake.
+- **I2 `--stagnation-fuzzy`** — approximate signature matching so the stall pivot fires on same-cause
+  failures with different assertion text.
+Both implemented behind flags, off by default, committed. Design fixed in `PREREGISTRATION.md` (+ Amend. 1).
 
-## Partial numbers at last read (n=80/arm, seeds 1–2)
+## Runs so far
+| run | status | why |
+|---|---|---|
+| 1a | discarded | I2 firing counter was unreachable (counted an event `--replan` preempts). Fixed. |
+| 1b | orphaned | session restart severed its stdout pipe; process would crash on next print without writing retry.json. Salvaged: `results/run1b_stdout.log` (seeds 1–2 complete, all arms, n=80/arm). |
+| **1c** | **completed, but FAILED 2/7 validity gates → measurement failure by rule** | canonical `results/retry.json` + `results/run1c_stdout.log`. |
+
+## Run 1c numbers (which the gates say NOT to treat as evidence)
 ```
-control  pass 61.3%  A 67.5%  R 42.6%   stall=4
-i1       pass 67.5%  A 67.5%  R 51.9%   diff=77 stall=4
-i2       pass 65.0%  A 55.0%  R 36.4%   stall=4
-
-I1 vs control (paired n=80): +6.2%  CI[-4.8%,+15.4%]  ns   retry-lens n=43: 34.9% vs 48.8%
-I2 vs control (paired n=80): +3.8%                    ns   retry-lens n=35: 28.6% vs 31.4%
+I1 vs control (n=120): control 65.0%  i1 60.8%  Δ -4.2%  CI[-11.8%,+4.5%]  ns
+I2 vs control (n=120): control 65.0%  i2 65.8%  Δ +0.8%  CI[-6.9%,+8.3%]   ns
+retry lens: I1 -7.0% ns, I2 +3.5% ns
 ```
-Read `results/run1b_stdout.log` with `python bench/retry_lift/parse_partial.py <log>` to recompute.
 
-## Two things already learned (hold regardless of how it finishes)
-1. **I1 shrank from +12.5% (n=40) to +6.2% (n=80)** — landed inside the pre-registered band (+3..+10pp),
-   CI still includes 0, exactly as predicted. Direction positive, underpowered.
-2. **I2 is trending "inert, not refuted":** its stall count EQUALS control (4 vs 4), so approximate
-   matching found the same stalls as exact. If it finishes tied, the §7 gate reports the i2 arm as
-   *the control arm* and its delta as noise — a real finding, but not about the idea.
+## The two gate failures (both minor, both bias toward the null anyway)
+1. **timeout symmetry** — i1 had 2 timeouts / 120, other arms 0. Gate threshold `worst-best<=1` fails
+   at 2. This is API slowness, not the whole-arm collapse gate 2 was built for (run 7a). The 2
+   timeouts count as i1 failures, i.e. they push i1 *down* — they cannot have manufactured a positive.
+2. **grading integrity** — `hfix_merge_ranges` had its test modified. Inspected: the change was
+   **additive** (agent prepended extra assert cases; the original hidden asserts remained), the grader
+   restored pristine and graded honestly. So the pass/fail data is not corrupted — but the gate is
+   "any modification fails," so it fails. (Same task tampered in learning-lift run 4 — this task
+   specifically induces the model to write into the test file.)
 
-## How to finish (the honest option)
-"Seed" here is just a **repetition index** — the runner seeds no RNG; variation is model
-nondeterminism. So the ~105 missing solves are recoverable cheaply:
+## The honest cross-run read (does not depend on 1c being valid)
+I1 gave **+6% in 1b and −4% in 1c** measuring the identical thing. A real effect does not flip sign on
+replication. The signal oscillates around zero → the pre-registered "I1 null" reading. I2 is +0.8% with
+its wire now proven live (19 stall responses vs 7 control in 1c; the 1b 4-vs-4 tie that looked "inert"
+was resolved — approximate matching *does* fire more, and still changes nothing). **Verdict: neither
+intervention is proven to help; both trend strongly null. But because 1c tripped its own honesty gates,
+this cannot be upgraded to "proven null" — it is "unproven, trending null."**
 
-**Preferred — run just the remaining repetition and merge:**
-1. Run seed 3 only: `BENCH_SEEDS=1` won't help (it starts at seed 1). Instead run the whole thing
-   again capturing stdout, OR add a one-off script that runs 40 tasks × 3 arms for a single seed and
-   appends to a fresh log. Simplest: re-run `run_retry.py` with `BENCH_SEEDS=1` into a NEW out dir,
-   treat it as "seed 3", and merge the three seeds' rows in analysis from the two logs.
-2. Merge `run1b_stdout.log` (seeds 1–2) + the new seed-3 log, parse all rows, run the pooled paired
-   estimator over n=120/arm.
+## Two gates are MIS-CALIBRATED (a methodological finding, direction-independent)
+Stated so a future amendment can fix them BEFORE any re-run — never after seeing a result:
+1. **grading gate** should distinguish *weakening* a test (corrupts the measurement) from *additive,
+   caught-and-reverted* tampering (the grader working as designed). Catching tampering is success, not
+   a measurement failure.
+2. **timeout gate** threshold of 1 is too tight for occasional API slowness. A small fraction of
+   timeouts in one arm (e.g. ≤ ~3% and not concentrated) is not the run-7a collapse. Pick a
+   fraction-based threshold, justified by the run-7a failure mode (a whole arm degrading), not a raw count.
 
-**Cleaner if cost allows — just re-run all 3 seeds fresh** (BENCH_SEEDS=3) so one `retry.json` holds
-the whole run with the validity gates computed in-process. ~360 solves ≈ US$3.5; key has headroom
-(limit raised to $10, ~$4.7 left after run 1a+1b partials).
-
-Decide with Bruno which. Either way: **do not report a 2-seed result as final** — pre-registered n is
-3 seeds, and stopping at 2 because a partial looked fine is the optional-stopping error this project
-was bitten by twice (runs 3 and 6).
-
-## Launch recipe (WSL, the working env)
-```
-BENCH_TIMEOUT=480 BENCH_SEEDS=3 BENCH_OUT=".../bench/retry_lift/results" \
-  uv run --extra dev python bench/retry_lift/run_retry.py
-```
-Env: `UV_PROJECT_ENVIRONMENT=/tmp/ciwsl-venv`, run via `MSYS_NO_PATHCONV=1 wsl -e bash <script>`,
-`export PATH="$HOME/.local/bin:$PATH"`. Model = mistral-small-3.2-24b (the bench default).
+## The open decision (what "decide later" is choosing between)
+- **(A) Amend the two gates + one clean run (~$1.5).** Produces a gate-passing verdict → can finally
+  say "proven null" instead of "trending null." The amendment must be committed before the run and its
+  justification must not reference 1c's result direction.
+- **(B) Accept trending-null, write RESULTS.md now.** No more spend. Documents everything incl. the gate
+  failures; verdict stays "unproven, trending null."
+- Do NOT loosen the gates and re-interpret 1c — that is the cardinal sin. Any gate change applies only
+  to a FUTURE run.
 
 ## Budget
-OpenRouter key `chimera-learning-lift-5usd`, limit raised to $10. Spent so far this line of work
-≈ $5.3 (probe + run 1a partial + run 1b partial). Check before a fresh 360:
-`curl -s -H "Authorization: Bearer $K" https://openrouter.ai/api/v1/auth/key`.
+Key `chimera-learning-lift-5usd`, limit raised to $10, **~$5.10 left**. A clean 360-solve run ≈ $1.5.
+
+## Launch recipe (WSL)
+`scratchpad/retry.sh` sets: `BENCH_TIMEOUT=480 BENCH_SEEDS=3 BENCH_OUT=results`,
+`UV_PROJECT_ENVIRONMENT=/tmp/ciwsl-venv`, run via `MSYS_NO_PATHCONV=1 wsl -e bash <script>` and
+**redirect stdout to a real file** (not the task pipe) so a restart can't orphan it. Model =
+mistral-small-3.2-24b. Parser: `python bench/retry_lift/parse_partial.py <log>`.
