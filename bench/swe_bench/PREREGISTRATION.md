@@ -99,3 +99,59 @@ the CIs, the failure accounting and the cost.
 
 **Status: registered, not yet run.** The run needs paid model calls and a Docker host; nothing in
 this file has been executed. When it is, the result appears here — win, loss, or null.
+
+---
+
+# Amendment 1 — the four deferred decisions, fixed before any model call
+
+**Committed before the first `chimera solve` of this run.** The gold dry-run (3 django instances,
+reference patches, 3/3 resolved, report parsed correctly) validated the Docker + harness + report +
+parser pipeline at zero model cost. These four choices were left open in `PLAN.md §5`; they are fixed now.
+
+## Decision 1 — Slice: django/django, `<15 min fix` stratum
+
+From the full Verified 500, the slice is **django/django instances in the easiest difficulty stratum
+(`<15 min fix`)** — 92 instances, one codebase. This is the plan's §3.1 recommendation made concrete:
+- **Off the floor:** the easy stratum is where even a mid model has a nonzero base rate (the floor that
+  killed terminal_bench's measurement is a hard-difficulty artefact).
+- **Transfer real, not staged:** one repository means django's own idioms recur across instances — the
+  transfer-possible setting the learning-lift series could only fake.
+- **Modern prebuilt images:** django versions 3.0–5.0 all have prebuilt eval images (gold run confirmed
+  v5.0 pulls work).
+
+The **exact instance-id set is frozen by the probe** (below) and written to `results/slice.jsonl`
+before the paired run; no instance is added or dropped after seeing a result.
+
+## Decision 2 — Model: `openrouter/deepseek/deepseek-chat-v3.1`
+
+Chosen over the weaker mistral-24b of the prior runs. **This is a deliberate change of what the run
+measures, stated plainly:** deepseek-chat-v3.1 is *competent*, not weak, so this is less a "lift a weak
+model" test (the project's central thesis) and more "does Chimera's scaffolding help a competent model
+on real repos." The trade-off, decided with the repo owner: a competent model has a much lower chance of
+the terminal_bench floor (37/40 both-fail) that makes a paired A/B measure nothing, and it yields a
+better absolute Q2 number. The honest cost is thesis purity — if deepseek already resolves an instance
+alone, there is less headroom for the scaffold to add, which will show up as a smaller Δ. Reported as-is.
+
+## Decision 3 — `--verify` policy: option (a), no verify (honest default)
+
+The treatment arm runs **without `--verify`**. Neither dataset ships a `test_cmd`, and synthesizing one
+from `FAIL_TO_PASS` would hand the agent its own hidden grading tests (leakage). Option (b) — verify on
+the repo's *existing* tests at base_commit — is legitimate but needs a per-version test command and adds
+run time; deferred. Option (c) — verify on `FAIL_TO_PASS` — is **forbidden, permanently**. So the
+treatment arm's scaffolding is `--repo-map --progress-ledger --replan --checklist --max-attempts 3`
+without executable ground truth, which tests a *weaker* Chimera than local_lift did — noted, not hidden.
+
+## Decision 4 — Scope: Q1 only (paired thesis), Q2 deferred
+
+This run answers **Q1** (does Chimera's scaffolding beat baseline on the same instances) on the django
+easy slice. **Q2** (absolute % of full Verified 500 with a strong model) is a separate, much more
+expensive run and is **not** bundled here. The slice result is never labelled a "Verified score."
+
+## Hygiene carried from the main design
+Both arms: `--no-remember --no-collect --no-evolve-skills`, fresh sanitized checkout per instance
+(single-branch clone, `reset --hard base_commit`, remote removed, future work gc'd unreachable — the
+harness's own anti-leakage recipe), pass@1 (one patch per instance, no best-of-N), graded ONLY by
+SWE-bench's official harness in Docker.
+
+**Status: amendment committed. The cost probe (3 instances, both arms, real deepseek calls) runs next
+to fix the slice size against observed per-instance cost, then the paired run.**
