@@ -616,7 +616,11 @@ class AutonomousAgent:
             # path either: re-deriving the same patch is unobstructed. Feeding the diff back closes
             # that. Opt-in and measured, not assumed — showing a wrong patch can also ANCHOR a model
             # on it, which is the registered counter-hypothesis (see bench/retry_lift).
-            if self.diff_feedback and attempt.diffs and (body := _rendered_diff(attempt.diffs)):
+            # Guarded on there BEING a next attempt: this is retry conditioning, so building it after
+            # the final attempt would inflate the injection count (the pre-registration's validity
+            # gate) with feedback no model ever reads.
+            if (self.diff_feedback and index < self.config.max_attempts
+                    and attempt.diffs and (body := _rendered_diff(attempt.diffs))):
                 feedback = f"{feedback}\n\n{_DIFF_FEEDBACK_HEADER}\n{body}\n{_DIFF_FEEDBACK_FOOTER}"
                 # Emitted so a bench can COUNT injections: a run where this never fires measured a
                 # plumbing failure, not the idea (learning-lift runs 1-2 were lost to exactly that,
