@@ -17,6 +17,8 @@ dist/
 # Env / secrets
 .env
 .env.local
+.env.bak*
+.env.*.bak
 *.key
 
 # Caches
