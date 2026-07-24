@@ -196,3 +196,41 @@ its result would mean.
 they act (`diff-feedback injected N chars (attempt K)`, `stagnation pivot injected (attempt K)`),
 and the runner passes `--stream` to all three arms so the counts are parseable from stdout.
 `--stream` only prints; it is identical across arms and cannot bias the comparison.
+
+---
+
+# Run 1a — DISCARDED after 120/360 solves (instrumentation defect, recorded not hidden)
+
+Stopped one seed in and discarded. Recorded here rather than quietly re-run, because an undocumented
+discard is indistinguishable from a re-roll — the same rule that governed learning-lift run 7a.
+
+**The defect was in the bench, not the intervention.** §7's first validity gate counts how often each
+intervention fires. The I2 counter looked for the status event `stagnation pivot injected` — which is
+emitted by the *advisory* branch of the stall handler. But that branch is the `else` of:
+
+```python
+if self.stagnation.assess().stagnant:
+    if task_ledger is not None and self.planner is not None:   # <- --replan makes this always true
+        ... self._emit("re-planned after stall ...")
+    else:
+        ... self._emit("stagnation pivot injected ...")
+```
+
+All three arms run `--replan`, and `task_ledger` is non-None exactly when `replan_on_stall` is set
+(`chimera/core/autonomous.py`). So the dual-ledger branch always won and the counted event was
+**unreachable by construction**. Seed 1 duly reported **0 pivots in the i2 arm** — for a live
+intervention. Left alone, the run would have failed I2's own validity gate for the wrong reason, and
+the runner discards each child's stdout after parsing, so the count was not recoverable afterwards.
+
+**Fixes, both committed before the re-run:**
+
+1. The counter now matches `stagnation pivot injected|re-planned after stall`.
+2. The gate now requires **i2 strictly greater than control**, not merely > 0. Control runs `--replan`
+   too, so both arms stall-detect; if approximate matching finds the *same* stalls as exact matching,
+   the i2 arm simply *is* the control arm and any delta is noise. That case now reports **"inert, not
+   refuted"** — an important distinction, because "I2 changed nothing" and "I2 does not help" are
+   different findings and only one of them is about the idea.
+
+**Seed 1's outcome numbers are discarded and not carried forward**, even though the I1 counter worked:
+partial data selected after seeing it is exactly the re-roll this rule exists to prevent. The re-run
+starts from seed 1 with the corrected instrumentation. Cost of the discard: ~120 solves.

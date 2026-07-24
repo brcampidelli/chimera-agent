@@ -65,7 +65,14 @@ _PROBE_R_CI = (0.208, 0.591)   # share of retried solves that recovered
 
 _ATTEMPTS_RE = re.compile(r"after (\d+) attempt")
 _DIFF_INJECT_RE = re.compile(r"diff-feedback injected")
-_PIVOT_INJECT_RE = re.compile(r"stagnation pivot injected")
+# I2 fires whenever the detector calls a stall — but WHICH event that produces depends on the
+# scaffolding. With --replan on (all three arms here) the dual-ledger branch wins and emits
+# "re-planned after stall"; the advisory "stagnation pivot injected" branch is its `else` and is
+# therefore UNREACHABLE in this configuration. Counting only the pivot would have reported zero
+# firings for a live intervention and failed I2's own validity gate for the wrong reason.
+# Both are counted, and because control also runs --replan, the control-vs-i2 difference in this
+# count is the direct measure of what approximate matching actually changed.
+_PIVOT_INJECT_RE = re.compile(r"stagnation pivot injected|re-planned after stall")
 
 
 def _solve(task: dict, ws: Path, arm: str, home: Path) -> dict[str, object]:
@@ -236,10 +243,15 @@ def _gates(stats: dict[str, dict], tampered: set[str]) -> dict[str, tuple[bool, 
             f"{stats['i1']['diff_injections']} diff injections in the i1 arm "
             f"(0 = plumbing failure, NOT evidence against the idea)",
         ),
+        # Not just ">0": control runs --replan too, so both arms stall-detect. If approximate
+        # matching finds the SAME stalls as exact matching, the i2 arm is the control arm and any
+        # measured delta is noise — an inert intervention, which must be reported as "nothing to
+        # measure" rather than as "I2 does not help".
         "wire live (I2)": (
-            int(stats["i2"]["pivot_injections"]) > 0,
-            f"{stats['i2']['pivot_injections']} pivots fired in i2 vs "
-            f"{stats['control']['pivot_injections']} in control",
+            int(stats["i2"]["pivot_injections"]) > int(stats["control"]["pivot_injections"]),
+            f"{stats['i2']['pivot_injections']} stall responses in i2 vs "
+            f"{stats['control']['pivot_injections']} in control "
+            f"(equal = approximate matching changed nothing; the arm is inert, not refuted)",
         ),
         "timeout symmetry": (
             worst - best <= 1,
