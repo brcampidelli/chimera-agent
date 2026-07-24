@@ -2345,6 +2345,9 @@ def solve(
     diff_feedback: bool = typer.Option(
         False, "--diff-feedback", help="Show a failed attempt its own reverted diff, as a path not to retake."
     ),
+    keep_workspace: bool = typer.Option(
+        False, "--keep-workspace", help="On failure, leave the last attempt's edits on disk for an external grader (don't revert)."
+    ),
     stagnation_fuzzy: bool = typer.Option(
         False, "--stagnation-fuzzy", help="Match repeated-failure signatures approximately, not byte-identically."
     ),
@@ -2602,6 +2605,9 @@ def solve(
             # Retry conditioning (--diff-feedback): feed the failed attempt's own reverted diff back
             # so the retry is told what it wrote, not just that it failed (bench/retry_lift, I1).
             diff_feedback=diff_feedback,
+            # --keep-workspace: leave the agent's final edits on disk when an external grader (e.g.
+            # SWE-bench's own tests) decides pass/fail, instead of Chimera's verify-or-revert.
+            keep_workspace=keep_workspace,
             # The six learning seams (experience, trajectories, memory, auto_evolver, cards, playbook)
             # from the shared factory above (M19-A0).
             **evo.apply_to(),

@@ -211,6 +211,7 @@ class AutonomousAgent:
         probe_log: ProbeLog | None = None,
         guard: WorkspaceGuard | None = None,
         diff_feedback: bool = False,
+        keep_workspace: bool = False,
         experience: ExperienceBuffer | None = None,
         trajectories: TrajectoryCollector | None = None,
         memory: SupportsRemember | None = None,
@@ -251,6 +252,7 @@ class AutonomousAgent:
         self.probe_log = probe_log
         self.guard = guard
         self.diff_feedback = diff_feedback
+        self.keep_workspace = keep_workspace
         self.experience = experience
         self.trajectories = trajectories
         self.memory = memory
@@ -432,6 +434,11 @@ class AutonomousAgent:
                 self._emit(_ev_status(f"resumed thread {thread_id} at attempt {start_index}"))
 
         self._emit(_ev_status("planning complete" if plan else "starting"))
+        # For --keep-workspace: the post-edit snapshot of the LAST attempt, so an external grader
+        # (SWE-bench, CI, a human) can judge the agent's final work even when Chimera's own verifier
+        # rejected it and rolled the tree back. Between-attempt reverts still happen (each attempt stays
+        # independent); only the final on-disk state is restored to this on a failed run.
+        last_after = None
         for index in range(start_index, self.config.max_attempts + 1):
             # Cooperative cancel (checked BEFORE the attempt starts): an in-flight model call can't be
             # interrupted, so a stop request halts the loop here — after the previous attempt finished,
@@ -546,6 +553,7 @@ class AutonomousAgent:
                 from chimera.evolution.diff_gate import diff_snapshots, unified_diffs
 
                 after = self.guard.snapshot()  # one capture feeds both the summary and the per-file diffs
+                last_after = after  # remember for --keep-workspace (restored after the loop if it fails)
                 pdiff = diff_snapshots(snapshot, after)
                 diff_productive = pdiff.is_productive
                 diff_summary = pdiff.audit_summary()
@@ -706,6 +714,10 @@ class AutonomousAgent:
 
         self._record_card_outcome(False)
         self._clear_checkpoint(thread_id)  # exhausted the budget — a terminal state, not resumable
+        # --keep-workspace: leave the last attempt's edits on disk for an external grader, undoing the
+        # in-loop revert of that final attempt. Only meaningful on failure (a success never reverts).
+        if self.keep_workspace and last_after is not None and self.guard is not None:
+            self.guard.restore(last_after)
         last = attempts[-1].answer if attempts else ""
         self._emit(_ev_final(False, last))
         result = AutonomousResult(answer=last, success=False, attempts=attempts, plan=plan)

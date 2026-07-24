@@ -720,3 +720,31 @@ def test_diff_feedback_defaults_off() -> None:
 
     agent = AutonomousAgent(FakeWorker())
     assert agent.diff_feedback is False
+
+
+def test_keep_workspace_leaves_last_attempt_on_disk(tmp_path: Path) -> None:
+    """--keep-workspace: on failure, the agent's final edits survive for an external grader.
+
+    Mirror of test_always_fail_reverts_everything, but with keep_workspace=True: the run still
+    fails and each attempt is still marked reverted (between-attempt isolation is unchanged), yet
+    the file the last attempt wrote is present at the end because the loop restores it. This is what
+    lets SWE-bench grade the agent's patch instead of an empty diff.
+    """
+    worker = FakeWorker(workspace=tmp_path, filename="out.txt")
+    auto = AutonomousAgent(
+        worker,
+        verifier=FailVerifier(),
+        guard=WorkspaceGuard(tmp_path),
+        keep_workspace=True,
+        config=AutonomousConfig(max_attempts=2, use_planner=False),
+    )
+    result = auto.run("create out.txt")
+
+    assert result.success is False
+    assert (tmp_path / "out.txt").exists()  # kept for the external grader, unlike the default
+
+
+def test_keep_workspace_defaults_off(tmp_path: Path) -> None:
+    from chimera.core.autonomous import AutonomousAgent
+
+    assert AutonomousAgent(FakeWorker()).keep_workspace is False
