@@ -305,3 +305,75 @@ transparency, and it changed nothing about the design.
 
 **Status: amendment committed. The baseline arm and the 16 remaining `treatment_diff` instances have
 not been run.**
+
+---
+
+# Amendment 4 — run 3: replicate run 2 on instances we have never seen
+
+**Committed before any model call of run 3.** Runs 1 and 2 stand as published.
+
+## Why
+
+Run 2 measured **+15.8% [−1.9%, +15.8%], 3 instances won and 0 lost** — directionally right, not
+significant, and resting on **three informative pairs** (8 of 19 were both-fail). The question it
+leaves is simple: *is that a real effect or a lucky sweep?* Under the null, three discordant pairs
+landing on the same side has probability 1/8 — suspicious, not decisive.
+
+More configurations cannot answer that. **More instances can** — and specifically, instances whose
+outcomes we have never seen. The django `<15 min fix` stratum has **92** instances; run 2 used 19,
+leaving **73 untouched**.
+
+## Design
+
+**Primary — out-of-sample replication (the headline).** The **41 fresh instances** that survive gold
+validation, taken in `instance_id` order from the 73 never used. Same two arms as run 2, unchanged:
+
+| | flags |
+|---|---|
+| baseline | `--no-plan --no-manager --max-attempts 1 --max-steps 30` |
+| chimera+diff | `--repo-map --progress-ledger --replan --checklist --max-attempts 3 --require-diff --max-steps 30` |
+
+Same model (`deepseek-chat-v3.1`), same 1800 s budget, same hygiene, pass@1, graded **only** by the
+official harness. **Nothing about the configuration changes** — that is what makes it a replication
+rather than another exploration.
+
+**Secondary — pooled n=60** (run 2's 19 + these 41), reported *beside* the primary, never instead of
+it. Pooling buys power; it also mixes seen with unseen data, so the out-of-sample number is the one
+that carries the evidential weight.
+
+**Gold validation first, as in run 2:** every candidate instance is graded with its *reference* patch
+before any model call. Any instance whose own gold patch fails is dropped as an infrastructure
+exclusion (run 2 dropped `django-10097` this way). This costs nothing and happens before the slice
+is frozen.
+
+## Registered predictions
+
+- **Primary (41 fresh):** Δ **+5 to +20 pp**, direction positive. **Significance is genuinely
+  uncertain** — at n=41 with run 2's both-fail rate (~42%), expect roughly 6–10 informative pairs; a
+  real +15% would likely clear zero, a real +5% would not.
+- **Pooled (n=60):** narrower CI than either alone. If both slices point the same way, this is where
+  the CI most plausibly excludes zero.
+- **A real chance the replication is null or negative — call it one in three.** Run 2's 3–0 sweep is
+  exactly the shape small samples produce by chance. If the fresh slice comes back at ~0%, **run 2's
+  result was a lucky sweep and gets the same retraction treatment run 6 of learning-lift got.**
+- **Empty-patch rate** stays near run 2's (baseline ~5/19 ≈ 26%, gated ~3/19 ≈ 16%) — a validity
+  check that the fresh instances are comparable, not systematically harder.
+
+## The pre-committed readings
+
+- **Fresh slice positive and significant** → run 2 replicated out-of-sample. This becomes the
+  project's strongest external claim, and the first one that survives a replication.
+- **Fresh slice positive, not significant, same direction** → consistent with a real modest effect,
+  still unproven. Report the pooled number too, and say plainly that neither run alone settles it.
+- **Fresh slice ≈ 0 or negative** → **run 2 was a lucky sweep. Retract it** with the prominence it
+  was published with, and the honest summary becomes: the scaffold shows no measurable lift on real
+  repos across n=60.
+
+## What does not change
+
+The slice is still django-only and still the easiest stratum, so **no result here is a SWE-bench
+Verified score** — that needs the full 500 and is still deferred. The middle arm (plain scaffold)
+stays cut, so a positive still reads "scaffold **plus** gate beats bare model", never "the gate did
+it". One run, no re-rolls; whatever it says is published.
+
+**Status: registered. Gold validation not yet run; no model call of run 3 has been made.**
