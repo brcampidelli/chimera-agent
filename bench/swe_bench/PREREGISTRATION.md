@@ -155,3 +155,101 @@ SWE-bench's official harness in Docker.
 
 **Status: amendment committed. The cost probe (3 instances, both arms, real deepseek calls) runs next
 to fix the slice size against observed per-instance cost, then the paired run.**
+
+---
+
+# Amendment 2 — the discriminating run (registered before any model call, and before the code exists)
+
+Run 1 returned **Δ = +0.0%** ([`RESULTS.md`](RESULTS.md)). **That null stands and is published
+regardless of what this run produces.** This is not a re-roll of run 1: run 1 measured a *deliberately
+weakened* Chimera on a misconfigured budget, and both faults were ours. This amendment fixes them and
+re-asks the question. If this run is also null, that is the honest end of the thesis for real repos.
+
+## Why: the failure mode was traced to a mechanism, not guessed
+
+Run 1's dominant failure was **not editing at all** (10/19 and 11/19 empty patches) while being
+*accurate when it did edit* (78% / 88% precision). Reading the code rather than speculating
+(`chimera/core/autonomous.py`), the cause is a chain:
+
+1. With no verifier, success is decided by the Manager alone — `ok = approved` (line 494).
+2. The Manager reads the answer *text*. A confident prose explanation of the bug is plausible, so it is
+   approved.
+3. The diff-gate **does** compute whether anything really changed (`diff_productive` ←
+   `PatchDiff.is_productive`, line 558) — and then uses it **only for telemetry** (lines 583, 600,
+   608). It never sets `ok = False`.
+
+**So a code-editing task can be scored a success having edited nothing, and the machinery that knows it
+is a passive observer.** That is a product defect for code work, independent of any benchmark.
+
+### A fix I proposed and then discarded, recorded so the reasoning is auditable
+
+`PLAN.md` §3.2 option (b) — `--verify` on the repository's *existing* tests at `base_commit` — was my
+stated next step in the RESULTS discussion. Checking the mechanism above shows **it would not fix this
+failure**: an attempt that edits nothing passes a regression suite *trivially*, so verify would return
+green and the empty answer would still be approved. Option (b) is abandoned as the fix for this defect
+(it remains legitimate, and forbidden option (c) stays forbidden forever).
+
+## Design
+
+Three arms, same frozen 19-instance slice, same model, same grading. **`max_steps` is raised for EVERY
+arm**, because it is a resource budget, not part of the scaffolding — giving it only to the treatment
+would confound "Chimera helps" with "more steps help".
+
+| | flags |
+|---|---|
+| **baseline** | `--no-plan --no-manager --max-attempts 1 --max-steps 30` |
+| **chimera** | `--repo-map --progress-ledger --replan --checklist --max-attempts 3 --max-steps 30` |
+| **chimera+diff** | as above **+ `--require-diff`** |
+
+`--require-diff` (to be implemented, off by default): an attempt whose diff-gate reports no productive
+change **fails** and is retried with that as feedback. It promotes an existing observation into a gate.
+
+Fixed now: **`max_steps = 30`**, **per-solve timeout 1800 s**, hygiene unchanged
+(`--no-remember --no-collect --no-evolve-skills --keep-workspace`), no `--verify` on any arm, pass@1,
+graded only by the official harness. n = 19 × 3 = **57 solves**.
+
+A 2–3 instance probe runs first to confirm *feasibility only* (that 30 steps completes inside 1800 s at
+acceptable cost). It may not be used to tune any parameter toward an outcome; if 30 steps proves
+infeasible, the change is a further amendment, committed before running.
+
+## Registered predictions
+
+- **Empty-patch rate falls in `chimera+diff`** — from 11/19 to **≤ 5/19**. This is the mechanism's
+  direct prediction and the one that would most clearly confirm the diagnosis.
+- **`chimera+diff` vs baseline: Δ +5 to +20 pp**, quite possibly **not significant** at n=19 (run 1 had
+  only 2 informative pairs; the same thinness may persist).
+- **`chimera` vs baseline (steps fixed, no diff-gate): Δ −5 to +10 pp** — raising steps alone may not
+  be enough, since the Manager still approves prose.
+- **A real chance everything stays null.** If forcing an edit produces *wrong* edits, resolution will
+  not move even as the empty rate falls. That would say the model cannot fix these bugs at all, and the
+  scaffolding was never the binding constraint.
+
+## Validity gates (a run failing one of these reports a measurement failure, not a result)
+
+1. **The gate must fire:** count attempts failed by `--require-diff`. Zero = plumbing failure, not
+   evidence against the idea (the learning-lift runs 1–2 lesson).
+2. **Steps must actually be used:** if solves still finish in ~8 steps, raising the budget changed
+   nothing and limitation 2 of run 1 was misdiagnosed — say so.
+3. **Timeout symmetry** across arms; asymmetric timeouts invalidate the run.
+4. **Floor check:** if both-fail pairs stay ≥ 11/19, the slice is uninformative regardless of arm, and
+   the pooled Δ is reported-not-interpreted.
+5. **Cost and infra-failure accounting** published per arm, as in run 1.
+
+## Pre-committed readings
+
+- **Empty rate falls AND resolution rises significantly** → the diagnosis was right and the diff-gate is
+  a real fix; it becomes a product default candidate.
+- **Empty rate falls, resolution flat** → the binding constraint is model capability, not commitment.
+  The scaffolding still does not lift; publish that plainly.
+- **Empty rate does not fall** → the mechanism trace above was wrong. Retract the diagnosis with the
+  same prominence as it was stated here.
+- **All null** → the thesis does not hold for a competent model on real repos. The project's claim gets
+  rewritten around honest measurement, which is what it demonstrably does well.
+
+## Caveats
+
+One repository, one model, 19 instances, one run per arm. n=19 with a high floor may again yield too
+few discordant pairs to resolve anything — that is a power limitation, not evidence of no effect, and
+will be labelled as such. Nothing here generalises beyond django, and none of it is a Verified score.
+
+**Status: registered. `--require-diff` does not exist yet; no model call of this run has been made.**
