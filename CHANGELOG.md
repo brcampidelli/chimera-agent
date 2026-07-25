@@ -6,6 +6,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.36.1] - 2026-07-25
+
+### Fixed
+- **The shipped benchmark snapshot cited the wrong file and told the wrong story.** v0.36.0 displayed
+  the re-verified weak-model-lift figures (48% → 71%) while citing
+  `bench/local_lift/results/paired.json` — the **superseded** run's raw data, kept unedited on purpose
+  because the erratum points at it. Anyone checking the citation would have found 9% → 15% instead of
+  the numbers on screen. The `note` shipped beside them was the old run's narrative too ("6 tasks
+  recovered", "85 of the 100 fail both arms") when the re-verified run measured **28 recoveries
+  against 5 regressions**, and **24** — not 85. The numbers were right; their provenance and their
+  explanation were not. The source is now derived from the file actually read, the note describes the
+  run that produced it, and a test pins both (including that the cited path exists).
+- **The desktop app showed only the external benchmark that does not favour us.** The snapshot's
+  `external` block was a constant carrying Terminal-Bench alone, so the SWE-bench result never reached
+  the UI. Both now ship together — publishing only the flattering half is precisely the selective
+  reporting this project's benchmark work exists to avoid. The test now checks external results **by
+  name rather than by index**, so a reordering cannot silently drop one.
+
+### Changed
+- **README and `docs/benchmarks.md` now carry the SWE-bench results.** The README mentioned SWE-bench
+  exactly once — inside a *disclaimer* — so the front page still implied no external number existed.
+  It now reports both runs (the exact zero and the +15.8%), each with its CI and the warning that
+  57.9% is **not** a SWE-bench Verified score. The learning-lift bullet was stale in the same way: it
+  described only the first run ("0.0pp, uninformative") when the series has since closed at **seven
+  runs, with the one positive retracted**.
+
 ## [0.36.0] - 2026-07-25
 
 ### Added

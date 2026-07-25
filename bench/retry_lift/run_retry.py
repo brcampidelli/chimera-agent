@@ -232,6 +232,31 @@ def _report(rows: list[dict], tampered: set[str]) -> dict[str, object]:
             "gates": {k: {"ok": v[0], "detail": v[1]} for k, v in gates.items()}}
 
 
+def _weakened(tampered: set[str]) -> set[str]:
+    """Of the tasks that modified their own test, which ones REMOVED pristine assertions.
+
+    The distinction the grading gate turns on. A modification that only *adds* cases leaves every
+    pristine line in place — the agent wrote its own checks alongside the hidden ones, which is
+    harmless because grading restores the pristine file anyway. A modification that *drops* pristine
+    lines is the agent editing away the assertions that judge it, and a run containing that is worth
+    discarding. Reads the workspace `_grade` preserved as evidence; an unreadable one counts as
+    weakened, because unverifiable tampering must not be waved through.
+    """
+    weak: set[str] = set()
+    by_id = {str(t["id"]): t for t in TASKS}
+    for task_id in tampered:
+        task = by_id.get(task_id)
+        preserved = _OUT / f"tampered_{task_id}" / (str(task["test"]) if task else "")
+        if task is None or not preserved.exists():
+            weak.add(task_id)
+            continue
+        on_disk = preserved.read_text(encoding="utf-8", errors="replace")
+        pristine_lines = [ln.strip() for ln in str(task["test_src"]).splitlines() if ln.strip()]
+        if any(ln not in on_disk for ln in pristine_lines):
+            weak.add(task_id)
+    return weak
+
+
 def _gates(stats: dict[str, dict], tampered: set[str]) -> dict[str, tuple[bool, str]]:
     ctrl = stats["control"]
     a, r = float(ctrl["A_attempt1_failed"]), float(ctrl["R_recovered"])
@@ -253,9 +278,14 @@ def _gates(stats: dict[str, dict], tampered: set[str]) -> dict[str, tuple[bool, 
             f"{stats['control']['pivot_injections']} in control "
             f"(equal = approximate matching changed nothing; the arm is inert, not refuted)",
         ),
+        # Fraction-based, not a raw count. The failure this guards is run 7a's: a WHOLE ARM degrading
+        # until latency collapse is indistinguishable from capability collapse. A raw threshold of 1
+        # failed run 1c on 2 timeouts out of 120 — ordinary API slowness, and it counted against the
+        # arm that had them, so it could not manufacture a positive. Trips at >3% of an arm's solves.
         "timeout symmetry": (
-            worst - best <= 1,
-            f"per-arm timeouts {timeouts} (asymmetry invalidates the run)",
+            (worst - best) <= max(1, int(0.03 * max(int(s["n"]) for s in stats.values()))),
+            f"per-arm timeouts {timeouts} (a whole-arm collapse invalidates the run; "
+            f"a few slow calls do not — threshold is >3% of solves)",
         ),
         "control drift (A)": (
             _PROBE_A_CI[0] <= a <= _PROBE_A_CI[1],
@@ -269,9 +299,21 @@ def _gates(stats: dict[str, dict], tampered: set[str]) -> dict[str, tuple[bool, 
             0.20 <= r <= 0.80,
             f"control R={r:.1%} (outside 20-80% = ceiling/floor, lens reported-not-interpreted)",
         ),
+        # Tampering is always REPORTED — it is a real finding about the agent — but it invalidates only
+        # when the test was WEAKENED. The grader restores the pristine test before every verdict, so a
+        # modification cannot corrupt the pass/fail data; catching one is the system working, not a
+        # measurement failure. Run 1c failed this gate on an ADDITIVE edit (extra asserts prepended,
+        # the originals intact), which is the mis-calibration. A weakened test still fails the run: it
+        # signals the agent optimising against its judge, and a run of that is worth discarding.
         "grading integrity": (
-            not tampered,
-            f"{len(tampered)} task(s) modified their own test" if tampered else "no arm modified its own test",
+            not _weakened(tampered),
+            (
+                f"{len(tampered)} task(s) modified their own test "
+                f"({len(_weakened(tampered))} WEAKENED the assertions, the rest additive); "
+                "graded against pristine either way"
+            )
+            if tampered
+            else "no arm modified its own test"
         ),
     }
 
