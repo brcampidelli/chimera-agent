@@ -6,6 +6,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **The project's first number on an externally recognized scoreboard: SWE-bench Verified.**
+  ([`bench/swe_bench/`](bench/swe_bench/)) Two pre-registered runs on the same frozen 19-instance
+  django slice, graded **only** by the official `swebench` 4.1.0 harness in Docker — never
+  self-reported. Run 1 was **an exact zero** (36.8% both arms, Δ +0.0%) and is published unchanged.
+  Run 2, after fixing two faults that were *ours* — a scaffold tested without its strongest mechanism,
+  and a step budget of 8 against a 250 MB repo — came out **42.1% → 57.9%, Δ +15.8%, 95% CI
+  [−1.9%, +15.8%]: three instances won, zero lost.** The CI crosses zero, so this is labelled **not
+  significant**, exactly as the pre-registration predicted. What the two runs together show is that
+  the scaffolding is worth nothing when the agent is starved of steps and worth three instances when
+  it is not — and that it wins by editing *better* (69% vs 57% precision), not by editing more.
+  Shipped with the retraction it earned: the mechanism we had claimed for the empty patches was
+  wrong, and the correction is in [`RESULTS.md`](bench/swe_bench/RESULTS.md) as prominently as the
+  claim was.
+- **`solve --keep-workspace`** — leave the agent's edits on disk when an **external** grader decides
+  pass/fail. `solve` is verify-or-revert, which is right when Chimera owns the verdict and wrong when
+  SWE-bench's own tests do: without this, a failed solve rolls the tree back and `git diff` yields an
+  empty patch. Off by default.
+- **`solve --require-diff`** — a code task that changed no file is not a success, however convincing
+  its prose. The diff-gate already computed the truth and spent it on telemetry alone; this promotes
+  it from observer to gate, failing the attempt and feeding the reason into the retry. Off by default.
+  Honest note: it is **not** what produced the SWE-bench gain (measured — see the retraction above);
+  it fixes a real defect that turned out not to be the binding constraint.
+
 ### Fixed
 - **The weak-model-lift bench graded with a test the agent under test could edit — and it did.** The
   task's pytest was written into the solve workspace (deliberately: `solve` uses it as its `--verify`
