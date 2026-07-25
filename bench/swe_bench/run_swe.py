@@ -44,10 +44,16 @@ _REPO_URL = "https://github.com/django/django"
 # solve and `git diff` yields an empty patch — which is what a first probe showed (all-empty), a
 # grading-owner confusion, not a floor. Identical on both arms, so it cannot bias the comparison.
 _HYGIENE = ["--no-remember", "--no-collect", "--no-evolve-skills", "--keep-workspace"]
+# Amendment 2: --max-steps is a RESOURCE budget, not scaffolding, so it is identical on every arm.
+# Giving the extra steps only to the treatment would confound "Chimera helps" with "more steps help".
+# Run 1 used the default (8) against a 250 MB repo — recorded there as our misconfiguration.
+_STEPS = ["--max-steps", os.environ.get("BENCH_MAX_STEPS", "30")]
+_SCAFFOLD = ["--repo-map", "--progress-ledger", "--replan", "--checklist", "--max-attempts", "3"]
 _ARMS: dict[str, list[str]] = {
-    "baseline": ["--no-plan", "--no-manager", "--max-attempts", "1", *_HYGIENE],
-    "treatment": ["--repo-map", "--progress-ledger", "--replan", "--checklist",
-                  "--max-attempts", "3", *_HYGIENE],
+    "baseline": ["--no-plan", "--no-manager", "--max-attempts", "1", *_STEPS, *_HYGIENE],
+    "treatment": [*_SCAFFOLD, *_STEPS, *_HYGIENE],
+    # The discriminating arm: the diff-gate promoted from observer to gate.
+    "treatment_diff": [*_SCAFFOLD, "--require-diff", *_STEPS, *_HYGIENE],
 }
 _INSTRUCTION = (
     "You are working in the checked-out django repository at a specific commit. Resolve this issue by "

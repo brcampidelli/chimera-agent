@@ -212,6 +212,7 @@ class AutonomousAgent:
         guard: WorkspaceGuard | None = None,
         diff_feedback: bool = False,
         keep_workspace: bool = False,
+        require_diff: bool = False,
         experience: ExperienceBuffer | None = None,
         trajectories: TrajectoryCollector | None = None,
         memory: SupportsRemember | None = None,
@@ -253,6 +254,7 @@ class AutonomousAgent:
         self.guard = guard
         self.diff_feedback = diff_feedback
         self.keep_workspace = keep_workspace
+        self.require_diff = require_diff
         self.experience = experience
         self.trajectories = trajectories
         self.memory = memory
@@ -543,12 +545,13 @@ class AutonomousAgent:
                     )
                     fb = f"{fb}\n\n{detail}" if fb else detail
 
-            attempt = Attempt(index, answer, approved, verified, False, ok, fb, vout)
-            self._emit(_ev_result(index, ok, detail=(fb or vout)[:200]))
             # Diff-gate (nanobot "Dream"): certify what the attempt *actually* changed from the
             # real workspace snapshot, BEFORE any revert — the machine truth, not the model's claim.
+            # Computed BEFORE the Attempt is finalized so --require-diff can act on it: the gate has to
+            # be able to fail the attempt, not just describe it after the verdict is already sealed.
             diff_productive: bool | None = None
             diff_summary: str | None = None
+            diffs: list[FileDiff] = []
             if snapshot is not None and self.guard is not None:
                 from chimera.evolution.diff_gate import diff_snapshots, unified_diffs
 
@@ -557,8 +560,26 @@ class AutonomousAgent:
                 pdiff = diff_snapshots(snapshot, after)
                 diff_productive = pdiff.is_productive
                 diff_summary = pdiff.audit_summary()
-                attempt.diff_summary = diff_summary or ""
-                attempt.diffs = unified_diffs(snapshot, after)  # real diffs, BEFORE any revert below
+                diffs = unified_diffs(snapshot, after)  # real diffs, BEFORE any revert below
+
+            # --require-diff: for a code task, an answer that changed nothing is not a success, however
+            # convincing its prose. Without this the diff-gate is a passive observer — with no verifier
+            # `ok = approved`, and the Manager judges the answer TEXT, so a confident explanation of the
+            # bug passes while the file is untouched (SWE-bench run 1: 11/19 empty patches). Fails the
+            # attempt and feeds the reason back, so the retry is told to actually edit. Only when the
+            # diff was genuinely measured — `None` means no workspace guard, i.e. we cannot know.
+            if self.require_diff and diff_productive is False:
+                ok = False
+                detail = (
+                    "No file was changed. This task requires editing code: an explanation is not a "
+                    "fix. Locate the responsible file and make the edit."
+                )
+                fb = f"{fb}\n\n{detail}" if fb else detail
+
+            attempt = Attempt(index, answer, approved, verified, False, ok, fb, vout)
+            attempt.diff_summary = diff_summary or ""
+            attempt.diffs = diffs
+            self._emit(_ev_result(index, ok, detail=(fb or vout)[:200]))
             if not ok and snapshot is not None and self.guard is not None:
                 self.guard.restore(snapshot)
                 attempt.reverted = True

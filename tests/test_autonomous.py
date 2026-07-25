@@ -748,3 +748,71 @@ def test_keep_workspace_defaults_off(tmp_path: Path) -> None:
     from chimera.core.autonomous import AutonomousAgent
 
     assert AutonomousAgent(FakeWorker()).keep_workspace is False
+
+
+# --- --require-diff: an answer that changed nothing is not a success (bench/swe_bench amendment 2) ---
+
+
+class _ProseWorker:
+    """A worker that answers convincingly and edits NOTHING — the SWE-bench run-1 failure mode."""
+
+    def __init__(self) -> None:
+        self.runs = 0
+
+    def run(self, task: str) -> AgentResult:
+        self.runs += 1
+        return AgentResult(answer="The bug is in formsets.py: index may be None.", steps=1,
+                           stopped_reason="final")
+
+
+def test_require_diff_fails_an_attempt_that_changed_nothing(tmp_path: Path) -> None:
+    """With no verifier, ok = approved and the Manager judges the TEXT, so prose passes while the
+    file is untouched. --require-diff makes the diff-gate a gate: no change => the attempt fails."""
+    worker = _ProseWorker()
+    auto = AutonomousAgent(
+        worker,
+        guard=WorkspaceGuard(tmp_path),
+        require_diff=True,
+        config=AutonomousConfig(max_attempts=2, use_planner=False, use_manager=False),
+    )
+    result = auto.run("fix the bug in formsets.py")
+
+    assert result.success is False  # would be True without the flag
+    assert worker.runs == 2  # it was retried rather than accepted
+    assert "No file was changed" in result.attempts[0].feedback
+
+
+def test_without_require_diff_prose_still_passes(tmp_path: Path) -> None:
+    """The defect this flag fixes, pinned: by default an edit-nothing answer is a success."""
+    auto = AutonomousAgent(
+        _ProseWorker(),
+        guard=WorkspaceGuard(tmp_path),
+        config=AutonomousConfig(max_attempts=2, use_planner=False, use_manager=False),
+    )
+    assert auto.run("fix the bug").success is True
+
+
+def test_require_diff_accepts_an_attempt_that_did_change_a_file(tmp_path: Path) -> None:
+    auto = AutonomousAgent(
+        FakeWorker(workspace=tmp_path, filename="out.txt"),
+        guard=WorkspaceGuard(tmp_path),
+        require_diff=True,
+        config=AutonomousConfig(max_attempts=2, use_planner=False, use_manager=False),
+    )
+    result = auto.run("create out.txt")
+    assert result.success is True  # a real change satisfies the gate
+
+
+def test_require_diff_cannot_fail_without_a_workspace_guard() -> None:
+    """No guard means the diff was never measured (diff_productive is None), so the gate must not
+    fire — an unmeasured attempt is not a failed one."""
+    auto = AutonomousAgent(
+        _ProseWorker(),  # edits nothing, but there is no guard to observe that
+        require_diff=True,
+        config=AutonomousConfig(max_attempts=1, use_planner=False, use_manager=False),
+    )
+    assert auto.run("answer this").success is True
+
+
+def test_require_diff_defaults_off() -> None:
+    assert AutonomousAgent(FakeWorker()).require_diff is False

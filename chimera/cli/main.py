@@ -2348,6 +2348,9 @@ def solve(
     keep_workspace: bool = typer.Option(
         False, "--keep-workspace", help="On failure, leave the last attempt's edits on disk for an external grader (don't revert)."
     ),
+    require_diff: bool = typer.Option(
+        False, "--require-diff", help="Fail an attempt that changed no file — for code tasks, an explanation is not a fix."
+    ),
     stagnation_fuzzy: bool = typer.Option(
         False, "--stagnation-fuzzy", help="Match repeated-failure signatures approximately, not byte-identically."
     ),
@@ -2608,6 +2611,9 @@ def solve(
             # --keep-workspace: leave the agent's final edits on disk when an external grader (e.g.
             # SWE-bench's own tests) decides pass/fail, instead of Chimera's verify-or-revert.
             keep_workspace=keep_workspace,
+            # --require-diff: promote the diff-gate from observer to gate, so an attempt that edited
+            # nothing fails and is retried instead of being approved on the strength of its prose.
+            require_diff=require_diff,
             # The six learning seams (experience, trajectories, memory, auto_evolver, cards, playbook)
             # from the shared factory above (M19-A0).
             **evo.apply_to(),
