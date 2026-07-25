@@ -1,0 +1,47 @@
+{
+  "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+  "summary": {
+    "n": 6,
+    "baseline_rate": 0.5,
+    "treatment_rate": 0.6667,
+    "delta": 0.1667,
+    "discordant": {
+      "baseline_only": 0,
+      "treatment_only": 1
+    },
+    "diff_ci": [
+      -0.0978,
+      0.1667
+    ],
+    "significant": false
+  },
+  "by_task": {
+    "eval_expr": {
+      "baseline": false,
+      "chimera": false
+    },
+    "fix_percentile": {
+      "baseline": true,
+      "chimera": true
+    },
+    "csv_parse": {
+      "baseline": false,
+      "chimera": false
+    },
+    "topo_sort": {
+      "baseline": true,
+      "chimera": true
+    },
+    "query_string_parse": {
+      "baseline": false,
+      "chimera": true
+    },
+    "query_string_build": {
+      "baseline": true,
+      "chimera": true
+    }
+  },
+  "resumed_pairs": 0,
+  "graded_against_pristine_test": true,
+  "tests_modified_by_solve": []
+}

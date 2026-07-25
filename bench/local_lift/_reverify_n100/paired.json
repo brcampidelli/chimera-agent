@@ -1,0 +1,425 @@
+{
+  "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+  "summary": {
+    "n": 100,
+    "baseline_rate": 0.48,
+    "treatment_rate": 0.71,
+    "delta": 0.23,
+    "discordant": {
+      "baseline_only": 5,
+      "treatment_only": 28
+    },
+    "diff_ci": [
+      0.1259,
+      0.2861
+    ],
+    "significant": true
+  },
+  "by_task": {
+    "roman_validate": {
+      "baseline": false,
+      "chimera": true
+    },
+    "config_parse": {
+      "baseline": true,
+      "chimera": true
+    },
+    "path_get": {
+      "baseline": false,
+      "chimera": false
+    },
+    "eval_expr": {
+      "baseline": false,
+      "chimera": false
+    },
+    "word_wrap": {
+      "baseline": true,
+      "chimera": true
+    },
+    "fix_percentile": {
+      "baseline": true,
+      "chimera": true
+    },
+    "balanced_brackets": {
+      "baseline": true,
+      "chimera": true
+    },
+    "run_length": {
+      "baseline": true,
+      "chimera": true
+    },
+    "base_convert": {
+      "baseline": true,
+      "chimera": true
+    },
+    "merge_intervals": {
+      "baseline": false,
+      "chimera": true
+    },
+    "csv_parse": {
+      "baseline": false,
+      "chimera": false
+    },
+    "template_render": {
+      "baseline": true,
+      "chimera": true
+    },
+    "lru_cache": {
+      "baseline": true,
+      "chimera": true
+    },
+    "topo_sort": {
+      "baseline": false,
+      "chimera": true
+    },
+    "fix_flatten": {
+      "baseline": true,
+      "chimera": true
+    },
+    "query_string_parse": {
+      "baseline": false,
+      "chimera": true
+    },
+    "query_string_build": {
+      "baseline": true,
+      "chimera": true
+    },
+    "duration_parse": {
+      "baseline": false,
+      "chimera": false
+    },
+    "duration_format": {
+      "baseline": false,
+      "chimera": true
+    },
+    "version_compare": {
+      "baseline": false,
+      "chimera": false
+    },
+    "shell_split": {
+      "baseline": false,
+      "chimera": false
+    },
+    "justify_text": {
+      "baseline": false,
+      "chimera": true
+    },
+    "log_line_parse": {
+      "baseline": false,
+      "chimera": false
+    },
+    "table_align": {
+      "baseline": false,
+      "chimera": true
+    },
+    "slugify": {
+      "baseline": false,
+      "chimera": true
+    },
+    "camel_to_snake": {
+      "baseline": false,
+      "chimera": true
+    },
+    "title_case": {
+      "baseline": true,
+      "chimera": false
+    },
+    "c_escape": {
+      "baseline": false,
+      "chimera": false
+    },
+    "json_string_decode": {
+      "baseline": false,
+      "chimera": false
+    },
+    "tokenize_expr": {
+      "baseline": false,
+      "chimera": false
+    },
+    "glob_path_match": {
+      "baseline": false,
+      "chimera": false
+    },
+    "number_format": {
+      "baseline": false,
+      "chimera": false
+    },
+    "parse_size": {
+      "baseline": false,
+      "chimera": true
+    },
+    "format_size": {
+      "baseline": false,
+      "chimera": false
+    },
+    "csv_serialize": {
+      "baseline": false,
+      "chimera": true
+    },
+    "markdown_table_parse": {
+      "baseline": false,
+      "chimera": false
+    },
+    "ansi_strip": {
+      "baseline": false,
+      "chimera": false
+    },
+    "cli_args_parse": {
+      "baseline": false,
+      "chimera": false
+    },
+    "range_spec_parse": {
+      "baseline": true,
+      "chimera": false
+    },
+    "dotenv_parse": {
+      "baseline": false,
+      "chimera": false
+    },
+    "html_escape": {
+      "baseline": false,
+      "chimera": false
+    },
+    "header_params_parse": {
+      "baseline": false,
+      "chimera": false
+    },
+    "strip_comments": {
+      "baseline": false,
+      "chimera": false
+    },
+    "insert_interval": {
+      "baseline": true,
+      "chimera": true
+    },
+    "remove_interval": {
+      "baseline": false,
+      "chimera": false
+    },
+    "meeting_rooms_min": {
+      "baseline": false,
+      "chimera": false
+    },
+    "sliding_window_max": {
+      "baseline": true,
+      "chimera": true
+    },
+    "min_window_substring": {
+      "baseline": false,
+      "chimera": true
+    },
+    "split_min_largest": {
+      "baseline": true,
+      "chimera": true
+    },
+    "union_find_ds": {
+      "baseline": false,
+      "chimera": true
+    },
+    "trie_delete": {
+      "baseline": false,
+      "chimera": false
+    },
+    "lfu_cache": {
+      "baseline": false,
+      "chimera": true
+    },
+    "multi_key_sort": {
+      "baseline": true,
+      "chimera": true
+    },
+    "spiral_matrix": {
+      "baseline": true,
+      "chimera": true
+    },
+    "rotate_matrix_inplace": {
+      "baseline": true,
+      "chimera": true
+    },
+    "grid_shortest_path": {
+      "baseline": false,
+      "chimera": true
+    },
+    "two_sum_pairs": {
+      "baseline": true,
+      "chimera": false
+    },
+    "longest_consecutive_run": {
+      "baseline": true,
+      "chimera": true
+    },
+    "running_median": {
+      "baseline": true,
+      "chimera": true
+    },
+    "dijkstra_paths": {
+      "baseline": false,
+      "chimera": true
+    },
+    "validate_bst": {
+      "baseline": true,
+      "chimera": true
+    },
+    "zigzag_levels": {
+      "baseline": true,
+      "chimera": true
+    },
+    "dedup_by_key": {
+      "baseline": true,
+      "chimera": true
+    },
+    "connected_components": {
+      "baseline": false,
+      "chimera": true
+    },
+    "n_queens_count": {
+      "baseline": true,
+      "chimera": true
+    },
+    "next_permutation": {
+      "baseline": true,
+      "chimera": true
+    },
+    "longest_k_distinct": {
+      "baseline": true,
+      "chimera": true
+    },
+    "subarray_count_k": {
+      "baseline": false,
+      "chimera": true
+    },
+    "min_stack": {
+      "baseline": true,
+      "chimera": true
+    },
+    "top_k_words": {
+      "baseline": true,
+      "chimera": true
+    },
+    "deep_merge_dicts": {
+      "baseline": true,
+      "chimera": true
+    },
+    "task_cooldown": {
+      "baseline": false,
+      "chimera": false
+    },
+    "fix_index_of": {
+      "baseline": false,
+      "chimera": true
+    },
+    "fix_moving_average": {
+      "baseline": true,
+      "chimera": true
+    },
+    "fix_chunk_list": {
+      "baseline": true,
+      "chimera": true
+    },
+    "fix_merge_settings": {
+      "baseline": true,
+      "chimera": true
+    },
+    "fix_clone_config": {
+      "baseline": false,
+      "chimera": true
+    },
+    "fix_collect_items": {
+      "baseline": false,
+      "chimera": true
+    },
+    "fix_parse_amount": {
+      "baseline": false,
+      "chimera": true
+    },
+    "fix_totals_match": {
+      "baseline": true,
+      "chimera": true
+    },
+    "fix_round_cents": {
+      "baseline": true,
+      "chimera": true
+    },
+    "fix_average": {
+      "baseline": true,
+      "chimera": true
+    },
+    "fix_validate_rows": {
+      "baseline": true,
+      "chimera": true
+    },
+    "fix_rank_players": {
+      "baseline": true,
+      "chimera": true
+    },
+    "fix_divisors": {
+      "baseline": true,
+      "chimera": false
+    },
+    "fix_most_common": {
+      "baseline": false,
+      "chimera": true
+    },
+    "fix_pagination": {
+      "baseline": false,
+      "chimera": true
+    },
+    "fix_remove_suffix": {
+      "baseline": true,
+      "chimera": true
+    },
+    "fix_normalize_ws": {
+      "baseline": false,
+      "chimera": true
+    },
+    "fix_rotate_list": {
+      "baseline": true,
+      "chimera": true
+    },
+    "fix_transpose": {
+      "baseline": false,
+      "chimera": true
+    },
+    "fix_group_by": {
+      "baseline": true,
+      "chimera": true
+    },
+    "fix_unique_pairs": {
+      "baseline": true,
+      "chimera": true
+    },
+    "fix_edit_distance": {
+      "baseline": true,
+      "chimera": true
+    },
+    "fix_count_words": {
+      "baseline": true,
+      "chimera": true
+    },
+    "fix_insert_pos": {
+      "baseline": true,
+      "chimera": true
+    },
+    "fix_parse_query": {
+      "baseline": true,
+      "chimera": false
+    },
+    "fix_retry_attempts": {
+      "baseline": false,
+      "chimera": true
+    },
+    "fix_first_value": {
+      "baseline": true,
+      "chimera": true
+    },
+    "fix_title_case": {
+      "baseline": false,
+      "chimera": true
+    }
+  },
+  "resumed_pairs": 0,
+  "graded_against_pristine_test": true,
+  "tests_modified_by_solve": [
+    "slugify"
+  ]
+}

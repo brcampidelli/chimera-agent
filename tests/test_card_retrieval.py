@@ -40,6 +40,50 @@ def test_card_index_empty_query_returns_nothing() -> None:
     assert CardIndex(_cards()).search("", k=3) == []
 
 
+def test_semantic_retrieval_matches_by_meaning_not_tokens(tmp_path: Path) -> None:
+    # The task shares NO tokens with the two_pointer card, but the fake embedder places them in the
+    # same direction (a paraphrase). BM25 would miss it; semantic recall should return two_pointer.
+    store = SkillStore(tmp_path / "skills.json")
+    for card in _cards():
+        store.add(card)
+    task = "scan a monotonic sequence from both ends toward the middle"
+
+    def embed(texts: list[str]) -> list[list[float]]:
+        return [[1.0, 0.0] if ("two_pointer" in t or t == task) else [0.0, 1.0] for t in texts]
+
+    retriever = CardRetriever(store, k=1, embed=embed)
+    block = retriever.card_context(task)
+    assert "two_pointer" in block
+    assert retriever.last_retrieved == ["two_pointer"]
+
+
+def test_semantic_min_similarity_floor_injects_nothing_on_weak_match(tmp_path: Path) -> None:
+    store = SkillStore(tmp_path / "skills.json")
+    for card in _cards():
+        store.add(card)
+
+    def embed(texts: list[str]) -> list[list[float]]:  # every card orthogonal to the query -> cos 0
+        return [[1.0, 0.0] if t == "q" else [0.0, 1.0] for t in texts]
+
+    retriever = CardRetriever(store, k=2, embed=embed, min_similarity=0.3)
+    assert retriever.card_context("q") == ""
+    assert retriever.last_retrieved == []
+
+
+def test_semantic_embed_failure_falls_back_to_bm25(tmp_path: Path) -> None:
+    # An embeddings outage must NOT crash a run — it falls back to keyword/BM25 recall.
+    store = SkillStore(tmp_path / "skills.json")
+    for card in _cards():
+        store.add(card)
+
+    def broken_embed(texts: list[str]) -> list[list[float]]:
+        raise RuntimeError("embeddings endpoint down")
+
+    retriever = CardRetriever(store, k=1, embed=broken_embed)
+    block = retriever.card_context("find a pair in a sorted array summing to a target")
+    assert "two_pointer" in block  # BM25 still returned the right card
+
+
 def test_context_block_has_template_and_instruction() -> None:
     block = cards_context_block(_cards()[:1])
     assert "Retrieved reasoning skills:" in block

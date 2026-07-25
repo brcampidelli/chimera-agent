@@ -1,0 +1,417 @@
+retry-lift: 40 tasks x 3 arms x 3 seed(s) = 360 solves | model=openrouter/mistralai/mistral-small-3.2-24b-instruct | timeout=480s
+
+  -- seed 1, arm control --
+    [ 1/40] control hfix_merge_ranges                PASS  att=1 inj=0/0  24s
+    [ 2/40] control hfix_lru_cache                   FAIL  att=3 inj=0/0  40s
+    [ 3/40] control hfix_deep_update                 PASS  att=3 inj=0/0  19s
+    [ 4/40] control hfix_stable_sort_by              PASS  att=1 inj=0/0  10s
+    [ 5/40] control hfix_paginate                    FAIL  att=3 inj=0/1  38s
+    [ 6/40] control hfix_word_wrap                   PASS  att=3 inj=0/0  46s
+    [ 7/40] control hfix_retry_backoff               PASS  att=1 inj=0/0  12s
+    [ 8/40] control hfix_group_consecutive           PASS  att=2 inj=0/0  18s
+    [ 9/40] control hfix_parse_duration              FAIL  att=3 inj=0/0  52s
+    [10/40] control hfix_flatten_depth               PASS  att=2 inj=0/0  18s
+    [11/40] control hfix_top_n                       PASS  att=1 inj=0/0  14s
+    [12/40] control hfix_csv_quotes                  PASS  att=1 inj=0/0  13s
+    [13/40] control hfix_normalize_path              FAIL  att=3 inj=0/0  40s
+    [14/40] control hfix_diff_keys                   PASS  att=3 inj=0/1  31s
+    [15/40] control hfix_running_median              PASS  att=1 inj=0/0  11s
+    [16/40] control hfix_template_render             FAIL  att=3 inj=0/0  221s
+    [17/40] control hfix_batch_by_size               PASS  att=2 inj=0/0  27s
+    [18/40] control hfix_case_insensitive_dict       PASS  att=1 inj=0/0  9s
+    [19/40] control hfix_split_sentences             FAIL  att=3 inj=0/0  45s
+    [20/40] control hfix_env_expand                  FAIL  att=3 inj=0/0  32s
+    [21/40] control hfix_url_join                    PASS  att=1 inj=0/0  9s
+    [22/40] control hfix_moving_window               PASS  att=1 inj=0/0  10s
+    [23/40] control hfix_partition_by                PASS  att=1 inj=0/0  10s
+    [24/40] control hfix_dedupe_keep_last            PASS  att=1 inj=0/0  21s
+    [25/40] control hfix_clamp_range                 FAIL  att=3 inj=0/1  30s
+    [26/40] control hfix_count_leaves                PASS  att=2 inj=0/0  17s
+    [27/40] control hfix_safe_divide                 PASS  att=3 inj=0/0  25s
+    [28/40] control hfix_strip_comments              PASS  att=1 inj=0/0  25s
+    [29/40] control hfix_merge_sorted                PASS  att=1 inj=0/0  14s
+    [30/40] control hfix_indent_block                FAIL  att=3 inj=0/0  48s
+    [31/40] control hfix_percent_change              PASS  att=1 inj=0/0  12s
+    [32/40] control hfix_title_words                 PASS  att=3 inj=0/0  26s
+    [33/40] control hfix_rate_limit                  PASS  att=2 inj=0/0  28s
+    [34/40] control hfix_bool_env                    PASS  att=2 inj=0/0  27s
+    [35/40] control hfix_columnize                   PASS  att=1 inj=0/0  15s
+    [36/40] control hfix_slug_unique                 PASS  att=1 inj=0/0  13s
+    [37/40] control hfix_nested_get                  FAIL  att=3 inj=0/1  30s
+    [38/40] control hfix_truncate_words              FAIL  att=3 inj=0/0  27s
+    [39/40] control hfix_sum_by                      PASS  att=1 inj=0/0  10s
+    [40/40] control hfix_next_weekday                PASS  att=2 inj=0/0  15s
+
+  -- seed 1, arm i1 --
+    [ 1/40] i1      hfix_merge_ranges                PASS  att=1 inj=0/0  14s
+    [ 2/40] i1      hfix_lru_cache                   FAIL  att=3 inj=2/0  38s
+    [ 3/40] i1      hfix_deep_update                 FAIL  att=3 inj=1/0  38s
+    [ 4/40] i1      hfix_stable_sort_by              PASS  att=2 inj=1/0  24s
+    [ 5/40] i1      hfix_paginate                    FAIL  att=3 inj=1/0  26s
+    [ 6/40] i1      hfix_word_wrap                   FAIL  att=3 inj=1/0  32s
+    [ 7/40] i1      hfix_retry_backoff               PASS  att=1 inj=0/0  9s
+    [ 8/40] i1      hfix_group_consecutive           PASS  att=1 inj=0/0  12s
+    [ 9/40] i1      hfix_parse_duration              FAIL  att=3 inj=2/0  50s
+    [10/40] i1      hfix_flatten_depth               PASS  att=1 inj=0/0  13s
+    [11/40] i1      hfix_top_n                       PASS  att=1 inj=0/0  15s
+    [12/40] i1      hfix_csv_quotes                  FAIL  att=3 inj=2/0  36s
+    [13/40] i1      hfix_normalize_path              FAIL  att=3 inj=2/0  59s
+    [14/40] i1      hfix_diff_keys                   FAIL  att=3 inj=2/0  35s
+    [15/40] i1      hfix_running_median              PASS  att=1 inj=0/0  13s
+    [16/40] i1      hfix_template_render             FAIL  att=3 inj=1/0  48s
+    [17/40] i1      hfix_batch_by_size               PASS  att=1 inj=0/0  19s
+    [18/40] i1      hfix_case_insensitive_dict       PASS  att=1 inj=0/0  21s
+    [19/40] i1      hfix_split_sentences             FAIL  att=3 inj=2/0  52s
+    [20/40] i1      hfix_env_expand                  FAIL  att=3 inj=2/0  103s
+    [21/40] i1      hfix_url_join                    PASS  att=3 inj=2/0  31s
+    [22/40] i1      hfix_moving_window               FAIL  att=3 inj=2/0  19s
+    [23/40] i1      hfix_partition_by                PASS  att=1 inj=0/0  10s
+    [24/40] i1      hfix_dedupe_keep_last            FAIL  att=3 inj=2/0  25s
+    [25/40] i1      hfix_clamp_range                 PASS  att=1 inj=0/0  9s
+    [26/40] i1      hfix_count_leaves                PASS  att=2 inj=1/0  18s
+    [27/40] i1      hfix_safe_divide                 PASS  att=2 inj=1/0  30s
+    [28/40] i1      hfix_strip_comments              FAIL  att=3 inj=2/0  48s
+    [29/40] i1      hfix_merge_sorted                PASS  att=1 inj=0/0  27s
+    [30/40] i1      hfix_indent_block                PASS  att=2 inj=1/0  21s
+    [31/40] i1      hfix_percent_change              PASS  att=1 inj=0/0  21s
+    [32/40] i1      hfix_title_words                 PASS  att=2 inj=1/0  28s
+    [33/40] i1      hfix_rate_limit                  PASS  att=2 inj=0/0  29s
+    [34/40] i1      hfix_bool_env                    PASS  att=1 inj=0/0  23s
+    [35/40] i1      hfix_columnize                   PASS  att=1 inj=0/0  17s
+    [36/40] i1      hfix_slug_unique                 PASS  att=1 inj=0/0  43s
+    [37/40] i1      hfix_nested_get                  FAIL  att=3 inj=2/0  42s
+    [38/40] i1      hfix_truncate_words              PASS  att=2 inj=1/0  20s
+    [39/40] i1      hfix_sum_by                      PASS  att=2 inj=1/0  46s
+    [40/40] i1      hfix_next_weekday                PASS  att=2 inj=1/0  51s
+
+  -- seed 1, arm i2 --
+    [ 1/40] i2      hfix_merge_ranges                PASS  att=1 inj=0/0  30s
+    [ 2/40] i2      hfix_lru_cache                   PASS  att=2 inj=0/0  28s
+    [ 3/40] i2      hfix_deep_update                 PASS  att=3 inj=0/0  28s
+    [ 4/40] i2      hfix_stable_sort_by              FAIL  att=3 inj=0/0  32s
+    [ 5/40] i2      hfix_paginate                    FAIL  att=3 inj=0/0  23s
+    [ 6/40] i2      hfix_word_wrap                   PASS  att=2 inj=0/0  16s
+    [ 7/40] i2      hfix_retry_backoff               PASS  att=1 inj=0/0  12s
+    [ 8/40] i2      hfix_group_consecutive           PASS  att=1 inj=0/0  10s
+    [ 9/40] i2      hfix_parse_duration              FAIL  att=3 inj=0/1  41s
+    [10/40] i2      hfix_flatten_depth               FAIL  att=3 inj=0/0  47s
+    [11/40] i2      hfix_top_n                       PASS  att=1 inj=0/0  8s
+    [12/40] i2      hfix_csv_quotes                  FAIL  att=3 inj=0/0  186s
+    [13/40] i2      hfix_normalize_path              PASS  att=2 inj=0/0  22s
+    [14/40] i2      hfix_diff_keys                   FAIL  att=3 inj=0/0  36s
+    [15/40] i2      hfix_running_median              PASS  att=1 inj=0/0  11s
+    [16/40] i2      hfix_template_render             FAIL  att=3 inj=0/0  217s
+    [17/40] i2      hfix_batch_by_size               FAIL  att=3 inj=0/0  20s
+    [18/40] i2      hfix_case_insensitive_dict       PASS  att=1 inj=0/0  13s
+    [19/40] i2      hfix_split_sentences             FAIL  att=3 inj=0/0  100s
+    [20/40] i2      hfix_env_expand                  FAIL  att=3 inj=0/1  60s
+    [21/40] i2      hfix_url_join                    FAIL  att=3 inj=0/2  37s
+    [22/40] i2      hfix_moving_window               FAIL  att=3 inj=0/1  30s
+    [23/40] i2      hfix_partition_by                PASS  att=1 inj=0/0  18s
+    [24/40] i2      hfix_dedupe_keep_last            PASS  att=3 inj=0/0  53s
+    [25/40] i2      hfix_clamp_range                 PASS  att=1 inj=0/0  12s
+    [26/40] i2      hfix_count_leaves                PASS  att=2 inj=0/0  18s
+    [27/40] i2      hfix_safe_divide                 PASS  att=3 inj=0/1  22s
+    [28/40] i2      hfix_strip_comments              FAIL  att=3 inj=0/0  50s
+    [29/40] i2      hfix_merge_sorted                PASS  att=2 inj=0/0  29s
+    [30/40] i2      hfix_indent_block                PASS  att=1 inj=0/0  15s
+    [31/40] i2      hfix_percent_change              PASS  att=2 inj=0/0  22s
+    [32/40] i2      hfix_title_words                 PASS  att=3 inj=0/0  31s
+    [33/40] i2      hfix_rate_limit                  PASS  att=1 inj=0/0  11s
+    [34/40] i2      hfix_bool_env                    PASS  att=1 inj=0/0  14s
+    [35/40] i2      hfix_columnize                   PASS  att=1 inj=0/0  11s
+    [36/40] i2      hfix_slug_unique                 PASS  att=1 inj=0/0  12s
+    [37/40] i2      hfix_nested_get                  FAIL  att=3 inj=0/1  29s
+    [38/40] i2      hfix_truncate_words              PASS  att=1 inj=0/0  12s
+    [39/40] i2      hfix_sum_by                      PASS  att=1 inj=0/0  9s
+    [40/40] i2      hfix_next_weekday                PASS  att=2 inj=0/0  18s
+
+  -- seed 2, arm control --
+    [ 1/40] control hfix_merge_ranges                PASS  att=1 inj=0/0  21s
+    [ 2/40] control hfix_lru_cache                   PASS  att=1 inj=0/0  15s
+    [ 3/40] control hfix_deep_update                 FAIL  att=3 inj=0/0  42s
+    [ 4/40] control hfix_stable_sort_by              PASS  att=1 inj=0/0  15s
+    [ 5/40] control hfix_paginate                    FAIL  att=3 inj=0/0  40s
+    [ 6/40] control hfix_word_wrap                   PASS  att=3 inj=0/0  70s
+    [ 7/40] control hfix_retry_backoff               PASS  att=1 inj=0/0  9s
+    [ 8/40] control hfix_group_consecutive           PASS  att=1 inj=0/0  14s
+    [ 9/40] control hfix_parse_duration              FAIL  att=3 inj=0/0  349s
+    [10/40] control hfix_flatten_depth               PASS  att=2 inj=0/0  27s
+    [11/40] control hfix_top_n                       PASS  att=2 inj=0/0  21s
+    [12/40] control hfix_csv_quotes                  PASS  att=2 inj=0/0  20s
+    [13/40] control hfix_normalize_path              FAIL  att=3 inj=0/0  37s
+    [14/40] control hfix_diff_keys                   FAIL  att=3 inj=0/0  31s
+    [15/40] control hfix_running_median              PASS  att=1 inj=0/0  9s
+    [16/40] control hfix_template_render             FAIL  att=3 inj=0/0  58s
+    [17/40] control hfix_batch_by_size               PASS  att=3 inj=0/0  43s
+    [18/40] control hfix_case_insensitive_dict       PASS  att=1 inj=0/0  10s
+    [19/40] control hfix_split_sentences             FAIL  att=3 inj=0/0  70s
+    [20/40] control hfix_env_expand                  FAIL  att=3 inj=0/0  39s
+    [21/40] control hfix_url_join                    PASS  att=2 inj=0/0  20s
+    [22/40] control hfix_moving_window               PASS  att=2 inj=0/0  16s
+    [23/40] control hfix_partition_by                PASS  att=1 inj=0/0  12s
+    [24/40] control hfix_dedupe_keep_last            FAIL  att=3 inj=0/0  34s
+    [25/40] control hfix_clamp_range                 FAIL  att=3 inj=0/0  30s
+    [26/40] control hfix_count_leaves                PASS  att=2 inj=0/0  17s
+    [27/40] control hfix_safe_divide                 FAIL  att=3 inj=0/0  23s
+    [28/40] control hfix_strip_comments              FAIL  att=3 inj=0/0  36s
+    [29/40] control hfix_merge_sorted                PASS  att=2 inj=0/0  20s
+    [30/40] control hfix_indent_block                FAIL  att=3 inj=0/0  30s
+    [31/40] control hfix_percent_change              PASS  att=2 inj=0/0  17s
+    [32/40] control hfix_title_words                 PASS  att=2 inj=0/0  22s
+    [33/40] control hfix_rate_limit                  PASS  att=2 inj=0/0  22s
+    [34/40] control hfix_bool_env                    PASS  att=2 inj=0/0  33s
+    [35/40] control hfix_columnize                   FAIL  att=3 inj=0/0  42s
+    [36/40] control hfix_slug_unique                 FAIL  att=3 inj=0/0  42s
+    [37/40] control hfix_nested_get                  FAIL  att=3 inj=0/0  29s
+    [38/40] control hfix_truncate_words              PASS  att=2 inj=0/0  43s
+    [39/40] control hfix_sum_by                      PASS  att=1 inj=0/0  18s
+    [40/40] control hfix_next_weekday                PASS  att=2 inj=0/0  24s
+
+  -- seed 2, arm i1 --
+    [ 1/40] i1      hfix_merge_ranges                FAIL  att=None inj=0/0  480s
+    [ 2/40] i1      hfix_lru_cache                   PASS  att=2 inj=1/0  47s
+    [ 3/40] i1      hfix_deep_update                 FAIL  att=3 inj=1/0  43s
+    [ 4/40] i1      hfix_stable_sort_by              PASS  att=1 inj=0/0  18s
+    [ 5/40] i1      hfix_paginate                    FAIL  att=3 inj=1/0  52s
+    [ 6/40] i1      hfix_word_wrap                   FAIL  att=3 inj=2/0  66s
+    [ 7/40] i1      hfix_retry_backoff               PASS  att=1 inj=0/0  16s
+    [ 8/40] i1      hfix_group_consecutive           PASS  att=1 inj=0/0  20s
+    [ 9/40] i1      hfix_parse_duration              FAIL  att=3 inj=2/0  41s
+    [10/40] i1      hfix_flatten_depth               PASS  att=1 inj=0/0  15s
+    [11/40] i1      hfix_top_n                       PASS  att=1 inj=0/0  25s
+    [12/40] i1      hfix_csv_quotes                  FAIL  att=3 inj=2/0  55s
+    [13/40] i1      hfix_normalize_path              FAIL  att=3 inj=2/0  62s
+    [14/40] i1      hfix_diff_keys                   FAIL  att=3 inj=2/0  29s
+    [15/40] i1      hfix_running_median              PASS  att=1 inj=0/0  15s
+    [16/40] i1      hfix_template_render             FAIL  att=3 inj=2/0  42s
+    [17/40] i1      hfix_batch_by_size               FAIL  att=3 inj=2/0  45s
+    [18/40] i1      hfix_case_insensitive_dict       PASS  att=1 inj=0/0  20s
+    [19/40] i1      hfix_split_sentences             FAIL  att=3 inj=2/0  81s
+    [20/40] i1      hfix_env_expand                  FAIL  att=3 inj=2/0  78s
+    [21/40] i1      hfix_url_join                    PASS  att=1 inj=0/0  22s
+    [22/40] i1      hfix_moving_window               PASS  att=1 inj=0/0  20s
+    [23/40] i1      hfix_partition_by                PASS  att=2 inj=1/0  29s
+    [24/40] i1      hfix_dedupe_keep_last            PASS  att=2 inj=1/0  42s
+    [25/40] i1      hfix_clamp_range                 PASS  att=1 inj=0/0  13s
+    [26/40] i1      hfix_count_leaves                PASS  att=2 inj=1/0  26s
+    [27/40] i1      hfix_safe_divide                 PASS  att=2 inj=1/0  26s
+    [28/40] i1      hfix_strip_comments              FAIL  att=3 inj=2/0  76s
+    [29/40] i1      hfix_merge_sorted                PASS  att=1 inj=0/0  34s
+    [30/40] i1      hfix_indent_block                FAIL  att=3 inj=2/0  32s
+    [31/40] i1      hfix_percent_change              PASS  att=2 inj=0/0  13s
+    [32/40] i1      hfix_title_words                 PASS  att=2 inj=1/0  15s
+    [33/40] i1      hfix_rate_limit                  PASS  att=2 inj=0/0  22s
+    [34/40] i1      hfix_bool_env                    FAIL  att=3 inj=2/0  35s
+    [35/40] i1      hfix_columnize                   FAIL  att=3 inj=1/0  28s
+    [36/40] i1      hfix_slug_unique                 PASS  att=1 inj=0/0  34s
+    [37/40] i1      hfix_nested_get                  FAIL  att=3 inj=2/1  72s
+    [38/40] i1      hfix_truncate_words              PASS  att=1 inj=0/0  20s
+    [39/40] i1      hfix_sum_by                      PASS  att=1 inj=0/0  14s
+    [40/40] i1      hfix_next_weekday                PASS  att=2 inj=1/0  33s
+
+  -- seed 2, arm i2 --
+    [ 1/40] i2      hfix_merge_ranges                PASS  att=1 inj=0/0  29s
+    [ 2/40] i2      hfix_lru_cache                   PASS  att=1 inj=0/0  31s
+    [ 3/40] i2      hfix_deep_update                 FAIL  att=3 inj=0/0  52s
+    [ 4/40] i2      hfix_stable_sort_by              PASS  att=1 inj=0/0  19s
+    [ 5/40] i2      hfix_paginate                    FAIL  att=3 inj=0/0  34s
+    [ 6/40] i2      hfix_word_wrap                   PASS  att=1 inj=0/0  33s
+    [ 7/40] i2      hfix_retry_backoff               PASS  att=1 inj=0/0  14s
+    [ 8/40] i2      hfix_group_consecutive           PASS  att=1 inj=0/0  18s
+    [ 9/40] i2      hfix_parse_duration              FAIL  att=3 inj=0/1  58s
+    [10/40] i2      hfix_flatten_depth               PASS  att=1 inj=0/0  17s
+    [11/40] i2      hfix_top_n                       PASS  att=1 inj=0/0  12s
+    [12/40] i2      hfix_csv_quotes                  PASS  att=1 inj=0/0  14s
+    [13/40] i2      hfix_normalize_path              FAIL  att=3 inj=0/0  96s
+    [14/40] i2      hfix_diff_keys                   PASS  att=1 inj=0/0  15s
+    [15/40] i2      hfix_running_median              PASS  att=3 inj=0/0  35s
+    [16/40] i2      hfix_template_render             FAIL  att=3 inj=0/0  64s
+    [17/40] i2      hfix_batch_by_size               PASS  att=2 inj=0/0  39s
+    [18/40] i2      hfix_case_insensitive_dict       PASS  att=1 inj=0/0  17s
+    [19/40] i2      hfix_split_sentences             FAIL  att=3 inj=0/1  73s
+    [20/40] i2      hfix_env_expand                  FAIL  att=3 inj=0/1  58s
+    [21/40] i2      hfix_url_join                    PASS  att=2 inj=0/0  40s
+    [22/40] i2      hfix_moving_window               FAIL  att=3 inj=0/0  48s
+    [23/40] i2      hfix_partition_by                PASS  att=1 inj=0/0  19s
+    [24/40] i2      hfix_dedupe_keep_last            FAIL  att=3 inj=0/0  53s
+    [25/40] i2      hfix_clamp_range                 PASS  att=3 inj=0/0  50s
+    [26/40] i2      hfix_count_leaves                PASS  att=1 inj=0/0  20s
+    [27/40] i2      hfix_safe_divide                 FAIL  att=3 inj=0/1  54s
+    [28/40] i2      hfix_strip_comments              FAIL  att=3 inj=0/0  107s
+    [29/40] i2      hfix_merge_sorted                PASS  att=2 inj=0/0  25s
+    [30/40] i2      hfix_indent_block                FAIL  att=3 inj=0/0  56s
+    [31/40] i2      hfix_percent_change              PASS  att=1 inj=0/0  30s
+    [32/40] i2      hfix_title_words                 PASS  att=2 inj=0/0  38s
+    [33/40] i2      hfix_rate_limit                  PASS  att=2 inj=0/0  20s
+    [34/40] i2      hfix_bool_env                    PASS  att=1 inj=0/0  12s
+    [35/40] i2      hfix_columnize                   FAIL  att=3 inj=0/1  91s
+    [36/40] i2      hfix_slug_unique                 PASS  att=1 inj=0/0  13s
+    [37/40] i2      hfix_nested_get                  FAIL  att=3 inj=0/1  56s
+    [38/40] i2      hfix_truncate_words              PASS  att=1 inj=0/0  13s
+    [39/40] i2      hfix_sum_by                      PASS  att=1 inj=0/0  19s
+    [40/40] i2      hfix_next_weekday                PASS  att=2 inj=0/0  13s
+
+  -- seed 3, arm control --
+    [ 1/40] control hfix_merge_ranges                PASS  att=2 inj=0/0  32s
+    [ 2/40] control hfix_lru_cache                   PASS  att=1 inj=0/0  13s
+    [ 3/40] control hfix_deep_update                 FAIL  att=3 inj=0/0  26s
+    [ 4/40] control hfix_stable_sort_by              PASS  att=1 inj=0/0  9s
+    [ 5/40] control hfix_paginate                    FAIL  att=3 inj=0/0  20s
+    [ 6/40] control hfix_word_wrap                   PASS  att=1 inj=0/0  17s
+    [ 7/40] control hfix_retry_backoff               PASS  att=1 inj=0/0  24s
+    [ 8/40] control hfix_group_consecutive           PASS  att=1 inj=0/0  22s
+    [ 9/40] control hfix_parse_duration              FAIL  att=3 inj=0/2  172s
+    [10/40] control hfix_flatten_depth               PASS  att=1 inj=0/0  18s
+    [11/40] control hfix_top_n                       PASS  att=1 inj=0/0  13s
+    [12/40] control hfix_csv_quotes                  FAIL  att=3 inj=0/0  92s
+    [13/40] control hfix_normalize_path              FAIL  att=3 inj=0/0  34s
+    [14/40] control hfix_diff_keys                   PASS  att=2 inj=0/0  38s
+    [15/40] control hfix_running_median              PASS  att=1 inj=0/0  10s
+    [16/40] control hfix_template_render             FAIL  att=3 inj=0/0  44s
+    [17/40] control hfix_batch_by_size               PASS  att=2 inj=0/0  27s
+    [18/40] control hfix_case_insensitive_dict       PASS  att=1 inj=0/0  13s
+    [19/40] control hfix_split_sentences             FAIL  att=3 inj=0/0  26s
+    [20/40] control hfix_env_expand                  FAIL  att=3 inj=0/0  312s
+    [21/40] control hfix_url_join                    PASS  att=1 inj=0/0  14s
+    [22/40] control hfix_moving_window               PASS  att=1 inj=0/0  10s
+    [23/40] control hfix_partition_by                PASS  att=1 inj=0/0  17s
+    [24/40] control hfix_dedupe_keep_last            PASS  att=3 inj=0/0  24s
+    [25/40] control hfix_clamp_range                 FAIL  att=3 inj=0/0  29s
+    [26/40] control hfix_count_leaves                PASS  att=2 inj=0/0  20s
+    [27/40] control hfix_safe_divide                 FAIL  att=3 inj=0/0  31s
+    [28/40] control hfix_strip_comments              FAIL  att=3 inj=0/0  34s
+    [29/40] control hfix_merge_sorted                PASS  att=1 inj=0/0  16s
+    [30/40] control hfix_indent_block                FAIL  att=3 inj=0/0  28s
+    [31/40] control hfix_percent_change              PASS  att=1 inj=0/0  12s
+    [32/40] control hfix_title_words                 FAIL  att=3 inj=0/0  30s
+    [33/40] control hfix_rate_limit                  PASS  att=1 inj=0/0  10s
+    [34/40] control hfix_bool_env                    FAIL  att=3 inj=0/0  38s
+    [35/40] control hfix_columnize                   PASS  att=1 inj=0/0  13s
+    [36/40] control hfix_slug_unique                 PASS  att=1 inj=0/0  16s
+    [37/40] control hfix_nested_get                  FAIL  att=3 inj=0/1  44s
+    [38/40] control hfix_truncate_words              PASS  att=1 inj=0/0  13s
+    [39/40] control hfix_sum_by                      PASS  att=2 inj=0/0  15s
+    [40/40] control hfix_next_weekday                PASS  att=2 inj=0/0  22s
+
+  -- seed 3, arm i1 --
+    [ 1/40] i1      hfix_merge_ranges                PASS  att=1 inj=0/0  17s
+    [ 2/40] i1      hfix_lru_cache                   PASS  att=3 inj=2/0  78s
+    [ 3/40] i1      hfix_deep_update                 FAIL  att=3 inj=1/0  30s
+    [ 4/40] i1      hfix_stable_sort_by              PASS  att=3 inj=1/0  41s
+    [ 5/40] i1      hfix_paginate                    PASS  att=2 inj=1/0  33s
+    [ 6/40] i1      hfix_word_wrap                   PASS  att=1 inj=0/0  9s
+    [ 7/40] i1      hfix_retry_backoff               PASS  att=1 inj=0/0  11s
+    [ 8/40] i1      hfix_group_consecutive           PASS  att=1 inj=0/0  20s
+    [ 9/40] i1      hfix_parse_duration              FAIL  att=None inj=0/0  480s
+    [10/40] i1      hfix_flatten_depth               PASS  att=1 inj=0/0  32s
+    [11/40] i1      hfix_top_n                       PASS  att=1 inj=0/0  22s
+    [12/40] i1      hfix_csv_quotes                  FAIL  att=3 inj=2/1  67s
+    [13/40] i1      hfix_normalize_path              FAIL  att=3 inj=2/0  66s
+    [14/40] i1      hfix_diff_keys                   FAIL  att=3 inj=2/1  32s
+    [15/40] i1      hfix_running_median              PASS  att=1 inj=0/0  14s
+    [16/40] i1      hfix_template_render             FAIL  att=3 inj=0/1  73s
+    [17/40] i1      hfix_batch_by_size               FAIL  att=3 inj=2/0  72s
+    [18/40] i1      hfix_case_insensitive_dict       PASS  att=1 inj=0/0  20s
+    [19/40] i1      hfix_split_sentences             FAIL  att=3 inj=2/0  311s
+    [20/40] i1      hfix_env_expand                  FAIL  att=3 inj=2/0  73s
+    [21/40] i1      hfix_url_join                    PASS  att=1 inj=0/0  24s
+    [22/40] i1      hfix_moving_window               FAIL  att=3 inj=2/0  28s
+    [23/40] i1      hfix_partition_by                PASS  att=3 inj=2/0  29s
+    [24/40] i1      hfix_dedupe_keep_last            FAIL  att=3 inj=2/0  69s
+    [25/40] i1      hfix_clamp_range                 PASS  att=1 inj=0/0  30s
+    [26/40] i1      hfix_count_leaves                PASS  att=2 inj=1/0  48s
+    [27/40] i1      hfix_safe_divide                 PASS  att=1 inj=0/0  14s
+    [28/40] i1      hfix_strip_comments              PASS  att=1 inj=0/0  22s
+    [29/40] i1      hfix_merge_sorted                PASS  att=2 inj=1/0  31s
+    [30/40] i1      hfix_indent_block                FAIL  att=3 inj=2/0  47s
+    [31/40] i1      hfix_percent_change              PASS  att=1 inj=0/0  15s
+    [32/40] i1      hfix_title_words                 PASS  att=2 inj=1/0  26s
+    [33/40] i1      hfix_rate_limit                  PASS  att=1 inj=0/0  18s
+    [34/40] i1      hfix_bool_env                    FAIL  att=3 inj=2/0  51s
+    [35/40] i1      hfix_columnize                   PASS  att=1 inj=0/0  23s
+    [36/40] i1      hfix_slug_unique                 FAIL  att=3 inj=2/1  35s
+    [37/40] i1      hfix_nested_get                  FAIL  att=3 inj=2/0  39s
+    [38/40] i1      hfix_truncate_words              PASS  att=2 inj=0/0  39s
+    [39/40] i1      hfix_sum_by                      PASS  att=1 inj=0/0  21s
+    [40/40] i1      hfix_next_weekday                PASS  att=2 inj=1/0  22s
+
+  -- seed 3, arm i2 --
+    [ 1/40] i2      hfix_merge_ranges                PASS  att=1 inj=0/0  35s
+    [ 2/40] i2      hfix_lru_cache                   PASS  att=1 inj=0/0  33s
+    [ 3/40] i2      hfix_deep_update                 PASS  att=3 inj=0/0  104s
+    [ 4/40] i2      hfix_stable_sort_by              FAIL  att=3 inj=0/0  50s
+    [ 5/40] i2      hfix_paginate                    PASS  att=2 inj=0/0  40s
+    [ 6/40] i2      hfix_word_wrap                   PASS  att=1 inj=0/0  27s
+    [ 7/40] i2      hfix_retry_backoff               PASS  att=1 inj=0/0  17s
+    [ 8/40] i2      hfix_group_consecutive           PASS  att=3 inj=0/0  67s
+    [ 9/40] i2      hfix_parse_duration              FAIL  att=3 inj=0/0  69s
+    [10/40] i2      hfix_flatten_depth               PASS  att=1 inj=0/0  15s
+    [11/40] i2      hfix_top_n                       PASS  att=2 inj=0/0  20s
+    [12/40] i2      hfix_csv_quotes                  FAIL  att=3 inj=0/1  48s
+    [13/40] i2      hfix_normalize_path              FAIL  att=3 inj=0/0  33s
+    [14/40] i2      hfix_diff_keys                   FAIL  att=3 inj=0/1  27s
+    [15/40] i2      hfix_running_median              PASS  att=2 inj=0/0  14s
+    [16/40] i2      hfix_template_render             FAIL  att=3 inj=0/0  37s
+    [17/40] i2      hfix_batch_by_size               FAIL  att=3 inj=0/0  78s
+    [18/40] i2      hfix_case_insensitive_dict       PASS  att=1 inj=0/0  23s
+    [19/40] i2      hfix_split_sentences             FAIL  att=3 inj=0/0  61s
+    [20/40] i2      hfix_env_expand                  FAIL  att=3 inj=0/0  52s
+    [21/40] i2      hfix_url_join                    PASS  att=1 inj=0/0  14s
+    [22/40] i2      hfix_moving_window               PASS  att=1 inj=0/0  17s
+    [23/40] i2      hfix_partition_by                PASS  att=1 inj=0/0  16s
+    [24/40] i2      hfix_dedupe_keep_last            PASS  att=1 inj=0/0  14s
+    [25/40] i2      hfix_clamp_range                 FAIL  att=3 inj=0/0  64s
+    [26/40] i2      hfix_count_leaves                PASS  att=2 inj=0/0  27s
+    [27/40] i2      hfix_safe_divide                 PASS  att=2 inj=0/0  29s
+    [28/40] i2      hfix_strip_comments              FAIL  att=3 inj=0/0  60s
+    [29/40] i2      hfix_merge_sorted                PASS  att=1 inj=0/0  32s
+    [30/40] i2      hfix_indent_block                PASS  att=3 inj=0/1  44s
+    [31/40] i2      hfix_percent_change              PASS  att=1 inj=0/0  13s
+    [32/40] i2      hfix_title_words                 PASS  att=3 inj=0/1  60s
+    [33/40] i2      hfix_rate_limit                  PASS  att=2 inj=0/0  28s
+    [34/40] i2      hfix_bool_env                    FAIL  att=3 inj=0/0  70s
+    [35/40] i2      hfix_columnize                   PASS  att=3 inj=0/0  41s
+    [36/40] i2      hfix_slug_unique                 PASS  att=3 inj=0/0  57s
+    [37/40] i2      hfix_nested_get                  FAIL  att=3 inj=0/2  50s
+    [38/40] i2      hfix_truncate_words              PASS  att=1 inj=0/0  18s
+    [39/40] i2      hfix_sum_by                      PASS  att=2 inj=0/0  57s
+    [40/40] i2      hfix_next_weekday                PASS  att=2 inj=0/0  22s
+
+==============================================================================
+  RETRY-LIFT — 40 tasks x 3 seed(s), hard suite, model openrouter/mistralai/mistral-small-3.2-24b-instruct
+
+  per arm:
+    control  pass  65.0% | A  63.3% | R  44.7% | attempts {1: 44, 2: 26, 3: 50} | median 23s | timeouts 0 | unparsed 0
+             injections: diff=0  pivot=7
+    i1       pass  60.8% | A  61.9% | R  38.4% | attempts {1: 45, 2: 24, 3: 49} | median 29s | timeouts 2 | unparsed 2
+             injections: diff=107  pivot=5
+    i2       pass  65.8% | A  61.7% | R  44.6% | attempts {1: 46, 2: 21, 3: 53} | median 29s | timeouts 0 | unparsed 0
+             injections: diff=0  pivot=19
+
+  I1 vs control — PRIMARY (pooled paired, n=120):
+    control 65.0%  i1 60.8%  Δ -4.2%  95% CI [-11.8%, +4.5%]  -> not significant
+    discordant: i1 +12 / control +17
+    SECONDARY (retried lens, both arms retried, n=57; 35 pair(s) retried by one arm only, excluded):
+      control 38.6%  i1 31.6%  Δ -7.0%  95% CI [-17.7%, +6.4%]  -> not significant
+
+  I2 vs control — PRIMARY (pooled paired, n=120):
+    control 65.0%  i2 65.8%  Δ +0.8%  95% CI [-6.9%, +8.3%]  -> not significant
+    discordant: i2 +13 / control +12
+    SECONDARY (retried lens, both arms retried, n=58; 34 pair(s) retried by one arm only, excluded):
+      control 36.2%  i2 39.7%  Δ +3.5%  95% CI [-8.4%, +13.8%]  -> not significant
+
+  VALIDITY GATES (PREREGISTRATION §7):
+    [ok ] wire live (I1): 107 diff injections in the i1 arm (0 = plumbing failure, NOT evidence against the idea)
+    [ok ] wire live (I2): 19 stall responses in i2 vs 7 in control (equal = approximate matching changed nothing; the arm is inert, not refuted)
+    [FAIL] timeout symmetry: per-arm timeouts {'control': 0, 'i1': 2, 'i2': 0} (asymmetry invalidates the run)
+    [ok ] control drift (A): control A=63.3%, probe CI [37.5%, 67.1%]
+    [ok ] control drift (R): control R=44.7%, probe CI [20.8%, 59.1%]
+    [ok ] retried lens informative: control R=44.7% (outside 20-80% = ceiling/floor, lens reported-not-interpreted)
+    [FAIL] grading integrity: 1 task(s) modified their own test
+
+  !! A gate failed. Per the pre-registration this run reports a MEASUREMENT
+     FAILURE, not evidence for or against either intervention.
+==============================================================================
+
+  wrote /mnt/c/Users/brcam/Desktop/Desenvolvendo Projetos/Agent AI/bench/retry_lift/results/retry.json

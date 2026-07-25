@@ -37,6 +37,7 @@ from chimera.config import get_settings
 if TYPE_CHECKING:
     from chimera.config import Settings
     from chimera.core import AgentEvent
+    from chimera.core.autonomous import AutonomousResult
     from chimera.ecosystem import TrajectoryCollector
     from chimera.evolution import Playbook
     from chimera.kanban import KanbanBoard
@@ -2329,6 +2330,9 @@ def solve(
     playbook: bool = typer.Option(
         False, "--playbook", help="Inject the stored ACE strategy playbook into context, then curate it from this run's outcome (closed loop)."
     ),
+    skill_cards: bool | None = typer.Option(
+        None, "--skill-cards/--no-skill-cards", help="Read learned skill cards back into context (the learn->use loop). Default follows settings.skill_cards; this overrides it per run."
+    ),
     agreement: int = typer.Option(
         1, "--agreement", help="With --fuse: sample K cheap answers per turn; escalate to fusion when they disagree (free confidence signal)."
     ),
@@ -2337,6 +2341,18 @@ def solve(
     ),
     replan: bool = typer.Option(
         False, "--replan", help="On a stall, rebuild the plan from accumulated failure causes (dual-ledger) instead of just nudging."
+    ),
+    diff_feedback: bool = typer.Option(
+        False, "--diff-feedback", help="Show a failed attempt its own reverted diff, as a path not to retake."
+    ),
+    keep_workspace: bool = typer.Option(
+        False, "--keep-workspace", help="On failure, leave the last attempt's edits on disk for an external grader (don't revert)."
+    ),
+    require_diff: bool = typer.Option(
+        False, "--require-diff", help="Fail an attempt that changed no file — for code tasks, an explanation is not a fix."
+    ),
+    stagnation_fuzzy: bool = typer.Option(
+        False, "--stagnation-fuzzy", help="Match repeated-failure signatures approximately, not byte-identically."
     ),
     contract: str = typer.Option(
         None, "--contract", help="Machine-checkable success clauses, comma-separated: file_exists:PATH | file_contains:PATH:REGEX | answer_matches:REGEX."
@@ -2385,7 +2401,6 @@ def solve(
         StrongVerifier,
         WorkspaceGuard,
     )
-    from chimera.core.autonomous import AutonomousResult
     from chimera.core.verify import CommandVerifier
     from chimera.evolution import build_evolution_context
     from chimera.fusion.probe_log import ProbeLog as _ProbeLog
@@ -2539,13 +2554,20 @@ def solve(
             audit=allow_audit,
             memory=None if no_remember else _memory_manager(),
             playbook=stored_playbook,
+            # --skill-cards/--no-skill-cards: per-run override of settings.skill_cards, so the
+            # learn->use loop can be turned on for an experiment (learning-lift) without flipping
+            # the global default. None keeps the settings default (today: off).
+            skill_cards=skill_cards,
         )
 
         auto = AutonomousAgent(
             worker,
             escalate_worker=escalate_worker,
             # Pivot the retry when attempts keep failing the same way (short budget → window 2).
-            stagnation=StagnationDetector(window=2),
+            # --stagnation-fuzzy loosens the match: byte-identical signatures are strict enough to
+            # miss two attempts failing from the same cause with different assertion text, so the
+            # pivot never fires and the loop refines a dead end (bench/retry_lift, I2).
+            stagnation=StagnationDetector(window=2, signature_similarity=0.8 if stagnation_fuzzy else 1.0),
             # Structured per-attempt self-check (Magentic-One): turns "it failed" into a concrete
             # next_focus for the retry — the lift for weak models. Opt-in via --progress-ledger.
             progress_ledger=ProgressLedger(gateway, model) if progress_ledger else None,
@@ -2583,6 +2605,15 @@ def solve(
             # PROBE (M18-5): record (arm, cheap manager proxy, verified reward) per attempt.
             probe_log=_ProbeLog(settings.home / "probe.jsonl") if probe_log else None,
             guard=WorkspaceGuard(ws),
+            # Retry conditioning (--diff-feedback): feed the failed attempt's own reverted diff back
+            # so the retry is told what it wrote, not just that it failed (bench/retry_lift, I1).
+            diff_feedback=diff_feedback,
+            # --keep-workspace: leave the agent's final edits on disk when an external grader (e.g.
+            # SWE-bench's own tests) decides pass/fail, instead of Chimera's verify-or-revert.
+            keep_workspace=keep_workspace,
+            # --require-diff: promote the diff-gate from observer to gate, so an attempt that edited
+            # nothing fails and is retried instead of being approved on the strength of its prose.
+            require_diff=require_diff,
             # The six learning seams (experience, trajectories, memory, auto_evolver, cards, playbook)
             # from the shared factory above (M19-A0).
             **evo.apply_to(),
@@ -2632,11 +2663,9 @@ def solve(
     if stored_playbook is not None:
         from chimera.evolution import BackendDeltaProposer, PlaybookCurator
 
-        verdict = "succeeded" if result.success else "failed"
-        outcome_text = (
-            f"The task {verdict} after {len(result.attempts)} attempt(s). "
-            f"Final answer: {result.answer[:500]}"
-        )
+        # Level-2 P3: seed curation from the run's error evidence (failing verifier output + the
+        # fixing diff), not just verdict+final-answer — so the curator distils process pitfalls.
+        outcome_text = _curation_outcome(result, from_errors=settings.playbook_curate_from_errors)
         applied = PlaybookCurator(BackendDeltaProposer(gateway, model)).curate(
             stored_playbook, task, outcome_text
         )
@@ -2699,7 +2728,6 @@ def solve_batch(
         Planner,
         WorkspaceGuard,
     )
-    from chimera.core.autonomous import AutonomousResult
     from chimera.governance import TaintLedger, ledger_registry
     from chimera.orchestration import run_isolated
     from chimera.providers import LLMGateway, MissingCredentialsError
@@ -3236,6 +3264,29 @@ def _save_playbook(playbook: Playbook) -> None:
     from chimera.evolution.wiring import save_playbook
 
     save_playbook(get_settings(), playbook)
+
+
+def _curation_outcome(result: AutonomousResult, *, from_errors: bool) -> str:
+    """Build the reflect-step text the ACE curator sees after a run.
+
+    Baseline = verdict + final answer. With ``from_errors`` (Level-2 P3) also feed the concrete error
+    evidence the curator was previously blind to: the failing verifier output from the last failed
+    attempt (why it failed) and the diff that ultimately passed (what worked). A curator instructed to
+    generalise turns that into process pitfalls ("run the given test first", "re-check a second case")
+    rather than platitudes. Bounded so the curation prompt stays small.
+    """
+    verdict = "succeeded" if result.success else "failed"
+    parts = [f"The task {verdict} after {len(result.attempts)} attempt(s)."]
+    if from_errors and result.attempts:
+        failed = [a for a in result.attempts if not a.success and (a.verify_output or a.feedback)]
+        if failed:
+            why = (failed[-1].verify_output or failed[-1].feedback).strip()
+            if why:
+                parts.append(f"What went wrong (verifier output from a failed attempt):\n{why[:400]}")
+        if result.success and (fix := (result.attempts[-1].diff_summary or "").strip()):
+            parts.append(f"What fixed it (the diff that passed):\n{fix[:400]}")
+    parts.append(f"Final answer: {result.answer[:300]}")
+    return "\n\n".join(parts)
 
 
 @playbook_app.command("show")

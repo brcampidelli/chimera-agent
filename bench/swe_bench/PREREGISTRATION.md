@@ -99,3 +99,209 @@ the CIs, the failure accounting and the cost.
 
 **Status: registered, not yet run.** The run needs paid model calls and a Docker host; nothing in
 this file has been executed. When it is, the result appears here — win, loss, or null.
+
+---
+
+# Amendment 1 — the four deferred decisions, fixed before any model call
+
+**Committed before the first `chimera solve` of this run.** The gold dry-run (3 django instances,
+reference patches, 3/3 resolved, report parsed correctly) validated the Docker + harness + report +
+parser pipeline at zero model cost. These four choices were left open in `PLAN.md §5`; they are fixed now.
+
+## Decision 1 — Slice: django/django, `<15 min fix` stratum
+
+From the full Verified 500, the slice is **django/django instances in the easiest difficulty stratum
+(`<15 min fix`)** — 92 instances, one codebase. This is the plan's §3.1 recommendation made concrete:
+- **Off the floor:** the easy stratum is where even a mid model has a nonzero base rate (the floor that
+  killed terminal_bench's measurement is a hard-difficulty artefact).
+- **Transfer real, not staged:** one repository means django's own idioms recur across instances — the
+  transfer-possible setting the learning-lift series could only fake.
+- **Modern prebuilt images:** django versions 3.0–5.0 all have prebuilt eval images (gold run confirmed
+  v5.0 pulls work).
+
+The **exact instance-id set is frozen by the probe** (below) and written to `results/slice.jsonl`
+before the paired run; no instance is added or dropped after seeing a result.
+
+## Decision 2 — Model: `openrouter/deepseek/deepseek-chat-v3.1`
+
+Chosen over the weaker mistral-24b of the prior runs. **This is a deliberate change of what the run
+measures, stated plainly:** deepseek-chat-v3.1 is *competent*, not weak, so this is less a "lift a weak
+model" test (the project's central thesis) and more "does Chimera's scaffolding help a competent model
+on real repos." The trade-off, decided with the repo owner: a competent model has a much lower chance of
+the terminal_bench floor (37/40 both-fail) that makes a paired A/B measure nothing, and it yields a
+better absolute Q2 number. The honest cost is thesis purity — if deepseek already resolves an instance
+alone, there is less headroom for the scaffold to add, which will show up as a smaller Δ. Reported as-is.
+
+## Decision 3 — `--verify` policy: option (a), no verify (honest default)
+
+The treatment arm runs **without `--verify`**. Neither dataset ships a `test_cmd`, and synthesizing one
+from `FAIL_TO_PASS` would hand the agent its own hidden grading tests (leakage). Option (b) — verify on
+the repo's *existing* tests at base_commit — is legitimate but needs a per-version test command and adds
+run time; deferred. Option (c) — verify on `FAIL_TO_PASS` — is **forbidden, permanently**. So the
+treatment arm's scaffolding is `--repo-map --progress-ledger --replan --checklist --max-attempts 3`
+without executable ground truth, which tests a *weaker* Chimera than local_lift did — noted, not hidden.
+
+## Decision 4 — Scope: Q1 only (paired thesis), Q2 deferred
+
+This run answers **Q1** (does Chimera's scaffolding beat baseline on the same instances) on the django
+easy slice. **Q2** (absolute % of full Verified 500 with a strong model) is a separate, much more
+expensive run and is **not** bundled here. The slice result is never labelled a "Verified score."
+
+## Hygiene carried from the main design
+Both arms: `--no-remember --no-collect --no-evolve-skills`, fresh sanitized checkout per instance
+(single-branch clone, `reset --hard base_commit`, remote removed, future work gc'd unreachable — the
+harness's own anti-leakage recipe), pass@1 (one patch per instance, no best-of-N), graded ONLY by
+SWE-bench's official harness in Docker.
+
+**Status: amendment committed. The cost probe (3 instances, both arms, real deepseek calls) runs next
+to fix the slice size against observed per-instance cost, then the paired run.**
+
+---
+
+# Amendment 2 — the discriminating run (registered before any model call, and before the code exists)
+
+Run 1 returned **Δ = +0.0%** ([`RESULTS.md`](RESULTS.md)). **That null stands and is published
+regardless of what this run produces.** This is not a re-roll of run 1: run 1 measured a *deliberately
+weakened* Chimera on a misconfigured budget, and both faults were ours. This amendment fixes them and
+re-asks the question. If this run is also null, that is the honest end of the thesis for real repos.
+
+## Why: the failure mode was traced to a mechanism, not guessed
+
+Run 1's dominant failure was **not editing at all** (10/19 and 11/19 empty patches) while being
+*accurate when it did edit* (78% / 88% precision). Reading the code rather than speculating
+(`chimera/core/autonomous.py`), the cause is a chain:
+
+1. With no verifier, success is decided by the Manager alone — `ok = approved` (line 494).
+2. The Manager reads the answer *text*. A confident prose explanation of the bug is plausible, so it is
+   approved.
+3. The diff-gate **does** compute whether anything really changed (`diff_productive` ←
+   `PatchDiff.is_productive`, line 558) — and then uses it **only for telemetry** (lines 583, 600,
+   608). It never sets `ok = False`.
+
+**So a code-editing task can be scored a success having edited nothing, and the machinery that knows it
+is a passive observer.** That is a product defect for code work, independent of any benchmark.
+
+### A fix I proposed and then discarded, recorded so the reasoning is auditable
+
+`PLAN.md` §3.2 option (b) — `--verify` on the repository's *existing* tests at `base_commit` — was my
+stated next step in the RESULTS discussion. Checking the mechanism above shows **it would not fix this
+failure**: an attempt that edits nothing passes a regression suite *trivially*, so verify would return
+green and the empty answer would still be approved. Option (b) is abandoned as the fix for this defect
+(it remains legitimate, and forbidden option (c) stays forbidden forever).
+
+## Design
+
+Three arms, same frozen 19-instance slice, same model, same grading. **`max_steps` is raised for EVERY
+arm**, because it is a resource budget, not part of the scaffolding — giving it only to the treatment
+would confound "Chimera helps" with "more steps help".
+
+| | flags |
+|---|---|
+| **baseline** | `--no-plan --no-manager --max-attempts 1 --max-steps 30` |
+| **chimera** | `--repo-map --progress-ledger --replan --checklist --max-attempts 3 --max-steps 30` |
+| **chimera+diff** | as above **+ `--require-diff`** |
+
+`--require-diff` (to be implemented, off by default): an attempt whose diff-gate reports no productive
+change **fails** and is retried with that as feedback. It promotes an existing observation into a gate.
+
+Fixed now: **`max_steps = 30`**, **per-solve timeout 1800 s**, hygiene unchanged
+(`--no-remember --no-collect --no-evolve-skills --keep-workspace`), no `--verify` on any arm, pass@1,
+graded only by the official harness. n = 19 × 3 = **57 solves**.
+
+A 2–3 instance probe runs first to confirm *feasibility only* (that 30 steps completes inside 1800 s at
+acceptable cost). It may not be used to tune any parameter toward an outcome; if 30 steps proves
+infeasible, the change is a further amendment, committed before running.
+
+## Registered predictions
+
+- **Empty-patch rate falls in `chimera+diff`** — from 11/19 to **≤ 5/19**. This is the mechanism's
+  direct prediction and the one that would most clearly confirm the diagnosis.
+- **`chimera+diff` vs baseline: Δ +5 to +20 pp**, quite possibly **not significant** at n=19 (run 1 had
+  only 2 informative pairs; the same thinness may persist).
+- **`chimera` vs baseline (steps fixed, no diff-gate): Δ −5 to +10 pp** — raising steps alone may not
+  be enough, since the Manager still approves prose.
+- **A real chance everything stays null.** If forcing an edit produces *wrong* edits, resolution will
+  not move even as the empty rate falls. That would say the model cannot fix these bugs at all, and the
+  scaffolding was never the binding constraint.
+
+## Validity gates (a run failing one of these reports a measurement failure, not a result)
+
+1. **The gate must fire:** count attempts failed by `--require-diff`. Zero = plumbing failure, not
+   evidence against the idea (the learning-lift runs 1–2 lesson).
+2. **Steps must actually be used:** if solves still finish in ~8 steps, raising the budget changed
+   nothing and limitation 2 of run 1 was misdiagnosed — say so.
+3. **Timeout symmetry** across arms; asymmetric timeouts invalidate the run.
+4. **Floor check:** if both-fail pairs stay ≥ 11/19, the slice is uninformative regardless of arm, and
+   the pooled Δ is reported-not-interpreted.
+5. **Cost and infra-failure accounting** published per arm, as in run 1.
+
+## Pre-committed readings
+
+- **Empty rate falls AND resolution rises significantly** → the diagnosis was right and the diff-gate is
+  a real fix; it becomes a product default candidate.
+- **Empty rate falls, resolution flat** → the binding constraint is model capability, not commitment.
+  The scaffolding still does not lift; publish that plainly.
+- **Empty rate does not fall** → the mechanism trace above was wrong. Retract the diagnosis with the
+  same prominence as it was stated here.
+- **All null** → the thesis does not hold for a competent model on real repos. The project's claim gets
+  rewritten around honest measurement, which is what it demonstrably does well.
+
+## Caveats
+
+One repository, one model, 19 instances, one run per arm. n=19 with a high floor may again yield too
+few discordant pairs to resolve anything — that is a power limitation, not evidence of no effect, and
+will be labelled as such. Nothing here generalises beyond django, and none of it is a Verified score.
+
+**Status: registered. `--require-diff` does not exist yet; no model call of this run has been made.**
+
+---
+
+# Amendment 3 — cut the middle arm (a cost decision, committed before the run)
+
+Amendment 2's feasibility probe did its job and **found the run unaffordable as designed**. Measured on
+the heaviest arm at `max_steps=30`: **984 s and US$ 0.317 per solve**. Time is fine (984 s < the 1800 s
+budget), but 57 solves projects to **US$ 14–18 against US$ 12.80 available**. Per Amendment 2's own
+rule ("if 30 steps proves infeasible, the change is a further amendment, committed before running"),
+this is that amendment.
+
+## The change
+
+Three arms → **two**: `baseline` and `chimera+diff` (`treatment_diff`). The middle arm — plain scaffold
+at 30 steps — is dropped. **19 × 2 = 38 solves**, projected ≈ US$ 9, ≈ 6 h.
+
+`max_steps=30` is unchanged and remains **identical on both arms**, so the comparison still cannot
+confound "Chimera helps" with "more steps help". Everything else is as Amendment 2 fixed it.
+
+## What this costs us, stated plainly
+
+**We lose the ability to attribute a win between the scaffold and the gate.** If `chimera+diff` beats
+baseline, this design cannot say whether the diff-gate did it or the scaffolding-at-30-steps did. Run 1
+is *suggestive* evidence that the scaffold alone does not help (Δ = 0.0%), but it ran at 8 steps, so it
+is not a clean control for this run. The honest reading of any positive here will therefore be
+"scaffold **plus** gate beats bare model", never "the gate is what worked" — that would need the arm we
+are cutting, and would be a separate run.
+
+**What survives intact** is the headline prediction, which is about a rate this design measures
+directly: the empty-patch rate in the gated arm.
+
+## Withdrawn prediction
+
+Amendment 2's third prediction — "`chimera` vs baseline (steps fixed, no diff-gate): Δ −5 to +10 pp" —
+is **withdrawn as untestable** under this design, not quietly dropped. The other three stand unchanged,
+including "a real chance everything stays null".
+
+## Probe reuse — declared, not silent
+
+The probe ran the **identical final configuration** (`treatment_diff`, `--max-steps 30`, 1800 s) on
+what happens to be the **first 3 instances of the frozen slice** (10880, 10914, 10999 — the slice is
+ordered by `instance_id` and the probe took its head). Those solves are therefore valid run data and
+are **reused** rather than re-run, saving ≈ US$ 1 and ≈ 48 min.
+
+Why this is not outcome-driven selection: the configuration was frozen in Amendment 2 **before** the
+probe ran; the arm cut is driven by **measured cost**, not by any result; and no grading had been run,
+so no resolve/unresolve outcome was visible when this amendment was written. What *was* visible is that
+instance 10880 produced a patch where run 1 produced an empty one in both arms — recorded here for
+transparency, and it changed nothing about the design.
+
+**Status: amendment committed. The baseline arm and the 16 remaining `treatment_diff` instances have
+not been run.**

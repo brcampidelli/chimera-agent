@@ -59,9 +59,31 @@ from chimera.telemetry import get_logger
 
 _log = get_logger("core.autonomous")
 
+# --diff-feedback wording and bound. Fixed in bench/retry_lift/PREREGISTRATION.md BEFORE the run that
+# measures it, because framing and truncation are the most temptingly tunable knobs in the whole
+# experiment — "it didn't work, let me reword the prompt" is how a null becomes a fabricated win.
+# Changing either is an amendment, committed before the run that uses it.
+_DIFF_FEEDBACK_HEADER = "You already tried this and it FAILED verification. This exact change was reverted:"
+_DIFF_FEEDBACK_FOOTER = (
+    "Do not re-derive this edit. Diagnose why it was wrong, then take a different approach."
+)
+_DIFF_FEEDBACK_MAX_CHARS = 2000
+
 
 def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:80]
+
+
+def _rendered_diff(diffs: list[FileDiff]) -> str:
+    """Render per-file diffs as one bounded patch body for retry feedback.
+
+    Truncation is explicit rather than silent: a clipped body says so, so the model does not read a
+    half-diff as the whole change it made.
+    """
+    body = "\n".join(f"--- {d.path}\n{d.patch}".rstrip() for d in diffs if d.patch)
+    if len(body) > _DIFF_FEEDBACK_MAX_CHARS:
+        body = body[:_DIFF_FEEDBACK_MAX_CHARS] + "\n... [diff truncated]"
+    return body
 
 
 def _format_requirements(requirements: list[Any]) -> str:
@@ -188,6 +210,9 @@ class AutonomousAgent:
         verifier: Verifier | None = None,
         probe_log: ProbeLog | None = None,
         guard: WorkspaceGuard | None = None,
+        diff_feedback: bool = False,
+        keep_workspace: bool = False,
+        require_diff: bool = False,
         experience: ExperienceBuffer | None = None,
         trajectories: TrajectoryCollector | None = None,
         memory: SupportsRemember | None = None,
@@ -227,6 +252,9 @@ class AutonomousAgent:
         self.verifier = verifier
         self.probe_log = probe_log
         self.guard = guard
+        self.diff_feedback = diff_feedback
+        self.keep_workspace = keep_workspace
+        self.require_diff = require_diff
         self.experience = experience
         self.trajectories = trajectories
         self.memory = memory
@@ -408,6 +436,11 @@ class AutonomousAgent:
                 self._emit(_ev_status(f"resumed thread {thread_id} at attempt {start_index}"))
 
         self._emit(_ev_status("planning complete" if plan else "starting"))
+        # For --keep-workspace: the post-edit snapshot of the LAST attempt, so an external grader
+        # (SWE-bench, CI, a human) can judge the agent's final work even when Chimera's own verifier
+        # rejected it and rolled the tree back. Between-attempt reverts still happen (each attempt stays
+        # independent); only the final on-disk state is restored to this on a failed run.
+        last_after = None
         for index in range(start_index, self.config.max_attempts + 1):
             # Cooperative cancel (checked BEFORE the attempt starts): an in-flight model call can't be
             # interrupted, so a stop request halts the loop here — after the previous attempt finished,
@@ -512,21 +545,41 @@ class AutonomousAgent:
                     )
                     fb = f"{fb}\n\n{detail}" if fb else detail
 
-            attempt = Attempt(index, answer, approved, verified, False, ok, fb, vout)
-            self._emit(_ev_result(index, ok, detail=(fb or vout)[:200]))
             # Diff-gate (nanobot "Dream"): certify what the attempt *actually* changed from the
             # real workspace snapshot, BEFORE any revert — the machine truth, not the model's claim.
+            # Computed BEFORE the Attempt is finalized so --require-diff can act on it: the gate has to
+            # be able to fail the attempt, not just describe it after the verdict is already sealed.
             diff_productive: bool | None = None
             diff_summary: str | None = None
+            diffs: list[FileDiff] = []
             if snapshot is not None and self.guard is not None:
                 from chimera.evolution.diff_gate import diff_snapshots, unified_diffs
 
                 after = self.guard.snapshot()  # one capture feeds both the summary and the per-file diffs
+                last_after = after  # remember for --keep-workspace (restored after the loop if it fails)
                 pdiff = diff_snapshots(snapshot, after)
                 diff_productive = pdiff.is_productive
                 diff_summary = pdiff.audit_summary()
-                attempt.diff_summary = diff_summary or ""
-                attempt.diffs = unified_diffs(snapshot, after)  # real diffs, BEFORE any revert below
+                diffs = unified_diffs(snapshot, after)  # real diffs, BEFORE any revert below
+
+            # --require-diff: for a code task, an answer that changed nothing is not a success, however
+            # convincing its prose. Without this the diff-gate is a passive observer — with no verifier
+            # `ok = approved`, and the Manager judges the answer TEXT, so a confident explanation of the
+            # bug passes while the file is untouched (SWE-bench run 1: 11/19 empty patches). Fails the
+            # attempt and feeds the reason back, so the retry is told to actually edit. Only when the
+            # diff was genuinely measured — `None` means no workspace guard, i.e. we cannot know.
+            if self.require_diff and diff_productive is False:
+                ok = False
+                detail = (
+                    "No file was changed. This task requires editing code: an explanation is not a "
+                    "fix. Locate the responsible file and make the edit."
+                )
+                fb = f"{fb}\n\n{detail}" if fb else detail
+
+            attempt = Attempt(index, answer, approved, verified, False, ok, fb, vout)
+            attempt.diff_summary = diff_summary or ""
+            attempt.diffs = diffs
+            self._emit(_ev_result(index, ok, detail=(fb or vout)[:200]))
             if not ok and snapshot is not None and self.guard is not None:
                 self.guard.restore(snapshot)
                 attempt.reverted = True
@@ -585,6 +638,23 @@ class AutonomousAgent:
             feedback = "\n\n".join(p for p in (fb, _verify_fb) if p) or (
                 "The attempt did not pass verification."
             )
+            # Retry-conditioning (--diff-feedback): the agent already captured what this attempt
+            # ACTUALLY wrote (above, pre-revert) and every consumer of it is telemetry — it never
+            # re-enters a prompt. So the retry is told THAT it failed but never shown the code it
+            # wrote, and since the workspace was just reverted, nothing on disk records the wrong
+            # path either: re-deriving the same patch is unobstructed. Feeding the diff back closes
+            # that. Opt-in and measured, not assumed — showing a wrong patch can also ANCHOR a model
+            # on it, which is the registered counter-hypothesis (see bench/retry_lift).
+            # Guarded on there BEING a next attempt: this is retry conditioning, so building it after
+            # the final attempt would inflate the injection count (the pre-registration's validity
+            # gate) with feedback no model ever reads.
+            if (self.diff_feedback and index < self.config.max_attempts
+                    and attempt.diffs and (body := _rendered_diff(attempt.diffs))):
+                feedback = f"{feedback}\n\n{_DIFF_FEEDBACK_HEADER}\n{body}\n{_DIFF_FEEDBACK_FOOTER}"
+                # Emitted so a bench can COUNT injections: a run where this never fires measured a
+                # plumbing failure, not the idea (learning-lift runs 1-2 were lost to exactly that,
+                # and the retry_lift pre-registration makes it a hard validity gate).
+                self._emit(_ev_status(f"diff-feedback injected {len(body)} chars (attempt {index})"))
             # Step-level failure attribution (SkillAdaptor): if a tool step errored,
             # point the retry at the FIRST faulty step instead of letting one early
             # error diffuse across the whole next attempt.
@@ -639,6 +709,9 @@ class AutonomousAgent:
                     else:
                         _log.debug("attempt %d: stagnation detected; injecting pivot advice", index)
                         feedback = f"{feedback}\n\n{self.stagnation.advice()}"
+                        # Countable for the same reason as the diff injection above: a bench arm
+                        # whose pivot never fires measured nothing, and must say so.
+                        self._emit(_ev_status(f"stagnation pivot injected (attempt {index})"))
 
             # Durable checkpoint: this attempt failed, so persist the state to resume from the
             # NEXT attempt if the process dies. (A successful attempt returns above and clears
@@ -662,6 +735,10 @@ class AutonomousAgent:
 
         self._record_card_outcome(False)
         self._clear_checkpoint(thread_id)  # exhausted the budget — a terminal state, not resumable
+        # --keep-workspace: leave the last attempt's edits on disk for an external grader, undoing the
+        # in-loop revert of that final attempt. Only meaningful on failure (a success never reverts).
+        if self.keep_workspace and last_after is not None and self.guard is not None:
+            self.guard.restore(last_after)
         last = attempts[-1].answer if attempts else ""
         self._emit(_ev_final(False, last))
         result = AutonomousResult(answer=last, success=False, attempts=attempts, plan=plan)

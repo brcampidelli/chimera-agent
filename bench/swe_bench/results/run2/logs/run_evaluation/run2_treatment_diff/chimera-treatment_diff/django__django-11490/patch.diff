@@ -1,0 +1,18 @@
+diff --git a/django/db/backends/mysql/compiler.py b/django/db/backends/mysql/compiler.py
+index fc74ac1991..a09eece1ff 100644
+--- a/django/db/backends/mysql/compiler.py
++++ b/django/db/backends/mysql/compiler.py
+@@ -6,6 +6,13 @@ class SQLCompiler(compiler.SQLCompiler):
+         qn = compiler.quote_name_unless_alias
+         qn2 = self.connection.ops.quote_name
+         sql, params = self.as_sql()
++        # For combined queries, use the current select columns instead of the
++        # passed columns parameter, which may be stale if values()/values_list()
++        # was called after the query was composed.
++        if self.query.combinator:
++            # self.select is a list of (expression, (sql, params), alias)
++            # We need to extract column names from the expressions
++            columns = [col.target.column for col, _, _ in self.select]
+         return '(%s) IN (%s)' % (', '.join('%s.%s' % (qn(alias), qn2(column)) for column in columns), sql), params
+ 
+ 

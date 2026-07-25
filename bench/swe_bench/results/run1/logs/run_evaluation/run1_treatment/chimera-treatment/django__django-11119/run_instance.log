@@ -1,0 +1,47 @@
+2026-07-24 20:55:27,070 - INFO - Creating container for django__django-11119...
+2026-07-24 20:55:27,218 - INFO - Container for django__django-11119 created: 0c2df4508bf957adbded5f15912d84dd1ed924edd9fd618f18de2859f374670d
+2026-07-24 20:55:27,405 - INFO - Container for django__django-11119 started: 0c2df4508bf957adbded5f15912d84dd1ed924edd9fd618f18de2859f374670d
+2026-07-24 20:55:27,410 - INFO - Intermediate patch for django__django-11119 written to logs/run_evaluation/run1_treatment/chimera-treatment/django__django-11119/patch.diff, now applying to container...
+2026-07-24 20:55:27,561 - INFO - >>>>> Applied Patch:
+Checking patch django/template/engine.py...
+Applied patch django/template/engine.py cleanly.
+
+2026-07-24 20:55:28,130 - INFO - Git diff before:
+diff --git a/django/template/engine.py b/django/template/engine.py
+index dfaa67ba12..ff9ce58d59 100644
+--- a/django/template/engine.py
++++ b/django/template/engine.py
+@@ -160,7 +160,7 @@ class Engine:
+         if isinstance(context, Context):
+             return t.render(context)
+         else:
+-            return t.render(Context(context))
++            return t.render(Context(context, autoescape=self.autoescape))
+ 
+     def select_template(self, template_name_list):
+         """
+2026-07-24 20:55:28,133 - INFO - Eval script for django__django-11119 written to logs/run_evaluation/run1_treatment/chimera-treatment/django__django-11119/eval.sh; copying to container...
+2026-07-24 20:55:33,156 - INFO - Test runtime: 4.94 seconds
+2026-07-24 20:55:33,158 - INFO - Test output for django__django-11119 written to logs/run_evaluation/run1_treatment/chimera-treatment/django__django-11119/test_output.txt
+2026-07-24 20:55:33,236 - INFO - Git diff after:
+diff --git a/django/template/engine.py b/django/template/engine.py
+index dfaa67ba12..ff9ce58d59 100644
+--- a/django/template/engine.py
++++ b/django/template/engine.py
+@@ -160,7 +160,7 @@ class Engine:
+         if isinstance(context, Context):
+             return t.render(context)
+         else:
+-            return t.render(Context(context))
++            return t.render(Context(context, autoescape=self.autoescape))
+ 
+     def select_template(self, template_name_list):
+         """
+2026-07-24 20:55:33,236 - INFO - Grading answer for django__django-11119...
+2026-07-24 20:55:33,238 - INFO - report: {'django__django-11119': {'patch_is_None': False, 'patch_exists': True, 'patch_successfully_applied': True, 'resolved': True, 'tests_status': {'FAIL_TO_PASS': {'success': ['test_autoescape_off (template_tests.test_engine.RenderToStringTest)'], 'failure': []}, 'PASS_TO_PASS': {'success': ['test_cached_loader_priority (template_tests.test_engine.LoaderTests)', 'test_loader_priority (template_tests.test_engine.LoaderTests)', 'test_origin (template_tests.test_engine.LoaderTests)', 'test_basic_context (template_tests.test_engine.RenderToStringTest)', 'test_multiple_engines_configured (template_tests.test_engine.GetDefaultTests)', 'test_no_engines_configured (template_tests.test_engine.GetDefaultTests)', 'test_single_engine_configured (template_tests.test_engine.GetDefaultTests)'], 'failure': []}, 'FAIL_TO_FAIL': {'success': [], 'failure': []}, 'PASS_TO_FAIL': {'success': [], 'failure': []}}}}
+Result for django__django-11119: resolved: True
+2026-07-24 20:55:33,240 - INFO - Attempting to stop container sweb.eval.django__django-11119.run1_treatment...
+2026-07-24 20:55:48,526 - INFO - Attempting to remove container sweb.eval.django__django-11119.run1_treatment...
+2026-07-24 20:55:48,555 - INFO - Container sweb.eval.django__django-11119.run1_treatment removed.
+2026-07-24 20:55:48,556 - INFO - Attempting to remove image swebench/sweb.eval.x86_64.django_1776_django-11119:latest...
+2026-07-24 20:55:48,774 - INFO - Image swebench/sweb.eval.x86_64.django_1776_django-11119:latest removed.

@@ -1,0 +1,65 @@
+2026-07-24 20:52:34,803 - INFO - Creating container for django__django-11099...
+2026-07-24 20:52:34,860 - INFO - Container for django__django-11099 created: bed33df2d95d285541a7ff3b9090f8dc67d97ca694704b2521355b8d6fd17e7f
+2026-07-24 20:52:35,108 - INFO - Container for django__django-11099 started: bed33df2d95d285541a7ff3b9090f8dc67d97ca694704b2521355b8d6fd17e7f
+2026-07-24 20:52:35,112 - INFO - Intermediate patch for django__django-11099 written to logs/run_evaluation/run1_baseline/chimera-baseline/django__django-11099/patch.diff, now applying to container...
+2026-07-24 20:52:35,271 - INFO - >>>>> Applied Patch:
+Checking patch django/contrib/auth/validators.py...
+Applied patch django/contrib/auth/validators.py cleanly.
+
+2026-07-24 20:52:35,759 - INFO - Git diff before:
+diff --git a/django/contrib/auth/validators.py b/django/contrib/auth/validators.py
+index b4878cfd45..1304f20a60 100644
+--- a/django/contrib/auth/validators.py
++++ b/django/contrib/auth/validators.py
+@@ -7,7 +7,7 @@ from django.utils.translation import gettext_lazy as _
+ 
+ @deconstructible
+ class ASCIIUsernameValidator(validators.RegexValidator):
+-    regex = r'^[\w.@+-]+$'
++    regex = r'\A[\w.@+-]+\Z'
+     message = _(
+         'Enter a valid username. This value may contain only English letters, '
+         'numbers, and @/./+/-/_ characters.'
+@@ -17,7 +17,7 @@ class ASCIIUsernameValidator(validators.RegexValidator):
+ 
+ @deconstructible
+ class UnicodeUsernameValidator(validators.RegexValidator):
+-    regex = r'^[\w.@+-]+$'
++    regex = r'\A[\w.@+-]+\Z'
+     message = _(
+         'Enter a valid username. This value may contain only letters, '
+         'numbers, and @/./+/-/_ characters.'
+2026-07-24 20:52:35,761 - INFO - Eval script for django__django-11099 written to logs/run_evaluation/run1_baseline/chimera-baseline/django__django-11099/eval.sh; copying to container...
+2026-07-24 20:52:41,217 - INFO - Test runtime: 5.38 seconds
+2026-07-24 20:52:41,221 - INFO - Test output for django__django-11099 written to logs/run_evaluation/run1_baseline/chimera-baseline/django__django-11099/test_output.txt
+2026-07-24 20:52:41,310 - INFO - Git diff after:
+diff --git a/django/contrib/auth/validators.py b/django/contrib/auth/validators.py
+index b4878cfd45..1304f20a60 100644
+--- a/django/contrib/auth/validators.py
++++ b/django/contrib/auth/validators.py
+@@ -7,7 +7,7 @@ from django.utils.translation import gettext_lazy as _
+ 
+ @deconstructible
+ class ASCIIUsernameValidator(validators.RegexValidator):
+-    regex = r'^[\w.@+-]+$'
++    regex = r'\A[\w.@+-]+\Z'
+     message = _(
+         'Enter a valid username. This value may contain only English letters, '
+         'numbers, and @/./+/-/_ characters.'
+@@ -17,7 +17,7 @@ class ASCIIUsernameValidator(validators.RegexValidator):
+ 
+ @deconstructible
+ class UnicodeUsernameValidator(validators.RegexValidator):
+-    regex = r'^[\w.@+-]+$'
++    regex = r'\A[\w.@+-]+\Z'
+     message = _(
+         'Enter a valid username. This value may contain only letters, '
+         'numbers, and @/./+/-/_ characters.'
+2026-07-24 20:52:41,311 - INFO - Grading answer for django__django-11099...
+2026-07-24 20:52:41,313 - INFO - report: {'django__django-11099': {'patch_is_None': False, 'patch_exists': True, 'patch_successfully_applied': True, 'resolved': True, 'tests_status': {'FAIL_TO_PASS': {'success': ['test_ascii_validator (auth_tests.test_validators.UsernameValidatorsTests)', 'test_unicode_validator (auth_tests.test_validators.UsernameValidatorsTests)', 'test_help_text (auth_tests.test_validators.UserAttributeSimilarityValidatorTest)'], 'failure': []}, 'PASS_TO_PASS': {'success': ['test_help_text (auth_tests.test_validators.MinimumLengthValidatorTest)', 'test_validate (auth_tests.test_validators.MinimumLengthValidatorTest)', 'test_help_text (auth_tests.test_validators.NumericPasswordValidatorTest)', 'test_validate (auth_tests.test_validators.NumericPasswordValidatorTest)', 'test_validate (auth_tests.test_validators.UserAttributeSimilarityValidatorTest)', 'test_validate_property (auth_tests.test_validators.UserAttributeSimilarityValidatorTest)', 'test_empty_password_validator_help_text_html (auth_tests.test_validators.PasswordValidationTest)', 'test_get_default_password_validators (auth_tests.test_validators.PasswordValidationTest)', 'test_get_password_validators_custom (auth_tests.test_validators.PasswordValidationTest)', 'test_password_changed (auth_tests.test_validators.PasswordValidationTest)', 'test_password_changed_with_custom_validator (auth_tests.test_validators.PasswordValidationTest)', 'test_password_validators_help_text_html (auth_tests.test_validators.PasswordValidationTest)', 'test_password_validators_help_text_html_escaping (auth_tests.test_validators.PasswordValidationTest)', 'test_password_validators_help_texts (auth_tests.test_validators.PasswordValidationTest)', 'test_validate_password (auth_tests.test_validators.PasswordValidationTest)', 'test_help_text (auth_tests.test_validators.CommonPasswordValidatorTest)', 'test_validate (auth_tests.test_validators.CommonPasswordValidatorTest)', 'test_validate_custom_list (auth_tests.test_validators.CommonPasswordValidatorTest)', 'test_validate_django_supplied_file (auth_tests.test_validators.CommonPasswordValidatorTest)'], 'failure': []}, 'FAIL_TO_FAIL': {'success': [], 'failure': []}, 'PASS_TO_FAIL': {'success': [], 'failure': []}}}}
+Result for django__django-11099: resolved: True
+2026-07-24 20:52:41,316 - INFO - Attempting to stop container sweb.eval.django__django-11099.run1_baseline...
+2026-07-24 20:52:57,910 - INFO - Attempting to remove container sweb.eval.django__django-11099.run1_baseline...
+2026-07-24 20:52:58,313 - INFO - Container sweb.eval.django__django-11099.run1_baseline removed.
+2026-07-24 20:52:58,313 - INFO - Attempting to remove image swebench/sweb.eval.x86_64.django_1776_django-11099:latest...
+2026-07-24 20:52:58,636 - INFO - Image swebench/sweb.eval.x86_64.django_1776_django-11099:latest removed.

@@ -1,0 +1,78 @@
+2026-07-25 02:53:56,017 - INFO - Traceback (most recent call last):
+  File "/tmp/swebench-venv/lib/python3.11/site-packages/docker/api/client.py", line 275, in _raise_for_status
+    response.raise_for_status()
+  File "/tmp/swebench-venv/lib/python3.11/site-packages/requests/models.py", line 1167, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 404 Client Error: Not Found for url: http+docker://localhost/v1.54/images/swebench/sweb.eval.x86_64.django_1776_django-11451:latest/json
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/tmp/swebench-venv/lib/python3.11/site-packages/swebench/harness/docker_build.py", line 496, in build_container
+    client.images.get(test_spec.instance_image_key)
+  File "/tmp/swebench-venv/lib/python3.11/site-packages/docker/models/images.py", line 333, in get
+    return self.prepare_model(self.client.api.inspect_image(name))
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/swebench-venv/lib/python3.11/site-packages/docker/utils/decorators.py", line 19, in wrapped
+    return f(self, resource_id, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/swebench-venv/lib/python3.11/site-packages/docker/api/image.py", line 251, in inspect_image
+    return self._result(
+           ^^^^^^^^^^^^^
+  File "/tmp/swebench-venv/lib/python3.11/site-packages/docker/api/client.py", line 281, in _result
+    self._raise_for_status(response)
+  File "/tmp/swebench-venv/lib/python3.11/site-packages/docker/api/client.py", line 277, in _raise_for_status
+    raise create_api_error_from_http_exception(e) from e
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/swebench-venv/lib/python3.11/site-packages/docker/errors.py", line 39, in create_api_error_from_http_exception
+    raise cls(e, response=response, explanation=explanation) from e
+docker.errors.ImageNotFound: 404 Client Error for http+docker://localhost/v1.54/images/swebench/sweb.eval.x86_64.django_1776_django-11451:latest/json: Not Found ("No such image: swebench/sweb.eval.x86_64.django_1776_django-11451:latest")
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/tmp/swebench-venv/lib/python3.11/site-packages/docker/api/client.py", line 275, in _raise_for_status
+    response.raise_for_status()
+  File "/tmp/swebench-venv/lib/python3.11/site-packages/requests/models.py", line 1167, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 404 Client Error: Not Found for url: http+docker://localhost/v1.54/images/swebench/sweb.eval.x86_64.django_1776_django-11451:latest/json
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/tmp/swebench-venv/lib/python3.11/site-packages/swebench/harness/docker_build.py", line 499, in build_container
+    client.images.pull(test_spec.instance_image_key)
+  File "/tmp/swebench-venv/lib/python3.11/site-packages/docker/models/images.py", line 474, in pull
+    return self.get(f'{repository}{sep}{tag}')
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/swebench-venv/lib/python3.11/site-packages/docker/models/images.py", line 333, in get
+    return self.prepare_model(self.client.api.inspect_image(name))
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/swebench-venv/lib/python3.11/site-packages/docker/utils/decorators.py", line 19, in wrapped
+    return f(self, resource_id, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/swebench-venv/lib/python3.11/site-packages/docker/api/image.py", line 251, in inspect_image
+    return self._result(
+           ^^^^^^^^^^^^^
+  File "/tmp/swebench-venv/lib/python3.11/site-packages/docker/api/client.py", line 281, in _result
+    self._raise_for_status(response)
+  File "/tmp/swebench-venv/lib/python3.11/site-packages/docker/api/client.py", line 277, in _raise_for_status
+    raise create_api_error_from_http_exception(e) from e
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/swebench-venv/lib/python3.11/site-packages/docker/errors.py", line 39, in create_api_error_from_http_exception
+    raise cls(e, response=response, explanation=explanation) from e
+docker.errors.ImageNotFound: 404 Client Error for http+docker://localhost/v1.54/images/swebench/sweb.eval.x86_64.django_1776_django-11451:latest/json: Not Found ("No such image: swebench/sweb.eval.x86_64.django_1776_django-11451:latest")
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/tmp/swebench-venv/lib/python3.11/site-packages/swebench/harness/run_evaluation.py", line 152, in run_instance
+    container = build_container(
+                ^^^^^^^^^^^^^^^^
+  File "/tmp/swebench-venv/lib/python3.11/site-packages/swebench/harness/docker_build.py", line 501, in build_container
+    raise BuildImageError(test_spec.instance_id, str(e), logger) from e
+swebench.harness.docker_build.BuildImageError: Error building image django__django-11451: 404 Client Error for http+docker://localhost/v1.54/images/swebench/sweb.eval.x86_64.django_1776_django-11451:latest/json: Not Found ("No such image: swebench/sweb.eval.x86_64.django_1776_django-11451:latest")
+Check (logs/run_evaluation/run2_baseline/chimera-baseline/django__django-11451/run_instance.log) for more information.
+
+2026-07-25 02:53:56,017 - INFO - Attempting to remove image swebench/sweb.eval.x86_64.django_1776_django-11451:latest...
+2026-07-25 02:53:56,023 - INFO - Image swebench/sweb.eval.x86_64.django_1776_django-11451:latest not found, removing has no effect.

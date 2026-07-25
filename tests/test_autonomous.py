@@ -682,3 +682,137 @@ def test_memory_readback_never_fails_the_run() -> None:
         FakeWorker("ok"), memory=BrokenMemory(), config=AutonomousConfig(use_planner=False)
     )
     assert auto.run("t").success is True  # advisory recall degrades, never crashes
+
+
+# --- --diff-feedback: show a failed attempt its own reverted diff (bench/retry_lift, I1) ---
+
+
+def test_rendered_diff_joins_files_and_labels_paths() -> None:
+    from chimera.core.autonomous import _rendered_diff
+    from chimera.evolution.diff_gate import FileDiff
+
+    body = _rendered_diff([FileDiff("a.py", "@@ -1 +1 @@\n-x\n+y"), FileDiff("b.py", "@@ -2 +2 @@\n-p\n+q")])
+    assert "--- a.py" in body and "--- b.py" in body
+    assert "+y" in body and "+q" in body
+
+
+def test_rendered_diff_truncation_is_explicit_not_silent() -> None:
+    """A clipped body must SAY it is clipped, or the model reads half a diff as the whole change."""
+    from chimera.core.autonomous import _DIFF_FEEDBACK_MAX_CHARS, _rendered_diff
+    from chimera.evolution.diff_gate import FileDiff
+
+    body = _rendered_diff([FileDiff("big.py", "+" + "z" * (_DIFF_FEEDBACK_MAX_CHARS * 2))])
+    assert body.endswith("... [diff truncated]")
+    assert len(body) <= _DIFF_FEEDBACK_MAX_CHARS + len("\n... [diff truncated]")
+
+
+def test_rendered_diff_skips_files_with_empty_patches() -> None:
+    from chimera.core.autonomous import _rendered_diff
+    from chimera.evolution.diff_gate import FileDiff
+
+    assert _rendered_diff([FileDiff("untouched.py", "")]) == ""
+
+
+def test_diff_feedback_defaults_off() -> None:
+    """Opt-in: the registered counter-hypothesis is that showing a wrong patch ANCHORS the model,
+    so this must not become the default until a run says otherwise."""
+    from chimera.core.autonomous import AutonomousAgent
+
+    agent = AutonomousAgent(FakeWorker())
+    assert agent.diff_feedback is False
+
+
+def test_keep_workspace_leaves_last_attempt_on_disk(tmp_path: Path) -> None:
+    """--keep-workspace: on failure, the agent's final edits survive for an external grader.
+
+    Mirror of test_always_fail_reverts_everything, but with keep_workspace=True: the run still
+    fails and each attempt is still marked reverted (between-attempt isolation is unchanged), yet
+    the file the last attempt wrote is present at the end because the loop restores it. This is what
+    lets SWE-bench grade the agent's patch instead of an empty diff.
+    """
+    worker = FakeWorker(workspace=tmp_path, filename="out.txt")
+    auto = AutonomousAgent(
+        worker,
+        verifier=FailVerifier(),
+        guard=WorkspaceGuard(tmp_path),
+        keep_workspace=True,
+        config=AutonomousConfig(max_attempts=2, use_planner=False),
+    )
+    result = auto.run("create out.txt")
+
+    assert result.success is False
+    assert (tmp_path / "out.txt").exists()  # kept for the external grader, unlike the default
+
+
+def test_keep_workspace_defaults_off(tmp_path: Path) -> None:
+    from chimera.core.autonomous import AutonomousAgent
+
+    assert AutonomousAgent(FakeWorker()).keep_workspace is False
+
+
+# --- --require-diff: an answer that changed nothing is not a success (bench/swe_bench amendment 2) ---
+
+
+class _ProseWorker:
+    """A worker that answers convincingly and edits NOTHING — the SWE-bench run-1 failure mode."""
+
+    def __init__(self) -> None:
+        self.runs = 0
+
+    def run(self, task: str) -> AgentResult:
+        self.runs += 1
+        return AgentResult(answer="The bug is in formsets.py: index may be None.", steps=1,
+                           stopped_reason="final")
+
+
+def test_require_diff_fails_an_attempt_that_changed_nothing(tmp_path: Path) -> None:
+    """With no verifier, ok = approved and the Manager judges the TEXT, so prose passes while the
+    file is untouched. --require-diff makes the diff-gate a gate: no change => the attempt fails."""
+    worker = _ProseWorker()
+    auto = AutonomousAgent(
+        worker,
+        guard=WorkspaceGuard(tmp_path),
+        require_diff=True,
+        config=AutonomousConfig(max_attempts=2, use_planner=False, use_manager=False),
+    )
+    result = auto.run("fix the bug in formsets.py")
+
+    assert result.success is False  # would be True without the flag
+    assert worker.runs == 2  # it was retried rather than accepted
+    assert "No file was changed" in result.attempts[0].feedback
+
+
+def test_without_require_diff_prose_still_passes(tmp_path: Path) -> None:
+    """The defect this flag fixes, pinned: by default an edit-nothing answer is a success."""
+    auto = AutonomousAgent(
+        _ProseWorker(),
+        guard=WorkspaceGuard(tmp_path),
+        config=AutonomousConfig(max_attempts=2, use_planner=False, use_manager=False),
+    )
+    assert auto.run("fix the bug").success is True
+
+
+def test_require_diff_accepts_an_attempt_that_did_change_a_file(tmp_path: Path) -> None:
+    auto = AutonomousAgent(
+        FakeWorker(workspace=tmp_path, filename="out.txt"),
+        guard=WorkspaceGuard(tmp_path),
+        require_diff=True,
+        config=AutonomousConfig(max_attempts=2, use_planner=False, use_manager=False),
+    )
+    result = auto.run("create out.txt")
+    assert result.success is True  # a real change satisfies the gate
+
+
+def test_require_diff_cannot_fail_without_a_workspace_guard() -> None:
+    """No guard means the diff was never measured (diff_productive is None), so the gate must not
+    fire — an unmeasured attempt is not a failed one."""
+    auto = AutonomousAgent(
+        _ProseWorker(),  # edits nothing, but there is no guard to observe that
+        require_diff=True,
+        config=AutonomousConfig(max_attempts=1, use_planner=False, use_manager=False),
+    )
+    assert auto.run("answer this").success is True
+
+
+def test_require_diff_defaults_off() -> None:
+    assert AutonomousAgent(FakeWorker()).require_diff is False

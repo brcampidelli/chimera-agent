@@ -26,6 +26,7 @@ half-finished arm's result is thrown away too, so no outcome is ever selected af
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import os
 import shutil
@@ -45,7 +46,17 @@ sys.path.insert(0, str(HERE.parent.parent))
 _MODEL = os.environ.get("BENCH_MODEL", "openrouter/meta-llama/llama-3.1-8b-instruct")
 _TIMEOUT = int(os.environ.get("BENCH_TIMEOUT", "300"))
 _ONLY = {t.strip() for t in os.environ.get("BENCH_TASKS", "").split(",") if t.strip()}
+# Where results land. Defaults to `results/`, but a re-verification run MUST be able to write
+# somewhere else: this runner used to overwrite `results/paired.json` and append to the same
+# journal on every invocation, so re-running the suite silently destroyed the published run's
+# record — and a journal carried over from an old run replays its pairs instead of re-measuring
+# them, which would make a "re-run" quietly return the very numbers it was meant to check.
+_OUT = Path(os.environ.get("BENCH_OUT", "")) if os.environ.get("BENCH_OUT") else None
 _HYGIENE = ["--no-remember", "--no-collect", "--no-evolve-skills"]
+# Task ids whose grading test differed from the pristine source when grading started — i.e. `solve`
+# edited the file that scores it. Surfaced in the report and the JSON; an empty set is the claim that
+# no arm graded itself, and that claim is now made from a measurement rather than from assumption.
+_TAMPERED: set[str] = set()
 # The only variable between arms is Chimera's scaffolding (same model, same task, same start state).
 _ARM_FLAGS = {
     "baseline": ["--no-plan", "--no-manager", "--max-attempts", "1", *_HYGIENE],
@@ -170,7 +181,39 @@ def _real_solve(task: dict, ws: Path, arm: str) -> None:
         subprocess.run(argv, capture_output=True, text=True, timeout=_TIMEOUT, check=False)
 
 
+def _test_digest(path: Path) -> str:
+    """SHA-256 of the on-disk test, or ``"missing"``. Used to detect a solve that edited its gate."""
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return "missing"
+
+
 def _real_grade(task: dict, ws: Path) -> bool:
+    """Independent verdict: restore the pristine test, run it, and record any tampering.
+
+    ``solve`` is deliberately given the test as its ``--verify`` gate — that mirrors a developer
+    running the suite, and it is the regime this bench measures. But it also means the file that
+    decides the score sits inside a workspace the agent can write to, so grading MUST NOT trust
+    whatever is on disk afterwards: an agent that edits its own gate would grade itself. The sibling
+    `run_gate_ab.py` already had this discipline ("write the hidden test, run it, then remove it");
+    this runner did not, and the n=100 headline was produced without it.
+
+    The digest comparison is kept (and reported) rather than silently repaired: "the agent modified
+    its grading test" is a finding, not an inconvenience, and a run that hides it cannot be audited.
+    """
+    test_path = ws / task["test"]
+    before = task["test_src"]
+    tampered = _test_digest(test_path) != hashlib.sha256(before.encode("utf-8")).hexdigest()
+    if tampered:
+        _TAMPERED.add(str(task["id"]))
+        # Keep the evidence OUTSIDE the run root: `main` deletes that tempdir in a `finally`, which
+        # is exactly why the n=100 run left nothing to audit. Preserving it in there would have been
+        # a no-op that looked like a safeguard.
+        with contextlib.suppress(OSError):
+            dest = (_OUT or (HERE / "results")) / f"tampered_{task['id']}"
+            shutil.copytree(ws, dest, dirs_exist_ok=True)
+    test_path.write_text(before, encoding="utf-8")  # pristine, regardless of what solve left
     proc = subprocess.run(
         [sys.executable, "-m", "pytest", "-q", task["test"]],
         cwd=str(ws), capture_output=True, text=True, errors="replace", check=False,
@@ -184,7 +227,8 @@ def main() -> None:
     with contextlib.suppress(Exception):  # best-effort console fix; never block the run
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
     tasks = [t for t in TASKS if not _ONLY or t["id"] in _ONLY]
-    out = HERE / "results"
+    out = _OUT or (HERE / "results")
+    out.mkdir(parents=True, exist_ok=True)
     journal = out / "journal.jsonl"
     resumed = len(_load_journal(journal, model=_MODEL))
     print(f"paired experiment · model={_MODEL} · tasks={len(tasks)} · timeout={_TIMEOUT}s/arm", flush=True)
@@ -215,6 +259,18 @@ def main() -> None:
 
     print("\n" + format_paired(result), flush=True)
 
+    # Grading integrity. Silence here is a claim, so state it explicitly either way.
+    if _TAMPERED:
+        print(
+            f"\n!! GRADING INTEGRITY: {len(_TAMPERED)} task(s) had their test edited by solve "
+            f"before grading: {', '.join(sorted(_TAMPERED))}. Those workspaces are preserved under "
+            f"results/tampered_<id>/. Grading used the pristine test, so the verdict stands — but "
+            f"the attempt itself is a finding worth reading.",
+            flush=True,
+        )
+    else:
+        print("\ngrading integrity: no arm modified its own test (pristine digest matched on every task)", flush=True)
+
     # …and the unpaired Newcombe verdict on the same marginals, so the tightening is visible.
     print(
         f"\n[unpaired marginals] raw-model {result.baseline_rate:.0%} vs chimera "
@@ -225,7 +281,17 @@ def main() -> None:
     out.mkdir(exist_ok=True)
     (out / "paired.json").write_text(
         json.dumps(
-            {"model": _MODEL, "summary": result.summary(), "by_task": by_task, "resumed_pairs": resumed},
+            {
+                "model": _MODEL,
+                "summary": result.summary(),
+                "by_task": by_task,
+                "resumed_pairs": resumed,
+                # Grading provenance, so a reader of this file alone can tell whether the verdict was
+                # produced against pristine tests. Absent in the n=100 artifact — which is why that
+                # run cannot be re-verified from what it left behind.
+                "graded_against_pristine_test": True,
+                "tests_modified_by_solve": sorted(_TAMPERED),
+            },
             indent=2,
         ),
         encoding="utf-8",

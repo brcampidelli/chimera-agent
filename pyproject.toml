@@ -209,6 +209,10 @@ artifacts = ["apps/desktop/dist/**"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+# Preserved forensic evidence: workspaces kept because an arm modified its own grading test. These
+# files are what the agent actually wrote and must stay byte-for-byte as found — linting them is
+# meaningless and `--fix` would rewrite the evidence.
+extend-exclude = ["bench/**/tampered_*"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]

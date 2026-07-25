@@ -136,6 +136,13 @@ def build_evolution_context(
             ),
             accept_mode=settings.skill_accept_mode,
         )
+    # Semantic card recall (memory_bench: keyword misses paraphrases 0% -> semantic 94%): when
+    # ``semantic_memory`` is on, rank cards by embedding cosine instead of BM25 so a card matches a task
+    # by meaning, not shared tokens. ``semantic_embed`` returns None unless the flag is set, so cards
+    # stay lexical by default. Same embedder the memory-fact recall already uses.
+    from chimera.evolution.wiring import semantic_embed
+
+    card_embed = semantic_embed(settings) if use_cards else None
     return EvolutionContext(
         experience=ExperienceBuffer(home / "experience.json"),
         trajectories=TrajectoryCollector(home / "trajectories.jsonl") if collect else None,
@@ -147,6 +154,7 @@ def build_evolution_context(
                 k=settings.skill_cards_k,
                 min_overlap=settings.skill_cards_min_overlap,
                 max_lines=settings.skill_cards_max_lines,
+                embed=card_embed,
             )
             if use_cards
             else None

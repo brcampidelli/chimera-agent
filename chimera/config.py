@@ -134,6 +134,15 @@ class Settings(BaseSettings):
     # isn't averaged away, and it's cheaper. Off by default and conservative: knowledge/open tasks,
     # and any logic task without a panel majority, still use judge -> synthesizer. ---
     fusion_task_typed: bool = Field(default=False, validation_alias="CHIMERA_FUSION_TASK_TYPED")
+    # --- Diversity sampling (how_to_generate study): per-panelist decode spread. A comma-separated
+    # list of temperatures (e.g. "0.2,0.5,0.7,0.9") — panelist i samples at temps[i % len], widening
+    # the candidate set the judge/synthesizer selects from (one low-temp anchor + higher-temp
+    # explorers) at near-zero cost. Empty (default) = every panelist at the single 0.3, unchanged.
+    # Measure the lift with `fusion-bench` before making a spread the default; `panel_diversity()` in
+    # the route_meta reports whether the spread actually widened the answers. ---
+    fusion_panel_temperatures: Annotated[list[float], NoDecode] = Field(
+        default_factory=list, validation_alias="CHIMERA_FUSION_PANEL_TEMPS"
+    )
 
     # --- Behaviour ---
     log_level: str = Field(default="INFO", validation_alias="CHIMERA_LOG_LEVEL")
@@ -212,6 +221,16 @@ class Settings(BaseSettings):
     # cron if you do opt in, so a misfiring card is born on probation and auto-demoted.
     skill_cards_couple_read: bool = Field(
         default=False, validation_alias="CHIMERA_SKILL_CARDS_READ"
+    )
+
+    # --- ACE playbook curation from errors (Level-2 P3): when curating the playbook after a run,
+    # feed the curator the actual error evidence — the failing verifier output and the diff that
+    # fixed it — not just verdict+final-answer. Blind-to-failure curation produces platitudes; the
+    # evidence lets it distill process pitfalls ("run the failing test first", "re-check a second
+    # case", "re-read the docstring for quiet clauses"). On by default: strictly more signal for a
+    # curator already instructed to generalise. Set 0 to ablate against the verdict-only baseline. ---
+    playbook_curate_from_errors: bool = Field(
+        default=True, validation_alias="CHIMERA_PLAYBOOK_CURATE_FROM_ERRORS"
     )
 
     # --- How the collective skill-accept gate scores cross-model transfer: "point" (the
@@ -346,6 +365,7 @@ class Settings(BaseSettings):
 
     @field_validator(
         "fusion_panel",
+        "fusion_panel_temperatures",
         "fallback_models",
         "openrouter_keys",
         "openai_keys",
