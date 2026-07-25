@@ -1,0 +1,154 @@
+[
+  {
+    "instance_id": "django__django-10880",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/db/models/aggregates.py b/django/db/models/aggregates.py\nindex ac0b62d0bf..62a9ff66f7 100644\n--- a/django/db/models/aggregates.py\n+++ b/django/db/models/aggregates.py\n@@ -16,140 +16,4 @@ __all__ = [\n class Aggregate(Func):\n     template = '%(function)s(%(distinct)s%(expressions)s)'\n     contains_aggregate = True\n-    name = None\n-    filter_template = '%s FILTER (WHERE %%(filter)s)'\n-    window_compatible = True\n-    allow_distinct = False\n-\n-    def __init__(self, *expressions, distinct=False, filter=None, **extra):\n-        if distinct and not self.allow_distinct:\n-            raise TypeError(\"%s does not allow distinct.\" % self.__class__.__name__)\n-        self.distinct = distinct\n-        self.filter = filter\n-        super().__init__(*expressions, **extra)\n-\n-    def get_source_fields(self):\n-        # Don't return the filter expression since it's not a source field.\n-        return [e._output_field_or_none for e in super().get_source_expressions()]\n-\n-    def get_source_expressions(self):\n-        source_expressions = super().get_source_expressions()\n-        if self.filter:\n-            return source_expressions + [self.filter]\n-        return source_expressions\n-\n-    def set_source_expressions(self, exprs):\n-        self.filter = self.filter and exprs.pop()\n-        return super().set_source_expressions(exprs)\n-\n-    def resolve_expression(self, query=None, allow_joins=True, reuse=None, summarize=False, for_save=False):\n-        # Aggregates are not allowed in UPDATE queries, so ignore for_save\n-        c = super().resolve_expression(query, allow_joins, reuse, summarize)\n-        c.filter = c.filter and c.filter.resolve_expression(query, allow_joins, reuse, summarize)\n-        if not summarize:\n-            # Call Aggregate.get_source_expressions() to avoid\n-            # returning self.filter and including that in this loop.\n-            expressions = super(Aggregate, c).get_source_expressions()\n-            for index, expr in enumerate(expressions):\n-                if expr.contains_aggregate:\n-                    before_resolved = self.get_source_expressions()[index]\n-                    name = before_resolved.name if hasattr(before_resolved, 'name') else repr(before_resolved)\n-                    raise FieldError(\"Cannot compute %s('%s'): '%s' is an aggregate\" % (c.name, name, name))\n-        return c\n-\n-    @property\n-    def default_alias(self):\n-        expressions = self.get_source_expressions()\n-        if len(expressions) == 1 and hasattr(expressions[0], 'name'):\n-            return '%s__%s' % (expressions[0].name, self.name.lower())\n-        raise TypeError(\"Complex expressions require an alias\")\n-\n-    def get_group_by_cols(self):\n-        return []\n-\n-    def as_sql(self, compiler, connection, **extra_context):\n-        extra_context['distinct'] = 'DISTINCT' if self.distinct else ''\n-        if self.filter:\n-            if connection.features.supports_aggregate_filter_clause:\n-                filter_sql, filter_params = self.filter.as_sql(compiler, connection)\n-                template = self.filter_template % extra_context.get('template', self.template)\n-                sql, params = super().as_sql(\n-                    compiler, connection, template=template, filter=filter_sql,\n-                    **extra_context\n-                )\n-                return sql, params + filter_params\n-            else:\n-                copy = self.copy()\n-                copy.filter = None\n-                source_expressions = copy.get_source_expressions()\n-                condition = When(self.filter, then=source_expressions[0])\n-                copy.set_source_expressions([Case(condition)] + source_expressions[1:])\n-                return super(Aggregate, copy).as_sql(compiler, connection, **extra_context)\n-        return super().as_sql(compiler, connection, **extra_context)\n-\n-    def _get_repr_options(self):\n-        options = super()._get_repr_options()\n-        if self.distinct:\n-            options['distinct'] = self.distinct\n-        if self.filter:\n-            options['filter'] = self.filter\n-        return options\n-\n-\n-class Avg(FixDurationInputMixin, NumericOutputFieldMixin, Aggregate):\n-    function = 'AVG'\n-    name = 'Avg'\n-\n-\n-class Count(Aggregate):\n-    function = 'COUNT'\n-    name = 'Count'\n-    output_field = IntegerField()\n-    allow_distinct = True\n-\n-    def __init__(self, expression, filter=None, **extra):\n-        if expression == '*':\n-            expression = Star()\n-        if isinstance(expression, Star) and filter is not None:\n-            raise ValueError('Star cannot be used with filter. Please specify a field.')\n-        super().__init__(expression, filter=filter, **extra)\n-\n-    def convert_value(self, value, expression, connection):\n-        return 0 if value is None else value\n-\n-\n-class Max(Aggregate):\n-    function = 'MAX'\n-    name = 'Max'\n-\n-\n-class Min(Aggregate):\n-    function = 'MIN'\n-    name = 'Min'\n-\n-\n-class StdDev(NumericOutputFieldMixin, Aggregate):\n-    name = 'StdDev'\n-\n-    def __init__(self, expression, sample=False, **extra):\n-        self.function = 'STDDEV_SAMP' if sample else 'STDDEV_POP'\n-        super().__init__(expression, **extra)\n-\n-    def _get_repr_options(self):\n-        return {**super()._get_repr_options(), 'sample': self.function == 'STDDEV_SAMP'}\n-\n-\n-class Sum(FixDurationInputMixin, Aggregate):\n-    function = 'SUM'\n-    name = 'Sum'\n-\n-\n-class Variance(NumericOutputFieldMixin, Aggregate):\n-    name = 'Variance'\n-\n-    def __init__(self, expression, sample=False, **extra):\n-        self.function = 'VAR_SAMP' if sample else 'VAR_POP'\n-        super().__init__(expression, **extra)\n-\n-    def _get_repr_options(self):\n-        return {**super()._get_repr_options(), 'sample': self.function == 'VAR_SAMP'}\n+    name\u6781\n\\ No newline at end of file\n",
+    "_seconds": 252.7,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-10914",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/conf/global_settings.py b/django/conf/global_settings.py\nindex acee9887d2..bdeec80610 100644\n--- a/django/conf/global_settings.py\n+++ b/django/conf/global_settings.py\n@@ -304,7 +304,7 @@ FILE_UPLOAD_TEMP_DIR = None\n \n # The numeric mode to set newly-uploaded files to. The value should be a mode\n # you'd pass directly to os.chmod; see https://docs.python.org/library/os.html#files-and-directories.\n-FILE_UPLOAD_PERMISSIONS = None\n+FILE_UPLOAD_PERMISSIONS = 0o644\n \n # The numeric mode to assign to newly-created directories, when uploading files.\n # The value should be a mode as you'd pass to os.chmod;\n",
+    "_seconds": 71.2,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-10999",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/utils/dateparse.py b/django/utils/dateparse.py\nindex 8d08b7d1d3..a037758784 100644\n--- a/django/utils/dateparse.py\n+++ b/django/utils/dateparse.py\n@@ -29,7 +29,7 @@ datetime_re = re.compile(\n standard_duration_re = re.compile(\n     r'^'\n     r'(?:(?P<days>-?\\d+) (days?, )?)?'\n-    r'((?:(?P<hours>-?\\d+):)(?=\\d+:\\d+))?'\n+    r'((?:(?P<hours>-?\\d+):)(?=-?\\d+:-?\\d+))?'\n     r'(?:(?P<minutes>-?\\d+):)?'\n     r'(?P<seconds>-?\\d+)'\n     r'(?:\\.(?P<microseconds>\\d{1,6})\\d{0,6})?'\n",
+    "_seconds": 34.8,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-11066",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/contrib/contenttypes/management/__init__.py b/django/contrib/contenttypes/management/__init__.py\nindex 2b5f688136..563cba2fdf 100644\n--- a/django/contrib/contenttypes/management/__init__.py\n+++ b/django/contrib/contenttypes/management/__init__.py\n@@ -24,7 +24,7 @@ class RenameContentType(migrations.RunPython):\n             content_type.model = new_model\n             try:\n                 with transaction.atomic(using=db):\n-                    content_type.save(update_fields={'model'})\n+                    content_type.save(using=db, update_fields={'model'})\n             except IntegrityError:\n                 # Gracefully fallback if a stale content type causes a\n                 # conflict as remove_stale_contenttypes will take care of\n",
+    "_seconds": 47.0,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-11099",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/contrib/auth/validators.py b/django/contrib/auth/validators.py\nindex b4878cfd45..1304f20a60 100644\n--- a/django/contrib/auth/validators.py\n+++ b/django/contrib/auth/validators.py\n@@ -7,7 +7,7 @@ from django.utils.translation import gettext_lazy as _\n \n @deconstructible\n class ASCIIUsernameValidator(validators.RegexValidator):\n-    regex = r'^[\\w.@+-]+$'\n+    regex = r'\\A[\\w.@+-]+\\Z'\n     message = _(\n         'Enter a valid username. This value may contain only English letters, '\n         'numbers, and @/./+/-/_ characters.'\n@@ -17,7 +17,7 @@ class ASCIIUsernameValidator(validators.RegexValidator):\n \n @deconstructible\n class UnicodeUsernameValidator(validators.RegexValidator):\n-    regex = r'^[\\w.@+-]+$'\n+    regex = r'\\A[\\w.@+-]+\\Z'\n     message = _(\n         'Enter a valid username. This value may contain only letters, '\n         'numbers, and @/./+/-/_ characters.'\n",
+    "_seconds": 42.6,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-11119",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/template/engine.py b/django/template/engine.py\nindex dfaa67ba12..ff9ce58d59 100644\n--- a/django/template/engine.py\n+++ b/django/template/engine.py\n@@ -160,7 +160,7 @@ class Engine:\n         if isinstance(context, Context):\n             return t.render(context)\n         else:\n-            return t.render(Context(context))\n+            return t.render(Context(context, autoescape=self.autoescape))\n \n     def select_template(self, template_name_list):\n         \"\"\"\n",
+    "_seconds": 325.4,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-11133",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "",
+    "_seconds": 1800.1,
+    "_timed_out": true,
+    "_empty": true
+  },
+  {
+    "instance_id": "django__django-11163",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/forms/models.py b/django/forms/models.py\nindex d157c291ef..5edbbd376f 100644\n--- a/django/forms/models.py\n+++ b/django/forms/models.py\n@@ -83,7 +83,7 @@ def model_to_dict(instance, fields=None, exclude=None):\n     for f in chain(opts.concrete_fields, opts.private_fields, opts.many_to_many):\n         if not getattr(f, 'editable', False):\n             continue\n-        if fields and f.name not in fields:\n+        if fields is not None and f.name not in fields:\n             continue\n         if exclude and f.name in exclude:\n             continue\n",
+    "_seconds": 292.6,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-11179",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/db/models/deletion.py b/django/db/models/deletion.py\nindex 92fe4affb9..3a462f1c4c 100644\n--- a/django/db/models/deletion.py\n+++ b/django/db/models/deletion.py\n@@ -277,6 +277,7 @@ class Collector:\n             if self.can_fast_delete(instance):\n                 with transaction.mark_for_rollback_on_error():\n                     count = sql.DeleteQuery(model).delete_batch([instance.pk], self.using)\n+                setattr(instance, model._meta.pk.attname, None)\n                 return count, {model._meta.label: count}\n \n         with transaction.atomic(using=self.using, savepoint=False):\n",
+    "_seconds": 195.1,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-11239",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/db/backends/postgresql/client.py b/django/db/backends/postgresql/client.py\nindex cf4df76882..eacef6562b 100644\n--- a/django/db/backends/postgresql/client.py\n+++ b/django/db/backends/postgresql/client.py\n@@ -17,6 +17,10 @@ class DatabaseClient(BaseDatabaseClient):\n         dbname = conn_params.get('database', '')\n         user = conn_params.get('user', '')\n         passwd = conn_params.get('password', '')\n+        sslmode = conn_params.get('sslmode', '')\n+        sslcert = conn_params.get('sslcert', '')\n+        sslkey = conn_params.get('sslkey', '')\n+        sslrootcert = conn_params.get('sslrootcert', '')\n \n         if user:\n             args += ['-U', user]\n@@ -24,6 +28,14 @@ class DatabaseClient(BaseDatabaseClient):\n             args += ['-h', host]\n         if port:\n             args += ['-p', str(port)]\n+        if sslmode:\n+            args += ['--ssl-mode', sslmode]\n+        if sslcert:\n+            args += ['--ssl-cert', sslcert]\n+        if sslkey:\n+            args += ['--ssl-key', sslkey]\n+        if sslrootcert:\n+            args += ['--ssl-root-cert', sslrootcert]\n         args += [dbname]\n \n         sigint_handler = signal.getsignal(signal.SIGINT)\ndiff --git a/tests/dbshell/test_postgresql.py b/tests/dbshell/test_postgresql.py\nindex a33e7f6482..9f358a591c 100644\n--- a/tests/dbshell/test_postgresql.py\n+++ b/tests/dbshell/test_postgresql.py\n@@ -94,3 +94,42 @@ class PostgreSqlDbshellCommandTestCase(SimpleTestCase):\n             DatabaseClient.runshell_db({})\n         # dbshell restores the original handler.\n         self.assertEqual(sigint_handler, signal.getsignal(signal.SIGINT))\n+\n+    def test_ssl_params(self):\n+        \"\"\"SSL parameters are passed to psql command.\"\"\"\n+        self.assertEqual(\n+            self._run_it({\n+                'database': 'dbname',\n+                'user': 'someuser',\n+                'password': 'somepassword',\n+                'host': 'somehost',\n+                'port': '444',\n+                'sslmode': 'verify-ca',\n+                'sslcert': 'client.crt',\n+                'sslkey': 'client.key',\n+                'sslrootcert': 'ca.crt',\n+            }), (\n+                ['psql', '-U', 'someuser', '-h', 'somehost', '-p', '444', \n+                 '--ssl-mode', 'verify-ca', '--ssl-cert', 'client.crt', \n+                 '--ssl-key', 'client.key', '--ssl-root-cert', 'ca.crt', 'dbname'],\n+                'somepassword',\n+            )\n+        )\n+\n+    def test_partial_ssl_params(self):\n+        \"\"\"Only specified SSL parameters are passed to psql command.\"\"\"\n+        self.assertEqual(\n+            self._run_it({\n+                'database': 'dbname',\n+                'user': 'someuser',\n+                'password': 'somepassword',\n+                'host': 'somehost',\n+                'port': '444',\n+                'sslmode': 'require',\n+                'sslrootcert': 'ca.crt',\n+            }), (\n+                ['psql', '-U', 'someuser', '-h', 'somehost', '-p', '444', \n+                 '--ssl-mode', 'require', '--ssl-root-cert', 'ca.crt', 'dbname'],\n+                'somepassword',\n+            )\n+        )\n\\ No newline at end of file\n",
+    "_seconds": 615.5,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-11299",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "",
+    "_seconds": 208.6,
+    "_timed_out": false,
+    "_empty": true
+  },
+  {
+    "instance_id": "django__django-11433",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/forms/models.py b/django/forms/models.py\nindex 5edbbd376f..91d4ad48dd 100644\n--- a/django/forms/models.py\n+++ b/django/forms/models.py\n@@ -48,8 +48,10 @@ def construct_instance(form, instance, fields=None, exclude=None):\n             continue\n         # Leave defaults for fields that aren't in POST data, except for\n         # checkbox inputs because they don't appear in POST data if not checked.\n+        # Only skip if the field is also not present in cleaned_data.\n         if (f.has_default() and\n-                form[f.name].field.widget.value_omitted_from_data(form.data, form.files, form.add_prefix(f.name))):\n+                form[f.name].field.widget.value_omitted_from_data(form.data, form.files, form.add_prefix(f.name)) and\n+                f.name not in cleaned_data):\n             continue\n         # Defer saving file-type fields until after the other fields, so a\n         # callable upload_to can use the values from other fields.\n",
+    "_seconds": 512.9,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-11451",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/contrib/auth/backends.py b/django/contrib/auth/backends.py\nindex f4b1722757..a3765ae0f1 100644\n--- a/django/contrib/auth/backends.py\n+++ b/django/contrib/auth/backends.py\n@@ -39,6 +39,8 @@ class ModelBackend(BaseBackend):\n     def authenticate(self, request, username=None, password=None, **kwargs):\n         if username is None:\n             username = kwargs.get(UserModel.USERNAME_FIELD)\n+        if username is None or password is None:\n+            return\n         try:\n             user = UserModel._default_manager.get_by_natural_key(username)\n         except UserModel.DoesNotExist:\n",
+    "_seconds": 51.4,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-11490",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/db/backends/mysql/compiler.py b/django/db/backends/mysql/compiler.py\nindex fc74ac1991..6dc0008606 100644\n--- a/django/db/backends/mysql/compiler.py\n+++ b/django/db/backends/mysql/compiler.py\n@@ -6,6 +6,10 @@ class SQLCompiler(compiler.SQLCompiler):\n         qn = compiler.quote_name_unless_alias\n         qn2 = self.connection.ops.quote_name\n         sql, params = self.as_sql()\n+        # For combined queries, use the current query's selected columns\n+        # instead of the static columns parameter to respect values()/values_list() changes\n+        if self.query.combinator:\n+            columns = [col.target.column for col, _, _ in self.select]\n         return '(%s) IN (%s)' % (', '.join('%s.%s' % (qn(alias), qn2(column)) for column in columns), sql), params\n \n \n",
+    "_seconds": 259.2,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-11555",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "",
+    "_seconds": 206.4,
+    "_timed_out": false,
+    "_empty": true
+  },
+  {
+    "instance_id": "django__django-11603",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/db/models/aggregates.py b/django/db/models/aggregates.py\nindex da4ff928aa..3effaa7533 100644\n--- a/django/db/models/aggregates.py\n+++ b/django/db/models/aggregates.py\n@@ -99,6 +99,7 @@ class Aggregate(Func):\n class Avg(FixDurationInputMixin, NumericOutputFieldMixin, Aggregate):\n     function = 'AVG'\n     name = 'Avg'\n+    allow_distinct = True\n \n \n class Count(Aggregate):\n@@ -121,11 +122,13 @@ class Count(Aggregate):\n class Max(Aggregate):\n     function = 'MAX'\n     name = 'Max'\n+    allow_distinct = True\n \n \n class Min(Aggregate):\n     function = 'MIN'\n     name = 'Min'\n+    allow_distinct = True\n \n \n class StdDev(NumericOutputFieldMixin, Aggregate):\n@@ -142,6 +145,7 @@ class StdDev(NumericOutputFieldMixin, Aggregate):\n class Sum(FixDurationInputMixin, Aggregate):\n     function = 'SUM'\n     name = 'Sum'\n+    allow_distinct = True\n \n \n class Variance(NumericOutputFieldMixin, Aggregate):\n",
+    "_seconds": 77.8,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-11820",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "",
+    "_seconds": 155.1,
+    "_timed_out": false,
+    "_empty": true
+  },
+  {
+    "instance_id": "django__django-11880",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/forms/fields.py b/django/forms/fields.py\nindex 03cd8af8d7..4cc3133ca0 100644\n--- a/django/forms/fields.py\n+++ b/django/forms/fields.py\n@@ -200,6 +200,7 @@ class Field:\n         memo[id(self)] = result\n         result.widget = copy.deepcopy(self.widget, memo)\n         result.validators = self.validators[:]\n+        result.error_messages = copy.deepcopy(self.error_messages, memo)\n         return result\n \n \n",
+    "_seconds": 301.9,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-11951",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "",
+    "_seconds": 262.4,
+    "_timed_out": false,
+    "_empty": true
+  }
+]

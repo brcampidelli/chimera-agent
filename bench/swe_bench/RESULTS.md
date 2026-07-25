@@ -1,129 +1,139 @@
-# SWE-bench Verified — run 1 (Q1 paired A/B): an exact zero
+# SWE-bench Verified — the Chimera scaffold on real django bugs
 
-Design, slice, model, arms and predictions were fixed in [`PREREGISTRATION.md`](PREREGISTRATION.md)
-(+ Amendment 1) **before any model call**. The result publishes as it came out.
+Two runs, both pre-registered in [`PREREGISTRATION.md`](PREREGISTRATION.md) before any model call, on
+the same frozen 19-instance slice, graded only by the official `swebench` 4.1.0 harness in Docker.
+**Run 1 is a null and stays published. Run 2 reverses it — and forces me to retract the mechanism I
+had claimed.**
 
-**Bottom line up front.** On 19 gold-validated `django/django` instances from the easiest difficulty
-stratum of SWE-bench Verified, driving `deepseek-chat-v3.1` through Chimera's scaffolding resolved
-**exactly as many instances as the bare model**: 7/19 both, **Δ = +0.0%, 95% CI [−8.5%, +8.5%]**. Not
-a "roughly equal" — literally 7 and 7, with one discordant pair each way. This is the project's first
-number on an externally recognized scoreboard, and it is a **null**.
+| | baseline | chimera | paired Δ | 95% CI |
+|---|---|---|---|---|
+| **Run 1** (`max_steps=8`) | 36.8% (7/19) | 36.8% (7/19) | **+0.0%** | [−8.5%, +8.5%] |
+| **Run 2** (`max_steps=30`, +`--require-diff`) | 42.1% (8/19) | **57.9% (11/19)** | **+15.8%** | [−1.9%, +15.8%] |
 
-Three things keep this from being the verdict on the thesis, and all three are stated before the
-numbers so they cannot read as excuses invented afterwards: the run **disabled verify-or-revert** (a
-pre-registered choice, §Limitations 1) — the one mechanism behind the project's only positive result;
-it ran with **`max_steps=8`** against a 250 MB repository (an oversight, not pre-registered,
-§Limitations 2); and it used a **competent** model where the thesis is about lifting *weak* ones
-(§Limitations 3). Most decisively, **17 of 19 pairs were concordant**, so the entire estimate rests on
-**two** informative pairs.
+Neither Δ is statistically significant. But they are different kinds of non-significant, and the
+difference matters: run 1 was an exact tie with one discordant pair each way; **run 2 was 3–0 — every
+instance the baseline solved, Chimera solved, plus three more.**
 
-## The result
+---
+
+## Run 2: the discriminating run
+
+Registered as Amendments 2 and 3 after run 1's null was traced to two faults **of our own** — a
+scaffold tested without its strongest mechanism, and a step budget of 8 against a 250 MB repository.
 
 ```
-n=19 django "<15 min fix" instances | model openrouter/deepseek/deepseek-chat-v3.1 | pass@1
-  baseline (bare)     36.8%   (7/19)     --no-plan --no-manager --max-attempts 1
-  chimera (scaffold)  36.8%   (7/19)     --repo-map --progress-ledger --replan --checklist --max-attempts 3
-
-  paired Δ  +0.0%   95% CI [-8.5%, +8.5%]   -> NOT significant
-  discordant: chimera-only 1 (django-11880) / baseline-only 1 (django-11163)
-  concordant: both resolved 6 (10914, 11066, 11099, 11119, 11451, 11603) | both failed 11
+n=19 django "<15 min fix" | deepseek-chat-v3.1 | pass@1 | max_steps=30 on BOTH arms
+  baseline      42.1%  (8/19)    --no-plan --no-manager --max-attempts 1
+  chimera+gate  57.9%  (11/19)   --repo-map --progress-ledger --replan --checklist
+                                 --max-attempts 3 --require-diff
+  paired Δ +15.8%   95% CI [-1.9%, +15.8%]   -> not significant
+  discordant: chimera-only 3 (11133, 11451, 11951) / baseline-only 0
+  concordant: both resolved 8 | both failed 8
 ```
 
-Graded exclusively by the **official `swebench` 4.1.0 harness** in Docker (`FAIL_TO_PASS` must pass,
-`PASS_TO_PASS` must stay green). Never self-reported. Raw reports:
-`results/run1/chimera-{baseline,treatment}.run1_*.json`.
+**Why the 3–0 is worth noticing, and why it is still not proof.** Noise usually splits between arms;
+a clean sweep does not. Under the null, three discordant pairs landing on the same side has
+probability 1/8 ≈ 12.5% — suggestive, not conclusive, and the CI crosses zero by 1.9 points. The
+pre-registration predicted exactly this shape ("Δ +5 to +20 pp, quite possibly not significant at
+n=19"), so the honest label is **the registered one: not significant**.
 
-### Q1 and Q2, kept apart as registered
+### The scaffold only pays off once the agent can move
 
-- **Q1 — the thesis (what this run answers).** Does Chimera's scaffolding beat the same model alone on
-  the same instances? **No measurable difference: Δ = 0.0% [−8.5%, +8.5%].**
-- **Q2 — the scoreboard (what this run does NOT answer).** 36.8% on a *deliberately easy, single-repo
-  slice* is **not a SWE-bench Verified score** and will never be labelled as one. A Verified score needs
-  the full 500 and remains deferred.
+```
+run 1 (8 steps):   baseline  7/19  |  scaffold   7/19   ->  Δ  +0.0%
+run 2 (30 steps):  baseline  8/19  |  scaffold  11/19   ->  Δ +15.8%
+```
 
-## Failure accounting (pre-registration rule 3)
+Extra steps alone bought the **baseline** one instance. The same scaffolding that was worth *nothing*
+at 8 steps is worth *three* at 30. That reads naturally: at 8 steps the agent barely finishes
+navigating django, so planning, re-planning and a checklist have nothing to orchestrate; given room to
+act, the scaffolding starts to pay. **Run 1's headline null measured a starved agent, and the starving
+was our configuration error.**
 
-Infrastructure failures are reported separately from genuine agent failures. **There were none.**
+### Precision, not just activity
 
-| | baseline | chimera |
+| | patches | resolved | precision when it edited |
+|---|---|---|---|
+| run 1 baseline | 9/19 | 7 | 78% |
+| run 1 scaffold | 8/19 | 7 | 88% |
+| **run 2 baseline** | 14/19 | 8 | **57%** |
+| **run 2 chimera+gate** | 16/19 | 11 | **69%** |
+
+Raising the step budget made both arms *act* far more (patch rate 47% → 74%) and act *worse*
+(precision 78% → 57% for the baseline): the newly-attempted instances are the harder ones, and most of
+those attempts are wrong. The scaffolded arm degrades less (69% vs 57%), which is where its three
+extra resolutions come from — **not from editing more often, but from editing better**.
+
+---
+
+## Retraction: my mechanism trace was wrong
+
+Amendment 2 traced run 1's empty patches to a specific chain: with no verifier `ok = approved`, the
+Manager judges the answer *text*, and the diff-gate computes `diff_productive` but spends it on
+telemetry — so confident prose passes while the file is untouched. I called it "a product defect,
+independent of any benchmark" and predicted the gate would drop the empty rate to ≤5/19.
+
+**The prediction came true and the explanation was wrong.** The empty rate did fall — but it fell just
+as far in the **baseline**, which has no gate and no scaffold:
+
+```
+empty patches:  run 1 baseline 10/19  ->  run 2 baseline  5/19   (only max_steps changed)
+                run 1 scaffold 11/19  ->  run 2 gated     3/19
+```
+
+The decisive evidence is instance-level. Of the four instances where the run-2 baseline failed to edit,
+the gate converted **one** — `11133`, and that one is not a clean test, because there the baseline had
+*timed out* rather than declined to edit. On the three genuine cases (`11299`, `11555`, `11820` — real
+empties, finished in 155–209 s with budget to spare), the gate rejected the attempts, forced the
+retries, burned 2–3× the time, and **still produced nothing**.
+
+So: forcing a retry does not make a model edit when it does not know what to edit. **The empty patches
+were a step-budget problem, not a commitment problem**, and the residue left after fixing the budget is
+capability-limited. Per Amendment 2's pre-committed rule, this retraction ships as prominently as the
+claim did.
+
+**What survives.** The defect itself is real and independently worth fixing: a code-editing task could
+be scored a success having changed no file (pinned by `test_without_require_diff_prose_still_passes`).
+`--require-diff` fixes that, and stays off by default. It is simply **not what produced run 2's +15.8%**.
+
+## What this run cannot say
+
+Amendment 3 cut the middle arm (plain scaffold at 30 steps) for cost, and that cost is now visible:
+**the +15.8% cannot be attributed between the scaffolding and the gate.** The evidence above argues the
+gate contributed little, which points at the scaffolding — but a clean attribution needs the arm we
+dropped. Any claim here reads "scaffold **plus** gate beats the bare model", never "the gate worked".
+
+## Failure accounting and cost
+
+| | baseline | chimera+gate |
 |---|---|---|
 | solves | 19 | 19 |
-| produced a patch | 9 | 8 |
-| **empty patch (no edit at all)** | **10** | **11** |
-| resolved | 7 | 7 |
-| **precision when it edited** | **7/9 = 78%** | **7/8 = 88%** |
-| timeouts | 0 | 0 |
+| patches | 14 | 16 |
+| empty (declined to edit) | 4 | 3 |
+| **timeouts (1800 s)** | **1** | **0** |
 | infrastructure errors | 0 | 0 |
+| median / max time | 209 s / 1800 s | 609 s / 1284 s |
+| total wall time | 1.6 h | 3.6 h |
 
-One instance, `django__django-10097`, was **excluded from the slice before any spend**: the gold
-dry-run showed its own *reference* patch does not pass grading, so no agent patch could be judged
-fairly on it. That is an infrastructure exclusion caught by gold, not an outcome-driven drop (commit
-`4b28039`). The frozen slice went 20 → 19.
+Timeout asymmetry is 1 vs 0 — within the tolerance the validity gate allows, and it runs *against* the
+scaffolded arm (the timed-out baseline solve counts as a baseline failure). **Cost: US$ 6.83** for run 2
+including its feasibility probe; US$ 5.97 of the US$ 20 key remains. The scaffolded arm costs ~2.2× the
+wall time of the baseline for its three extra resolutions.
 
-## Cost (pre-registration rule 4)
+`django__django-10097` remains excluded from the slice: the gold dry-run showed its *reference* patch
+fails grading, so no agent patch could be judged fairly on it. Caught before any spend.
 
-**US$ 0.82** for the full paired run (38 solves), plus **US$ 0.54** for the 3-instance cost probe.
-Wall time: baseline 22 min (median 61 s/solve), chimera ≈ 46 min for the 10 measured solves (median
-250 s/solve, max 411 s). The scaffolded arm is roughly **4× slower per solve** and produced *fewer*
-patches. Timing for the first 9 chimera solves was lost when the run was paused mid-flight (telemetry
-is written at completion) — reported rather than silently omitted.
+## Q1 and Q2, kept apart
 
-## The one finding that is genuinely actionable
+- **Q1 — the thesis.** On real django bugs with a competent model and an adequate step budget, the
+  scaffolding resolved **+3 instances, 0 losses, Δ +15.8% [−1.9%, +15.8%]** — the first externally
+  graded result pointing the right way, and **not statistically significant**.
+- **Q2 — the scoreboard.** 57.9% is on a *deliberately easy, single-repo slice*. It is **not a SWE-bench
+  Verified score** and must never be presented as one. A Verified score needs the full 500.
 
-**Both arms are accurate when they act, and both usually don't act.** Precision when a patch exists is
-78% and 88%; the dominant failure mode is producing **no edit at all** (10 and 11 of 19). Faced with a
-real django issue, the model frequently answers in prose without touching a file.
+## What would settle it
 
-That reframes the target. The bottleneck measured here is not "reasons badly" but **"does not commit
-to an action"** — and neither scaffold addresses it. Both limitations below are direct candidate
-causes, which is why the discriminating run (below) attacks exactly them.
-
-## Limitations — why this null is not the thesis verdict
-
-**1. Verify-or-revert was disabled (pre-registered, Amendment 1 decision 3).** Neither dataset ships a
-runnable `test_cmd`, and synthesizing one from `FAIL_TO_PASS` would hand the agent its own hidden
-graders. So the treatment arm ran with **no executable ground truth**. But `bench/local_lift` — the
-project's *only* statistically significant lift — ran **with** `--verify`. This run therefore tested a
-Chimera missing the mechanism behind its one proven win. The pre-registration flagged this ("tests a
-weaker Chimera than local_lift did — noted, not hidden"); in hindsight it understated how much it
-hollows out the test.
-
-**2. `max_steps=8` against a 250 MB repo — an oversight, not a registered choice.** `chimera solve`
-defaults to 8 tool-calling steps and the runner did not override it. Eight steps to navigate django,
-locate the right file, and edit it is plausibly not enough; the observed signature (200–400 s elapsed,
-no patch) is consistent with the step budget being consumed by navigation. This cannot be confirmed
-retroactively — the runner discarded per-solve stdout — so it is a **hypothesis**, and the cheapest one
-to test. It is recorded here as a methodological error of ours, not a property of the agent.
-
-**3. A competent model, where the thesis is about weak ones.** `deepseek-chat-v3.1` was chosen to avoid
-the floor that made `bench/terminal_bench` uninformative (37/40 both-fail). **It did not avoid the
-floor** — 11 of 19 pairs were both-fail here — so the thesis-purity cost was paid without buying the
-intended protection.
-
-**4. Two informative pairs.** 17/19 concordant. McNemar reads only discordant pairs, so ±8.5% is what
-two pairs buy. This is *uninformative*, not *disproving*.
-
-## What this establishes, and what it does not
-
-**Establishes.** The full SWE-bench pipeline works end to end and is honest: official Docker grading,
-gold-validated slice, deterministic frozen instance set, sanitized checkouts (the `--no-tags` fix
-mattered — django's `stable/*.x` tags reach the fix commit and would have leaked the answer), zero
-infra failures, complete cost and failure accounting. And it produces a real, publishable external
-number where the project previously had none.
-
-**Does not establish.** That Chimera's scaffolding fails to lift models on real repositories. This run
-tested a deliberately weakened configuration on a slice where both arms fail more than half the time,
-with two informative pairs. The honest statement is: **on this slice, in this configuration, no lift
-was measurable** — and the configuration was ours to choose badly.
-
-## Next: one discriminating run
-
-The two limitations under our control (1 and 2) are both fixable and both were listed as options in
-[`PLAN.md`](PLAN.md) *before* any result existed: `--verify` on the repository's **existing** tests at
-`base_commit` (option (b) — legitimate, no leakage of `FAIL_TO_PASS`) and a step budget matched to the
-repo. That is a **different experiment** — full Chimera vs baseline, rather than weakened Chimera vs
-baseline — pre-registered as Amendment 2, not a re-roll of this one.
-
-**This null stands and is published regardless of how that run turns out.** If the discriminating run
-is also null, the honest reading is that the scaffolding does not lift a competent model on real repos,
-and the project's claim should be rewritten around what it demonstrably does: measure itself honestly.
+n=19 with 8 both-fail pairs cannot resolve a 3-pair effect. The honest next step is **more instances,
+not more configurations**: the same two arms on 50–60 easy instances (≈ US$ 25–35 at run 2's rates)
+would either push the CI clear of zero or show the sweep was luck. Restoring the middle arm would then
+buy the attribution this run had to give up. Neither is a re-roll of run 2 — run 2 publishes as it is.
