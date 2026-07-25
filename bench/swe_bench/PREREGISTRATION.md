@@ -253,3 +253,55 @@ few discordant pairs to resolve anything — that is a power limitation, not evi
 will be labelled as such. Nothing here generalises beyond django, and none of it is a Verified score.
 
 **Status: registered. `--require-diff` does not exist yet; no model call of this run has been made.**
+
+---
+
+# Amendment 3 — cut the middle arm (a cost decision, committed before the run)
+
+Amendment 2's feasibility probe did its job and **found the run unaffordable as designed**. Measured on
+the heaviest arm at `max_steps=30`: **984 s and US$ 0.317 per solve**. Time is fine (984 s < the 1800 s
+budget), but 57 solves projects to **US$ 14–18 against US$ 12.80 available**. Per Amendment 2's own
+rule ("if 30 steps proves infeasible, the change is a further amendment, committed before running"),
+this is that amendment.
+
+## The change
+
+Three arms → **two**: `baseline` and `chimera+diff` (`treatment_diff`). The middle arm — plain scaffold
+at 30 steps — is dropped. **19 × 2 = 38 solves**, projected ≈ US$ 9, ≈ 6 h.
+
+`max_steps=30` is unchanged and remains **identical on both arms**, so the comparison still cannot
+confound "Chimera helps" with "more steps help". Everything else is as Amendment 2 fixed it.
+
+## What this costs us, stated plainly
+
+**We lose the ability to attribute a win between the scaffold and the gate.** If `chimera+diff` beats
+baseline, this design cannot say whether the diff-gate did it or the scaffolding-at-30-steps did. Run 1
+is *suggestive* evidence that the scaffold alone does not help (Δ = 0.0%), but it ran at 8 steps, so it
+is not a clean control for this run. The honest reading of any positive here will therefore be
+"scaffold **plus** gate beats bare model", never "the gate is what worked" — that would need the arm we
+are cutting, and would be a separate run.
+
+**What survives intact** is the headline prediction, which is about a rate this design measures
+directly: the empty-patch rate in the gated arm.
+
+## Withdrawn prediction
+
+Amendment 2's third prediction — "`chimera` vs baseline (steps fixed, no diff-gate): Δ −5 to +10 pp" —
+is **withdrawn as untestable** under this design, not quietly dropped. The other three stand unchanged,
+including "a real chance everything stays null".
+
+## Probe reuse — declared, not silent
+
+The probe ran the **identical final configuration** (`treatment_diff`, `--max-steps 30`, 1800 s) on
+what happens to be the **first 3 instances of the frozen slice** (10880, 10914, 10999 — the slice is
+ordered by `instance_id` and the probe took its head). Those solves are therefore valid run data and
+are **reused** rather than re-run, saving ≈ US$ 1 and ≈ 48 min.
+
+Why this is not outcome-driven selection: the configuration was frozen in Amendment 2 **before** the
+probe ran; the arm cut is driven by **measured cost**, not by any result; and no grading had been run,
+so no resolve/unresolve outcome was visible when this amendment was written. What *was* visible is that
+instance 10880 produced a patch where run 1 produced an empty one in both arms — recorded here for
+transparency, and it changed nothing about the design.
+
+**Status: amendment committed. The baseline arm and the 16 remaining `treatment_diff` instances have
+not been run.**
