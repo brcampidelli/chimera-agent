@@ -82,24 +82,36 @@ snapshot.)
   tampering evidence, and what could not be re-verified are in
   [`bench/local_lift/RESULTS.md`](bench/local_lift/RESULTS.md).
   Source: [`bench/local_lift/_reverify_n100/paired.json`](bench/local_lift/_reverify_n100/paired.json), [`PREREGISTRATION.md`](bench/local_lift/PREREGISTRATION.md).
-- **Does accumulated learning help? (unproven).** The flywheel — skills gated on recurrence + a
-  transfer test, anti-pattern cards, persistent memory — had **never been measured**: the lift bench
-  above disables learning in both arms on purpose, and the continuous-evolution bench measures whether
-  performance *holds*, not whether it improves. A first pre-registered attempt (30 same-family tasks,
-  learning on vs off, difference-in-differences) returned **exactly 0.0pp**, with 31 skills genuinely
-  learned — but the control arm scored **100% on the first half**, so the design had no headroom to
-  detect an improvement. Null and **uninformative**, published as such:
-  [`bench/learning_lift/RESULTS.md`](bench/learning_lift/RESULTS.md). "It gets better the more you use
-  it" remains unevidenced — now as a measured absence rather than an untested assumption.
+- **SWE-bench Verified (the first external number that points the right way).** Two pre-registered
+  runs on the same frozen 19-instance `django/django` slice, graded **only** by the official
+  `swebench` 4.1.0 harness in Docker — never self-reported. Run 1 was **an exact zero** (36.8% both
+  arms, Δ +0.0%) and is published unchanged. Run 2, after fixing two faults that were **ours** (a
+  scaffold tested without its strongest mechanism, and a step budget of 8 against a 250 MB repo):
+  **42.1% → 57.9%, Δ +15.8%, 95% CI [−1.9%, +15.8%] — not significant**, but **3 instances won and
+  0 lost**. Together they show the scaffold is worth *nothing* when the agent is starved of steps and
+  *three instances* when it isn't — and that it wins by editing **better** (69% vs 57% precision), not
+  by editing more. ⚠️ **57.9% is NOT a SWE-bench Verified score** — it is a deliberately easy,
+  single-repo slice; a real score needs the full 500. Ships with the **retraction it earned**: the
+  mechanism we had claimed for the empty patches was wrong.
+  Source: [`bench/swe_bench/RESULTS.md`](bench/swe_bench/RESULTS.md), [`PREREGISTRATION.md`](bench/swe_bench/PREREGISTRATION.md).
 - **Terminal-Bench (humbling).** Pre-registered N=40 A/B on the official benchmark, same model both
   arms (`deepseek-chat-v3.1`): **7.5% → 2.5%** with the scaffold, paired **Δ −5.0pp, 95% CI [−5.0%,
   +1.6%] — not significant**. The scaffold **did not lift an already-competent model** (this isn't the
   weak "goldilocks" regime where scaffolding helps); both arms sit at a variance-dominated floor.
   Source: [`bench/terminal_bench/RESULTS.md`](bench/terminal_bench/RESULTS.md).
+- **Does accumulated learning help? Seven runs say: not provably (and one positive was retracted).**
+  The flywheel — skills gated on recurrence + a transfer test, anti-pattern cards, persistent memory —
+  was measured across **seven pre-registered runs**. Run 6 produced the series' only positive (a
+  significant +6.7% on the within-family transfer metric); **run 7, with more power, cut it to +2.0%
+  and non-significant — so it was retracted**, exactly as the pre-registration committed. The honest
+  verdict: **no adequately-powered run shows accumulated learning improves task success**, and the
+  blocker is the instrument — three attempts to author a suite landing in the informative 40–60% band
+  all came out at 84–92%. "It gets better the more you use it" remains **unevidenced**.
+  Source: [`bench/learning_lift/RESULTS.md`](bench/learning_lift/RESULTS.md).
 
-Significant internally (on our own hard suite), humbling externally (on an already-competent model
-where the scaffold doesn't help). We publish both and don't re-roll for significance — that would be
-p-hacking.
+Significant internally (on our own hard suite), directionally right but **not yet significant** on real
+repos (SWE-bench, 3–0 but n=19), and humbling on Terminal-Bench. The learning claim is **retracted**.
+We publish all of it and don't re-roll for significance — that would be p-hacking.
 
 ## Token economy — measured, not claimed
 

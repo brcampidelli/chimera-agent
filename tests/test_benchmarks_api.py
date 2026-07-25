@@ -23,6 +23,7 @@ import pytest
 from chimera.api.benchmarks_api import benchmark_report
 from chimera.eval.benchmark_snapshot import (
     _default_paired_path,
+    _repo_root,
     build_snapshot,
     snapshot_path,
 )
@@ -55,14 +56,22 @@ def test_build_snapshot_internal_lift_and_external() -> None:
     assert 0.0 <= lift["baseline_rate"] <= 1.0
     assert 0.0 <= lift["treatment_rate"] <= 1.0
     assert len(lift["ci"]) == 2 and lift["ci"][0] <= lift["ci"][1]
-    assert lift["source"] == "bench/local_lift/results/paired.json"
+    # The cited source must be the file the numbers were actually read from. v0.36.0 shipped the
+    # re-verified figures still citing the superseded run's path, so this pins the two together.
+    assert lift["source"] == _default_paired_path().relative_to(_repo_root()).as_posix()
+    assert Path(_repo_root() / lift["source"]).exists(), "the cited source path must exist"
     assert "discordant" in lift and set(lift["discordant"]) == {"treatment_only", "baseline_only"}
 
-    # The humbling external result is published alongside — the list is non-empty and also not significant.
-    assert snap["external"], "the external Terminal-Bench block must be present"
-    ext = snap["external"][0]
-    assert ext["significant"] is False
-    assert ext["source"] == "bench/terminal_bench/RESULTS.md"
+    # BOTH recorded external results ship together — the one that points our way (SWE-bench) and the
+    # one that does not (Terminal-Bench). Checked by benchmark name, not index, so a reordering can't
+    # silently drop one: publishing only the flattering half is the failure mode this guards.
+    sources = {e["source"] for e in snap["external"]}
+    assert sources == {"bench/swe_bench/RESULTS.md", "bench/terminal_bench/RESULTS.md"}
+    for ext in snap["external"]:
+        assert ext["significant"] is False, f"{ext['source']} is not significant and must say so"
+        lo_e, hi_e = ext["ci"]
+        assert lo_e <= 0.0 <= hi_e, "a non-significant CI must include zero"
+        assert ext["n"] > 0 and ext["note"], "every external result carries its n and its caveats"
     assert isinstance(snap["generated_for"], str)
 
 

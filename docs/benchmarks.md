@@ -33,12 +33,38 @@ Chimera plugs in as the treatment agent via `chimera/eval/terminal_bench.py`
 scaffolding flags). Point Harbor at a pinned subset and a free model for each arm; see the
 [Harbor docs](https://www.tbench.ai/) for the exact `harbor run` invocation and `--agent-import-path`.
 
-## SWE-bench Verified-Mini (the second scoreboard)
+## SWE-bench Verified (the second scoreboard) — **run, twice**
 
 Terminal-Bench proves the thesis on CLI tasks; SWE-bench proves it on real GitHub bug-fixes — given
 a repo at a base commit and an issue, the agent must produce a patch that makes the instance's
 `FAIL_TO_PASS` tests pass while keeping `PASS_TO_PASS` green. "Verified" is the human-validated
-subset; "Mini" is a small curated slice for a cheap, fast A/B.
+subset.
+
+### Results
+
+Two pre-registered runs on the same frozen 19-instance `django/django` slice (easiest difficulty
+stratum), `deepseek-chat-v3.1`, pass@1, graded **only** by the official `swebench` 4.1.0 harness in
+Docker. Full write-up: [`bench/swe_bench/RESULTS.md`](../bench/swe_bench/RESULTS.md).
+
+| run | baseline | + Chimera | paired Δ | 95% CI | |
+|---|---|---|---|---|---|
+| 1 (`max_steps=8`) | 36.8% (7/19) | 36.8% (7/19) | +0.0% | [−8.5%, +8.5%] | not significant |
+| 2 (`max_steps=30`) | 42.1% (8/19) | **57.9% (11/19)** | **+15.8%** | [−1.9%, +15.8%] | not significant |
+
+Run 1 is an **exact zero** and is published unchanged. Run 2 fixed two faults that were *ours* — the
+scaffold ran without its strongest mechanism, and 8 tool-calling steps is not enough to navigate a
+250 MB repository — and came out **3 instances won, 0 lost**. The pair is the finding: the scaffold is
+worth *nothing* when the agent is starved of steps and *three instances* when it is not, and it wins
+by editing **better** (69% vs 57% precision when it edits), not by editing more.
+
+> ⚠️ **57.9% is not a SWE-bench Verified score.** The slice is deliberately easy and single-repo,
+> chosen so a paired A/B has room to measure; a real Verified score needs the full 500. And the delta
+> is **not significant** — with 8 both-fail pairs, n=19 leaves only three informative pairs.
+
+Run 2 also ships a **retraction**: the mechanism we had traced for run 1's empty patches was wrong
+(the fix was the step budget, not the diff-gate we blamed), corrected as prominently as it was claimed.
+
+### The adapter
 
 The adapter (`chimera.eval.swe_bench`) is honest about its boundary: the pure parts — the per-
 instance `chimera solve` invocation (treatment arm) and the parsing of the official evaluation

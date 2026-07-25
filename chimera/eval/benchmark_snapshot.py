@@ -53,6 +53,29 @@ _TERMINAL_BENCH: dict[str, Any] = {
     ),
 }
 
+# SWE-bench Verified — the second recorded external result, and the first pointing the project's way.
+# Carried the same way (constant + source + full caveats) so no surface can show the number without
+# them. The `note` carries the two that matter most: this is NOT a Verified score (deliberately easy,
+# single-repo slice), and the delta is NOT significant despite winning 3 instances to 0.
+_SWE_BENCH: dict[str, Any] = {
+    "benchmark": "SWE-bench Verified (19-instance django easy slice)",
+    "model": "openrouter/deepseek/deepseek-chat-v3.1",
+    "n": 19,
+    "baseline_rate": 0.421,  # 8/19, bare model
+    "treatment_rate": 0.579,  # 11/19, + Chimera scaffold at an adequate step budget
+    "delta": 0.158,  # paired delta, pp as a fraction
+    "ci": [-0.019, 0.158],  # 95% paired CI — includes 0
+    "significant": False,
+    "source": "bench/swe_bench/RESULTS.md",
+    "note": (
+        "NOT a SWE-bench Verified score — a deliberately easy, single-repo slice; a real score needs "
+        "the full 500. Graded only by the official swebench harness in Docker, never self-reported. "
+        "The delta is NOT significant (CI includes 0) even though the scaffold won 3 instances and "
+        "lost 0; with 8 both-fail pairs, n=19 leaves too little to resolve it. An earlier run of the "
+        "same slice at a starved step budget scored an exact 0.0pp and is published unchanged."
+    ),
+}
+
 
 def _repo_root() -> Path:
     """The repo root, resolved from this file: ``chimera/eval/benchmark_snapshot.py`` → parents[2]."""
@@ -96,15 +119,20 @@ def _internal_lift(paired_path: Path) -> dict[str, Any]:
             "treatment_only": discordant["treatment_only"],
             "baseline_only": discordant["baseline_only"],
         },
-        "source": "bench/local_lift/results/paired.json",
+        # Derived from the file actually read, never hardcoded: the source must point at where the
+        # numbers came from. It briefly did not — v0.36.0 shipped the corrected numbers citing the
+        # superseded run's path, so anyone checking the citation would have found different figures.
+        "source": paired_path.relative_to(_repo_root()).as_posix(),
         "note": (
             "A cheap weak model + Chimera's retry loop vs the cheap model alone, on a pre-registered "
             "n=100 suite (design + tasks committed before any model call). SIGNIFICANT: the paired 95% "
-            "CI excludes zero. The lift is 6 tasks the loop RECOVERED (raw fail → verified pass) with 0 "
-            "regressions. Absolute rates are low (9%/15%) because 85 of the 100 tasks are hard enough to "
-            "fail both arms — a deliberate floor so the loop has headroom; the lift is real where the "
-            "model has a chance. One model, one seed/task, small self-contained Python tasks — NOT "
-            "SWE-bench, does not generalise to real repos. One run, no re-roll."
+            "CI excludes zero. The lift is 28 tasks the loop RECOVERED (raw fail → verified pass) "
+            "against 5 regressions. This is the RE-VERIFIED run: an earlier run of the same suite "
+            "(9% → 15%) was graded with a test file the agent under test could edit — and on re-run it "
+            "did edit one — so grading was hardened to restore the pristine test, and the lift "
+            "replicated LARGER, not smaller. The superseded run is kept unedited beside the erratum in "
+            "bench/local_lift/RESULTS.md. One model, one seed/task, small self-contained Python tasks "
+            "— NOT SWE-bench, does not generalise to real repos. One run, no re-roll."
         ),
     }
 
@@ -118,7 +146,10 @@ def build_snapshot(paired_path: Path | None = None) -> dict[str, Any]:
     path = paired_path if paired_path is not None else _default_paired_path()
     return {
         "internal_lift": _internal_lift(path),
-        "external": [dict(_TERMINAL_BENCH)],
+        # Both recorded external results travel together, on purpose: the one that points our way and
+        # the one that does not. Showing only the flattering half would be exactly the selective
+        # reporting the benchmarks section exists to avoid.
+        "external": [dict(_SWE_BENCH), dict(_TERMINAL_BENCH)],
         "generated_for": __version__,
     }
 
