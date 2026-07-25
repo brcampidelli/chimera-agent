@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-07-25
+
 ### Added
 - **The project's first number on an externally recognized scoreboard: SWE-bench Verified.**
   ([`bench/swe_bench/`](bench/swe_bench/)) Two pre-registered runs on the same frozen 19-instance

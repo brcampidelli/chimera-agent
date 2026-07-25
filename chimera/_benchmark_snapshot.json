@@ -16,17 +16,17 @@
       "treatment_rate": 0.025
     }
   ],
-  "generated_for": "0.36.0rc1",
+  "generated_for": "0.36.0",
   "internal_lift": {
-    "baseline_rate": 0.09,
+    "baseline_rate": 0.48,
     "ci": [
-      0.0132,
-      0.06
+      0.1259,
+      0.2861
     ],
-    "delta": 0.06,
+    "delta": 0.23,
     "discordant": {
-      "baseline_only": 0,
-      "treatment_only": 6
+      "baseline_only": 5,
+      "treatment_only": 28
     },
     "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
     "n": 100,
@@ -34,6 +34,6 @@
     "significant": true,
     "source": "bench/local_lift/results/paired.json",
     "suite": "internal Docker-free suite (local_lift), pytest-graded \u2014 NOT SWE-bench/Terminal-Bench",
-    "treatment_rate": 0.15
+    "treatment_rate": 0.71
   }
 }

@@ -60,8 +60,16 @@ def _repo_root() -> Path:
 
 
 def _default_paired_path() -> Path:
-    """The committed local_lift paired result the internal-lift block is read from."""
-    return _repo_root() / "bench" / "local_lift" / "results" / "paired.json"
+    """The committed local_lift paired result the internal-lift block is read from.
+
+    Points at ``_reverify_n100/`` — the **canonical** run — not ``results/``. The original n=100 run
+    was graded with a test the agent under test could edit (and did), so its numbers are superseded;
+    ``results/`` deliberately still holds that original raw data, unedited, because the erratum in
+    ``bench/local_lift/RESULTS.md`` cites it — superseding a number is not hiding it. Reading
+    ``results/`` here would ship the retracted 9% → 15% figure to the desktop UI instead of the
+    re-verified 48% → 71%.
+    """
+    return _repo_root() / "bench" / "local_lift" / "_reverify_n100" / "paired.json"
 
 
 def _internal_lift(paired_path: Path) -> dict[str, Any]:
