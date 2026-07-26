@@ -28,6 +28,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   ⚠️ Unchanged: **48.3% is not a SWE-bench Verified score** — a deliberately easy, single-repo slice.
   Full write-up, validity gates, cost and the four things this does *not* establish:
   [`bench/swe_bench/RESULTS.md`](bench/swe_bench/RESULTS.md).
+- **The delta is now decomposed by component — and the answer contradicted our own prediction.** A
+  fourth run restored the middle arm (plain scaffold, no diff-gate) on the same 41 instances, so each
+  arm differs from the next by exactly one component:
+
+  | arm | resolved | rate | **precision when it edited** |
+  |---|---|---|---|
+  | baseline | 14/41 | 34.1% | 50% |
+  | + scaffold | 16/41 | 39.0% | 59% |
+  | + scaffold **and** diff-gate | 18/41 | 43.9% | 67% |
+
+  **Both components contribute in roughly equal halves** — scaffold +4.9% over baseline, the diff-gate
+  a further +4.9%, neither significant alone. That **contradicts the prediction we registered** (that
+  the scaffold would carry *most* of it) and **withdraws an earlier reading** that `--require-diff` was
+  not what produced the gain — a conclusion drawn from too narrow a slice of the evidence. All three
+  arms edit at the *same* rate (27–28 patches of 41); what climbs is precision. The tidy additivity is
+  **not** claimed as a measured 50/50 split: each comparison rests on 5–6 discordant pairs.
+- **The decomposition reaches the desktop app, not just the repo.** `BenchmarkExternalOut` is a strict
+  model, so the new field would have been **dropped silently** — the numbers would have sat in the
+  shipped JSON and never appeared in the UI. Adds `BenchmarkArmOut` and an optional `decomposition`
+  field (optional because Terminal-Bench has no attribution arm, and forcing one would be a lie).
 
 ## [0.36.1] - 2026-07-25
 
