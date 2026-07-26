@@ -53,26 +53,30 @@ _TERMINAL_BENCH: dict[str, Any] = {
     ),
 }
 
-# SWE-bench Verified — the second recorded external result, and the first pointing the project's way.
-# Carried the same way (constant + source + full caveats) so no surface can show the number without
-# them. The `note` carries the two that matter most: this is NOT a Verified score (deliberately easy,
-# single-repo slice), and the delta is NOT significant despite winning 3 instances to 0.
+# SWE-bench Verified — the strongest external result, and the one that survived a replication.
+# The OUT-OF-SAMPLE run is what ships here, not the pooled figure: pooling run 2 with run 3 crosses
+# significance, but it mixes seen with unseen data and was pre-registered as SECONDARY, so surfacing
+# it as the headline would be picking the flattering statistic after the fact. The pooled number is
+# named in the note, where its caveat travels with it.
 _SWE_BENCH: dict[str, Any] = {
-    "benchmark": "SWE-bench Verified (19-instance django easy slice)",
+    "benchmark": "SWE-bench Verified (41-instance django easy slice, out-of-sample replication)",
     "model": "openrouter/deepseek/deepseek-chat-v3.1",
-    "n": 19,
-    "baseline_rate": 0.421,  # 8/19, bare model
-    "treatment_rate": 0.579,  # 11/19, + Chimera scaffold at an adequate step budget
-    "delta": 0.158,  # paired delta, pp as a fraction
-    "ci": [-0.019, 0.158],  # 95% paired CI — includes 0
+    "n": 41,
+    "baseline_rate": 0.341,  # 14/41, bare model
+    "treatment_rate": 0.439,  # 18/41, + Chimera scaffold at an adequate step budget
+    "delta": 0.098,  # paired delta, pp as a fraction
+    "ci": [-0.035, 0.167],  # 95% paired CI — includes 0
     "significant": False,
     "source": "bench/swe_bench/RESULTS.md",
     "note": (
         "NOT a SWE-bench Verified score — a deliberately easy, single-repo slice; a real score needs "
         "the full 500. Graded only by the official swebench harness in Docker, never self-reported. "
-        "The delta is NOT significant (CI includes 0) even though the scaffold won 3 instances and "
-        "lost 0; with 8 both-fail pairs, n=19 leaves too little to resolve it. An earlier run of the "
-        "same slice at a starved step budget scored an exact 0.0pp and is published unchanged."
+        "This is the OUT-OF-SAMPLE replication: 41 instances never used by the earlier run, nothing "
+        "else changed. The delta is NOT significant on its own (CI includes 0); pooling it with the "
+        "earlier 19 gives +11.7% [+0.8%, +16.4%], which IS significant but mixes seen with unseen "
+        "data and was pre-registered as secondary. The mechanism replicated: the scaffolded arm made "
+        "FEWER patches (27 vs 28) and resolved MORE (18 vs 14) — precision 67% vs 50%. An earlier run "
+        "of the same design at a starved step budget scored an exact 0.0pp and is published unchanged."
     ),
 }
 

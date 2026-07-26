@@ -1,19 +1,19 @@
 {
   "external": [
     {
-      "baseline_rate": 0.421,
-      "benchmark": "SWE-bench Verified (19-instance django easy slice)",
+      "baseline_rate": 0.341,
+      "benchmark": "SWE-bench Verified (41-instance django easy slice, out-of-sample replication)",
       "ci": [
-        -0.019,
-        0.158
+        -0.035,
+        0.167
       ],
-      "delta": 0.158,
+      "delta": 0.098,
       "model": "openrouter/deepseek/deepseek-chat-v3.1",
-      "n": 19,
-      "note": "NOT a SWE-bench Verified score \u2014 a deliberately easy, single-repo slice; a real score needs the full 500. Graded only by the official swebench harness in Docker, never self-reported. The delta is NOT significant (CI includes 0) even though the scaffold won 3 instances and lost 0; with 8 both-fail pairs, n=19 leaves too little to resolve it. An earlier run of the same slice at a starved step budget scored an exact 0.0pp and is published unchanged.",
+      "n": 41,
+      "note": "NOT a SWE-bench Verified score \u2014 a deliberately easy, single-repo slice; a real score needs the full 500. Graded only by the official swebench harness in Docker, never self-reported. This is the OUT-OF-SAMPLE replication: 41 instances never used by the earlier run, nothing else changed. The delta is NOT significant on its own (CI includes 0); pooling it with the earlier 19 gives +11.7% [+0.8%, +16.4%], which IS significant but mixes seen with unseen data and was pre-registered as secondary. The mechanism replicated: the scaffolded arm made FEWER patches (27 vs 28) and resolved MORE (18 vs 14) \u2014 precision 67% vs 50%. An earlier run of the same design at a starved step budget scored an exact 0.0pp and is published unchanged.",
       "significant": false,
       "source": "bench/swe_bench/RESULTS.md",
-      "treatment_rate": 0.579
+      "treatment_rate": 0.439
     },
     {
       "baseline_rate": 0.075,

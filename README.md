@@ -82,17 +82,33 @@ snapshot.)
   tampering evidence, and what could not be re-verified are in
   [`bench/local_lift/RESULTS.md`](bench/local_lift/RESULTS.md).
   Source: [`bench/local_lift/_reverify_n100/paired.json`](bench/local_lift/_reverify_n100/paired.json), [`PREREGISTRATION.md`](bench/local_lift/PREREGISTRATION.md).
-- **SWE-bench Verified (the first external number that points the right way).** Two pre-registered
-  runs on the same frozen 19-instance `django/django` slice, graded **only** by the official
-  `swebench` 4.1.0 harness in Docker — never self-reported. Run 1 was **an exact zero** (36.8% both
-  arms, Δ +0.0%) and is published unchanged. Run 2, after fixing two faults that were **ours** (a
-  scaffold tested without its strongest mechanism, and a step budget of 8 against a 250 MB repo):
-  **42.1% → 57.9%, Δ +15.8%, 95% CI [−1.9%, +15.8%] — not significant**, but **3 instances won and
-  0 lost**. Together they show the scaffold is worth *nothing* when the agent is starved of steps and
-  *three instances* when it isn't — and that it wins by editing **better** (69% vs 57% precision), not
-  by editing more. ⚠️ **57.9% is NOT a SWE-bench Verified score** — it is a deliberately easy,
-  single-repo slice; a real score needs the full 500. Ships with the **retraction it earned**: the
-  mechanism we had claimed for the empty patches was wrong.
+- **SWE-bench Verified — the strongest external evidence, and it survived a replication designed to
+  kill it.** Three pre-registered runs on `django/django` slices, graded **only** by the official
+  `swebench` 4.1.0 harness in Docker — never self-reported.
+
+  | run | slice | baseline | + Chimera | paired Δ | 95% CI | |
+  |---|---|---|---|---|---|---|
+  | 1 (`max_steps=8`) | 19 | 36.8% | 36.8% | +0.0% | [−8.5%, +8.5%] | ns |
+  | 2 (`max_steps=30`) | same 19 | 42.1% | 57.9% | +15.8% | [−1.9%, +15.8%] | ns |
+  | **3 (replication)** | **41 unseen** | 34.1% | 43.9% | **+9.8%** | [−3.5%, +16.7%] | ns |
+  | pooled *(secondary)* | 60 | 36.7% | 48.3% | **+11.7%** | **[+0.8%, +16.4%]** | **significant** |
+
+  Run 2's +15.8% was a 3–0 sweep on three informative pairs, and the pre-registration gave it a
+  **one-in-three chance of being exactly that — a lucky sample**, with the retraction pre-committed.
+  Run 3 tested it on **41 instances whose outcomes we had never seen**, changing nothing else. The
+  effect **reappeared** (+9.8%, inside the registered +5-to-+20 band) on a slice that proved *harder*
+  than run 2's. Across both, discordant pairs run **9 for Chimera against 2** (p ≈ 2.6% under the null).
+
+  **The mechanism replicated, and it is the interesting part:** in run 3 the scaffolded arm made
+  *fewer* patches (27 vs 28) and resolved *more* (18 vs 14) — **precision 67% vs 50%**, matching run
+  2's 69% vs 57%. It doesn't win by acting more; it wins by acting **better**.
+
+  ⚠️ Read honestly: **the out-of-sample primary is NOT significant.** The significant number is the
+  **pooled secondary**, pre-registered as secondary precisely because it mixes seen with unseen data —
+  it is not promoted to headline now that it crossed the line. And **48.3% is NOT a SWE-bench Verified
+  score**: a deliberately easy, single-repo slice; a real score needs the full 500. Run 1's exact zero
+  is published unchanged, and run 2 shipped the **retraction it earned** (the mechanism we had claimed
+  for its empty patches was wrong — the cure was the step budget).
   Source: [`bench/swe_bench/RESULTS.md`](bench/swe_bench/RESULTS.md), [`PREREGISTRATION.md`](bench/swe_bench/PREREGISTRATION.md).
 - **Terminal-Bench (humbling).** Pre-registered N=40 A/B on the official benchmark, same model both
   arms (`deepseek-chat-v3.1`): **7.5% → 2.5%** with the scaffold, paired **Δ −5.0pp, 95% CI [−5.0%,
@@ -109,9 +125,10 @@ snapshot.)
   all came out at 84–92%. "It gets better the more you use it" remains **unevidenced**.
   Source: [`bench/learning_lift/RESULTS.md`](bench/learning_lift/RESULTS.md).
 
-Significant internally (on our own hard suite), directionally right but **not yet significant** on real
-repos (SWE-bench, 3–0 but n=19), and humbling on Terminal-Bench. The learning claim is **retracted**.
-We publish all of it and don't re-roll for significance — that would be p-hacking.
+Significant internally (on our own hard suite). On real repos, **replicated out-of-sample and
+significant only when pooled** — the honest label, not the flattering one. Humbling on Terminal-Bench.
+The learning claim is **retracted**. We publish all of it, we write down the branch where the result
+kills our own claim *before* running, and we don't re-roll for significance — that would be p-hacking.
 
 ## Token economy — measured, not claimed
 
