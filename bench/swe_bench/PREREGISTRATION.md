@@ -377,3 +377,68 @@ stays cut, so a positive still reads "scaffold **plus** gate beats bare model", 
 it". One run, no re-rolls; whatever it says is published.
 
 **Status: registered. Gold validation not yet run; no model call of run 3 has been made.**
+
+---
+
+# Amendment 5 — run 4: restore the middle arm and settle the attribution
+
+**Committed before any model call of run 4.** Runs 1–3 stand as published.
+
+## Why
+
+[`RESULTS.md`](RESULTS.md) states a limitation in its own words: *"Amendment 3 cut the middle arm
+(plain scaffold, no diff-gate) for cost, so the result reads 'scaffold plus gate beats the bare
+model' — never 'the gate did it'."* Run 4 closes exactly that, on the **same frozen 41-instance
+slice** run 3 used, so the other two arms already exist and one new arm completes a three-way
+comparison.
+
+Budget forces the choice. At the measured **US$ 0.208/solve**, the three open paths cost: middle arm
+**US$ 8.53** (41 solves), a second repository ~US$ 8.32 (20 instances × 2 arms), and Q2 — the absolute
+score on the full 500 — **US$ 104 for the treatment arm alone**. With **US$ 12.95 remaining, Q2 is out
+of reach and is not attempted**; that is a budget fact, recorded rather than dressed up.
+
+## Design
+
+One new arm on run 3's frozen slice. **Nothing else changes** — same model, step budget, timeout,
+hygiene, pass@1, official Docker grading:
+
+| arm | flags | status |
+|---|---|---|
+| baseline | `--no-plan --no-manager --max-attempts 1 --max-steps 30` | **already run** (run 3) |
+| **scaffold** (new) | `--repo-map --progress-ledger --replan --checklist --max-attempts 3 --max-steps 30` | **run 4** |
+| scaffold+gate | as above **+ `--require-diff`** | **already run** (run 3) |
+
+The three arms then differ by exactly one component each, on identical instances.
+
+## Registered predictions
+
+- **scaffold vs baseline: Δ +5 to +15 pp**, i.e. **most of run 3's +9.8%**. Run 2's instance-level
+  evidence argued the gate converted only 1 of 4 genuine non-edits — and that one had *timed out*
+  rather than declined — so the scaffold is the likelier source of the effect.
+- **scaffold+gate vs scaffold: Δ −5 to +5 pp**, i.e. the gate adds little either way.
+- **A real chance the gate turns out to matter after all — call it one in four.** If scaffold alone
+  lands near baseline while scaffold+gate keeps its lead, the gate is the active ingredient and the
+  run-2 conclusion about it was wrong. That would be a **second retraction** on this component, and it
+  ships with the same prominence as the claim.
+- **Validity:** the baseline and scaffold+gate arms are *not re-run*; their run-3 results are reused
+  verbatim. Any drift would therefore be model non-determinism between runs, which this design cannot
+  separate — stated as a limitation, not waved away.
+
+## Pre-committed readings
+
+- **scaffold ≈ scaffold+gate, both above baseline** → the **scaffolding** is what works; `--require-diff`
+  is a real fix for a real defect that does not move this number. The claim becomes "the scaffold
+  lifts", which is stronger and more honest than today's conjunction.
+- **scaffold ≈ baseline, scaffold+gate above both** → the **gate** is the active ingredient, and run 2's
+  instance-level reading of it was wrong. Retract that reading.
+- **Both above baseline but the gate clearly higher** → both contribute; report the decomposition.
+- **scaffold above scaffold+gate** → the gate *costs* something. Report it; a flag that hurts should
+  not stay on in any recommended configuration.
+
+## Caveats
+
+One repository, one model, one stratum, one run per arm — unchanged from run 3. The comparison against
+run 3's stored arms means the three arms were not run concurrently; instance-level pairing is exact,
+but between-run model drift is a confound this design accepts and names.
+
+**Status: registered. No model call of run 4 has been made.**
