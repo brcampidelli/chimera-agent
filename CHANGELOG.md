@@ -6,6 +6,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.36.2] - 2026-07-26
+
+### Changed
+- **The SWE-bench result replicated out-of-sample, and the shipped snapshot now carries the
+  replication.** A third pre-registered run put run 2's +15.8% to the test on **41 django instances
+  whose outcomes had never been seen**, changing nothing else about the configuration. Run 2's figure
+  had rested on a 3–0 sweep over three informative pairs, and the pre-registration gave it a
+  **one-in-three chance of being exactly that — a lucky sample**, with the retraction pre-committed.
+  The effect **reappeared**: **34.1% → 43.9%, Δ +9.8%, 95% CI [−3.5%, +16.7%]** — inside the registered
+  +5-to-+20 band, on a slice that proved *harder* than run 2's. Across both runs the discordant pairs
+  run **9 for Chimera against 2** (p ≈ 2.6% under the null).
+  **The mechanism replicated too, and it is the interesting part:** the scaffolded arm produced
+  *fewer* patches (27 vs 28) and resolved *more* (18 vs 14) — **precision 67% vs 50%**, matching run 2's
+  69% vs 57%. It does not win by acting more; it wins by acting **better**.
+  The shipped snapshot deliberately carries the **out-of-sample** number (+9.8%, not significant)
+  rather than the pooled n=60 figure (+11.7%, [+0.8%, +16.4%], significant): pooling mixes seen with
+  unseen data and was **pre-registered as secondary**, so promoting it to the headline now that it
+  crossed the line would be picking the flattering statistic after the fact. The pooled number is
+  named in the snapshot's note, with its caveat attached.
+  ⚠️ Unchanged: **48.3% is not a SWE-bench Verified score** — a deliberately easy, single-repo slice.
+  Full write-up, validity gates, cost and the four things this does *not* establish:
+  [`bench/swe_bench/RESULTS.md`](bench/swe_bench/RESULTS.md).
+
 ## [0.36.1] - 2026-07-25
 
 ### Fixed
