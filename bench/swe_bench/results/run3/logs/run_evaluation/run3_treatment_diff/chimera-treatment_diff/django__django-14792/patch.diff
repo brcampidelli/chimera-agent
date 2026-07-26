@@ -1,0 +1,48 @@
+diff --git a/django/utils/timezone.py b/django/utils/timezone.py
+index bb2b6b9594..7f67a27f64 100644
+--- a/django/utils/timezone.py
++++ b/django/utils/timezone.py
+@@ -73,7 +73,42 @@ def get_current_timezone_name():
+ 
+ def _get_timezone_name(timezone):
+     """Return the name of ``timezone``."""
+-    return str(timezone)
++    # Get the timezone name
++    if hasattr(timezone, 'zone'):
++        # pytz timezone object
++        tz_name = timezone.zone
++    elif hasattr(timezone, 'key'):
++        # zoneinfo.ZoneInfo object
++        tz_name = timezone.key
++    else:
++        # Other timezone object (e.g., datetime.timezone)
++        tz_name = str(timezone)
++    
++    # Handle Etc/GMT time zones specially
++    if tz_name.startswith('Etc/GMT'):
++        # Etc/GMT time zones have counter-intuitive naming:
++        # Etc/GMT-10 means 10 hours EAST of GMT (UTC+10)
++        # Etc/GMT+10 means 10 hours WEST of GMT (UTC-10)
++        # We need to return offset strings like '+10' or '-10'
++        if len(tz_name) > 7:
++            sign = tz_name[7]  # The character after 'Etc/GMT'
++            if sign in ('-', '+'):
++                offset_str = tz_name[8:]
++                # Validate that the offset is a valid integer
++                if offset_str:  # Make sure offset_str is not empty
++                    try:
++                        # Try to parse the offset as an integer
++                        offset = int(offset_str)
++                        if sign == '-':
++                            # Etc/GMT-10 -> UTC+10 -> '+10'
++                            return '+' + offset_str
++                        elif sign == '+':
++                            # Etc/GMT+10 -> UTC-10 -> '-10'
++                            return '-' + offset_str
++                    except ValueError:
++                        # Not a valid integer offset, return the original string
++                        pass
++    return tz_name
+ 
+ # Timezone selection functions.
+ 

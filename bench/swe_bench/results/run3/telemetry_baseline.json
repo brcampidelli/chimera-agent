@@ -1,0 +1,330 @@
+[
+  {
+    "instance_id": "django__django-11964",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "",
+    "_seconds": 269.1,
+    "_timed_out": false,
+    "_empty": true
+  },
+  {
+    "instance_id": "django__django-12125",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/db/migrations/serializer.py b/django/db/migrations/serializer.py\nindex 7d226955d5..0610702219 100644\n--- a/django/db/migrations/serializer.py\n+++ b/django/db/migrations/serializer.py\n@@ -196,7 +196,31 @@ class IterableSerializer(BaseSerializer):\n class ModelFieldSerializer(DeconstructableSerializer):\n     def serialize(self):\n         attr_name, path, args, kwargs = self.value.deconstruct()\n-        return self.serialize_deconstructed(path, args, kwargs)\n+        # For fields, we have access to the actual class, so we can get the module\n+        # This is important for inner classes where path is module.Outer.Inner\n+        # but we need to import just 'module', not 'module.Outer'\n+        module = self.value.__class__.__module__\n+        if module == \"django.db.models\":\n+            imports = {\"from django.db import models\"}\n+            # Handle special case for Model\n+            if path == \"django.db.models.Model\":\n+                name = \"models.Model\"\n+            else:\n+                name = \"models.%s\" % path.split(\".\", 2)[-1]  # Get everything after django.db.models.\n+        else:\n+            imports = {\"import %s\" % module}\n+            name = path\n+        \n+        strings = []\n+        for arg in args:\n+            arg_string, arg_imports = serializer_factory(arg).serialize()\n+            strings.append(arg_string)\n+            imports.update(arg_imports)\n+        for kw, arg in sorted(kwargs.items()):\n+            arg_string, arg_imports = serializer_factory(arg).serialize()\n+            imports.update(arg_imports)\n+            strings.append(\"%s=%s\" % (kw, arg_string))\n+        return \"%s(%s)\" % (name, \", \".join(strings)), imports\n \n \n class ModelManagerSerializer(DeconstructableSerializer):\n",
+    "_seconds": 329.2,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-12193",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/forms/widgets.py b/django/forms/widgets.py\nindex 6fe220bea7..ddd052be8d 100644\n--- a/django/forms/widgets.py\n+++ b/django/forms/widgets.py\n@@ -524,6 +524,8 @@ class CheckboxInput(Input):\n         if self.check_test(value):\n             if attrs is None:\n                 attrs = {}\n+            else:\n+                attrs = attrs.copy()\n             attrs['checked'] = True\n         return super().get_context(name, value, attrs)\n \n",
+    "_seconds": 216.0,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-12209",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "",
+    "_seconds": 253.2,
+    "_timed_out": false,
+    "_empty": true
+  },
+  {
+    "instance_id": "django__django-12276",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "",
+    "_seconds": 249.4,
+    "_timed_out": false,
+    "_empty": true
+  },
+  {
+    "instance_id": "django__django-12304",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "",
+    "_seconds": 248.0,
+    "_timed_out": false,
+    "_empty": true
+  },
+  {
+    "instance_id": "django__django-12308",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "",
+    "_seconds": 264.9,
+    "_timed_out": false,
+    "_empty": true
+  },
+  {
+    "instance_id": "django__django-12419",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/conf/global_settings.py b/django/conf/global_settings.py\nindex 09c9b95d26..8bb59a4037 100644\n--- a/django/conf/global_settings.py\n+++ b/django/conf/global_settings.py\n@@ -637,6 +637,6 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = False\n SECURE_HSTS_PRELOAD = False\n SECURE_HSTS_SECONDS = 0\n SECURE_REDIRECT_EXEMPT = []\n-SECURE_REFERRER_POLICY = None\n+SECURE_REFERRER_POLICY = 'same-origin'\n SECURE_SSL_HOST = None\n SECURE_SSL_REDIRECT = False\n",
+    "_seconds": 271.3,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-12741",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/core/management/commands/flush.py b/django/core/management/commands/flush.py\nindex e8ed3967f7..bc8021cf4e 100644\n--- a/django/core/management/commands/flush.py\n+++ b/django/core/management/commands/flush.py\n@@ -60,7 +60,7 @@ Are you sure you want to do this?\n \n         if confirm == 'yes':\n             try:\n-                connection.ops.execute_sql_flush(database, sql_list)\n+                connection.ops.execute_sql_flush(sql_list)\n             except Exception as exc:\n                 raise CommandError(\n                     \"Database %s couldn't be flushed. Possible reasons:\\n\"\ndiff --git a/tests/backends/base/test_operations.py b/tests/backends/base/test_operations.py\nindex 0485fe8465..b0ffe958c8 100644\n--- a/tests/backends/base/test_operations.py\n+++ b/tests/backends/base/test_operations.py\n@@ -172,7 +172,7 @@ class SqlFlushTests(TransactionTestCase):\n             reset_sequences=True,\n             allow_cascade=True,\n         )\n-        connection.ops.execute_sql_flush(connection.alias, sql_list)\n+        connection.ops.execute_sql_flush(sql_list)\n \n         with transaction.atomic():\n             self.assertIs(Author.objects.exists(), False)\ndiff --git a/tests/backends/tests.py b/tests/backends/tests.py\nindex d6c2331378..40fc6de7fc 100644\n--- a/tests/backends/tests.py\n+++ b/tests/backends/tests.py\n@@ -162,7 +162,7 @@ class LongNameTest(TransactionTestCase):\n             VLM_m2m._meta.db_table,\n         ]\n         sql_list = connection.ops.sql_flush(no_style(), tables, reset_sequences=True)\n-        connection.ops.execute_sql_flush(connection.alias, sql_list)\n+        connection.ops.execute_sql_flush(sql_list)\n \n \n class SequenceResetTest(TestCase):\n",
+    "_seconds": 169.0,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-13023",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/forms/fields.py b/django/forms/fields.py\nindex 36dad72704..d9d16805b0 100644\n--- a/django/forms/fields.py\n+++ b/django/forms/fields.py\n@@ -346,7 +346,7 @@ class DecimalField(IntegerField):\n         value = str(value).strip()\n         try:\n             value = Decimal(value)\n-        except DecimalException:\n+        except (DecimalException, TypeError):\n             raise ValidationError(self.error_messages['invalid'], code='invalid')\n         return value\n \n",
+    "_seconds": 197.4,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-13089",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/core/cache/backends/db.py b/django/core/cache/backends/db.py\nindex 33c79c5a14..4d67c18b61 100644\n--- a/django/core/cache/backends/db.py\n+++ b/django/core/cache/backends/db.py\n@@ -267,9 +267,11 @@ class DatabaseCache(BaseDatabaseCache):\n                 cursor.execute(\n                     connection.ops.cache_key_culling_sql() % table,\n                     [cull_num])\n-                cursor.execute(\"DELETE FROM %s \"\n-                               \"WHERE cache_key < %%s\" % table,\n-                               [cursor.fetchone()[0]])\n+                result = cursor.fetchone()\n+                if result is not None:\n+                    cursor.execute(\"DELETE FROM %s \"\n+                                   \"WHERE cache_key < %%s\" % table,\n+                                   [result[0]])\n \n     def clear(self):\n         db = router.db_for_write(self.cache_model_class)\n",
+    "_seconds": 86.7,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-13109",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "",
+    "_seconds": 169.5,
+    "_timed_out": false,
+    "_empty": true
+  },
+  {
+    "instance_id": "django__django-13112",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "",
+    "_seconds": 161.9,
+    "_timed_out": false,
+    "_empty": true
+  },
+  {
+    "instance_id": "django__django-13297",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "",
+    "_seconds": 382.6,
+    "_timed_out": false,
+    "_empty": true
+  },
+  {
+    "instance_id": "django__django-13363",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/db/models/functions/datetime.py b/django/db/models/functions/datetime.py\nindex b6594b043b..0f0523b7da 100644\n--- a/django/db/models/functions/datetime.py\n+++ b/django/db/models/functions/datetime.py\n@@ -6,7 +6,7 @@ from django.db.models.fields import (\n     DateField, DateTimeField, DurationField, Field, IntegerField, TimeField,\n )\n from django.db.models.lookups import (\n-    Transform, YearExact, YearGt, YearGte, YearLt, YearLte,\n+    Transform, YearExact, YearGt, YearGte, YearL\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1ft, YearLte,\n )\n from django.utils import timezone\n \n@@ -19,7 +19,7 @@ class TimezoneMixin:\n         # applying a function. 2015-12-31 23:00:00 -02:00 is stored in the\n         # database as 2016-01-01 01:00:00 +00:00. Any results should be\n         # based on the input datetime not the stored datetime.\n-        tzname = None\n+        tzname = None\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f\n         if settings.USE_TZ:\n             if self.tzinfo is None:\n                 tzname = timezone.get_current_timezone_name()\n@@ -28,7 +28,7 @@ class TimezoneMixin:\n         return tzname\n \n \n-class Extract(TimezoneMixin, Transform):\n+class Extract(TimezoneMixin\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f, Transform):\n     lookup_name = None\n     output_field = IntegerField()\n \n@@ -47,16 +47,15 @@ class Extract(TimezoneMixin, Transform):\n             tzname = self.get_tzname()\n             sql = connection.ops.datetime_extract_sql(self.lookup_name, sql, tzname)\n         elif isinstance(lhs_output_field, DateField):\n-            sql = connection.ops.date_extract_sql(self.lookup_name, sql)\n-        elif isinstance(lhs_output_field, TimeField):\n+            sql = connection.ops.date_extract_sql(self.lookup_name\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f, sql)\n+        elif isinstance(lhs_output\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f_field, TimeField):\n             sql = connection.ops.time_extract_sql(self.lookup_name, sql)\n         elif isinstance(lhs_output_field, DurationField):\n             if not connection.features.has_native_duration_field:\n                 raise ValueError('Extract requires native DurationField database support.')\n-            sql = connection.ops.time_extract_sql(self.lookup_name, sql)\n-        else:\n+            sql = connection\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f.ops.time_extract_sql(self.lookup_name, sql)\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1fn        else:\n             # resolve_expression has already validated the output_field so this\n-            # assert should never be hit.\n+            # assert should never be hit\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f.\n             assert False, \"Tried to Extract from an invalid type.\"\n         return sql, params\n \n@@ -71,7 +70,7 @@ class Extract(TimezoneMixin, Transform):\n         # Passing dates to functions expecting datetimes is most likely a mistake.\n         if type(field) == DateField and copy.lookup_name in ('hour', 'minute', 'second'):\n             raise ValueError(\n-                \"Cannot extract time component '%s' from DateField '%s'. \" % (copy.lookup_name, field.name)\n+                \"Cannot extract time component '%s' from Date\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1fField '%s'. \" % (copy.lookup_name, field.name)\n             )\n         if (\n             isinstance(field, DurationField) and\n@@ -106,12 +105,11 @@ class ExtractWeek(Extract):\n     Return 1-52 or 53, based on ISO-8601, i.e., Monday is the first of the\n     week.\n     \"\"\"\n-    lookup_name = 'week'\n+    lookup_name = '\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1fweek'\n \n \n class ExtractWeekDay(Extract):\n-    \"\"\"\n-    Return Sunday=1 through Saturday=7.\n+    \"\"\"\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1fn    Return Sunday=1 through Saturday=7.\n \n     To replicate this in Python: (mydatetime.isoweekday() % 7) + 1\n     \"\"\"\n@@ -119,12 +117,12 @@ class ExtractWeekDay(Extract):\n \n \n class ExtractIsoWeekDay(Extract):\n-    \"\"\"Return Monday=1 through Sunday=7, based on ISO-8601.\"\"\"\n+    \"\"\"Return Monday=1 through Sunday=\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f7, based on ISO-8601.\"\"\"\n     lookup_name = 'iso_week_day'\n \n \n-class ExtractQuarter(Extract):\n-    lookup_name = 'quarter'\n+class ExtractQuarter(Extract):\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f\n+\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f    lookup_name = 'quarter'\n \n \n class ExtractHour(Extract):\n@@ -152,7 +150,7 @@ TimeField.register_lookup(ExtractHour)\n TimeField.register_lookup(ExtractMinute)\n TimeField.register_lookup(ExtractSecond)\n \n-DateTimeField.register_lookup(ExtractHour)\n+DateTimeField.register\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f_lookup(ExtractHour)\n DateTimeField.register_lookup(ExtractMinute)\n DateTimeField.register_lookup(ExtractSecond)\n \n@@ -164,7 +162,7 @@ ExtractYear.register_lookup(YearLte)\n \n ExtractIsoYear.register_lookup(YearExact)\n ExtractIsoYear.register_lookup(YearGt)\n-ExtractIsoYear.register_lookup(YearGte)\n+Extract\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1fIsoYear.register_lookup(YearGte)\n ExtractIsoYear.register_lookup(YearLt)\n ExtractIsoYear.register_lookup(YearLte)\n \n@@ -173,11 +171,11 @@ class Now(Func):\n     template = 'CURRENT_TIMESTAMP'\n     output_field = DateTimeField()\n \n-    def as_postgresql(self, compiler, connection, **extra_context):\n+   \u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f def as_postgresql(self, compiler, connection, **extra_context):\n         # PostgreSQL's CURRENT_TIMESTAMP means \"the time at the start of the\n-        # transaction\". Use STATEMENT_TIMESTAMP to be cross-compatible with\n+        # transaction\". Use STATEMENT_TIMESTAMP to\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f be cross-compatible with\n         # other databases.\n-        return self.as_sql(compiler, connection, template='STATEMENT_TIMESTAMP()', **extra_context)\n+        return self.as_sql(compiler\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f\u554a\uff1f, connection, template='STATEMENT_TIMESTAMP()', **extra_context)\n \n \n class TruncBase(TimezoneMixin, Transform):\n@@ -199,11 +197,11 @@ class TruncBase(TimezoneMixin, Transform):\n         elif isinstance(self.output_field, TimeField):\n             sql = connection.ops.time_trunc_sql(self.kind, inner_sql)\n         else:\n-            raise ValueError('Trunc only valid on DateField, TimeField, or DateTimeField.')\n+            raise ValueError('Trunc only valid on DateField, TimeField, or DateTimeField.'\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f)\n         return sql, inner_params\n \n-    def resolve_expression(self, query=None, allow_joins=True, reuse=None, summarize=False, for_save=False):\n-        copy = super().resolve_expression(query, allow_joins, reuse, summarize, for_save)\n+    def resolve_expression(self, query=None,\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f allow_\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1fjoins=True, reuse=None, summarize=False, for_save=False):\n+        copy = super().resolve_expression(query, allow_joins, reuse, summarize, for_save\u6781\u901f\u8d5b\u8f66\u5f00\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f)\n         field = copy.lhs.output_field\n         # DateTimeField is a subclass of DateField so this works for both.\n         assert isinstance(field, (DateField, TimeField)), (\n@@ -212,13 +210,13 @@ class TruncBase(TimezoneMixin, Transform):\n         # If self.output_field was None, then accessing the field will trigger\n         # the resolver to assign it to self.lhs.output_field.\n         if not isinstance(copy.output_field, (DateField, DateTimeField, TimeField)):\n-            raise ValueError('output_field must be either DateField, TimeField, or DateTimeField')\n+            raise ValueError('output_field must be either DateField\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f, TimeField, or DateTimeField')\n         # Passing dates or times to functions expecting datetimes is most\n         # likely a mistake.\n-        class_output_field = self.__class__.output_field if isinstance(self.__class__.output_field, Field) else None\n+        class_output_field = self.__class__.output_field if isinstance(self.__class__.output_field, Field) else None\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f\n         output_field = class_output_field or copy.output_field\n         has_explicit_output_field = class_output_field or field.__class__ is not copy.output_field.__class__\n-        if type(field) == DateField and (\n+\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f        if type(field) == DateField and (\n                 isinstance(output_field, DateTimeField) or copy.kind in ('hour', 'minute', 'second', 'time')):\n             raise ValueError(\"Cannot truncate DateField '%s' to %s. \" % (\n                 field.name, output_field.__class__.__name__ if has_explicit_output_field else 'DateTimeField'\n@@ -243,11 +241,11 @@ class TruncBase(TimezoneMixin, Transform):\n                     'Database returned an invalid datetime value. Are time '\n                     'zone definitions for your database installed?'\n                 )\n-        elif isinstance(value, datetime):\n-            if value is None:\n+        elif isinstance(value, datetime):\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f\n+            if value\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f is None:\n                 pass\n             elif isinstance(self.output_field, DateField):\n-                value = value.date()\n+                value =\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f value.date()\n             elif isinstance(self.output_field, TimeField):\n                 value = value.time()\n         return value\n@@ -267,7 +265,7 @@ class TruncYear(TruncBase):\n     kind = 'year'\n \n \n-class TruncQuarter(TruncBase):\n+class TruncQuarter(Trunc\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1fBase):\n     kind = 'quarter'\n \n \n@@ -299,13 +297,12 @@ class TruncDate(TruncBase):\n \n class TruncTime(TruncBase):\n     kind = 'time'\n-    lookup_name = 'time'\n-    output_field = TimeField()\n+    lookup_name = 'time'\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1fn    output_field = TimeField()\n \n     def as_sql(self, compiler, connection):\n         # Cast to time rather than truncate to time.\n         lhs, lhs_params = compiler.compile(self.lhs)\n-        tzname = timezone.get_current_timezone_name() if settings.USE_TZ else None\n+        tzname = timezone.get_current_timezone_name() if settings.USE\u6781\u901f\u8d5b\u8f66\u5f00\u5956\u76f4\u64ad\u5386\u53f2\u8bb0\u5f55\u67e5\u8be2\u7ed3\u679c\u53f7\u7801\u67e5\u8be2\u5b98\u7f51\u7f51\u5740\u662f\u591a\u5c11\u554a\uff1f_TZ else None\n         sql = connection.ops.datetime_cast_time_sql(lhs, tzname)\n         return sql, lhs_params\n \n@@ -323,4 +320,4 @@ class TruncSecond(TruncBase):\n \n \n DateTimeField.register_lookup(TruncDate)\n-DateTimeField.register_lookup(TruncTime)\n+DateTimeField.register_lookup(TruncTime)\n\\ No newline at end of file\n",
+    "_seconds": 1800.1,
+    "_timed_out": true,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-13406",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "",
+    "_seconds": 229.4,
+    "_timed_out": false,
+    "_empty": true
+  },
+  {
+    "instance_id": "django__django-13410",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/core/files/locks.py b/django/core/files/locks.py\nindex c46b00b905..4938347ea7 100644\n--- a/django/core/files/locks.py\n+++ b/django/core/files/locks.py\n@@ -107,9 +107,15 @@ else:\n             return True\n     else:\n         def lock(f, flags):\n-            ret = fcntl.flock(_fd(f), flags)\n-            return ret == 0\n+            try:\n+                fcntl.flock(_fd(f), flags)\n+                return True\n+            except OSError:\n+                return False\n \n         def unlock(f):\n-            ret = fcntl.flock(_fd(f), fcntl.LOCK_UN)\n-            return ret == 0\n+            try:\n+                fcntl.flock(_fd(f), fcntl.LOCK_UN)\n+                return True\n+            except OSError:\n+                return False\n",
+    "_seconds": 28.2,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-13417",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "",
+    "_seconds": 242.2,
+    "_timed_out": false,
+    "_empty": true
+  },
+  {
+    "instance_id": "django__django-13512",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/contrib/admin/utils.py b/django/contrib/admin/utils.py\nindex 446083e659..b825d070bd 100644\n--- a/django/contrib/admin/utils.py\n+++ b/django/contrib/admin/utils.py\n@@ -1,5 +1,6 @@\n import datetime\n import decimal\n+import json\n from collections import defaultdict\n \n from django.core.exceptions import FieldDoesNotExist\n@@ -400,7 +401,7 @@ def display_for_field(value, field, empty_value_display):\n         return format_html('<a href=\"{}\">{}</a>', value.url, value)\n     elif isinstance(field, models.JSONField) and value:\n         try:\n-            return field.get_prep_value(value)\n+            return json.dumps(value, ensure_ascii=False)\n         except TypeError:\n             return display_for_value(value, empty_value_display)\n     else:\n",
+    "_seconds": 233.6,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-13551",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/contrib/auth/tokens.py b/django/contrib/auth/tokens.py\nindex 93e2d71af2..ec5b7ff6c2 100644\n--- a/django/contrib/auth/tokens.py\n+++ b/django/contrib/auth/tokens.py\n@@ -85,6 +85,7 @@ class PasswordResetTokenGenerator:\n            same password is chosen, due to password salting).\n         2. The last_login field will usually be updated very shortly after\n            a password reset.\n+        3. The email field will change if the user updates their email address.\n         Failing those things, settings.PASSWORD_RESET_TIMEOUT eventually\n         invalidates the token.\n \n@@ -94,7 +95,9 @@ class PasswordResetTokenGenerator:\n         # Truncate microseconds so that tokens are consistent even if the\n         # database doesn't support microseconds.\n         login_timestamp = '' if user.last_login is None else user.last_login.replace(microsecond=0, tzinfo=None)\n-        return str(user.pk) + user.password + str(login_timestamp) + str(timestamp)\n+        # Use an empty string if email is None\n+        email = getattr(user, 'email', '') or ''\n+        return str(user.pk) + user.password + str(login_timestamp) + str(timestamp) + email\n \n     def _num_seconds(self, dt):\n         return int((dt - datetime(2001, 1, 1)).total_seconds())\n",
+    "_seconds": 400.5,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-13741",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/contrib/auth/forms.py b/django/contrib/auth/forms.py\nindex b9eb33329f..9a6614a809 100644\n--- a/django/contrib/auth/forms.py\n+++ b/django/contrib/auth/forms.py\n@@ -56,6 +56,7 @@ class ReadOnlyPasswordHashField(forms.Field):\n \n     def __init__(self, *args, **kwargs):\n         kwargs.setdefault(\"required\", False)\n+        kwargs.setdefault(\"disabled\", True)\n         super().__init__(*args, **kwargs)\n \n     def bound_data(self, data, initial):\n",
+    "_seconds": 285.9,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-13794",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/template/defaultfilters.py b/django/template/defaultfilters.py\nindex 1c844580c6..c66d763685 100644\n--- a/django/template/defaultfilters.py\n+++ b/django/template/defaultfilters.py\n@@ -678,6 +678,12 @@ def add(value, arg):\n         return int(value) + int(arg)\n     except (ValueError, TypeError):\n         try:\n+            # Handle lazy strings by converting them to strings first\n+            from django.utils.functional import Promise\n+            if isinstance(value, Promise):\n+                value = str(value)\n+            if isinstance(arg, Promise):\n+                arg = str(arg)\n             return value + arg\n         except Exception:\n             return ''\n",
+    "_seconds": 278.3,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-13807",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/db/backends/sqlite3/base.py b/django/db/backends/sqlite3/base.py\nindex 2eeaf98c0d..b0ef30a1fa 100644\n--- a/django/db/backends/sqlite3/base.py\n+++ b/django/db/backends/sqlite3/base.py\n@@ -327,13 +327,13 @@ class DatabaseWrapper(BaseDatabaseWrapper):\n                     violations = cursor.execute('PRAGMA foreign_key_check').fetchall()\n                 else:\n                     violations = chain.from_iterable(\n-                        cursor.execute('PRAGMA foreign_key_check(%s)' % table_name).fetchall()\n+                        cursor.execute('PRAGMA foreign_key_check(%s)' % self.ops.quote_name(table_name)).fetchall()\n                         for table_name in table_names\n                     )\n                 # See https://www.sqlite.org/pragma.html#pragma_foreign_key_check\n                 for table_name, rowid, referenced_table_name, foreign_key_index in violations:\n                     foreign_key = cursor.execute(\n-                        'PRAGMA foreign_key_list(%s)' % table_name\n+                        'PRAGMA foreign_key_list(%s)' % self.ops.quote_name(table_name)\n                     ).fetchall()[foreign_key_index]\n                     column_name, referenced_column_name = foreign_key[3:5]\n                     primary_key_column_name = self.introspection.get_primary_key_column(cursor, table_name)\n",
+    "_seconds": 278.3,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-13821",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/db/backends/sqlite3/base.py b/django/db/backends/sqlite3/base.py\nindex ab4ea70492..dcff5534e0 100644\n--- a/django/db/backends/sqlite3/base.py\n+++ b/django/db/backends/sqlite3/base.py\n@@ -64,8 +64,8 @@ def list_aggregate(function):\n \n \n def check_sqlite_version():\n-    if Database.sqlite_version_info < (3, 8, 3):\n-        raise ImproperlyConfigured('SQLite 3.8.3 or later is required (found %s).' % Database.sqlite_version)\n+    if Database.sqlite_version_info < (3, 9, 0):\n+        raise ImproperlyConfigured('SQLite 3.9.0 or later is required (found %s).' % Database.sqlite_version)\n \n \n check_sqlite_version()\ndiff --git a/docs/ref/contrib/gis/install/index.txt b/docs/ref/contrib/gis/install/index.txt\nindex 687fe5d59d..c8343913cf 100644\n--- a/docs/ref/contrib/gis/install/index.txt\n+++ b/docs/ref/contrib/gis/install/index.txt\n@@ -61,7 +61,7 @@ Database            Library Requirements            Supported Versions  Notes\n PostgreSQL          GEOS, GDAL, PROJ, PostGIS       9.6+                Requires PostGIS.\n MySQL               GEOS, GDAL                      5.7+                :ref:`Limited functionality <mysql-spatial-limitations>`.\n Oracle              GEOS, GDAL                      12.2+               XE not supported.\n-SQLite              GEOS, GDAL, PROJ, SpatiaLite    3.8.3+              Requires SpatiaLite 4.3+\n+SQLite              GEOS, GDAL, PROJ, SpatiaLite    3.9.0+              Requires SpatiaLite 4.3+\n ==================  ==============================  ==================  =========================================\n \n See also `this comparison matrix`__ on the OSGeo Wiki for\ndiff --git a/docs/ref/databases.txt b/docs/ref/databases.txt\nindex 809ee68db6..8fc9e89662 100644\n--- a/docs/ref/databases.txt\n+++ b/docs/ref/databases.txt\n@@ -679,7 +679,7 @@ appropriate typecasting.\n SQLite notes\n ============\n \n-Django supports SQLite 3.8.3 and later.\n+Django supports SQLite 3.9.0 and later.\n \n SQLite_ provides an excellent development alternative for applications that\n are predominantly read-only or require a smaller installation footprint. As\ndiff --git a/tests/backends/sqlite/tests.py b/tests/backends/sqlite/tests.py\nindex 17a58f32ae..bab83d6a48 100644\n--- a/tests/backends/sqlite/tests.py\n+++ b/tests/backends/sqlite/tests.py\n@@ -30,7 +30,7 @@ class Tests(TestCase):\n     longMessage = True\n \n     def test_check_sqlite_version(self):\n-        msg = 'SQLite 3.8.3 or later is required (found 3.8.2).'\n+        msg = 'SQLite 3.9.0 or later is required (found 3.8.2).'\n         with mock.patch.object(dbapi2, 'sqlite_version_info', (3, 8, 2)), \\\n                 mock.patch.object(dbapi2, 'sqlite_version', '3.8.2'), \\\n                 self.assertRaisesMessage(ImproperlyConfigured, msg):\n",
+    "_seconds": 196.1,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-13933",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "",
+    "_seconds": 163.5,
+    "_timed_out": false,
+    "_empty": true
+  },
+  {
+    "instance_id": "django__django-14089",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/utils/datastructures.py b/django/utils/datastructures.py\nindex 871b016715..721b0ee951 100644\n--- a/django/utils/datastructures.py\n+++ b/django/utils/datastructures.py\n@@ -34,6 +34,9 @@ class OrderedSet:\n     def __len__(self):\n         return len(self.dict)\n \n+    def __reversed__(self):\n+        return reversed(self.dict)\n+\n \n class MultiValueDictKeyError(KeyError):\n     pass\n",
+    "_seconds": 75.8,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-14315",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/db/backends/base/client.py b/django/db/backends/base/client.py\nindex 339f1e863c..6bd3b14c5a 100644\n--- a/django/db/backends/base/client.py\n+++ b/django/db/backends/base/client.py\n@@ -21,6 +21,5 @@ class BaseDatabaseClient:\n \n     def runshell(self, parameters):\n         args, env = self.settings_to_cmd_args_env(self.connection.settings_dict, parameters)\n-        if env:\n-            env = {**os.environ, **env}\n+        env = {**os.environ, **env}\n         subprocess.run(args, env=env, check=True)\n",
+    "_seconds": 61.9,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-14373",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/utils/dateformat.py b/django/utils/dateformat.py\nindex 38e89c47bb..7185c6921c 100644\n--- a/django/utils/dateformat.py\n+++ b/django/utils/dateformat.py\n@@ -314,7 +314,7 @@ class DateFormat(TimeFormat):\n \n     def Y(self):\n         \"Year, 4 digits; e.g. '1999'\"\n-        return self.data.year\n+        return '%04d' % self.data.year\n \n     def z(self):\n         \"\"\"Day of the year, i.e. 1 to 366.\"\"\"\ndiff --git a/tests/utils_tests/test_dateformat.py b/tests/utils_tests/test_dateformat.py\nindex c6d3ded80f..2bbd5ce716 100644\n--- a/tests/utils_tests/test_dateformat.py\n+++ b/tests/utils_tests/test_dateformat.py\n@@ -179,6 +179,26 @@ class DateFormatTests(SimpleTestCase):\n                     expected_date,\n                 )\n \n+    def test_year_before_1000_Y_format(self):\n+        \"\"\"\n+        Y format should return 4-digit zero-padded years for years < 1000.\n+        Regression test for issue where Y() returned integers instead of strings.\n+        \"\"\"\n+        tests = [\n+            (999, '0999'),\n+            (100, '0100'),\n+            (10, '0010'),\n+            (5, '0005'),\n+            (1000, '1000'),  # Should not be zero-padded\n+            (2023, '2023'),  # Should not be zero-padded\n+        ]\n+        for year, expected in tests:\n+            with self.subTest(year=year):\n+                self.assertEqual(\n+                    dateformat.format(datetime(year, 1, 1), 'Y'),\n+                    expected,\n+                )\n+\n     def test_twelve_hour_format(self):\n         tests = [\n             (0, '12'),\n",
+    "_seconds": 391.1,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-14376",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/db/backends/mysql/base.py b/django/db/backends/mysql/base.py\nindex 2c62182d31..8b28a60485 100644\n--- a/django/db/backends/mysql/base.py\n+++ b/django/db/backends/mysql/base.py\n@@ -200,9 +200,9 @@ class DatabaseWrapper(BaseDatabaseWrapper):\n         if settings_dict['USER']:\n             kwargs['user'] = settings_dict['USER']\n         if settings_dict['NAME']:\n-            kwargs['db'] = settings_dict['NAME']\n+            kwargs['database'] = settings_dict['NAME']\n         if settings_dict['PASSWORD']:\n-            kwargs['passwd'] = settings_dict['PASSWORD']\n+            kwargs['password'] = settings_dict['PASSWORD']\n         if settings_dict['HOST'].startswith('/'):\n             kwargs['unix_socket'] = settings_dict['HOST']\n         elif settings_dict['HOST']:\n",
+    "_seconds": 53.5,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-14404",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/contrib/admin/sites.py b/django/contrib/admin/sites.py\nindex 59a4a0364d..74ef4c491e 100644\n--- a/django/contrib/admin/sites.py\n+++ b/django/contrib/admin/sites.py\n@@ -420,7 +420,7 @@ class AdminSite:\n     def catch_all_view(self, request, url):\n         if settings.APPEND_SLASH and not url.endswith('/'):\n             urlconf = getattr(request, 'urlconf', None)\n-            path = '%s/' % request.path_info\n+            path = '%s/' % request.path\n             try:\n                 match = resolve(path, urlconf)\n             except Resolver404:\n",
+    "_seconds": 136.7,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-14493",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/contrib/staticfiles/storage.py b/django/contrib/staticfiles/storage.py\nindex f957a667b2..f653cfe59a 100644\n--- a/django/contrib/staticfiles/storage.py\n+++ b/django/contrib/staticfiles/storage.py\n@@ -261,9 +261,10 @@ class HashedFilesMixin:\n \n         paths = {path: paths[path] for path in adjustable_paths}\n \n+        substitutions = False\n         for i in range(self.max_post_process_passes):\n             substitutions = False\n-            for name, hashed_name, processed, subst in self._post_process(paths, adjustable_paths, hashed_files):\n+            for name, hashed_name, processed, subst\u6781\u7b80 in self._post_process(paths, adjustable_paths, hashed_files):\n                 # Overwrite since hashed_name may be newer.\n                 processed_adjustable_paths[name] = (name, hashed_name, processed)\n                 substitutions = substitutions or subst\n",
+    "_seconds": 136.0,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-14534",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "",
+    "_seconds": 184.5,
+    "_timed_out": false,
+    "_empty": true
+  },
+  {
+    "instance_id": "django__django-14539",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/utils/html.py b/django/utils/html.py\nindex 3bc02b8dd3..2d79c464fa 100644\n--- a/django/utils/html.py\n+++ b/django/utils/html.py\n@@ -283,9 +283,24 @@ def urlize(text, trim_url_limit=None, nofollow=False, autoescape=False):\n             middle_unescaped = html.unescape(middle)\n             stripped = middle_unescaped.rstrip(TRAILING_PUNCTUATION_CHARS)\n             if middle_unescaped != stripped:\n-                trail = middle[len(stripped):] + trail\n-                middle = middle[:len(stripped) - len(middle_unescaped)]\n-                trimmed_something = True\n+                # Find where the stripped version ends in the original string\n+                # by working backwards and comparing unescaped versions\n+                chars_to_remove = 0\n+                \n+                # Start from the end and find the position where the unescaped\n+                # version of the substring matches the stripped version\n+                for i in range(len(middle), 0, -1):\n+                    substring = middle[:i]\n+                    unescaped_substring = html.unescape(substring)\n+                    if unescaped_substring == stripped:\n+                        chars_to_remove = len(middle) - i\n+                        break\n+                \n+                # If we found a match, update trail and middle\n+                if chars_to_remove > 0:\n+                    trail = middle[-chars_to_remove:] + trail\n+                    middle = middle[:-chars_to_remove]\n+                    trimmed_something = True\n         return lead, middle, trail\n \n     def is_email_simple(value):\n",
+    "_seconds": 571.7,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-14580",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/db/migrations/writer.py b/django/db/migrations/writer.py\nindex 4918261fb0..a1dd8b198d 100644\n--- a/django/db/migrations/writer.py\n+++ b/django/db/migrations/writer.py\n@@ -169,6 +169,15 @@ class MigrationWriter:\n             imports.add(\"from django.db import migrations, models\")\n         else:\n             imports.add(\"from django.db import migrations\")\n+        \n+        # Check if the migration content contains 'models.Model' but the import is missing\n+        # This can happen when TypeSerializer returns \"models.Model\" without adding the import\n+        operations_content = items[\"operations\"]\n+        if \"models.Model\" in operations_content and \"from django.db import models\" not in \"\\n\".join(imports):\n+            # Replace the migrations import with combined migrations, models import\n+            if \"from django.db import migrations\" in imports:\n+                imports.discard(\"from django.db import migrations\")\n+            imports.add(\"from django.db import migrations, models\")\n \n         # Sort imports by the package / module to be imported (the part after\n         # \"from\" in \"from ... import ...\" or after \"import\" in \"import ...\").\n",
+    "_seconds": 1800.0,
+    "_timed_out": true,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-14608",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/forms/formsets.py b/django/forms/formsets.py\nindex a89c35599f..bbb08a3376 100644\n--- a/django/forms/formsets.py\n+++ b/django/forms/formsets.py\n@@ -295,7 +295,7 @@ class BaseFormSet:\n         \"\"\"\n         if self._non_form_errors is None:\n             self.full_clean()\n-        return self._non_form_errors\n+        return self.error_class(self._non_form_errors, error_class='nonform')\n \n     @property\n     def errors(self):\n",
+    "_seconds": 315.4,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-14752",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/contrib/admin/views/autocomplete.py b/django/contrib/admin/views/autocomplete.py\nindex 3903e4c98c..a5973f1fbf 100644\n--- a/django/contrib/admin/views/autocomplete.py\n+++ b/django/contrib/admin/views/autocomplete.py\n@@ -26,8 +26,7 @@ class AutocompleteJsonView(BaseListView):\n         context = self.get_context_data()\n         return JsonResponse({\n             'results': [\n-                {'id': str(getattr(obj, to_field_name)), 'text': str(obj)}\n-                for obj in context['object_list']\n+                self.serialize_result(obj, to_field_name) for obj in context['object_list']\n             ],\n             'pagination': {'more': context['page_obj'].has_next()},\n         })\n@@ -97,6 +96,15 @@ class AutocompleteJsonView(BaseListView):\n \n         return term, model_admin, source_field, to_field_name\n \n+    def serialize_result(self, obj, to_field_name):\n+        \"\"\"\n+        Convert an object to a dictionary representation.\n+        \n+        This method can be overridden to add extra fields to the autocomplete\n+        response.\n+        \"\"\"\n+        return {'id': str(getattr(obj, to_field_name)), 'text': str(obj)}\n+\n     def has_perm(self, request, obj=None):\n         \"\"\"Check if user has permission to access the related model.\"\"\"\n         return self.model_admin.has_view_permission(request, obj=obj)\n",
+    "_seconds": 307.0,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-14765",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/db/migrations/state.py b/django/db/migrations/state.py\nindex 088f5c41f0..1d30c7a20d 100644\n--- a/django/db/migrations/state.py\n+++ b/django/db/migrations/state.py\n@@ -92,7 +92,8 @@ class ProjectState:\n         self.models = models or {}\n         # Apps to include from main registry, usually unmigrated ones\n         if real_apps:\n-            self.real_apps = real_apps if isinstance(real_apps, set) else set(real_apps)\n+            assert isinstance(real_apps, set), \"real_apps must be a set\"\n+            self.real_apps = real_apps\n         else:\n             self.real_apps = set()\n         self.is_delayed = False\n",
+    "_seconds": 203.8,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-14787",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/utils/decorators.py b/django/utils/decorators.py\nindex 5c9a5d01c7..5480121232 100644\n--- a/django/utils/decorators.py\n+++ b/django/utils/decorators.py\n@@ -38,6 +38,8 @@ def _multi_decorate(decorators, method):\n         # 'func'. Also, wrap method.__get__() in a function because new\n         # attributes can't be set on bound method objects, only on functions.\n         bound_method = partial(method.__get__(self, type(self)))\n+        # Preserve the original function's attributes on the bound_method\n+        update_wrapper(bound_method, method)\n         for dec in decorators:\n             bound_method = dec(bound_method)\n         return bound_method(*args, **kwargs)\n",
+    "_seconds": 562.2,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-14792",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/db/backends/postgresql/operations.py b/django/db/backends/postgresql/operations.py\nindex 8d19872bea..91961fba9a 100644\n--- a/django/db/backends/postgresql/operations.py\n+++ b/django/db/backends/postgresql/operations.py\n@@ -44,7 +44,13 @@ class DatabaseOperations(BaseDatabaseOperations):\n         return \"DATE_TRUNC('%s', %s)\" % (lookup_type, field_name)\n \n     def _prepare_tzname_delta(self, tzname):\n-        if '+' in tzname:\n+        if tzname.startswith('Etc/GMT'):\n+            # Handle Etc/GMT timezones specially\n+            if '+' in tzname:\n+                return tzname[tzname.find('+'):].replace('+', '-')\n+            elif '-' in tzname:\n+                return tzname[tzname.find('-'):].replace('-', '+')\n+        elif '+' in tzname:\n             return tzname.replace('+', '-')\n         elif '-' in tzname:\n             return tzname.replace('-', '+')\n",
+    "_seconds": 279.8,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-14855",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "diff --git a/django/contrib/admin/helpers.py b/django/contrib/admin/helpers.py\nindex dd154f72ee..ba8c3463a0 100644\n--- a/django/contrib/admin/helpers.py\n+++ b/django/contrib/admin/helpers.py\n@@ -209,7 +209,11 @@ class AdminReadonlyField:\n             remote_field.model._meta.model_name,\n         )\n         try:\n-            url = reverse(url_name, args=[quote(remote_obj.pk)])\n+            url = reverse(\n+                url_name,\n+                args=[quote(remote_obj.pk)],\n+                current_app=self.model_admin.admin_site.name\n+            )\n             return format_html('<a href=\"{}\">{}</a>', url, remote_obj)\n         except NoReverseMatch:\n             return str(remote_obj)\n",
+    "_seconds": 82.9,
+    "_timed_out": false,
+    "_empty": false
+  },
+  {
+    "instance_id": "django__django-14915",
+    "model_name_or_path": "chimera-baseline",
+    "model_patch": "",
+    "_seconds": 225.1,
+    "_timed_out": false,
+    "_empty": true
+  }
+]

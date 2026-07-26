@@ -1,0 +1,37 @@
+diff --git a/django/db/migrations/serializer.py b/django/db/migrations/serializer.py
+index 7d226955d5..0610702219 100644
+--- a/django/db/migrations/serializer.py
++++ b/django/db/migrations/serializer.py
+@@ -196,7 +196,31 @@ class IterableSerializer(BaseSerializer):
+ class ModelFieldSerializer(DeconstructableSerializer):
+     def serialize(self):
+         attr_name, path, args, kwargs = self.value.deconstruct()
+-        return self.serialize_deconstructed(path, args, kwargs)
++        # For fields, we have access to the actual class, so we can get the module
++        # This is important for inner classes where path is module.Outer.Inner
++        # but we need to import just 'module', not 'module.Outer'
++        module = self.value.__class__.__module__
++        if module == "django.db.models":
++            imports = {"from django.db import models"}
++            # Handle special case for Model
++            if path == "django.db.models.Model":
++                name = "models.Model"
++            else:
++                name = "models.%s" % path.split(".", 2)[-1]  # Get everything after django.db.models.
++        else:
++            imports = {"import %s" % module}
++            name = path
++        
++        strings = []
++        for arg in args:
++            arg_string, arg_imports = serializer_factory(arg).serialize()
++            strings.append(arg_string)
++            imports.update(arg_imports)
++        for kw, arg in sorted(kwargs.items()):
++            arg_string, arg_imports = serializer_factory(arg).serialize()
++            imports.update(arg_imports)
++            strings.append("%s=%s" % (kw, arg_string))
++        return "%s(%s)" % (name, ", ".join(strings)), imports
+ 
+ 
+ class ModelManagerSerializer(DeconstructableSerializer):

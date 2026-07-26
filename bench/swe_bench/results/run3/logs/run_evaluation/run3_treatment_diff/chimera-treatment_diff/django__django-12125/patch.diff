@@ -1,0 +1,81 @@
+diff --git a/django/db/migrations/serializer.py b/django/db/migrations/serializer.py
+index 7d226955d5..58a1ae52ab 100644
+--- a/django/db/migrations/serializer.py
++++ b/django/db/migrations/serializer.py
+@@ -90,14 +90,59 @@ class DeconstructableSerializer(BaseSerializer):
+ 
+     @staticmethod
+     def _serialize_path(path):
+-        module, name = path.rsplit(".", 1)
+-        if module == "django.db.models":
+-            imports = {"from django.db import models"}
+-            name = "models.%s" % name
+-        else:
++        # Try to split the path into module and qualname.
++        # The path is in the form "module.qualname" where qualname may contain
++        # dots for nested classes (e.g., "myapp.models.Outer.Inner").
++        # We need to find the longest importable prefix as the module.
++        
++        # Special case for django.db.models
++        if path == "django.db.models":
++            return "models", {"from django.db import models"}
++        elif path.startswith("django.db.models."):
++            name = path.replace("django.db.models.", "models.", 1)
++            return name, {"from django.db import models"}
++        
++        parts = path.split('.')
++        if len(parts) <= 1:
++            # Single component, must be a module
++            return path, {"import %s" % path}
++        
++        # Try importing progressively shorter prefixes
++        # Start from full path and go backwards
++        for i in range(len(parts), 0, -1):
++            module_path = '.'.join(parts[:i])
++            try:
++                __import__(module_path)
++                # Import succeeded, so this is a valid module
++                if i == len(parts):
++                    # The whole path is a module
++                    return path, {"import %s" % path}
++                else:
++                    # We have a module and a qualname
++                    return path, {"import %s" % module_path}
++            except ImportError:
++                continue
++        
++        # If nothing imports, try a different approach:
++        # The path comes from __module__ + "." + __qualname__
++        # __module__ doesn't contain uppercase letters (by convention)
++        # while class names in __qualname__ start with uppercase (by convention)
++        # Use this heuristic to split
++        for i in range(1, len(parts)):
++            # Check if parts[i] starts with uppercase (likely a class name)
++            if parts[i] and parts[i][0].isupper():
++                module_path = '.'.join(parts[:i])
++                return path, {"import %s" % module_path}
++        
++        # Ultimate fallback: use the original logic
++        # This will be wrong for inner classes but at least won't crash
++        try:
++            module, name = path.rsplit(".", 1)
+             imports = {"import %s" % module}
+-            name = path
+-        return name, imports
++            return path, imports
++        except ValueError:
++            # No dot in path
++            return path, {"import %s" % path}
+ 
+     def serialize(self):
+         return self.serialize_deconstructed(*self.value.deconstruct())
+@@ -269,7 +314,8 @@ class TypeSerializer(BaseSerializer):
+             if module == builtins.__name__:
+                 return self.value.__name__, set()
+             else:
+-                return "%s.%s" % (module, self.value.__name__), {"import %s" % module}
++                # Use __qualname__ to handle nested classes
++                return "%s.%s" % (module, self.value.__qualname__), {"import %s" % module}
+ 
+ 
+ class UUIDSerializer(BaseSerializer):

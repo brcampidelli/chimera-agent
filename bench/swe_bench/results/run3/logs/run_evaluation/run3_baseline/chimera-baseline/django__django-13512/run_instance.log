@@ -1,0 +1,61 @@
+2026-07-26 07:30:45,617 - INFO - Creating container for django__django-13512...
+2026-07-26 07:30:45,926 - INFO - Container for django__django-13512 created: b93048f4e14e48125014e6c8c869d0f6b4dbb15f95f047331c3fb6a6c5eafa32
+2026-07-26 07:30:46,090 - INFO - Container for django__django-13512 started: b93048f4e14e48125014e6c8c869d0f6b4dbb15f95f047331c3fb6a6c5eafa32
+2026-07-26 07:30:46,092 - INFO - Intermediate patch for django__django-13512 written to logs/run_evaluation/run3_baseline/chimera-baseline/django__django-13512/patch.diff, now applying to container...
+2026-07-26 07:30:46,302 - INFO - >>>>> Applied Patch:
+Checking patch django/contrib/admin/utils.py...
+Applied patch django/contrib/admin/utils.py cleanly.
+
+2026-07-26 07:30:46,866 - INFO - Git diff before:
+diff --git a/django/contrib/admin/utils.py b/django/contrib/admin/utils.py
+index 446083e659..b825d070bd 100644
+--- a/django/contrib/admin/utils.py
++++ b/django/contrib/admin/utils.py
+@@ -1,5 +1,6 @@
+ import datetime
+ import decimal
++import json
+ from collections import defaultdict
+ 
+ from django.core.exceptions import FieldDoesNotExist
+@@ -400,7 +401,7 @@ def display_for_field(value, field, empty_value_display):
+         return format_html('<a href="{}">{}</a>', value.url, value)
+     elif isinstance(field, models.JSONField) and value:
+         try:
+-            return field.get_prep_value(value)
++            return json.dumps(value, ensure_ascii=False)
+         except TypeError:
+             return display_for_value(value, empty_value_display)
+     else:
+2026-07-26 07:30:46,867 - INFO - Eval script for django__django-13512 written to logs/run_evaluation/run3_baseline/chimera-baseline/django__django-13512/eval.sh; copying to container...
+2026-07-26 07:30:50,647 - INFO - Test runtime: 3.65 seconds
+2026-07-26 07:30:50,650 - INFO - Test output for django__django-13512 written to logs/run_evaluation/run3_baseline/chimera-baseline/django__django-13512/test_output.txt
+2026-07-26 07:30:50,732 - INFO - Git diff after:
+diff --git a/django/contrib/admin/utils.py b/django/contrib/admin/utils.py
+index 446083e659..b825d070bd 100644
+--- a/django/contrib/admin/utils.py
++++ b/django/contrib/admin/utils.py
+@@ -1,5 +1,6 @@
+ import datetime
+ import decimal
++import json
+ from collections import defaultdict
+ 
+ from django.core.exceptions import FieldDoesNotExist
+@@ -400,7 +401,7 @@ def display_for_field(value, field, empty_value_display):
+         return format_html('<a href="{}">{}</a>', value.url, value)
+     elif isinstance(field, models.JSONField) and value:
+         try:
+-            return field.get_prep_value(value)
++            return json.dumps(value, ensure_ascii=False)
+         except TypeError:
+             return display_for_value(value, empty_value_display)
+     else:
+2026-07-26 07:30:50,738 - INFO - Grading answer for django__django-13512...
+2026-07-26 07:30:50,741 - INFO - report: {'django__django-13512': {'patch_is_None': False, 'patch_exists': True, 'patch_successfully_applied': True, 'resolved': False, 'tests_status': {'FAIL_TO_PASS': {'success': ['test_json_display_for_field (admin_utils.tests.UtilsTests)', 'test_label_for_field (admin_utils.tests.UtilsTests)'], 'failure': ['test_prepare_value (forms_tests.field_tests.test_jsonfield.JSONFieldTest)']}, 'PASS_TO_PASS': {'success': ['test_cyclic (admin_utils.tests.NestedObjectsTests)', 'test_non_added_parent (admin_utils.tests.NestedObjectsTests)', 'test_on_delete_do_nothing (admin_utils.tests.NestedObjectsTests)', 'test_queries (admin_utils.tests.NestedObjectsTests)', 'test_relation_on_abstract (admin_utils.tests.NestedObjectsTests)', 'test_siblings (admin_utils.tests.NestedObjectsTests)', 'test_unrelated_roots (admin_utils.tests.NestedObjectsTests)', 'test_converted_value (forms_tests.field_tests.test_jsonfield.JSONFieldTest)', 'test_custom_encoder_decoder (forms_tests.field_tests.test_jsonfield.JSONFieldTest)', 'The widget can be overridden with an attribute.', 'test_custom_widget_kwarg (forms_tests.field_tests.test_jsonfield.JSONFieldTest)', 'test_formfield_disabled (forms_tests.field_tests.test_jsonfield.JSONFieldTest)', 'test_has_changed (forms_tests.field_tests.test_jsonfield.JSONFieldTest)', 'test_invalid (forms_tests.field_tests.test_jsonfield.JSONFieldTest)', 'test_redisplay_wrong_input (forms_tests.field_tests.test_jsonfield.JSONFieldTest)', 'test_valid (forms_tests.field_tests.test_jsonfield.JSONFieldTest)', 'test_valid_empty (forms_tests.field_tests.test_jsonfield.JSONFieldTest)', 'test_widget (forms_tests.field_tests.test_jsonfield.JSONFieldTest)', 'test_flatten (admin_utils.tests.UtilsTests)', 'test_flatten_fieldsets (admin_utils.tests.UtilsTests)', 'test_help_text_for_field (admin_utils.tests.UtilsTests)', 'test_label_for_field_form_argument (admin_utils.tests.UtilsTests)', 'test_label_for_property (admin_utils.tests.UtilsTests)', 'test_list_display_for_value (admin_utils.tests.UtilsTests)', 'test_list_display_for_value_boolean (admin_utils.tests.UtilsTests)', 'test_null_display_for_field (admin_utils.tests.UtilsTests)', 'test_number_formats_display_for_field (admin_utils.tests.UtilsTests)', 'test_number_formats_with_thousand_separator_display_for_field (admin_utils.tests.UtilsTests)', 'test_quote (admin_utils.tests.UtilsTests)', 'test_related_name (admin_utils.tests.UtilsTests)', 'test_safestring_in_field_label (admin_utils.tests.UtilsTests)', 'test_values_from_lookup_field (admin_utils.tests.UtilsTests)'], 'failure': []}, 'FAIL_TO_FAIL': {'success': [], 'failure': []}, 'PASS_TO_FAIL': {'success': [], 'failure': []}}}}
+Result for django__django-13512: resolved: False
+2026-07-26 07:30:50,744 - INFO - Attempting to stop container sweb.eval.django__django-13512.run3_baseline...
+2026-07-26 07:31:07,849 - INFO - Attempting to remove container sweb.eval.django__django-13512.run3_baseline...
+2026-07-26 07:31:07,882 - INFO - Container sweb.eval.django__django-13512.run3_baseline removed.
+2026-07-26 07:31:07,883 - INFO - Attempting to remove image swebench/sweb.eval.x86_64.django_1776_django-13512:latest...
+2026-07-26 07:31:08,045 - INFO - Image swebench/sweb.eval.x86_64.django_1776_django-13512:latest removed.

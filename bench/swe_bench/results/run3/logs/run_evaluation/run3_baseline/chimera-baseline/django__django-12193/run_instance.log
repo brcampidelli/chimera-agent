@@ -1,0 +1,45 @@
+2026-07-26 07:30:04,959 - INFO - Creating container for django__django-12193...
+2026-07-26 07:30:06,166 - INFO - Container for django__django-12193 created: 067107b2dfff88bb2ebd007a88017c087badde608f664a9684e58c0e14537164
+2026-07-26 07:30:06,547 - INFO - Container for django__django-12193 started: 067107b2dfff88bb2ebd007a88017c087badde608f664a9684e58c0e14537164
+2026-07-26 07:30:06,549 - INFO - Intermediate patch for django__django-12193 written to logs/run_evaluation/run3_baseline/chimera-baseline/django__django-12193/patch.diff, now applying to container...
+2026-07-26 07:30:06,917 - INFO - >>>>> Applied Patch:
+Checking patch django/forms/widgets.py...
+Applied patch django/forms/widgets.py cleanly.
+
+2026-07-26 07:30:07,543 - INFO - Git diff before:
+diff --git a/django/forms/widgets.py b/django/forms/widgets.py
+index 6fe220bea7..ddd052be8d 100644
+--- a/django/forms/widgets.py
++++ b/django/forms/widgets.py
+@@ -524,6 +524,8 @@ class CheckboxInput(Input):
+         if self.check_test(value):
+             if attrs is None:
+                 attrs = {}
++            else:
++                attrs = attrs.copy()
+             attrs['checked'] = True
+         return super().get_context(name, value, attrs)
+2026-07-26 07:30:07,545 - INFO - Eval script for django__django-12193 written to logs/run_evaluation/run3_baseline/chimera-baseline/django__django-12193/eval.sh; copying to container...
+2026-07-26 07:30:12,990 - INFO - Test runtime: 5.28 seconds
+2026-07-26 07:30:12,993 - INFO - Test output for django__django-12193 written to logs/run_evaluation/run3_baseline/chimera-baseline/django__django-12193/test_output.txt
+2026-07-26 07:30:13,099 - INFO - Git diff after:
+diff --git a/django/forms/widgets.py b/django/forms/widgets.py
+index 6fe220bea7..ddd052be8d 100644
+--- a/django/forms/widgets.py
++++ b/django/forms/widgets.py
+@@ -524,6 +524,8 @@ class CheckboxInput(Input):
+         if self.check_test(value):
+             if attrs is None:
+                 attrs = {}
++            else:
++                attrs = attrs.copy()
+             attrs['checked'] = True
+         return super().get_context(name, value, attrs)
+2026-07-26 07:30:13,099 - INFO - Grading answer for django__django-12193...
+2026-07-26 07:30:13,101 - INFO - report: {'django__django-12193': {'patch_is_None': False, 'patch_exists': True, 'patch_successfully_applied': True, 'resolved': True, 'tests_status': {'FAIL_TO_PASS': {'success': ['test_get_context_does_not_mutate_attrs (forms_tests.widget_tests.test_checkboxinput.CheckboxInputTest)'], 'failure': []}, 'PASS_TO_PASS': {'success': ['test_render_check_exception (forms_tests.widget_tests.test_checkboxinput.CheckboxInputTest)', 'test_render_check_test (forms_tests.widget_tests.test_checkboxinput.CheckboxInputTest)', 'test_render_empty (forms_tests.widget_tests.test_checkboxinput.CheckboxInputTest)', 'test_render_false (forms_tests.widget_tests.test_checkboxinput.CheckboxInputTest)', 'test_render_int (forms_tests.widget_tests.test_checkboxinput.CheckboxInputTest)', 'test_render_none (forms_tests.widget_tests.test_checkboxinput.CheckboxInputTest)', 'test_render_true (forms_tests.widget_tests.test_checkboxinput.CheckboxInputTest)', 'test_render_value (forms_tests.widget_tests.test_checkboxinput.CheckboxInputTest)', 'test_value_from_datadict (forms_tests.widget_tests.test_checkboxinput.CheckboxInputTest)', 'test_value_from_datadict_string_int (forms_tests.widget_tests.test_checkboxinput.CheckboxInputTest)', 'test_value_omitted_from_data (forms_tests.widget_tests.test_checkboxinput.CheckboxInputTest)'], 'failure': []}, 'FAIL_TO_FAIL': {'success': [], 'failure': []}, 'PASS_TO_FAIL': {'success': [], 'failure': []}}}}
+Result for django__django-12193: resolved: True
+2026-07-26 07:30:13,103 - INFO - Attempting to stop container sweb.eval.django__django-12193.run3_baseline...
+2026-07-26 07:30:30,419 - INFO - Attempting to remove container sweb.eval.django__django-12193.run3_baseline...
+2026-07-26 07:30:30,553 - INFO - Container sweb.eval.django__django-12193.run3_baseline removed.
+2026-07-26 07:30:30,553 - INFO - Attempting to remove image swebench/sweb.eval.x86_64.django_1776_django-12193:latest...
+2026-07-26 07:30:31,335 - INFO - Image swebench/sweb.eval.x86_64.django_1776_django-12193:latest removed.

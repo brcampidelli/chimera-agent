@@ -1,0 +1,45 @@
+2026-07-26 07:30:04,961 - INFO - Creating container for django__django-13023...
+2026-07-26 07:30:06,189 - INFO - Container for django__django-13023 created: b4206239a38c07bf46ccb8975eca50f1cbc47e5c2d28b2dce9021f09ff68357e
+2026-07-26 07:30:06,441 - INFO - Container for django__django-13023 started: b4206239a38c07bf46ccb8975eca50f1cbc47e5c2d28b2dce9021f09ff68357e
+2026-07-26 07:30:06,444 - INFO - Intermediate patch for django__django-13023 written to logs/run_evaluation/run3_baseline/chimera-baseline/django__django-13023/patch.diff, now applying to container...
+2026-07-26 07:30:06,762 - INFO - >>>>> Applied Patch:
+Checking patch django/forms/fields.py...
+Applied patch django/forms/fields.py cleanly.
+
+2026-07-26 07:30:07,336 - INFO - Git diff before:
+diff --git a/django/forms/fields.py b/django/forms/fields.py
+index 36dad72704..d9d16805b0 100644
+--- a/django/forms/fields.py
++++ b/django/forms/fields.py
+@@ -346,7 +346,7 @@ class DecimalField(IntegerField):
+         value = str(value).strip()
+         try:
+             value = Decimal(value)
+-        except DecimalException:
++        except (DecimalException, TypeError):
+             raise ValidationError(self.error_messages['invalid'], code='invalid')
+         return value
+2026-07-26 07:30:07,338 - INFO - Eval script for django__django-13023 written to logs/run_evaluation/run3_baseline/chimera-baseline/django__django-13023/eval.sh; copying to container...
+2026-07-26 07:30:12,925 - INFO - Test runtime: 5.37 seconds
+2026-07-26 07:30:12,928 - INFO - Test output for django__django-13023 written to logs/run_evaluation/run3_baseline/chimera-baseline/django__django-13023/test_output.txt
+2026-07-26 07:30:13,002 - INFO - Git diff after:
+diff --git a/django/forms/fields.py b/django/forms/fields.py
+index 36dad72704..d9d16805b0 100644
+--- a/django/forms/fields.py
++++ b/django/forms/fields.py
+@@ -346,7 +346,7 @@ class DecimalField(IntegerField):
+         value = str(value).strip()
+         try:
+             value = Decimal(value)
+-        except DecimalException:
++        except (DecimalException, TypeError):
+             raise ValidationError(self.error_messages['invalid'], code='invalid')
+         return value
+2026-07-26 07:30:13,003 - INFO - Grading answer for django__django-13023...
+2026-07-26 07:30:13,005 - INFO - report: {'django__django-13023': {'patch_is_None': False, 'patch_exists': True, 'patch_successfully_applied': True, 'resolved': False, 'tests_status': {'FAIL_TO_PASS': {'success': [], 'failure': ['test_invalid_value (model_fields.test_decimalfield.DecimalFieldTests)', 'test_lookup_really_big_value (model_fields.test_decimalfield.DecimalFieldTests)']}, 'PASS_TO_PASS': {'success': ['test_default (model_fields.test_decimalfield.DecimalFieldTests)', 'test_filter_with_strings (model_fields.test_decimalfield.DecimalFieldTests)', 'test_get_prep_value (model_fields.test_decimalfield.DecimalFieldTests)', 'test_max_decimal_places_validation (model_fields.test_decimalfield.DecimalFieldTests)', 'test_max_digits_validation (model_fields.test_decimalfield.DecimalFieldTests)', 'test_max_whole_digits_validation (model_fields.test_decimalfield.DecimalFieldTests)', "Trailing zeros in the fractional part aren't truncated.", 'test_save_without_float_conversion (model_fields.test_decimalfield.DecimalFieldTests)', 'test_to_python (model_fields.test_decimalfield.DecimalFieldTests)'], 'failure': []}, 'FAIL_TO_FAIL': {'success': [], 'failure': []}, 'PASS_TO_FAIL': {'success': [], 'failure': []}}}}
+Result for django__django-13023: resolved: False
+2026-07-26 07:30:13,007 - INFO - Attempting to stop container sweb.eval.django__django-13023.run3_baseline...
+2026-07-26 07:30:30,234 - INFO - Attempting to remove container sweb.eval.django__django-13023.run3_baseline...
+2026-07-26 07:30:30,299 - INFO - Container sweb.eval.django__django-13023.run3_baseline removed.
+2026-07-26 07:30:30,299 - INFO - Attempting to remove image swebench/sweb.eval.x86_64.django_1776_django-13023:latest...
+2026-07-26 07:30:30,519 - INFO - Image swebench/sweb.eval.x86_64.django_1776_django-13023:latest removed.

@@ -1,0 +1,56 @@
+diff --git a/django/contrib/auth/base_user.py b/django/contrib/auth/base_user.py
+index 3a4a64ee19..80d4642d97 100644
+--- a/django/contrib/auth/base_user.py
++++ b/django/contrib/auth/base_user.py
+@@ -140,6 +140,28 @@ class AbstractBaseUser(models.Model):
+             algorithm=settings.DEFAULT_HASHING_ALGORITHM,
+         ).hexdigest()
+ 
++    def get_password_reset_token_hash_value(self, timestamp):
++        """
++        Return a hash value for password reset token generation.
++        Includes the user's primary key, password, last login timestamp,
++        and email address to ensure tokens are invalidated when these change.
++        """
++        # Truncate microseconds so that tokens are consistent even if the
++        # database doesn't support microseconds.
++        login_timestamp = '' if self.last_login is None else self.last_login.replace(microsecond=0, tzinfo=None)
++        
++        # Get email field value, using empty string if email is None or field doesn't exist
++        email_field_name = self.get_email_field_name()
++        try:
++            email_value = getattr(self, email_field_name, '')
++            if email_value is None:
++                email_value = ''
++        except AttributeError:
++            # If the email field doesn't exist on this user model
++            email_value = ''
++        
++        return str(self.pk) + self.password + str(login_timestamp) + str(timestamp) + str(email_value)
++
+     @classmethod
+     def get_email_field_name(cls):
+         try:
+diff --git a/django/contrib/auth/tokens.py b/django/contrib/auth/tokens.py
+index 93e2d71af2..b62574a7ca 100644
+--- a/django/contrib/auth/tokens.py
++++ b/django/contrib/auth/tokens.py
+@@ -85,16 +85,14 @@ class PasswordResetTokenGenerator:
+            same password is chosen, due to password salting).
+         2. The last_login field will usually be updated very shortly after
+            a password reset.
++        3. The email field will invalidate the token if changed.
+         Failing those things, settings.PASSWORD_RESET_TIMEOUT eventually
+         invalidates the token.
+ 
+         Running this data through salted_hmac() prevents password cracking
+         attempts using the reset token, provided the secret isn't compromised.
+         """
+-        # Truncate microseconds so that tokens are consistent even if the
+-        # database doesn't support microseconds.
+-        login_timestamp = '' if user.last_login is None else user.last_login.replace(microsecond=0, tzinfo=None)
+-        return str(user.pk) + user.password + str(login_timestamp) + str(timestamp)
++        return user.get_password_reset_token_hash_value(timestamp)
+ 
+     def _num_seconds(self, dt):
+         return int((dt - datetime(2001, 1, 1)).total_seconds())

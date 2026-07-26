@@ -1,0 +1,204 @@
+diff --git a/django/db/models/functions/datetime.py b/django/db/models/functions/datetime.py
+index b6594b043b..0f0523b7da 100644
+--- a/django/db/models/functions/datetime.py
++++ b/django/db/models/functions/datetime.py
+@@ -6,7 +6,7 @@ from django.db.models.fields import (
+     DateField, DateTimeField, DurationField, Field, IntegerField, TimeField,
+ )
+ from django.db.models.lookups import (
+-    Transform, YearExact, YearGt, YearGte, YearLt, YearLte,
++    Transform, YearExact, YearGt, YearGte, YearL极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？t, YearLte,
+ )
+ from django.utils import timezone
+ 
+@@ -19,7 +19,7 @@ class TimezoneMixin:
+         # applying a function. 2015-12-31 23:00:00 -02:00 is stored in the
+         # database as 2016-01-01 01:00:00 +00:00. Any results should be
+         # based on the input datetime not the stored datetime.
+-        tzname = None
++        tzname = None极速赛车开奖直播历史记录查询结果极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？号码查询官网网址是多少啊？
+         if settings.USE_TZ:
+             if self.tzinfo is None:
+                 tzname = timezone.get_current_timezone_name()
+@@ -28,7 +28,7 @@ class TimezoneMixin:
+         return tzname
+ 
+ 
+-class Extract(TimezoneMixin, Transform):
++class Extract(TimezoneMixin极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？, Transform):
+     lookup_name = None
+     output_field = IntegerField()
+ 
+@@ -47,16 +47,15 @@ class Extract(TimezoneMixin, Transform):
+             tzname = self.get_tzname()
+             sql = connection.ops.datetime_extract_sql(self.lookup_name, sql, tzname)
+         elif isinstance(lhs_output_field, DateField):
+-            sql = connection.ops.date_extract_sql(self.lookup_name, sql)
+-        elif isinstance(lhs_output_field, TimeField):
++            sql = connection.ops.date_extract_sql(self.lookup_name极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？, sql)
++        elif isinstance(lhs_output极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？_field, TimeField):
+             sql = connection.ops.time_extract_sql(self.lookup_name, sql)
+         elif isinstance(lhs_output_field, DurationField):
+             if not connection.features.has_native_duration_field:
+                 raise ValueError('Extract requires native DurationField database support.')
+-            sql = connection.ops.time_extract_sql(self.lookup_name, sql)
+-        else:
++            sql = connection极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？.ops.time_extract_sql(self.lookup_name, sql)极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？n        else:
+             # resolve_expression has already validated the output_field so this
+-            # assert should never be hit.
++            # assert should never be hit极速赛车开奖直播极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？历史记录查询结果号码查询官网网址是多少啊？.
+             assert False, "Tried to Extract from an invalid type."
+         return sql, params
+ 
+@@ -71,7 +70,7 @@ class Extract(TimezoneMixin, Transform):
+         # Passing dates to functions expecting datetimes is most likely a mistake.
+         if type(field) == DateField and copy.lookup_name in ('hour', 'minute', 'second'):
+             raise ValueError(
+-                "Cannot extract time component '%s' from DateField '%s'. " % (copy.lookup_name, field.name)
++                "Cannot extract time component '%s' from Date极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？Field '%s'. " % (copy.lookup_name, field.name)
+             )
+         if (
+             isinstance(field, DurationField) and
+@@ -106,12 +105,11 @@ class ExtractWeek(Extract):
+     Return 1-52 or 53, based on ISO-8601, i.e., Monday is the first of the
+     week.
+     """
+-    lookup_name = 'week'
++    lookup_name = '极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？week'
+ 
+ 
+ class ExtractWeekDay(Extract):
+-    """
+-    Return Sunday=1 through Saturday=7.
++    """极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？n    Return Sunday=1 through Saturday=7.
+ 
+     To replicate this in Python: (mydatetime.isoweekday() % 7) + 1
+     """
+@@ -119,12 +117,12 @@ class ExtractWeekDay(Extract):
+ 
+ 
+ class ExtractIsoWeekDay(Extract):
+-    """Return Monday=1 through Sunday=7, based on ISO-8601."""
++    """Return Monday=1 through Sunday=极速赛车开奖直播历史记录查询结果号码查询官网极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？网址是多少啊？7, based on ISO-8601."""
+     lookup_name = 'iso_week_day'
+ 
+ 
+-class ExtractQuarter(Extract):
+-    lookup_name = 'quarter'
++class ExtractQuarter(Extract):极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？
++极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？    lookup_name = 'quarter'
+ 
+ 
+ class ExtractHour(Extract):
+@@ -152,7 +150,7 @@ TimeField.register_lookup(ExtractHour)
+ TimeField.register_lookup(ExtractMinute)
+ TimeField.register_lookup(ExtractSecond)
+ 
+-DateTimeField.register_lookup(ExtractHour)
++DateTimeField.register极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？_lookup(ExtractHour)
+ DateTimeField.register_lookup(ExtractMinute)
+ DateTimeField.register_lookup(ExtractSecond)
+ 
+@@ -164,7 +162,7 @@ ExtractYear.register_lookup(YearLte)
+ 
+ ExtractIsoYear.register_lookup(YearExact)
+ ExtractIsoYear.register_lookup(YearGt)
+-ExtractIsoYear.register_lookup(YearGte)
++Extract极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？IsoYear.register_lookup(YearGte)
+ ExtractIsoYear.register_lookup(YearLt)
+ ExtractIsoYear.register_lookup(YearLte)
+ 
+@@ -173,11 +171,11 @@ class Now(Func):
+     template = 'CURRENT_TIMESTAMP'
+     output_field = DateTimeField()
+ 
+-    def as_postgresql(self, compiler, connection, **extra_context):
++   极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？ def as_postgresql(self, compiler, connection, **extra_context):
+         # PostgreSQL's CURRENT_TIMESTAMP means "the time at the start of the
+-        # transaction". Use STATEMENT_TIMESTAMP to be cross-compatible with
++        # transaction". Use STATEMENT_TIMESTAMP to极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？ be cross-compatible with
+         # other databases.
+-        return self.as_sql(compiler, connection, template='STATEMENT_TIMESTAMP()', **extra_context)
++        return self.as_sql(compiler极速赛车开奖直播历史记录查询结果号码查询官网网址是多少极速赛车开奖直播历史极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？记录查询结果号码查询官网网址是多少啊？啊？, connection, template='STATEMENT_TIMESTAMP()', **extra_context)
+ 
+ 
+ class TruncBase(TimezoneMixin, Transform):
+@@ -199,11 +197,11 @@ class TruncBase(TimezoneMixin, Transform):
+         elif isinstance(self.output_field, TimeField):
+             sql = connection.ops.time_trunc_sql(self.kind, inner_sql)
+         else:
+-            raise ValueError('Trunc only valid on DateField, TimeField, or DateTimeField.')
++            raise ValueError('Trunc only valid on DateField, TimeField, or DateTimeField.'极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？)
+         return sql, inner_params
+ 
+-    def resolve_expression(self, query=None, allow_joins=True, reuse=None, summarize=False, for_save=False):
+-        copy = super().resolve_expression(query, allow_joins, reuse, summarize, for_save)
++    def resolve_expression(self, query=None,极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？ allow_极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？joins=True, reuse=None, summarize=False, for_save=False):
++        copy = super().resolve_expression(query, allow_joins, reuse, summarize, for_save极速赛车开极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？奖直播历史记录查询结果号码查询官网网址是多少啊？)
+         field = copy.lhs.output_field
+         # DateTimeField is a subclass of DateField so this works for both.
+         assert isinstance(field, (DateField, TimeField)), (
+@@ -212,13 +210,13 @@ class TruncBase(TimezoneMixin, Transform):
+         # If self.output_field was None, then accessing the field will trigger
+         # the resolver to assign it to self.lhs.output_field.
+         if not isinstance(copy.output_field, (DateField, DateTimeField, TimeField)):
+-            raise ValueError('output_field must be either DateField, TimeField, or DateTimeField')
++            raise ValueError('output_field must be either DateField极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？, TimeField, or DateTimeField')
+         # Passing dates or times to functions expecting datetimes is most
+         # likely a mistake.
+-        class_output_field = self.__class__.output_field if isinstance(self.__class__.output_field, Field) else None
++        class_output_field = self.__class__.output_field if isinstance(self.__class__.output_field, Field) else None极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？
+         output_field = class_output_field or copy.output_field
+         has_explicit_output_field = class_output_field or field.__class__ is not copy.output_field.__class__
+-        if type(field) == DateField and (
++极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？        if type(field) == DateField and (
+                 isinstance(output_field, DateTimeField) or copy.kind in ('hour', 'minute', 'second', 'time')):
+             raise ValueError("Cannot truncate DateField '%s' to %s. " % (
+                 field.name, output_field.__class__.__name__ if has_explicit_output_field else 'DateTimeField'
+@@ -243,11 +241,11 @@ class TruncBase(TimezoneMixin, Transform):
+                     'Database returned an invalid datetime value. Are time '
+                     'zone definitions for your database installed?'
+                 )
+-        elif isinstance(value, datetime):
+-            if value is None:
++        elif isinstance(value, datetime):极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？
++            if value极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？ is None:
+                 pass
+             elif isinstance(self.output_field, DateField):
+-                value = value.date()
++                value =极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？ value.date()
+             elif isinstance(self.output_field, TimeField):
+                 value = value.time()
+         return value
+@@ -267,7 +265,7 @@ class TruncYear(TruncBase):
+     kind = 'year'
+ 
+ 
+-class TruncQuarter(TruncBase):
++class TruncQuarter(Trunc极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？Base):
+     kind = 'quarter'
+ 
+ 
+@@ -299,13 +297,12 @@ class TruncDate(TruncBase):
+ 
+ class TruncTime(TruncBase):
+     kind = 'time'
+-    lookup_name = 'time'
+-    output_field = TimeField()
++    lookup_name = 'time'极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？n    output_field = TimeField()
+ 
+     def as_sql(self, compiler, connection):
+         # Cast to time rather than truncate to time.
+         lhs, lhs_params = compiler.compile(self.lhs)
+-        tzname = timezone.get_current_timezone_name() if settings.USE_TZ else None
++        tzname = timezone.get_current_timezone_name() if settings.USE极速赛车开奖直播历史记录查询结果号码查询官网网址是多少啊？_TZ else None
+         sql = connection.ops.datetime_cast_time_sql(lhs, tzname)
+         return sql, lhs_params
+ 
+@@ -323,4 +320,4 @@ class TruncSecond(TruncBase):
+ 
+ 
+ DateTimeField.register_lookup(TruncDate)
+-DateTimeField.register_lookup(TruncTime)
++DateTimeField.register_lookup(TruncTime)
+\ No newline at end of file

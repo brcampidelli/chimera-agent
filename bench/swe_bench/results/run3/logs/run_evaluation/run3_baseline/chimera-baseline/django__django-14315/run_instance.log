@@ -1,0 +1,45 @@
+2026-07-26 07:31:44,367 - INFO - Creating container for django__django-14315...
+2026-07-26 07:31:44,662 - INFO - Container for django__django-14315 created: 2a103882fc6d25b67e2e89972205c8b71510c6b7b129bd08eaa5d65d92000a30
+2026-07-26 07:31:44,827 - INFO - Container for django__django-14315 started: 2a103882fc6d25b67e2e89972205c8b71510c6b7b129bd08eaa5d65d92000a30
+2026-07-26 07:31:44,830 - INFO - Intermediate patch for django__django-14315 written to logs/run_evaluation/run3_baseline/chimera-baseline/django__django-14315/patch.diff, now applying to container...
+2026-07-26 07:31:45,025 - INFO - >>>>> Applied Patch:
+Checking patch django/db/backends/base/client.py...
+Applied patch django/db/backends/base/client.py cleanly.
+
+2026-07-26 07:31:45,579 - INFO - Git diff before:
+diff --git a/django/db/backends/base/client.py b/django/db/backends/base/client.py
+index 339f1e863c..6bd3b14c5a 100644
+--- a/django/db/backends/base/client.py
++++ b/django/db/backends/base/client.py
+@@ -21,6 +21,5 @@ class BaseDatabaseClient:
+ 
+     def runshell(self, parameters):
+         args, env = self.settings_to_cmd_args_env(self.connection.settings_dict, parameters)
+-        if env:
+-            env = {**os.environ, **env}
++        env = {**os.environ, **env}
+         subprocess.run(args, env=env, check=True)
+2026-07-26 07:31:45,581 - INFO - Eval script for django__django-14315 written to logs/run_evaluation/run3_baseline/chimera-baseline/django__django-14315/eval.sh; copying to container...
+2026-07-26 07:31:51,726 - INFO - Test runtime: 5.98 seconds
+2026-07-26 07:31:51,732 - INFO - Test output for django__django-14315 written to logs/run_evaluation/run3_baseline/chimera-baseline/django__django-14315/test_output.txt
+2026-07-26 07:31:51,850 - INFO - Git diff after:
+diff --git a/django/db/backends/base/client.py b/django/db/backends/base/client.py
+index 339f1e863c..6bd3b14c5a 100644
+--- a/django/db/backends/base/client.py
++++ b/django/db/backends/base/client.py
+@@ -21,6 +21,5 @@ class BaseDatabaseClient:
+ 
+     def runshell(self, parameters):
+         args, env = self.settings_to_cmd_args_env(self.connection.settings_dict, parameters)
+-        if env:
+-            env = {**os.environ, **env}
++        env = {**os.environ, **env}
+         subprocess.run(args, env=env, check=True)
+2026-07-26 07:31:51,850 - INFO - Grading answer for django__django-14315...
+2026-07-26 07:31:51,853 - INFO - report: {'django__django-14315': {'patch_is_None': False, 'patch_exists': True, 'patch_successfully_applied': True, 'resolved': False, 'tests_status': {'FAIL_TO_PASS': {'success': ['test_accent (dbshell.test_postgresql.PostgreSqlDbshellCommandTestCase)', 'test_basic (dbshell.test_postgresql.PostgreSqlDbshellCommandTestCase)', 'test_column (dbshell.test_postgresql.PostgreSqlDbshellCommandTestCase)', 'test_crash_password_does_not_leak (dbshell.test_postgresql.PostgreSqlDbshellCommandTestCase)', 'test_passfile (dbshell.test_postgresql.PostgreSqlDbshellCommandTestCase)', 'test_service (dbshell.test_postgresql.PostgreSqlDbshellCommandTestCase)', 'test_ssl_certificate (dbshell.test_postgresql.PostgreSqlDbshellCommandTestCase)'], 'failure': ['test_runshell_use_environ (backends.base.test_client.SimpleDatabaseClientTests)', 'test_settings_to_cmd_args_env (backends.base.test_client.SimpleDatabaseClientTests)', 'test_nopass (dbshell.test_postgresql.PostgreSqlDbshellCommandTestCase)', 'test_parameters (dbshell.test_postgresql.PostgreSqlDbshellCommandTestCase)']}, 'PASS_TO_PASS': {'success': [], 'failure': []}, 'FAIL_TO_FAIL': {'success': [], 'failure': []}, 'PASS_TO_FAIL': {'success': [], 'failure': []}}}}
+Result for django__django-14315: resolved: False
+2026-07-26 07:31:51,855 - INFO - Attempting to stop container sweb.eval.django__django-14315.run3_baseline...
+2026-07-26 07:32:09,056 - INFO - Attempting to remove container sweb.eval.django__django-14315.run3_baseline...
+2026-07-26 07:32:09,086 - INFO - Container sweb.eval.django__django-14315.run3_baseline removed.
+2026-07-26 07:32:09,087 - INFO - Attempting to remove image swebench/sweb.eval.x86_64.django_1776_django-14315:latest...
+2026-07-26 07:32:09,269 - INFO - Image swebench/sweb.eval.x86_64.django_1776_django-14315:latest removed.

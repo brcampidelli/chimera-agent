@@ -1,0 +1,17 @@
+diff --git a/django/template/defaultfilters.py b/django/template/defaultfilters.py
+index 1c844580c6..c66d763685 100644
+--- a/django/template/defaultfilters.py
++++ b/django/template/defaultfilters.py
+@@ -678,6 +678,12 @@ def add(value, arg):
+         return int(value) + int(arg)
+     except (ValueError, TypeError):
+         try:
++            # Handle lazy strings by converting them to strings first
++            from django.utils.functional import Promise
++            if isinstance(value, Promise):
++                value = str(value)
++            if isinstance(arg, Promise):
++                arg = str(arg)
+             return value + arg
+         except Exception:
+             return ''
