@@ -608,17 +608,31 @@ class BenchmarkLiftOut(BaseModel):
     note: str  # the honest one-liner about THIS run (scope, limits, no re-rolling)
 
 
+class BenchmarkArmOut(BaseModel):
+    """One arm of a three-way decomposition — which component of the scaffold earned the delta."""
+
+    arm: str  # "baseline" | "scaffold" | "scaffold+diff-gate"
+    resolved: int  # instances resolved by this arm
+    n: int  # instances attempted (identical across arms — the same frozen slice)
+    rate: float  # resolved / n (0..1)
+    precision_when_edited: float  # resolved / patches produced — the mechanism, not the headline
+
+
 class BenchmarkExternalOut(BaseModel):
-    benchmark: str  # the external benchmark's name (e.g. Terminal-Bench)
+    benchmark: str  # the external benchmark's name (e.g. SWE-bench Verified, Terminal-Bench)
     model: str  # the model both arms ran
     n: int  # task count
     baseline_rate: float  # bare model pass rate (0..1)
     treatment_rate: float  # + Chimera scaffold pass rate (0..1)
-    delta: float  # treatment - baseline (0..1); negative here — the humbling number
-    ci: list[float]  # 95% paired CI [lo, hi] — includes 0
-    significant: bool  # False
+    delta: float  # treatment - baseline (0..1); may be negative — the humbling results ship too
+    ci: list[float]  # 95% paired CI [lo, hi] — significance is exactly "does this exclude 0"
+    significant: bool  # carried verbatim; never asserted independently of the CI
     source: str  # the committed RESULTS.md this block is cited from
-    note: str  # why it didn't lift (already-competent model, not the weak regime) — published anyway
+    note: str  # the honest one-liner: scope, limits, and what the number is NOT
+    # Present only where a run actually decomposed the delta by component. Optional rather than
+    # required because not every external result has an attribution arm — and a surface that shows a
+    # headline delta without saying which part earned it invites exactly the wrong inference.
+    decomposition: list[BenchmarkArmOut] | None = None
 
 
 class BenchmarksOut(BaseModel):

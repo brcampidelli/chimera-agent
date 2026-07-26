@@ -1043,6 +1043,22 @@ export interface components {
             /** Index */
             index?: number | null;
         };
+        /**
+         * BenchmarkArmOut
+         * @description One arm of a three-way decomposition — which component of the scaffold earned the delta.
+         */
+        BenchmarkArmOut: {
+            /** Arm */
+            arm: string;
+            /** N */
+            n: number;
+            /** Precision When Edited */
+            precision_when_edited: number;
+            /** Rate */
+            rate: number;
+            /** Resolved */
+            resolved: number;
+        };
         /** BenchmarkExternalOut */
         BenchmarkExternalOut: {
             /** Baseline Rate */
@@ -1051,6 +1067,8 @@ export interface components {
             benchmark: string;
             /** Ci */
             ci: number[];
+            /** Decomposition */
+            decomposition?: components["schemas"]["BenchmarkArmOut"][] | null;
             /** Delta */
             delta: number;
             /** Model */

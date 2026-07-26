@@ -68,15 +68,30 @@ _SWE_BENCH: dict[str, Any] = {
     "ci": [-0.035, 0.167],  # 95% paired CI — includes 0
     "significant": False,
     "source": "bench/swe_bench/RESULTS.md",
+    # The three-way decomposition: a fourth run restored the plain-scaffold arm on these same 41
+    # instances, so each arm differs from the next by exactly one component. Carried here because a
+    # headline delta without it invites "which part actually worked?" — and because the answer
+    # contradicted our own registered prediction, which the note says out loud.
+    "decomposition": [
+        {"arm": "baseline", "resolved": 14, "n": 41, "rate": 0.341, "precision_when_edited": 0.50},
+        {"arm": "scaffold", "resolved": 16, "n": 41, "rate": 0.390, "precision_when_edited": 0.59},
+        {"arm": "scaffold+diff-gate", "resolved": 18, "n": 41, "rate": 0.439, "precision_when_edited": 0.67},
+    ],
     "note": (
         "NOT a SWE-bench Verified score — a deliberately easy, single-repo slice; a real score needs "
         "the full 500. Graded only by the official swebench harness in Docker, never self-reported. "
         "This is the OUT-OF-SAMPLE replication: 41 instances never used by the earlier run, nothing "
         "else changed. The delta is NOT significant on its own (CI includes 0); pooling it with the "
         "earlier 19 gives +11.7% [+0.8%, +16.4%], which IS significant but mixes seen with unseen "
-        "data and was pre-registered as secondary. The mechanism replicated: the scaffolded arm made "
-        "FEWER patches (27 vs 28) and resolved MORE (18 vs 14) — precision 67% vs 50%. An earlier run "
-        "of the same design at a starved step budget scored an exact 0.0pp and is published unchanged."
+        "data and was pre-registered as secondary. DECOMPOSITION (4th run, middle arm restored on the "
+        "same 41): scaffold alone +4.9% over baseline, the diff-gate a further +4.9% — BOTH components "
+        "contribute in roughly equal halves, neither significant alone. That CONTRADICTED our own "
+        "registered prediction that the scaffold would carry most of it, and withdrew an earlier "
+        "reading that the gate was not what produced the gain; the retraction is in RESULTS.md. The "
+        "tidy additivity is NOT claimed as a measured 50/50 split — each comparison rests on 5-6 "
+        "discordant pairs. All three arms edit at the SAME rate (27-28 patches of 41); what climbs is "
+        "precision, 50% -> 59% -> 67%. An earlier run of the same design at a starved step budget "
+        "scored an exact 0.0pp and is published unchanged."
     ),
 }
 

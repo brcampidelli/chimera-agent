@@ -302,6 +302,40 @@
         "title": "BatchCancelRequest",
         "type": "object"
       },
+      "BenchmarkArmOut": {
+        "description": "One arm of a three-way decomposition \u2014 which component of the scaffold earned the delta.",
+        "properties": {
+          "arm": {
+            "title": "Arm",
+            "type": "string"
+          },
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "precision_when_edited": {
+            "title": "Precision When Edited",
+            "type": "number"
+          },
+          "rate": {
+            "title": "Rate",
+            "type": "number"
+          },
+          "resolved": {
+            "title": "Resolved",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "arm",
+          "resolved",
+          "n",
+          "rate",
+          "precision_when_edited"
+        ],
+        "title": "BenchmarkArmOut",
+        "type": "object"
+      },
       "BenchmarkExternalOut": {
         "properties": {
           "baseline_rate": {
@@ -318,6 +352,20 @@
             },
             "title": "Ci",
             "type": "array"
+          },
+          "decomposition": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BenchmarkArmOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decomposition"
           },
           "delta": {
             "title": "Delta",
