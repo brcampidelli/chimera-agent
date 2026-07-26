@@ -1,0 +1,87 @@
+2026-07-26 16:35:08,628 - INFO - Creating container for django__django-14373...
+2026-07-26 16:35:09,264 - INFO - Container for django__django-14373 created: df36d86c6c0b633266038f2f2a0406c12fa19f37cee266a8546e37345e4d286c
+2026-07-26 16:35:09,568 - INFO - Container for django__django-14373 started: df36d86c6c0b633266038f2f2a0406c12fa19f37cee266a8546e37345e4d286c
+2026-07-26 16:35:09,571 - INFO - Intermediate patch for django__django-14373 written to logs/run_evaluation/run4_treatment/chimera-treatment/django__django-14373/patch.diff, now applying to container...
+2026-07-26 16:35:09,875 - INFO - >>>>> Applied Patch:
+Checking patch django/utils/dateformat.py...
+Checking patch tests/utils_tests/test_dateformat.py...
+Applied patch django/utils/dateformat.py cleanly.
+Applied patch tests/utils_tests/test_dateformat.py cleanly.
+
+2026-07-26 16:35:10,443 - INFO - Git diff before:
+diff --git a/django/utils/dateformat.py b/django/utils/dateformat.py
+index 38e89c47bb..8849df51a8 100644
+--- a/django/utils/dateformat.py
++++ b/django/utils/dateformat.py
+@@ -314,7 +314,7 @@ class DateFormat(TimeFormat):
+ 
+     def Y(self):
+         "Year, 4 digits; e.g. '1999'"
+-        return self.data.year
++        return str(self.data.year).zfill(4)
+ 
+     def z(self):
+         """Day of the year, i.e. 1 to 366."""
+diff --git a/tests/utils_tests/test_dateformat.py b/tests/utils_tests/test_dateformat.py
+index c6d3ded80f..8b3a0163fa 100644
+--- a/tests/utils_tests/test_dateformat.py
++++ b/tests/utils_tests/test_dateformat.py
+@@ -179,6 +179,32 @@ class DateFormatTests(SimpleTestCase):
+                     expected_date,
+                 )
+ 
++    def test_year_before_1000_Y_format(self):
++        """
++        Test that Y format returns zero-padded four-digit years for years < 1000.
++        Regression test for DateFormat.Y() not being zero-padded.
++        """
++        tests = [
++            (0, '0000'),
++            (1, '0001'),
++            (9, '0009'),
++            (10, '0010'),
++            (99, '0099'),
++            (100, '0100'),
++            (476, '0476'),
++            (999, '0999'),
++            (1000, '1000'),
++            (1979, '1979'),
++            (2023, '2023'),
++            (9999, '9999'),
++        ]
++        for year, expected in tests:
++            with self.subTest(year=year):
++                self.assertEqual(
++                    dateformat.format(datetime(year, 9, 8, 5, 0), 'Y'),
++                    expected,
++                )
++
+     def test_twelve_hour_format(self):
+         tests = [
+             (0, '12'),
+2026-07-26 16:35:10,444 - INFO - Eval script for django__django-14373 written to logs/run_evaluation/run4_treatment/chimera-treatment/django__django-14373/eval.sh; copying to container...
+2026-07-26 16:35:14,357 - INFO - Test runtime: 3.79 seconds
+2026-07-26 16:35:14,359 - INFO - Test output for django__django-14373 written to logs/run_evaluation/run4_treatment/chimera-treatment/django__django-14373/test_output.txt
+2026-07-26 16:35:14,431 - INFO - Git diff after:
+diff --git a/django/utils/dateformat.py b/django/utils/dateformat.py
+index 38e89c47bb..8849df51a8 100644
+--- a/django/utils/dateformat.py
++++ b/django/utils/dateformat.py
+@@ -314,7 +314,7 @@ class DateFormat(TimeFormat):
+ 
+     def Y(self):
+         "Year, 4 digits; e.g. '1999'"
+-        return self.data.year
++        return str(self.data.year).zfill(4)
+ 
+     def z(self):
+         """Day of the year, i.e. 1 to 366."""
+2026-07-26 16:35:14,432 - INFO - Git diff changed after running eval script
+2026-07-26 16:35:14,432 - INFO - Grading answer for django__django-14373...
+2026-07-26 16:35:14,433 - INFO - report: {'django__django-14373': {'patch_is_None': False, 'patch_exists': True, 'patch_successfully_applied': True, 'resolved': True, 'tests_status': {'FAIL_TO_PASS': {'success': ['test_Y_format_year_before_1000 (utils_tests.test_dateformat.DateFormatTests)'], 'failure': []}, 'PASS_TO_PASS': {'success': ['test_am_pm (utils_tests.test_dateformat.DateFormatTests)', 'test_date (utils_tests.test_dateformat.DateFormatTests)', 'test_date_formats (utils_tests.test_dateformat.DateFormatTests)', 'test_dateformat (utils_tests.test_dateformat.DateFormatTests)', 'test_datetime_with_local_tzinfo (utils_tests.test_dateformat.DateFormatTests)', 'test_datetime_with_tzinfo (utils_tests.test_dateformat.DateFormatTests)', 'test_day_of_year_leap (utils_tests.test_dateformat.DateFormatTests)', 'test_empty_format (utils_tests.test_dateformat.DateFormatTests)', 'test_epoch (utils_tests.test_dateformat.DateFormatTests)', 'test_futuredates (utils_tests.test_dateformat.DateFormatTests)', 'test_invalid_time_format_specifiers (utils_tests.test_dateformat.DateFormatTests)', 'test_microsecond (utils_tests.test_dateformat.DateFormatTests)', 'test_naive_ambiguous_datetime (utils_tests.test_dateformat.DateFormatTests)', 'test_naive_datetime (utils_tests.test_dateformat.DateFormatTests)', 'test_r_format_with_non_en_locale (utils_tests.test_dateformat.DateFormatTests)', 'test_time_formats (utils_tests.test_dateformat.DateFormatTests)', 'test_timezones (utils_tests.test_dateformat.DateFormatTests)', 'test_twelve_hour_format (utils_tests.test_dateformat.DateFormatTests)', 'test_y_format_year_before_1000 (utils_tests.test_dateformat.DateFormatTests)'], 'failure': []}, 'FAIL_TO_FAIL': {'success': [], 'failure': []}, 'PASS_TO_FAIL': {'success': [], 'failure': []}}}}
+Result for django__django-14373: resolved: True
+2026-07-26 16:35:14,435 - INFO - Attempting to stop container sweb.eval.django__django-14373.run4_treatment...
+2026-07-26 16:35:31,811 - INFO - Attempting to remove container sweb.eval.django__django-14373.run4_treatment...
+2026-07-26 16:35:31,856 - INFO - Container sweb.eval.django__django-14373.run4_treatment removed.
+2026-07-26 16:35:31,856 - INFO - Attempting to remove image swebench/sweb.eval.x86_64.django_1776_django-14373:latest...
+2026-07-26 16:35:32,185 - INFO - Image swebench/sweb.eval.x86_64.django_1776_django-14373:latest removed.

@@ -99,9 +99,22 @@ snapshot.)
   effect **reappeared** (+9.8%, inside the registered +5-to-+20 band) on a slice that proved *harder*
   than run 2's. Across both, discordant pairs run **9 for Chimera against 2** (p ≈ 2.6% under the null).
 
-  **The mechanism replicated, and it is the interesting part:** in run 3 the scaffolded arm made
-  *fewer* patches (27 vs 28) and resolved *more* (18 vs 14) — **precision 67% vs 50%**, matching run
-  2's 69% vs 57%. It doesn't win by acting more; it wins by acting **better**.
+  **The mechanism replicated, and it is the interesting part.** A fourth run restored the middle arm
+  (plain scaffold, no diff-gate) on the same 41 instances, so all three differ by exactly one
+  component. All three **edit at the same rate** (27–28 patches of 41); what changes is how often the
+  edit is *right*:
+
+  | arm | resolved | **precision when it edited** |
+  |---|---|---|
+  | baseline | 14/41 | 50% |
+  | + scaffold | 16/41 | 59% |
+  | + scaffold **and** diff-gate | 18/41 | 67% |
+
+  **Both components contribute, in roughly equal halves** (+4.9% each, neither significant alone) —
+  which **contradicts our own registered prediction** that the scaffold would carry most of it, and
+  withdraws a run-2 reading that the diff-gate "is not what produced the gain". The retraction is in
+  [`RESULTS.md`](bench/swe_bench/RESULTS.md); the tidy additivity is *not* claimed as a measured 50/50
+  split, since each comparison rests on 5–6 discordant pairs.
 
   ⚠️ Read honestly: **the out-of-sample primary is NOT significant.** The significant number is the
   **pooled secondary**, pre-registered as secondary precisely because it mixes seen with unseen data —

@@ -1,0 +1,50 @@
+diff --git a/django/utils/dateformat.py b/django/utils/dateformat.py
+index 38e89c47bb..8849df51a8 100644
+--- a/django/utils/dateformat.py
++++ b/django/utils/dateformat.py
+@@ -314,7 +314,7 @@ class DateFormat(TimeFormat):
+ 
+     def Y(self):
+         "Year, 4 digits; e.g. '1999'"
+-        return self.data.year
++        return str(self.data.year).zfill(4)
+ 
+     def z(self):
+         """Day of the year, i.e. 1 to 366."""
+diff --git a/tests/utils_tests/test_dateformat.py b/tests/utils_tests/test_dateformat.py
+index c6d3ded80f..8b3a0163fa 100644
+--- a/tests/utils_tests/test_dateformat.py
++++ b/tests/utils_tests/test_dateformat.py
+@@ -179,6 +179,32 @@ class DateFormatTests(SimpleTestCase):
+                     expected_date,
+                 )
+ 
++    def test_year_before_1000_Y_format(self):
++        """
++        Test that Y format returns zero-padded four-digit years for years < 1000.
++        Regression test for DateFormat.Y() not being zero-padded.
++        """
++        tests = [
++            (0, '0000'),
++            (1, '0001'),
++            (9, '0009'),
++            (10, '0010'),
++            (99, '0099'),
++            (100, '0100'),
++            (476, '0476'),
++            (999, '0999'),
++            (1000, '1000'),
++            (1979, '1979'),
++            (2023, '2023'),
++            (9999, '9999'),
++        ]
++        for year, expected in tests:
++            with self.subTest(year=year):
++                self.assertEqual(
++                    dateformat.format(datetime(year, 9, 8, 5, 0), 'Y'),
++                    expected,
++                )
++
+     def test_twelve_hour_format(self):
+         tests = [
+             (0, '12'),

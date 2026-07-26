@@ -1,0 +1,39 @@
+diff --git a/django/views/generic/base.py b/django/views/generic/base.py
+index ea5baca08d..c4b37d4c42 100644
+--- a/django/views/generic/base.py
++++ b/django/views/generic/base.py
+@@ -168,17 +168,23 @@ class TemplateView(TemplateResponseMixin, ContextMixin, View):
+ def _wrap_url_kwargs_with_deprecation_warning(url_kwargs):
+     context_kwargs = {}
+     for key, value in url_kwargs.items():
+-        # Bind into function closure.
+-        @SimpleLazyObject
+-        def access_value(key=key, value=value):
+-            warnings.warn(
+-                'TemplateView passing URL kwargs to the context is '
+-                'deprecated. Reference %s in your template through '
+-                'view.kwargs instead.' % key,
+-                RemovedInDjango40Warning, stacklevel=2,
+-            )
+-            return value
+-        context_kwargs[key] = access_value
++        # Create a function that shows the warning and returns the value
++        def make_accessor(key, value):
++            warned = [False]  # Use a list for mutable closure
++            def accessor():
++                if not warned[0]:
++                    warnings.warn(
++                        'TemplateView passing URL kwargs to the context is '
++                        'deprecated. Reference %s in your template through '
++                        'view.kwargs instead.' % key,
++                        RemovedInDjango40Warning, stacklevel=3,
++                    )
++                    warned[0] = True
++                return value
++            return accessor
++        
++        # Create a SimpleLazyObject with the accessor
++        context_kwargs[key] = SimpleLazyObject(make_accessor(key, value))
+     return context_kwargs
+ 
+ 

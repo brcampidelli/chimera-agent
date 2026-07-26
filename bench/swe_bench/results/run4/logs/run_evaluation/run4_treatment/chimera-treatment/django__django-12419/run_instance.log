@@ -1,0 +1,45 @@
+2026-07-26 16:32:36,858 - INFO - Creating container for django__django-12419...
+2026-07-26 16:32:37,937 - INFO - Container for django__django-12419 created: a14e82781fb64c0bd91e833c68579ec8f44d2e31c34483430ba1cd88bb5d49e0
+2026-07-26 16:32:38,177 - INFO - Container for django__django-12419 started: a14e82781fb64c0bd91e833c68579ec8f44d2e31c34483430ba1cd88bb5d49e0
+2026-07-26 16:32:38,179 - INFO - Intermediate patch for django__django-12419 written to logs/run_evaluation/run4_treatment/chimera-treatment/django__django-12419/patch.diff, now applying to container...
+2026-07-26 16:32:38,520 - INFO - >>>>> Applied Patch:
+Checking patch django/conf/global_settings.py...
+Applied patch django/conf/global_settings.py cleanly.
+
+2026-07-26 16:32:39,051 - INFO - Git diff before:
+diff --git a/django/conf/global_settings.py b/django/conf/global_settings.py
+index 09c9b95d26..8bb59a4037 100644
+--- a/django/conf/global_settings.py
++++ b/django/conf/global_settings.py
+@@ -637,6 +637,6 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+ SECURE_HSTS_PRELOAD = False
+ SECURE_HSTS_SECONDS = 0
+ SECURE_REDIRECT_EXEMPT = []
+-SECURE_REFERRER_POLICY = None
++SECURE_REFERRER_POLICY = 'same-origin'
+ SECURE_SSL_HOST = None
+ SECURE_SSL_REDIRECT = False
+2026-07-26 16:32:39,053 - INFO - Eval script for django__django-12419 written to logs/run_evaluation/run4_treatment/chimera-treatment/django__django-12419/eval.sh; copying to container...
+2026-07-26 16:32:43,833 - INFO - Test runtime: 4.59 seconds
+2026-07-26 16:32:43,835 - INFO - Test output for django__django-12419 written to logs/run_evaluation/run4_treatment/chimera-treatment/django__django-12419/test_output.txt
+2026-07-26 16:32:43,910 - INFO - Git diff after:
+diff --git a/django/conf/global_settings.py b/django/conf/global_settings.py
+index 09c9b95d26..8bb59a4037 100644
+--- a/django/conf/global_settings.py
++++ b/django/conf/global_settings.py
+@@ -637,6 +637,6 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+ SECURE_HSTS_PRELOAD = False
+ SECURE_HSTS_SECONDS = 0
+ SECURE_REDIRECT_EXEMPT = []
+-SECURE_REFERRER_POLICY = None
++SECURE_REFERRER_POLICY = 'same-origin'
+ SECURE_SSL_HOST = None
+ SECURE_SSL_REDIRECT = False
+2026-07-26 16:32:43,910 - INFO - Grading answer for django__django-12419...
+2026-07-26 16:32:43,912 - INFO - report: {'django__django-12419': {'patch_is_None': False, 'patch_exists': True, 'patch_successfully_applied': True, 'resolved': True, 'tests_status': {'FAIL_TO_PASS': {'success': ['test_middleware_headers (project_template.test_settings.TestStartProjectSettings)'], 'failure': []}, 'PASS_TO_PASS': {'success': [], 'failure': []}, 'FAIL_TO_FAIL': {'success': [], 'failure': []}, 'PASS_TO_FAIL': {'success': [], 'failure': []}}}}
+Result for django__django-12419: resolved: True
+2026-07-26 16:32:43,929 - INFO - Attempting to stop container sweb.eval.django__django-12419.run4_treatment...
+2026-07-26 16:33:01,243 - INFO - Attempting to remove container sweb.eval.django__django-12419.run4_treatment...
+2026-07-26 16:33:01,422 - INFO - Container sweb.eval.django__django-12419.run4_treatment removed.
+2026-07-26 16:33:01,423 - INFO - Attempting to remove image swebench/sweb.eval.x86_64.django_1776_django-12419:latest...
+2026-07-26 16:33:01,650 - INFO - Image swebench/sweb.eval.x86_64.django_1776_django-12419:latest removed.

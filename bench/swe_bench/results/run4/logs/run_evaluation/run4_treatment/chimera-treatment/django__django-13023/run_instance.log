@@ -1,0 +1,47 @@
+2026-07-26 16:33:55,785 - INFO - Creating container for django__django-13023...
+2026-07-26 16:33:57,097 - INFO - Container for django__django-13023 created: 0622e77279476499b4ecf299c83cc082e30b5cfa01387334739319d69cbda1a5
+2026-07-26 16:33:57,367 - INFO - Container for django__django-13023 started: 0622e77279476499b4ecf299c83cc082e30b5cfa01387334739319d69cbda1a5
+2026-07-26 16:33:57,369 - INFO - Intermediate patch for django__django-13023 written to logs/run_evaluation/run4_treatment/chimera-treatment/django__django-13023/patch.diff, now applying to container...
+2026-07-26 16:33:57,726 - INFO - >>>>> Applied Patch:
+Checking patch django/db/models/fields/__init__.py...
+Applied patch django/db/models/fields/__init__.py cleanly.
+
+2026-07-26 16:33:58,251 - INFO - Git diff before:
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 0fd69059ee..28374272f4 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -1501,7 +1501,7 @@ class DecimalField(Field):
+             return self.context.create_decimal_from_float(value)
+         try:
+             return decimal.Decimal(value)
+-        except decimal.InvalidOperation:
++        except (decimal.InvalidOperation, TypeError, ValueError):
+             raise exceptions.ValidationError(
+                 self.error_messages['invalid'],
+                 code='invalid',
+2026-07-26 16:33:58,253 - INFO - Eval script for django__django-13023 written to logs/run_evaluation/run4_treatment/chimera-treatment/django__django-13023/eval.sh; copying to container...
+2026-07-26 16:34:03,287 - INFO - Test runtime: 4.88 seconds
+2026-07-26 16:34:03,289 - INFO - Test output for django__django-13023 written to logs/run_evaluation/run4_treatment/chimera-treatment/django__django-13023/test_output.txt
+2026-07-26 16:34:03,359 - INFO - Git diff after:
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 0fd69059ee..28374272f4 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -1501,7 +1501,7 @@ class DecimalField(Field):
+             return self.context.create_decimal_from_float(value)
+         try:
+             return decimal.Decimal(value)
+-        except decimal.InvalidOperation:
++        except (decimal.InvalidOperation, TypeError, ValueError):
+             raise exceptions.ValidationError(
+                 self.error_messages['invalid'],
+                 code='invalid',
+2026-07-26 16:34:03,360 - INFO - Grading answer for django__django-13023...
+2026-07-26 16:34:03,362 - INFO - report: {'django__django-13023': {'patch_is_None': False, 'patch_exists': True, 'patch_successfully_applied': True, 'resolved': True, 'tests_status': {'FAIL_TO_PASS': {'success': ['test_invalid_value (model_fields.test_decimalfield.DecimalFieldTests)', 'test_lookup_really_big_value (model_fields.test_decimalfield.DecimalFieldTests)'], 'failure': []}, 'PASS_TO_PASS': {'success': ['test_default (model_fields.test_decimalfield.DecimalFieldTests)', 'test_filter_with_strings (model_fields.test_decimalfield.DecimalFieldTests)', 'test_get_prep_value (model_fields.test_decimalfield.DecimalFieldTests)', 'test_max_decimal_places_validation (model_fields.test_decimalfield.DecimalFieldTests)', 'test_max_digits_validation (model_fields.test_decimalfield.DecimalFieldTests)', 'test_max_whole_digits_validation (model_fields.test_decimalfield.DecimalFieldTests)', "Trailing zeros in the fractional part aren't truncated.", 'test_save_without_float_conversion (model_fields.test_decimalfield.DecimalFieldTests)', 'test_to_python (model_fields.test_decimalfield.DecimalFieldTests)'], 'failure': []}, 'FAIL_TO_FAIL': {'success': [], 'failure': []}, 'PASS_TO_FAIL': {'success': [], 'failure': []}}}}
+Result for django__django-13023: resolved: True
+2026-07-26 16:34:03,364 - INFO - Attempting to stop container sweb.eval.django__django-13023.run4_treatment...
+2026-07-26 16:34:18,668 - INFO - Attempting to remove container sweb.eval.django__django-13023.run4_treatment...
+2026-07-26 16:34:18,699 - INFO - Container sweb.eval.django__django-13023.run4_treatment removed.
+2026-07-26 16:34:18,699 - INFO - Attempting to remove image swebench/sweb.eval.x86_64.django_1776_django-13023:latest...
+2026-07-26 16:34:18,885 - INFO - Image swebench/sweb.eval.x86_64.django_1776_django-13023:latest removed.
