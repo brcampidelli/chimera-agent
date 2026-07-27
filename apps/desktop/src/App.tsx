@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconRail, type View } from "@/components/IconRail";
 import { Sessions } from "@/components/Sessions";
@@ -13,6 +13,8 @@ import { Maturity } from "@/components/Maturity";
 import { Onboarding } from "@/components/Onboarding";
 import { Activity, type Status } from "@/components/Activity";
 import { AppShell } from "@/components/shell/AppShell";
+import { CommandPalette, type Command } from "@/components/shell/CommandPalette";
+import { useHotkeys } from "@/lib/hotkeys";
 import { AgentProvider } from "@/lib/agent-context";
 import { Spinner } from "@/components/ui/panel";
 import { ErrorState } from "@/components/ui/async";
@@ -66,6 +68,7 @@ export default function App() {
   const [skipOnboarding, setSkipOnboarding] = useState(false);
 
   const [view, setView] = useState<View>("chat");
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [live, setLive] = useState("");
@@ -100,6 +103,38 @@ export default function App() {
     setReport(null);
     setStatus("idle");
   }, []);
+
+  // Every destination, plus every session by title. This is the long tail the rail no longer
+  // carries — and the reason collapsing the rail cost nothing in reach.
+  const commands: Command[] = useMemo(() => {
+    const views: View[] = ["chat", "work", "code", "knowledge", "automation", "settings"];
+    return [
+      { id: "new-chat", label: t("sessions.new"), group: t("nav.chat"), run: newChat },
+      ...views.map((v) => ({
+        id: `go-${v}`,
+        label: t(`nav.${v}`),
+        group: t("palette.group.go"),
+        run: () => setView(v),
+      })),
+      ...sessions.map((s) => ({
+        id: `session-${s.id}`,
+        label: s.title || t("chat.header.chat"),
+        group: t("palette.group.session"),
+        run: () => void openSession(s.id),
+      })),
+    ];
+  }, [sessions, t, newChat, openSession]);
+
+  useHotkeys({
+    onPalette: () => setPaletteOpen((o) => !o),
+    onSettings: () => setView("settings"),
+    onNewChat: newChat,
+    onNavigate: (i) => {
+      const order: View[] = ["chat", "work", "code", "knowledge", "automation"];
+      const target = order[i - 1];
+      if (target) setView(target);
+    },
+  });
 
   const removeSession = useCallback(
     async (id: string) => {
@@ -193,6 +228,7 @@ export default function App() {
   const isChat = view === "chat";
   return (
     <AgentProvider value={{ status, tools, report, busy, stop }}>
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} commands={commands} />
       <AppShell
         ignite={ignite}
         viewKey={view}

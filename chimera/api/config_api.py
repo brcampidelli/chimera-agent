@@ -104,6 +104,7 @@ def read_config(settings: Settings) -> dict[str, Any]:
         "sandbox": {"mode": settings.sandbox, "image": settings.sandbox_image},
         "server": {"token_set": bool(settings.server_token)},
         "mcp": {"autoload": settings.mcp_autoload},
+        "automation": {"cron": settings.app_cron},
         "providers": providers,
     }
 

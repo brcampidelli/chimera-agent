@@ -107,6 +107,17 @@ class ProviderOut(BaseModel):
     hint: str
 
 
+class AutomationCfgOut(BaseModel):
+    """The scheduler daemon's master switch.
+
+    The Schedule screen can create and enable jobs, but whether the daemon that fires them runs
+    inside the desktop app is a separate setting — and it was readable only from the environment,
+    so the UI could not show its own scheduler's state.
+    """
+
+    cron: bool
+
+
 class ConfigOut(BaseModel):
     models: ModelsCfgOut
     memory: MemoryCfgOut
@@ -114,6 +125,7 @@ class ConfigOut(BaseModel):
     sandbox: SandboxCfgOut
     server: ServerCfgOut
     mcp: McpCfgOut
+    automation: AutomationCfgOut
     providers: list[ProviderOut]
 
 

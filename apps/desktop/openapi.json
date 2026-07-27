@@ -266,6 +266,20 @@
         "title": "AuditEventOut",
         "type": "object"
       },
+      "AutomationCfgOut": {
+        "description": "The scheduler daemon's master switch.\n\nThe Schedule screen can create and enable jobs, but whether the daemon that fires them runs\ninside the desktop app is a separate setting \u2014 and it was readable only from the environment,\nso the UI could not show its own scheduler's state.",
+        "properties": {
+          "cron": {
+            "title": "Cron",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "cron"
+        ],
+        "title": "AutomationCfgOut",
+        "type": "object"
+      },
       "BatchCancelOut": {
         "properties": {
           "cancelled": {
@@ -625,6 +639,9 @@
       },
       "ConfigOut": {
         "properties": {
+          "automation": {
+            "$ref": "#/components/schemas/AutomationCfgOut"
+          },
           "cache": {
             "$ref": "#/components/schemas/CacheCfgOut"
           },
@@ -658,6 +675,7 @@
           "sandbox",
           "server",
           "mcp",
+          "automation",
           "providers"
         ],
         "title": "ConfigOut",

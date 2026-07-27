@@ -1,10 +1,13 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { KanbanSquare, ShieldAlert } from "lucide-react";
-import { approveProject, denyProject, getKanban, getProjects } from "@/lib/api";
+import { approveProject, denyProject, getKanban, getProject, getProjects } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
 import { ErrorState } from "@/components/ui/async";
+import { focusRing } from "@/components/ui/focus";
 import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import type { ProjectState, TaskCard } from "@/lib/types";
 
 const COLUMN_ORDER = ["backlog", "doing", "review", "blocked", "done"];
@@ -17,7 +20,17 @@ function statusTone(s: string): "ok" | "accent" | "warn" | "bad" | "muted" {
   return "muted";
 }
 
-function ProjectRow({ p, onChange }: { p: ProjectState; onChange: () => void }) {
+function ProjectRow({
+  p,
+  onChange,
+  selected,
+  onSelect,
+}: {
+  p: ProjectState;
+  onChange: () => void;
+  selected: boolean;
+  onSelect: () => void;
+}) {
   const t = useT();
   const approve = useMutation({
     mutationFn: (card?: string) => approveProject(p.id, card),
@@ -27,9 +40,18 @@ function ProjectRow({ p, onChange }: { p: ProjectState; onChange: () => void }) 
   const awaiting = p.status === "awaiting_approval";
 
   return (
-    <div className="px-4 py-3">
+    <div className={cn("px-4 py-3", selected && "bg-surface-2")}>
       <div className="flex items-center gap-2">
-        <span className="truncate font-mono text-sm">{p.id}</span>
+        {/* Selecting a project filters the board below to its own cards — which is what
+            `/api/projects/{id}` returns and what nothing was calling. */}
+        <button
+          type="button"
+          onClick={onSelect}
+          aria-pressed={selected}
+          className={cn("truncate font-mono text-sm hover:text-accent", focusRing)}
+        >
+          {p.id}
+        </button>
         <Badge tone={statusTone(p.status)}>{p.status.replace("_", " ")}</Badge>
         <span className="text-xs text-muted-foreground">
           {t("tasks.iter", { a: p.iterations, b: p.max_iterations })}
@@ -97,6 +119,14 @@ export function Tasks({ embedded = false }: { embedded?: boolean } = {}) {
   const qc = useQueryClient();
   const projects = useQuery({ queryKey: ["projects"], queryFn: getProjects });
   const kanban = useQuery({ queryKey: ["kanban"], queryFn: getKanban });
+  // Which project's board to show. `null` is the global board — every card from every project,
+  // which is the right default and a poor way to follow one piece of work.
+  const [selected, setSelected] = useState<string | null>(null);
+  const project = useQuery({
+    queryKey: ["project", selected],
+    queryFn: () => getProject(selected!),
+    enabled: selected !== null,
+  });
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["projects"] });
     qc.invalidateQueries({ queryKey: ["kanban"] });
@@ -112,17 +142,33 @@ export function Tasks({ embedded = false }: { embedded?: boolean } = {}) {
         ) : !projects.data || projects.data.length === 0 ? (
           <EmptyState text={t("tasks.projectsEmpty")} />
         ) : (
-          projects.data.map((p) => <ProjectRow key={p.id} p={p} onChange={refresh} />)
+          projects.data.map((p) => (
+            <ProjectRow
+              key={p.id}
+              p={p}
+              onChange={refresh}
+              selected={selected === p.id}
+              // Clicking the selected project clears the filter, so there is always a way back to
+              // the whole board without hunting for a "show all" control.
+              onSelect={() => setSelected((cur: string | null) => (cur === p.id ? null : p.id))}
+            />
+          ))
         )}
       </Panel>
 
-      <Panel title={t("tasks.board")}>
+      <Panel
+        title={
+          selected
+            ? `${t("tasks.board")} · ${selected}`
+            : t("tasks.board")
+        }
+      >
         {kanban.isError ? (
           <ErrorState error={kanban.error} onRetry={() => kanban.refetch()} />
-        ) : kanban.isLoading ? (
+        ) : kanban.isLoading || (selected && project.isLoading) ? (
           <Spinner />
         ) : (
-          <Board columns={kanban.data ?? {}} />
+          <Board columns={(selected ? project.data?.columns : kanban.data) ?? {}} />
         )}
       </Panel>
     </Screen>

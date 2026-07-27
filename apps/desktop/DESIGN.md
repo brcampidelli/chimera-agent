@@ -228,3 +228,20 @@ Three rules that decided the shape, worth reapplying to anything new:
 
 Adding a sixth rail icon is a real decision, not a small one. Ask first whether the thing is a
 question a person actually has, or a feature you want them to notice.
+
+### Keyboard
+
+| | |
+|---|---|
+| `⌘K` / `Ctrl K` | command palette — every destination, every tab, every conversation by title |
+| `⌘1`–`⌘5` | rail positions |
+| `⌘N` | new chat |
+| `⌘,` | settings |
+
+The palette is what makes a five-icon rail cost nothing in reach: the long tail lives there instead
+of on screen.
+
+**Every shortcut except `⌘K` is suppressed while the user is typing.** `⌘N` inside the composer
+would discard a half-written message, and a shortcut that destroys work is worse than no shortcut.
+`⌘K` is the deliberate exception — a palette exists to be reachable without moving your hands, and
+it opens *over* the field rather than acting on it.

@@ -1028,6 +1028,18 @@ export interface components {
             /** Type */
             type: string;
         };
+        /**
+         * AutomationCfgOut
+         * @description The scheduler daemon's master switch.
+         *
+         *     The Schedule screen can create and enable jobs, but whether the daemon that fires them runs
+         *     inside the desktop app is a separate setting — and it was readable only from the environment,
+         *     so the UI could not show its own scheduler's state.
+         */
+        AutomationCfgOut: {
+            /** Cron */
+            cron: boolean;
+        };
         /** BatchCancelOut */
         BatchCancelOut: {
             /** Cancelled */
@@ -1191,6 +1203,7 @@ export interface components {
         };
         /** ConfigOut */
         ConfigOut: {
+            automation: components["schemas"]["AutomationCfgOut"];
             cache: components["schemas"]["CacheCfgOut"];
             mcp: components["schemas"]["McpCfgOut"];
             memory: components["schemas"]["MemoryCfgOut"];

@@ -162,7 +162,23 @@ function SecretField({ provider, onSave }: { provider: ProviderCfg; onSave: (v: 
   );
 }
 
-export function MessagingCard({ save }: { save: (u: Record<string, string>) => void }) {
+/**
+ * One messaging platform.
+ *
+ * Was hardcoded to Discord — the platform name appeared in four places and the status was read as
+ * `status.data?.discord`. The backend has always taken a platform parameter and the manager has
+ * always supported Telegram; the UI simply never offered it, so a configured Telegram token was
+ * unreachable from the app.
+ */
+export function MessagingCard({
+  save,
+  platform = "discord",
+  tokenEnv = "CHIMERA_DISCORD_BOT_TOKEN",
+}: {
+  save: (u: Record<string, string>) => void;
+  platform?: "discord" | "telegram";
+  tokenEnv?: string;
+}) {
   const t = useT();
   const qc = useQueryClient();
   const status = useQuery({ queryKey: ["messaging"], queryFn: getMessaging });
@@ -170,16 +186,17 @@ export function MessagingCard({ save }: { save: (u: Record<string, string>) => v
   const [token, setToken] = useState("");
   const invalidate = () => qc.invalidateQueries({ queryKey: ["messaging"] });
   const toggle = useMutation({
-    mutationFn: (on: boolean) => (on ? startMessaging("discord") : stopMessaging("discord")),
+    mutationFn: (on: boolean) => (on ? startMessaging(platform) : stopMessaging(platform)),
     onSuccess: invalidate,
   });
 
-  const d = status.data?.discord;
+  const d = status.data?.[platform];
   const running = !!d?.running;
   const configured = !!d?.configured;
+  const label = platform === "discord" ? "Discord" : "Telegram";
 
   return (
-    <Card title={t("settings.card.messaging")}>
+    <Card title={`${t("settings.card.messaging")} · ${label}`}>
       <Row label={t("settings.row.discordToken")} hint={t("settings.hint.discordToken")}>
         {editing ? (
           <>
@@ -195,7 +212,7 @@ export function MessagingCard({ save }: { save: (u: Record<string, string>) => v
               size="sm"
               disabled={!token.trim()}
               onClick={() => {
-                save({ CHIMERA_DISCORD_BOT_TOKEN: token.trim() });
+                save({ [tokenEnv]: token.trim() });
                 setEditing(false);
                 setToken("");
                 setTimeout(invalidate, 300); // refresh "configured" after the save lands
@@ -374,6 +391,11 @@ export function Settings() {
         </Card>
 
         <MessagingCard save={save} />
+        <MessagingCard
+          save={save}
+          platform="telegram"
+          tokenEnv="CHIMERA_TELEGRAM_BOT_TOKEN"
+        />
 
         <Card title={t("settings.card.cacheSandbox")}>
           <Row label={t("settings.row.completionCache")} hint={t("settings.hint.completionCache")}>
@@ -393,6 +415,15 @@ export function Settings() {
             <Toggle
               on={c.mcp.autoload}
               onChange={(v) => save({ CHIMERA_MCP_AUTOLOAD: String(v) })}
+            />
+          </Row>
+        </Card>
+
+        <Card title={t("settings.card.automation")}>
+          <Row label={t("settings.row.appCron")} hint={t("settings.hint.appCron")}>
+            <Toggle
+              on={c.automation.cron}
+              onChange={(v) => save({ CHIMERA_APP_CRON: String(v) })}
             />
           </Row>
         </Card>

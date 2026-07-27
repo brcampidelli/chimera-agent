@@ -1,11 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { IconRail } from "@/components/IconRail";
+import { IconRail, type View } from "@/components/IconRail";
 import { I18nProvider } from "@/lib/i18n";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-function renderRail(view = "chat" as const) {
+function renderRail(view: View = "chat") {
   return render(
     <I18nProvider>
       <TooltipProvider>
