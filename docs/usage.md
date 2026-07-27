@@ -376,6 +376,22 @@ Useful flags:
 | `--no-remember` | don't auto-write a memory fact on success |
 | `--no-evolve-skills` | don't auto-propose a learned skill when a task recurs |
 | `--isolate` | run in a throwaway git worktree; changed files copied back only on success |
+| `--require-diff` | an attempt that changed **no file** fails and is retried — for a code task, an explanation is not a fix |
+| `--keep-workspace` | on failure, leave the last attempt's edits on disk instead of reverting — for when an **external** grader decides pass/fail |
+| `--diff-feedback` | show a failed attempt its own reverted diff, framed as a path not to retake |
+| `--stagnation-fuzzy` | match repeated-failure signatures approximately, so the anti-stall pivot fires on same-cause failures whose wording differs |
+
+> **On `--max-steps`.** The default of 8 is tuned for small workspaces. On a **large repository it is
+> the binding constraint**, not the model: SWE-bench run 1 scored an exact 0.0pp at 8 steps against a
+> 250 MB checkout, and the same configuration at **30 steps** lifted the baseline's patch rate from
+> 47% to 74% ([`bench/swe_bench/RESULTS.md`](../bench/swe_bench/RESULTS.md)). If the agent explores and
+> then finishes without editing, raise this first.
+
+> **`--require-diff` and `--keep-workspace` are for external grading.** `solve` is verify-or-revert:
+> when *it* owns the pass/fail decision, reverting a failed attempt is right. When something else owns
+> it — a CI job, a benchmark harness, a human reviewing the diff — `--keep-workspace` stops the agent's
+> work being rolled back before that judge ever sees it, and `--require-diff` stops a confident
+> explanation from being scored as a completed change. Both are **off by default**.
 
 **`solve` learns across runs.** Each run feeds a closed behavioural loop, all gated by
 verify-or-revert so only verified work has any effect: (1) relevant **lessons** from

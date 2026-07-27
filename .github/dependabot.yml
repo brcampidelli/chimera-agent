@@ -1,0 +1,45 @@
+# Dependency updates.
+#
+# Chimera's headline claim is "security by architecture", and the taint layer plus the sandbox are
+# defences against what a *model* does. Neither of them looks at what our own dependency tree drags
+# in. A known-vulnerable transitive package is a hole under the whole argument, so the tree gets
+# watched on a schedule like everything else we claim.
+#
+# Grouped by ecosystem and batched weekly: an unbatched dependabot on three ecosystems opens enough
+# PRs to train maintainers to rubber-stamp them, which is worse than not running it.
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      python-dev:
+        dependency-type: "development"
+      python-runtime:
+        dependency-type: "production"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # The desktop app ships in the [desktop] extra, so its npm tree is part of what users install.
+  - package-ecosystem: "npm"
+    directory: "/apps/desktop"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      npm-dev:
+        dependency-type: "development"
+      npm-runtime:
+        dependency-type: "production"

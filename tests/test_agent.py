@@ -97,12 +97,27 @@ def test_insist_off_by_default_accepts_narration() -> None:
     assert result.answer.startswith("You can run")  # returned as-is, no nudge
 
 
-def test_insist_accepts_a_completion_report() -> None:
-    # A real "I did it" report (no code block, no advisory phrasing) is accepted, not nudged.
-    backend = ScriptedBackend([CompletionResult(content="I created hello.py and it passes.", model="fake")])
+def test_insist_accepts_a_completion_report_backed_by_real_tool_calls() -> None:
+    """An "I did it" report is accepted when the run actually used a tool.
+
+    This test used to assert that the same report was accepted with ZERO tool calls. That encoded a
+    false premise: a run that never touched a tool did not create anything, so the report cannot be
+    true. The nudge now fires on `tool_calls_made == 0` regardless of phrasing, and acceptance
+    requires the claim to be backed by an actual action.
+    """
+    backend = ScriptedBackend(
+        [
+            CompletionResult(
+                content="",
+                model="fake",
+                tool_calls=[ToolCall(id="c1", name="echo", arguments={"text": "hello.py"})],
+            ),
+            CompletionResult(content="I created hello.py and it passes.", model="fake"),
+        ]
+    )
     result = Agent(backend, _echo_registry(), AgentConfig(insist_on_action=True)).run("make hello.py")
     assert result.answer == "I created hello.py and it passes."
-    assert result.steps == 1  # accepted on the first response, no nudge round
+    assert result.tool_calls_made == 1  # the claim is backed by a real action, so it is accepted
 
 
 def test_insist_nudges_at_most_once() -> None:
@@ -324,3 +339,36 @@ def test_on_edit_absent_makes_no_extra_reads(tmp_path: Any) -> None:
     result = Agent(backend, registry).run("write d")  # no on_edit
     assert result.answer == "done"
     assert (Path(tmp_path) / "d.txt").read_text(encoding="utf-8") == "x\n"
+
+
+def test_zero_tool_calls_triggers_the_nudge_even_when_the_prose_looks_innocent() -> None:
+    """The gap SWE-bench measured: a confident explanation with no code block and none of the listed
+    advisory phrases slipped past the text heuristic, and the run finished having changed nothing.
+
+    `tool_calls_made == 0` is machine truth — an action task that never touched a tool did nothing,
+    whatever its prose looks like — so it now triggers the nudge on its own.
+    """
+    from chimera.core.agent import _looks_like_unexecuted_plan
+
+    prose = "The bug is in formsets.py: index may be None before the comparison."
+    assert _looks_like_unexecuted_plan(prose) is False  # the heuristic alone does NOT catch it
+
+    backend = ScriptedBackend([CompletionResult(content=prose, model="fake")], final="Fixed it.")
+    agent = Agent(backend, ToolRegistry(), AgentConfig(insist_on_action=True, max_steps=4))
+    result = agent.run("fix the bug in formsets.py")
+
+    # Two model calls: the narration, then the answer produced after the nudge was pushed back.
+    assert len(backend.calls) == 2
+    nudge_texts = [m.get("content", "") for m in backend.calls[1]["messages"] if isinstance(m, dict)]
+    assert any("did not carry it out" in str(t) for t in nudge_texts)
+    assert result.answer == "Fixed it."
+
+
+def test_zero_tool_calls_does_not_nudge_when_insist_is_off() -> None:
+    """Ask-style runs (`insist_on_action=False`) legitimately answer without touching a tool."""
+    backend = ScriptedBackend([CompletionResult(content="It sorts ascending.", model="fake")])
+    agent = Agent(backend, ToolRegistry(), AgentConfig(insist_on_action=False, max_steps=4))
+    result = agent.run("what does this function do?")
+
+    assert len(backend.calls) == 1  # answered once, no push-back
+    assert result.answer == "It sorts ascending."

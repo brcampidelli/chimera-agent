@@ -189,3 +189,37 @@ jobs:
 
       - name: Gate — every survivor must be a justified allowlist entry
         run: uv run python scripts/mutation_gate.py
+
+  supply-chain:
+    name: supply chain (secrets · known CVEs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # gitleaks needs history to scan commits, not just the checked-out tree. A secret that was
+          # committed and then deleted is still a leaked secret.
+          fetch-depth: 0
+
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Known vulnerabilities in the dependency tree (pip-audit)
+        # Advisory for now: pip-audit fails on any CVE in any transitive package, including ones with
+        # no fix released, which would make a red CI the normal state and teach everyone to ignore it.
+        # Dependabot (.github/dependabot.yml) is what actually moves versions; this reports what is
+        # currently known so it is visible in the run rather than discovered by a user.
+        continue-on-error: true
+        run: |
+          uvx pip-audit --version
+          uv export --format requirements-txt --no-hashes --no-emit-project > /tmp/reqs.txt
+          uvx pip-audit --requirement /tmp/reqs.txt --strict || true

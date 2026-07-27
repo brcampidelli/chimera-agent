@@ -226,10 +226,16 @@ class Agent:
                 # Narrate-instead-of-act guard: if asked to insist on action, push a described-but-
                 # unexecuted plan back once instead of accepting it as done. Only once, so a genuine
                 # completion report (or a second narration) still ends the loop.
+                # `tool_calls_made == 0` is the STRONGER signal and comes first: an action task that
+                # finished without touching a single tool did nothing, whatever its prose looks like.
+                # The text heuristic only catches phrasings we listed, so it misses the commonest
+                # failure — a confident explanation of the fix with no code block and none of those
+                # exact phrases. SWE-bench measured that gap: 13–14 of 41 solves returned an empty
+                # patch (bench/swe_bench/RESULTS.md). Machine truth over phrase-matching.
                 if (
                     self.config.insist_on_action
                     and not nudged
-                    and _looks_like_unexecuted_plan(result.content)
+                    and (tool_calls_made == 0 or _looks_like_unexecuted_plan(result.content))
                 ):
                     nudged = True
                     messages.append({"role": "assistant", "content": result.content})

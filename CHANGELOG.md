@@ -6,6 +6,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **`solve` no longer accepts a plain-prose "I fixed it" as a finished action.** The
+  narrate-instead-of-act guard only fired on a text heuristic — fenced code blocks or one of eight
+  listed English phrases — so the commonest failure slipped past it: a confident explanation of the
+  fix, no code block, none of those exact phrases, **and not a single tool call**. The guard now
+  leads with `tool_calls_made == 0`, which is machine truth rather than phrase-matching: a run that
+  touched no tool did nothing, whatever its prose looks like. This is the shape SWE-bench measured —
+  13-14 of 41 solves returned an empty patch (`bench/swe_bench/RESULTS.md`).
+  - One existing test asserted the old behaviour was correct (it accepted "I created hello.py and it
+    passes." from a run with zero tool calls). That test encoded a false premise and was rewritten to
+    script a real tool call, which is what a completion report is supposed to be backed by.
+
+### Added
+- **Supply-chain checks in CI** (`supply-chain` job): `gitleaks` over full history for committed
+  secrets, and `pip-audit` over the resolved dependency tree for known CVEs. `pip-audit` is advisory
+  — it flags CVEs with no released fix, and a permanently red CI teaches people to ignore it.
+- **`.github/dependabot.yml`** — weekly grouped updates for pip, GitHub Actions and the desktop npm
+  tree. The taint layer and the sandbox defend against what the *model* does; neither looks at what
+  our own dependency tree drags in.
+
+### Documentation
+- Documented four `solve` flags that shipped in the CLI with **no user-facing documentation at all**:
+  `--require-diff`, `--keep-workspace`, `--diff-feedback`, `--stagnation-fuzzy`, plus a note on
+  `--max-steps` being the binding constraint on large repositories (the reason SWE-bench run 1 scored
+  an exact 0.0pp).
+
 ## [0.36.2] - 2026-07-26
 
 ### Changed
