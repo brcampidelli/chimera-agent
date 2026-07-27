@@ -6,13 +6,11 @@ import { Chat } from "@/components/Chat";
 import { Composer } from "@/components/Composer";
 import { Settings } from "@/components/Settings";
 import { Knowledge } from "@/components/Knowledge";
-import { Cron } from "@/components/Cron";
-import { Tasks } from "@/components/Tasks";
+import { Automation } from "@/components/Automation";
 import { Fusion } from "@/components/Fusion";
 import { Usage } from "@/components/Usage";
-import { Runs } from "@/components/Runs";
 import { Code } from "@/components/Code";
-import { Agents } from "@/components/Agents";
+import { Work } from "@/components/Work";
 import { Governance } from "@/components/Governance";
 import { Maturity } from "@/components/Maturity";
 import { Tools } from "@/components/Tools";
@@ -256,13 +254,11 @@ export default function App() {
           </>
         )}
         {view === "knowledge" && <Knowledge />}
-        {view === "cron" && <Cron />}
-        {view === "tasks" && <Tasks />}
+        {view === "automation" && <Automation />}
         {view === "fusion" && <Fusion report={report} />}
         {view === "usage" && <Usage />}
-        {view === "runs" && <Runs />}
+        {view === "work" && <Work />}
         {view === "code" && <Code />}
-        {view === "agents" && <Agents />}
         {view === "tools" && <Tools />}
         {view === "mcp" && <Mcp />}
         {view === "governance" && <Governance />}

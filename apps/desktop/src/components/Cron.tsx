@@ -82,7 +82,7 @@ function AddSchedule() {
   );
 }
 
-export function Cron() {
+export function Cron({ embedded = false }: { embedded?: boolean } = {}) {
   const t = useT();
   const qc = useQueryClient();
   const jobs = useQuery({ queryKey: ["cron"], queryFn: getCron });
@@ -92,7 +92,7 @@ export function Cron() {
   const remove = useMutation({ mutationFn: deleteCron, onSuccess: invalidate });
 
   return (
-    <Screen title={t("cron.title")} icon={<Clock className="h-5 w-5" />}>
+    <Screen title={t("cron.title")} icon={<Clock className="h-5 w-5" />} embedded={embedded}>
       <AddSchedule />
       <Panel title={t("cron.jobs")}>
         {jobs.isError ? (

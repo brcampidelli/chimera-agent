@@ -92,7 +92,7 @@ function Board({ columns }: { columns: Record<string, TaskCard[]> }) {
   );
 }
 
-export function Tasks() {
+export function Tasks({ embedded = false }: { embedded?: boolean } = {}) {
   const t = useT();
   const qc = useQueryClient();
   const projects = useQuery({ queryKey: ["projects"], queryFn: getProjects });
@@ -103,7 +103,7 @@ export function Tasks() {
   };
 
   return (
-    <Screen title={t("tasks.title")} icon={<KanbanSquare className="h-5 w-5" />}>
+    <Screen title={t("tasks.title")} icon={<KanbanSquare className="h-5 w-5" />} embedded={embedded}>
       <Panel title={t("tasks.projects")}>
         {projects.isError ? (
           <ErrorState error={projects.error} onRetry={() => projects.refetch()} />

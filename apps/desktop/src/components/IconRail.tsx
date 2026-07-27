@@ -3,11 +3,9 @@ import {
   MessageSquare,
   Brain,
   Clock,
-  KanbanSquare,
   Network,
   BarChart3,
   ListChecks,
-  Boxes,
   FileCode2,
   Wrench,
   Plug,
@@ -26,13 +24,11 @@ import { useT } from "@/lib/i18n";
 export type View =
   | "chat"
   | "knowledge"
-  | "cron"
-  | "tasks"
+  | "automation"
   | "fusion"
   | "usage"
-  | "runs"
+  | "work"
   | "code"
-  | "agents"
   | "tools"
   | "mcp"
   | "governance"
@@ -42,13 +38,11 @@ export type View =
 const NAV: { view: View; labelKey: string; icon: ComponentType<{ className?: string }> }[] = [
   { view: "chat", labelKey: "nav.chat", icon: MessageSquare },
   { view: "knowledge", labelKey: "nav.knowledge", icon: Brain },
-  { view: "cron", labelKey: "nav.schedule", icon: Clock },
-  { view: "tasks", labelKey: "nav.tasks", icon: KanbanSquare },
+  { view: "automation", labelKey: "nav.automation", icon: Clock },
   { view: "fusion", labelKey: "nav.fusion", icon: Network },
   { view: "usage", labelKey: "nav.usage", icon: BarChart3 },
-  { view: "runs", labelKey: "nav.runs", icon: ListChecks },
   { view: "code", labelKey: "nav.code", icon: FileCode2 },
-  { view: "agents", labelKey: "nav.agents", icon: Boxes },
+  { view: "work", labelKey: "nav.work", icon: ListChecks },
   { view: "tools", labelKey: "nav.tools", icon: Wrench },
   { view: "mcp", labelKey: "nav.mcp", icon: Plug },
   { view: "governance", labelKey: "nav.governance", icon: Shield },
