@@ -58,6 +58,9 @@
   --elev-lg: 0 30px 70px -18px rgba(0, 0, 0, 0.78), inset 0 1px 0 rgba(255, 255, 255, 0.07);
   --inset: inset 0 2px 6px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.02);
   --glow: 0 0 0 3px hsl(var(--ring) / 0.28), 0 0 22px -2px hsl(var(--ring) / 0.5);
+  /* The selected rail destination: a hairline ring plus a contained bloom. */
+  --rail-active: inset 0 0 0 1px hsl(var(--accent) / 0.3), 0 0 16px -4px hsl(var(--accent) / 0.6);
+  --status-dot: 0 0 10px 1px hsl(var(--accent) / 0.8);
   --btn-shadow: 0 8px 18px -8px hsl(var(--accent) / 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.28),
     inset 0 -3px 8px rgba(0, 0, 0, 0.28);
   --btn-shadow-hover: 0 10px 28px -8px hsl(var(--accent) / 0.72),
@@ -99,6 +102,8 @@
   --elev-lg: 0 24px 54px -16px rgba(30, 50, 90, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.85);
   --inset: inset 0 2px 5px rgba(30, 50, 90, 0.13);
   --glow: 0 0 0 3px hsl(var(--ring) / 0.2), 0 0 16px -2px hsl(var(--ring) / 0.32);
+  --rail-active: inset 0 0 0 1px hsl(var(--accent) / 0.35), 0 0 14px -5px hsl(var(--accent) / 0.5);
+  --status-dot: 0 0 9px 1px hsl(var(--accent) / 0.6);
   --btn-shadow: 0 7px 16px -7px hsl(var(--accent) / 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35);
   --btn-shadow-hover: 0 9px 22px -7px hsl(var(--accent) / 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
@@ -114,14 +119,18 @@ body {
   color: hsl(var(--foreground));
   font-family: theme("fontFamily.sans");
   -webkit-font-smoothing: antialiased;
-  /* Deep navy ground with a faint top-center glow — the textured backdrop from the reference. */
   background-color: hsl(var(--background));
+}
+
+/* The faint top-centre glow over the navy ground. It lives on its own element rather than on
+   `body` so the launch sequence can fade it in — `body` cannot be animated into existence, and a
+   background that is simply there from frame one has nothing to arrive from. */
+.ambient-wash {
   background-image: radial-gradient(
     120% 80% at 50% -10%,
     hsl(var(--accent) / 0.1) 0%,
     transparent 55%
   );
-  background-attachment: fixed;
 }
 
 /* Thin, unobtrusive scrollbars that match the surface. */

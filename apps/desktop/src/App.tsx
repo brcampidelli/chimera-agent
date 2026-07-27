@@ -27,6 +27,8 @@ import { deleteSession, getDoctor, getSession, listSessions, streamChat } from "
 import { useT } from "@/lib/i18n";
 import type { Message, ToolEvent, TurnReport } from "@/lib/types";
 import { applyTheme, readTheme, resolveTheme, type Theme } from "@/lib/theme";
+import { useIgnition } from "@/lib/useIgnition";
+import { cn } from "@/lib/utils";
 
 /**
  * The theme preference, persisted.
@@ -63,6 +65,8 @@ export default function App() {
   const qc = useQueryClient();
   const t = useT();
   const { dark, toggle } = useTheme();
+  // The app's one piece of choreography. Runs on cold start only; see useIgnition.
+  const ignite = useIgnition();
   const { data: sessions = [] } = useQuery({ queryKey: ["sessions"], queryFn: listSessions });
   // First-run gate: no provider key => show the Onboarding wizard instead of the app (a keyed user
   // never sees it). Session-local "skip" lets a GUI-first user jump to Settings without a key yet.
@@ -195,47 +199,86 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-full">
-      <IconRail view={view} onSelect={setView} dark={dark} onToggleTheme={toggle} />
+    <div className={cn("relative flex h-full", ignite && "ignite")}>
+      {/* The ambient wash, lifted off `body` onto its own element so it can be animated. Purely
+          decorative and behind everything, hence aria-hidden and pointer-events-none. */}
+      <div
+        aria-hidden
+        {...(ignite && { "data-ignite": "wash" })}
+        className="ambient-wash pointer-events-none fixed inset-0 -z-10"
+      />
+      <IconRail
+        view={view}
+        onSelect={setView}
+        dark={dark}
+        onToggleTheme={toggle}
+        ignite={ignite}
+      />
       {view === "chat" && (
-        <Sessions
-          sessions={sessions}
-          currentId={currentId}
-          onSelect={openSession}
-          onNew={newChat}
-          onDelete={removeSession}
-        />
+        <div {...(ignite && { "data-ignite": "context" })} className="flex">
+          <Sessions
+            sessions={sessions}
+            currentId={currentId}
+            onSelect={openSession}
+            onNew={newChat}
+            onDelete={removeSession}
+          />
+        </div>
       )}
-      <main className="flex min-w-0 flex-1 flex-col">
+      <main
+        {...(ignite && { "data-ignite": "main" })}
+        className="flex min-w-0 flex-1 flex-col"
+      >
         {view === "chat" && (
           <>
-            <header className="flex items-center border-b border-hairline px-5 py-3">
+            <header className="relative flex items-center border-b border-hairline px-5 py-3">
               <span className="text-sm font-medium text-muted-foreground">
                 {currentId
                   ? (sessions.find((s) => s.id === currentId)?.title ?? t("chat.header.chat"))
                   : t("chat.header.new")}
               </span>
+              {/* The landing beat: one accent hairline drawing itself left to right. Everything
+                  before it converges inward; this is the single gesture that says "arrived". */}
+              {ignite && (
+                <span
+                  aria-hidden
+                  data-ignite="sweep"
+                  className="absolute inset-x-0 bottom-0 h-px bg-accent-grad"
+                />
+              )}
             </header>
             <Chat messages={messages} live={live} busy={busy} />
             <Composer busy={busy} onSend={send} onStop={stop} />
           </>
         )}
-        {view === "memory" && <Memory />}
-        {view === "skills" && <Skills />}
-        {view === "cron" && <Cron />}
-        {view === "tasks" && <Tasks />}
-        {view === "fusion" && <Fusion report={report} />}
-        {view === "usage" && <Usage />}
-        {view === "runs" && <Runs />}
-        {view === "code" && <Code />}
-        {view === "agents" && <Agents />}
-        {view === "tools" && <Tools />}
-        {view === "mcp" && <Mcp />}
-        {view === "governance" && <Governance />}
-        {view === "maturity" && <Maturity />}
-        {view === "settings" && <Settings />}
+        {/* `key` is what makes the transition work at all: re-keying on the view forces React to
+            replace the subtree, so the incoming screen mounts fresh and its enter animation runs.
+            Only the entrance is animated — the outgoing screen leaves immediately, because holding
+            it on screen to fade it out is what makes navigation feel slower than it is. */}
+        {view !== "chat" && (
+          <div key={view} className="view-enter flex min-h-0 flex-1 flex-col">
+            {view === "memory" && <Memory />}
+            {view === "skills" && <Skills />}
+            {view === "cron" && <Cron />}
+            {view === "tasks" && <Tasks />}
+            {view === "fusion" && <Fusion report={report} />}
+            {view === "usage" && <Usage />}
+            {view === "runs" && <Runs />}
+            {view === "code" && <Code />}
+            {view === "agents" && <Agents />}
+            {view === "tools" && <Tools />}
+            {view === "mcp" && <Mcp />}
+            {view === "governance" && <Governance />}
+            {view === "maturity" && <Maturity />}
+            {view === "settings" && <Settings />}
+          </div>
+        )}
       </main>
-      {view === "chat" && <Activity status={status} tools={tools} report={report} />}
+      {view === "chat" && (
+        <div {...(ignite && { "data-ignite": "inspector" })} className="flex">
+          <Activity status={status} tools={tools} report={report} />
+        </div>
+      )}
       {/* Low-key version indicator in the bottom corner (like the Hermes app's). Shows the running
           version, and an accent "update available" pill only when GitHub confirms a newer release. */}
       <div className="fixed bottom-2 right-3 z-40">

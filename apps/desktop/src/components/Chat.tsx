@@ -1,9 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/BrandMark";
+import { focusRing } from "@/components/ui/focus";
 import { useT } from "@/lib/i18n";
+import { useStickToBottom } from "@/lib/useStickToBottom";
 import type { Message } from "@/lib/types";
 
 interface Props {
@@ -37,7 +39,9 @@ function Bubble({
         {streaming ? (
           <span className="whitespace-pre-wrap">
             {content}
-            <span className="ml-0.5 inline-block h-4 w-1.5 translate-y-0.5 animate-pulse bg-accent" />
+            {/* `caret` blinks on steps(1) — hard on, hard off, like a text cursor. `animate-pulse`
+                is an eased sine, which reads as a heartbeat and subtly implies waiting. */}
+            <span className="caret ml-0.5 inline-block h-4 w-1.5 translate-y-0.5 bg-accent" />
           </span>
         ) : (
           <Markdown rehypePlugins={[rehypeHighlight]}>{content}</Markdown>
@@ -59,26 +63,53 @@ function Empty() {
 }
 
 export function Chat({ messages, live, busy }: Props) {
-  const endRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, live]);
+  const t = useT();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // Follows the stream by writing scrollTop once per frame, and stops the moment the reader scrolls
+  // up. The previous smooth-scroll-per-token both lagged behind the text and yanked the reader back.
+  const { stuck, scrollToBottom } = useStickToBottom(scrollRef, [messages, live]);
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
-        {messages.length === 0 && !live ? (
-          <Empty />
-        ) : (
-          <>
-            {messages.map((m, i) => (
-              <Bubble key={i} role={m.role} content={m.content} />
-            ))}
-            {busy && live && <Bubble role="assistant" content={live} streaming />}
-          </>
-        )}
-        <div ref={endRef} />
+    <div className="relative flex-1 overflow-hidden">
+      <div ref={scrollRef} className="h-full overflow-y-auto">
+        {/* role="log" tells a screen reader this region accumulates; aria-busy says the agent is
+            still writing. The streaming text is deliberately NOT a live region — announcing it
+            would re-read the whole growing answer on every token. The state announcements live in
+            the status region instead. */}
+        <div
+          role="log"
+          aria-busy={busy}
+          className="mx-auto max-w-3xl space-y-6 px-4 py-6"
+        >
+          {messages.length === 0 && !live ? (
+            <Empty />
+          ) : (
+            <>
+              {messages.map((m, i) => (
+                <Bubble key={i} role={m.role} content={m.content} />
+              ))}
+              {busy && live && <Bubble role="assistant" content={live} streaming />}
+            </>
+          )}
+        </div>
       </div>
+
+      {/* Only while there is something to miss: reading back through a finished answer shouldn't
+          nag you to return to the bottom. */}
+      {!stuck && busy && (
+        <button
+          type="button"
+          onClick={scrollToBottom}
+          className={cn(
+            "absolute bottom-4 left-1/2 -translate-x-1/2 rounded-chip border border-hairline",
+            "bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-elev",
+            "transition duration-1 ease-out hover:text-foreground",
+            focusRing,
+          )}
+        >
+          {t("chat.jumpToLatest")}
+        </button>
+      )}
     </div>
   );
 }

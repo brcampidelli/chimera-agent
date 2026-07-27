@@ -1,4 +1,4 @@
-import type { ComponentType } from "react";
+import type { ComponentType, CSSProperties } from "react";
 import {
   MessageSquare,
   Brain,
@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/BrandMark";
+import { focusRing } from "@/components/ui/focus";
 import { useT } from "@/lib/i18n";
 
 export type View =
@@ -61,21 +62,38 @@ function RailButton({
   label,
   onClick,
   icon: Icon,
+  igniteIndex,
+  isPage = true,
 }: {
   active: boolean;
   label: string;
   onClick: () => void;
   icon: ComponentType<{ className?: string }>;
+  /** Position in the launch stagger. Absent means this button doesn't take part. */
+  igniteIndex?: number;
+  /** False for controls that don't navigate (the theme toggle), so aria-current stays meaningful. */
+  isPage?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
       title={label}
       aria-label={label}
+      // Without this a screen-reader user can hear which button is focused but not which view they
+      // are actually looking at.
+      aria-current={isPage && active ? "page" : undefined}
+      {...(igniteIndex !== undefined && {
+        "data-ignite": "icon",
+        style: { "--i": igniteIndex } as CSSProperties,
+      })}
       className={cn(
-        "relative flex h-11 w-11 items-center justify-center rounded-xl2 transition-all duration-150",
+        "relative flex h-11 w-11 items-center justify-center rounded-xl2",
+        "transition-all duration-1 ease-out",
+        // The app's primary navigation had no focus indicator at all: a keyboard user could tab
+        // through fifteen destinations with nothing on screen telling them where they were.
+        focusRing,
         active
-          ? "bg-accent/15 text-accent shadow-[inset_0_0_0_1px_hsl(var(--accent)/0.3),0_0_16px_-4px_hsl(var(--accent)/0.6)]"
+          ? "bg-accent/15 text-accent shadow-rail-active"
           : "text-muted-foreground hover:bg-surface-hover hover:text-foreground",
       )}
     >
@@ -89,30 +107,39 @@ export function IconRail({
   onSelect,
   dark,
   onToggleTheme,
+  ignite = false,
 }: {
   view: View;
   onSelect: (v: View) => void;
   dark: boolean;
   onToggleTheme: () => void;
+  /** Whether the launch sequence is running; drives the per-icon stagger. */
+  ignite?: boolean;
 }) {
   const t = useT();
   return (
-    <div className="flex w-14 shrink-0 flex-col items-center gap-1 border-r border-hairline bg-card/40 py-3">
-      <BrandMark className="mb-2 h-8 w-8" glow />
+    <div
+      {...(ignite && { "data-ignite": "rail" })}
+      className="flex w-14 shrink-0 flex-col items-center gap-1 border-r border-hairline bg-card/40 py-3"
+    >
+      <BrandMark className="mb-2 h-8 w-8" glow {...(ignite && { "data-ignite": "mark" })} />
       <nav className="flex flex-1 flex-col items-center gap-1.5">
-        {NAV.map((n) => (
+        {NAV.map((n, i) => (
           <RailButton
             key={n.view}
             active={view === n.view}
             label={t(n.labelKey)}
             icon={n.icon}
             onClick={() => onSelect(n.view)}
+            // 40ms apart. A stagger reads as one sweep rather than N separate arrivals.
+            igniteIndex={ignite ? i : undefined}
           />
         ))}
       </nav>
       <div className="flex flex-col items-center gap-1.5">
         <RailButton
           active={false}
+          isPage={false}
           label={dark ? t("theme.light") : t("theme.dark")}
           icon={dark ? Sun : Moon}
           onClick={onToggleTheme}

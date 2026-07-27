@@ -5,6 +5,9 @@ import App from "@/App";
 import { I18nProvider } from "@/lib/i18n";
 import "highlight.js/styles/github-dark.css";
 import "@/index.css";
+// After index.css: motion.css consumes the --dur-*/--ease-* tokens declared there, and its
+// reduced-motion overrides must win over anything a component sets.
+import "@/styles/motion.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {

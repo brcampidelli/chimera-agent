@@ -34,6 +34,8 @@ export default {
         glow: "var(--glow)",
         btn: "var(--btn-shadow)",
         "btn-hover": "var(--btn-shadow-hover)",
+        "rail-active": "var(--rail-active)",
+        "status-dot": "var(--status-dot)",
       },
       borderRadius: { chip: "1.5rem", xl2: "1.15rem" },
       fontFamily: {

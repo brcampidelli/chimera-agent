@@ -1,5 +1,7 @@
+import type { CSSProperties } from "react";
 import { Check, X, Wrench, Cpu, Brain, CircleDollarSign } from "lucide-react";
 import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import type { TurnReport, ToolEvent } from "@/lib/types";
 
 export type Status = "idle" | "thinking" | "streaming" | "done";
@@ -32,12 +34,14 @@ export function Activity({ status, tools, report }: Props) {
   return (
     <aside className="flex h-full w-72 shrink-0 flex-col overflow-y-auto border-l border-hairline bg-card/40">
       <div className="flex items-center gap-2 px-4 py-3.5">
+        {/* Breathes only while something is happening. The glow is a static box-shadow and the
+            pulse animates opacity — animating the shadow itself would repaint a large blurred
+            area every frame for no visual gain. */}
         <span
-          className={`h-2 w-2 rounded-full ${
-            status === "idle"
-              ? "bg-muted-foreground"
-              : "animate-pulse bg-accent shadow-[0_0_10px_1px_hsl(var(--accent)/0.8)]"
-          }`}
+          className={cn(
+            "h-2 w-2 rounded-full",
+            status === "idle" ? "bg-muted-foreground" : "status-dot bg-accent shadow-status-dot",
+          )}
         />
         <span className="text-sm font-medium">{t(`activity.${status}`)}</span>
       </div>
@@ -48,7 +52,14 @@ export function Activity({ status, tools, report }: Props) {
         ) : (
           <ul className="space-y-1.5">
             {tools.map((t, i) => (
-              <li key={i} className="flex items-center gap-2 text-sm">
+              // The only per-event animation in the app. Each row rises 4px into place 40ms after
+              // the one before it, so a burst of tool calls reads as the agent working through them
+              // rather than as a list appearing all at once.
+              <li
+                key={i}
+                className="event-enter flex items-center gap-2 text-sm"
+                style={{ "--i": i } as CSSProperties}
+              >
                 {t.ok ? (
                   <Check className="h-3.5 w-3.5 text-ok" />
                 ) : (

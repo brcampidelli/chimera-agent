@@ -1,0 +1,345 @@
+/* ── Motion ──────────────────────────────────────────────────────────────────────────────────────
+   Every animation in the app lives here. That is deliberate: motion scattered across components is
+   how an app ends up with fourteen slightly different fade durations and no rhythm.
+
+   Two rules hold throughout:
+     · Only `transform` and `opacity` are animated. They are the two properties the compositor can
+       handle alone — anything else (width, height, top, box-shadow) forces layout or paint on every
+       frame, which is what "janky" actually means.
+     · Every keyframe below has an answer in the reduced-motion block at the bottom. The design
+       system test fails the build if one does not.
+
+   Timing tokens (--dur-*, --ease-*) are declared in index.css. Full rules in DESIGN.md.
+   ──────────────────────────────────────────────────────────────────────────────────────────────── */
+
+/* ── The launch sequence ─────────────────────────────────────────────────────────────────────────
+   Fires once, on cold start. Seven beats over ~900ms, converging inward from three directions, and
+   then one accent hairline draws itself under the header and settles. Driven entirely by
+   `animation-delay` — no JS timeline to drift out of sync with the CSS.
+
+   Elements opt in with `data-ignite="<beat>"`, and staggered children carry `--i`. */
+
+@keyframes ignite-wash {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ignite-mark {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ignite-from-left {
+  from {
+    opacity: 0;
+    transform: translate3d(-12px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ignite-from-right {
+  from {
+    opacity: 0;
+    transform: translate3d(12px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ignite-from-below {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ignite-icon {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The landing. A 1px element scaling on the compositor — the cheapest possible way to end a
+   sequence, and the only beat anyone will consciously notice. */
+@keyframes ignite-sweep {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+[data-ignite] {
+  animation-duration: var(--dur-3);
+  animation-timing-function: var(--ease-out);
+  animation-fill-mode: both;
+  /* Promoted only while the sequence runs; the .ignite class is removed when it finishes, so this
+     never becomes a permanent extra compositor layer. */
+  will-change: transform, opacity;
+}
+
+[data-ignite="wash"] {
+  animation-name: ignite-wash;
+  animation-duration: var(--dur-4);
+}
+[data-ignite="mark"] {
+  animation-name: ignite-mark;
+  animation-delay: 60ms;
+  animation-duration: 420ms;
+  animation-timing-function: var(--ease-spring);
+}
+[data-ignite="rail"] {
+  animation-name: ignite-from-left;
+  animation-delay: 140ms;
+  animation-duration: 380ms;
+}
+[data-ignite="icon"] {
+  animation-name: ignite-icon;
+  /* Each icon leaves 40ms after the one above it. The eye reads a stagger as a single sweep. */
+  animation-delay: calc(140ms + var(--i, 0) * 40ms);
+  animation-duration: 300ms;
+}
+[data-ignite="context"] {
+  animation-name: ignite-from-left;
+  animation-delay: 220ms;
+  animation-duration: 360ms;
+}
+[data-ignite="main"] {
+  animation-name: ignite-from-below;
+  animation-delay: 260ms;
+  animation-duration: 420ms;
+}
+[data-ignite="inspector"] {
+  animation-name: ignite-from-right;
+  animation-delay: 320ms;
+  animation-duration: 360ms;
+}
+[data-ignite="sweep"] {
+  animation-name: ignite-sweep;
+  animation-delay: 560ms;
+  animation-duration: 420ms;
+  transform-origin: left;
+}
+
+/* ── Views ───────────────────────────────────────────────────────────────────────────────────────
+   Incoming only; the outgoing view unmounts immediately. There is no directional slide: with five
+   destinations there is no spatial model to reinforce, and a slide makes navigation feel slower
+   than it is. */
+
+@keyframes view-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.view-enter {
+  animation: view-enter var(--dur-2) var(--ease-out) both;
+}
+
+/* ── Overlays ────────────────────────────────────────────────────────────────────────────────────
+   Dialog, command palette, toast. Paired with usePresence, which keeps them mounted through the
+   exit. */
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes overlay-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes backdrop-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+[data-state="entering"].overlay,
+[data-state="open"].overlay {
+  animation: overlay-in var(--dur-2) var(--ease-out) both;
+}
+[data-state="exiting"].overlay {
+  animation: overlay-out var(--dur-1) var(--ease-in-out) both;
+}
+[data-state="entering"].backdrop,
+[data-state="open"].backdrop {
+  animation: backdrop-in var(--dur-2) var(--ease-out) both;
+}
+[data-state="exiting"].backdrop {
+  animation: backdrop-out var(--dur-1) var(--ease-in-out) both;
+}
+
+/* ── The agent working ───────────────────────────────────────────────────────────────────────────
+   The only per-event animation in the app, and the one that sells "something is happening". */
+
+/* A text cursor is on or off. `animate-pulse`'s eased sine reads as a heartbeat instead. */
+@keyframes caret-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.caret {
+  animation: caret-blink 1.06s steps(1, end) infinite;
+}
+
+/* Tool events arriving in the inspector, staggered so a burst reads as a sequence. */
+@keyframes event-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 4px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.event-enter {
+  animation: event-enter var(--dur-2) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 40ms);
+}
+
+/* The status dot and the brand mark breathing while the agent is busy. Opacity only — animating the
+   box-shadow itself would repaint a large blurred area every frame for no visual gain. */
+@keyframes pulse-glow {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.status-dot,
+.pulse-glow {
+  animation: pulse-glow 1.8s var(--ease-in-out) infinite;
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────────────────────────────
+   Honours the OS flag AND the in-app override (Settings › Appearance), because on Windows the OS
+   flag is commonly off while the person still wants calm UI.
+
+   Durations collapse; they are never removed. `animation: none` is the obvious move and it is a bug
+   factory: every keyframe above starts at `opacity: 0`, so suppressing the animation outright would
+   leave those elements permanently invisible, and `animationend` would never fire — stranding
+   usePresence's children mounted and leaving the .ignite class on forever. At 1ms the state
+   machines still resolve; nothing moves. */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+:root[data-motion="reduced"] *,
+:root[data-motion="reduced"] *::before,
+:root[data-motion="reduced"] *::after {
+  animation-duration: 1ms !important;
+  animation-delay: 0ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 1ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Reduced is not nothing. The launch still arrives — one quiet fade of the whole shell, no
+   translation, no stagger, no sweep. A journey becomes an arrival. */
+@keyframes ignite-reduced {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ignite {
+    animation: ignite-reduced 140ms linear both !important;
+  }
+}
+
+:root[data-motion="reduced"] .ignite {
+  animation: ignite-reduced 140ms linear both !important;
+}
+
+/* An override of "full" re-enables motion even when the OS asks for less — an explicit choice made
+   in the app beats an OS-wide default the person may not have set for this app. */
+:root[data-motion="full"] *,
+:root[data-motion="full"] *::before,
+:root[data-motion="full"] *::after {
+  animation-duration: revert-layer;
+  animation-delay: revert-layer;
+  animation-iteration-count: revert-layer;
+  transition-duration: revert-layer;
+}

@@ -14,22 +14,39 @@
  *   - **Ratchet** — a counted violation that may not INCREASE (see ratchet.json). This is what lets
  *     the gate land today instead of after a refactor of every file.
  */
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import ratchet from "./ratchet.json";
 
-// Every source file, read through Vite's own pipeline — no node:fs, so no @types/node.
+// Source files come through Vite's glob, which returns their text verbatim.
 const sources = import.meta.glob("../**/*.{ts,tsx}", {
   query: "?raw",
   import: "default",
   eager: true,
 }) as Record<string, string>;
 
-const styles = import.meta.glob("../**/*.css", {
-  query: "?raw",
-  import: "default",
-  eager: true,
-}) as Record<string, string>;
+/**
+ * Stylesheets are read from disk, NOT through `import.meta.glob`.
+ *
+ * Vitest stubs CSS imports to an empty string by default (`test.css` is false), and `?raw` does not
+ * exempt them. Every CSS rule below therefore ran against `""` and passed vacuously — a keyframe
+ * with no reduced-motion answer sailed through, which is precisely the check this file exists for.
+ * A gate that cannot fail is worse than no gate, because it manufactures confidence.
+ */
+function readStyles(dir: string, out: Record<string, string> = {}): Record<string, string> {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) readStyles(path, out);
+    else if (entry.name.endsWith(".css")) out[path] = readFileSync(path, "utf8");
+  }
+  return out;
+}
+
+// Vitest's root is apps/desktop (vite.config.ts lives there), so cwd is stable.
+const styles = readStyles(join(process.cwd(), "src"));
 
 /** Source files excluding this gate and its data, which necessarily contain the banned patterns. */
 function appSources(): [string, string][] {
@@ -116,6 +133,16 @@ describe("motion", () => {
       return !words.some((w) => /(^|:)duration-/.test(w)) || !words.some((w) => /(^|:)ease-/.test(w));
     });
     expect(untokened.length).toBeLessThanOrEqual(ratchet.transitionsWithoutTokens);
+  });
+
+  it("is actually reading the stylesheets", () => {
+    // The rule below was silently vacuous once already: Vitest handed it empty strings and it
+    // "passed" over a keyframe with no reduced-motion answer. Assert the input is real before
+    // trusting any verdict drawn from it.
+    const all = Object.values(styles).join("");
+    expect(Object.keys(styles).length).toBeGreaterThan(0);
+    expect(all.length).toBeGreaterThan(1000);
+    expect(all).toContain("@keyframes");
   });
 
   it("pairs every keyframe with a reduced-motion answer", () => {
