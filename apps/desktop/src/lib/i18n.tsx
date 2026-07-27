@@ -75,6 +75,7 @@ const en: Dict = {
   "chat.empty.body":
     "Ask anything. Tokens stream live; the panel on the right shows the tools, cost, and memory each turn actually used.",
   "chat.jumpToLatest": "↓ Latest",
+  "a11y.skipToContent": "Skip to content",
   "activity.idle": "idle",
   "activity.thinking": "thinking…",
   "activity.streaming": "streaming…",
@@ -512,6 +513,7 @@ const pt: Dict = {
   "chat.empty.body":
     "Pergunte qualquer coisa. Os tokens aparecem ao vivo; o painel à direita mostra as ferramentas, o custo e a memória que cada turno realmente usou.",
   "chat.jumpToLatest": "↓ Mais recentes",
+  "a11y.skipToContent": "Ir para o conteúdo",
   "activity.idle": "ocioso",
   "activity.thinking": "pensando…",
   "activity.streaming": "transmitindo…",
@@ -946,6 +948,7 @@ const es: Dict = {
   "chat.empty.body":
     "Pregunta lo que sea. Los tokens llegan en vivo; el panel de la derecha muestra las herramientas, el coste y la memoria que cada turno usó realmente.",
   "chat.jumpToLatest": "↓ Lo más reciente",
+  "a11y.skipToContent": "Ir al contenido",
   "activity.idle": "inactivo",
   "activity.thinking": "pensando…",
   "activity.streaming": "transmitiendo…",
@@ -1361,6 +1364,7 @@ const fr: Dict = {
   "chat.empty.body":
     "Demandez ce que vous voulez. Les tokens s'affichent en direct ; le panneau de droite montre les outils, le coût et la mémoire réellement utilisés à chaque tour.",
   "chat.jumpToLatest": "↓ Plus récent",
+  "a11y.skipToContent": "Aller au contenu",
   "activity.idle": "inactif",
   "activity.thinking": "réflexion…",
   "activity.streaming": "diffusion…",
@@ -1776,6 +1780,7 @@ const de: Dict = {
   "chat.empty.body":
     "Frag was du willst. Tokens erscheinen live; das Panel rechts zeigt die Tools, die Kosten und den Speicher, die jede Runde tatsächlich genutzt hat.",
   "chat.jumpToLatest": "↓ Neuestes",
+  "a11y.skipToContent": "Zum Inhalt springen",
   "activity.idle": "inaktiv",
   "activity.thinking": "denkt…",
   "activity.streaming": "streamt…",
@@ -2190,6 +2195,7 @@ const zh: Dict = {
   "chat.empty.body":
     "随便问。Token 会实时流式显示；右侧面板显示每一轮实际使用的工具、成本和记忆。",
   "chat.jumpToLatest": "↓ 最新",
+  "a11y.skipToContent": "跳到内容",
   "activity.idle": "空闲",
   "activity.thinking": "思考中…",
   "activity.streaming": "输出中…",
@@ -2600,6 +2606,7 @@ const ja: Dict = {
   "chat.empty.body":
     "何でも聞いてください。トークンはライブで流れ、右のパネルには各ターンで実際に使われたツール・コスト・メモリが表示されます。",
   "chat.jumpToLatest": "↓ 最新",
+  "a11y.skipToContent": "コンテンツへスキップ",
   "activity.idle": "待機中",
   "activity.thinking": "思考中…",
   "activity.streaming": "生成中…",

@@ -19,8 +19,9 @@ import { Maturity } from "@/components/Maturity";
 import { Tools } from "@/components/Tools";
 import { Mcp } from "@/components/Mcp";
 import { Onboarding } from "@/components/Onboarding";
-import { VersionBadge } from "@/components/VersionBadge";
 import { Activity, type Status } from "@/components/Activity";
+import { AppShell } from "@/components/shell/AppShell";
+import { AgentProvider } from "@/lib/agent-context";
 import { Spinner } from "@/components/ui/panel";
 import { ErrorState } from "@/components/ui/async";
 import { deleteSession, getDoctor, getSession, listSessions, streamChat } from "@/lib/api";
@@ -28,7 +29,6 @@ import { useT } from "@/lib/i18n";
 import type { Message, ToolEvent, TurnReport } from "@/lib/types";
 import { applyTheme, readTheme, resolveTheme, type Theme } from "@/lib/theme";
 import { useIgnition } from "@/lib/useIgnition";
-import { cn } from "@/lib/utils";
 
 /**
  * The theme preference, persisted.
@@ -198,39 +198,39 @@ export default function App() {
     );
   }
 
+  const isChat = view === "chat";
   return (
-    <div className={cn("relative flex h-full", ignite && "ignite")}>
-      {/* The ambient wash, lifted off `body` onto its own element so it can be animated. Purely
-          decorative and behind everything, hence aria-hidden and pointer-events-none. */}
-      <div
-        aria-hidden
-        {...(ignite && { "data-ignite": "wash" })}
-        className="ambient-wash pointer-events-none fixed inset-0 -z-10"
-      />
-      <IconRail
-        view={view}
-        onSelect={setView}
-        dark={dark}
-        onToggleTheme={toggle}
+    <AgentProvider value={{ status, tools, report, busy, stop }}>
+      <AppShell
         ignite={ignite}
-      />
-      {view === "chat" && (
-        <div {...(ignite && { "data-ignite": "context" })} className="flex">
-          <Sessions
-            sessions={sessions}
-            currentId={currentId}
-            onSelect={openSession}
-            onNew={newChat}
-            onDelete={removeSession}
+        viewKey={view}
+        viewLabel={t(view === "chat" ? "nav.chat" : `nav.${view}`)}
+        onOpenUsage={() => setView("usage")}
+        rail={
+          <IconRail
+            view={view}
+            onSelect={setView}
+            dark={dark}
+            onToggleTheme={toggle}
+            ignite={ignite}
           />
-        </div>
-      )}
-      <main
-        {...(ignite && { "data-ignite": "main" })}
-        className="flex min-w-0 flex-1 flex-col"
-      >
-        {view === "chat" && (
-          <>
+        }
+        // Left = what exists. Right = what the agent is doing. Chat fills both today; the other
+        // screens grow into them in the next phase.
+        context={
+          isChat ? (
+            <Sessions
+              sessions={sessions}
+              currentId={currentId}
+              onSelect={openSession}
+              onNew={newChat}
+              onDelete={removeSession}
+            />
+          ) : undefined
+        }
+        inspector={isChat ? <Activity status={status} tools={tools} report={report} /> : undefined}
+        header={
+          isChat ? (
             <header className="relative flex items-center border-b border-hairline px-5 py-3">
               <span className="text-sm font-medium text-muted-foreground">
                 {currentId
@@ -247,43 +247,30 @@ export default function App() {
                 />
               )}
             </header>
+          ) : undefined
+        }
+      >
+        {isChat && (
+          <>
             <Chat messages={messages} live={live} busy={busy} />
             <Composer busy={busy} onSend={send} onStop={stop} />
           </>
         )}
-        {/* `key` is what makes the transition work at all: re-keying on the view forces React to
-            replace the subtree, so the incoming screen mounts fresh and its enter animation runs.
-            Only the entrance is animated — the outgoing screen leaves immediately, because holding
-            it on screen to fade it out is what makes navigation feel slower than it is. */}
-        {view !== "chat" && (
-          <div key={view} className="view-enter flex min-h-0 flex-1 flex-col">
-            {view === "memory" && <Memory />}
-            {view === "skills" && <Skills />}
-            {view === "cron" && <Cron />}
-            {view === "tasks" && <Tasks />}
-            {view === "fusion" && <Fusion report={report} />}
-            {view === "usage" && <Usage />}
-            {view === "runs" && <Runs />}
-            {view === "code" && <Code />}
-            {view === "agents" && <Agents />}
-            {view === "tools" && <Tools />}
-            {view === "mcp" && <Mcp />}
-            {view === "governance" && <Governance />}
-            {view === "maturity" && <Maturity />}
-            {view === "settings" && <Settings />}
-          </div>
-        )}
-      </main>
-      {view === "chat" && (
-        <div {...(ignite && { "data-ignite": "inspector" })} className="flex">
-          <Activity status={status} tools={tools} report={report} />
-        </div>
-      )}
-      {/* Low-key version indicator in the bottom corner (like the Hermes app's). Shows the running
-          version, and an accent "update available" pill only when GitHub confirms a newer release. */}
-      <div className="fixed bottom-2 right-3 z-40">
-        <VersionBadge />
-      </div>
-    </div>
+        {view === "memory" && <Memory />}
+        {view === "skills" && <Skills />}
+        {view === "cron" && <Cron />}
+        {view === "tasks" && <Tasks />}
+        {view === "fusion" && <Fusion report={report} />}
+        {view === "usage" && <Usage />}
+        {view === "runs" && <Runs />}
+        {view === "code" && <Code />}
+        {view === "agents" && <Agents />}
+        {view === "tools" && <Tools />}
+        {view === "mcp" && <Mcp />}
+        {view === "governance" && <Governance />}
+        {view === "maturity" && <Maturity />}
+        {view === "settings" && <Settings />}
+      </AppShell>
+    </AgentProvider>
   );
 }
