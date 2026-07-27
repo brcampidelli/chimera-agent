@@ -6,7 +6,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **The desktop app was redesigned around the agent rather than around a feature list.** Fifteen
+  rail destinations become **five** — Chat, Work, Code, Knowledge, Automation — plus Settings pinned
+  to the footer. Fifteen icons had stopped being words and become positions to memorise. Three rules
+  decided what moved, and each was a defect on its own terms:
+  - *A screen that is empty for an installed user should not ship.* **Maturity** reports the Chimera
+    project's own test coverage and needs a source checkout — in an installer it rendered an empty
+    state. It is now development-only.
+  - *A turn detail is not a place.* **Fusion** rendered only when the immediately preceding chat turn
+    had used fusion, so seeing it meant sending a fused message, navigating away, and reading it
+    before the next message erased it. It is a section of the activity inspector now, beside the turn
+    it describes — more discoverable for losing its icon.
+  - *A read-only inspector is not a daily surface.* **Tools** offered no action at all and **MCP**'s
+    own empty state says the CLI is the source of truth. Both are Settings › Connections. **Usage**
+    and **Governance** likewise moved into Settings.
+- **The agent no longer disappears when you navigate.** Its status, tools and cost lived in the chat
+  view only, so opening Settings mid-response hid the agent *and* the Stop button — leaving a run you
+  could neither see nor halt. A status bar now renders on every screen, with a global Stop.
+- **One layout instead of four.** The sessions list and activity panel were hardcoded to the chat
+  view, every other screen was a lone centred column, and Code and Agents opted out entirely. A slot
+  shell gives one pattern everywhere: left is what exists, centre is what you are doing, right is
+  what the agent is doing.
+- **Three run launchers became one.** Runs, Code's run panel and Agents each carried their own copy,
+  free to drift apart.
+
+### Added
+- **A launch sequence** — roughly 900ms, seven beats, converging inward and landing on one accent
+  hairline drawn under the header. It is the app's *only* choreography: a view change is a 200ms
+  fade and nothing else. Concentration is the point; scattered micro-animation is what makes
+  software feel cheap. Pure CSS on the compositor, no animation library, and it clears itself
+  afterwards rather than leaving elements promoted to their own layers.
+- **Reduced motion as a designed state, not an absence.** Honours the OS flag *and* an in-app
+  override (Settings › Appearance), because on Windows the OS flag is commonly off while the person
+  still wants calm UI. Durations collapse to 1ms rather than animations being removed — removal
+  would strand every element whose keyframes start at `opacity: 0` permanently invisible. The launch
+  still arrives, as one 140ms fade.
+- **A command palette (⌘K)** carrying every destination, tab and conversation by title, plus ⌘1-5,
+  ⌘N and ⌘,. Every shortcut except ⌘K is suppressed while typing: ⌘N in the composer would discard a
+  half-written message.
+- **A Profile screen** (Knowledge › Profile). `GET /api/memory/profile` existed with nothing reading
+  it while Memory happily *wrote* persona facts — you could feed the agent a picture of yourself and
+  never be shown it.
+- **A design system with a gate that enforces it.** `apps/desktop/DESIGN.md` states the rules and
+  `src/design/design-system.test.ts` makes them true, riding the existing test step: no arbitrary
+  font sizes, no colour literals, no untokened motion, and every `@keyframes` paired with a
+  reduced-motion answer. Plus root `AGENTS.md`. A guideline nobody enforces decays into decoration —
+  this project had already run that experiment.
+- **A primitive layer** the README had claimed for a while and did not have: Dialog, Tooltip, Select
+  and Menu on four headless Radix packages (+21 kB gzip), with Tabs, Switch and Toast hand-built.
+- Telegram is reachable from Settings, the scheduler daemon has a visible switch, and selecting a
+  project filters the board to its own cards.
+
 ### Fixed
+- **The light theme had no visible panel borders.** `border-white/5` was used as a de-facto token in
+  thirty places; against a white card that is white on white. Real `--hairline`, `--surface-2` and
+  `--surface-hover` tokens now carry dark ink on light.
+- **The chat transcript fought the reader.** A smooth scroll fired on every streamed token — roughly
+  thirty times a second — so it never completed and the viewport lagged permanently behind the text,
+  and scrolling up to re-read something yanked you back down. It now writes `scrollTop` once per
+  frame and stops the moment you leave the bottom.
+- **The theme reset on every launch, and flashed on the way.** The choice is persisted and resolved
+  before first paint. It is three-state, and follows the OS live while set to *system*.
+- **The primary navigation had no focus indicator at all** — a keyboard user could tab through every
+  destination with nothing on screen saying where they were. Also: a skip link, focus moving into the
+  new screen on navigation, `aria-current` on the active destination, `role="log"` on the transcript,
+  and real tooltips instead of `title=`, which keyboard users never see.
+- **A dialog dropped focus on `<body>` when it closed**, putting a keyboard user back at the top of
+  the document every time they dismissed something.
+- **Six switches in Settings announced as an unnamed "switch"**.
 - **`chimera features` told you to install the wrong thing.** Every optional capability's install
   instruction carries a pip extra — `pip install 'chimera-agent[stt]'` — and Rich parsed `[stt]` as
   style markup and deleted it. The rendered line read `pip install 'chimera-agent'`, which installs
