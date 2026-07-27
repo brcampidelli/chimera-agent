@@ -78,7 +78,7 @@ function FusionBreakdown({ meta, t }: { meta: FusionMeta; t: TFunc }) {
         }
       >
         {meta.panel.length === 0 ? (
-          <EmptyState text={t("fusion.empty")} />
+          <EmptyState text={t("fusion.panelEmpty")} />
         ) : (
           meta.panel.map((entry, i) => <PanelRow key={`${entry.model}-${i}`} entry={entry} />)
         )}

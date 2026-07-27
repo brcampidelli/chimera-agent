@@ -66,7 +66,7 @@ const en: Dict = {
   "composer.hint": "Enter to send · Shift+Enter for a new line",
   "composer.fuse": "Fuse",
   "composer.fuseHint":
-    "Fuse this turn: several models answer, a judge synthesizes one result — then open the Fusion tab.",
+    "Fuse this turn: several models answer, a judge synthesizes one result — the breakdown appears in the panel on the right.",
   "composer.fuseOn": "Fusion on — this turn goes through panel → judge → synthesis (no tools).",
   "composer.stop": "Stop",
   "composer.send": "Send",
@@ -205,6 +205,7 @@ const en: Dict = {
   "fusion.title": "Fusion & Cascade",
   "fusion.empty":
     "The last turn used a single model. Turn on Fusion, or enable Cascade in Settings, to see how an answer gets composed — panel, judge, and synthesis.",
+  "fusion.panelEmpty": "Fusion ran but reported no panel members.",
   "fusion.panel": "Panel",
   "fusion.judge": "Judge",
   "fusion.synthesis": "Synthesis",
@@ -525,7 +526,7 @@ const pt: Dict = {
   "composer.hint": "Enter para enviar · Shift+Enter para nova linha",
   "composer.fuse": "Fundir",
   "composer.fuseHint":
-    "Fundir este turno: vários modelos respondem, um juiz sintetiza um resultado — depois abra a aba Fusion.",
+    "Fundir este turno: vários modelos respondem, um juiz sintetiza um resultado — o detalhamento aparece no painel à direita.",
   "composer.fuseOn": "Fusão ligada — este turno passa por painel → juiz → síntese (sem ferramentas).",
   "composer.stop": "Parar",
   "composer.send": "Enviar",
@@ -664,6 +665,7 @@ const pt: Dict = {
   "fusion.title": "Fusão e Cascata",
   "fusion.empty":
     "O último turno usou um único modelo. Ative a Fusão, ou a Cascata nas Configurações, para ver como uma resposta é composta — painel, juiz e síntese.",
+  "fusion.panelEmpty": "A fusão rodou mas não reportou membros do painel.",
   "fusion.panel": "Painel",
   "fusion.judge": "Juiz",
   "fusion.synthesis": "Síntese",
@@ -981,7 +983,7 @@ const es: Dict = {
   "composer.hint": "Enter para enviar · Shift+Enter para una nueva línea",
   "composer.fuse": "Fusionar",
   "composer.fuseHint":
-    "Fusionar este turno: varios modelos responden, un juez sintetiza un resultado — luego abre la pestaña Fusion.",
+    "Fusionar este turno: varios modelos responden, un juez sintetiza un resultado — el desglose aparece en el panel de la derecha.",
   "composer.fuseOn": "Fusión activada — este turno pasa por panel → juez → síntesis (sin herramientas).",
   "composer.stop": "Detener",
   "composer.send": "Enviar",
@@ -1101,6 +1103,7 @@ const es: Dict = {
   "fusion.title": "Fusión y Cascada",
   "fusion.empty":
     "El último turno usó un solo modelo. Activa la Fusión, o la Cascada en Ajustes, para ver cómo se compone una respuesta — panel, juez y síntesis.",
+  "fusion.panelEmpty": "La fusión se ejecutó pero no informó miembros del panel.",
   "fusion.panel": "Panel",
   "fusion.judge": "Juez",
   "fusion.synthesis": "Síntesis",
@@ -1418,7 +1421,7 @@ const fr: Dict = {
   "composer.hint": "Entrée pour envoyer · Maj+Entrée pour une nouvelle ligne",
   "composer.fuse": "Fusion",
   "composer.fuseHint":
-    "Fusionner ce tour : plusieurs modèles répondent, un juge synthétise un résultat — puis ouvrez l'onglet Fusion.",
+    "Fusionner ce tour : plusieurs modèles répondent, un juge synthétise un résultat — le détail apparaît dans le panneau de droite.",
   "composer.fuseOn": "Fusion activée — ce tour passe par panel → juge → synthèse (sans outils).",
   "composer.stop": "Arrêter",
   "composer.send": "Envoyer",
@@ -1538,6 +1541,7 @@ const fr: Dict = {
   "fusion.title": "Fusion et Cascade",
   "fusion.empty":
     "Le dernier tour a utilisé un seul modèle. Activez la Fusion, ou la Cascade dans les Paramètres, pour voir comment une réponse est composée — panel, juge et synthèse.",
+  "fusion.panelEmpty": "La fusion s'est exécutée mais n'a signalé aucun membre du panel.",
   "fusion.panel": "Panel",
   "fusion.judge": "Juge",
   "fusion.synthesis": "Synthèse",
@@ -1855,7 +1859,7 @@ const de: Dict = {
   "composer.hint": "Enter zum Senden · Umschalt+Enter für eine neue Zeile",
   "composer.fuse": "Fusion",
   "composer.fuseHint":
-    "Diesen Zug fusionieren: mehrere Modelle antworten, ein Judge synthetisiert ein Ergebnis — dann den Fusion-Tab öffnen.",
+    "Diese Runde fusionieren: mehrere Modelle antworten, ein Judge synthetisiert ein Ergebnis — die Aufschlüsselung erscheint im rechten Panel.",
   "composer.fuseOn": "Fusion an — dieser Zug läuft über Panel → Judge → Synthese (ohne Tools).",
   "composer.stop": "Stopp",
   "composer.send": "Senden",
@@ -1975,6 +1979,7 @@ const de: Dict = {
   "fusion.title": "Fusion & Kaskade",
   "fusion.empty":
     "Die letzte Runde nutzte ein einzelnes Modell. Aktiviere Fusion oder Kaskade in den Einstellungen, um zu sehen, wie eine Antwort entsteht — Panel, Judge und Synthese.",
+  "fusion.panelEmpty": "Die Fusion lief, meldete aber keine Panel-Mitglieder.",
   "fusion.panel": "Panel",
   "fusion.judge": "Judge",
   "fusion.synthesis": "Synthese",
@@ -2291,7 +2296,7 @@ const zh: Dict = {
   "composer.placeholder": "给 Chimera 发消息…",
   "composer.hint": "回车发送 · Shift+回车换行",
   "composer.fuse": "融合",
-  "composer.fuseHint": "融合本轮：多个模型作答，由裁判合成一个结果 — 然后打开 Fusion 标签页。",
+  "composer.fuseHint": "融合本轮：多个模型作答，由裁判合成一个结果 — 详细拆解显示在右侧面板中。",
   "composer.fuseOn": "已开启融合 — 本轮走 面板 → 裁判 → 合成（无工具）。",
   "composer.stop": "停止",
   "composer.send": "发送",
@@ -2411,6 +2416,7 @@ const zh: Dict = {
   "fusion.title": "融合与级联",
   "fusion.empty":
     "上一轮使用了单一模型。开启融合，或在设置中启用级联，即可查看答案是如何组成的——评审组、评判和综合。",
+  "fusion.panelEmpty": "融合已执行，但未报告任何面板成员。",
   "fusion.panel": "评审组",
   "fusion.judge": "评判",
   "fusion.synthesis": "综合",
@@ -2723,7 +2729,7 @@ const ja: Dict = {
   "composer.placeholder": "Chimera にメッセージ…",
   "composer.hint": "Enter で送信 · Shift+Enter で改行",
   "composer.fuse": "融合",
-  "composer.fuseHint": "このターンを融合：複数のモデルが回答し、ジャッジが一つに統合します — その後 Fusion タブを開いてください。",
+  "composer.fuseHint": "このターンを融合：複数のモデルが回答し、ジャッジが一つに統合します — 内訳は右のパネルに表示されます。",
   "composer.fuseOn": "融合オン — このターンは パネル → ジャッジ → 統合（ツールなし）で処理されます。",
   "composer.stop": "停止",
   "composer.send": "送信",
@@ -2843,6 +2849,7 @@ const ja: Dict = {
   "fusion.title": "フュージョンとカスケード",
   "fusion.empty":
     "前回のターンは単一モデルを使用しました。フュージョンを有効にするか、設定でカスケードを有効にすると、回答がどう構成されるか（パネル・ジャッジ・統合）が見えます。",
+  "fusion.panelEmpty": "融合は実行されましたが、パネルのメンバーが報告されませんでした。",
   "fusion.panel": "パネル",
   "fusion.judge": "ジャッジ",
   "fusion.synthesis": "統合",
