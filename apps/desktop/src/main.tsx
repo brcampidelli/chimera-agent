@@ -3,6 +3,8 @@ import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "@/App";
 import { I18nProvider } from "@/lib/i18n";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { ToastProvider } from "@/components/ui/toast";
 import "highlight.js/styles/github-dark.css";
 import "@/index.css";
 // After index.css: motion.css consumes the --dur-*/--ease-* tokens declared there, and its
@@ -30,7 +32,13 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
-        <App />
+        {/* One TooltipProvider for the app so tooltips share a delay group: after the first
+            opens, moving along the rail shows the rest instantly instead of re-waiting. */}
+        <TooltipProvider>
+          <ToastProvider>
+            <App />
+          </ToastProvider>
+        </TooltipProvider>
       </I18nProvider>
     </QueryClientProvider>
   </React.StrictMode>,

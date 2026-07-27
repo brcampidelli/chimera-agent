@@ -21,6 +21,7 @@ import {
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/BrandMark";
 import { focusRing } from "@/components/ui/focus";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useT } from "@/lib/i18n";
 
 export type View =
@@ -75,30 +76,34 @@ function RailButton({
   isPage?: boolean;
 }) {
   return (
-    <button
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-      // Without this a screen-reader user can hear which button is focused but not which view they
-      // are actually looking at.
-      aria-current={isPage && active ? "page" : undefined}
-      {...(igniteIndex !== undefined && {
-        "data-ignite": "icon",
-        style: { "--i": igniteIndex } as CSSProperties,
-      })}
-      className={cn(
-        "relative flex h-11 w-11 items-center justify-center rounded-xl2",
-        "transition-all duration-1 ease-out",
-        // The app's primary navigation had no focus indicator at all: a keyboard user could tab
-        // through fifteen destinations with nothing on screen telling them where they were.
-        focusRing,
-        active
-          ? "bg-accent/15 text-accent shadow-rail-active"
-          : "text-muted-foreground hover:bg-surface-hover hover:text-foreground",
-      )}
-    >
-      <Icon className="h-5 w-5" />
-    </button>
+    // A real tooltip rather than `title=`: the native one never appears for a keyboard user and has
+    // an uncontrollable delay. In a rail that is nothing but icons, that gap covered the whole of
+    // the app's primary navigation. `aria-label` stays — a tooltip is a visual affordance, not a name.
+    <Tooltip label={label}>
+      <button
+        onClick={onClick}
+        aria-label={label}
+        // Without this a screen-reader user can hear which button is focused but not which view
+        // they are actually looking at.
+        aria-current={isPage && active ? "page" : undefined}
+        {...(igniteIndex !== undefined && {
+          "data-ignite": "icon",
+          style: { "--i": igniteIndex } as CSSProperties,
+        })}
+        className={cn(
+          "relative flex h-11 w-11 items-center justify-center rounded-xl2",
+          "transition-all duration-1 ease-out",
+          // The app's primary navigation had no focus indicator at all: a keyboard user could tab
+          // through fifteen destinations with nothing on screen telling them where they were.
+          focusRing,
+          active
+            ? "bg-accent/15 text-accent shadow-rail-active"
+            : "text-muted-foreground hover:bg-surface-hover hover:text-foreground",
+        )}
+      >
+        <Icon className="h-5 w-5" />
+      </button>
+    </Tooltip>
   );
 }
 

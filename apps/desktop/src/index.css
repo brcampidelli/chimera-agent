@@ -52,6 +52,8 @@
   --hairline: 210 20% 100% / 0.06;
   --surface-2: 222 26% 17%;
   --surface-hover: 222 24% 22%;
+  /* The dim behind a modal. Heavier on dark, where the page is already low-contrast. */
+  --scrim: 222 47% 4% / 0.6;
 
   --elev: 0 12px 30px -12px rgba(0, 0, 0, 0.72), 0 2px 6px -2px rgba(0, 0, 0, 0.5),
     inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 0 0 1px rgba(255, 255, 255, 0.02);
@@ -61,6 +63,7 @@
   /* The selected rail destination: a hairline ring plus a contained bloom. */
   --rail-active: inset 0 0 0 1px hsl(var(--accent) / 0.3), 0 0 16px -4px hsl(var(--accent) / 0.6);
   --status-dot: 0 0 10px 1px hsl(var(--accent) / 0.8);
+  --toggle-on: 0 0 12px -2px hsl(var(--accent) / 0.75);
   --btn-shadow: 0 8px 18px -8px hsl(var(--accent) / 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.28),
     inset 0 -3px 8px rgba(0, 0, 0, 0.28);
   --btn-shadow-hover: 0 10px 28px -8px hsl(var(--accent) / 0.72),
@@ -96,6 +99,7 @@
   --hairline: 222 30% 12% / 0.1;
   --surface-2: 214 34% 97%;
   --surface-hover: 214 30% 93%;
+  --scrim: 222 30% 20% / 0.35;
 
   --elev: 0 10px 26px -12px rgba(30, 50, 90, 0.2), 0 1px 3px rgba(30, 50, 90, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.8);
@@ -104,6 +108,7 @@
   --glow: 0 0 0 3px hsl(var(--ring) / 0.2), 0 0 16px -2px hsl(var(--ring) / 0.32);
   --rail-active: inset 0 0 0 1px hsl(var(--accent) / 0.35), 0 0 14px -5px hsl(var(--accent) / 0.5);
   --status-dot: 0 0 9px 1px hsl(var(--accent) / 0.6);
+  --toggle-on: 0 0 10px -2px hsl(var(--accent) / 0.5);
   --btn-shadow: 0 7px 16px -7px hsl(var(--accent) / 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35);
   --btn-shadow-hover: 0 9px 22px -7px hsl(var(--accent) / 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }

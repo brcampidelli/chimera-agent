@@ -20,6 +20,56 @@ if (!window.matchMedia) {
   }));
 }
 
+// Radix primitives measure and position their popovers on mount. jsdom implements none of that, so
+// without these stubs every test that imports a Dialog, Select, Tooltip or Menu throws before it
+// renders. Stubbing them is not a fidelity claim — jsdom does no layout, so positioning is
+// untestable here either way; these tests assert behaviour and semantics.
+if (!globalThis.ResizeObserver) {
+  globalThis.ResizeObserver = class {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  };
+}
+if (!globalThis.DOMRect) {
+  globalThis.DOMRect = class {
+    constructor(
+      readonly x = 0,
+      readonly y = 0,
+      readonly width = 0,
+      readonly height = 0,
+    ) {}
+    get top() {
+      return this.y;
+    }
+    get left() {
+      return this.x;
+    }
+    get right() {
+      return this.x + this.width;
+    }
+    get bottom() {
+      return this.y + this.height;
+    }
+    static fromRect(r?: DOMRectInit) {
+      return new DOMRect(r?.x, r?.y, r?.width, r?.height);
+    }
+    toJSON() {
+      return { ...this };
+    }
+  } as unknown as typeof DOMRect;
+}
+// jsdom fires pointer events but doesn't implement these two, which Radix calls while deciding
+// whether a press came from touch.
+if (!Element.prototype.hasPointerCapture) {
+  Element.prototype.hasPointerCapture = () => false;
+  Element.prototype.setPointerCapture = () => {};
+  Element.prototype.releasePointerCapture = () => {};
+}
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {};
+}
+
 // Unmount anything a test rendered and drop any persisted UI state, so tests can't leak into each
 // other (VersionBadge, for one, reads localStorage on mount).
 afterEach(() => {

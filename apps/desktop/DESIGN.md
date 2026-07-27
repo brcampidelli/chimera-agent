@@ -164,12 +164,24 @@ no translation, no stagger. Still an arrival — just not a journey. Ambient loo
 Before building a primitive, check `src/components/ui/` — the Switch was independently invented
 twice before this file existed.
 
-| Component | File |
-|---|---|
-| `Button` | `ui/button.tsx` |
-| `Screen`, `Panel`, `Badge`, `Spinner`, `EmptyState` | `ui/panel.tsx` |
-| `ErrorState` | `ui/async.tsx` |
-| `BrandMark` | `BrandMark.tsx` |
+| Component | File | Notes |
+|---|---|---|
+| `Button` | `ui/button.tsx` | |
+| `Screen`, `Panel`, `Badge`, `Spinner`, `EmptyState` | `ui/panel.tsx` | |
+| `ErrorState` | `ui/async.tsx` | |
+| `Switch` | `ui/switch.tsx` | **requires a `label`** — an unnamed switch announces as "switch, on" |
+| `Tabs`, `TabPanel` | `ui/tabs.tsx` | roving tabindex; the strip is one tab stop |
+| `Dialog` | `ui/dialog.tsx` | Radix. Restores focus to whatever opened it, not to `<body>` |
+| `Tooltip`, `TooltipProvider` | `ui/tooltip.tsx` | Radix. Use instead of `title=`, which keyboard users never see |
+| `Select` | `ui/select.tsx` | Radix. For long lists or options needing a hint line — a native `<select>` is fine otherwise |
+| `ToastProvider`, `useToast` | `ui/toast.tsx` | transient only; anything needing a decision belongs in its own surface |
+| `focusRing` | `ui/focus.ts` | the one focus-ring definition |
+| `BrandMark` | `BrandMark.tsx` | |
+
+**Dependencies:** four headless Radix packages (dialog, tooltip, select, dropdown-menu) and nothing
+else. Tabs, Switch and Toast are hand-built — each is well under a hundred lines, and a dependency
+should buy something harder than that. Radix earns its place on the parts that are genuinely hard to
+get right: focus traps, collision detection, typeahead.
 
 ---
 

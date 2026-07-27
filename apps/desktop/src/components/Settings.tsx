@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, KeyRound, Loader2 } from "lucide-react";
 import {
@@ -11,10 +11,11 @@ import {
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/async";
+import { Switch } from "@/components/ui/switch";
 import { LANGS, useI18n, useT } from "@/lib/i18n";
 import type { AppConfig, DoctorInfo, ProviderCfg } from "@/lib/types";
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
+function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="surface overflow-hidden">
       <h2 className="border-b border-hairline px-4 py-2.5 text-sm font-semibold">{title}</h2>
@@ -23,14 +24,19 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+/** The label of the enclosing Row, so a control inside it can name itself without repeating it. */
+const RowLabelContext = createContext("");
+
+function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-4 px-4 py-3">
       <div className="min-w-0">
         <div className="text-sm font-medium">{label}</div>
         {hint && <div className="text-xs text-muted-foreground">{hint}</div>}
       </div>
-      <div className="flex shrink-0 items-center gap-2">{children}</div>
+      <div className="flex shrink-0 items-center gap-2">
+        <RowLabelContext.Provider value={label}>{children}</RowLabelContext.Provider>
+      </div>
     </div>
   );
 }
@@ -82,24 +88,9 @@ function LanguageSelect() {
 }
 
 function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      onClick={() => onChange(!on)}
-      className={`relative h-5 w-9 rounded-chip transition-all ${
-        on
-          ? "bg-accent-grad shadow-[0_0_12px_-2px_hsl(var(--accent)/0.75)]"
-          : "bg-muted shadow-inset"
-      }`}
-      role="switch"
-      aria-checked={on}
-    >
-      <span
-        className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all ${
-          on ? "left-4" : "left-0.5"
-        }`}
-      />
-    </button>
-  );
+  // Was a near-copy of the one in Cron.tsx. Now the shared primitive, named from its Row — before
+  // this, all six of these announced as an unlabelled "switch".
+  return <Switch checked={on} onChange={onChange} label={useContext(RowLabelContext)} />;
 }
 
 function Select({

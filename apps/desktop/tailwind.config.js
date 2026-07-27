@@ -25,6 +25,8 @@ export default {
         "surface-2": "hsl(var(--surface-2))",
         // The fill a row takes under the pointer. Replaces `hover:bg-white/5`.
         "surface-hover": "hsl(var(--surface-hover))",
+        // The dim behind a modal — a real design concept, and lighter on the light theme.
+        scrim: "hsl(var(--scrim))",
       },
       // Neumorphic / soft-UI shadows, defined as CSS vars so they adapt per theme (index.css).
       boxShadow: {
@@ -36,6 +38,7 @@ export default {
         "btn-hover": "var(--btn-shadow-hover)",
         "rail-active": "var(--rail-active)",
         "status-dot": "var(--status-dot)",
+        "toggle-on": "var(--toggle-on)",
       },
       borderRadius: { chip: "1.5rem", xl2: "1.15rem" },
       fontFamily: {

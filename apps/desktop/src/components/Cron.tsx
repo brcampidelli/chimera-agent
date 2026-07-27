@@ -5,6 +5,7 @@ import { createCron, deleteCron, disableCron, enableCron, getCron } from "@/lib/
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
 import { ErrorState } from "@/components/ui/async";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { useT } from "@/lib/i18n";
 
 const PRESETS: { key: string; cron: string }[] = [
@@ -81,23 +82,6 @@ function AddSchedule() {
   );
 }
 
-function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
-  const t = useT();
-  return (
-    <button
-      onClick={onChange}
-      className={`relative h-5 w-9 rounded-chip transition-all ${
-        on ? "bg-accent-grad shadow-[0_0_12px_-2px_hsl(var(--accent)/0.75)]" : "bg-muted shadow-inset"
-      }`}
-      role="switch"
-      aria-checked={on}
-      title={on ? t("cron.disable") : t("cron.enable")}
-    >
-      <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all ${on ? "left-4" : "left-0.5"}`} />
-    </button>
-  );
-}
-
 export function Cron() {
   const t = useT();
   const qc = useQueryClient();
@@ -120,7 +104,11 @@ export function Cron() {
         ) : (
           jobs.data.map((j) => (
             <div key={j.id} className="group flex items-center gap-3 px-4 py-3">
-              <Toggle on={j.enabled} onChange={() => (j.enabled ? disable : enable).mutate(j.id)} />
+              <Switch
+                checked={j.enabled}
+                onChange={() => (j.enabled ? disable : enable).mutate(j.id)}
+                label={j.enabled ? t("cron.disable") : t("cron.enable")}
+              />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="truncate text-sm font-medium">{j.name}</span>
