@@ -5,8 +5,7 @@ import { Sessions } from "@/components/Sessions";
 import { Chat } from "@/components/Chat";
 import { Composer } from "@/components/Composer";
 import { Settings } from "@/components/Settings";
-import { Memory } from "@/components/Memory";
-import { Skills } from "@/components/Skills";
+import { Knowledge } from "@/components/Knowledge";
 import { Cron } from "@/components/Cron";
 import { Tasks } from "@/components/Tasks";
 import { Fusion } from "@/components/Fusion";
@@ -256,8 +255,7 @@ export default function App() {
             <Composer busy={busy} onSend={send} onStop={stop} />
           </>
         )}
-        {view === "memory" && <Memory />}
-        {view === "skills" && <Skills />}
+        {view === "knowledge" && <Knowledge />}
         {view === "cron" && <Cron />}
         {view === "tasks" && <Tasks />}
         {view === "fusion" && <Fusion report={report} />}

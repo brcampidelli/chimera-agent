@@ -91,7 +91,7 @@ function LayersPanel({ t }: { t: TFunc }) {
   );
 }
 
-export function Memory() {
+export function Memory({ embedded = false }: { embedded?: boolean } = {}) {
   const t = useT();
   const qc = useQueryClient();
   const [query, setQuery] = useState("");
@@ -116,7 +116,7 @@ export function Memory() {
   });
 
   return (
-    <Screen title={t("memory.title")} icon={<Brain className="h-5 w-5" />}>
+    <Screen title={t("memory.title")} icon={<Brain className="h-5 w-5" />} embedded={embedded}>
       <LayersPanel t={t} />
 
       <Panel title={t("memory.addFact")}>

@@ -19,6 +19,7 @@ import type {
   McpTest,
   MemoryItem,
   MemoryLayers,
+  MemoryProfile,
   PlanResult,
   ProjectState,
   RunReceipt,
@@ -139,6 +140,9 @@ export const testProviderKey = (model?: string) =>
 export const getMemory = (q = "") =>
   json<MemoryItem[]>(`/api/memory${q ? `?q=${encodeURIComponent(q)}` : ""}`);
 export const getMemoryLayers = () => json<MemoryLayers>("/api/memory/layers");
+// The agent's learned picture of you. The UI could WRITE persona facts (addMemory with
+// kind: "persona") but had no way to read them back — you fed a store you could never inspect.
+export const getMemoryProfile = () => json<MemoryProfile>("/api/memory/profile");
 export const addMemory = (content: string, kind: string) =>
   json<{ status: string; item: MemoryItem }>("/api/memory", {
     method: "POST",

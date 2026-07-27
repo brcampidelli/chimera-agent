@@ -14,7 +14,7 @@ function statusTone(status: string): "ok" | "accent" | "warn" | "muted" {
   return "muted";
 }
 
-export function Skills() {
+export function Skills({ embedded = false }: { embedded?: boolean } = {}) {
   const t = useT();
   const qc = useQueryClient();
   const skills = useQuery({ queryKey: ["skills"], queryFn: getSkills });
@@ -26,7 +26,7 @@ export function Skills() {
   const candidates = new Set(skills.data?.retirement_candidates ?? []);
 
   return (
-    <Screen title={t("skills.title")} icon={<Sparkles className="h-5 w-5" />}>
+    <Screen title={t("skills.title")} icon={<Sparkles className="h-5 w-5" />} embedded={embedded}>
       <Panel title={t("skills.learned")}>
         {skills.isError ? (
           <ErrorState error={skills.error} onRetry={() => skills.refetch()} />

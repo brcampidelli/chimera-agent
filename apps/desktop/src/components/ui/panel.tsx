@@ -2,7 +2,23 @@ import type { ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export function Screen({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {
+export function Screen({
+  title,
+  icon,
+  children,
+  embedded = false,
+}: {
+  title: string;
+  icon: ReactNode;
+  children: ReactNode;
+  /**
+   * Rendered inside another screen's tab, which already supplies the heading, the scroll container
+   * and the column width. Without this a nested screen brings a second `<h1>` and a second
+   * scrollbar — two headings for one page is the kind of thing that reads fine and sounds wrong.
+   */
+  embedded?: boolean;
+}) {
+  if (embedded) return <div className="space-y-6">{children}</div>;
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="mx-auto max-w-3xl space-y-6 px-6 py-7">

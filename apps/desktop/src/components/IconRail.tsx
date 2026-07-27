@@ -2,7 +2,6 @@ import type { ComponentType, CSSProperties } from "react";
 import {
   MessageSquare,
   Brain,
-  Sparkles,
   Clock,
   KanbanSquare,
   Network,
@@ -26,8 +25,7 @@ import { useT } from "@/lib/i18n";
 
 export type View =
   | "chat"
-  | "memory"
-  | "skills"
+  | "knowledge"
   | "cron"
   | "tasks"
   | "fusion"
@@ -43,8 +41,7 @@ export type View =
 
 const NAV: { view: View; labelKey: string; icon: ComponentType<{ className?: string }> }[] = [
   { view: "chat", labelKey: "nav.chat", icon: MessageSquare },
-  { view: "memory", labelKey: "nav.memory", icon: Brain },
-  { view: "skills", labelKey: "nav.skills", icon: Sparkles },
+  { view: "knowledge", labelKey: "nav.knowledge", icon: Brain },
   { view: "cron", labelKey: "nav.schedule", icon: Clock },
   { view: "tasks", labelKey: "nav.tasks", icon: KanbanSquare },
   { view: "fusion", labelKey: "nav.fusion", icon: Network },
