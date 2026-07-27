@@ -18,7 +18,7 @@ function Tile({ label, value, tone }: { label: string; value: string; tone?: "ok
   const color = tone === "ok" ? "text-ok" : tone === "bad" ? "text-bad" : "text-foreground";
   return (
     <div className="surface flex flex-col gap-1 p-4">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
       <span className={`font-mono text-xl ${color}`}>{value}</span>
@@ -33,12 +33,12 @@ function LayerBar({ row, max, t }: { row: LayerRow; max: number; t: TFunc }) {
     <div className="px-4 py-3">
       <div className="flex items-center justify-between gap-2">
         <span className="truncate font-mono text-xs text-foreground">{row.kind}</span>
-        <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
+        <span className="shrink-0 font-mono text-xs text-muted-foreground">
           {num(row.count)} · {t("memory.layers.clean")} {num(row.clean)} ·{" "}
           {t("memory.layers.unverified")} {num(row.tainted)}
         </span>
       </div>
-      <div className="mt-1.5 h-2 overflow-hidden rounded-chip bg-white/[0.05]">
+      <div className="mt-1.5 h-2 overflow-hidden rounded-chip bg-surface-2">
         <div className="h-full rounded-chip bg-accent-grad" style={{ width: `${pct}%` }} />
       </div>
     </div>
@@ -65,23 +65,23 @@ function LayersPanel({ t }: { t: TFunc }) {
             <Tile label={t("memory.layers.clean")} value={num(data.clean)} tone="ok" />
             <Tile label={t("memory.layers.unverified")} value={num(data.tainted)} tone="bad" />
           </div>
-          <div className="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="px-4 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {t("memory.layers.byKind")}
           </div>
           {data.layers.map((row) => (
             <LayerBar key={row.kind} row={row} max={Math.max(...data.layers.map((l) => l.count), 1)} t={t} />
           ))}
-          <div className="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="px-4 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {t("memory.layers.bySource")}
           </div>
           {data.by_source.map((s) => (
             <div key={s.source || "—"} className="flex items-center justify-between gap-2 px-4 py-2">
               <span className="truncate font-mono text-xs text-foreground">{s.source || "—"}</span>
-              <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{num(s.count)}</span>
+              <span className="shrink-0 font-mono text-xs text-muted-foreground">{num(s.count)}</span>
             </div>
           ))}
           {!data.semantic_embeddings_enabled && (
-            <div className="px-4 py-3 text-[11px] text-muted-foreground">
+            <div className="px-4 py-3 text-xs text-muted-foreground">
               {t("memory.layers.semanticOff")}
             </div>
           )}

@@ -1,0 +1,11 @@
+{
+  "_comment": [
+    "Ceilings, not targets. The design-system test fails when a count goes UP, which is what lets",
+    "the rules land on day one without a big-bang refactor of every existing site. Lowering a number",
+    "is a deliberate commit; raising one requires explaining yourself in the diff.",
+    "Seeded 2026-07-27 from the counts at the time each rule was written."
+  ],
+  "arbitraryUtilities": 22,
+  "transitionsWithoutTokens": 17,
+  "focusVisibleRules": 1
+}

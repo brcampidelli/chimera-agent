@@ -3,13 +3,31 @@
 @tailwind utilities;
 
 /* ── Chimera design system ───────────────────────────────────────────────────────────────────────
-   A tactile, dark "soft-UI": deep-navy surfaces raised by soft outer drop-shadows + a top inner
-   highlight, recessed input fields, and an always-visible soft focus glow. The accent is the brand
-   blue→cyan (from the Chimera mark: blue lion, cyan snake/dragon). Dark is the primary look; light is
-   a clean flat fallback. Shadows live in CSS vars so they adapt per theme.
+   Deep-navy surfaces separated by hairlines, recessed input fields, and an always-visible soft focus
+   glow. The accent is the brand blue→cyan (from the Chimera mark: blue lion, cyan snake/dragon).
+
+   Elevation is EARNED, not decorative: `--elev` means "this floats above the page" and is reserved
+   for dialogs, the command palette and toasts. A panel is not floating — it gets a hairline border
+   and a flat `--card` fill. (This is a deliberate move away from applying the neumorphic shadow to
+   every surface, which reads as a 2020 dashboard rather than a calm agent workspace.)
+
+   Both themes are first-class and each is declared exactly once, keyed on `data-theme`. The OS
+   preference is resolved by the inline script in index.html BEFORE first paint, so there is no
+   flash and no `prefers-color-scheme` fallback block to keep in sync.
+
+   The full rules live in apps/desktop/DESIGN.md.
    ──────────────────────────────────────────────────────────────────────────────────────────────── */
 
 :root {
+  /* ── Motion. Theme-independent: how things move doesn't change with the lights. ── */
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 320ms;
+  --dur-4: 520ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1); /* expo-out — the house easing */
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* overshoots; use sparingly */
+
   /* Dark (default) — deep navy from the icon background. */
   --background: 222 45% 8%;
   --foreground: 210 22% 91%;
@@ -27,6 +45,13 @@
   --ring: 217 91% 62%;
   --ok: 152 58% 50%;
   --bad: 0 72% 62%;
+  --warn: 38 92% 50%;
+  --warn-foreground: 38 92% 62%;
+  /* The separator between surfaces, a panel raised inside a panel, and the fill a row takes on
+     under the pointer. All three were previously low-alpha white, which is invisible on light. */
+  --hairline: 210 20% 100% / 0.06;
+  --surface-2: 222 26% 17%;
+  --surface-hover: 222 24% 22%;
 
   --elev: 0 12px 30px -12px rgba(0, 0, 0, 0.72), 0 2px 6px -2px rgba(0, 0, 0, 0.5),
     inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 0 0 1px rgba(255, 255, 255, 0.02);
@@ -39,35 +64,10 @@
     0 0 26px -4px hsl(var(--accent2) / 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.34);
 }
 
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
-    --background: 214 42% 96%;
-    --foreground: 222 47% 14%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 14%;
-    --muted: 214 30% 92%;
-    --muted-foreground: 222 12% 42%;
-    --border: 214 24% 86%;
-    --input: 214 34% 97%;
-    --primary: 222 47% 14%;
-    --primary-foreground: 0 0% 100%;
-    --accent: 217 91% 52%;
-    --accent-foreground: 0 0% 100%;
-    --accent2: 189 90% 42%;
-    --ring: 217 91% 52%;
-    --ok: 152 55% 40%;
-    --bad: 0 72% 50%;
-
-    --elev: 0 10px 26px -12px rgba(30, 50, 90, 0.2), 0 1px 3px rgba(30, 50, 90, 0.1),
-      inset 0 1px 0 rgba(255, 255, 255, 0.8);
-    --elev-lg: 0 24px 54px -16px rgba(30, 50, 90, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.85);
-    --inset: inset 0 2px 5px rgba(30, 50, 90, 0.13);
-    --glow: 0 0 0 3px hsl(var(--ring) / 0.2), 0 0 16px -2px hsl(var(--ring) / 0.32);
-    --btn-shadow: 0 7px 16px -7px hsl(var(--accent) / 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35);
-    --btn-shadow-hover: 0 9px 22px -7px hsl(var(--accent) / 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.5);
-  }
-}
-
+/* Light. Declared once, keyed on the attribute the inline script in index.html sets before paint.
+   There is deliberately no `@media (prefers-color-scheme: light)` twin: it existed only to cover
+   the gap before React set `data-theme`, and keeping a byte-identical copy in sync by hand is a
+   drift waiting to happen. The OS preference is now resolved in that script instead. */
 :root[data-theme="light"] {
   --background: 214 42% 96%;
   --foreground: 222 47% 14%;
@@ -85,6 +85,14 @@
   --ring: 217 91% 52%;
   --ok: 152 55% 40%;
   --bad: 0 72% 50%;
+  --warn: 32 95% 44%;
+  --warn-foreground: 28 90% 34%;
+  /* Dark ink at low alpha — the mirror of the dark theme's low-alpha white. The literal this token
+     replaced was a 5%-white border, i.e. white-on-white here: the light theme had NO visible
+     panel edges at all. That is the bug this token exists to fix. */
+  --hairline: 222 30% 12% / 0.1;
+  --surface-2: 214 34% 97%;
+  --surface-hover: 214 30% 93%;
 
   --elev: 0 10px 26px -12px rgba(30, 50, 90, 0.2), 0 1px 3px rgba(30, 50, 90, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.8);
@@ -137,13 +145,19 @@ body {
 }
 
 @layer components {
-  /* A raised surface (card / panel). */
+  /* A panel. Flat fill + hairline — it sits ON the page, it does not float above it. Elevation is
+     reserved for things that genuinely overlay (see `.floating`). */
   .surface {
-    @apply rounded-xl2 border border-white/5 bg-card shadow-elev;
+    @apply rounded-xl2 border border-hairline bg-card;
+  }
+  /* Genuinely overlaying: dialog, command palette, toast, popover. This is the only place `--elev`
+     belongs — a drop shadow is a depth cue, and it lies when nothing is actually in front. */
+  .floating {
+    @apply rounded-xl2 border border-hairline bg-card shadow-elev-lg;
   }
   /* A recessed input field. */
   .field {
-    @apply rounded-lg border border-black/20 bg-input shadow-inset outline-none transition;
+    @apply rounded-lg border border-black/20 bg-input shadow-inset outline-none transition duration-1 ease-out;
   }
   .field:focus,
   .field:focus-within {

@@ -37,8 +37,8 @@ function ProjectRow({ p, onChange }: { p: ProjectState; onChange: () => void }) 
       </div>
       {p.note && <div className="mt-1 text-xs text-muted-foreground">{p.note}</div>}
       {awaiting && (
-        <div className="mt-2 flex items-center gap-2 rounded-lg border border-[hsl(38_92%_50%/0.4)] bg-[hsl(38_92%_50%/0.08)] px-3 py-2 shadow-inset">
-          <ShieldAlert className="h-4 w-4 text-[hsl(38_92%_42%)]" />
+        <div className="mt-2 flex items-center gap-2 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 shadow-inset">
+          <ShieldAlert className="h-4 w-4 text-warn-foreground" />
           <span className="flex-1 text-xs">
             {p.pending_card_id
               ? t("tasks.awaitingStep", { card: p.pending_card_id })
@@ -66,14 +66,14 @@ function Board({ columns }: { columns: Record<string, TaskCard[]> }) {
     <div className="flex gap-3 overflow-x-auto p-3">
       {cols.map((col) => (
         <div key={col} className="w-56 shrink-0">
-          <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {col} · {columns[col].length}
           </div>
           <div className="space-y-2">
             {columns[col].map((c) => (
               <div
                 key={c.id}
-                className={`rounded-lg border border-white/5 bg-card px-3 py-2.5 shadow-elev transition hover:brightness-105 ${
+                className={`rounded-lg border border-hairline bg-card px-3 py-2.5 shadow-elev transition hover:brightness-105 ${
                   c.risk === "high" ? "ring-1 ring-bad/30" : ""
                 }`}
               >

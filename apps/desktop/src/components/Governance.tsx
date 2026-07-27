@@ -17,11 +17,11 @@ const pct = (n: number): string => `${(n * 100).toFixed(0)}%`;
 function Tile({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
     <div className="surface flex flex-col gap-1 p-4">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
       <span className="font-mono text-xl text-foreground">{value}</span>
-      {note && <span className="text-[11px] text-muted-foreground">{note}</span>}
+      {note && <span className="text-xs text-muted-foreground">{note}</span>}
     </div>
   );
 }
@@ -33,19 +33,19 @@ function CategoryRowView({ row, t }: { row: CategoryRow; t: TFunc }) {
     <div className="px-4 py-3">
       <div className="flex items-center justify-between gap-2">
         <span className="truncate font-mono text-xs text-foreground">{row.category}</span>
-        <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
+        <span className="shrink-0 font-mono text-xs text-muted-foreground">
           {t("governance.injection.undefended")} {pct(row.undefended_asr)} →{" "}
           {t("governance.injection.defended")} {pct(row.defended_asr)}
         </span>
       </div>
       <div className="mt-1.5 space-y-1">
-        <div className="h-2 overflow-hidden rounded-chip bg-white/[0.05]">
+        <div className="h-2 overflow-hidden rounded-chip bg-surface-2">
           <div
             className="h-full rounded-chip bg-bad/70"
             style={{ width: `${Math.max(row.undefended_asr * 100, row.undefended_asr > 0 ? 3 : 0)}%` }}
           />
         </div>
-        <div className="h-2 overflow-hidden rounded-chip bg-white/[0.05]">
+        <div className="h-2 overflow-hidden rounded-chip bg-surface-2">
           <div
             className="h-full rounded-chip bg-ok/70"
             style={{ width: `${Math.max(row.defended_asr * 100, row.defended_asr > 0 ? 3 : 0)}%` }}
@@ -74,18 +74,18 @@ function AttackRowView({ row, t }: { row: AttackRow; t: TFunc }) {
     <div className="flex items-center gap-3 px-4 py-2.5">
       <span className="min-w-0 flex-1 truncate font-mono text-xs text-foreground">{row.id}</span>
       <Badge tone="muted">{row.category}</Badge>
-      <span className="hidden shrink-0 font-mono text-[11px] text-muted-foreground sm:inline">
+      <span className="hidden shrink-0 font-mono text-xs text-muted-foreground sm:inline">
         {row.harmful_tool}
       </span>
       <span className="flex shrink-0 items-center gap-2 font-mono text-xs">
         <span className="flex items-center gap-1">
-          <span className="text-[10px] uppercase text-muted-foreground">
+          <span className="text-xs uppercase text-muted-foreground">
             {t("governance.injection.defended")}
           </span>
           <BlockedGlyph blocked={row.blocked_defended} />
         </span>
         <span className="flex items-center gap-1">
-          <span className="text-[10px] uppercase text-muted-foreground">
+          <span className="text-xs uppercase text-muted-foreground">
             {t("governance.injection.undefended")}
           </span>
           <BlockedGlyph blocked={row.blocked_undefended} />
@@ -116,14 +116,14 @@ function InjectionPanel({ data, t }: { data: InjectionReport; t: TFunc }) {
         />
       </div>
 
-      <div className="px-4 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <div className="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {t("governance.injection.byCategory")}
       </div>
       {data.by_category.map((row) => (
         <CategoryRowView key={row.category} row={row} t={t} />
       ))}
 
-      <div className="px-4 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <div className="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {t("governance.injection.attacksTable")}
       </div>
       {data.attacks.map((row) => (
@@ -132,7 +132,7 @@ function InjectionPanel({ data, t }: { data: InjectionReport; t: TFunc }) {
 
       {data.leaks_defended.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2 px-4 py-3">
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {t("governance.injection.leaksNote")}
           </span>
           {data.leaks_defended.map((id) => (
@@ -143,7 +143,7 @@ function InjectionPanel({ data, t }: { data: InjectionReport; t: TFunc }) {
         </div>
       ) : null}
 
-      <p className="px-4 py-3 text-[11px] text-muted-foreground">{t("governance.injection.note")}</p>
+      <p className="px-4 py-3 text-xs text-muted-foreground">{t("governance.injection.note")}</p>
     </Panel>
   );
 }
@@ -160,11 +160,11 @@ function AuditPanel({ data, t }: { data: GovernanceAudit; t: TFunc }) {
     <Panel title={t("governance.audit.title")}>
       {data.events.map((e: AuditEvent) => (
         <div key={e.seq} className="flex items-center gap-3 px-4 py-2.5">
-          <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
+          <span className="shrink-0 font-mono text-xs text-muted-foreground">
             #{e.seq}
           </span>
           <Badge tone="accent">{e.type || "—"}</Badge>
-          <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">
+          <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
             {e.summary}
           </span>
         </div>

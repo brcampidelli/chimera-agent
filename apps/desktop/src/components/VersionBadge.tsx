@@ -39,7 +39,7 @@ export function VersionBadge() {
   if (!canUpdate) {
     // Quiet state: just the current version, non-interactive.
     return (
-      <span className="select-none px-2 py-1 text-[11px] tabular-nums text-muted-foreground/60">
+      <span className="select-none px-2 py-1 text-xs tabular-nums text-muted-foreground/60">
         v{data.version}
       </span>
     );
@@ -64,8 +64,8 @@ export function VersionBadge() {
         <div className="surface absolute bottom-full right-0 mb-2 w-72 space-y-3 p-3 text-sm shadow-elev">
           <p className="text-foreground">{t("update.prompt", { latest })}</p>
           <p className="text-xs text-muted-foreground">{t("update.howto")}</p>
-          <div className="flex items-center justify-between gap-2 rounded-chip bg-white/[0.05] px-2 py-1.5 ring-1 ring-white/5">
-            <code className="truncate font-mono text-[11px] text-muted-foreground">{PIP_CMD}</code>
+          <div className="flex items-center justify-between gap-2 rounded-chip bg-surface-2 px-2 py-1.5 ring-1 ring-hairline">
+            <code className="truncate font-mono text-xs text-muted-foreground">{PIP_CMD}</code>
             <button
               onClick={copy}
               title={copied ? t("update.copied") : t("update.copy")}
@@ -100,7 +100,7 @@ export function VersionBadge() {
       <button
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-chip px-2 py-1 text-[11px] font-medium",
+          "inline-flex items-center gap-1.5 rounded-chip px-2 py-1 text-xs font-medium",
           "bg-accent/15 text-accent ring-1 ring-accent/25 transition-colors hover:bg-accent/25",
         )}
       >

@@ -17,8 +17,8 @@ import type { AppConfig, DoctorInfo, ProviderCfg } from "@/lib/types";
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="surface overflow-hidden">
-      <h2 className="border-b border-white/5 px-4 py-2.5 text-sm font-semibold">{title}</h2>
-      <div className="divide-y divide-white/[0.04]">{children}</div>
+      <h2 className="border-b border-hairline px-4 py-2.5 text-sm font-semibold">{title}</h2>
+      <div className="divide-y divide-hairline">{children}</div>
     </section>
   );
 }

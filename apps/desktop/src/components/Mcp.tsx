@@ -24,7 +24,7 @@ function EnvChips({ keys }: { keys: string[] }) {
       {keys.map((k) => (
         <span
           key={k}
-          className="rounded-chip bg-white/[0.05] px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground ring-1 ring-white/5"
+          className="rounded-chip bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-muted-foreground ring-1 ring-hairline"
         >
           {k}
         </span>
@@ -82,9 +82,9 @@ function ServerRow({
           <div className="flex flex-col gap-1">
             {result.tools.map((tool) => (
               <div key={tool.name} className="flex flex-col">
-                <span className="font-mono text-[11px] font-bold text-foreground">{tool.name}</span>
+                <span className="font-mono text-xs font-bold text-foreground">{tool.name}</span>
                 {tool.description && (
-                  <span className="text-[11px] leading-snug text-muted-foreground">
+                  <span className="text-xs leading-snug text-muted-foreground">
                     {tool.description}
                   </span>
                 )}
@@ -245,7 +245,7 @@ export function Mcp() {
   return (
     <Screen title={t("mcp.title")} icon={<Plug className="h-5 w-5" />}>
       {autoloadOff && (
-        <div className="rounded-xl2 bg-white/[0.03] px-4 py-2.5 text-xs text-muted-foreground ring-1 ring-white/5">
+        <div className="rounded-xl2 bg-surface-2 px-4 py-2.5 text-xs text-muted-foreground ring-1 ring-hairline">
           {t("mcp.autoloadOff")}
         </div>
       )}
@@ -278,7 +278,7 @@ export function Mcp() {
         <AddForm onAdded={invalidate} />
       </Panel>
 
-      <p className="px-1 text-[11px] text-muted-foreground">{t("mcp.note")}</p>
+      <p className="px-1 text-xs text-muted-foreground">{t("mcp.note")}</p>
     </Screen>
   );
 }

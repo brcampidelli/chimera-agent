@@ -33,7 +33,7 @@ function Bubble({
   return (
     <div className="flex gap-3">
       <BrandMark className="mt-0.5 h-6 w-6 shrink-0" alt="Chimera" />
-      <div className={cn("md min-w-0 flex-1 text-[15px] leading-relaxed")}>
+      <div className={cn("md min-w-0 flex-1 text-base leading-relaxed")}>
         {streaming ? (
           <span className="whitespace-pre-wrap">
             {content}

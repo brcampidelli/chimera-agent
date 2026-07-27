@@ -12,8 +12,8 @@ interface Props {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="border-t border-white/5 px-4 py-3">
-      <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+    <div className="border-t border-hairline px-4 py-3">
+      <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {title}
       </div>
       {children}
@@ -30,7 +30,7 @@ export function Activity({ status, tools, report }: Props) {
         ? t("activity.costUnavailable")
         : `~ $${report.usd.toFixed(4)}`;
   return (
-    <aside className="flex h-full w-72 shrink-0 flex-col overflow-y-auto border-l border-white/5 bg-card/40">
+    <aside className="flex h-full w-72 shrink-0 flex-col overflow-y-auto border-l border-hairline bg-card/40">
       <div className="flex items-center gap-2 px-4 py-3.5">
         <span
           className={`h-2 w-2 rounded-full ${
@@ -55,7 +55,7 @@ export function Activity({ status, tools, report }: Props) {
                   <X className="h-3.5 w-3.5 text-bad" />
                 )}
                 <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="font-mono text-[13px]">{t.name}</span>
+                <span className="font-mono text-sm">{t.name}</span>
               </li>
             ))}
           </ul>
@@ -78,7 +78,7 @@ export function Activity({ status, tools, report }: Props) {
           <CircleDollarSign className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="font-mono">{cost ?? "—"}</span>
           {report && report.usd != null && (
-            <span className="text-[11px] text-muted-foreground">{t("activity.exclCache")}</span>
+            <span className="text-xs text-muted-foreground">{t("activity.exclCache")}</span>
           )}
         </div>
       </Section>

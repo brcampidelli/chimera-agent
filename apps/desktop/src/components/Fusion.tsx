@@ -35,7 +35,7 @@ function PanelRow({ entry }: { entry: FusionPanelEntry }) {
       <div className="flex items-center gap-1.5">
         <span className="font-mono text-xs text-foreground">{entry.model}</span>
         {entry.error ? <Badge tone="bad">error</Badge> : null}
-        {tok ? <span className="text-[11px] text-muted-foreground">{tok}</span> : null}
+        {tok ? <span className="text-xs text-muted-foreground">{tok}</span> : null}
       </div>
       {entry.error ? (
         <div className="mt-1 whitespace-pre-wrap text-xs text-bad">{entry.error}</div>
@@ -54,7 +54,7 @@ function StageRow({ stage }: { stage: FusionStage }) {
     <div className="flex items-center gap-2 px-4 py-3">
       <Badge tone="muted">{stage.stage}</Badge>
       <span className="min-w-0 flex-1 truncate font-mono text-xs text-foreground">{stage.model}</span>
-      {tok ? <span className="shrink-0 text-[11px] text-muted-foreground">{tok}</span> : null}
+      {tok ? <span className="shrink-0 text-xs text-muted-foreground">{tok}</span> : null}
     </div>
   );
 }
@@ -135,7 +135,7 @@ function CascadeRoute({ meta, t }: { meta: CascadeMeta; t: TFunc }) {
                 {meta.models[tier] ?? "—"}
               </span>
               {tier in meta.tokens_by_tier ? (
-                <span className="shrink-0 text-[11px] text-muted-foreground">
+                <span className="shrink-0 text-xs text-muted-foreground">
                   {meta.tokens_by_tier[tier]} tokens
                 </span>
               ) : null}

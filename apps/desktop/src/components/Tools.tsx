@@ -31,24 +31,24 @@ function ToolRow({ tool, t }: { tool: ToolInfo; t: TFunc }) {
         {tool.untrusted_output && <Badge tone="warn">{t("tools.tag.untrusted")}</Badge>}
       </div>
       {tool.description && (
-        <div className="text-[13px] leading-snug text-muted-foreground">{tool.description}</div>
+        <div className="text-sm leading-snug text-muted-foreground">{tool.description}</div>
       )}
       {tool.params.length > 0 ? (
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {t("tools.params", { n: tool.params.length })}
           </span>
           {tool.params.map((p) => (
             <span
               key={p}
-              className="rounded-chip bg-white/[0.05] px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground ring-1 ring-white/5"
+              className="rounded-chip bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-muted-foreground ring-1 ring-hairline"
             >
               {p}
             </span>
           ))}
         </div>
       ) : (
-        <span className="text-[11px] text-muted-foreground">{t("tools.noParams")}</span>
+        <span className="text-xs text-muted-foreground">{t("tools.noParams")}</span>
       )}
     </div>
   );
@@ -116,7 +116,7 @@ export function Tools() {
           filtered.map((tool) => <ToolRow key={tool.name} tool={tool} t={t} />)
         )}
       </Panel>
-      <p className="px-1 text-[11px] text-muted-foreground">{t("tools.note")}</p>
+      <p className="px-1 text-xs text-muted-foreground">{t("tools.note")}</p>
     </Screen>
   );
 }

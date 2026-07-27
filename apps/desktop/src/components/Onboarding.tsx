@@ -147,7 +147,7 @@ export function Onboarding({ onSkip }: { onSkip: () => void }) {
           </p>
         ) : null}
 
-        <div className="flex items-center justify-between border-t border-white/5 pt-4">
+        <div className="flex items-center justify-between border-t border-hairline pt-4">
           <button className="text-sm text-muted-foreground hover:text-foreground" onClick={onSkip}>
             {t("onboarding.skip")}
           </button>

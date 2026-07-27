@@ -76,7 +76,7 @@ function RailButton({
         "relative flex h-11 w-11 items-center justify-center rounded-xl2 transition-all duration-150",
         active
           ? "bg-accent/15 text-accent shadow-[inset_0_0_0_1px_hsl(var(--accent)/0.3),0_0_16px_-4px_hsl(var(--accent)/0.6)]"
-          : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
+          : "text-muted-foreground hover:bg-surface-hover hover:text-foreground",
       )}
     >
       <Icon className="h-5 w-5" />
@@ -97,7 +97,7 @@ export function IconRail({
 }) {
   const t = useT();
   return (
-    <div className="flex w-14 shrink-0 flex-col items-center gap-1 border-r border-white/5 bg-card/40 py-3">
+    <div className="flex w-14 shrink-0 flex-col items-center gap-1 border-r border-hairline bg-card/40 py-3">
       <BrandMark className="mb-2 h-8 w-8" glow />
       <nav className="flex flex-1 flex-col items-center gap-1.5">
         {NAV.map((n) => (

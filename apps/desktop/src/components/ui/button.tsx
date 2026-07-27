@@ -18,7 +18,7 @@ const variants: Record<Variant, string> = {
     "disabled:bg-none disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none",
   ),
   outline: cn(
-    "border border-white/10 bg-card text-foreground shadow-elev",
+    "border border-border bg-card text-foreground shadow-elev",
     "hover:shadow-glow hover:border-accent/40",
     "active:shadow-inset active:translate-y-px",
     "disabled:opacity-50 disabled:shadow-none",

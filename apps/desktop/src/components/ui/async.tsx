@@ -15,7 +15,7 @@ export function ErrorState({ error, onRetry }: { error: unknown; onRetry: () => 
       <button
         type="button"
         onClick={onRetry}
-        className="flex items-center gap-1.5 rounded-chip bg-white/[0.06] px-3 py-1.5 text-xs font-medium ring-1 ring-white/10 transition hover:bg-white/[0.1]"
+        className="flex items-center gap-1.5 rounded-chip bg-surface-2 px-3 py-1.5 text-xs font-medium ring-1 ring-border transition hover:bg-surface-hover"
       >
         <RefreshCw className="h-3.5 w-3.5" />
         {t("common.retry")}

@@ -33,7 +33,7 @@ export function Composer({ busy, onSend, onStop }: Props) {
   }
 
   return (
-    <div className="border-t border-white/5 p-3">
+    <div className="border-t border-hairline p-3">
       <div className="field mx-auto flex max-w-3xl items-end gap-2 rounded-2xl px-3 py-2">
         <button
           type="button"
@@ -44,7 +44,7 @@ export function Composer({ busy, onSend, onStop }: Props) {
             "mb-0.5 flex h-8 shrink-0 items-center gap-1.5 rounded-chip px-2.5 text-xs font-medium transition-all",
             fuse
               ? "bg-accent-grad text-accent-foreground shadow-[0_0_12px_-2px_hsl(var(--accent)/0.75)]"
-              : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
+              : "text-muted-foreground hover:bg-surface-hover hover:text-foreground",
           )}
         >
           <Network className="h-3.5 w-3.5" />
@@ -73,7 +73,7 @@ export function Composer({ busy, onSend, onStop }: Props) {
           </Button>
         )}
       </div>
-      <p className="mx-auto mt-1.5 max-w-3xl text-center text-[11px] text-muted-foreground">
+      <p className="mx-auto mt-1.5 max-w-3xl text-center text-xs text-muted-foreground">
         {fuse ? t("composer.fuseOn") : t("composer.hint")}
       </p>
     </div>

@@ -22,11 +22,11 @@ const groupUsd = (v: number, unpriced: number, turns: number): string =>
 function Tile({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
     <div className="surface flex flex-col gap-1 p-4">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
       <span className="font-mono text-xl text-foreground">{value}</span>
-      {note && <span className="text-[11px] text-muted-foreground">{note}</span>}
+      {note && <span className="text-xs text-muted-foreground">{note}</span>}
     </div>
   );
 }
@@ -55,7 +55,7 @@ function DayBars({
 
   return (
     <div className="overflow-x-auto px-4 py-4">
-      <div className="mb-2 text-[11px] text-muted-foreground">
+      <div className="mb-2 text-xs text-muted-foreground">
         {chartUsd ? t("usage.spend") : t("usage.tokens")}
       </div>
       <svg
@@ -115,11 +115,11 @@ function ModelBar({ row, max }: { row: ModelRow; max: number }) {
     <div className="px-4 py-3">
       <div className="flex items-center justify-between gap-2">
         <span className="truncate font-mono text-xs text-foreground">{row.model || "—"}</span>
-        <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
+        <span className="shrink-0 font-mono text-xs text-muted-foreground">
           {num(row.turns)} · {num(tokens)} · {groupUsd(row.usd, row.unpriced, row.turns)}
         </span>
       </div>
-      <div className="mt-1.5 h-2 overflow-hidden rounded-chip bg-white/[0.05]">
+      <div className="mt-1.5 h-2 overflow-hidden rounded-chip bg-surface-2">
         <div className="h-full rounded-chip bg-accent-grad" style={{ width: `${pct}%` }} />
       </div>
     </div>
@@ -202,7 +202,7 @@ export function Usage() {
           return (
             <div key={s.session_id} className="flex items-center justify-between gap-2 px-4 py-3">
               <span className="truncate font-mono text-xs text-foreground">{s.session_id}</span>
-              <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
+              <span className="shrink-0 font-mono text-xs text-muted-foreground">
                 {num(s.turns)} · {num(tokens)} · {groupUsd(s.usd, s.unpriced, s.turns)}
               </span>
             </div>
@@ -213,7 +213,7 @@ export function Usage() {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Tile label={t("usage.cacheHit")} value={cacheHit} />
         <div className="surface flex flex-col gap-2 p-4">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {t("usage.routeMix")}
           </span>
           <div className="flex flex-wrap gap-1.5">

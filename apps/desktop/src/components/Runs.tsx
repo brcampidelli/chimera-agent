@@ -31,7 +31,7 @@ function AttemptRow({ attempt, t }: { attempt: AttemptReceipt; t: TFunc }) {
   return (
     <div className="px-4 py-3">
       <div className="flex items-center gap-2">
-        <span className="font-mono text-[11px] text-muted-foreground">
+        <span className="font-mono text-xs text-muted-foreground">
           {t("runs.attempt")} {attempt.index}
         </span>
         <span
@@ -43,17 +43,17 @@ function AttemptRow({ attempt, t }: { attempt: AttemptReceipt; t: TFunc }) {
         {attempt.reverted ? <Badge tone="warn">↩ {t("runs.reverted")}</Badge> : null}
       </div>
       {attempt.diff_summary ? (
-        <div className="mt-1.5 whitespace-pre-wrap font-mono text-[11px] text-muted-foreground">
+        <div className="mt-1.5 whitespace-pre-wrap font-mono text-xs text-muted-foreground">
           <span className="text-foreground/70">{t("runs.diff")}: </span>
           {attempt.diff_summary}
         </div>
       ) : null}
       {attempt.verify_output ? (
         <details className="mt-1.5">
-          <summary className="cursor-pointer text-[11px] text-muted-foreground hover:text-foreground">
+          <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
             {t("runs.output")}
           </summary>
-          <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap rounded-chip bg-white/[0.03] p-2 font-mono text-[11px] text-muted-foreground">
+          <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap rounded-chip bg-surface-2 p-2 font-mono text-xs text-muted-foreground">
             {truncate(attempt.verify_output, MAX_OUTPUT)}
           </pre>
         </details>
@@ -69,7 +69,7 @@ function RunCard({ run, t }: { run: RunReceipt; t: TFunc }) {
       action={<StatusBadge run={run} t={t} />}
     >
       <div className="flex items-center gap-2 px-4 py-2.5">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {t("runs.verifyCmd")}
         </span>
         <span className="min-w-0 flex-1 truncate font-mono text-xs text-foreground">
@@ -188,9 +188,9 @@ function NewRunPanel({ t }: { t: TFunc }) {
             )}
           </Button>
         </div>
-        <p className="text-[11px] text-muted-foreground">{t("runs.safetyNote")}</p>
+        <p className="text-xs text-muted-foreground">{t("runs.safetyNote")}</p>
         {lines.length > 0 ? (
-          <div className="mt-1 space-y-1 rounded-chip bg-white/[0.03] p-2 font-mono text-[11px] text-muted-foreground">
+          <div className="mt-1 space-y-1 rounded-chip bg-surface-2 p-2 font-mono text-xs text-muted-foreground">
             {lines.map((line, i) => (
               <div key={i}>{line}</div>
             ))}

@@ -150,7 +150,7 @@ function TreeNode({
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
           </div>
         ) : q.isError ? (
-          <div style={{ paddingLeft: `${depth * 12 + 24}px` }} className="py-1 text-[11px] text-bad">
+          <div style={{ paddingLeft: `${depth * 12 + 24}px` }} className="py-1 text-xs text-bad">
             {t("code.treeError")}
           </div>
         ) : (
@@ -190,9 +190,9 @@ function TreePanel({
   });
 
   return (
-    <aside className="flex min-h-0 flex-col border-white/5 lg:w-72 lg:border-r">
-      <div className="border-b border-white/5 p-3">
-        <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+    <aside className="flex min-h-0 flex-col border-hairline lg:w-72 lg:border-r">
+      <div className="border-b border-hairline p-3">
+        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {t("code.workspace")}
         </label>
         <form
@@ -235,7 +235,7 @@ function TreePanel({
           ))
         )}
         {rootQ.data?.capped ? (
-          <div className="px-3 py-2 text-[11px] text-muted-foreground">{t("code.treeCapped")}</div>
+          <div className="px-3 py-2 text-xs text-muted-foreground">{t("code.treeCapped")}</div>
         ) : null}
       </div>
     </aside>
@@ -308,8 +308,8 @@ function Viewer({ workspace, path }: { workspace: string; path: string | null })
   }
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col border-white/5 lg:border-r">
-      <div className="flex items-center gap-2 border-b border-white/5 px-4 py-2.5">
+    <section className="flex min-h-0 flex-1 flex-col border-hairline lg:border-r">
+      <div className="flex items-center gap-2 border-b border-hairline px-4 py-2.5">
         <FileCode2 className="h-4 w-4 shrink-0 text-accent" />
         <span className="min-w-0 flex-1 truncate font-mono text-xs text-foreground">
           {path ?? t("code.noFile")}
@@ -317,7 +317,7 @@ function Viewer({ workspace, path }: { workspace: string; path: string | null })
         {dirty ? <Badge tone="warn">{t("code.dirty")}</Badge> : null}
         {q.data?.truncated ? <Badge tone="warn">{t("code.truncated")}</Badge> : null}
         {savedFlash && !editing ? (
-          <span className="text-[11px] text-ok">{t("code.saved")}</span>
+          <span className="text-xs text-ok">{t("code.saved")}</span>
         ) : null}
         {editing ? (
           <>
@@ -347,7 +347,7 @@ function Viewer({ workspace, path }: { workspace: string; path: string | null })
             spellCheck={false}
             onChange={(e) => setDraft(e.target.value)}
           />
-          <div className="border-t border-white/5 px-4 py-1.5 text-[11px]">
+          <div className="border-t border-hairline px-4 py-1.5 text-xs">
             {saveErr ? (
               <span className="text-bad">{t("code.saveError")}</span>
             ) : (
@@ -382,7 +382,7 @@ function Viewer({ workspace, path }: { workspace: string; path: string | null })
 function DiffLines({ patch }: { patch: string }) {
   const lines = patch.split("\n");
   return (
-    <pre className="overflow-x-auto rounded-chip bg-white/[0.03] p-2 font-mono text-[11px] leading-relaxed">
+    <pre className="overflow-x-auto rounded-chip bg-surface-2 p-2 font-mono text-xs leading-relaxed">
       {lines.map((line, i) => {
         let cls = "text-muted-foreground";
         if (line.startsWith("+++") || line.startsWith("---")) cls = "text-foreground/50";
@@ -407,17 +407,17 @@ function AttemptDiffs({ attempt, t }: { attempt: AttemptReceipt; t: TFunc }) {
   return (
     <div className="space-y-2 px-4 py-3">
       <div className="flex items-center gap-2">
-        <span className="font-mono text-[11px] text-muted-foreground">
+        <span className="font-mono text-xs text-muted-foreground">
           {t("code.attempt")} {attempt.index}
         </span>
         {attempt.reverted ? <Badge tone="warn">↩ {t("runs.reverted")}</Badge> : null}
       </div>
       {attempt.reverted ? (
-        <p className="text-[11px] text-[hsl(38_92%_62%)]">{t("code.revertedNote")}</p>
+        <p className="text-xs text-warn-foreground">{t("code.revertedNote")}</p>
       ) : null}
       {attempt.diffs.map((diff: FileDiff) => (
-        <details key={diff.path} className="rounded-chip bg-white/[0.02]" open>
-          <summary className="flex cursor-pointer items-center gap-2 px-2 py-1.5 font-mono text-[11px] text-foreground/80 hover:text-foreground">
+        <details key={diff.path} className="rounded-chip bg-surface-2" open>
+          <summary className="flex cursor-pointer items-center gap-2 px-2 py-1.5 font-mono text-xs text-foreground/80 hover:text-foreground">
             {diff.path}
             {diff.truncated ? <Badge tone="muted">{t("code.truncated")}</Badge> : null}
           </summary>
@@ -429,11 +429,11 @@ function AttemptDiffs({ attempt, t }: { attempt: AttemptReceipt; t: TFunc }) {
       {/* The verifier's REAL captured stdout/stderr for this attempt (the concrete test/assert
           output). Collapsed by default; shown only when non-empty — never fabricated. */}
       {attempt.verify_output ? (
-        <details className="rounded-chip bg-white/[0.02]">
-          <summary className="cursor-pointer px-2 py-1.5 text-[11px] text-muted-foreground hover:text-foreground">
+        <details className="rounded-chip bg-surface-2">
+          <summary className="cursor-pointer px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground">
             {t("code.verifyOutput")}
           </summary>
-          <pre className="overflow-x-auto rounded-chip bg-white/[0.03] px-2 py-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
+          <pre className="overflow-x-auto rounded-chip bg-surface-2 px-2 py-2 font-mono text-xs leading-relaxed text-muted-foreground">
             <code className="whitespace-pre-wrap break-all">{attempt.verify_output}</code>
           </pre>
         </details>
@@ -449,13 +449,13 @@ function AttemptDiffs({ attempt, t }: { attempt: AttemptReceipt; t: TFunc }) {
 function LiveEdits({ edits, t }: { edits: { path: string; patch: string }[]; t: TFunc }) {
   if (edits.length === 0) return null;
   return (
-    <div className="space-y-2 border-b border-white/5 px-4 py-3">
-      <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+    <div className="space-y-2 border-b border-hairline px-4 py-3">
+      <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {t("code.liveEdits")}
       </div>
       {edits.map((e, i) => (
-        <details key={i} className="rounded-chip bg-white/[0.02]" open>
-          <summary className="flex cursor-pointer items-center gap-2 px-2 py-1.5 font-mono text-[11px] text-foreground/80 hover:text-foreground">
+        <details key={i} className="rounded-chip bg-surface-2" open>
+          <summary className="flex cursor-pointer items-center gap-2 px-2 py-1.5 font-mono text-xs text-foreground/80 hover:text-foreground">
             <span className="shrink-0 text-muted-foreground">{i + 1}.</span>
             <span className="truncate">{e.path}</span>
           </summary>
@@ -520,12 +520,12 @@ function VerifyPanel({ workspace }: { workspace: string }) {
   }
 
   return (
-    <section className="space-y-2.5 border-t border-white/5 p-3">
+    <section className="space-y-2.5 border-t border-hairline p-3">
       <div className="flex items-center gap-2 text-accent">
         <Camera className="h-4 w-4" />
         <h2 className="text-sm font-semibold text-foreground">{t("code.verify.title")}</h2>
       </div>
-      <p className="text-[11px] text-muted-foreground">{t("code.verify.note")}</p>
+      <p className="text-xs text-muted-foreground">{t("code.verify.note")}</p>
       <div className="flex flex-wrap gap-2">
         <input
           className={`${fieldCls} h-9 min-w-0 flex-1 font-mono text-xs`}
@@ -552,15 +552,15 @@ function VerifyPanel({ workspace }: { workspace: string }) {
           )}
         </Button>
       </div>
-      {error ? <p className="text-[11px] text-bad">{error}</p> : null}
+      {error ? <p className="text-xs text-bad">{error}</p> : null}
       {shot ? (
         <figure className="space-y-1.5">
           <img
             src={`/api/artifacts/${shot.id}`}
             alt={t("code.verify.alt")}
-            className="max-w-full rounded-chip border border-white/10"
+            className="max-w-full rounded-chip border border-border"
           />
-          <figcaption className="text-[11px] text-muted-foreground">
+          <figcaption className="text-xs text-muted-foreground">
             {t("code.verify.caption")} <span className="break-all font-mono">{shot.url}</span> · {shot.at}
           </figcaption>
         </figure>
@@ -761,7 +761,7 @@ function RunPanel({
 
   return (
     <aside className="flex min-h-0 flex-col overflow-auto lg:w-96">
-      <div className="space-y-2.5 border-b border-white/5 p-3">
+      <div className="space-y-2.5 border-b border-hairline p-3">
         <div className="flex items-center gap-2 text-accent">
           <Play className="h-4 w-4" />
           <h2 className="text-sm font-semibold text-foreground">{t("code.instruction")}</h2>
@@ -788,7 +788,7 @@ function RunPanel({
             onChange={(e) => setModel(e.target.value)}
             disabled={running}
           />
-          <div className="flex shrink-0 overflow-hidden rounded-chip border border-white/10">
+          <div className="flex shrink-0 overflow-hidden rounded-chip border border-border">
             {(["single", "fuse", "cascade"] as const).map((m) => (
               <button
                 key={m}
@@ -796,7 +796,7 @@ function RunPanel({
                 onClick={() => setMode(m)}
                 disabled={running}
                 className={cn(
-                  "px-2.5 py-1.5 text-[11px] transition-colors disabled:opacity-50",
+                  "px-2.5 py-1.5 text-xs transition-colors disabled:opacity-50",
                   mode === m
                     ? "bg-accent/20 text-accent"
                     : "text-muted-foreground hover:text-foreground",
@@ -868,26 +868,26 @@ function RunPanel({
           ) : null}
         </div>
         {planPreviewed && !running ? (
-          <div className="space-y-2 rounded-chip border border-white/10 bg-white/[0.02] p-2.5">
-            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="space-y-2 rounded-chip border border-border bg-surface-2 p-2.5">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <ListChecks className="h-3.5 w-3.5" /> {t("code.planTitle")}
             </div>
-            <p className="text-[11px] text-muted-foreground">{t("code.planNote")}</p>
+            <p className="text-xs text-muted-foreground">{t("code.planNote")}</p>
             {planStepsOf(planDraft).length > 0 ? (
               <ol className="space-y-1 pl-1">
                 {planStepsOf(planDraft).map((step, i) => (
-                  <li key={i} className="flex gap-2 text-[11px] text-foreground/80">
+                  <li key={i} className="flex gap-2 text-xs text-foreground/80">
                     <span className="shrink-0 font-mono text-muted-foreground">{i + 1}.</span>
                     <span>{step}</span>
                   </li>
                 ))}
               </ol>
             ) : (
-              <p className="text-[11px] text-muted-foreground">{t("code.planEmpty")}</p>
+              <p className="text-xs text-muted-foreground">{t("code.planEmpty")}</p>
             )}
-            {planNote ? <p className="text-[11px] text-bad">{planNote}</p> : null}
+            {planNote ? <p className="text-xs text-bad">{planNote}</p> : null}
             <textarea
-              className={`${fieldCls} min-h-[80px] resize-y py-2 font-mono text-[11px]`}
+              className={`${fieldCls} min-h-[80px] resize-y py-2 font-mono text-xs`}
               placeholder={t("code.planEditPlaceholder")}
               value={planDraft}
               onChange={(e) => setPlanDraft(e.target.value)}
@@ -907,13 +907,13 @@ function RunPanel({
           </div>
         ) : null}
         {running && runPlan && runPlan.length > 0 ? (
-          <div className="space-y-1 rounded-chip border border-white/10 bg-white/[0.02] p-2.5">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="space-y-1 rounded-chip border border-border bg-surface-2 p-2.5">
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {t("code.planForRun")}
             </div>
             <ol className="space-y-1 pl-1">
               {runPlan.map((step, i) => (
-                <li key={i} className="flex gap-2 text-[11px] text-foreground/80">
+                <li key={i} className="flex gap-2 text-xs text-foreground/80">
                   <span className="shrink-0 font-mono text-muted-foreground">{i + 1}.</span>
                   <span>{step}</span>
                 </li>
@@ -922,7 +922,7 @@ function RunPanel({
           </div>
         ) : null}
         {lines.length > 0 ? (
-          <div className="space-y-1 rounded-chip bg-white/[0.03] p-2 font-mono text-[11px] text-muted-foreground">
+          <div className="space-y-1 rounded-chip bg-surface-2 p-2 font-mono text-xs text-muted-foreground">
             {lines.map((line, i) => (
               <div key={i}>{line}</div>
             ))}
@@ -934,7 +934,7 @@ function RunPanel({
         <LiveEdits edits={liveEdits} t={t} />
         {receipt ? (
           <>
-            <div className="flex flex-wrap items-center gap-2 border-b border-white/5 px-4 py-2">
+            <div className="flex flex-wrap items-center gap-2 border-b border-hairline px-4 py-2">
               <Button size="sm" variant="ghost" onClick={accept}>
                 <Check className="h-3.5 w-3.5" /> {t("code.git.accept")}
               </Button>
@@ -954,14 +954,14 @@ function RunPanel({
                 </Button>
               </span>
               {revertErr ? (
-                <span className="text-[11px] text-bad">{t("code.git.revertError")}</span>
+                <span className="text-xs text-bad">{t("code.git.revertError")}</span>
               ) : !isRepo ? (
-                <span className="text-[11px] text-muted-foreground">{t("code.git.discardNeedsGit")}</span>
+                <span className="text-xs text-muted-foreground">{t("code.git.discardNeedsGit")}</span>
               ) : null}
             </div>
             {receipt.attempts.some((a) => a.diffs.length > 0 || a.verify_output) ? (
-              <div className="divide-y divide-white/[0.04]">
-                <div className="px-4 pt-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="divide-y divide-hairline">
+                <div className="px-4 pt-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   {t("code.diff")}
                 </div>
                 {receipt.attempts.map((a) => (
@@ -1012,7 +1012,7 @@ function CmdRunner({ workspace }: { workspace: string }) {
   }
 
   return (
-    <section className="border-t border-white/5">
+    <section className="border-t border-hairline">
       <div className="flex items-center gap-2 px-4 pt-2.5 text-accent">
         <Terminal className="h-4 w-4" />
         <h2 className="text-sm font-semibold text-foreground">{t("code.cmdRunner")}</h2>
@@ -1057,10 +1057,10 @@ function CmdRunner({ workspace }: { workspace: string }) {
           )}
         </Button>
       </div>
-      <p className="px-4 pt-2 text-[11px] text-muted-foreground">{t("code.freshProcNote")}</p>
-      <p className="px-4 pb-1 text-[11px] text-muted-foreground">{t("code.execSecurityNote")}</p>
+      <p className="px-4 pt-2 text-xs text-muted-foreground">{t("code.freshProcNote")}</p>
+      <p className="px-4 pb-1 text-xs text-muted-foreground">{t("code.execSecurityNote")}</p>
       {lines.length > 0 || exitCode !== null ? (
-        <pre className="mx-4 mb-3 max-h-56 overflow-auto rounded-chip bg-white/[0.03] p-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
+        <pre className="mx-4 mb-3 max-h-56 overflow-auto rounded-chip bg-surface-2 p-2 font-mono text-xs leading-relaxed text-muted-foreground">
           {lines.map((line, i) => (
             <div key={i} className="whitespace-pre-wrap break-all">
               {line || " "}
@@ -1096,13 +1096,13 @@ function GitRow({
   return (
     <div
       className={cn(
-        "flex items-center gap-2 px-2 py-1 text-[11px]",
-        active ? "bg-accent/10" : "hover:bg-white/[0.03]",
+        "flex items-center gap-2 px-2 py-1 text-xs",
+        active ? "bg-accent/10" : "hover:bg-surface-hover",
       )}
     >
       <input
         type="checkbox"
-        className="h-3 w-3 shrink-0 accent-[hsl(var(--accent))]"
+        className="h-3 w-3 shrink-0 accent-accent"
         checked={checked}
         onChange={onToggleCheck}
       />
@@ -1116,7 +1116,7 @@ function GitRow({
       >
         {file.path}
       </button>
-      <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{code}</span>
+      <span className="shrink-0 font-mono text-xs text-muted-foreground">{code}</span>
     </div>
   );
 }
@@ -1197,7 +1197,7 @@ function GitPanel({ workspace }: { workspace: string }) {
     if (list.length === 0) return null;
     return (
       <div>
-        <div className="px-2 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="px-2 pt-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {label}
         </div>
         {list.map((f) => (
@@ -1215,12 +1215,12 @@ function GitPanel({ workspace }: { workspace: string }) {
   }
 
   return (
-    <section className="border-t border-white/5">
+    <section className="border-t border-hairline">
       <div className="flex items-center gap-2 px-4 pt-2.5 text-accent">
         <GitBranch className="h-4 w-4" />
         <h2 className="text-sm font-semibold text-foreground">{t("code.git.title")}</h2>
         {status?.is_repo ? (
-          <span className="font-mono text-[11px] text-muted-foreground">
+          <span className="font-mono text-xs text-muted-foreground">
             {t("code.git.branch")}: {status.branch || "—"}
           </span>
         ) : null}
@@ -1231,12 +1231,12 @@ function GitPanel({ workspace }: { workspace: string }) {
           <Loader2 className="h-4 w-4 animate-spin" />
         </div>
       ) : !status?.is_repo ? (
-        <p className="px-4 py-3 text-[11px] text-muted-foreground">{t("code.git.notRepo")}</p>
+        <p className="px-4 py-3 text-xs text-muted-foreground">{t("code.git.notRepo")}</p>
       ) : files.length === 0 ? (
-        <p className="px-4 py-3 text-[11px] text-muted-foreground">{t("code.git.clean")}</p>
+        <p className="px-4 py-3 text-xs text-muted-foreground">{t("code.git.clean")}</p>
       ) : (
         <div className="flex flex-col gap-2 px-2 py-2 lg:flex-row lg:items-start">
-          <div className="min-w-0 flex-1 rounded-chip bg-white/[0.02] py-1">
+          <div className="min-w-0 flex-1 rounded-chip bg-surface-2 py-1">
             {group(t("code.git.staged"), staged, true)}
             {group(t("code.git.modified"), modified, false)}
             {group(t("code.git.untracked"), untracked, false)}
@@ -1259,11 +1259,11 @@ function GitPanel({ workspace }: { workspace: string }) {
                 {t("code.git.commit")} ({selectedPaths.length})
               </Button>
               {commitHash ? (
-                <span className="font-mono text-[11px] text-ok">
+                <span className="font-mono text-xs text-ok">
                   {t("code.git.committed")} {commitHash}
                 </span>
               ) : null}
-              {commitErr ? <span className="text-[11px] text-bad">{t("code.git.commitError")}</span> : null}
+              {commitErr ? <span className="text-xs text-bad">{t("code.git.commitError")}</span> : null}
             </div>
           </div>
         </div>
@@ -1272,16 +1272,16 @@ function GitPanel({ workspace }: { workspace: string }) {
       {selected ? (
         <div className="px-4 pb-3">
           {diffQ.isLoading ? (
-            <div className="py-2 text-[11px] text-muted-foreground">…</div>
+            <div className="py-2 text-xs text-muted-foreground">…</div>
           ) : diffQ.data?.patch ? (
             <DiffLines patch={diffQ.data.patch} />
           ) : (
-            <p className="text-[11px] text-muted-foreground">{t("code.noDiff")}</p>
+            <p className="text-xs text-muted-foreground">{t("code.noDiff")}</p>
           )}
         </div>
       ) : null}
 
-      <p className="px-4 pb-2 text-[11px] text-muted-foreground">{t("code.git.gitNote")}</p>
+      <p className="px-4 pb-2 text-xs text-muted-foreground">{t("code.git.gitNote")}</p>
     </section>
   );
 }
@@ -1294,11 +1294,11 @@ export function Code() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center gap-2.5 border-b border-white/5 px-5 py-3 text-accent">
+      <div className="flex items-center gap-2.5 border-b border-hairline px-5 py-3 text-accent">
         <FileCode2 className="h-5 w-5" />
         <h1 className="text-sm font-semibold text-foreground">{t("code.title")}</h1>
       </div>
-      <p className="border-b border-white/5 px-5 py-2 text-[11px] text-muted-foreground">
+      <p className="border-b border-hairline px-5 py-2 text-xs text-muted-foreground">
         {t("code.safetyNote")}
       </p>
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
@@ -1324,7 +1324,7 @@ export function Code() {
       </div>
       <GitPanel workspace={workspace} />
       <CmdRunner workspace={workspace} />
-      <p className="border-t border-white/5 px-5 py-2 text-[11px] text-muted-foreground">
+      <p className="border-t border-hairline px-5 py-2 text-xs text-muted-foreground">
         {t("code.phase2note")}
       </p>
     </div>

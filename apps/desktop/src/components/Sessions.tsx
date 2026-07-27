@@ -16,7 +16,7 @@ interface Props {
 export function Sessions({ sessions, currentId, onSelect, onNew, onDelete }: Props) {
   const t = useT();
   return (
-    <div className="flex h-full w-64 shrink-0 flex-col border-r border-white/5 bg-card/40">
+    <div className="flex h-full w-64 shrink-0 flex-col border-r border-hairline bg-card/40">
       <div className="flex items-center gap-2 px-4 py-3.5">
         <BrandMark className="h-6 w-6" glow />
         <span className="font-semibold tracking-tight">Chimera</span>
@@ -37,7 +37,7 @@ export function Sessions({ sessions, currentId, onSelect, onNew, onDelete }: Pro
               "group flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm transition",
               s.id === currentId
                 ? "bg-accent/12 text-foreground shadow-[inset_0_0_0_1px_hsl(var(--accent)/0.2)]"
-                : "hover:bg-white/5",
+                : "hover:bg-surface-hover",
             )}
             onClick={() => onSelect(s.id)}
           >

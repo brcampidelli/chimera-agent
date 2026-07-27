@@ -8,6 +8,31 @@
     <meta name="theme-color" content="#0b1120" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Chimera</title>
+    <!--
+      Resolve theme + motion BEFORE first paint. React sets these in an effect, which runs after the
+      first frame — so without this the app painted dark, then flipped. Kept inline and dependency-
+      free on purpose: an external file would be one more round-trip in front of the flash it exists
+      to prevent. Storage keys are mirrored in src/lib/theme.ts and asserted equal by theme.test.ts.
+    -->
+    <script>
+      (function () {
+        var d = document.documentElement;
+        function pick(key, valid, fallback) {
+          try {
+            var v = localStorage.getItem(key);
+            return valid.indexOf(v) >= 0 ? v : fallback;
+          } catch (e) {
+            return fallback; // private mode / storage disabled — never block the paint
+          }
+        }
+        var t = pick("chimera.theme", ["light", "dark", "system"], "system");
+        d.dataset.theme =
+          t !== "system" ? t : matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+        var m = pick("chimera.motion", ["full", "reduced", "system"], "system");
+        // Only stamp an explicit override; "system" leaves the CSS media query in charge.
+        if (m !== "system") d.dataset.motion = m;
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

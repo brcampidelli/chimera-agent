@@ -25,12 +25,12 @@ const ciText = (ci: number[]): string =>
 /** The honest caveat line that MUST sit next to every lift number: n · CI · significance. */
 function Caveat({ n, ci, significant, t }: { n: number; ci: number[]; significant: boolean; t: TFunc }) {
   return (
-    <span className="text-[11px] text-muted-foreground">
+    <span className="text-xs text-muted-foreground">
       {t("maturity.bench.n")}={n} · {t("maturity.bench.ci")} {ciText(ci)} ·{" "}
       {significant ? (
         <span className="text-ok">{t("maturity.bench.significant")}</span>
       ) : (
-        <span className="font-semibold text-[hsl(38_92%_62%)]">
+        <span className="font-semibold text-warn-foreground">
           {t("maturity.bench.notSignificant")}
         </span>
       )}
@@ -49,7 +49,7 @@ function WeakLiftCard({ lift, t }: { lift: BenchmarkLift; t: TFunc }) {
         </span>
         <Badge tone="accent">{signedPP(lift.delta)}</Badge>
       </div>
-      <p className="mt-1 font-mono text-[11px] text-muted-foreground">{lift.model}</p>
+      <p className="mt-1 font-mono text-xs text-muted-foreground">{lift.model}</p>
       <div className="mt-2 flex items-baseline gap-2">
         <span className="font-mono text-sm text-muted-foreground">{pct(lift.baseline_rate)}</span>
         <span className="text-muted-foreground">→</span>
@@ -58,7 +58,7 @@ function WeakLiftCard({ lift, t }: { lift: BenchmarkLift; t: TFunc }) {
       <div className="mt-1.5">
         <Caveat n={lift.n} ci={lift.ci} significant={lift.significant} t={t} />
       </div>
-      <p className="mt-2 text-[11px] text-muted-foreground">
+      <p className="mt-2 text-xs text-muted-foreground">
         {t("maturity.bench.suite")}: {lift.suite}
       </p>
     </div>
@@ -74,7 +74,7 @@ function ExternalRow({ row, t }: { row: BenchmarkExternal; t: TFunc }) {
         <span className="truncate text-xs font-semibold text-foreground">{row.benchmark}</span>
         <Badge tone={row.delta >= 0 ? "accent" : "muted"}>{signedPP(row.delta)}</Badge>
       </div>
-      <p className="mt-1 font-mono text-[11px] text-muted-foreground">{row.model}</p>
+      <p className="mt-1 font-mono text-xs text-muted-foreground">{row.model}</p>
       <div className="mt-2 flex items-baseline gap-2">
         <span className="font-mono text-sm text-muted-foreground">{pct(row.baseline_rate)}</span>
         <span className="text-muted-foreground">→</span>
@@ -83,7 +83,7 @@ function ExternalRow({ row, t }: { row: BenchmarkExternal; t: TFunc }) {
       <div className="mt-1.5">
         <Caveat n={row.n} ci={row.ci} significant={row.significant} t={t} />
       </div>
-      <p className="mt-2 text-[11px] text-muted-foreground">{row.note}</p>
+      <p className="mt-2 text-xs text-muted-foreground">{row.note}</p>
     </div>
   );
 }
@@ -104,14 +104,14 @@ function Benchmarks({ t }: { t: TFunc }) {
         <>
           {data.internal_lift && <WeakLiftCard lift={data.internal_lift} t={t} />}
           {data.external.length > 0 && (
-            <p className="bg-white/[0.02] px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <p className="bg-surface-2 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {t("maturity.bench.external")}
             </p>
           )}
           {data.external.map((row) => (
             <ExternalRow key={row.benchmark} row={row} t={t} />
           ))}
-          <p className="px-4 py-3 text-[11px] text-muted-foreground">{t("maturity.bench.humbleNote")}</p>
+          <p className="px-4 py-3 text-xs text-muted-foreground">{t("maturity.bench.humbleNote")}</p>
         </>
       )}
     </Panel>
@@ -127,11 +127,11 @@ const levelTone = (level: string): Tone =>
 function Tile({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
     <div className="surface flex flex-col gap-1 p-4">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
       <span className="font-mono text-xl text-foreground">{value}</span>
-      {note && <span className="text-[11px] text-muted-foreground">{note}</span>}
+      {note && <span className="text-xs text-muted-foreground">{note}</span>}
     </div>
   );
 }
@@ -156,14 +156,14 @@ function SurfaceRow({
         </span>
         <span className="flex shrink-0 items-center gap-2">
           <Badge tone={levelTone(row.level)}>{row.level}</Badge>
-          <span className="font-mono text-[11px] text-muted-foreground">
+          <span className="font-mono text-xs text-muted-foreground">
             {row.proven}/{row.total} ({pct(row.ratio)})
           </span>
         </span>
       </div>
       {row.missing.length > 0 && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] text-muted-foreground">{t("maturity.missing")}</span>
+          <span className="text-xs text-muted-foreground">{t("maturity.missing")}</span>
           {row.missing.map((id) => (
             <Badge key={id} tone="muted">
               {id}
@@ -216,7 +216,7 @@ export function Maturity() {
         <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-3">
           <Tile label={t("maturity.proven")} value={`${data.proven}/${data.total}`} />
           <div className="surface flex flex-col gap-1 p-4">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {t("maturity.level")}
             </span>
             <span>
@@ -226,7 +226,7 @@ export function Maturity() {
           <Tile label={t("maturity.coverage")} value={pct(data.ratio)} />
         </div>
         {data.source === "snapshot" && data.generated_for && (
-          <p className="px-4 py-3 text-[11px] text-muted-foreground">
+          <p className="px-4 py-3 text-xs text-muted-foreground">
             {t("maturity.snapshotNote", { version: data.generated_for })}
           </p>
         )}
@@ -238,7 +238,7 @@ export function Maturity() {
         ))}
       </Panel>
 
-      <p className="px-1 text-[11px] text-muted-foreground">{t("maturity.coverageNote")}</p>
+      <p className="px-1 text-xs text-muted-foreground">{t("maturity.coverageNote")}</p>
 
       <Benchmarks t={t} />
     </Screen>

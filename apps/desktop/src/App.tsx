@@ -26,18 +26,37 @@ import { ErrorState } from "@/components/ui/async";
 import { deleteSession, getDoctor, getSession, listSessions, streamChat } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import type { Message, ToolEvent, TurnReport } from "@/lib/types";
+import { applyTheme, readTheme, resolveTheme, type Theme } from "@/lib/theme";
 
+/**
+ * The theme preference, persisted.
+ *
+ * The inline script in index.html has already painted the right theme by the time this runs; this
+ * hook exists so the toggle can change it. `dark` is the *resolved* theme (what is on screen), so
+ * the icon always matches reality even while the preference is "system".
+ */
 function useTheme() {
-  const [dark, setDark] = useState(
-    () =>
-      document.documentElement.dataset.theme === "dark" ||
-      (!document.documentElement.dataset.theme &&
-        window.matchMedia("(prefers-color-scheme: dark)").matches),
-  );
+  const [theme, setTheme] = useState<Theme>(readTheme);
+  const [dark, setDark] = useState(() => resolveTheme(readTheme()) === "dark");
+
   useEffect(() => {
-    document.documentElement.dataset.theme = dark ? "dark" : "light";
-  }, [dark]);
-  return { dark, toggle: () => setDark((d) => !d) };
+    setDark(applyTheme(theme) === "dark");
+  }, [theme]);
+
+  useEffect(() => {
+    // Follow the OS while the preference is "system" — someone flipping their system to night mode
+    // mid-session should see the app follow, not wait for a restart.
+    if (theme !== "system" || typeof matchMedia !== "function") return;
+    const mq = matchMedia("(prefers-color-scheme: light)");
+    const onChange = () => setDark(applyTheme("system") === "dark");
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [theme]);
+
+  // The rail button is a two-state control over a three-state preference: tapping it commits to an
+  // explicit choice, which is what someone reaching for the toggle means. "System" is set in
+  // Settings › Appearance.
+  return { dark, theme, setTheme, toggle: () => setTheme(dark ? "light" : "dark") };
 }
 
 export default function App() {
@@ -190,7 +209,7 @@ export default function App() {
       <main className="flex min-w-0 flex-1 flex-col">
         {view === "chat" && (
           <>
-            <header className="flex items-center border-b border-white/5 px-5 py-3">
+            <header className="flex items-center border-b border-hairline px-5 py-3">
               <span className="text-sm font-medium text-muted-foreground">
                 {currentId
                   ? (sessions.find((s) => s.id === currentId)?.title ?? t("chat.header.chat"))

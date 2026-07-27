@@ -52,7 +52,7 @@ function AddSchedule() {
               key={p.key}
               type="button"
               onClick={() => setSchedule(p.cron)}
-              className={`rounded-chip border border-white/10 px-2 py-0.5 transition hover:brightness-110 ${
+              className={`rounded-chip border border-border px-2 py-0.5 transition hover:brightness-110 ${
                 schedule === p.cron ? "bg-accent-grad text-white" : "bg-muted"
               }`}
             >
