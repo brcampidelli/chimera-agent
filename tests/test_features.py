@@ -84,3 +84,22 @@ def test_web_search_tool_without_key_returns_a_hint(monkeypatch: pytest.MonkeyPa
 
     get_settings.cache_clear()
     assert "TAVILY_API_KEY" in WebSearchTool().run(query="anything")
+
+
+def test_features_cli_prints_the_pip_extra_instead_of_swallowing_it() -> None:
+    """`chimera features` must show `chimera-agent[stt]`, not `chimera-agent`.
+
+    The how/blocker strings carry pip extras in square brackets, which Rich parses as style markup
+    and deletes. The rendered instruction then said `pip install 'chimera-agent'` — installing the
+    package WITHOUT the capability the user came for, silently. A table whose entire job is telling
+    people what to install must not drop the part that installs it.
+    """
+    from typer.testing import CliRunner
+
+    from chimera.cli.main import app
+
+    result = CliRunner().invoke(app, ["features"])
+    assert result.exit_code == 0
+    # Rich wraps inside table cells, so assert on the bracketed extra rather than the whole command.
+    for extra in ("[stt]", "[documents]", "[viz]"):
+        assert extra in result.stdout, f"the {extra} pip extra was swallowed by Rich markup"

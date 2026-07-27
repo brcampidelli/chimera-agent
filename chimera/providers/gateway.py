@@ -164,6 +164,43 @@ class MissingCredentialsError(RuntimeError):
     """Raised when a model call is attempted but no provider key is configured."""
 
 
+class CredentialRejectedError(MissingCredentialsError):
+    """Every configured credential was rejected by the provider (401/403, or quota exhausted).
+
+    Deliberately a *subclass* of :class:`MissingCredentialsError`: from the caller's point of view a
+    key the provider refuses is the same situation as no key at all — nothing will run until the
+    user fixes their credentials — and every ``except MissingCredentialsError`` site in the CLI
+    already renders that case as a clean, actionable message instead of a traceback. Subclassing
+    gives all of them the same treatment for a rejected key without touching a single call site.
+
+    Without this, a typo'd, expired or credit-exhausted key produced a raw provider stack trace,
+    while a *missing* key produced a helpful message — the common failure got the worse experience.
+    """
+
+
+def _credential_error(exc: BaseException) -> CredentialRejectedError | None:
+    """Translate a spent-all-credentials failure into an actionable error, or ``None`` if unrelated.
+
+    Only AUTH and RATE_LIMIT qualify. Both mean "your credentials are the problem": a rejected key,
+    or one whose quota/credit is gone. Everything else (a provider outage, a bad model slug, a
+    context overflow) keeps its original exception, because the original text is the useful part.
+    """
+    reason = classify(exc)
+    if reason is FailoverReason.AUTH:
+        what = "Every configured provider key was rejected (401/403)."
+        fix = "Check the key is correct and still active"
+    elif reason is FailoverReason.RATE_LIMIT:
+        what = "Every configured provider key is rate-limited or out of credit."
+        fix = "Wait for the limit to reset, top up the account, or add another key"
+    else:
+        return None
+    return CredentialRejectedError(
+        f"{what} {fix} — the relevant variables are {list(_KEY_ENV_VARS.values())} "
+        "(or use a local model, e.g. CHIMERA_MODEL=ollama/llama3, which needs no key). "
+        f"Provider said: {exc}"
+    )
+
+
 class _KeyRotator:
     """Round-robin over a provider's credential pool, thread-safe.
 
@@ -401,6 +438,12 @@ class LLMGateway:
             if next_model:
                 continue
         assert last_exc is not None  # there is always at least one (candidate, key) attempt
+        # Every candidate model and every key is now spent. If what finally stopped us was the
+        # provider refusing our credentials, say so in words the user can act on rather than
+        # re-raising a provider stack trace.
+        friendly = _credential_error(last_exc)
+        if friendly is not None:
+            raise friendly from last_exc
         raise last_exc
 
     async def acomplete(

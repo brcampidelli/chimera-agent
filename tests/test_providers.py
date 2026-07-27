@@ -478,3 +478,57 @@ def test_empty_completion_is_not_cached(monkeypatch: pytest.MonkeyPatch, tmp_pat
     # a second identical deterministic call re-hits the model instead of serving the cached ""
     assert gw.complete(msgs, model="prov/m", temperature=0.0).content == "real answer"
     assert calls["n"] == 2
+
+
+def test_rejected_key_becomes_an_actionable_error_not_a_provider_traceback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A key the provider refuses must read like the no-key message, not a stack trace.
+
+    A *missing* key already produced a clear "set one of [...]" message, while a typo'd, expired or
+    credit-exhausted key — much the commoner situation — surfaced litellm's raw AuthenticationError.
+    The worse experience was attached to the likelier failure.
+    """
+    monkeypatch.setenv("CHIMERA_OPENROUTER_KEYS", "dead1,dead2")
+    monkeypatch.delenv("CHIMERA_FALLBACK_MODELS", raising=False)
+    get_settings.cache_clear()
+    import litellm
+
+    def fake(*, model: str, **kw: Any) -> SimpleNamespace:
+        raise RuntimeError('AuthenticationError: {"error":{"message":"User not found.","code":401}}')
+
+    monkeypatch.setattr(litellm, "completion", fake)
+    from chimera.providers import CredentialRejectedError, LLMGateway, MissingCredentialsError
+    from chimera.providers.gateway import Message
+
+    with pytest.raises(CredentialRejectedError) as excinfo:
+        LLMGateway().complete([Message(role="user", content="hi")], model="openrouter/x")
+
+    text = str(excinfo.value)
+    assert "rejected" in text.lower()
+    assert "OPENROUTER_API_KEY" in text  # names the variable to fix
+    assert "ollama" in text.lower()  # and the keyless way out
+    assert "User not found" in text  # the provider's own words are preserved, not swallowed
+    # Subclassing is what gives every existing `except MissingCredentialsError` CLI handler the
+    # clean rendering for free; if that link breaks, the tracebacks come back.
+    assert isinstance(excinfo.value, MissingCredentialsError)
+
+
+def test_non_credential_failure_keeps_its_original_exception(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Only auth/quota is reworded. A provider outage must keep its own text, which is the useful part."""
+    monkeypatch.setenv("CHIMERA_OPENROUTER_KEYS", "k1")
+    monkeypatch.delenv("CHIMERA_FALLBACK_MODELS", raising=False)
+    get_settings.cache_clear()
+    import litellm
+
+    def fake(*, model: str, **kw: Any) -> SimpleNamespace:
+        raise RuntimeError("503 service unavailable")
+
+    monkeypatch.setattr(litellm, "completion", fake)
+    from chimera.providers import CredentialRejectedError, LLMGateway
+    from chimera.providers.gateway import Message
+
+    with pytest.raises(RuntimeError) as excinfo:
+        LLMGateway().complete([Message(role="user", content="hi")], model="openrouter/x")
+    assert not isinstance(excinfo.value, CredentialRejectedError)
+    assert "503" in str(excinfo.value)

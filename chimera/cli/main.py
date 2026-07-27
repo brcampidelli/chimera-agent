@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING, Any
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 
@@ -532,8 +533,13 @@ def features() -> None:
     table.add_column("status")
     table.add_column("how to enable / use")
     for status in feature_status():
-        state = "[green]ready[/green]" if status.ready else f"[yellow]{status.blocker}[/yellow]"
-        table.add_row(status.feature.name, state, status.feature.how)
+        # escape(): these strings carry pip extras — `pip install 'chimera-agent[stt]'` — and Rich
+        # parses `[stt]` as style markup and deletes it. The instruction then reads
+        # `pip install 'chimera-agent'`, which installs the package WITHOUT the thing the user came
+        # for, and does it silently. This table's whole job is telling people what to install, so a
+        # blocker/how that quietly drops its extra is worse than printing nothing.
+        state = "[green]ready[/green]" if status.ready else f"[yellow]{escape(status.blocker)}[/yellow]"
+        table.add_row(escape(status.feature.name), state, escape(status.feature.how))
     console.print(table)
 
 
@@ -2947,6 +2953,10 @@ def tools(workspace: str = typer.Option(".", "--workspace", "-w")) -> None:
     for tool in registry.tools():
         table.add_row(tool.name, tool.description)
     console.print(table)
+    # `tools` lists only what is switched on, which reads as "this is everything Chimera has" — the
+    # route by which a user concludes it cannot search the web. `features` is the full checklist.
+    console.print("\n[dim]More capabilities ship in the box but need a key or an extra. See[/dim] "
+                  "[bold]chimera features[/bold]")
 
 
 @app.command()

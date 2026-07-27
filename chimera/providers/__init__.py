@@ -2,6 +2,7 @@
 
 from chimera.providers.gateway import (
     CompletionResult,
+    CredentialRejectedError,
     LLMGateway,
     Message,
     MissingCredentialsError,
@@ -11,6 +12,7 @@ from chimera.providers.gateway import (
 
 __all__ = [
     "CompletionResult",
+    "CredentialRejectedError",
     "LLMGateway",
     "Message",
     "MissingCredentialsError",

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- **`chimera features` told you to install the wrong thing.** Every optional capability's install
+  instruction carries a pip extra — `pip install 'chimera-agent[stt]'` — and Rich parsed `[stt]` as
+  style markup and deleted it. The rendered line read `pip install 'chimera-agent'`, which installs
+  the package *without* the capability the user came for, and does it silently. Affected every
+  extra-gated feature: documents, media download, speech-to-text, data analysis, charts, local image
+  generation. The underlying data was correct all along; only the rendering dropped it.
+- **A rejected provider key produced a raw stack trace.** A *missing* key already produced a clear
+  "set one of `[OPENROUTER_API_KEY, …]`" message, but a typo'd, expired or credit-exhausted key —
+  much the commoner situation — surfaced litellm's `AuthenticationError` traceback instead. The
+  worse experience was attached to the likelier failure. Now, once every candidate model and every
+  key is spent, an auth/quota failure is re-raised as `CredentialRejectedError` naming the variables
+  to fix and the keyless local-model alternative, with the provider's own words preserved. It
+  subclasses `MissingCredentialsError`, so every existing CLI handler renders it cleanly with no
+  call-site changes.
+- `chimera tools` now points at `chimera features`. Listing only the switched-on tools reads as
+  "this is everything Chimera has" — the route by which someone concludes it cannot search the web.
 - **`solve` no longer accepts a plain-prose "I fixed it" as a finished action.** The
   narrate-instead-of-act guard only fired on a text heuristic — fenced code blocks or one of eight
   listed English phrases — so the commonest failure slipped past it: a confident explanation of the
