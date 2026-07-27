@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-07-27
+
 ### Changed
 - **The desktop app was redesigned around the agent rather than around a feature list.** Fifteen
   rail destinations become **five** — Chat, Work, Code, Knowledge, Automation — plus Settings pinned
