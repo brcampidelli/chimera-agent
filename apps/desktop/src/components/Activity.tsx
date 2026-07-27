@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { Check, X, Wrench, Cpu, Brain, CircleDollarSign } from "lucide-react";
+import { Fusion } from "@/components/Fusion";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { TurnReport, ToolEvent } from "@/lib/types";
@@ -109,6 +110,10 @@ export function Activity({ status, tools, report }: Props) {
           )}
         </div>
       </Section>
+
+      {/* The routing breakdown for this same turn. Renders nothing unless the turn used fusion or
+          the cascade, so it never leaves an empty box behind. */}
+      <Fusion report={report} />
     </aside>
   );
 }

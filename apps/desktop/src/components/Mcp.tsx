@@ -198,7 +198,7 @@ function AddForm({ onAdded }: { onAdded: () => void }) {
   );
 }
 
-export function Mcp() {
+export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
   const t = useT();
   const qc = useQueryClient();
   const servers = useQuery({ queryKey: ["mcp"], queryFn: getMcpServers });
@@ -225,7 +225,7 @@ export function Mcp() {
 
   if (servers.isError) {
     return (
-      <Screen title={t("mcp.title")} icon={<Plug className="h-5 w-5" />}>
+      <Screen title={t("mcp.title")} icon={<Plug className="h-5 w-5" />} embedded={embedded}>
         <Panel>
           <ErrorState error={servers.error} onRetry={() => servers.refetch()} />
         </Panel>

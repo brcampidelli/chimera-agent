@@ -198,3 +198,33 @@ The shell provides slots; a screen fills the ones it needs.
 
 A screen that opts out of the shell entirely is what made this app feel like a menu of features
 rather than one workspace. Opt out only with a reason.
+
+### Information architecture
+
+Five destinations, plus Settings pinned to the rail footer. Fifteen icons stopped being words and
+became positions to memorise.
+
+```
+Chat · Work · Code · Knowledge · Automation          ⚙ Settings
+        │      │        │            │                  ├ General
+        │      │        │            │                  ├ Connections
+     Run │      │   Memory        Schedule              │   ├ MCP servers
+  Agents │      │   Profile          Tasks              │   └ Capabilities
+                                     Skills             ├ Usage
+                                                        └ Security
+```
+
+Three rules that decided the shape, worth reapplying to anything new:
+
+1. **A screen that is empty for an installed user should not ship.** Maturity measures the Chimera
+   project's own test coverage and needs a source checkout, so it is `import.meta.env.DEV` only.
+   A permanently blank screen is a trust cost with no upside.
+2. **A turn detail is not a place.** Fusion was a destination that rendered only when the
+   *immediately preceding* chat turn had used fusion — you had to send a fused message, navigate
+   away, and read it before the next message erased it. It is a section of the activity inspector
+   now, and more discoverable for losing its icon.
+3. **A read-only inspector is not a daily surface.** Tools had no action available at all and MCP's
+   own empty state says the CLI is the source of truth. Both are Settings › Connections.
+
+Adding a sixth rail icon is a real decision, not a small one. Ask first whether the thing is a
+question a person actually has, or a feature you want them to notice.

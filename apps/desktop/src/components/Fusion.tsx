@@ -1,4 +1,3 @@
-import { Network } from "lucide-react";
 import type {
   CascadeMeta,
   FusionMeta,
@@ -6,7 +5,7 @@ import type {
   FusionStage,
   TurnReport,
 } from "@/lib/types";
-import { Badge, EmptyState, Panel, Screen } from "@/components/ui/panel";
+import { Badge, EmptyState, Panel } from "@/components/ui/panel";
 import { cn } from "@/lib/utils";
 import { useT, type TFunc } from "@/lib/i18n";
 
@@ -150,20 +149,28 @@ function CascadeRoute({ meta, t }: { meta: CascadeMeta; t: TFunc }) {
   );
 }
 
+/**
+ * How the last turn was composed.
+ *
+ * No longer a rail destination. It was structurally a *turn detail* pretending to be a place: it
+ * rendered only when the immediately preceding chat turn had used fusion, so seeing it meant
+ * sending a fused message, navigating away, and reading it before the next message erased it. As a
+ * section of the activity inspector it sits beside the turn it describes, and is more discoverable
+ * for losing its icon, not less.
+ */
 export function Fusion({ report }: { report?: TurnReport | null }) {
   const t = useT();
   const meta = report?.route_meta;
+  // Nothing to show unless this turn actually routed through fusion or the cascade. Rendering an
+  // empty panel here would put a permanent "no data" box in the inspector.
+  if (!meta) return null;
   return (
-    <Screen title={t("fusion.title")} icon={<Network className="h-5 w-5" />}>
-      {!meta ? (
-        <Panel>
-          <EmptyState text={t("fusion.empty")} />
-        </Panel>
-      ) : meta.kind === "fusion" ? (
+    <div className="space-y-3">
+      {meta.kind === "fusion" ? (
         <FusionBreakdown meta={meta} t={t} />
       ) : (
         <CascadeRoute meta={meta} t={t} />
       )}
-    </Screen>
+    </div>
   );
 }

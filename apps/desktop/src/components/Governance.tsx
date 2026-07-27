@@ -173,13 +173,13 @@ function AuditPanel({ data, t }: { data: GovernanceAudit; t: TFunc }) {
   );
 }
 
-export function Governance() {
+export function Governance({ embedded = false }: { embedded?: boolean } = {}) {
   const t = useT();
   const injection = useQuery({ queryKey: ["governance-injection"], queryFn: getGovernanceInjection });
   const audit = useQuery({ queryKey: ["governance-audit"], queryFn: getGovernanceAudit });
 
   return (
-    <Screen title={t("governance.title")} icon={<ShieldCheck className="h-5 w-5" />}>
+    <Screen title={t("governance.title")} icon={<ShieldCheck className="h-5 w-5" />} embedded={embedded}>
       {injection.isError ? (
         <Panel title={t("governance.injection.title")}>
           <ErrorState error={injection.error} onRetry={() => injection.refetch()} />

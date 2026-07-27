@@ -126,13 +126,13 @@ function ModelBar({ row, max }: { row: ModelRow; max: number }) {
   );
 }
 
-export function Usage() {
+export function Usage({ embedded = false }: { embedded?: boolean } = {}) {
   const t = useT();
   const q = useQuery({ queryKey: ["usage"], queryFn: getUsage });
 
   if (q.isError) {
     return (
-      <Screen title={t("usage.title")} icon={<BarChart3 className="h-5 w-5" />}>
+      <Screen title={t("usage.title")} icon={<BarChart3 className="h-5 w-5" />} embedded={embedded}>
         <Panel>
           <ErrorState error={q.error} onRetry={() => q.refetch()} />
         </Panel>

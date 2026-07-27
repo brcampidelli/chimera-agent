@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useId, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, KeyRound, Loader2 } from "lucide-react";
 import {
@@ -12,6 +12,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/async";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabPanel } from "@/components/ui/tabs";
+import { Connections } from "@/components/Connections";
+import { Governance } from "@/components/Governance";
+import { Usage } from "@/components/Usage";
 import { LANGS, useI18n, useT } from "@/lib/i18n";
 import type { AppConfig, DoctorInfo, ProviderCfg } from "@/lib/types";
 
@@ -238,8 +242,12 @@ export function MessagingCard({ save }: { save: (u: Record<string, string>) => v
   );
 }
 
+type SettingsTab = "general" | "connections" | "usage" | "security";
+
 export function Settings() {
   const t = useT();
+  const tabsId = useId();
+  const [tab, setTab] = useState<SettingsTab>("general");
   const qc = useQueryClient();
   const config = useQuery({ queryKey: ["config"], queryFn: getConfig });
   const doctor = useQuery({ queryKey: ["doctor"], queryFn: getDoctor });
@@ -269,14 +277,28 @@ export function Settings() {
   const c: AppConfig = config.data;
   const d: DoctorInfo | undefined = doctor.data;
 
+  const tabs = [
+    { value: "general" as const, label: t("settings.tab.general") },
+    { value: "connections" as const, label: t("settings.tab.connections") },
+    { value: "usage" as const, label: t("nav.usage") },
+    { value: "security" as const, label: t("settings.tab.security") },
+  ];
+
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex items-center gap-2 px-6 pt-6">
+        <KeyRound className="h-5 w-5 text-accent" />
+        <h1 className="text-lg font-semibold">{t("settings.title")}</h1>
+        {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+      </div>
+      <Tabs items={tabs} value={tab} onChange={setTab} aria-label={t("settings.title")} className="px-6" />
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <TabPanel tabsId={tabsId} value={tab}>
+          {tab === "connections" && <Connections />}
+          {tab === "usage" && <Usage embedded />}
+          {tab === "security" && <Governance embedded />}
+          {tab === "general" && (
       <div className="mx-auto max-w-2xl space-y-6 px-6 py-6">
-        <div className="flex items-center gap-2">
-          <KeyRound className="h-5 w-5" />
-          <h1 className="text-lg font-semibold">{t("settings.title")}</h1>
-          {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-        </div>
 
         <Card title={t("settings.card.appearance")}>
           <Row label={t("settings.row.language")} hint={t("settings.hint.language")}>
@@ -385,6 +407,9 @@ export function Settings() {
         </Card>
 
         {mutation.isError && <p className="text-sm text-bad">{t("settings.saveError")}</p>}
+      </div>
+          )}
+        </TabPanel>
       </div>
     </div>
   );

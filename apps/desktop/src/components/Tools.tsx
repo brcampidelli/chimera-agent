@@ -54,7 +54,7 @@ function ToolRow({ tool, t }: { tool: ToolInfo; t: TFunc }) {
   );
 }
 
-export function Tools() {
+export function Tools({ embedded = false }: { embedded?: boolean } = {}) {
   const t = useT();
   const q = useQuery({ queryKey: ["tools"], queryFn: getTools });
   const [query, setQuery] = useState("");
@@ -75,7 +75,7 @@ export function Tools() {
 
   if (q.isError) {
     return (
-      <Screen title={t("tools.title")} icon={<Wrench className="h-5 w-5" />}>
+      <Screen title={t("tools.title")} icon={<Wrench className="h-5 w-5" />} embedded={embedded}>
         <Panel>
           <ErrorState error={q.error} onRetry={() => q.refetch()} />
         </Panel>

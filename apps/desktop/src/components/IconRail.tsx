@@ -3,13 +3,8 @@ import {
   MessageSquare,
   Brain,
   Clock,
-  Network,
-  BarChart3,
   ListChecks,
   FileCode2,
-  Wrench,
-  Plug,
-  Shield,
   Gauge,
   Settings as SettingsIcon,
   Moon,
@@ -25,28 +20,25 @@ export type View =
   | "chat"
   | "knowledge"
   | "automation"
-  | "fusion"
-  | "usage"
   | "work"
   | "code"
-  | "tools"
-  | "mcp"
-  | "governance"
   | "maturity"
   | "settings";
 
+/** Maturity reports the Chimera project's OWN test coverage, so it needs a source checkout — in
+ *  an installed build it renders an empty state. Shipping a permanently blank screen is a trust
+ *  cost with no upside, so it appears only in development. */
 const NAV: { view: View; labelKey: string; icon: ComponentType<{ className?: string }> }[] = [
+  // Ordered by how often a person reaches for it: talk to it, watch it work, open the code, ask
+  // what it knows, set up what it does unprompted.
   { view: "chat", labelKey: "nav.chat", icon: MessageSquare },
+  { view: "work", labelKey: "nav.work", icon: ListChecks },
+  { view: "code", labelKey: "nav.code", icon: FileCode2 },
   { view: "knowledge", labelKey: "nav.knowledge", icon: Brain },
   { view: "automation", labelKey: "nav.automation", icon: Clock },
-  { view: "fusion", labelKey: "nav.fusion", icon: Network },
-  { view: "usage", labelKey: "nav.usage", icon: BarChart3 },
-  { view: "code", labelKey: "nav.code", icon: FileCode2 },
-  { view: "work", labelKey: "nav.work", icon: ListChecks },
-  { view: "tools", labelKey: "nav.tools", icon: Wrench },
-  { view: "mcp", labelKey: "nav.mcp", icon: Plug },
-  { view: "governance", labelKey: "nav.governance", icon: Shield },
-  { view: "maturity", labelKey: "nav.maturity", icon: Gauge },
+  ...(import.meta.env.DEV
+    ? [{ view: "maturity" as const, labelKey: "nav.maturity", icon: Gauge }]
+    : []),
 ];
 
 function RailButton({

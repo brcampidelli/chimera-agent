@@ -7,14 +7,9 @@ import { Composer } from "@/components/Composer";
 import { Settings } from "@/components/Settings";
 import { Knowledge } from "@/components/Knowledge";
 import { Automation } from "@/components/Automation";
-import { Fusion } from "@/components/Fusion";
-import { Usage } from "@/components/Usage";
 import { Code } from "@/components/Code";
 import { Work } from "@/components/Work";
-import { Governance } from "@/components/Governance";
 import { Maturity } from "@/components/Maturity";
-import { Tools } from "@/components/Tools";
-import { Mcp } from "@/components/Mcp";
 import { Onboarding } from "@/components/Onboarding";
 import { Activity, type Status } from "@/components/Activity";
 import { AppShell } from "@/components/shell/AppShell";
@@ -202,7 +197,8 @@ export default function App() {
         ignite={ignite}
         viewKey={view}
         viewLabel={t(view === "chat" ? "nav.chat" : `nav.${view}`)}
-        onOpenUsage={() => setView("usage")}
+        // Usage lives in Settings now; the cost chip still takes you straight there.
+        onOpenUsage={() => setView("settings")}
         rail={
           <IconRail
             view={view}
@@ -255,14 +251,10 @@ export default function App() {
         )}
         {view === "knowledge" && <Knowledge />}
         {view === "automation" && <Automation />}
-        {view === "fusion" && <Fusion report={report} />}
-        {view === "usage" && <Usage />}
         {view === "work" && <Work />}
         {view === "code" && <Code />}
-        {view === "tools" && <Tools />}
-        {view === "mcp" && <Mcp />}
-        {view === "governance" && <Governance />}
-        {view === "maturity" && <Maturity />}
+        {/* Dev-only, matching the rail: in a shipped build this screen has no data. */}
+        {view === "maturity" && import.meta.env.DEV && <Maturity />}
         {view === "settings" && <Settings />}
       </AppShell>
     </AgentProvider>
