@@ -18,7 +18,7 @@
 ![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)
 [![Donate](https://img.shields.io/badge/Donate-Stripe-635BFF.svg?logo=stripe&logoColor=white)](https://donate.stripe.com/9B63cofM491m4SBfe177O00)
 
-<sub><b>English</b> · <a href="README.pt-BR.md">Português</a> · <a href="README.es.md">Español</a> · <a href="README.de.md">Deutsch</a> · <a href="README.fr.md">Français</a> · <a href="README.zh-CN.md">中文</a> · <a href="README.ja.md">日本語</a></sub>
+<sub><b>English</b> · <a href="README.pt-BR.md">Português</a> · <a href="README.es.md">Español</a> · <a href="README.de.md">Deutsch</a> · <a href="README.fr.md">Français</a> · <a href="README.it.md">Italiano</a> · <a href="README.pl.md">Polski</a> · <a href="README.zh-CN.md">中文</a> · <a href="README.ja.md">日本語</a></sub>
 
 </div>
 
@@ -31,7 +31,7 @@ its own work, and keeps only what actually works.
 > **Free and open-source (Apache-2.0), in early but active development.** It already works end to
 > end: chat with it, let it finish tasks on its own, run it as a bot on your favourite messaging app,
 > deploy it on a server so it works 24/7, and watch it learn from what it does. It's **alpha** — solid
-> and heavily tested (**1000+ automated tests**, strict type-checking and linting on every change), but
+> and heavily tested (**2,000+ automated tests**, strict type-checking and linting on every change), but
 > not yet battle-hardened in production.
 
 ---
@@ -180,7 +180,7 @@ token number as a dollar number.
 
 ### 🧠 Thinking & doing
 - **Blend several models into one answer** (`chimera fuse`) — a panel of models, a judge that surfaces where they agree, disagree, or miss something, and a synthesizer that writes the final answer. A smart router only spends this extra effort on hard problems, and when the first models already agree it stops early — measured at **~20–28% fewer tokens with no loss of accuracy** on our benchmarks. (Fusion / mixture-of-agents itself isn't unique — you'll find it in OpenRouter and other tools; the difference here is it's wired into the agent loop behind that cost-aware router and measured, not a model you pick.)
-- **Finish tasks on its own** (`chimera solve`) — it plans, acts with tools, then **verifies and reverts**: it runs your check (e.g. tests) and keeps the change only if it passes, otherwise undoes it and retries. Optionally works on an isolated copy of your project so nothing is touched until it's proven.
+- **Finish tasks on its own** (`chimera solve`) — it plans, acts with tools, then **verifies and reverts**: it runs your check (e.g. tests) and keeps the change only if it passes, otherwise undoes it and retries. Optionally works on an isolated copy of your project so nothing is touched until it's proven. **And a convincing paragraph is not a solve:** with no `--verify` to appeal to, a run that changed nothing on disk is reported as a failure, not a success — because the only thing left judging it would be a model reading prose, which never sees the diff. Every attempt records *who* approved it (`verifier` / `diff+manager` / `manager` / `none`), so a receipt never says "success" without naming the authority behind it.
 - **Teams of specialists** (`chimera crew`, `chimera crew-isolated`) — several role-focused agents split one job. In isolated mode each works on its **own private copy in parallel**; safe edits are merged, clashes are flagged instead of silently overwritten, and a bad worker's changes can be rejected by a per-worker test. A supervisor can fold everyone's work into one unified report.
 - **Delegate and explore** — any agent can hand a self-contained subtask to a fresh **sub-agent** that reports back only the result, keeping the main context clean. The **Context Explorer** (`chimera explore`) finds the right files and lines in a codebase and returns a short answer instead of dumping everything.
 
@@ -188,6 +188,14 @@ token number as a dollar number.
 - **Long-term memory** — it keeps short-term, recent, factual, and about-you memories, plus a map of how things relate. It can store memories in a fast full-text database, carry a profile of your preferences into every chat, merge duplicate notes automatically, and gently suggest saving a preference when you mention one.
 - **Learns new skills** — when it succeeds at the same kind of task more than once, it turns that into a tested, reusable skill automatically.
 - **Optional self-training (advanced)** — it can record its own experience so you can later fine-tune a model from it. Off by default; nothing trains without you asking.
+
+### 📏 A loop you can measure — and that says when it's lost
+An agent is a model **plus everything around it**. That surrounding machinery is what decides whether
+a long run stays useful, and most of it is invisible until it fails. Chimera measures its own:
+
+- **Every run leaves a receipt.** One JSONL line per run in `traces.jsonl`: tokens per step, the tools called with what came back, where history was dropped — and the **cache hit rate**, the share of prompt tokens the provider served from cache. That last one is the loop's real cost number (a cached token costs roughly a tenth of a fresh one, so identical token counts can differ ~10× in price) *and* a design alarm: it collapses whenever something rewrites the front of the prompt, which has no other symptom. A provider that reports no cache reads as **unknown**, never as a miss.
+- **It notices when it has stopped getting anywhere.** Two different things get called "context problems": attention thinning inside one long prompt, and a *trajectory* that quietly stops accumulating and starts circling — every individual step fine, the run as a whole going nowhere. Chimera's loop-breaker catches the tight version (a 12-call window); a run that revisits the same three files every twenty turns walks straight through it. So there's a second detector comparing the **first half of a run against the second**: work re-derived that the run already had, failures climbing, or redundancy jumping right after history was dropped. It **reports and does not act** — stopping, re-planning and force-compacting are all plausible cures and we have no evidence which one helps, so choosing one would bake in exactly the unmeasured assumption this work exists to remove.
+- **Long runs survive their own context.** Running out of window used to end a run outright, which made the window — not the difficulty of the task — the real ceiling. Compaction now keeps the system message untouched (it's the stable prefix the whole prompt cache is keyed on), never orphans a tool result from its call, and **restores what the run needs to still be itself**: the open file, the plan, the task list, the current state. It says plainly what it dropped instead of summarising it — an agent can re-read a file, but it cannot un-believe a fabricated summary.
 
 ### 🔌 Connect & automate
 - **Talk to it anywhere** — a terminal chat, a full-screen terminal app, or as a bot on **Discord, Telegram, Slack, Signal, and WhatsApp**. There's also a simple HTTP endpoint.
@@ -199,6 +207,8 @@ token number as a dollar number.
 - **Any model, one interface** — hosted models or your own local ones, with automatic fallback if one is down and rotation across multiple keys.
 - **One-command server deploy** — run it with Docker (or bare-metal) so it stays up and restarts on reboot. See **[docs/deploy.md](docs/deploy.md)**.
 - **Safety kernel** — a check on every action (allow / warn / block / ask), an **opt-in** network-isolated container for untrusted code (`CHIMERA_SANDBOX=docker`; the default local runner is *not* isolated), and a full audit log of what it did.
+- **Stop before it commits, when it read something it shouldn't trust** (`--pause-on-taint`) — a run that consumed untrusted content parks itself instead of finalising, and waits for you. You can accept the result, accept a version you edited, send guidance and let it try again, or reject it outright — from the terminal *or* the desktop app. Nothing is saved and nothing is learned until you decide, and a pause is never reported as a failure: it hasn't reached a verdict, it's waiting on a person.
+- **A desktop app that pilots a run, not just launches one** — five destinations instead of a menu of fifteen, in nine languages. Start a run and walk away: the progress is still there when you come back, the status bar names what the agent is doing from every screen, and Stop works from all of them. Native installers for Windows / macOS / Linux on [Releases](https://github.com/brcampidelli/chimera-agent/releases).
 
 ## Quickstart
 
@@ -274,8 +284,10 @@ Prefer a lean install? Keep `pip install chimera-agent` and add only the extras 
 | **Chat that remembers you** | — | `chimera chat` |
 | **Ask one question** | — | `chimera run "explain X in 3 bullets"` |
 | **Full-screen terminal app** | — | `chimera tui` |
-| **Desktop app** (chat, cost, memory, governance, coding — all optional) | `[desktop]` or a download | `chimera app`, or grab a native installer (`.exe`/`.dmg`/`.AppImage`/`.deb`) from [Releases](https://github.com/brcampidelli/chimera-agent/releases) |
+| **Desktop app** (chat · work · code · knowledge · automation, in 9 languages) | `[desktop]` or a download | `chimera app`, or grab a native installer (`.exe`/`.dmg`/`.AppImage`/`.deb`) from [Releases](https://github.com/brcampidelli/chimera-agent/releases) |
 | **Do a task, keep it only if a check passes** | — | `chimera solve "add hello() to app.py + a test" --verify "pytest -q"` |
+| **Ask me before finalising anything it read off the web** | — | add `--pause-on-taint` to `chimera solve` |
+| **See what a run actually cost, step by step** | — | written for you at `.chimera/traces.jsonl` (or `$CHIMERA_HOME`) |
 | **Blend several models into one answer** | — | `chimera fuse "your question" --show-panel` |
 | **A team of specialist agents** | — | `chimera crew "your task" --mode supervisor` |
 | **Run a whole project to completion** (asks you before risky steps) | — | `chimera project start spec.yaml -w .` |

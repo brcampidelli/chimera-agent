@@ -18,7 +18,7 @@
 ![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)
 [![Donate](https://img.shields.io/badge/Donate-Stripe-635BFF.svg?logo=stripe&logoColor=white)](https://donate.stripe.com/9B63cofM491m4SBfe177O00)
 
-<sub><a href="README.md">English</a> · <a href="README.pt-BR.md">Português</a> · <b>Español</b> · <a href="README.de.md">Deutsch</a> · <a href="README.fr.md">Français</a> · <a href="README.zh-CN.md">中文</a> · <a href="README.ja.md">日本語</a></sub>
+<sub><a href="README.md">English</a> · <a href="README.pt-BR.md">Português</a> · <b>Español</b> · <a href="README.de.md">Deutsch</a> · <a href="README.fr.md">Français</a> · <a href="README.it.md">Italiano</a> · <a href="README.pl.md">Polski</a> · <a href="README.zh-CN.md">中文</a> · <a href="README.ja.md">日本語</a></sub>
 
 </div>
 
@@ -32,7 +32,7 @@ de verdad funciona.
 > **Gratis y open-source (Apache-2.0), en desarrollo temprano pero activo.** Ya funciona de principio
 > a fin: conversa con él, deja que complete tareas por su cuenta, ejecútalo como un bot en tu app de
 > mensajería favorita, despliégalo en un servidor para que trabaje 24/7 y míralo aprender de lo que
-> hace. Está en **alpha** — sólido y probado a fondo (**más de 1000 tests automatizados**, verificación
+> hace. Está en **alpha** — sólido y probado a fondo (**más de 2.000 tests automatizados**, verificación
 > de tipos estricta y linting en cada cambio), pero todavía no curtido en producción.
 
 ---
@@ -63,6 +63,96 @@ CrewAI, LangGraph) descubrió que **todos dejan abiertas** — y las convierte e
 - 📊 **Benchmarks honestos y publicados.** ~20% de los casos "resueltos" de un leaderboard popular en realidad están mal. Chimera reporta cada número con un intervalo de confianza — **incluidas las ejecuciones en las que no ganó** — y nunca vuelve a tirar los dados en busca de significancia. Una ejecución pareada registrada muestra el bucle completo **elevando un modelo débil en una suite pre-registrada de 100 tareas — 48% → 71% (+23pp), IC 95% [+12,6%, +28,6%] — estadísticamente significativa** (el IC excluye el cero), a partir de **28 tareas que recuperó** (fallo crudo → aprobación verificada) frente a 5 regresiones. Una sola ejecución, sin repeticiones. Esto **reemplaza una ejecución anterior de la misma suite** (9% → 15%, +6pp) cuyo harness calificaba con un archivo de test que el agente podía editar — y que, al repetirla, editó una vez. La dirección y la significancia se replicaron y se reforzaron al endurecer la calificación; la fe de erratas, la evidencia de manipulación preservada y por qué las tasas absolutas de la ejecución original eran tan bajas están en [`bench/local_lift/RESULTS.md`](bench/local_lift/RESULTS.md). Y en el **Terminal-Bench oficial**, un A/B pre-registrado de N=40 aterrizó en un **suelo dominado por la varianza sin diferencia significativa en ninguna dirección** — publicado tal cual ([`bench/terminal_bench/RESULTS.md`](bench/terminal_bench/RESULTS.md)), incluida la **retractación de una lectura intermedia errónea** una vez que se midió el brazo de control. Los resultados nulos y las autocorrecciones también se publican; ese es el punto.
 
 **En una línea: el agente auto-evolutivo gobernado — probado y gobernado.** Está en alpha, y lo dice.
+
+## Benchmarks (honestos)
+
+Dos números registrados, ambos ciertos, publicados juntos a propósito — uno ya significativo, otro
+humillante. (También aparecen en la pantalla **Madurez y Benchmarks** de la app de escritorio,
+directamente desde el snapshot incluido.)
+
+- **Elevación de un modelo débil (significativa).** Un modelo barato (`mistral-small-3.2-24b`) + el
+  bucle de reintento de Chimera frente al mismo modelo solo, en una **suite pre-registrada de n=100**
+  (diseño y tareas comiteadas y publicadas antes de cualquier llamada al modelo): **48,0% → 71,0%
+  (+23,0pp)**, IC 95% pareado **[+12,6%, +28,6%] — estadísticamente significativo** (el IC excluye 0),
+  a partir de **28 tareas que el bucle recuperó** (fallo crudo → aprobado verificado) frente a 5
+  regresiones. Un modelo, una semilla/tarea, tareas Python pequeñas y autocontenidas — **NO** es
+  SWE-bench y no generaliza a repositorios reales. Una ejecución, sin re-roll.
+  **Esto sustituye a una ejecución anterior de la misma suite** (9,0% → 15,0%, +6,0pp) cuyo harness
+  calificaba con un archivo de test que el agente bajo prueba podía editar. Al repetirla con el test
+  original restaurado se pilló al agente reescribiendo su propio test de calificación en una tarea —
+  o sea, el agujero era real — y la elevación se replicó *mayor*, no menor. La afirmación de la
+  ejecución anterior de que "85 de las 100 tareas son lo bastante difíciles como para fallar en ambos
+  brazos" tampoco se sostuvo: la repetición mide 24. La errata completa, la evidencia de manipulación
+  preservada y lo que no pudo re-verificarse están en
+  [`bench/local_lift/RESULTS.md`](bench/local_lift/RESULTS.md).
+  Fuente: [`bench/local_lift/_reverify_n100/paired.json`](bench/local_lift/_reverify_n100/paired.json), [`PREREGISTRATION.md`](bench/local_lift/PREREGISTRATION.md).
+- **SWE-bench Verified — la evidencia externa más fuerte, y sobrevivió a una replicación diseñada para
+  matarla.** Tres ejecuciones pre-registradas sobre porciones de `django/django`, calificadas
+  **únicamente** por el harness oficial `swebench` 4.1.0 en Docker — nunca auto-reportadas.
+
+  | ejecución | porción | baseline | + Chimera | Δ pareado | IC 95% | |
+  |---|---|---|---|---|---|---|
+  | 1 (`max_steps=8`) | 19 | 36,8% | 36,8% | +0,0% | [−8,5%, +8,5%] | ns |
+  | 2 (`max_steps=30`) | las mismas 19 | 42,1% | 57,9% | +15,8% | [−1,9%, +15,8%] | ns |
+  | **3 (replicación)** | **41 inéditas** | 34,1% | 43,9% | **+9,8%** | [−3,5%, +16,7%] | ns |
+  | agrupado *(secundario)* | 60 | 36,7% | 48,3% | **+11,7%** | **[+0,8%, +16,4%]** | **significativo** |
+
+  El +15,8% de la ejecución 2 fue un 3–0 en tres pares informativos, y la pre-registración le daba
+  **una probabilidad de una entre tres de ser exactamente eso — una muestra afortunada**, con la
+  retractación pre-comprometida. La ejecución 3 lo probó en **41 instancias cuyos resultados nunca
+  habíamos visto**, sin cambiar nada más. El efecto **reapareció** (+9,8%, dentro de la banda
+  registrada de +5 a +20) en una porción que resultó *más difícil* que la de la ejecución 2. Entre
+  ambas, los pares discordantes quedan **9 a favor de Chimera contra 2** (p ≈ 2,6% bajo la hipótesis
+  nula).
+
+  **El mecanismo se replicó, y es la parte interesante.** Una cuarta ejecución restauró el brazo
+  intermedio (scaffold puro, sin la compuerta de diff) sobre las mismas 41 instancias, de modo que los
+  tres difieren en exactamente un componente. Los tres **editan al mismo ritmo** (27–28 parches de 41);
+  lo que cambia es con qué frecuencia la edición es *correcta*:
+
+  | brazo | resueltas | **precisión cuando editó** |
+  |---|---|---|
+  | baseline | 14/41 | 50% |
+  | + scaffold | 16/41 | 59% |
+  | + scaffold **y** compuerta de diff | 18/41 | 67% |
+
+  **Ambos componentes contribuyen, en mitades aproximadamente iguales** (+4,9% cada uno, ninguno
+  significativo por separado) — lo que **contradice nuestra propia predicción registrada** de que el
+  scaffold cargaría con la mayor parte, y retira una lectura de la ejecución 2 según la cual la
+  compuerta de diff "no es lo que produjo la ganancia". La retractación está en
+  [`RESULTS.md`](bench/swe_bench/RESULTS.md); la aditividad tan limpia *no* se reclama como un reparto
+  50/50 medido, ya que cada comparación se apoya en 5–6 pares discordantes.
+
+  ⚠️ Léelo con honestidad: **el primario fuera de muestra NO es significativo.** El número
+  significativo es el **secundario agrupado**, pre-registrado como secundario precisamente porque
+  mezcla datos vistos con inéditos — no se asciende a titular ahora que ha cruzado la línea. Y
+  **48,3% NO es una puntuación de SWE-bench Verified**: es una porción deliberadamente fácil, de un
+  solo repositorio; una puntuación real necesita las 500 completas. El cero exacto de la ejecución 1
+  se publica sin cambios, y la ejecución 2 trajo la **retractación que se ganó** (el mecanismo que
+  habíamos alegado para sus parches vacíos era erróneo — la cura era el presupuesto de pasos).
+  Fuente: [`bench/swe_bench/RESULTS.md`](bench/swe_bench/RESULTS.md), [`PREREGISTRATION.md`](bench/swe_bench/PREREGISTRATION.md).
+- **Terminal-Bench (humillante).** A/B pre-registrado con N=40 sobre el benchmark oficial, mismo
+  modelo en ambos brazos (`deepseek-chat-v3.1`): **7,5% → 2,5%** con el scaffold, **Δ pareado −5,0pp,
+  IC 95% [−5,0%, +1,6%] — no significativo**. El scaffold **no elevó a un modelo ya competente** (no es
+  el régimen débil de "goldilocks" donde el scaffolding ayuda); ambos brazos se sitúan en un suelo
+  dominado por la varianza. Fuente: [`bench/terminal_bench/RESULTS.md`](bench/terminal_bench/RESULTS.md).
+- **¿Ayuda el aprendizaje acumulado? Siete ejecuciones dicen: no de forma demostrable (y un positivo
+  fue retractado).** El volante — skills condicionadas a la recurrencia + una prueba de transferencia,
+  tarjetas de antipatrón, memoria persistente — se midió en **siete ejecuciones pre-registradas**. La
+  ejecución 6 produjo el único positivo de la serie (+6,7% significativo en la métrica de
+  transferencia dentro de la familia); **la ejecución 7, con más potencia estadística, lo redujo a
+  +2,0% y no significativo — así que fue retractado**, exactamente como se había comprometido en la
+  pre-registración. El veredicto honesto: **ninguna ejecución con potencia adecuada muestra que el
+  aprendizaje acumulado mejore el éxito en las tareas**, y el cuello de botella es el instrumento —
+  tres intentos de escribir una suite que cayera en la franja informativa del 40–60% salieron todos
+  en 84–92%. "Mejora cuanto más lo usas" sigue **sin evidencia**.
+  Fuente: [`bench/learning_lift/RESULTS.md`](bench/learning_lift/RESULTS.md).
+
+Significativo internamente (en nuestra propia suite difícil). En repositorios reales, **replicado
+fuera de muestra y significativo solo al agrupar** — la etiqueta honesta, no la halagadora.
+Humillante en Terminal-Bench. La afirmación sobre el aprendizaje está **retractada**. Publicamos todo,
+escribimos de antemano la rama en la que el resultado mata nuestra propia afirmación *antes* de
+ejecutar, y no repetimos ejecuciones buscando significancia — eso sería p-hacking.
 
 ## Economía de tokens — medida, no proclamada
 
@@ -104,7 +194,7 @@ silenciosamente el número de tokens como si fuera un número en dólares.
 
 ### 🧠 Pensar y hacer
 - **Combina varios modelos en una respuesta** (`chimera fuse`) — un panel de modelos, un juez que saca a la luz dónde coinciden, dónde discrepan o qué se les escapa, y un sintetizador que redacta la respuesta final. Un enrutador inteligente solo dedica este esfuerzo extra a los problemas difíciles, y cuando los primeros modelos ya coinciden se detiene antes de tiempo — medido en **~20–28% menos tokens sin pérdida de precisión** en nuestros benchmarks. (La fusión / mixture-of-agents en sí no es exclusiva nuestra — la encuentras en OpenRouter y otras herramientas; la diferencia aquí es que está integrada en el bucle del agente, detrás de ese enrutador consciente del costo, y está medida, no es un modelo que eliges.)
-- **Completa tareas por su cuenta** (`chimera solve`) — planifica, actúa con herramientas y luego **verifica y revierte**: ejecuta tu comprobación (p. ej. tests) y conserva el cambio solo si pasa; de lo contrario lo deshace y reintenta. Opcionalmente trabaja sobre una copia aislada de tu proyecto para que no se toque nada hasta que esté probado.
+- **Completa tareas por su cuenta** (`chimera solve`) — planifica, actúa con herramientas y luego **verifica y revierte**: ejecuta tu comprobación (p. ej. tests) y conserva el cambio solo si pasa; de lo contrario lo deshace y reintenta. Opcionalmente trabaja sobre una copia aislada de tu proyecto para que no se toque nada hasta que esté probado. **Y un párrafo convincente no es una solución:** sin un `--verify` al que apelar, una ejecución que no cambió nada en disco se reporta como fallo, no como éxito — porque lo único que quedaría juzgándola sería un modelo leyendo prosa, que nunca ve el diff. Cada intento registra *quién* lo aprobó (`verifier` / `diff+manager` / `manager` / `none`), así que un recibo nunca dice "éxito" sin nombrar la autoridad detrás.
 - **Equipos de especialistas** (`chimera crew`, `chimera crew-isolated`) — varios agentes enfocados en roles se reparten un mismo trabajo. En modo aislado, cada uno trabaja en su **propia copia privada en paralelo**; las ediciones seguras se fusionan, los conflictos se señalan en lugar de sobrescribirse en silencio, y los cambios de un worker defectuoso pueden rechazarse mediante un test por worker. Un supervisor puede reunir el trabajo de todos en un único informe unificado.
 - **Delega y explora** — cualquier agente puede pasar una subtarea autocontenida a un **subagente** nuevo que solo informa del resultado, manteniendo limpio el contexto principal. El **Explorador de Contexto** (`chimera explore`) encuentra los archivos y las líneas correctas en un código y devuelve una respuesta breve en lugar de volcarlo todo.
 
@@ -112,6 +202,15 @@ silenciosamente el número de tokens como si fuera un número en dólares.
 - **Memoria a largo plazo** — mantiene memorias a corto plazo, recientes, factuales y sobre ti, además de un mapa de cómo se relacionan las cosas. Puede guardar memorias en una base de datos de texto completo rápida, llevar un perfil de tus preferencias a cada conversación, fusionar notas duplicadas automáticamente y sugerirte con delicadeza guardar una preferencia cuando mencionas una.
 - **Aprende nuevas skills** — cuando tiene éxito en el mismo tipo de tarea más de una vez, lo convierte automáticamente en una skill probada y reutilizable.
 - **Autoentrenamiento opcional (avanzado)** — puede registrar su propia experiencia para que luego puedas afinar un modelo a partir de ella. Desactivado por defecto; nada se entrena sin que lo pidas.
+
+### 📏 Un bucle que se puede medir — y que avisa cuando se ha perdido
+Un agente es un modelo **más todo lo que lo rodea**. Esa maquinaria de alrededor es lo que decide si
+una ejecución larga sigue siendo útil, y casi todo en ella es invisible hasta que falla. Chimera mide
+la suya:
+
+- **Cada ejecución deja un recibo.** Una línea JSONL por ejecución en `traces.jsonl`: tokens por paso, las herramientas llamadas con lo que devolvieron, dónde se descartó el historial — y la **tasa de acierto de caché**, la porción de tokens de prompt que el proveedor sirvió desde caché. Ese es el número de coste real del bucle (un token cacheado cuesta alrededor de una décima parte de uno nuevo, así que recuentos idénticos pueden diferir ~10× en precio) *y* una alarma de diseño: se desploma cada vez que algo reescribe el principio del prompt, lo cual no tiene otro síntoma. Un proveedor que no informa de caché se lee como **desconocido**, nunca como fallo.
+- **Se da cuenta de cuándo ha dejado de llegar a algún sitio.** Dos cosas distintas se llaman "problema de contexto": la atención diluyéndose dentro de un prompt largo, y una *trayectoria* que en silencio deja de acumular y empieza a dar vueltas — cada paso individual bien, la ejecución entera sin ir a ninguna parte. El detector de bucles de Chimera pilla la versión estrecha (una ventana de 12 llamadas); una ejecución que revisita los mismos tres archivos cada veinte turnos la atraviesa sin saltar. Por eso hay un segundo detector que compara la **primera mitad de la ejecución con la segunda**: trabajo re-derivado que ya tenía, fallos subiendo, o redundancia disparándose justo después de descartar historial. **Informa y no actúa** — parar, re-planificar y forzar compactación son curas plausibles y no tenemos evidencia de cuál ayuda, así que elegir una incrustaría justo la suposición no medida que este trabajo existe para eliminar.
+- **Las ejecuciones largas sobreviven a su propio contexto.** Agotar la ventana solía terminar la ejecución de golpe, lo que convertía a la ventana — y no a la dificultad de la tarea — en el techo real. La compactación ahora deja intacto el mensaje de sistema (es el prefijo estable sobre el que se ancla toda la caché de prompt), nunca deja un resultado de herramienta huérfano de su llamada, y **restaura lo que la ejecución necesita para seguir siendo ella misma**: el archivo abierto, el plan, la lista de tareas, el estado actual. Dice claramente qué descartó en lugar de resumirlo — un agente puede releer un archivo, pero no puede des-creerse un resumen inventado.
 
 ### 🔌 Conectar y automatizar
 - **Habla con él donde sea** — un chat de terminal, una app de terminal a pantalla completa, o como un bot en **Discord, Telegram, Slack, Signal y WhatsApp**. También hay un endpoint HTTP simple.
@@ -123,6 +222,8 @@ silenciosamente el número de tokens como si fuera un número en dólares.
 - **Cualquier modelo, una interfaz** — modelos alojados en la nube o los tuyos en local, con conmutación automática si uno está caído y rotación entre varias claves.
 - **Despliegue en servidor con un comando** — ejecútalo con Docker (o en bare-metal) para que siga activo y se reinicie al arrancar. Consulta **[docs/deploy.md](docs/deploy.md)**.
 - **Núcleo de seguridad** — una verificación en cada acción (permitir / advertir / bloquear / preguntar), un contenedor con red aislada **opcional** para código no confiable (`CHIMERA_SANDBOX=docker`; el runner local por defecto *no* está aislado) y un registro de auditoría completo de lo que hizo.
+- **Detente antes de que finalice, cuando leyó algo en lo que no se debe confiar** (`--pause-on-taint`) — una ejecución que consumió contenido no confiable se aparca en lugar de finalizar, y te espera. Puedes aceptar el resultado, aceptar una versión que tú editaste, enviar indicaciones y dejar que lo intente de nuevo, o rechazarlo del todo — desde la terminal *o* desde la app de escritorio. Nada se guarda y nada se aprende hasta que decides, y una pausa nunca se reporta como fallo: no ha llegado a un veredicto, está esperando a una persona.
+- **Una app de escritorio que pilota una ejecución, no solo la lanza** — cinco destinos en vez de un menú de quince, en nueve idiomas. Inicia una ejecución y vete: el progreso sigue ahí cuando vuelves, la barra de estado nombra lo que el agente está haciendo desde cualquier pantalla, y Detener funciona desde todas. Instaladores nativos para Windows / macOS / Linux en [Releases](https://github.com/brcampidelli/chimera-agent/releases).
 
 ## Inicio rápido
 
@@ -198,7 +299,10 @@ quieras (mira la columna "Necesita"). **¿Usas Docker? La imagen oficial ya incl
 | **Chat que te recuerda** | — | `chimera chat` |
 | **Hacer una pregunta** | — | `chimera run "explica X en 3 puntos"` |
 | **App de terminal a pantalla completa** | — | `chimera tui` |
+| **App de escritorio** (chat · trabajo · código · conocimiento · automatización, en 9 idiomas) | `[desktop]` o una descarga | `chimera app`, o descarga un instalador nativo (`.exe`/`.dmg`/`.AppImage`/`.deb`) desde [Releases](https://github.com/brcampidelli/chimera-agent/releases) |
 | **Hacer una tarea y conservarla solo si pasa una comprobación** | — | `chimera solve "añade hello() a app.py + un test" --verify "pytest -q"` |
+| **Pregúntame antes de finalizar algo que leyó de la web** | — | añade `--pause-on-taint` a `chimera solve` |
+| **Ver lo que costó de verdad una ejecución, paso a paso** | — | se escribe solo en `.chimera/traces.jsonl` (o `$CHIMERA_HOME`) |
 | **Fusionar varios modelos en una sola respuesta** | — | `chimera fuse "tu pregunta" --show-panel` |
 | **Un equipo de agentes especialistas** | — | `chimera crew "tu tarea" --mode supervisor` |
 | **Llevar un proyecto entero hasta el final** (pausa antes de pasos arriesgados) | — | `chimera project start spec.yaml -w .` |
@@ -353,6 +457,8 @@ uv run pytest -q         # la suite de tests
 
 Las contribuciones son muy bienvenidas — código, documentación, ideas, reportes de errores. Empieza
 con [CONTRIBUTING.md](CONTRIBUTING.md) y nuestro [Código de Conducta](CODE_OF_CONDUCT.md).
+¿Quieres enseñarle algo nuevo a Chimera? La **[guía de extensión](docs/extending.md)** explica cómo
+añadir tu propia **herramienta, skill o receta** (con ejemplos listos para copiar).
 ¿Encontraste un problema de seguridad? Consulta [SECURITY.md](SECURITY.md).
 
 ## Comunidad

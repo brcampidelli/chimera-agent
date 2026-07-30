@@ -18,7 +18,7 @@
 ![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)
 [![Donate](https://img.shields.io/badge/Donate-Stripe-635BFF.svg?logo=stripe&logoColor=white)](https://donate.stripe.com/9B63cofM491m4SBfe177O00)
 
-<sub><a href="README.md">English</a> · <a href="README.pt-BR.md">Português</a> · <a href="README.es.md">Español</a> · <a href="README.de.md">Deutsch</a> · <b>Français</b> · <a href="README.zh-CN.md">中文</a> · <a href="README.ja.md">日本語</a></sub>
+<sub><a href="README.md">English</a> · <a href="README.pt-BR.md">Português</a> · <a href="README.es.md">Español</a> · <a href="README.de.md">Deutsch</a> · <b>Français</b> · <a href="README.it.md">Italiano</a> · <a href="README.pl.md">Polski</a> · <a href="README.zh-CN.md">中文</a> · <a href="README.ja.md">日本語</a></sub>
 
 </div>
 
@@ -33,7 +33,7 @@ vérifie son propre travail, et ne garde que ce qui fonctionne vraiment.
 > bout en bout : discutez avec lui, laissez-le terminer des tâches tout seul, faites-le tourner comme
 > un bot sur votre application de messagerie préférée, déployez-le sur un serveur pour qu'il travaille
 > 24h/24, et regardez-le apprendre de ce qu'il fait. C'est une version **alpha** — solide et
-> abondamment testée (**plus de 1000 tests automatisés**, vérification de types stricte et lint à chaque
+> abondamment testée (**plus de 2 000 tests automatisés**, vérification de types stricte et lint à chaque
 > changement), mais pas encore éprouvée en production.
 
 ---
@@ -64,6 +64,97 @@ CrewAI, LangGraph) a trouvées qu'ils **laissent tous ouvertes** — et en fait 
 - 📊 **Des benchmarks honnêtes et publiés.** ~20 % des cas « résolus » d'un classement populaire sont en réalité faux. Chimera rapporte chaque chiffre avec un intervalle de confiance — **y compris les exécutions où il n'a pas gagné** — et ne relance jamais pour obtenir la significativité. Une exécution appariée enregistrée montre la boucle complète **rehaussant un modèle faible sur une suite pré-enregistrée de 100 tâches — 9 % → 15 % (+6pp), IC 95 % [+1,3 %, +6,0 %] — statistiquement significative** (l'IC exclut zéro), à partir de **6 tâches qu'elle a récupérées** (échec brut → réussite vérifiée) avec **zéro régression** ; les taux absolus sont bas à dessein, car 85 des 100 tâches sont assez difficiles pour échouer dans les deux bras (un plancher délibéré, pour laisser de la marge à la boucle). Une exécution, sans relance. Et sur le **Terminal-Bench officiel**, un A/B pré-enregistré N=40 a atterri sur un **plancher dominé par la variance, sans différence significative dans un sens ou l'autre** — publié tel quel ([`bench/terminal_bench/RESULTS.md`](bench/terminal_bench/RESULTS.md)), y compris **la rétractation d'une lecture intermédiaire erronée** une fois le bras de contrôle mesuré. Les résultats nuls et les auto-corrections sont publiés aussi ; c'est tout l'intérêt.
 
 **En une ligne : l'agent auto-évolutif gouverné — prouvé et gouverné.** C'est de l'alpha, et il le dit.
+
+## Benchmarks (honnêtes)
+
+Deux chiffres enregistrés, tous deux vrais, publiés ensemble à dessein — l'un désormais significatif,
+l'autre humiliant. (Également visibles dans l'écran **Maturité et Benchmarks** de l'application de
+bureau, directement depuis l'instantané embarqué.)
+
+- **Élévation d'un modèle faible (significative).** Un modèle bon marché (`mistral-small-3.2-24b`) + la
+  boucle de reprise de Chimera contre le même modèle seul, sur une **suite pré-enregistrée de n=100**
+  (conception et tâches commitées et poussées avant tout appel de modèle) : **48,0 % → 71,0 %
+  (+23,0 pts)**, IC 95 % apparié **[+12,6 %, +28,6 %] — statistiquement significatif** (l'IC exclut 0),
+  à partir de **28 tâches récupérées par la boucle** (échec brut → réussite vérifiée) contre
+  5 régressions. Un modèle, une graine/tâche, de petites tâches Python autonomes — **PAS** SWE-bench,
+  et cela ne se généralise pas à de vrais dépôts. Une exécution, sans re-tirage.
+  **Ceci remplace une exécution antérieure de la même suite** (9,0 % → 15,0 %, +6,0 pts) dont le
+  harnais notait avec un fichier de test que l'agent testé pouvait modifier. En la refaisant avec le
+  test d'origine restauré, l'agent a été pris en train de réécrire son propre test de notation sur une
+  tâche — la faille était donc réelle — et l'élévation s'est répliquée *plus grande*, pas plus petite.
+  L'affirmation de l'exécution antérieure selon laquelle « 85 des 100 tâches sont assez difficiles pour
+  échouer dans les deux bras » n'a pas tenu non plus : la reprise en mesure 24. L'erratum complet, les
+  preuves de falsification conservées et ce qui n'a pas pu être re-vérifié sont dans
+  [`bench/local_lift/RESULTS.md`](bench/local_lift/RESULTS.md).
+  Source : [`bench/local_lift/_reverify_n100/paired.json`](bench/local_lift/_reverify_n100/paired.json), [`PREREGISTRATION.md`](bench/local_lift/PREREGISTRATION.md).
+- **SWE-bench Verified — la preuve externe la plus solide, et elle a survécu à une réplication conçue
+  pour la tuer.** Trois exécutions pré-enregistrées sur des tranches de `django/django`, notées
+  **uniquement** par le harnais officiel `swebench` 4.1.0 dans Docker — jamais auto-déclarées.
+
+  | exécution | tranche | référence | + Chimera | Δ apparié | IC 95 % | |
+  |---|---|---|---|---|---|---|
+  | 1 (`max_steps=8`) | 19 | 36,8 % | 36,8 % | +0,0 % | [−8,5 %, +8,5 %] | ns |
+  | 2 (`max_steps=30`) | les mêmes 19 | 42,1 % | 57,9 % | +15,8 % | [−1,9 %, +15,8 %] | ns |
+  | **3 (réplication)** | **41 inédites** | 34,1 % | 43,9 % | **+9,8 %** | [−3,5 %, +16,7 %] | ns |
+  | groupé *(secondaire)* | 60 | 36,7 % | 48,3 % | **+11,7 %** | **[+0,8 %, +16,4 %]** | **significatif** |
+
+  Le +15,8 % de l'exécution 2 était un 3–0 sur trois paires informatives, et le pré-enregistrement lui
+  donnait **une chance sur trois d'être exactement cela — un échantillon chanceux**, avec la
+  rétractation engagée d'avance. L'exécution 3 l'a testé sur **41 instances dont nous n'avions jamais
+  vu les résultats**, sans rien changer d'autre. L'effet **est réapparu** (+9,8 %, dans la fourchette
+  enregistrée de +5 à +20) sur une tranche qui s'est révélée *plus difficile* que celle de
+  l'exécution 2. Sur les deux, les paires discordantes sont de **9 pour Chimera contre 2**
+  (p ≈ 2,6 % sous l'hypothèse nulle).
+
+  **Le mécanisme s'est répliqué, et c'est la partie intéressante.** Une quatrième exécution a restauré
+  le bras intermédiaire (échafaudage seul, sans la barrière de diff) sur les mêmes 41 instances, si
+  bien que les trois ne diffèrent que d'un composant. Les trois **éditent au même rythme** (27–28
+  correctifs sur 41) ; ce qui change, c'est la fréquence à laquelle l'édition est *juste* :
+
+  | bras | résolues | **précision quand il a édité** |
+  |---|---|---|
+  | référence | 14/41 | 50 % |
+  | + échafaudage | 16/41 | 59 % |
+  | + échafaudage **et** barrière de diff | 18/41 | 67 % |
+
+  **Les deux composants contribuent, à peu près par moitiés** (+4,9 % chacun, aucun significatif seul)
+  — ce qui **contredit notre propre prédiction enregistrée** selon laquelle l'échafaudage porterait
+  l'essentiel, et retire une lecture de l'exécution 2 affirmant que la barrière de diff « n'est pas ce
+  qui a produit le gain ». La rétractation est dans [`RESULTS.md`](bench/swe_bench/RESULTS.md) ;
+  l'additivité si nette n'est *pas* revendiquée comme un partage 50/50 mesuré, chaque comparaison
+  reposant sur 5–6 paires discordantes.
+
+  ⚠️ À lire honnêtement : **le résultat primaire hors échantillon N'EST PAS significatif.** Le chiffre
+  significatif est le **secondaire groupé**, pré-enregistré comme secondaire précisément parce qu'il
+  mêle données vues et inédites — il n'est pas promu au rang de titre maintenant qu'il a franchi la
+  ligne. Et **48,3 % N'EST PAS un score SWE-bench Verified** : c'est une tranche délibérément facile,
+  d'un seul dépôt ; un vrai score exige les 500 complètes. Le zéro exact de l'exécution 1 est publié
+  tel quel, et l'exécution 2 a livré la **rétractation qu'elle méritait** (le mécanisme que nous
+  avions avancé pour ses correctifs vides était faux — le remède était le budget d'étapes).
+  Source : [`bench/swe_bench/RESULTS.md`](bench/swe_bench/RESULTS.md), [`PREREGISTRATION.md`](bench/swe_bench/PREREGISTRATION.md).
+- **Terminal-Bench (humiliant).** A/B pré-enregistré N=40 sur le benchmark officiel, même modèle dans
+  les deux bras (`deepseek-chat-v3.1`) : **7,5 % → 2,5 %** avec l'échafaudage, **Δ apparié −5,0 pts,
+  IC 95 % [−5,0 %, +1,6 %] — non significatif**. L'échafaudage **n'a pas élevé un modèle déjà
+  compétent** (ce n'est pas le régime faible « boucle d'or » où l'échafaudage aide) ; les deux bras
+  sont à un plancher dominé par la variance.
+  Source : [`bench/terminal_bench/RESULTS.md`](bench/terminal_bench/RESULTS.md).
+- **L'apprentissage accumulé aide-t-il ? Sept exécutions répondent : pas de façon démontrable (et un
+  résultat positif a été rétracté).** Le volant d'inertie — skills conditionnées à la récurrence plus
+  un test de transfert, cartes d'anti-motifs, mémoire persistante — a été mesuré sur **sept exécutions
+  pré-enregistrées**. L'exécution 6 a produit le seul positif de la série (+6,7 % significatif sur la
+  métrique de transfert intra-famille) ; **l'exécution 7, avec plus de puissance, l'a ramené à +2,0 %
+  et non significatif — il a donc été rétracté**, exactement comme le pré-enregistrement s'y était
+  engagé. Le verdict honnête : **aucune exécution suffisamment puissante ne montre que l'apprentissage
+  accumulé améliore la réussite des tâches**, et le goulot d'étranglement est l'instrument — trois
+  tentatives d'écrire une suite tombant dans la plage informative de 40–60 % ont toutes atterri à
+  84–92 %. « Il s'améliore à mesure que vous l'utilisez » reste **sans preuve**.
+  Source : [`bench/learning_lift/RESULTS.md`](bench/learning_lift/RESULTS.md).
+
+Significatif en interne (sur notre propre suite difficile). Sur de vrais dépôts, **répliqué hors
+échantillon et significatif seulement une fois groupé** — l'étiquette honnête, pas la flatteuse.
+Humiliant sur Terminal-Bench. L'affirmation sur l'apprentissage est **rétractée**. Nous publions tout,
+nous écrivons *avant* de lancer la branche où le résultat tue notre propre affirmation, et nous ne
+relançons pas pour obtenir la significativité — ce serait du p-hacking.
 
 ## Économie de tokens — mesurée, pas revendiquée
 
@@ -106,7 +197,7 @@ le chiffre de tokens pour un chiffre en dollars.
 
 ### 🧠 Penser et agir
 - **Combiner plusieurs modèles en une seule réponse** (`chimera fuse`) — un panel de modèles, un juge qui fait ressortir où ils sont d'accord, en désaccord, ou passent à côté de quelque chose, et un synthétiseur qui rédige la réponse finale. Un routeur intelligent ne consacre cet effort supplémentaire qu'aux problèmes difficiles, et lorsque les premiers modèles sont déjà d'accord il s'arrête plus tôt — mesuré à environ **~20–28 % de tokens en moins sans perte de précision** sur nos benchmarks. (La fusion / mixture-of-agents en soi n'a rien d'unique — on la trouve dans OpenRouter et d'autres outils ; la différence ici, c'est qu'elle est intégrée à la boucle de l'agent, derrière ce routeur soucieux du coût, et mesurée, pas un modèle que l'on choisit.)
-- **Terminer des tâches tout seul** (`chimera solve`) — il planifie, agit avec des outils, puis **vérifie et annule** : il lance votre contrôle (par ex. les tests) et ne garde le changement que s'il passe, sinon il l'annule et réessaie. Il peut, en option, travailler sur une copie isolée de votre projet pour que rien ne soit touché tant que ce n'est pas éprouvé.
+- **Terminer des tâches tout seul** (`chimera solve`) — il planifie, agit avec des outils, puis **vérifie et annule** : il lance votre contrôle (par ex. les tests) et ne garde le changement que s'il passe, sinon il l'annule et réessaie. Il peut, en option, travailler sur une copie isolée de votre projet pour que rien ne soit touché tant que ce n'est pas éprouvé. **Et un paragraphe convaincant n'est pas une solution :** sans `--verify` auquel se référer, une exécution qui n'a rien changé sur le disque est signalée comme un échec, pas comme un succès — car la seule chose qui resterait à la juger serait un modèle lisant de la prose, qui ne voit jamais le diff. Chaque tentative enregistre *qui* l'a approuvée (`verifier` / `diff+manager` / `manager` / `none`), pour qu'un reçu ne dise jamais « succès » sans nommer l'autorité derrière.
 - **Des équipes de spécialistes** (`chimera crew`, `chimera crew-isolated`) — plusieurs agents concentrés sur un rôle se partagent une même tâche. En mode isolé, chacun travaille sur sa **propre copie privée en parallèle** ; les modifications sûres sont fusionnées, les conflits sont signalés au lieu d'être écrasés en silence, et les changements d'un mauvais worker peuvent être rejetés par un test propre à chaque worker. Un superviseur peut regrouper le travail de tous en un seul rapport unifié.
 - **Déléguer et explorer** — n'importe quel agent peut confier une sous-tâche autonome à un nouveau **sous-agent** qui ne renvoie que le résultat, gardant le contexte principal propre. Le **Context Explorer** (`chimera explore`) trouve les bons fichiers et les bonnes lignes dans une base de code et renvoie une réponse courte au lieu de tout déverser.
 
@@ -114,6 +205,15 @@ le chiffre de tokens pour un chiffre en dollars.
 - **Mémoire à long terme** — il conserve des mémoires à court terme, récentes, factuelles et vous concernant, plus une carte des relations entre les choses. Il peut stocker ses mémoires dans une base de données full-text rapide, transporter un profil de vos préférences dans chaque conversation, fusionner automatiquement les notes en double, et suggérer gentiment d'enregistrer une préférence quand vous en mentionnez une.
 - **Apprend de nouvelles compétences** — quand il réussit plus d'une fois le même type de tâche, il en fait automatiquement une compétence testée et réutilisable.
 - **Auto-entraînement optionnel (avancé)** — il peut enregistrer sa propre expérience pour que vous puissiez ensuite affiner un modèle à partir de celle-ci. Désactivé par défaut ; rien ne s'entraîne sans que vous le demandiez.
+
+### 📏 Une boucle mesurable — et qui dit quand elle s'est perdue
+Un agent, c'est un modèle **plus tout ce qui l'entoure**. Cette machinerie périphérique décide si une
+longue exécution reste utile, et l'essentiel en est invisible jusqu'à la panne. Chimera mesure la
+sienne :
+
+- **Chaque exécution laisse un reçu.** Une ligne JSONL par exécution dans `traces.jsonl` : tokens par étape, les outils appelés avec ce qu'ils ont renvoyé, l'endroit où l'historique a été abandonné — et le **taux de succès du cache**, la part des tokens de prompt servie depuis le cache par le fournisseur. C'est le véritable chiffre de coût de la boucle (un token en cache coûte environ un dixième d'un token frais : des comptages identiques peuvent donc différer d'environ 10× en prix) *et* une alarme de conception : il s'effondre dès que quelque chose réécrit le début du prompt, ce qui n'a aucun autre symptôme. Un fournisseur qui ne signale aucun cache se lit comme **inconnu**, jamais comme un échec de cache.
+- **Elle remarque quand elle n'avance plus.** Deux choses différentes sont appelées « problème de contexte » : l'attention qui se dilue dans un long prompt, et une *trajectoire* qui cesse discrètement d'accumuler pour se mettre à tourner en rond — chaque étape prise isolément va bien, l'exécution entière ne va nulle part. Le briseur de boucle de Chimera attrape la version serrée (une fenêtre de 12 appels) ; une exécution qui revient sur les trois mêmes fichiers tous les vingt tours la traverse sans déclencher. D'où un second détecteur qui compare la **première moitié d'une exécution à la seconde** : du travail redérivé que l'exécution avait déjà, des échecs en hausse, ou une redondance qui bondit juste après l'abandon d'historique. Il **signale et n'agit pas** — arrêter, replanifier et forcer une compaction sont tous des remèdes plausibles et nous n'avons aucune preuve de celui qui aide ; en choisir un intégrerait précisément l'hypothèse non mesurée que ce travail vise à supprimer.
+- **Les longues exécutions survivent à leur propre contexte.** Épuiser la fenêtre mettait autrefois fin à l'exécution, ce qui faisait de la fenêtre — et non de la difficulté de la tâche — le vrai plafond. La compaction laisse désormais le message système intact (c'est le préfixe stable sur lequel repose tout le cache de prompt), ne laisse jamais un résultat d'outil orphelin de son appel, et **restaure ce dont l'exécution a besoin pour rester elle-même** : le fichier ouvert, le plan, la liste des tâches, l'état courant. Elle dit clairement ce qu'elle a abandonné au lieu de le résumer — un agent peut relire un fichier, mais il ne peut pas décroire un résumé inventé.
 
 ### 🔌 Connecter et automatiser
 - **Parlez-lui n'importe où** — un chat en terminal, une application terminal plein écran, ou comme un bot sur **Discord, Telegram, Slack, Signal et WhatsApp**. Il y a aussi un point d'accès HTTP simple.
@@ -125,6 +225,8 @@ le chiffre de tokens pour un chiffre en dollars.
 - **N'importe quel modèle, une seule interface** — modèles hébergés ou vos propres modèles locaux, avec bascule automatique si l'un est indisponible et rotation entre plusieurs clés.
 - **Déploiement serveur en une commande** — faites-le tourner avec Docker (ou en bare-metal) pour qu'il reste actif et redémarre au reboot. Voir **[docs/deploy.md](docs/deploy.md)**.
 - **Noyau de sécurité** — une vérification sur chaque action (autoriser / avertir / bloquer / demander), un conteneur à réseau isolé **optionnel** pour le code non fiable (`CHIMERA_SANDBOX=docker` ; le runner *local* par défaut n'est *pas* isolé), et un journal d'audit complet de ce qu'il a fait.
+- **Arrêtez-le avant qu'il ne valide quelque chose lu d'une source douteuse** (`--pause-on-taint`) — une exécution qui a consommé du contenu non fiable se met en attente au lieu de finaliser, et vous attend. Vous pouvez accepter le résultat, accepter une version que vous avez modifiée, envoyer des consignes et le laisser réessayer, ou le rejeter — depuis le terminal *ou* depuis l'application de bureau. Rien n'est enregistré et rien n'est appris tant que vous n'avez pas décidé, et une pause n'est jamais rapportée comme un échec : elle n'a pas atteint de verdict, elle attend une personne.
+- **Une application de bureau qui pilote une exécution, pas seulement qui la lance** — cinq destinations au lieu d'un menu de quinze, en neuf langues. Lancez une exécution et partez : la progression est toujours là à votre retour, la barre d'état nomme ce que fait l'agent depuis n'importe quel écran, et Arrêter fonctionne partout. Installateurs natifs pour Windows / macOS / Linux sur [Releases](https://github.com/brcampidelli/chimera-agent/releases).
 
 ## Démarrage rapide
 
@@ -201,7 +303,10 @@ extras voulus (voir la colonne « Requiert »). **Docker ? L'image officielle co
 | **Chat qui se souvient de vous** | — | `chimera chat` |
 | **Poser une question** | — | `chimera run "explique X en 3 points"` |
 | **Application terminal plein écran** | — | `chimera tui` |
+| **Application de bureau** (chat · travail · code · connaissances · automatisation, en 9 langues) | `[desktop]` ou un téléchargement | `chimera app`, ou récupérez un installateur natif (`.exe`/`.dmg`/`.AppImage`/`.deb`) depuis [Releases](https://github.com/brcampidelli/chimera-agent/releases) |
 | **Faire une tâche, la garder seulement si un test passe** | — | `chimera solve "ajoute hello() à app.py + un test" --verify "pytest -q"` |
+| **Me demander avant de valider ce qu'il a lu sur le web** | — | ajoutez `--pause-on-taint` à `chimera solve` |
+| **Voir ce qu'une exécution a réellement coûté, étape par étape** | — | écrit pour vous dans `.chimera/traces.jsonl` (ou `$CHIMERA_HOME`) |
 | **Fusionner plusieurs modèles en une seule réponse** | — | `chimera fuse "votre question" --show-panel` |
 | **Une équipe d'agents spécialistes** | — | `chimera crew "votre tâche" --mode supervisor` |
 | **Mener un projet entier jusqu'au bout** (pause avant les étapes risquées) | — | `chimera project start spec.yaml -w .` |
@@ -356,6 +461,8 @@ uv run pytest -q         # la suite de tests
 
 Les contributions sont les bienvenues — code, documentation, idées, rapports de bugs. Commencez par
 [CONTRIBUTING.md](CONTRIBUTING.md) et notre [Code de conduite](CODE_OF_CONDUCT.md).
+Vous voulez apprendre quelque chose de nouveau à Chimera ? Le **[guide d'extension](docs/extending.md)**
+montre comment ajouter votre propre **outil, skill ou recette** (avec des exemples à copier-coller).
 Vous avez trouvé un problème de sécurité ? Voir [SECURITY.md](SECURITY.md).
 
 ## Communauté
