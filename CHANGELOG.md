@@ -6,6 +6,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **A paragraph no longer counts as a solve.** Without `--verify`, the verdict on a run fell to the
+  Manager — which receives `(task, answer, context)`, never sees the diff or a single file, and has
+  no tool registry at all. So the default path could report success for a run that read some code,
+  wrote a convincing explanation and changed nothing: the empty-patch failure the code already
+  documented ("SWE-bench run 1: 11/19 empty patches"), reachable by default. When nothing was
+  verified **and** nothing changed, that is now a failure. An executable verifier still outranks the
+  diff (a task can legitimately pass without touching a file), `--require-diff` is unchanged, and an
+  *unmeasurable* diff — no workspace guard — is treated as unknown rather than empty.
+- **Every attempt now records who approved it**: `verifier` / `diff+manager` / `manager` / `none`. A
+  receipt that says "success" without naming the authority invites the reader to assume the
+  strongest one.
+
+### Added
+- **Per-step accounting.** Each run keeps a step log — prompt tokens, completion tokens, latency,
+  the tools called and whether history was compacted — written as one JSONL line. The provider
+  already reports `prompt_tokens` per call and that number *is* the context size, so this needed no
+  tokenizer. `context_peak_tokens` is what a budget is spent against and what decides whether raising
+  `max_steps` is safe; `context_growth_per_step` is what says whether a loop is accumulating or
+  churning.
+- **Context as a budget, with compaction.** An overflow used to be terminal (`CONTEXT_OVERFLOW` →
+  abort), which made the window — not the difficulty of the task — the real ceiling on the agent.
+  `context_budget` (off by default) spends a fraction of the window and compacts at a trigger below
+  it, because compaction itself needs room to work. It never touches the system message (the stable
+  prefix the whole prompt cache is keyed on), never leaves a `tool` result orphaned from its call,
+  and **restores** what the run needs to still be itself — the open file, the plan, the task list,
+  the current state. The default note describes what was dropped instead of summarising it: an agent
+  can re-read a file, but it cannot un-believe a fabricated summary.
+- **The desktop app can pilot a run, not just launch one.** A run now lives above the view switch:
+  navigate away mid-run and the progress is still there when you return, the status bar names it
+  from every screen, and Stop works from all of them. Stop stays in "stopping" until the backend's
+  own terminal frame arrives, because cancellation is cooperative; a broken stream is reported as
+  broken rather than as a failed run.
+- **Human-in-the-loop over HTTP.** The approval envelope has been in the core since M13 and was
+  reachable only from the CLI, so the app could arm a pause it had no way to answer. There is now a
+  `paused` stream frame (distinct from `done` — a pause has not reached a verdict), `GET
+  /api/runs/paused` for runs parked before the window was opened, and `POST
+  /api/runs/{thread}/respond` for accept / edit / respond / ignore. Recording a verdict does not
+  conclude the run and the response says so.
+
 ## [0.37.0] - 2026-07-27
 
 ### Changed
