@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from chimera.core.steplog import StepLog, StepRecord, clip, tool_record
 from chimera.core.tool_loop import ToolLoopDetector
 from chimera.governance.ledger import WRITE_TOOLS
 from chimera.providers.gateway import CompletionResult, MessageLike, SupportsComplete
@@ -157,6 +158,9 @@ class AgentResult:
     usd: float | None = None
     tool_names: list[str] = field(default_factory=list)  # names of the tools actually called, in order
     model: str = ""  # the model slug that actually answered (for a per-model usage breakdown)
+    #: Per-step record: context size at each step, and what each tool was asked and answered.
+    #: `steplog.context_peak_tokens` is the number that decides whether raising max_steps is safe.
+    steplog: StepLog = field(default_factory=StepLog)
     # Per-turn fusion/cascade trace from the backend (UI-ready JSON), or None for a single-model turn.
     route_meta: dict[str, Any] | None = None
 
@@ -217,11 +221,23 @@ class Agent:
         tool_calls_made = 0
         tool_names: list[str] = []
         usage = _UsageTally()
+        steplog = StepLog()
         nudged = False
         loop_detector = ToolLoopDetector() if self.config.detect_tool_loops else None
 
         for step in range(1, self.config.max_steps + 1):
             result = self._step(messages, tools=tool_schema, on_token=on_token, usage=usage)
+            # `result.prompt_tokens` is the provider's own count for the prompt we just sent — which
+            # is exactly the live size of the context. Keeping it per step (instead of only summing
+            # it) is the whole cost of knowing how much room is left.
+            record = StepRecord(
+                index=step,
+                prompt_tokens=result.prompt_tokens or 0,
+                completion_tokens=result.completion_tokens or 0,
+                model=result.model,
+                content=clip(result.content or "", 400),
+            )
+            steplog.add(record)
             if not result.tool_calls:
                 # Narrate-instead-of-act guard: if asked to insist on action, push a described-but-
                 # unexecuted plan back once instead of accepting it as done. Only once, so a genuine
@@ -244,7 +260,7 @@ class Agent:
                 messages.append({"role": "assistant", "content": result.content})
                 return self._result(result.content, step, "final", messages, tool_calls_made,
                                     tool_names, usage, result.model,
-                                    route_meta=result.route_meta)
+                                    route_meta=result.route_meta, steplog=steplog)
 
             messages.append(self._assistant_tool_message(result))
             tripped: str | None = None
@@ -260,6 +276,7 @@ class Agent:
                 if on_tool is not None:
                     on_tool(ToolActivity(call.name, call.arguments,
                                          not observation.startswith("error:"), observation))
+                record.tools.append(tool_record(call.name, call.arguments, observation))
                 messages.append(
                     {"role": "tool", "tool_call_id": call.id, "content": observation}
                 )
@@ -280,14 +297,14 @@ class Agent:
                                    tools=None, on_token=on_token, usage=usage)
                 messages.append({"role": "assistant", "content": final.content})
                 return self._result(final.content, step, "tool_loop", messages, tool_calls_made,
-                                    tool_names, usage, final.model)
+                                    tool_names, usage, final.model, steplog=steplog)
 
         # Budget exhausted: ask once more, without tools, for a final answer.
         final = self._step([*messages, {"role": "user", "content": "Provide your final answer now."}],
                            tools=None, on_token=on_token, usage=usage)
         messages.append({"role": "assistant", "content": final.content})
         return self._result(final.content, self.config.max_steps, "max_steps", messages,
-                            tool_calls_made, tool_names, usage, final.model)
+                            tool_calls_made, tool_names, usage, final.model, steplog=steplog)
 
     def _step(
         self,
@@ -324,6 +341,7 @@ class Agent:
         usage: _UsageTally,
         model: str,
         route_meta: dict[str, Any] | None = None,
+        steplog: StepLog | None = None,
     ) -> AgentResult:
         """Assemble the final result, pricing the summed tokens at the model's list rate."""
         from chimera.obs import record_llm_metrics
@@ -347,6 +365,7 @@ class Agent:
             tool_names=tool_names,
             model=model,
             route_meta=route_meta,
+            steplog=steplog if steplog is not None else StepLog(),
         )
 
     def _run_tool(self, name: str, arguments: dict[str, Any]) -> str:
