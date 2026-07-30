@@ -53,6 +53,8 @@ from chimera.api.schemas import (
     GitStatusOut,
     GovernanceAuditOut,
     HealthOut,
+    HitlOut,
+    HitlRequest,
     InjectionReportOut,
     MaturityOut,
     McpAddRequest,
@@ -60,6 +62,7 @@ from chimera.api.schemas import (
     McpTestOut,
     MessagingPlatformOut,
     NewSessionOut,
+    PausedRunOut,
     PlanOut,
     RunReceiptOut,
     ScreenshotOut,
@@ -180,6 +183,13 @@ class RunRequest(BaseModel):
     cascade: bool = False
     """Route the worker through the FrugalGPT cascade (weak → gate → mid → gate → fusion), the same
     wiring as ``chimera solve --cascade``. Takes precedence over ``fuse``. Off = single-model."""
+    thread_id: str | None = None
+    """The run's durable identity. With one, the run is checkpointed: it can pause for approval and
+    a later POST with the SAME thread_id resumes it. None = a one-shot run that cannot be paused."""
+    pause_on_taint: bool = False
+    """Stop before finalizing a run that consumed untrusted content, and wait for a human verdict
+    (POST /api/runs/{thread_id}/respond). Requires ``thread_id`` — there is nowhere to park an
+    unfinished run without one. Off = finalize as before."""
 
 
 # A builder for the per-run autonomous agent, injectable so the endpoint is testable without a real
@@ -574,7 +584,21 @@ def build_api_app(
             try:
                 auto = solve_factory(req, ws, on_event, settings, cancel.is_set)
                 # The receipt persists itself via the agent's run_log at run() — no extra write here.
-                result = auto.run(req.task)
+                result = auto.run(req.task, thread_id=req.thread_id)
+                if getattr(result, "paused", False):
+                    # The run stopped BEFORE finalizing and is parked under its thread. Its own frame,
+                    # not `done`: `done` carries a verdict, and this run has not reached one. A client
+                    # that treated a pause as an ordinary failure would quietly discard work that is
+                    # sitting there waiting to be sanctioned.
+                    emit(
+                        "paused",
+                        {
+                            "thread_id": req.thread_id or "",
+                            "answer": (result.answer or "")[:2000],
+                            "attempts": len(result.attempts),
+                        },
+                    )
+                    return
                 emit(
                     "done",
                     {
@@ -618,6 +642,40 @@ def build_api_app(
             return {"ok": False}
         event.set()
         return {"ok": True}
+
+    @app.get("/api/runs/paused", dependencies=[guard], response_model=list[PausedRunOut])
+    def paused_runs() -> list[dict[str, Any]]:
+        # Every run parked awaiting a verdict. Without this the app could only ever know about a
+        # pause it personally witnessed on an open stream — close the window mid-run and the run is
+        # still sitting there, invisible, holding work nobody can release.
+        from chimera.core.runstate import RunCheckpointer
+
+        store = RunCheckpointer(settings.home / "runs.db")
+        out: list[dict[str, Any]] = []
+        for thread in store.threads():
+            state = store.load(thread)
+            if not state or not state.get("awaiting_approval"):
+                continue  # checkpointed but already answered — resumable, not waiting on a human
+            out.append(
+                {
+                    "thread_id": thread,
+                    "answer": str(state.get("paused_answer") or "")[:2000],
+                    "tainted": bool(state.get("was_tainted", False)),
+                }
+            )
+        return out
+
+    @app.post("/api/runs/{thread_id}/respond", dependencies=[guard], response_model=HitlOut)
+    def respond_run(thread_id: str, req: HitlRequest) -> dict[str, Any]:
+        # The human verdict on a paused run. The whole HITL envelope has lived in the core since
+        # M13 and was reachable only from the CLI, which meant the desktop app could arm a pause it
+        # had no way to answer. Answering does not itself resume: "respond" needs another attempt,
+        # so the client re-POSTs /api/runs with the same thread_id to carry it out.
+        from chimera.core.runstate import RunCheckpointer
+
+        store = RunCheckpointer(settings.home / "runs.db")
+        ok = store.respond(thread_id, req.action, answer=req.answer, feedback=req.feedback)
+        return {"ok": ok, "resume_required": ok, "retries": ok and req.action == "respond"}
 
     @app.get("/api/agents/schema", dependencies=[guard], response_model=AgentsBatchOut)
     def agents_schema_endpoint() -> dict[str, Any]:
@@ -1138,6 +1196,7 @@ def _build_solve_agent(
         AutonomousAgent as _AutonomousAgent,
     )
     from chimera.core.planner import Plan
+    from chimera.core.runstate import RunCheckpointer
     from chimera.core.verify import CommandVerifier
     from chimera.providers import LLMGateway
     from chimera.tools import default_registry
@@ -1176,9 +1235,12 @@ def _build_solve_agent(
     # (so it can be answered rather than only refused) is the follow-up.
     from chimera.governance import TaintLedger, ledger_registry
 
-    registry = ledger_registry(
-        default_registry(ws), TaintLedger(), narrow_on_taint=settings.taint_narrow
-    )
+    # Held rather than passed inline: the same ledger has to reach the agent as ``taint=``, which is
+    # what lets it know the run read untrusted content and is therefore pausable. Building two
+    # ledgers would mean the run that got tainted and the run that gets asked about it are different
+    # objects, and the pause would never fire.
+    ledger = TaintLedger()
+    registry = ledger_registry(default_registry(ws), ledger, narrow_on_taint=settings.taint_narrow)
     # insist_on_action: solve is task completion, so a described-but-unexecuted plan is pushed back
     # to actually run (mirrors the CLI worker config).
     cfg = AgentConfig(model=req.model, max_steps=6, insist_on_action=True)
@@ -1203,6 +1265,12 @@ def _build_solve_agent(
         on_event=on_event,
         # Persist the run receipt (step 3a) to the same append-only log GET /api/runs reads.
         run_log=settings.home / "runs.jsonl",
+        # HITL. The ledger tells the agent whether this run went tainted; the checkpointer is where
+        # a paused run waits. Both only when the client supplied a thread — a pause with no durable
+        # identity is a run nobody can ever come back to, which is worse than not pausing.
+        taint=ledger if req.thread_id else None,
+        checkpointer=RunCheckpointer(settings.home / "runs.db") if req.thread_id else None,
+        pause_on_taint=bool(req.thread_id and req.pause_on_taint),
         config=AutonomousConfig(max_attempts=req.max_attempts),
     )
 

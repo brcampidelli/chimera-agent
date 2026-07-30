@@ -711,6 +711,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/paused": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Paused Runs */
+        get: operations["paused_runs_api_runs_paused_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}/cancel": {
         parameters: {
             query?: never;
@@ -722,6 +739,23 @@ export interface paths {
         put?: never;
         /** Cancel Run */
         post: operations["cancel_run_api_runs__run_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{thread_id}/respond": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Respond Run */
+        post: operations["respond_run_api_runs__thread_id__respond_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1440,6 +1474,27 @@ export interface components {
             /** Status */
             status: string;
         };
+        /** HitlOut */
+        HitlOut: {
+            /** Ok */
+            ok: boolean;
+            /** Resume Required */
+            resume_required: boolean;
+            /** Retries */
+            retries: boolean;
+        };
+        /**
+         * HitlRequest
+         * @description A human verdict on a paused run — the LangGraph ``HumanInterrupt`` envelope.
+         */
+        HitlRequest: {
+            /** Action */
+            action: string;
+            /** Answer */
+            answer?: string | null;
+            /** Feedback */
+            feedback?: string | null;
+        };
         /** InjectionAttackOut */
         InjectionAttackOut: {
             /** Blocked Defended */
@@ -1702,6 +1757,18 @@ export interface components {
             /** Id */
             id: string;
         };
+        /**
+         * PausedRunOut
+         * @description A run that stopped before finalizing and is waiting for a human verdict.
+         */
+        PausedRunOut: {
+            /** Answer */
+            answer: string;
+            /** Tainted */
+            tainted: boolean;
+            /** Thread Id */
+            thread_id: string;
+        };
         /** PlanOut */
         PlanOut: {
             /** Note */
@@ -1795,10 +1862,17 @@ export interface components {
             max_attempts: number;
             /** Model */
             model?: string | null;
+            /**
+             * Pause On Taint
+             * @default false
+             */
+            pause_on_taint: boolean;
             /** Plan */
             plan?: string | null;
             /** Task */
             task: string;
+            /** Thread Id */
+            thread_id?: string | null;
             /** Verify */
             verify?: string | null;
             /** Workspace */
@@ -3377,6 +3451,26 @@ export interface operations {
             };
         };
     };
+    paused_runs_api_runs_paused_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PausedRunOut"][];
+                };
+            };
+        };
+    };
     cancel_run_api_runs__run_id__cancel_post: {
         parameters: {
             query?: never;
@@ -3395,6 +3489,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CancelOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    respond_run_api_runs__thread_id__respond_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                thread_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HitlRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HitlOut"];
                 };
             };
             /** @description Validation Error */

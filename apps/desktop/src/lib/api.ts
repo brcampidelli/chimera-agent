@@ -341,6 +341,8 @@ export interface RunStreamHandlers {
   onError?: (msg: string) => void;
   // The run's id, delivered on the first `run` frame — the handle for POST /api/runs/{id}/cancel.
   onRunId?: (id: string) => void;
+  // The run stopped for a human verdict. Arrives INSTEAD of `onDone`.
+  onPaused?: (p: PausedRun) => void;
 }
 
 /** Trigger an autonomous run and stream its live progress. Mirrors {@link streamChat}: the API's SSE
@@ -400,8 +402,37 @@ function dispatchRun(frame: string, h: RunStreamHandlers): void {
   if (event === "run") h.onRunId?.(payload.run_id as string);
   else if (event === "event") h.onEvent?.(payload as unknown as RunEvent);
   else if (event === "done") h.onDone?.(payload as unknown as RunDone);
+  else if (event === "paused") h.onPaused?.(payload as unknown as PausedRun);
   else if (event === "error") h.onError?.(payload.message as string);
 }
+
+/** A run that stopped before finalizing and is waiting for a human verdict. Arrives on the stream's
+ *  `paused` frame INSTEAD of `done` — a pause is not a verdict, and treating it as a failed run
+ *  would quietly throw away work that is sitting there to be released. */
+export interface PausedRun {
+  thread_id: string;
+  answer: string;
+  tainted?: boolean;
+}
+
+/** Every run parked awaiting a verdict, including ones this window never witnessed. */
+export const getPausedRuns = () => json<PausedRun[]>("/api/runs/paused");
+
+/** The four HITL actions, mirroring the core's LangGraph `HumanInterrupt` envelope. */
+export type HitlAction = "accept" | "edit" | "respond" | "ignore";
+
+/** Record a verdict on a paused run. This does NOT conclude it: every action needs the run to be
+ *  resumed (POST /api/runs with the same thread_id), which is where the answer is finalized. Only
+ *  `respond` spends another attempt — `retries` says so, so the UI can warn before committing it. */
+export const respondRun = (
+  threadId: string,
+  action: HitlAction,
+  body: { answer?: string; feedback?: string } = {},
+) =>
+  json<{ ok: boolean; resume_required: boolean; retries: boolean }>(
+    `/api/runs/${encodeURIComponent(threadId)}/respond`,
+    { method: "POST", body: JSON.stringify({ action, ...body }) },
+  );
 
 /** Cooperatively cancel an in-flight run: the loop halts BEFORE its next attempt (an in-flight model
  *  step can't be interrupted). A finished/unknown id is a no-op {ok:false}, never an error. */

@@ -1324,6 +1324,65 @@
         "title": "HealthOut",
         "type": "object"
       },
+      "HitlOut": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "resume_required": {
+            "title": "Resume Required",
+            "type": "boolean"
+          },
+          "retries": {
+            "title": "Retries",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "resume_required",
+          "retries"
+        ],
+        "title": "HitlOut",
+        "type": "object"
+      },
+      "HitlRequest": {
+        "description": "A human verdict on a paused run \u2014 the LangGraph ``HumanInterrupt`` envelope.",
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          },
+          "feedback": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feedback"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "HitlRequest",
+        "type": "object"
+      },
       "InjectionAttackOut": {
         "properties": {
           "blocked_defended": {
@@ -2053,6 +2112,30 @@
         "title": "NewSessionOut",
         "type": "object"
       },
+      "PausedRunOut": {
+        "description": "A run that stopped before finalizing and is waiting for a human verdict.",
+        "properties": {
+          "answer": {
+            "title": "Answer",
+            "type": "string"
+          },
+          "tainted": {
+            "title": "Tainted",
+            "type": "boolean"
+          },
+          "thread_id": {
+            "title": "Thread Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "thread_id",
+          "answer",
+          "tainted"
+        ],
+        "title": "PausedRunOut",
+        "type": "object"
+      },
       "PlanOut": {
         "properties": {
           "note": {
@@ -2298,6 +2381,11 @@
             ],
             "title": "Model"
           },
+          "pause_on_taint": {
+            "default": false,
+            "title": "Pause On Taint",
+            "type": "boolean"
+          },
           "plan": {
             "anyOf": [
               {
@@ -2312,6 +2400,17 @@
           "task": {
             "title": "Task",
             "type": "string"
+          },
+          "thread_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thread Id"
           },
           "verify": {
             "anyOf": [
@@ -4653,6 +4752,28 @@
         "summary": "Run Stream"
       }
     },
+    "/api/runs/paused": {
+      "get": {
+        "operationId": "paused_runs_api_runs_paused_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PausedRunOut"
+                  },
+                  "title": "Response Paused Runs Api Runs Paused Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Paused Runs"
+      }
+    },
     "/api/runs/{run_id}/cancel": {
       "post": {
         "operationId": "cancel_run_api_runs__run_id__cancel_post",
@@ -4690,6 +4811,55 @@
           }
         },
         "summary": "Cancel Run"
+      }
+    },
+    "/api/runs/{thread_id}/respond": {
+      "post": {
+        "operationId": "respond_run_api_runs__thread_id__respond_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "thread_id",
+            "required": true,
+            "schema": {
+              "title": "Thread Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HitlRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HitlOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Respond Run"
       }
     },
     "/api/sessions": {

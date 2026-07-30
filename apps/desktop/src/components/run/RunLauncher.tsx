@@ -1,10 +1,14 @@
 import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { Loader2, Play } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Loader2, Play, Square } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
-import { streamRun, type RunEvent } from "@/lib/api";
+import { Switch } from "@/components/ui/switch";
+import { PausedRunCard } from "@/components/run/PausedRunCard";
+import { focusRing } from "@/components/ui/focus";
+import { getPausedRuns, type RunEvent } from "@/lib/api";
+import { useRunSession } from "@/lib/run-session";
 import { useT, type TFunc } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -17,68 +21,72 @@ const fieldCls = "field w-full px-3 text-sm";
  * same thing — a task, an optional verify command, an attempt budget — and all drifting apart,
  * because the only thing holding them in sync was whoever remembered to edit all three.
  *
- * They converge on code, not on a screen. `variant="inline"` is what lets Code keep its run scoped
- * to the workspace it already has open instead of asking for one.
+ * The form is local; the RUN is not. It lives in the shell's run session, so leaving this screen
+ * no longer abandons it: come back and the progress is still here, and the Stop below is the same
+ * Stop the status bar offers from every other screen.
  */
 export function RunLauncher({
   variant = "panel",
   workspace,
-  onLine,
-  onFinished,
 }: {
   variant?: "panel" | "inline";
   /** Fixed workspace. When given, the field is hidden — Code already knows where it is working. */
   workspace?: string;
-  /** Each human-readable progress line, already formatted. */
-  onLine?: (line: string) => void;
-  onFinished?: (success: boolean) => void;
 }) {
   const t = useT();
   const qc = useQueryClient();
+  const run = useRunSession();
   const [task, setTask] = useState("");
   const [verify, setVerify] = useState("");
   const [ws, setWs] = useState("");
   const [maxAttempts, setMaxAttempts] = useState(3);
-  const [running, setRunning] = useState(false);
-  const [lines, setLines] = useState<string[]>([]);
+  const [pauseOnTaint, setPauseOnTaint] = useState(false);
+  // Runs parked before this window opened. A pause outlives the stream that reported it, so the
+  // only way to see one you did not personally witness is to ask.
+  const parked = useQuery({ queryKey: ["runs", "paused"], queryFn: getPausedRuns });
 
-  const append = (s: string) => {
-    setLines((prev) => [...prev, s]);
-    onLine?.(s);
+  const running = run.running;
+  const invalidate = () => {
+    void qc.invalidateQueries({ queryKey: ["runs"] });
   };
+
+  /** The run request for a thread, so start and resume cannot drift apart. */
+  const request = (threadId: string | null) => ({
+    task: task.trim(),
+    verify: verify.trim() || null,
+    workspace: workspace ?? (ws.trim() || null),
+    max_attempts: maxAttempts,
+    thread_id: threadId,
+    pause_on_taint: pauseOnTaint,
+  });
 
   function start() {
     if (!task.trim() || running) return;
-    setRunning(true);
-    setLines([]);
-    const finish = (success: boolean) => {
-      setRunning(false);
-      onFinished?.(success);
-      void qc.invalidateQueries({ queryKey: ["runs"] });
-    };
-    void streamRun(
-      {
-        task: task.trim(),
-        verify: verify.trim() || null,
-        workspace: workspace ?? (ws.trim() || null),
-        max_attempts: maxAttempts,
-      },
-      {
-        onEvent: (e) => {
-          const line = liveLine(e, t);
-          if (line) append(line);
-        },
-        onDone: (d) => {
-          append(d.success ? t("runs.doneOk") : t("runs.doneFail"));
-          finish(d.success);
-        },
-        onError: () => {
-          append(t("runs.doneFail"));
-          finish(false);
-        },
-      },
-    );
+    // A thread only when the run can actually pause: without one there is nowhere to park it, and
+    // an unthreaded run is the cheaper, unchanged path.
+    const threadId = pauseOnTaint ? `run-${Date.now().toString(36)}` : null;
+    run.start(request(threadId), { onDone: invalidate });
   }
+
+  /** Carry out a recorded verdict. Recording it did not conclude the run — this does. */
+  function resume(threadId: string) {
+    run.clearPaused();
+    // Keeps pause_on_taint armed: for accept/edit the resume finalizes without re-running, so the
+    // flag is moot, but "respond" makes a fresh attempt that can read untrusted content again and
+    // must be able to stop and ask a second time.
+    run.start(request(threadId), {
+      onDone: () => {
+        invalidate();
+        void qc.invalidateQueries({ queryKey: ["runs", "paused"] });
+      },
+    });
+  }
+
+  // Formatted here rather than stored formatted: the session holds raw events so the transcript
+  // follows the current language instead of freezing in whichever one was active at the time.
+  const lines = run.events.map((e) => liveLine(e, t)).filter((l): l is string => l !== null);
+  if (run.done) lines.push(run.done.success ? t("runs.doneOk") : t("runs.doneFail"));
+  else if (run.broken) lines.push(t("runs.doneFail"));
 
   const body = (
     <div className={cn("space-y-2.5", variant === "panel" && "px-4 py-3")}>
@@ -132,9 +140,52 @@ export function RunLauncher({
             </>
           )}
         </Button>
+        {running && (
+          <button
+            type="button"
+            onClick={run.stop}
+            // Disabled until the backend has handed us the run's id: there is nothing to address a
+            // cancel to before the first frame arrives.
+            disabled={!run.runId || run.stopping}
+            className={cn(
+              "flex items-center gap-1.5 rounded-chip border border-hairline px-2.5 py-1 text-xs",
+              "transition-colors duration-1 ease-out hover:text-foreground disabled:opacity-50",
+              focusRing,
+            )}
+          >
+            <Square className="h-3 w-3" />
+            {t("composer.stop")}
+          </button>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        <Switch
+          checked={pauseOnTaint}
+          onChange={setPauseOnTaint}
+          label={t("runs.pauseOnTaint")}
+          disabled={running}
+        />
+        {/* aria-hidden: the switch already carries this exact text as its accessible name, and a
+            screen reader would otherwise read the whole sentence twice. */}
+        <span aria-hidden className="text-xs text-muted-foreground">
+          {t("runs.pauseOnTaint")}
+        </span>
       </div>
       <p className="text-xs text-muted-foreground">{t("runs.safetyNote")}</p>
       <RunStream lines={lines} />
+
+      {/* The live pause first, then any parked from before this window existed — deduplicated, so a
+          run that just paused is not also listed as an old one. */}
+      {[
+        ...(run.paused ? [run.paused] : []),
+        ...(parked.data ?? []).filter((p) => p.thread_id !== run.paused?.thread_id),
+      ].map((p) => (
+        <PausedRunCard
+          key={p.thread_id}
+          run={p}
+          onResolved={(threadId) => resume(threadId)}
+        />
+      ))}
     </div>
   );
 

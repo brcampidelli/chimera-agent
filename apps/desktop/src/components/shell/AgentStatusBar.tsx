@@ -4,6 +4,7 @@ import { BrandMark } from "@/components/BrandMark";
 import { VersionBadge } from "@/components/VersionBadge";
 import { focusRing } from "@/components/ui/focus";
 import { useAgent } from "@/lib/agent-context";
+import { useRunSession } from "@/lib/run-session";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -22,7 +23,11 @@ import { cn } from "@/lib/utils";
 export function AgentStatusBar({ onOpenUsage }: { onOpenUsage?: () => void }) {
   const t = useT();
   const { status, tools, report, busy, stop } = useAgent();
-  const idle = status === "idle";
+  const run = useRunSession();
+  // A live run outranks the chat turn as the subject of this bar. Both can be going at once, but
+  // only one of them is the thing you might have walked away from — a chat turn finishes in
+  // seconds and you are looking at it; a run takes minutes and is the reason this bar exists.
+  const idle = status === "idle" && !run.running;
   // Not `.at(-1)`: the project targets ES2020, and widening lib for one call is a
   // disproportionate change.
   const lastTool = tools.length > 0 ? tools[tools.length - 1] : undefined;
@@ -41,19 +46,30 @@ export function AgentStatusBar({ onOpenUsage }: { onOpenUsage?: () => void }) {
       {/* The single announcement channel for agent state. Transitions only — announcing the
           streaming text itself would re-read the whole growing answer on every token. */}
       <span role="status" aria-live="polite" className="font-medium">
-        {t(`activity.${status}`)}
+        {run.running ? t("runs.running") : t(`activity.${status}`)}
       </span>
 
-      {lastTool && (
+      {run.running ? (
+        // Which run. Without the task text the bar says something is happening but not what, which
+        // is exactly the state you are in after navigating away and forgetting.
         <>
           <Separator />
-          <span className="truncate font-mono">
-            {lastTool.name} {lastTool.ok ? "✓" : "✗"}
-          </span>
+          <span className="truncate">{run.task}</span>
         </>
+      ) : (
+        lastTool && (
+          <>
+            <Separator />
+            <span className="truncate font-mono">
+              {lastTool.name} {lastTool.ok ? "✓" : "✗"}
+            </span>
+          </>
+        )
       )}
 
-      {report && (
+      {/* The turn's cost belongs to the chat turn that produced it. Showing it beside a run's
+          status would read as that run's cost, which it is not. */}
+      {!run.running && report && (
         <>
           <Separator />
           {/* Prompt + completion, matching what the Activity panel shows for the same turn. */}
@@ -77,11 +93,15 @@ export function AgentStatusBar({ onOpenUsage }: { onOpenUsage?: () => void }) {
 
       <div className="flex-1" />
 
-      {busy && (
+      {(busy || run.running) && (
         <button
           type="button"
-          onClick={stop}
+          // Stops whatever this bar is currently reporting on. The run takes precedence for the
+          // same reason it does above: it is the one you can leave behind.
+          onClick={run.running ? run.stop : stop}
+          disabled={run.running && (!run.runId || run.stopping)}
           className={cn(
+            "disabled:opacity-50",
             "flex items-center gap-1.5 rounded-chip border border-hairline px-2 py-0.5",
             "transition-colors duration-1 ease-out hover:text-foreground",
             focusRing,

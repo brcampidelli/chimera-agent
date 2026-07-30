@@ -16,6 +16,7 @@ import { AppShell } from "@/components/shell/AppShell";
 import { CommandPalette, type Command } from "@/components/shell/CommandPalette";
 import { useHotkeys } from "@/lib/hotkeys";
 import { AgentProvider } from "@/lib/agent-context";
+import { RunSessionProvider } from "@/lib/run-session";
 import { Spinner } from "@/components/ui/panel";
 import { ErrorState } from "@/components/ui/async";
 import { deleteSession, getDoctor, getSession, listSessions, streamChat } from "@/lib/api";
@@ -228,6 +229,10 @@ export default function App() {
   const isChat = view === "chat";
   return (
     <AgentProvider value={{ status, tools, report, busy, stop }}>
+      {/* Above the view switch on purpose: a run outlives the screen that started it, so its state
+          cannot live inside that screen. This is what keeps the progress and the Stop alive when
+          you navigate away mid-run. */}
+      <RunSessionProvider>
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} commands={commands} />
       <AppShell
         ignite={ignite}
@@ -293,6 +298,7 @@ export default function App() {
         {view === "maturity" && import.meta.env.DEV && <Maturity />}
         {view === "settings" && <Settings />}
       </AppShell>
+      </RunSessionProvider>
     </AgentProvider>
   );
 }

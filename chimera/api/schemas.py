@@ -348,6 +348,32 @@ class CancelOut(BaseModel):
     # (a no-op — cancellation is COOPERATIVE: the run halts before its NEXT attempt, never mid model-call)
 
 
+class PausedRunOut(BaseModel):
+    """A run that stopped before finalizing and is waiting for a human verdict."""
+
+    thread_id: str  # its durable identity — the handle for POST /api/runs/{thread_id}/respond
+    answer: str  # what the run WOULD have finalized; the thing being sanctioned or rejected
+    tainted: bool  # True when the pause is because the run consumed untrusted content
+
+
+class HitlRequest(BaseModel):
+    """A human verdict on a paused run — the LangGraph ``HumanInterrupt`` envelope."""
+
+    action: str  # accept | edit | respond | ignore
+    answer: str | None = None  # for "edit": the corrected answer to finalize INSTEAD of the model's
+    feedback: str | None = None  # for "respond": guidance fed back so the run tries again
+
+
+class HitlOut(BaseModel):
+    ok: bool  # False when the thread is unknown, not awaiting approval, or the action is unrecognised
+    # (a no-op, 200 — a verdict on a run that already resolved is exactly what a stale click sends)
+    resume_required: bool  # True whenever ok. Recording the verdict does not conclude the run: EVERY
+    # action (accept included) needs the client to re-POST /api/runs with the same thread_id, which is
+    # where the answer is finalized, the receipt written and the checkpoint cleared.
+    retries: bool  # True only for "respond": that resume makes ANOTHER attempt with the feedback.
+    # accept/edit/ignore conclude on the reviewed output without re-running the worker.
+
+
 class BatchCancelOut(BaseModel):
     ok: bool  # True when the batch_id was known AND the request named real task(s); False for a
     # finished/unknown batch or an out-of-range index (a no-op, 200 — never a 404)
