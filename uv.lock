@@ -508,7 +508,7 @@ wheels = [
 
 [[package]]
 name = "chimera-agent"
-version = "0.36.2"
+version = "0.37.0"
 source = { editable = "." }
 dependencies = [
     { name = "croniter" },
