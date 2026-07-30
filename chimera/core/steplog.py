@@ -61,6 +61,9 @@ class StepRecord:
     #: The assistant's text for this step, clipped. Empty on a pure tool-call step.
     content: str = ""
     tools: list[ToolRecord] = field(default_factory=list)
+    #: Whether the context was compacted right after this step. Marks where history was dropped,
+    #: which is the first thing to check when an agent starts contradicting its earlier self.
+    compacted: bool = False
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -69,6 +72,7 @@ class StepRecord:
             "completion_tokens": self.completion_tokens,
             "model": self.model,
             "content": self.content,
+            "compacted": self.compacted,
             "tools": [
                 {"name": t.name, "arguments": t.arguments, "observation": t.observation, "ok": t.ok}
                 for t in self.tools
@@ -95,6 +99,11 @@ class StepLog:
         return max((s.prompt_tokens for s in self.steps), default=0)
 
     @property
+    def compactions(self) -> int:
+        """How many times history was dropped during the run."""
+        return sum(1 for s in self.steps if s.compacted)
+
+    @property
     def context_growth_per_step(self) -> float:
         """Mean tokens added to the prompt per step, from the first measured step to the last.
 
@@ -110,6 +119,7 @@ class StepLog:
         return {
             "context_peak_tokens": self.context_peak_tokens,
             "context_growth_per_step": round(self.context_growth_per_step, 1),
+            "compactions": self.compactions,
             "steps": [s.as_dict() for s in self.steps],
         }
 

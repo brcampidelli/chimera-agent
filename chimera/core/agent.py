@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from chimera.core.context_budget import ContextBudget, RunState, compact
 from chimera.core.steplog import StepLog, StepRecord, clip, tool_record
 from chimera.core.tool_loop import ToolLoopDetector
 from chimera.governance.ledger import WRITE_TOOLS
@@ -112,6 +113,13 @@ class AgentConfig:
     # so the model knows which learned procedures apply. Keyword-scored, so nothing is injected when
     # nothing matches. This is what connects the built-in skill library to the running loop.
     inject_skill_context: bool = True
+    # Context budget. None (the default) keeps the historical behaviour: the message list only grows
+    # and an overflow is terminal. A fraction spends that share of the model's advertised window on
+    # the prompt, compacting once the prompt crosses `trigger` of it. Off by default because
+    # compaction discards messages, and a caller that has not asked for that should not get it.
+    context_budget: float | None = None
+    #: Turns kept verbatim at the tail when compacting — where the current sub-task lives.
+    keep_recent: int = 6
 
 
 @dataclass
@@ -178,6 +186,14 @@ class Agent:
         self.backend = backend
         self.tools = tools
         self.config = config or AgentConfig()
+        self._budget = (
+            ContextBudget.for_model(self.config.model or "", fraction=self.config.context_budget)
+            if self.config.context_budget
+            else None
+        )
+        #: What a compaction must restore. A caller that knows the open file, the plan or the task
+        #: list assigns it here; left empty, compaction still keeps the recent tail.
+        self.run_state = RunState()
         # The skill library surfaced as context. Defaults to the built-in registry (lazy, shared),
         # so every construction site picks up skills without changes; pass an explicit one to override.
         self.skills = skills
@@ -238,6 +254,24 @@ class Agent:
                 content=clip(result.content or "", 400),
             )
             steplog.add(record)
+            # Compaction is decided AFTER the call, on the provider's real count for the prompt we
+            # just sent — the most accurate number available, and free. The next step's prompt is
+            # this one plus whatever we are about to append, so acting here means acting one step
+            # before the wall rather than at it.
+            if (
+                self._budget is not None
+                and result.prompt_tokens
+                and self._budget.should_compact(result.prompt_tokens)
+            ):
+                messages, compacted = compact(
+                    messages, keep_recent=self.config.keep_recent, state=self.run_state
+                )
+                if compacted:
+                    record.compacted = True
+                    _log.info(
+                        "compacted at %d tokens (threshold %d of %d-token window)",
+                        result.prompt_tokens, self._budget.threshold, self._budget.window,
+                    )
             if not result.tool_calls:
                 # Narrate-instead-of-act guard: if asked to insist on action, push a described-but-
                 # unexecuted plan back once instead of accepting it as done. Only once, so a genuine
