@@ -25,7 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   already reports `prompt_tokens` per call and that number *is* the context size, so this needed no
   tokenizer. `context_peak_tokens` is what a budget is spent against and what decides whether raising
   `max_steps` is safe; `context_growth_per_step` is what says whether a loop is accumulating or
-  churning.
+  churning. It also records the **cache hit rate** — the share of prompt tokens the provider served
+  from cache. That is the loop's most useful cost number (a cached token costs roughly a tenth of a
+  fresh one, so two runs with identical token counts can differ ~10x in price) and a design signal:
+  the rate collapses whenever something rewrites the front of the prompt, which has no other
+  symptom. A provider that reports no cache usage reads as *unknown*, never as a miss.
 - **Context as a budget, with compaction.** An overflow used to be terminal (`CONTEXT_OVERFLOW` →
   abort), which made the window — not the difficulty of the task — the real ceiling on the agent.
   `context_budget` (off by default) spends a fraction of the window and compacts at a trigger below
