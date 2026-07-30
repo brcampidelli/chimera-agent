@@ -150,3 +150,32 @@ def test_trace_writes_one_line_per_run(tmp_path: Path) -> None:
     assert first["context_peak_tokens"] == 1200
     assert first["stopped_reason"] == "final"
     assert first["steps"][0]["tools"][0]["name"] == "echo"
+
+
+# --- cache accounting -------------------------------------------------------------------------
+
+def test_cache_hit_rate_is_a_share_of_the_prompt_not_of_the_steps() -> None:
+    log = StepLog()
+    log.add(StepRecord(index=1, prompt_tokens=1000, completion_tokens=10, cached_tokens=900, model="m"))
+    log.add(StepRecord(index=2, prompt_tokens=1000, completion_tokens=10, cached_tokens=100, model="m"))
+    # Averaging per-step rates would say 50%. What is billed is tokens, and half of these 2000 were
+    # served from cache — which is the number that predicts the invoice.
+    assert log.cache_hit_rate == 0.5
+
+
+def test_a_silent_provider_is_not_a_cache_miss() -> None:
+    log = StepLog()
+    log.add(StepRecord(index=1, prompt_tokens=1000, completion_tokens=10, cached_tokens=None, model="m"))
+    # Scoring silence as 0% would read as a broken prompt prefix and send someone off to fix a
+    # cache that was never reported on in the first place.
+    assert log.cache_hit_rate is None
+    assert log.as_dict()["cache_hit_rate"] is None
+
+
+def test_steps_without_a_cache_report_are_excluded_rather_than_counted_as_misses() -> None:
+    log = StepLog()
+    log.add(StepRecord(index=1, prompt_tokens=1000, completion_tokens=10, cached_tokens=800, model="m"))
+    log.add(StepRecord(index=2, prompt_tokens=1000, completion_tokens=10, cached_tokens=None, model="m"))
+    # Only the step that reported counts: 800/1000. Folding the silent step in would report 40% and
+    # understate a cache that is working.
+    assert log.cache_hit_rate == 0.8

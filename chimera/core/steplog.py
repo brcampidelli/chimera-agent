@@ -58,6 +58,11 @@ class StepRecord:
     prompt_tokens: int
     completion_tokens: int
     model: str
+    #: Prompt tokens the provider served from its cache — the part of ``prompt_tokens`` that was
+    #: roughly a tenth of the price. None when the provider reports no cache usage at all, which is
+    #: NOT the same as a miss and must not be counted as one. Defaulting to None rather than 0 means
+    #: a call site that forgets it reports "unknown", never a cache miss that did not happen.
+    cached_tokens: int | None = None
     #: The assistant's text for this step, clipped. Empty on a pure tool-call step.
     content: str = ""
     tools: list[ToolRecord] = field(default_factory=list)
@@ -70,6 +75,7 @@ class StepRecord:
             "index": self.index,
             "prompt_tokens": self.prompt_tokens,
             "completion_tokens": self.completion_tokens,
+            "cached_tokens": self.cached_tokens,
             "model": self.model,
             "content": self.content,
             "compacted": self.compacted,
@@ -104,6 +110,28 @@ class StepLog:
         return sum(1 for s in self.steps if s.compacted)
 
     @property
+    def cache_hit_rate(self) -> float | None:
+        """Share of prompt tokens the provider served from cache, across the whole run.
+
+        The single most useful cost number a loop produces, because a cached prompt token costs
+        roughly a tenth of a fresh one — so the same run can differ ~10x in price on this alone. It
+        is also a design signal: the rate collapses when something rewrites the front of the prompt
+        (a mutated system message, a re-ordered tool list, a timestamp in the preamble), which is a
+        bug you cannot see any other way.
+
+        Returns None when NO step reported cache usage — the provider is silent, not missing. A
+        silent provider scored as 0% would read as a broken cache and invite someone to go fix a
+        prefix that was never the problem.
+        """
+        reported = [s for s in self.steps if s.cached_tokens is not None]
+        if not reported:
+            return None
+        prompt = sum(s.prompt_tokens for s in reported)
+        if prompt <= 0:
+            return None
+        return sum(s.cached_tokens or 0 for s in reported) / prompt
+
+    @property
     def context_growth_per_step(self) -> float:
         """Mean tokens added to the prompt per step, from the first measured step to the last.
 
@@ -119,6 +147,9 @@ class StepLog:
         return {
             "context_peak_tokens": self.context_peak_tokens,
             "context_growth_per_step": round(self.context_growth_per_step, 1),
+            "cache_hit_rate": (
+                None if self.cache_hit_rate is None else round(self.cache_hit_rate, 3)
+            ),
             "compactions": self.compactions,
             "steps": [s.as_dict() for s in self.steps],
         }

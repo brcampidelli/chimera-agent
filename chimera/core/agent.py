@@ -250,6 +250,9 @@ class Agent:
                 index=step,
                 prompt_tokens=result.prompt_tokens or 0,
                 completion_tokens=result.completion_tokens or 0,
+                # Passed through as-is, None included: "the provider said nothing" and "the cache
+                # missed" are different facts, and collapsing them to 0 would invent a diagnosis.
+                cached_tokens=result.cache_read_tokens,
                 model=result.model,
                 content=clip(result.content or "", 400),
             )
