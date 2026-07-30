@@ -179,3 +179,68 @@ def test_steps_without_a_cache_report_are_excluded_rather_than_counted_as_misses
     # Only the step that reported counts: 800/1000. Folding the silent step in would report 40% and
     # understate a cache that is working.
     assert log.cache_hit_rate == 0.8
+
+
+# --- the trace actually reaching disk -----------------------------------------------------------
+
+def test_the_loop_writes_its_trace_when_a_path_is_configured(tmp_path: Path) -> None:
+    """A step log nothing ever persists is a measurement with no consumer.
+
+    The writer existed from the start and had no caller: every number the loop took died with the
+    process. `trace_path` is what connects them.
+    """
+
+    from chimera.core import Agent, AgentConfig
+    from chimera.providers import CompletionResult
+    from chimera.tools import ToolRegistry
+
+    class _Backend:
+        def complete(self, messages: list[Any], *, tools: Any = None, **kwargs: Any) -> Any:
+            return CompletionResult(
+                content="done", model="fake", prompt_tokens=120, completion_tokens=8
+            )
+
+    trace = tmp_path / "traces.jsonl"
+    agent = Agent(_Backend(), ToolRegistry(), AgentConfig(max_steps=3, trace_path=trace))
+    agent.run("the task")
+
+    line = json.loads(trace.read_text(encoding="utf-8").strip())
+    assert line["task"] == "the task"
+    assert line["stopped_reason"] == "final"
+    assert line["context_peak_tokens"] == 120
+    assert line["drift"]["assessed"] is False  # too short to say, and it says so
+
+
+def test_no_trace_path_writes_nothing(tmp_path: Path) -> None:
+
+    from chimera.core import Agent, AgentConfig
+    from chimera.providers import CompletionResult
+    from chimera.tools import ToolRegistry
+
+    class _Backend:
+        def complete(self, messages: list[Any], *, tools: Any = None, **kwargs: Any) -> Any:
+            return CompletionResult(content="done", model="fake", prompt_tokens=100)
+
+    Agent(_Backend(), ToolRegistry(), AgentConfig(max_steps=2)).run("t")
+    # Disk the caller did not ask for is not a default anyone should inherit.
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_an_unwritable_trace_does_not_take_the_run_down(tmp_path: Path) -> None:
+
+    from chimera.core import Agent, AgentConfig
+    from chimera.providers import CompletionResult
+    from chimera.tools import ToolRegistry
+
+    class _Backend:
+        def complete(self, messages: list[Any], *, tools: Any = None, **kwargs: Any) -> Any:
+            return CompletionResult(content="done", model="fake", prompt_tokens=100)
+
+    blocker = tmp_path / "blocked"
+    blocker.write_text("i am a file, not a directory", encoding="utf-8")
+    agent = Agent(
+        _Backend(), ToolRegistry(), AgentConfig(max_steps=2, trace_path=blocker / "traces.jsonl")
+    )
+    # The answer is the product; the trace is evidence about how it was reached. Losing the evidence
+    # must never cost the work.
+    assert agent.run("t").answer == "done"

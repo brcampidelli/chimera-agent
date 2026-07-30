@@ -21,7 +21,10 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from chimera.core.context_drift import DriftReport
 
 # Enough to recognise a call and see how a result begins or ends; far too little to reconstruct a
 # 20k-char file dump. Diffs and verifier output already have their own richer receipts.
@@ -132,6 +135,18 @@ class StepLog:
         return sum(s.cached_tokens or 0 for s in reported) / prompt
 
     @property
+    def drift(self) -> DriftReport:
+        """Whether this trajectory stopped getting anywhere. See :mod:`chimera.core.context_drift`.
+
+        Short runs come back ``assessed=False`` — which is the honest answer, not a clean bill of
+        health. With the default eight-step budget that is every run: drift needs a trajectory long
+        enough to have a shape, which is the configuration the context budget made survivable.
+        """
+        from chimera.core.context_drift import assess
+
+        return assess(self.steps)
+
+    @property
     def context_growth_per_step(self) -> float:
         """Mean tokens added to the prompt per step, from the first measured step to the last.
 
@@ -151,6 +166,9 @@ class StepLog:
                 None if self.cache_hit_rate is None else round(self.cache_hit_rate, 3)
             ),
             "compactions": self.compactions,
+            # In the trace itself, so a run is self-describing: whoever reads this back should not
+            # have to re-derive by hand whether the trajectory was still going somewhere.
+            "drift": self.drift.as_dict(),
             "steps": [s.as_dict() for s in self.steps],
         }
 

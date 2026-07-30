@@ -6,6 +6,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Context drift detection.** Two different failures get called "context problems" and they need
+  different instruments. *Rot* happens inside one step — attention thins across a long prompt. *Drift*
+  happens across a trajectory: nothing is wrong with any individual step, but over dozens of turns the
+  run stops accumulating and starts circling. The existing tool-loop breaker watches a 12-call sliding
+  window and catches the tight version; a run that revisits the same three files every twenty turns
+  passes straight through it. `chimera.core.context_drift` answers the other question — *has this run
+  stopped getting anywhere?* — from three signals, each a **comparison of the early half against the
+  late half**, never a total:
+  - **redundancy** — tool calls that re-derived a `(tool, args, observation)` triple the run already
+    had. The observation is part of the key: read → edit → read is the same call with a *different*
+    answer, which is progress, and keying on `(tool, args)` alone would punish the most ordinary shape
+    in a coding run.
+  - **failure** — tool failures climbing as the run goes on. A run that was broken from step one is a
+    different problem with a different fix, and is not flagged.
+  - **post-compaction** — redundancy jumping right after history was dropped. Its own signal because
+    it names a mechanism: the fix is the restoration payload, not the task.
+  A signal must clear an absolute floor **and** a ratio, so a run whose redundancy is high but flat is
+  deliberately not flagged. Runs too short to have a shape come back `assessed=False` — which is not a
+  clean bill of health, and the report keeps the two apart. The detector reports and does not act:
+  stopping, re-planning and force-compacting are all plausible responses and there is no evidence yet
+  about which one helps.
+- **The trace is now written.** The step log had a writer with no caller, so every measurement the
+  loop took died with the process. `chimera solve` and the desktop's run endpoint both append one
+  JSONL line per run to `traces.jsonl` — per-step tokens, cache hit rate, tools, and the drift
+  assessment. Off unless a path is set, and a trace that cannot be written never takes the run down
+  with it.
+
 ### Changed
 - **A paragraph no longer counts as a solve.** Without `--verify`, the verdict on a run fell to the
   Manager — which receives `(task, answer, context)`, never sees the diff or a single file, and has

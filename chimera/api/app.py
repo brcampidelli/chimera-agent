@@ -1243,7 +1243,14 @@ def _build_solve_agent(
     registry = ledger_registry(default_registry(ws), ledger, narrow_on_taint=settings.taint_narrow)
     # insist_on_action: solve is task completion, so a described-but-unexecuted plan is pushed back
     # to actually run (mirrors the CLI worker config).
-    cfg = AgentConfig(model=req.model, max_steps=6, insist_on_action=True)
+    cfg = AgentConfig(
+        model=req.model,
+        max_steps=6,
+        insist_on_action=True,
+        # Same trace the CLI writes, in the same place — a run started from the app and one started
+        # from a terminal should leave the same evidence.
+        trace_path=settings.home / "traces.jsonl",
+    )
     worker = Agent(backend, registry, cfg)
     escalate_worker = (
         Agent(escalate_backend, registry, cfg) if escalate_backend is not None else None

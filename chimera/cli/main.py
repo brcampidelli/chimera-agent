@@ -2536,7 +2536,15 @@ def solve(
             )
         # insist_on_action: solve is autonomous task completion, so a described-but-unexecuted plan
         # is pushed back to actually run — the fix for the worker narrating instead of acting.
-        _worker_cfg = AgentConfig(model=model, max_steps=max_steps, insist_on_action=True)
+        _worker_cfg = AgentConfig(
+            model=model,
+            max_steps=max_steps,
+            insist_on_action=True,
+            # One JSONL line per worker run: per-step tokens, cache hit rate, the tools called, and
+            # the drift assessment. This is the only place the step log is persisted, so without it
+            # every measurement the loop takes dies with the process.
+            trace_path=settings.home / "traces.jsonl",
+        )
         worker = Agent(backend, registry, _worker_cfg)
         escalate_worker = (
             Agent(escalate_backend, registry, _worker_cfg)

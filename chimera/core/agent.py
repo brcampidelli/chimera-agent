@@ -120,6 +120,11 @@ class AgentConfig:
     context_budget: float | None = None
     #: Turns kept verbatim at the tail when compacting — where the current sub-task lives.
     keep_recent: int = 6
+    #: Where to append this run's trace (one JSONL line: per-step tokens, cache, tools, drift).
+    #: None writes nothing. Off by default because a trace is disk the caller did not ask for — but
+    #: a step log nothing ever persists is a measurement with no consumer, which is the failure this
+    #: whole line of work exists to avoid. The CLI and the desktop API both set it.
+    trace_path: Path | None = None
 
 
 @dataclass
@@ -240,6 +245,11 @@ class Agent:
         steplog = StepLog()
         nudged = False
         loop_detector = ToolLoopDetector() if self.config.detect_tool_loops else None
+        # Drift is reported once, at the step it first shows. Post-hoc the trace carries it anyway;
+        # what this adds is knowing at step 60 of 200 rather than after the bill. It does not act:
+        # stopping, re-planning and force-compacting are all plausible answers and we have no
+        # evidence about which one helps, so choosing here would bake in an unmeasured assumption.
+        drift_reported = False
 
         for step in range(1, self.config.max_steps + 1):
             result = self._step(messages, tools=tool_schema, on_token=on_token, usage=usage)
@@ -297,7 +307,7 @@ class Agent:
                 messages.append({"role": "assistant", "content": result.content})
                 return self._result(result.content, step, "final", messages, tool_calls_made,
                                     tool_names, usage, result.model,
-                                    route_meta=result.route_meta, steplog=steplog)
+                                    route_meta=result.route_meta, steplog=steplog, task=task)
 
             messages.append(self._assistant_tool_message(result))
             tripped: str | None = None
@@ -322,6 +332,12 @@ class Agent:
                     if verdict.tripped:
                         tripped = verdict.reason
                         break
+            if not drift_reported:
+                drift = steplog.drift
+                if drift.drifting:
+                    drift_reported = True
+                    _log.warning("context drift at step %d: %s", step, drift.summary)
+
             if tripped is not None:
                 # Physically spinning: stop burning budget. Ask once, no tools, for a final answer
                 # with what it has — better than grinding to max_steps on a stuck loop.
@@ -334,14 +350,15 @@ class Agent:
                                    tools=None, on_token=on_token, usage=usage)
                 messages.append({"role": "assistant", "content": final.content})
                 return self._result(final.content, step, "tool_loop", messages, tool_calls_made,
-                                    tool_names, usage, final.model, steplog=steplog)
+                                    tool_names, usage, final.model, steplog=steplog, task=task)
 
         # Budget exhausted: ask once more, without tools, for a final answer.
         final = self._step([*messages, {"role": "user", "content": "Provide your final answer now."}],
                            tools=None, on_token=on_token, usage=usage)
         messages.append({"role": "assistant", "content": final.content})
         return self._result(final.content, self.config.max_steps, "max_steps", messages,
-                            tool_calls_made, tool_names, usage, final.model, steplog=steplog)
+                            tool_calls_made, tool_names, usage, final.model, steplog=steplog,
+                            task=task)
 
     def _step(
         self,
@@ -379,10 +396,20 @@ class Agent:
         model: str,
         route_meta: dict[str, Any] | None = None,
         steplog: StepLog | None = None,
+        task: str = "",
     ) -> AgentResult:
         """Assemble the final result, pricing the summed tokens at the model's list rate."""
         from chimera.obs import record_llm_metrics
         from chimera.orchestration.receipts import price_delegation
+
+        log = steplog if steplog is not None else StepLog()
+        if self.config.trace_path is not None and log.steps:
+            # Best-effort: a trace that cannot be written must never take the run down with it. The
+            # answer is the product; the trace is evidence about how it was reached.
+            try:
+                log.write(self.config.trace_path, task=task, stopped_reason=stopped_reason)
+            except OSError as exc:  # pragma: no cover - disk-shaped failure
+                _log.debug("could not write trace to %s: %s", self.config.trace_path, exc)
 
         usd = price_delegation(self.config.model or model, usage.prompt, usage.completion)
         record_llm_metrics(

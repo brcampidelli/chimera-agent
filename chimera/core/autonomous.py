@@ -471,6 +471,11 @@ class AutonomousAgent:
                 return self._finalize_cancelled(task, attempts, plan, thread_id)
             agent_result = self._run_worker(worker, prompt)
             answer = agent_result.answer
+            # Surface a degrading trajectory where a person will see it, not only in the trace. It
+            # is advisory: the attempt is judged on its result as always, and the run continues.
+            steplog = getattr(agent_result, "steplog", None)
+            if steplog is not None and steplog.drift.drifting:
+                self._emit(_ev_status(f"context drift — {steplog.drift.summary}"))
 
             # Executable evidence is ground truth: when a verifier is present it
             # decides success, and the Manager is consulted only for feedback on a
