@@ -75,6 +75,15 @@ def test_approved_hollow_tainted_success_is_not_learned(tmp_path: Path) -> None:
             self.saved.append((content, provenance))
             return ("ADD", None)
 
+    from chimera.core.verify import VerificationResult
+
+    class _PassVerifier:
+        """Hollow means verified-but-unchanged. Without a verifier this run would simply fail the
+        success gate, and the diff-gate on learning would never be exercised."""
+
+        def verify(self) -> VerificationResult:
+            return VerificationResult(True, "ok")
+
     ws = tmp_path / "ws"
     ws.mkdir()  # empty + separate from runs.db, so the diff is genuinely empty (hollow)
     store = RunCheckpointer(tmp_path / "runs.db")
@@ -85,6 +94,7 @@ def test_approved_hollow_tainted_success_is_not_learned(tmp_path: Path) -> None:
             _OkWorker(),  # writes nothing -> empty diff -> hollow success
             taint=_Taint(True), checkpointer=store, pause_on_taint=True,
             guard=WorkspaceGuard(ws), memory=mem,  # type: ignore[arg-type]
+            verifier=_PassVerifier(),  # type: ignore[arg-type]
             config=AutonomousConfig(max_attempts=1, use_planner=False, use_manager=False),
         )
 

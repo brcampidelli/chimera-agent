@@ -199,7 +199,11 @@ def test_post_runs_streams_events_done_and_persists_receipt(tmp_path: Any) -> No
     from chimera.core.events import EventSink
 
     class _FakeWorker:
+        def __init__(self, workspace: Any) -> None:
+            self.workspace = workspace
+
         def run(self, task: str) -> AgentResult:
+            (self.workspace / "done.py").write_text("# edited\n", encoding="utf-8")
             return AgentResult(answer="did it", steps=1, stopped_reason="final")
 
     settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
@@ -211,9 +215,11 @@ def test_post_runs_streams_events_done_and_persists_receipt(tmp_path: Any) -> No
         settings: Any,
         should_stop: Callable[[], bool] | None = None,
     ) -> AutonomousAgent:
-        # No verifier / planner / manager: verify abstains → manager approves → success on attempt 1.
+        # No verifier / planner / manager, but the worker edits a file: the diff is the evidence that
+        # carries the run to success on attempt 1. What is under test is the SSE marshalling and the
+        # receipt, so the run has to succeed for an ordinary reason.
         return AutonomousAgent(
-            _FakeWorker(),
+            _FakeWorker(ws),
             should_stop=should_stop,
             guard=WorkspaceGuard(ws),
             workspace=ws,
@@ -227,7 +233,13 @@ def test_post_runs_streams_events_done_and_persists_receipt(tmp_path: Any) -> No
             lambda: ChatSession(_FakeAgent()), settings=settings, solve_agent_factory=solve_factory
         )
     )
-    resp = client.post("/api/runs", json={"task": "make it so", "max_attempts": 2})
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    # The workspace is explicit because the worker now WRITES. Omitting it falls back to the
+    # directory the app was launched from — under pytest, the repository itself.
+    resp = client.post(
+        "/api/runs", json={"task": "make it so", "max_attempts": 2, "workspace": str(ws)}
+    )
     assert resp.status_code == 200
     events = _read_sse(resp.text)
     kinds = [e for e, _ in events]
@@ -690,17 +702,22 @@ def test_run_request_plan_injection_skips_the_planner(tmp_path: Any) -> None:
             return Plan(steps=["planner ran"], raw="planner ran")
 
     class _RecordingWorker:
-        def __init__(self) -> None:
+        def __init__(self, workspace: Any) -> None:
             self.prompt = ""
+            self.workspace = workspace
 
         def run(self, task: str) -> AgentResult:
             self.prompt = task
+            # Writes, so this is a real solve and the run reaches success on its own merits. A
+            # worker that only narrates no longer passes the gate, and the seam under test here is
+            # the injected plan, not what counts as done.
+            (self.workspace / "touched.py").write_text("# edited\n", encoding="utf-8")
             return AgentResult(answer="did it", steps=1, stopped_reason="final")
 
     ws = tmp_path / "ws"
     ws.mkdir()
     spy = _SpyPlanner()
-    worker = _RecordingWorker()
+    worker = _RecordingWorker(ws)
     agent = AutonomousAgent(
         worker,
         planner=spy,  # would be called if no plan were injected...

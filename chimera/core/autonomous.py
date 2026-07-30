@@ -171,6 +171,11 @@ class Attempt:
     verify_output: str = ""
     diff_summary: str = ""
     diffs: list[FileDiff] = field(default_factory=list)  # real per-file unified diffs (pre-revert)
+    #: What actually decided this attempt: "verifier" (a command exited 0), "diff+manager" (files
+    #: changed and an LLM approved the answer), "manager" (an LLM approved prose, nothing else
+    #: checked), or "none". A receipt that says "success" without saying on whose authority invites
+    #: the reader to assume the strongest one.
+    evidence: str = "none"
 
 
 @dataclass
@@ -568,7 +573,15 @@ class AutonomousAgent:
             # bug passes while the file is untouched (SWE-bench run 1: 11/19 empty patches). Fails the
             # attempt and feeds the reason back, so the retry is told to actually edit. Only when the
             # diff was genuinely measured — `None` means no workspace guard, i.e. we cannot know.
-            if self.require_diff and diff_productive is False:
+            # Two ways this gate fires. `--require-diff` is the explicit one. The second is the
+            # important one: when NO verifier ran, the only thing standing between "the model wrote
+            # a convincing paragraph" and "success" is a Manager that never sees the diff, the
+            # transcript, or a single file — it judges the answer text alone. Combined with an
+            # unchanged workspace, that is precisely the empty-patch failure measured above, and it
+            # was reachable by default. An attempt that changed nothing and that nothing verified
+            # is not a success; it is an explanation.
+            unverified_and_unchanged = not verifier_active and diff_productive is False
+            if diff_productive is False and (self.require_diff or unverified_and_unchanged):
                 ok = False
                 detail = (
                     "No file was changed. This task requires editing code: an explanation is not a "
@@ -576,7 +589,16 @@ class AutonomousAgent:
                 )
                 fb = f"{fb}\n\n{detail}" if fb else detail
 
-            attempt = Attempt(index, answer, approved, verified, False, ok, fb, vout)
+            if verifier_active:
+                evidence = "verifier"
+            elif diff_productive:
+                evidence = "diff+manager"
+            elif ok:
+                evidence = "manager"
+            else:
+                evidence = "none"
+            attempt = Attempt(index, answer, approved, verified, False, ok, fb, vout,
+                              evidence=evidence)
             attempt.diff_summary = diff_summary or ""
             attempt.diffs = diffs
             self._emit(_ev_result(index, ok, detail=(fb or vout)[:200]))

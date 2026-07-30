@@ -50,6 +50,14 @@ class FailVerifier:
         return VerificationResult(False, "always fails")
 
 
+class _PassVerifier:
+    """Executable evidence that genuinely passed — distinct from the vacuous True a missing
+    verifier returns, which is what `verifier_active` exists to tell apart."""
+
+    def verify(self) -> VerificationResult:
+        return VerificationResult(True, "ok")
+
+
 class _FeedbackManager:
     """A manager that rejects with prose feedback (so we can check it doesn't shadow the test output)."""
 
@@ -544,13 +552,16 @@ def test_plan_is_attached() -> None:
 
 
 def test_hollow_success_does_not_learn(tmp_path: Path) -> None:
-    # Guard present + worker writes NOTHING -> empty diff -> a hollow success: the run verifies,
-    # but nothing changed, so no memory fact and no skill is minted.
+    # A REAL verifier passes while the worker writes nothing -> hollow success: the task genuinely
+    # verified, but no file changed, so no memory fact and no skill is minted.
+    # (The verifier is what makes this a hollow success rather than an unverified one: without it
+    # the success gate now rejects an unchanged workspace outright — see test_success_gate.py.)
     mem = RecordingMemory()
     evolver = RecordingEvolver()
     auto = AutonomousAgent(
         FakeWorker("done"),  # no workspace/filename -> writes nothing
         guard=WorkspaceGuard(tmp_path),
+        verifier=_PassVerifier(),
         memory=mem,
         auto_evolver=evolver,
         config=AutonomousConfig(use_planner=False),
@@ -579,6 +590,7 @@ def test_hollow_success_does_not_credit_card_telemetry(tmp_path: Path) -> None:
     auto = AutonomousAgent(
         FakeWorker("done"),  # writes nothing -> hollow success
         guard=WorkspaceGuard(tmp_path),
+        verifier=_PassVerifier(),  # a real pass, so this is hollow rather than merely unverified
         cards=cards,  # type: ignore[arg-type]
         config=AutonomousConfig(use_planner=False),
     )
@@ -782,14 +794,22 @@ def test_require_diff_fails_an_attempt_that_changed_nothing(tmp_path: Path) -> N
     assert "No file was changed" in result.attempts[0].feedback
 
 
-def test_without_require_diff_prose_still_passes(tmp_path: Path) -> None:
-    """The defect this flag fixes, pinned: by default an edit-nothing answer is a success."""
+def test_prose_no_longer_passes_by_default(tmp_path: Path) -> None:
+    """This test used to pin the DEFECT, and its old docstring said so: "by default an edit-nothing
+    answer is a success". That default is closed.
+
+    With no verifier and no manager, `_review` returned (True, "") and every attempt was an
+    unconditional success — so a run that changed nothing and that nothing checked was reported as
+    done. An unchanged workspace now fails whenever nothing else verified the work, and
+    `--require-diff` remains the explicit form for when a verifier IS present."""
     auto = AutonomousAgent(
         _ProseWorker(),
         guard=WorkspaceGuard(tmp_path),
         config=AutonomousConfig(max_attempts=2, use_planner=False, use_manager=False),
     )
-    assert auto.run("fix the bug").success is True
+    result = auto.run("fix the bug")
+    assert result.success is False
+    assert "No file was changed" in result.attempts[0].feedback
 
 
 def test_require_diff_accepts_an_attempt_that_did_change_a_file(tmp_path: Path) -> None:
