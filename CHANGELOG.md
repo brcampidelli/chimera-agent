@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-07-30
+
 ### Added
 - **Context drift detection.** Two different failures get called "context problems" and they need
   different instruments. *Rot* happens inside one step — attention thins across a long prompt. *Drift*
