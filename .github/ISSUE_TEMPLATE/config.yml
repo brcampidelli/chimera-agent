@@ -2,15 +2,27 @@
 # actionable — repro steps for a bug, an explicit "out of scope" line for a first task — and a blank
 # issue routes around all of it. With a single maintainer, an issue that arrives without those fields
 # is not free: it costs a round trip to ask, and the asking is what makes a queue look unanswered.
-# Ideas and questions are not blocked by this; they have a better home, linked below.
 blank_issues_enabled: false
 contact_links:
+  # Feature requests go to Discussions rather than Issues, and this is deliberate.
+  #
+  # An idea filed as an issue arrives as a task with an implied owner, and a queue of them reads as a
+  # backlog nobody is working through — which is exactly the impression a one-person project cannot
+  # afford. The same idea in Discussions can be argued with and, more usefully, VOTED on. A vote is
+  # the only triage signal a solo maintainer can actually read in thirty seconds.
+  #
+  # Nothing is lost: an idea that finds agreement becomes an issue in one click, with the discussion
+  # linked. The Issues tab then holds only work that has been accepted, which is what makes the
+  # weekly triage in GOVERNANCE.md a promise that can be kept.
   - name: 💡 Idea or feature request
     url: https://github.com/brcampidelli/chimera-agent/discussions/categories/ideas
-    about: Propose it in Discussions first, where it can be discussed and voted on. Ideas that find agreement get turned into issues.
+    about: Propose it in Discussions, where it can be discussed and voted on. Ideas that find agreement become issues.
   - name: 💬 Question, or show what you built
     url: https://github.com/brcampidelli/chimera-agent/discussions
-    about: Ask anything, or share what you made with Chimera.
+    about: Ask anything, or share what you made with Chimera. If the docs made you ask, the docs have a bug.
+  - name: 📊 Replicate a benchmark
+    url: https://github.com/brcampidelli/chimera-agent/discussions/21
+    about: Run an existing PREREGISTRATION.md and post what you got — a result that disagrees with ours is the most valuable thing here.
   - name: 🔒 Security vulnerability
     url: https://github.com/brcampidelli/chimera-agent/security/advisories/new
     about: Please report security issues privately (see SECURITY.md), never as a public issue.
