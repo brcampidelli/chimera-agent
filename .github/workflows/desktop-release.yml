@@ -50,12 +50,13 @@ jobs:
           - os: ubuntu-latest
             bundles: appimage,deb
             updater_target: linux-x86_64
+    timeout-minutes: 60
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "20"
           cache: npm
@@ -69,7 +70,7 @@ jobs:
         run: npm --prefix apps/desktop run build
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
         with:
           python-version: "3.12"
 
@@ -98,7 +99,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           workspaces: apps/desktop/src-tauri -> target
 
@@ -141,7 +142,7 @@ jobs:
 
       - name: Attach installers + signed updater artifacts to the release
         if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           # Installers (nsis/dmg/appimage/deb) for fresh installs, PLUS the updater bundles + `.sig`
           # the in-place auto-updater downloads. On macOS the updater artifact is `*.app.tar.gz` (in the
@@ -188,7 +189,7 @@ jobs:
           cat "manifest-fragments/${TARGET}.json"
 
       - name: Upload manifest fragment
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: manifest-fragment-${{ matrix.updater_target }}
           path: manifest-fragments/${{ matrix.updater_target }}.json
@@ -197,7 +198,7 @@ jobs:
 
       - name: Upload installers as workflow artifacts (manual runs)
         if: github.event_name != 'release'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: chimera-installers-${{ matrix.os }}
           path: apps/desktop/src-tauri/target/release/bundle/**/*
@@ -216,12 +217,13 @@ jobs:
     # which meant the only way to test it was to publish: v0.32.0-v0.32.2 were three patch releases
     # burned debugging it in public (a macOS build that emitted no .sig, then a Linux url pointing at
     # the .deb instead of the AppImage). A dry run would have caught both before any user saw them.
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     permissions:
       contents: write # attach latest.json to the release
     steps:
       - name: Download all manifest fragments
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: manifest-fragment-*
           path: fragments
@@ -252,7 +254,7 @@ jobs:
 
       - name: Publish latest.json to the release
         if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: latest.json
 
@@ -262,7 +264,7 @@ jobs:
       # .deb) — before cutting a release.
       - name: Upload latest.json for inspection (dry run — not published)
         if: github.event_name != 'release'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: latest-json-dryrun
           path: latest.json

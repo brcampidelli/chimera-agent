@@ -15,8 +15,8 @@ this repo — and this document exists to make it addressable rather than merely
 
 If the maintainer stops, the project stops: no one else can merge a security fix, cut a release, or
 rotate the PyPI trusted-publisher configuration. Users should weigh that before depending on Chimera
-for anything load-bearing. `CONTRIBUTING.md` has said "low adoption / bus-factor-1 is the honest
-weakness three separate reviews all named" for a while; this file is the plan to change it.
+for anything load-bearing. Low adoption and a bus factor of one are the honest weaknesses; this file
+is the plan to change them.
 
 ## Decision-making
 
@@ -24,9 +24,9 @@ While there is one maintainer, decisions are made by that maintainer, in public:
 
 - **Design and architecture** — argued in an issue or a PR description before the code lands. The
   reasoning goes in the commit message, not just the diff; see the commit history for the standard.
-- **Anything measured** — benchmark numbers, security claims — follows the rules in
-  `PREREGISTRATION.md` and `MUTATION.md`. A number that is not reproducible from a committed
-  artifact does not go in the README.
+- **Anything measured** — benchmark numbers, security claims — follows the rules in each suite's
+  `bench/*/PREREGISTRATION.md` and in `MUTATION.md`. A number that is not reproducible from a
+  committed artifact does not go in the README.
 - **Security posture** — changes to defaults that weaken a boundary need an explicit rationale in
   `SECURITY.md`, dated, including who is expected to be affected.
 

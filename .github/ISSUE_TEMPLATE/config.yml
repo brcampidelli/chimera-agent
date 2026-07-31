@@ -1,8 +1,16 @@
-blank_issues_enabled: true
+# Blank issues are off on purpose. Every template here asks for the one thing that makes an issue
+# actionable — repro steps for a bug, an explicit "out of scope" line for a first task — and a blank
+# issue routes around all of it. With a single maintainer, an issue that arrives without those fields
+# is not free: it costs a round trip to ask, and the asking is what makes a queue look unanswered.
+# Ideas and questions are not blocked by this; they have a better home, linked below.
+blank_issues_enabled: false
 contact_links:
-  - name: Questions & ideas
+  - name: 💡 Idea or feature request
+    url: https://github.com/brcampidelli/chimera-agent/discussions/categories/ideas
+    about: Propose it in Discussions first, where it can be discussed and voted on. Ideas that find agreement get turned into issues.
+  - name: 💬 Question, or show what you built
     url: https://github.com/brcampidelli/chimera-agent/discussions
-    about: Ask a question, share what you built, or float an idea in Discussions.
-  - name: Security vulnerability
+    about: Ask anything, or share what you made with Chimera.
+  - name: 🔒 Security vulnerability
     url: https://github.com/brcampidelli/chimera-agent/security/advisories/new
-    about: Please report security issues privately (see SECURITY.md), not as public issues.
+    about: Please report security issues privately (see SECURITY.md), never as a public issue.

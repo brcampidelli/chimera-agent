@@ -14,19 +14,32 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Least privilege, declared here rather than inherited. Without this block the token carries whatever
+# the repository default happens to be — a setting that lives in the web UI, is invisible in review,
+# and can be widened by someone who never reads this file. CI only ever needs to read the tree.
+#
+# Two related invariants that are currently correct and are cheap to break by accident:
+#   * No workflow uses `pull_request_target`. That trigger runs a fork's code with the BASE repo's
+#     token and secrets; a PR that introduces one is refused by default (see AGENTS.md).
+#   * Nothing reachable from `pull_request` reads a repository secret. `integration` and
+#     `quality-bench` hold the API keys and are gated to push-on-main / manual dispatch.
+permissions:
+  contents: read
+
 jobs:
   quality:
     name: lint · type-check · test
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
         with:
           enable-cache: true
 
@@ -49,16 +62,17 @@ jobs:
 
   integration:
     name: live integration (real provider)
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     needs: quality
     # Only on direct pushes to main (not fork PRs), where the secret is available.
     # The test self-skips when the secret is unset, so this job is green either way.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
         with:
           enable-cache: true
 
@@ -84,6 +98,7 @@ jobs:
     # hypothetical: litellm 1.92 went manylinux-only, which is why the dependency now carries a ceiling.
     # Testing the extremes (Windows/macOS × oldest+newest supported Python) catches that class before a
     # user hits it. The wheel is pure-Python, so success here means "a plain `pip install` just works".
+    timeout-minutes: 20
     runs-on: ${{ matrix.os }}
     needs: quality
     strategy:
@@ -92,8 +107,8 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ["3.11", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: ${{ matrix.python-version }}
       - name: Fresh pip install of the desktop extra (no uv, no lockfile)
@@ -107,13 +122,14 @@ jobs:
 
   desktop:
     name: desktop app (API types drift + tests + build)
+    timeout-minutes: 25
     runs-on: ubuntu-latest
     needs: quality
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
         with:
           enable-cache: true
 
@@ -124,7 +140,7 @@ jobs:
         run: uv sync --extra dev --extra desktop
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "20"
           cache: npm
@@ -159,15 +175,16 @@ jobs:
 
   mutation:
     name: mutation testing (critical modules)
+    timeout-minutes: 120
     runs-on: ubuntu-latest
     # Slow (hundreds of mutants). Weekly + on demand only — NOT on every push/PR. The gate is that
     # every surviving mutant is a justified allowlist entry (see MUTATION.md / scripts/mutation_gate.py).
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
         with:
           enable-cache: true
 
@@ -192,21 +209,22 @@ jobs:
 
   supply-chain:
     name: supply chain (secrets · known CVEs)
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           # gitleaks needs history to scan commits, not just the checked-out tree. A secret that was
           # committed and then deleted is still a leaked secret.
           fetch-depth: 0
 
       - name: Secret scan (gitleaks)
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
         with:
           enable-cache: true
 

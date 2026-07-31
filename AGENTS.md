@@ -21,9 +21,9 @@ Chimera is a Python agent framework (`chimera/`) with a Tauri + React desktop ap
 
 ## Hard rules
 
-**Never rename or delete an i18n key.** `apps/desktop/src/lib/i18n.tsx` carries seven languages, and
+**Never rename or delete an i18n key.** `apps/desktop/src/lib/i18n.tsx` carries nine languages, and
 the component tests assert on rendered English strings. A rename breaks them silently across all
-seven. Adding keys is free; renaming is not.
+nine. Adding keys is free; renaming is not.
 
 **A route change and its generated types ship in the same commit.** If you touch a FastAPI route in
 `chimera/api/`, regenerate both or CI fails on drift:
@@ -44,6 +44,15 @@ and are opposites in intent.
 **Numbers in `bench/` are pre-registered.** Predictions and readings are committed *before* a run
 and never loosened afterwards. A retraction is published with the same prominence as the original
 claim. If a result kills a claim, that is the result.
+
+**No workflow may use `pull_request_target`, and nothing reachable from `pull_request` may read a
+secret.** `pull_request_target` runs a fork's code with the *base* repository's token and secrets —
+it is how public projects get their release credentials stolen by a first-time contributor. Today no
+workflow uses it and the two jobs holding API keys (`integration`, `quality-bench`) are gated to
+push-on-main and manual dispatch. Both facts are invisible in a diff that breaks them, so: a PR
+introducing `pull_request_target`, or moving a `secrets.` reference into a job a PR can reach, is
+refused by default. Workflows also declare `permissions:` explicitly and pin every action to a commit
+SHA; a bare `@v4` is a mutable tag the upstream author can rewrite under us.
 
 ---
 
