@@ -74,6 +74,34 @@ def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:80]
 
 
+def _side_effects(steplog: Any) -> list[str]:
+    """Which out-of-checkout side-effect tools this attempt actually called, in first-call order.
+
+    The verdict code holds the step log — it is already read here for drift — while the Manager holds
+    no tool registry at all. That asymmetry is useful: the loop can see what the run *did* without
+    handing the evaluator anything it could act with.
+
+    This is recorded and nothing more. It matters because the diff gate answers "did the workspace
+    change?", and for a run that sent mail or posted a webhook that is the wrong question: an empty
+    diff there does not mean nothing happened, and a receipt that only carries the diff invites the
+    reader to conclude it did. Whether the *verdict* should consult this is a real design question
+    about retry safety, deliberately not decided here.
+    """
+    from chimera.governance.ledger import SIDE_EFFECT_TOOLS
+
+    if steplog is None:
+        return []
+    seen: list[str] = []
+    for step in getattr(steplog, "steps", ()):
+        for call in getattr(step, "tools", ()):
+            name = getattr(call, "name", "")
+            # Only calls that actually ran: a tool the ledger blocked, or one that errored before
+            # reaching the network, did not produce the effect this list exists to warn about.
+            if name in SIDE_EFFECT_TOOLS and getattr(call, "ok", False) and name not in seen:
+                seen.append(name)
+    return seen
+
+
 def _rendered_diff(diffs: list[FileDiff]) -> str:
     """Render per-file diffs as one bounded patch body for retry feedback.
 
@@ -176,6 +204,16 @@ class Attempt:
     #: checked), or "none". A receipt that says "success" without saying on whose authority invites
     #: the reader to assume the strongest one.
     evidence: str = "none"
+    #: Did the attempt change the workspace? ``None`` means *could not be measured* (no snapshot,
+    #: no guard) — deliberately NOT the same as ``False`` ("measured, and nothing changed"). The
+    #: third state is the whole point: collapsing "we could not tell" into either boolean is how a
+    #: gate that reads honestly today starts lying later.
+    diff_productive: bool | None = None
+    #: Names of out-of-checkout side-effect tools this attempt actually called (send_email,
+    #: http_post, …), read off the step log. Recorded, never acted on: an empty diff means
+    #: something very different once a run has already sent mail, and a reader of the receipt
+    #: should be able to see that without re-deriving it from a transcript.
+    side_effects: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -606,6 +644,8 @@ class AutonomousAgent:
                               evidence=evidence)
             attempt.diff_summary = diff_summary or ""
             attempt.diffs = diffs
+            attempt.diff_productive = diff_productive
+            attempt.side_effects = _side_effects(steplog)
             self._emit(_ev_result(index, ok, detail=(fb or vout)[:200]))
             if not ok and snapshot is not None and self.guard is not None:
                 self.guard.restore(snapshot)

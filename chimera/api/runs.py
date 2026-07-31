@@ -52,6 +52,20 @@ class AttemptReceipt(BaseModel):
     diff_summary: str = ""  # the workspace diff this attempt made, as audited before any revert
     feedback: str = ""  # the retry feedback this attempt produced, truncated in the builder
     diffs: list[FileDiffReceipt] = []  # real per-file unified diffs (what the attempt changed/attempted)
+    #: On whose authority this attempt was decided: "verifier" | "diff+manager" | "manager" | "none".
+    #: This crossed from ``Attempt`` late: the field existed in memory for a release while the
+    #: persisted receipt carried only the booleans, so a reader of runs.jsonl could not tell a
+    #: command-verified pass from an LLM approving prose. Nobody chose that — it just never crossed
+    #: the serialization boundary, which is the quiet way a three-way verdict decays into a two-way one.
+    evidence: str = "none"
+    #: Whether the workspace changed — ``null`` for "could not be measured", which is NOT "nothing
+    #: changed". Serialized explicitly (never omitted) so the unknown survives the round trip; a
+    #: field that disappears when it is None is indistinguishable from a field nobody set.
+    diff_productive: bool | None = None
+    #: Out-of-checkout side effects this attempt actually performed (send_email, http_post, …).
+    #: An empty diff means one thing for a run that only touched files and something else entirely
+    #: for a run that already sent mail — the receipt should not force that inference.
+    side_effects: list[str] = []
 
 
 class RunReceipt(BaseModel):
@@ -89,6 +103,12 @@ def build_receipt(
                 )
                 for d in list(getattr(a, "diffs", None) or [])[:20]
             ],
+            # getattr with a default keeps this tolerant of the duck-typed result this module
+            # accepts by design — an older Attempt without these fields reads as "unknown" rather
+            # than raising, which is the honest answer for a record that predates them.
+            evidence=getattr(a, "evidence", "none") or "none",
+            diff_productive=getattr(a, "diff_productive", None),
+            side_effects=list(getattr(a, "side_effects", None) or []),
         )
         for a in result.attempts
     ]

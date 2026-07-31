@@ -24,21 +24,42 @@ function StatusBadge({ run, t }: { run: RunReceipt; t: TFunc }) {
   );
 }
 
-/** One attempt's proof row: index, verified check, revert flag, the diff it made, and (collapsed)
- *  the concrete verifier output. Shows only captured data — an empty field is simply omitted. */
+/** Who approved this attempt, as its own badge rather than a ✓/✗.
+ *
+ *  The tick alone read `verified`, so an attempt approved by a real workspace diff plus a manager
+ *  review rendered identically to one where an LLM approved prose and nothing else was checked —
+ *  both ✗. That is precisely the collapse the three-way verdict exists to prevent, showing up on
+ *  the one surface a human actually looks at. Tone carries the strength: only executable evidence
+ *  is `ok`, an LLM approving prose with nothing else checked is `warn`, not a muted footnote. */
+function EvidenceBadge({ evidence, t }: { evidence: string; t: TFunc }) {
+  const tone = evidence === "verifier" ? "ok" : evidence === "diff+manager" ? "accent" : "warn";
+  return <Badge tone={tone}>{t(`runs.evidence.${evidence}`)}</Badge>;
+}
+
+/** One attempt's proof row: index, who approved it, whether the workspace measurably changed,
+ *  any out-of-checkout side effect, the revert flag, the diff, and (collapsed) the verifier output.
+ *  Shows only captured data — an empty field is simply omitted, and an UNKNOWN is shown as unknown
+ *  rather than being quietly rendered as a negative. */
 function AttemptRow({ attempt, t }: { attempt: AttemptReceipt; t: TFunc }) {
   return (
     <div className="px-4 py-3">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <span className="font-mono text-xs text-muted-foreground">
           {t("runs.attempt")} {attempt.index}
         </span>
-        <span
-          className={attempt.verified ? "text-ok" : "text-muted-foreground"}
-          title={attempt.verified ? "verified" : "not verified"}
-        >
-          {attempt.verified ? "✓" : "✗"}
-        </span>
+        <EvidenceBadge evidence={attempt.evidence} t={t} />
+        {/* Explicitly three-way. `null` is "could not be measured" and gets its own chip: inferring
+            it from the absence of the other two is the shortcut that erases the state. */}
+        {attempt.diff_productive === null ? (
+          <Badge tone="warn">{t("runs.diff.unknown")}</Badge>
+        ) : attempt.diff_productive ? null : (
+          <Badge tone="bad">{t("runs.diff.empty")}</Badge>
+        )}
+        {attempt.side_effects.length > 0 ? (
+          <Badge tone="warn">
+            ⚠ {t("runs.sideEffects")}: {attempt.side_effects.join(", ")}
+          </Badge>
+        ) : null}
         {attempt.reverted ? <Badge tone="warn">↩ {t("runs.reverted")}</Badge> : null}
       </div>
       {attempt.diff_summary ? (

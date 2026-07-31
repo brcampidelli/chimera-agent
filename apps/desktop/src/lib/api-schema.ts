@@ -1036,16 +1036,22 @@ export interface components {
         };
         /** AttemptReceiptOut */
         AttemptReceiptOut: {
+            /** Diff Productive */
+            diff_productive: boolean | null;
             /** Diff Summary */
             diff_summary: string;
             /** Diffs */
             diffs: components["schemas"]["FileDiffOut"][];
+            /** Evidence */
+            evidence: string;
             /** Feedback */
             feedback: string;
             /** Index */
             index: number;
             /** Reverted */
             reverted: boolean;
+            /** Side Effects */
+            side_effects: string[];
             /** Success */
             success: boolean;
             /** Verified */

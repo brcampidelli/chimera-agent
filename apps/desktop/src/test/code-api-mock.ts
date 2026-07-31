@@ -57,6 +57,9 @@ export function attempt(over: Partial<AttemptReceipt> = {}): AttemptReceipt {
     diffs: [{ path: "src/app.py", patch: "@@ -1 +1 @@\n-old\n+new", truncated: false }],
     feedback: "",
     verify_output: "",
+    evidence: "verifier",
+    diff_productive: true,
+    side_effects: [],
     ...over,
   };
 }

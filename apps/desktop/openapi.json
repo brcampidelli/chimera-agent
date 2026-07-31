@@ -194,6 +194,17 @@
       },
       "AttemptReceiptOut": {
         "properties": {
+          "diff_productive": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diff Productive"
+          },
           "diff_summary": {
             "title": "Diff Summary",
             "type": "string"
@@ -204,6 +215,10 @@
             },
             "title": "Diffs",
             "type": "array"
+          },
+          "evidence": {
+            "title": "Evidence",
+            "type": "string"
           },
           "feedback": {
             "title": "Feedback",
@@ -216,6 +231,13 @@
           "reverted": {
             "title": "Reverted",
             "type": "boolean"
+          },
+          "side_effects": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Side Effects",
+            "type": "array"
           },
           "success": {
             "title": "Success",
@@ -238,7 +260,10 @@
           "verify_output",
           "diff_summary",
           "feedback",
-          "diffs"
+          "diffs",
+          "evidence",
+          "diff_productive",
+          "side_effects"
         ],
         "title": "AttemptReceiptOut",
         "type": "object"

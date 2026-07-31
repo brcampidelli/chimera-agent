@@ -339,3 +339,99 @@ def test_no_run_log_writes_nothing(tmp_path: Path) -> None:
     )
     assert auto.run("t").success is True
     assert not (tmp_path / "runs.jsonl").exists()
+
+
+# --- provenance survives persistence ------------------------------------------------------------
+# The evidence label and the unknown diff state existed on ``Attempt`` for a release while the
+# receipt carried only booleans. Nobody decided to drop them; they simply never crossed the
+# serialization boundary — which is how a three-way verdict quietly becomes a two-way one. These
+# tests exist so that erosion has to be an explicit, failing choice rather than an omission.
+
+
+def test_receipt_carries_the_evidence_label(tmp_path: Path) -> None:
+    result = AutonomousResult(
+        answer="a",
+        success=True,
+        attempts=[Attempt(0, "a", True, False, False, True, evidence="diff+manager")],
+    )
+    receipt = build_receipt(result, "t", None, "2026-07-30T00:00:00+00:00")
+    assert receipt.attempts[0].evidence == "diff+manager"
+    # verified=False AND success=True is exactly the row a reader would otherwise misread as an
+    # unexplained pass: the label is the only thing naming who approved it.
+    assert receipt.attempts[0].verified is False
+
+
+def test_unknown_diff_state_survives_the_round_trip(tmp_path: Path) -> None:
+    # None means "could not be measured" and must stay distinguishable from False ("measured,
+    # nothing changed") after a write-and-load — including as an explicit JSON null, since a field
+    # that vanishes when unset is indistinguishable from one nobody wrote.
+    path = tmp_path / "runs.jsonl"
+    unknown = Attempt(0, "a", True, False, False, True)  # no guard ran → diff_productive is None
+    measured_empty = Attempt(1, "a", True, False, False, False)
+    measured_empty.diff_productive = False
+    append_run(
+        path,
+        build_receipt(
+            AutonomousResult(answer="a", success=True, attempts=[unknown, measured_empty]),
+            "t", None, "2026-07-30T00:00:00+00:00",
+        ),
+    )
+    assert '"diff_productive":null' in path.read_text(encoding="utf-8").replace(" ", "")
+
+    loaded = load_runs(path)[0]
+    assert loaded.attempts[0].diff_productive is None
+    assert loaded.attempts[1].diff_productive is False
+
+
+def test_receipt_records_out_of_checkout_side_effects(tmp_path: Path) -> None:
+    # An empty diff means something different once a run has already sent mail. The receipt records
+    # that rather than making a reader infer "nothing happened" from "no file changed".
+    attempt = Attempt(0, "a", True, False, False, True)
+    attempt.side_effects = ["send_email"]
+    receipt = build_receipt(
+        AutonomousResult(answer="a", success=True, attempts=[attempt]),
+        "t", None, "2026-07-30T00:00:00+00:00",
+    )
+    assert receipt.attempts[0].side_effects == ["send_email"]
+
+
+def test_receipt_defaults_are_honest_for_an_attempt_predating_the_fields(tmp_path: Path) -> None:
+    # build_receipt duck-types its input by design. An object without the new fields must read as
+    # "unknown / nothing recorded" rather than raising or inventing a value.
+    class _Old:
+        index, verified, reverted, success = 0, True, False, True
+        verify_output = diff_summary = feedback = ""
+        diffs: list[FileDiff] = []
+
+    receipt = build_receipt(
+        AutonomousResult(answer="a", success=True, attempts=[_Old()]),  # type: ignore[list-item]
+        "t", None, "2026-07-30T00:00:00+00:00",
+    )
+    assert receipt.attempts[0].evidence == "none"
+    assert receipt.attempts[0].diff_productive is None
+    assert receipt.attempts[0].side_effects == []
+
+
+def test_side_effects_are_read_off_the_step_log(tmp_path: Path) -> None:
+    # The verdict code holds the step log (it already reads it for drift) while the Manager holds no
+    # tool registry at all. This asserts the loop uses that access: an out-of-checkout effect the run
+    # actually performed reaches the receipt, and a blocked/failed call does not.
+    from chimera.core.autonomous import _side_effects
+    from chimera.core.steplog import StepLog, StepRecord, ToolRecord
+
+    log = StepLog()
+    log.steps.extend([
+        StepRecord(index=0, prompt_tokens=0, completion_tokens=0, model="m", tools=[
+            ToolRecord(name="read_file", arguments="{}", observation="x", ok=True),
+            ToolRecord(name="send_email", arguments='{"to":"a@b"}', observation="sent", ok=True),
+        ]),
+        StepRecord(index=1, prompt_tokens=0, completion_tokens=0, model="m", tools=[
+            # ok=False: the ledger blocked it, or it failed before reaching the network. No effect
+            # happened, so warning about one would be its own kind of dishonesty.
+            ToolRecord(name="http_post", arguments="{}", observation="[taint: needs review]", ok=False),
+            ToolRecord(name="send_email", arguments='{"to":"c@d"}', observation="sent", ok=True),
+        ]),
+    ])
+    # De-duplicated by name, in first-call order; the failed http_post is absent.
+    assert _side_effects(log) == ["send_email"]
+    assert _side_effects(None) == []
