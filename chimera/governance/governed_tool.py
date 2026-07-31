@@ -13,7 +13,7 @@ from typing import Any
 
 from chimera.governance.kernel import TrustKernel
 from chimera.governance.policy import Decision, Verdict
-from chimera.tools.base import Tool
+from chimera.tools.base import Tool, is_untrusted_output
 from chimera.tools.registry import ToolRegistry
 
 ApproveFn = Callable[[Verdict, str], bool]
@@ -29,6 +29,9 @@ class GovernedTool(Tool):
         self.name = inner.name
         self.description = inner.description
         self.parameters = inner.parameters
+        # Mirror the taint marker too. Dropping it here is what disarmed fencing, sanitisation and
+        # run-tainting whenever governance wrapped a tool before the ledger did (`--guard --taint`).
+        self.untrusted_output = is_untrusted_output(inner)
 
     def run(self, **kwargs: Any) -> str:
         action = f"{self.name} {kwargs}"
