@@ -33,6 +33,36 @@ While there is one maintainer, decisions are made by that maintainer, in public:
 This section is written to survive the transition to more than one maintainer: it describes how
 decisions are *justified*, which does not change when the number of people does.
 
+## How a pull request is handled
+
+The section above says how a decision is justified. This one says what happens to *your* change,
+which is the question you actually have.
+
+**Triage is weekly.** Issues and pull requests are looked at once a week. Expect a first response
+within seven days. That is a cadence, not a service level — but a published cadence is the difference
+between waiting and wondering, and wondering is what makes people leave.
+
+**What gets merged.** It does what the description says, the whole suite is green, new logic has a
+test, and it stays inside the scope agreed on the issue. `CONTRIBUTING.md` splits the tree into
+*open*, *agreed in an issue first*, and *protected*; a change in the open set needs no permission at
+all.
+
+**How something is refused.** In writing, with a reason, and with a label — `declined: out of scope`
+or `declined: core`. Never by silence. A closed pull request with an explanation costs you an
+afternoon; an open one nobody answers costs you the afternoon *and* the month you spent checking on
+it. If a change is refused because of where it lands rather than what it does, that is said plainly,
+and the underlying problem is still worth an issue.
+
+**What is refused by default.** An unsolicited patch to a protected path (the security kernel, the
+sandbox, generated artifacts, pre-registered numbers, the CI gates). Not because the problem is
+unwelcome — a bug report or a proof-of-concept against any of them is *actively wanted*, and security
+findings go through `SECURITY.md` and get answered. What is refused is landing a change to an
+invariant before agreeing that it is one.
+
+**Licensing.** Contributions are licensed inbound under Apache-2.0, per section 5 of the licence.
+There is no CLA and no DCO bot: one signature ceremony would not make the licence any more binding
+than it already is, and it would turn away the first-time contributor this project needs most.
+
 ## Becoming a maintainer
 
 There is no application process and no probation period, because with one maintainer that would be

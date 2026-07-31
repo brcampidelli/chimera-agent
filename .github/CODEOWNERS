@@ -1,0 +1,70 @@
+# Who is asked to review what.
+#
+# Read this as a map, not as a wall. With one maintainer it changes no permission — @brcampidelli
+# already owns every line of this repository. What it does is make the boundary VISIBLE: GitHub
+# shows the owner on a pull request's Files tab, so a contributor learns which parts of the tree
+# invite a patch and which parts want a conversation first, before writing the code rather than
+# after. CONTRIBUTING.md says the same thing in prose; this says it where the diff is.
+#
+# It is not access control. Anyone can still open a pull request against anything here, and should
+# — a bug report or a proof-of-concept against the security kernel is always welcome. What the
+# protected list means is that an *unsolicited patch* to those paths will be discussed before it is
+# merged, not that the problem it fixes is unwelcome.
+
+# Default: everything has an owner, so nothing falls through unreviewed.
+*                                   @brcampidelli
+
+# --- The safety kernel -----------------------------------------------------------------------
+# Capability is classified BY TOOL NAME here (ledger.py), and that classification changes real
+# behaviour in chimera/core/agent.py and chimera/core/autonomous.py. A tool whose name lands in no
+# frozenset is silently unclassified, which is a security hole that looks like nothing in a diff.
+/chimera/governance/                @brcampidelli
+/chimera/sandbox/                   @brcampidelli
+/chimera/tools/base.py              @brcampidelli
+/chimera/tools/shell.py             @brcampidelli
+/chimera/tools/code.py              @brcampidelli
+# Decides which capabilities exist by default, and gates each on a credential + a sandbox + a
+# confirmation callback. Adding a tool here is welcome — with an issue first, so the capability
+# classification and the gating are agreed before the code exists.
+/chimera/tools/builtin.py           @brcampidelli
+# Credential resolution, and the `trust_workspace` default. Changing that default disarms taint.
+/chimera/config.py                  @brcampidelli
+
+# --- Generated artifacts ---------------------------------------------------------------------
+# CI fails on drift between the FastAPI models and the TypeScript the desktop compiles against.
+# These are outputs; edit the route and regenerate, never the other way round.
+/chimera/api/                       @brcampidelli
+/apps/desktop/openapi.json          @brcampidelli
+/apps/desktop/src/lib/api-schema.ts @brcampidelli
+
+# --- Evidence --------------------------------------------------------------------------------
+# Pre-registration is the project's whole claim to honest numbers: a prediction is committed BEFORE
+# a run and never loosened afterwards. Replication of an existing pre-registration is very welcome
+# (see CONTRIBUTING.md); a new claim needs its registration agreed first, or it is not a claim.
+/bench/*/PREREGISTRATION.md         @brcampidelli
+/bench/*/RESULTS.md                 @brcampidelli
+
+# --- The gates themselves --------------------------------------------------------------------
+# A pull request that edits a workflow is a pull request that runs code on the runner, and can turn
+# off the checks reviewing it. The ratchet counters mean nothing if a change can raise its own
+# ceiling; the i18n pending list is declared translation debt, and debt that can be self-approved
+# is not debt.
+/.github/workflows/                 @brcampidelli
+/.github/CODEOWNERS                 @brcampidelli
+/apps/desktop/src/design/ratchet.json      @brcampidelli
+/apps/desktop/src/lib/i18n-pending.json    @brcampidelli
+
+# --- Supply chain ----------------------------------------------------------------------------
+# A dependency edit is an execution decision. The litellm ceiling in particular is load-bearing:
+# it is pinned below the release that dropped macOS/Windows wheels, not out of preference.
+/pyproject.toml                     @brcampidelli
+/uv.lock                            @brcampidelli
+/apps/desktop/package-lock.json     @brcampidelli
+
+# --- The constitution ------------------------------------------------------------------------
+/LICENSE                            @brcampidelli
+/SECURITY.md                        @brcampidelli
+/GOVERNANCE.md                      @brcampidelli
+/CODE_OF_CONDUCT.md                 @brcampidelli
+/CONTRIBUTING.md                    @brcampidelli
+/AGENTS.md                          @brcampidelli

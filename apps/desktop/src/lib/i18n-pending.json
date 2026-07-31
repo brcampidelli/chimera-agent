@@ -1,0 +1,7 @@
+{
+  "_why": "UI strings that may exist in English only, for now. Adding a string used to break CI in eight locales at once, which meant nobody outside the project could contribute to the app at all. The runtime already falls back to English, so the parity test was protecting a promise the code did not need — what it should protect is that untranslated debt stays VISIBLE and BOUNDED, which is what this file does. List a key here and CI stays green; the tests then force the list to shrink as translations land, and refuse entries that are already translated or no longer exist.",
+  "_howToUse": "Adding a UI string and not fluent in nine languages? Put its key in `keys` and open the PR. Translating? Delete the key from `keys` once every language has it — the test fails if you leave a finished entry behind.",
+  "_budget": "`maxPending` is a ceiling under review, not a number that can never move. A ratchet fixed at zero would just be the old rule with extra steps. It lives in .github/CODEOWNERS, so raising it is a decision someone sees; lowering it is always welcome and is the direction it should travel.",
+  "maxPending": 25,
+  "keys": []
+}
