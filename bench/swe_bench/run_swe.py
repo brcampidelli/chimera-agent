@@ -34,6 +34,7 @@ _OUT = Path(os.environ.get("BENCH_OUT", str(Path(__file__).resolve().parent / "r
 _REF = Path(os.environ.get("SWE_DJANGO_REF", "/tmp/swe-django-ref"))
 _WORK = Path(os.environ.get("SWE_WORK", "/tmp/swe-work"))
 _TIMEOUT = int(os.environ.get("BENCH_TIMEOUT", "900"))
+_ROLE_MODELS = os.environ.get("BENCH_ROLE_MODELS", "").strip()
 _REPO_URL = "https://github.com/django/django"
 
 # Arm flags, fixed by the pre-registration. Both arms share the no-learning hygiene; the ONLY
@@ -54,6 +55,14 @@ _ARMS: dict[str, list[str]] = {
     "treatment": [*_SCAFFOLD, *_STEPS, *_HYGIENE],
     # The discriminating arm: the diff-gate promoted from observer to gate.
     "treatment_diff": [*_SCAFFOLD, "--require-diff", *_STEPS, *_HYGIENE],
+    # --- bench/role_routing arms -------------------------------------------------------------
+    # Identical scaffolding on all three; the ONLY difference is which model does which job, which
+    # is what makes the comparison about ROUTING rather than about scaffolding or step budget.
+    # A0 is the single-model control and deliberately carries no --profile at all: passing one and
+    # then overriding every role would leave the receipt labelled with a profile the run did not use.
+    "roles_single": [*_SCAFFOLD, *_STEPS, *_HYGIENE],
+    "roles_balanced": [*_SCAFFOLD, "--profile", "balanced", *_STEPS, *_HYGIENE],
+    "roles_max": [*_SCAFFOLD, "--profile", "max", *_STEPS, *_HYGIENE],
 }
 _INSTRUCTION = (
     "You are working in the checked-out django repository at a specific commit. Resolve this issue by "
@@ -116,6 +125,11 @@ def _solve(instance: dict, ws: Path) -> dict:
     """Run one arm's chimera solve, return the prediction row + telemetry."""
     task = _INSTRUCTION.format(problem=instance["problem_statement"])
     argv = ["chimera", "solve", task, "--workspace", str(ws), "--model", _MODEL, "--stream", *_ARMS[_ARM]]
+    # An explicit per-role override, for a pilot that wants to price one role at a time without
+    # editing this file. Appended last so it merges OVER the arm's profile, matching the CLI's own
+    # precedence rather than inventing a second one here.
+    if _ROLE_MODELS:
+        argv += ["--role-models", _ROLE_MODELS]
     started = time.monotonic()
     timed_out = False
     try:

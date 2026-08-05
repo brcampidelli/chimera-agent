@@ -101,9 +101,41 @@ Any change to the arms, the suite, the statistic or the band is an amendment com
 run that uses it, in this file, with its reason. An amendment made after seeing a result is a
 retraction of this document, and will be labelled as one.
 
+### Amendment 1 — a costing pilot, committed before it runs
+
+**What.** Before the registered run, execute all three arms on **4 instances** drawn from the head of
+the same slice, for one purpose: to measure **US$ per instance per arm**.
+
+**Why.** §3 estimates the run's cost by multiplying run 4's measured US$0.316/instance by
+multipliers for A1 and A2 that are guesses. That is the identical mistake run 4's own post-mortem
+records — it estimated from run 3's *blended* rate instead of the comparable arm's, came in **52%
+over**, and exhausted the budget mid-question. Estimating a second time from numbers of the same
+quality would be choosing to repeat it.
+
+**The constraint that makes this safe.** The pilot measures **cost only**. Its pass/fail outcomes
+are **not evidence**, are **not reported** as a result, and are **not pooled** with the registered
+run — n=4 could not support a claim in any case, and the reason to write this down is the other
+direction: peeking at four outcomes and then choosing how to frame the main run is precisely the
+degree of freedom this document exists to remove. If the pilot's instances are reused in the main
+run, they are reused **in all three arms identically**, so the pairing is unaffected.
+
+**What it can change.** Only the *budget decision* — whether the registered run is affordable, and
+at what cap. It cannot change the arms, the slice, the statistic, or the band. If the measured cost
+makes the three-arm design unaffordable, dropping A2 is a further amendment written **before** that
+run, with its own reason, and it will say plainly that the result can no longer separate "routing
+helped" from "a stronger editor helped".
+
 ## 8. Status
 
-**Not yet run.** No budget has been spent on this. The SWE-bench phase was deliberately closed at
-US$0 remaining (see `bench/swe_bench/RESULTS.md`), so this bench is blocked on funding rather than
-on code — and until it runs, the profile selector ships as *a control*, described in the UI as a
-choice about cost and models, with no claim that routing improves outcomes.
+**Not yet run.** The code blocker is cleared: `chimera solve` now takes `--profile` /
+`--role-models`, resolved by the *same* function the desktop endpoint uses (a bench driving a second
+implementation of the routing would measure something the product does not ship), and the three arms
+`roles_single` / `roles_balanced` / `roles_max` live in `bench/swe_bench/run_swe.py` alongside the
+scaffold arms, differing from each other **only** in routing.
+
+What remains is money. The SWE-bench phase was deliberately closed at US$0 remaining (see
+`bench/swe_bench/RESULTS.md`). A US$10 costing pilot (Amendment 1) is authorised; the registered run
+is not, and will not start until its measured cost is known and funded.
+
+Until it runs, the profile selector ships as *a control*, described in the UI as a choice about cost
+and models, with no claim that routing improves outcomes.

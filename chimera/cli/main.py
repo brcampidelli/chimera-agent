@@ -90,6 +90,55 @@ def _set_env_var(path: Path, key: str, value: str) -> None:
     tmp.replace(path)
 
 
+def _resolve_cli_roles(profile: str | None, overrides: str | None, settings: Any) -> Any:
+    """Parse ``--profile`` / ``--role-model`` into the SAME role plan the desktop endpoint resolves.
+
+    One resolver for both surfaces, deliberately. ``bench/role_routing`` drives the CLI, and a bench
+    that exercised a second implementation of the routing would measure something the app does not
+    ship — which is the quiet way a benchmark stops being about the product.
+
+    An unknown role name is an error rather than a silent no-op: a typo in ``--role-model edt=…``
+    would otherwise produce a run that looks routed, reports itself as routed, and is not.
+    """
+    from chimera.api.roles import RoleModels
+    from chimera.api.roles import resolve as resolve_roles
+
+    fields = {f for f in RoleModels.model_fields if not f.startswith("fuse_")}
+    parsed: dict[str, str] = {}
+    for item in (overrides or "").split(","):
+        if not item.strip():
+            continue
+        role, sep, slug = item.partition("=")
+        role, slug = role.strip(), slug.strip()
+        if not sep or not slug:
+            raise typer.BadParameter(f"--role-model expects role=model, got {item!r}")
+        if role not in fields:
+            raise typer.BadParameter(
+                f"unknown role {role!r}; expected one of {', '.join(sorted(fields))}. "
+                "('verify' is not a role here — it runs a command and has no model to choose.)"
+            )
+        parsed[role] = slug
+    if profile is not None and profile not in ("economy", "balanced", "max"):
+        raise typer.BadParameter(f"unknown profile {profile!r}; expected economy, balanced or max")
+    # The str-valued role fields only; the fuse_* flags come from the profile, never from here.
+    override = RoleModels.model_validate(parsed) if parsed else None
+    return resolve_roles(profile, settings, override)  # type: ignore[arg-type]
+
+
+def _fused_if(backend: Any, fuse: bool, gateway: Any) -> Any:
+    """Wrap a TOOL-FREE role's backend in the fusion engine when its profile asks for it.
+
+    Only ever reached for planning and review. Both are turns with no tool schemas, which is the
+    whole reason fusion can run at all: the router sends any turn carrying tools to a single model,
+    so fusing the editor would be a switch that never fires and reports that it did.
+    """
+    if not fuse:
+        return backend
+    from chimera.fusion import FusionEngine
+
+    return FusionEngine(gateway)
+
+
 def _apply_tool_allowlist(
     registry: Any,
     *,
@@ -2324,6 +2373,18 @@ def solve(
     gen_tests: bool = typer.Option(
         False, "--gen-tests", help="With no --verify: generate executable pytest grounded in the task's requirements and use it as the gate (catches wrong code the coverage grade rubber-stamps)."
     ),
+    profile: str = typer.Option(
+        None, "--profile",
+        help="Model-role profile: economy | balanced | max. Puts a different model on each role "
+             "(explore/plan/edit/review) drawn from the tier ladder. Routing is NOT yet shown to "
+             "improve outcomes — see bench/role_routing/PREREGISTRATION.md.",
+    ),
+    role_models: str = typer.Option(
+        None, "--role-models",
+        help="Per-role model overrides: 'edit=vendor/slug,plan=vendor/other'. Roles: explore, plan, "
+             "edit, review. Merges over --profile; a role left unset keeps --model. `verify` is not "
+             "a role here — it runs a command and has no model to choose.",
+    ),
     write_region: str = typer.Option(
         None, "--write-region", help="Comma-separated globs the file-writers may touch (e.g. 'src/**,*.py'). A write outside is refused — blocks an injected instruction from rewriting an unrelated file."
     ),
@@ -2493,6 +2554,12 @@ def solve(
     # and curated back afterwards. Kept outside _run_solve so the worktree path doesn't shadow it.
     stored_playbook = _load_playbook() if playbook else None
 
+    # Roles, resolved ONCE and before the registry is assembled — the explorer's model is part of
+    # the routing, so computing this later would leave that one role silently unrouted. Resolved by
+    # the same function the desktop endpoint uses: a bench that drives the CLI has to exercise the
+    # routing the app ships, or it measures something nobody uses.
+    roles = _resolve_cli_roles(profile, role_models, settings)
+
     def _run_solve(ws: Path) -> AutonomousResult:
         from chimera.tools.write_region import WriteRegion
 
@@ -2510,7 +2577,12 @@ def solve(
             from chimera.core import ExploreRepositoryTool
 
             # Cheap explorer model: a narrow localization task doesn't need the worker's model.
-            registry.register(ExploreRepositoryTool(gateway, ws, max_turns=max_steps))
+            # A narrow localisation question does not need the editor's model.
+            registry.register(
+                ExploreRepositoryTool(
+                    gateway, ws, model=roles.models.explore or model, max_turns=max_steps
+                )
+            )
         if subagents:
             from chimera.core import SubAgentTool
 
@@ -2537,7 +2609,9 @@ def solve(
         # insist_on_action: solve is autonomous task completion, so a described-but-unexecuted plan
         # is pushed back to actually run — the fix for the worker narrating instead of acting.
         _worker_cfg = AgentConfig(
-            model=model,
+            # The EDITOR's model. Never fused: synthesising three patches produces one that applies
+            # cleanly and means nothing.
+            model=roles.models.edit or model,
             max_steps=max_steps,
             insist_on_action=True,
             # The workspace's own AGENTS.md, so `chimera solve` follows the conventions of the
@@ -2554,6 +2628,7 @@ def solve(
             if escalate_backend is not None
             else None
         )
+        from chimera.api.roles import review_model_for
         from chimera.evolution import StagnationDetector
 
         # The six learning seams (experience, trajectories, memory, auto_evolver, cards, playbook)
@@ -2616,8 +2691,16 @@ def solve(
             ),
             # Provenance gate: artifacts born from a tainted run are marked/held pending.
             taint=ledger,
-            planner=None if no_plan else Planner(planner_backend, model),
-            manager=None if no_manager else Manager(gateway, model, use_rubric=rubric),
+            planner=None if no_plan else Planner(
+                _fused_if(planner_backend, roles.models.fuse_plan, gateway), roles.models.plan or model
+            ),
+            # review_model_for refuses to let the reviewer be the model that wrote the patch —
+            # generate-and-verify collapses when it grades its own work and agrees with itself.
+            manager=None if no_manager else Manager(
+                _fused_if(gateway, roles.models.fuse_review, gateway),
+                review_model_for(roles) or model,
+                use_rubric=rubric,
+            ),
             verifier=CommandVerifier(verify, ws) if verify else None,
             # PROBE (M18-5): record (arm, cheap manager proxy, verified reward) per attempt.
             probe_log=_ProbeLog(settings.home / "probe.jsonl") if probe_log else None,
@@ -2641,6 +2724,7 @@ def solve(
             # Run receipt: persist how this run proved its work (verify-or-revert per attempt) to an
             # append-only log the desktop "Runs" screen reads read-only. Best-effort — never fails a run.
             run_log=settings.home / "runs.jsonl",
+            run_profile=profile,
             config=AutonomousConfig(
                 max_attempts=max_attempts,
                 use_planner=not no_plan,
