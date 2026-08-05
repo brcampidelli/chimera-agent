@@ -12,7 +12,7 @@ from chimera.core import (
     Planner,
     WorkspaceGuard,
 )
-from chimera.core.agent import AgentResult
+from chimera.core.agent import AgentResult, ToolActivity
 from chimera.core.verify import VerificationResult
 from chimera.evolution import ExperienceBuffer
 from chimera.providers import CompletionResult
@@ -212,6 +212,58 @@ def test_autonomous_runs_worker_without_on_edit_support() -> None:
     result = auto.run("do it")
     assert result.success and result.answer == "ok"
     assert not any(e.kind == "edit" for e in events)
+
+
+class _ToolingWorker:
+    """A worker that reports two tool calls through the ``on_tool`` hook the loop passes it."""
+
+    def __init__(self) -> None:
+        self.got_on_tool = False
+
+    def run(self, task: str, *, on_edit: Any = None, on_tool: Any = None) -> AgentResult:
+        if on_tool is not None:
+            self.got_on_tool = True
+            on_tool(ToolActivity("read_file", {"path": "a.py"}, True, "x = 1\n"))
+            on_tool(ToolActivity("run_shell", {"cmd": "pytest"}, False, "E   assert 1 == 2\n"))
+        return AgentResult(answer="done", steps=2, stopped_reason="final")
+
+
+def test_autonomous_forwards_tool_events_from_worker() -> None:
+    """Without these frames a run shows attempt boundaries and nothing in between, so four steps of
+    reading and searching before the first write look, from outside, like a run doing nothing."""
+    from chimera.core.events import AgentEvent
+
+    worker = _ToolingWorker()
+    events: list[AgentEvent] = []
+    auto = AutonomousAgent(
+        worker,
+        on_event=events.append,
+        config=AutonomousConfig(max_attempts=1, use_planner=False, use_manager=False),
+    )
+    assert auto.run("read and test").success
+    assert worker.got_on_tool
+    tools = [e for e in events if e.kind == "tool"]
+    assert [e.data["name"] for e in tools] == ["read_file", "run_shell"]
+    assert tools[0].data["arguments"] == {"path": "a.py"}
+    assert tools[0].data["ok"] is True
+    # A failing tool is the frame that matters most, so its outcome travels with it.
+    assert tools[1].data["ok"] is False
+    assert "assert 1 == 2" in tools[1].data["observation"]
+
+
+def test_tool_event_clips_arguments_and_observation_visibly() -> None:
+    """A `read_file` observation is a whole file and a `run_shell` one is a whole build log; a live
+    progress channel that forwards either in full is a firehose. Clipped — and SAID to be clipped,
+    because a reader who cannot tell a truncated observation from a complete one will eventually
+    draw a conclusion from half of one."""
+    from chimera.core.events import TOOL_ARG_CHARS, TOOL_OBSERVATION_CHARS, tool
+
+    event = tool("write_file", {"path": "a.py", "content": "x" * 5000}, True, "y" * 5000)
+    assert event.data["arguments"]["path"] == "a.py"  # a big sibling never crowds out a small one
+    content = event.data["arguments"]["content"]
+    assert content.startswith("x" * TOOL_ARG_CHARS) and "+4800 chars" in content
+    assert event.data["observation"].startswith("y" * TOOL_OBSERVATION_CHARS)
+    assert "+4600 chars" in event.data["observation"]
 
 
 class ScriptedBackend:

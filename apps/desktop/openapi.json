@@ -2380,9 +2380,53 @@
       },
       "RunRequest": {
         "properties": {
+          "allow_tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allow Tools"
+          },
           "cascade": {
             "default": false,
             "title": "Cascade",
+            "type": "boolean"
+          },
+          "context_budget": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Budget"
+          },
+          "deny_tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deny Tools"
+          },
+          "explorer": {
+            "default": false,
+            "title": "Explorer",
             "type": "boolean"
           },
           "fuse": {
@@ -2394,6 +2438,17 @@
             "default": 3,
             "title": "Max Attempts",
             "type": "integer"
+          },
+          "max_steps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Steps"
           },
           "model": {
             "anyOf": [
@@ -2421,6 +2476,11 @@
               }
             ],
             "title": "Plan"
+          },
+          "repo_map": {
+            "default": false,
+            "title": "Repo Map",
+            "type": "boolean"
           },
           "task": {
             "title": "Task",
@@ -2458,6 +2518,20 @@
               }
             ],
             "title": "Workspace"
+          },
+          "write_region": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Write Region"
           }
         },
         "required": [

@@ -14,7 +14,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-EventKind = Literal["status", "attempt", "result", "final", "token", "edit"]
+EventKind = Literal["status", "attempt", "result", "final", "token", "edit", "tool"]
 
 # A sink for events. Kept as a plain callable so any consumer (print, a queue, an SSE writer)
 # plugs in without a shared base class.
@@ -51,6 +51,46 @@ def result(index: int, success: bool, detail: str = "") -> AgentEvent:
 
 def final(success: bool, answer: str) -> AgentEvent:
     return AgentEvent("final", "done" if success else "gave up", {"success": success, "answer": answer})
+
+
+#: How much of a tool's arguments and of its observation travel in an event.
+#:
+#: These are progress frames, not the transcript. A `read_file` observation is an entire file and a
+#: `run_shell` observation can be a build log; forwarding either in full turns a live progress
+#: channel into a firehose that a UI has to defend itself against. The transcript keeps the real
+#: thing — this is the caption. Truncation is marked, never silent, because a reader who cannot tell
+#: a truncated observation from a complete one will eventually draw a conclusion from half of one.
+TOOL_ARG_CHARS = 200
+TOOL_OBSERVATION_CHARS = 400
+
+
+def _clip(text: str, limit: int) -> str:
+    return text if len(text) <= limit else text[:limit] + f"… (+{len(text) - limit} chars)"
+
+
+def tool(name: str, arguments: dict[str, Any], ok: bool, observation: str = "") -> AgentEvent:
+    """One tool call, as a live progress event: what was called, with what, and whether it worked.
+
+    This is the difference between watching an agent work and watching a spinner. The loop has
+    always known it — ``Agent.run``'s ``on_tool`` carries the full ``ToolActivity`` — but the
+    autonomous loop had no event for it, so a run started from the desktop showed attempt boundaries
+    and nothing in between.
+
+    Argument *values* are stringified and clipped individually so one large argument (a whole file
+    passed to ``write_file``) cannot crowd out the rest; the keys always survive, since knowing
+    which path was written matters more than seeing its contents scroll past.
+    """
+    clipped = {str(k): _clip(str(v), TOOL_ARG_CHARS) for k, v in (arguments or {}).items()}
+    return AgentEvent(
+        "tool",
+        f"{name} {'ok' if ok else 'failed'}",
+        {
+            "name": name,
+            "arguments": clipped,
+            "ok": ok,
+            "observation": _clip(observation or "", TOOL_OBSERVATION_CHARS),
+        },
+    )
 
 
 def edit(path: str, patch: str) -> AgentEvent:

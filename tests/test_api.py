@@ -763,6 +763,102 @@ def test_build_solve_agent_default_path_and_model_mode_plumbing(tmp_path: Any) -
     assert planned.worker.config.model == "vendor/model"
 
 
+def _solve_agent(tmp_path: Any, **fields: Any) -> Any:
+    """Build the real solve agent for a fresh workspace. No model is ever called — every assertion
+    below is about how the agent was *assembled*, which is where the run's ceilings live."""
+    from chimera.api.app import RunRequest, _build_solve_agent
+
+    ws = tmp_path / "ws"
+    ws.mkdir(exist_ok=True)
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    return _build_solve_agent(RunRequest(task="t", **fields), ws, lambda _e: None, settings)
+
+
+def test_the_coding_seams_are_all_off_unless_asked(tmp_path: Any) -> None:
+    """A request that names none of the new fields builds the loop it always built.
+
+    The one deliberate change: the step ceiling is no longer a hard-coded 6 that nothing justified
+    while ``AgentConfig`` documents 8 — a run through the API was quietly capped lower than the same
+    run through ``chimera solve``. This pins the parity so it cannot drift back.
+    """
+    from chimera.core import AgentConfig
+
+    agent = _solve_agent(tmp_path)
+    assert agent.worker.config.max_steps == AgentConfig.max_steps
+    assert agent.worker.config.context_budget is None  # compaction stays off unless asked for
+    assert agent.repo_map is False
+    assert "explore_repository" not in agent.worker.tools.names()
+
+
+def test_max_steps_is_clamped_at_both_ends(tmp_path: Any) -> None:
+    """The ceiling is a UI field, so it is a number a client can get wrong in both directions."""
+    from chimera.api.app import MAX_RUN_STEPS
+
+    assert _solve_agent(tmp_path, max_steps=40).worker.config.max_steps == 40
+    assert _solve_agent(tmp_path, max_steps=0).worker.config.max_steps == 1
+    assert _solve_agent(tmp_path, max_steps=10_000).worker.config.max_steps == MAX_RUN_STEPS
+
+
+def test_context_budget_reaches_the_worker(tmp_path: Any) -> None:
+    """Raising the step ceiling without a budget raises the odds of dying on overflow instead of
+    finishing, so the two fields have to be reachable together — not one without the other."""
+    agent = _solve_agent(tmp_path, max_steps=40, context_budget=0.6)
+    assert agent.worker.config.context_budget == 0.6
+
+
+def test_run_state_carries_the_plan_across_a_compaction(tmp_path: Any) -> None:
+    """Compaction keeps the recent tail; the plan is the one thing an agent cannot re-derive from it.
+
+    ``Agent.run_state`` existed with a comment saying it expected a caller and had none — so the
+    budget above would have compacted blind. This is that caller.
+    """
+    agent = _solve_agent(tmp_path, plan="1. do it\n2. verify it")
+    state = agent.worker.run_state
+    assert state.current_state == "t"
+    assert state.tasks == ["do it", "verify it"]
+    assert "do it" in (state.as_message() or {}).get("content", "")
+
+
+def test_write_region_actually_refuses_a_write_outside_it(tmp_path: Any) -> None:
+    """Asserted through the tool, not the field: a region the write tools do not consult is a
+    setting that reads as a guarantee and is not one."""
+    agent = _solve_agent(tmp_path, write_region=["src/**"])
+    tools = agent.worker.tools
+    assert tools.run("write_file", path="src/ok.py", content="x = 1\n").startswith("wrote")
+    assert tools.run("write_file", path="secrets.env", content="TOKEN=1\n").startswith("error:")
+
+
+def test_blank_write_region_globs_are_not_an_empty_region(tmp_path: Any) -> None:
+    """An empty region forbids EVERY write. That is a thing to say on purpose, not to reach via a
+    trailing comma in a text field."""
+    agent = _solve_agent(tmp_path, write_region=["", "  "])
+    assert agent.worker.tools.run("write_file", path="anywhere.py", content="x\n").startswith("wrote")
+
+
+def test_allow_and_deny_lists_scope_the_session(tmp_path: Any) -> None:
+    names = _solve_agent(tmp_path, allow_tools=["read_file", "write_file"]).worker.tools.names()
+    assert set(names) == {"read_file", "write_file"}
+
+    denied = _solve_agent(tmp_path, deny_tools=["run_shell"]).worker.tools.names()
+    assert "run_shell" not in denied and "read_file" in denied
+
+    # Deny wins over allow — the rule `restrict_registry` documents, pinned at the API boundary too.
+    both = _solve_agent(tmp_path, allow_tools=["read_file"], deny_tools=["read_file"]).worker.tools
+    assert both.names() == []
+
+
+def test_explorer_is_registered_only_when_asked_and_inherits_the_allowlist(tmp_path: Any) -> None:
+    """The explorer is added AFTER the allowlist on purpose (the CLI's order): the allowlist scopes
+    the native tools the sub-agent will inherit, and the explorer itself is what the caller asked
+    for — so an allowlist that omits it does not silently cancel the request."""
+    agent = _solve_agent(tmp_path, explorer=True, allow_tools=["read_file"])
+    assert set(agent.worker.tools.names()) == {"read_file", "explore_repository"}
+
+
+def test_repo_map_flag_reaches_the_loop(tmp_path: Any) -> None:
+    assert _solve_agent(tmp_path, repo_map=True).repo_map is True
+
+
 def test_fs_tree_and_file_endpoints_scope_to_the_workspace(tmp_path: Any) -> None:
     """The read-only fs endpoints list a workspace's tree and read a file, guarded by the app's
     workspace and the path-escape check (a `..` → 400; an invalid workspace param → 400)."""

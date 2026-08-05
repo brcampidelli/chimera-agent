@@ -1851,11 +1851,22 @@ export interface components {
         };
         /** RunRequest */
         RunRequest: {
+            /** Allow Tools */
+            allow_tools?: string[] | null;
             /**
              * Cascade
              * @default false
              */
             cascade: boolean;
+            /** Context Budget */
+            context_budget?: number | null;
+            /** Deny Tools */
+            deny_tools?: string[] | null;
+            /**
+             * Explorer
+             * @default false
+             */
+            explorer: boolean;
             /**
              * Fuse
              * @default false
@@ -1866,6 +1877,8 @@ export interface components {
              * @default 3
              */
             max_attempts: number;
+            /** Max Steps */
+            max_steps?: number | null;
             /** Model */
             model?: string | null;
             /**
@@ -1875,6 +1888,11 @@ export interface components {
             pause_on_taint: boolean;
             /** Plan */
             plan?: string | null;
+            /**
+             * Repo Map
+             * @default false
+             */
+            repo_map: boolean;
             /** Task */
             task: string;
             /** Thread Id */
@@ -1883,6 +1901,8 @@ export interface components {
             verify?: string | null;
             /** Workspace */
             workspace?: string | null;
+            /** Write Region */
+            write_region?: string[] | null;
         };
         /** SandboxCfgOut */
         SandboxCfgOut: {

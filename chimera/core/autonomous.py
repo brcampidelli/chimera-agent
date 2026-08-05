@@ -39,6 +39,7 @@ from chimera.core.events import edit as _ev_edit
 from chimera.core.events import final as _ev_final
 from chimera.core.events import result as _ev_result
 from chimera.core.events import status as _ev_status
+from chimera.core.events import tool as _ev_tool
 from chimera.core.ledger import ProgressLedger, TaskLedger
 from chimera.core.planner import Plan, Planner
 from chimera.core.repomap import build_repo_map
@@ -133,13 +134,18 @@ def _format_requirements(requirements: list[Any]) -> str:
 class Worker(Protocol):
     """Anything that can execute a task and return a result (the agent loop).
 
-    ``on_edit`` is optional and structural: a worker that supports it receives ``(path, patch)`` for
-    each file it edits mid-run (the live per-edit diff). The loop only passes it to workers whose
-    ``run`` actually accepts it (checked by signature), so a Worker without it is never broken.
+    Both callbacks are optional and structural: ``on_edit`` receives ``(path, patch)`` for each file
+    the worker changes mid-run (the live per-edit diff), and ``on_tool`` fires once per tool call
+    with its outcome. The loop passes each one only to workers whose ``run`` actually accepts it
+    (checked by signature), so a Worker that supports neither is never broken.
     """
 
     def run(
-        self, task: str, *, on_edit: Callable[[str, str], None] | None = None
+        self,
+        task: str,
+        *,
+        on_edit: Callable[[str, str], None] | None = None,
+        on_tool: Callable[[Any], None] | None = None,
     ) -> AgentResult: ...
 
 
@@ -329,23 +335,50 @@ class AutonomousAgent:
             return
         self._emit(_ev_edit(path, patch))
 
-    def _run_worker(self, worker: Worker, prompt: str) -> AgentResult:
-        """Run the worker, passing ``on_edit`` ONLY when it supports it and a sink is attached.
+    def _emit_tool(self, activity: Any) -> None:
+        """Forward one tool call from the worker as a ``tool`` event through the sink.
 
-        Backward-compatible: a worker whose ``run`` doesn't accept ``on_edit`` (or when no event sink
-        is set) is called exactly as before — ``worker.run(prompt)`` — so nothing breaks. The support
-        check reads the real signature; a TypeError fallback covers any wrapper that hides it.
+        This is what makes a run legible while it is running. Without it the only frames between
+        "attempt 1/3" and the verdict are the edits, so a run that spends four steps reading and
+        searching before it writes anything looks, from outside, like a run that is doing nothing.
+
+        Defensive about the payload: ``on_tool`` is a Protocol seam and a stubbed worker in a test
+        may hand back something that is only shaped like a ``ToolActivity``.
+        """
+        if self.on_event is None:
+            return
+        self._emit(
+            _ev_tool(
+                str(getattr(activity, "name", "")),
+                getattr(activity, "arguments", None) or {},
+                bool(getattr(activity, "ok", False)),
+                str(getattr(activity, "observation", "") or ""),
+            )
+        )
+
+    def _run_worker(self, worker: Worker, prompt: str) -> AgentResult:
+        """Run the worker, passing the live callbacks it actually supports and a sink exists for.
+
+        Backward-compatible in both directions: with no event sink the call is the bare
+        ``worker.run(prompt)`` it always was, and a worker whose ``run`` accepts neither callback
+        (any Worker implementation that predates them) is called the same way. The support check
+        reads the real signature; a TypeError fallback covers a wrapper whose signature lied.
         """
         if self.on_event is None:
             return worker.run(prompt)
         try:
-            supports_on_edit = "on_edit" in inspect.signature(worker.run).parameters
+            accepted = set(inspect.signature(worker.run).parameters)
         except (TypeError, ValueError):  # unintrospectable callable (C impl / odd wrapper)
-            supports_on_edit = False
-        if not supports_on_edit:
+            accepted = set()
+        kwargs: dict[str, Any] = {}
+        if "on_edit" in accepted:
+            kwargs["on_edit"] = self._emit_edit
+        if "on_tool" in accepted:
+            kwargs["on_tool"] = self._emit_tool
+        if not kwargs:
             return worker.run(prompt)
         try:
-            return worker.run(prompt, on_edit=self._emit_edit)
+            return worker.run(prompt, **kwargs)
         except TypeError:  # signature lied (e.g. **kwargs-only) — fall back to the plain call
             return worker.run(prompt)
 
@@ -369,7 +402,9 @@ class AutonomousAgent:
         # right file instead of exploring blind. Opt-in and bounded (see build_repo_map).
         repo_ctx = ""
         if self.repo_map and self.spine_workspace is not None:
-            digest = build_repo_map(self.spine_workspace)
+            # The task biases the ranking: a file the task names by stem outranks one nothing
+            # mentions, so the budget is spent nearest the work rather than on the graph's hubs.
+            digest = build_repo_map(self.spine_workspace, task=task)
             if digest:
                 repo_ctx = f"Repository map (file: top-level symbols):\n{digest}"
         # ACE playbook: accumulated, delta-curated strategy bullets, injected as advisory context

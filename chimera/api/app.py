@@ -191,6 +191,48 @@ class RunRequest(BaseModel):
     (POST /api/runs/{thread_id}/respond). Requires ``thread_id`` — there is nowhere to park an
     unfinished run without one. Off = finalize as before."""
 
+    # ---- Coding-agent seams -------------------------------------------------------------------
+    # Everything below is opt-in and defaults to the behaviour this endpoint already had. They exist
+    # because the endpoint was built as a deliberate minimum and the desktop's Code screen then
+    # inherited that minimum as a ceiling — a run started from the app was structurally weaker than
+    # the same run started from a terminal, for no reason anyone had written down.
+
+    max_steps: int | None = None
+    """Tool-loop steps the worker may take per attempt. None = the agent's own default.
+
+    This field replaces a hard-coded 6 that had no comment justifying it while ``AgentConfig``'s
+    documented default is 8 — so a run through the API was capped lower than the identical run
+    through ``chimera solve``, and nothing said so. Removing the magic number restores parity;
+    raising it beyond that is what a real coding task needs, and is now the caller's call.
+    Clamped to 1..100: a client asking for ten thousand steps is asking for a bill, not a run."""
+
+    context_budget: float | None = None
+    """Fraction of the model's advertised window to spend on the prompt before compacting.
+
+    None (default) keeps the historical behaviour: the message list only grows and an overflow is
+    terminal. This pairs with ``max_steps`` and should usually move with it — raising the step
+    ceiling without a budget raises the chance of dying on overflow instead of finishing."""
+
+    repo_map: bool = False
+    """Prepend a bounded structural digest of the repository to the worker's context, so it can aim
+    at the right file instead of exploring blind (mirrors ``chimera solve --repo-map``)."""
+
+    explorer: bool = False
+    """Give the worker an isolated read-only Context Explorer for repository search, so localisation
+    ("where does X live?") costs a cheap sub-agent rather than turns of the main loop
+    (mirrors ``chimera solve --explorer``)."""
+
+    allow_tools: list[str] | None = None
+    """Session allowlist of tool names. None = every tool. An explicit list — *including an empty
+    one* — is an allowlist, so ``[]`` is a fully locked, read-nothing session."""
+
+    deny_tools: list[str] | None = None
+    """Tool names removed from the session even when allowed (deny wins over allow)."""
+
+    write_region: list[str] | None = None
+    """Globs the write tools are confined to, relative to the workspace. None = the whole workspace
+    (fenced by ``WorkspaceGuard`` as before). Fail-closed: a write outside the region is refused."""
+
 
 # A builder for the per-run autonomous agent, injectable so the endpoint is testable without a real
 # LLM (a test passes a factory that returns a stubbed-worker agent — see tests/test_api.py). The
@@ -1164,6 +1206,31 @@ def _api_cascade_backend(gateway: SupportsComplete, settings: Settings) -> Suppo
     return CascadeBackend(gateway, FusionEngine(gateway), config)
 
 
+#: Hard ceiling on ``RunRequest.max_steps``. Not a judgement about how many steps a task needs —
+#: it is the difference between a long run and a runaway one, and the client asking is a UI field.
+MAX_RUN_STEPS = 100
+
+
+def _clamp_steps(value: int | None) -> int | None:
+    """Clamp a requested step ceiling into 1..MAX_RUN_STEPS. None (not asked) stays None."""
+    if value is None:
+        return None
+    return max(1, min(MAX_RUN_STEPS, value))
+
+
+def _write_region(globs: list[str] | None, ws: Path) -> Any:
+    """Build a ``WriteRegion`` from the requested globs, or None when the caller named none.
+
+    Blank entries are dropped, and a list that contained nothing but blanks is treated as "no region
+    asked for" rather than as an empty region — an empty region forbids every write, which is a
+    thing a caller should have to say on purpose, not stumble into via a trailing comma.
+    """
+    from chimera.tools.write_region import WriteRegion
+
+    cleaned = [g.strip() for g in (globs or []) if g.strip()]
+    return WriteRegion(cleaned, ws) if cleaned else None
+
+
 def _build_solve_agent(
     req: RunRequest,
     ws: Path,
@@ -1171,18 +1238,22 @@ def _build_solve_agent(
     settings: Settings,
     should_stop: Callable[[], bool] | None = None,
 ) -> AutonomousAgent:
-    """Build the PLAIN solve-core agent for the desktop trigger: plan → run → verify-or-revert → receipt.
+    """Build the solve-core agent for the desktop trigger: plan → run → verify-or-revert → receipt.
 
-    Deliberately minimal versus the CLI ``solve`` command — none of the advanced seams (taint
-    ledger, evolution, durable threads, strong-verify, contracts, write-region). It is the honest
-    core loop, the same capability as ``chimera solve TASK --verify CMD`` in a terminal. The worker's
-    file/shell tools write inside ``ws`` and ``CommandVerifier`` runs the verify command there; that
+    The same capability as ``chimera solve TASK --verify CMD`` in a terminal. The worker's file/shell
+    tools write inside ``ws`` and ``CommandVerifier`` runs the verify command there; that
     side-effecting power is the same the chat endpoint already exposes, gated the same way.
 
-    Three per-run knobs mirror the CLI: ``req.model`` (the worker's model), ``req.fuse`` / ``req.cascade``
-    (the backend routing, reproducing ``chimera solve --fuse`` / ``--cascade``), and ``req.plan`` (an
-    approved/edited plan injected verbatim, skipping the planning call). With none set, the build is
-    byte-identical to the plain single-model core loop.
+    Every per-run knob mirrors a CLI flag, and every one of them is off unless the caller asks:
+    ``model`` / ``fuse`` / ``cascade`` (backend routing), ``plan`` (an approved plan injected
+    verbatim, skipping the planning call), ``max_steps`` + ``context_budget`` (how long the loop may
+    run and when it compacts), ``repo_map`` / ``explorer`` (how it finds its way around a
+    repository), and ``allow_tools`` / ``deny_tools`` / ``write_region`` (what it is allowed to
+    touch). With none set, the build is the plain single-model core loop.
+
+    Still deliberately absent, and still a real difference from the CLI: evolution, strong-verify,
+    contracts, checklists and the trust kernel. Those are not ceilings on an ordinary run — they are
+    separate machinery, and each would need its own surface before it meant anything here.
     """
     from chimera.core import (
         Agent,
@@ -1240,13 +1311,37 @@ def _build_solve_agent(
     # ledgers would mean the run that got tainted and the run that gets asked about it are different
     # objects, and the pause would never fire.
     ledger = TaintLedger()
-    registry = ledger_registry(default_registry(ws), ledger, narrow_on_taint=settings.taint_narrow)
+
+    # Registry assembly, in the CLI's order (main.py `_run_solve`) — the order is load-bearing:
+    # the write region scopes the native write tools, the allowlist is applied BEFORE the meta-tools
+    # so a sub-agent inherits it, and the taint ledger wraps outermost so it sees every call.
+    region = _write_region(req.write_region, ws)
+    registry = default_registry(ws, write_region=region)
+    if req.allow_tools is not None or req.deny_tools:
+        from chimera.governance import restrict_registry
+
+        registry = restrict_registry(registry, allow=req.allow_tools, deny=req.deny_tools or None)
+    # A caller that said nothing about steps falls back to AgentConfig's own documented default,
+    # rather than to the hard-coded 6 this endpoint used to impose without saying why.
+    clamped = _clamp_steps(req.max_steps)
+    steps = clamped if clamped is not None else AgentConfig.max_steps
+    if req.explorer:
+        from chimera.core import ExploreRepositoryTool
+
+        # A narrow localisation question does not need the worker's model, and answering it in a
+        # sub-agent keeps the finding — not the search — in the main loop's context.
+        registry.register(ExploreRepositoryTool(gateway, ws, max_turns=steps))
+    registry = ledger_registry(registry, ledger, narrow_on_taint=settings.taint_narrow)
     # insist_on_action: solve is task completion, so a described-but-unexecuted plan is pushed back
     # to actually run (mirrors the CLI worker config).
     cfg = AgentConfig(
         model=req.model,
-        max_steps=6,
+        max_steps=steps,
+        context_budget=req.context_budget,
         insist_on_action=True,
+        # The workspace's own AGENTS.md. This repository ships one written for AI agents to follow
+        # and, until this line, the agent of this project did not read it.
+        project_root=ws,
         # Same trace the CLI writes, in the same place — a run started from the app and one started
         # from a terminal should leave the same evidence.
         trace_path=settings.home / "traces.jsonl",
@@ -1258,6 +1353,17 @@ def _build_solve_agent(
     # Plan mode: an approved/edited plan is injected verbatim (parsed the same way the planner parses
     # its own output), so the run follows the human-reviewed steps and makes no planning call.
     provided_plan = Plan.from_text(req.plan) if req.plan else None
+    # What a compaction has to put back. Without this the budget above would compact blind: it would
+    # keep the recent tail and drop the plan the run is executing, which is the one thing an agent
+    # cannot re-derive from its own tail. Seeded only from what is known here — the task and the
+    # approved plan; the open file arrives per-turn from the UI and is set there, not remembered.
+    for agent in (worker, escalate_worker):
+        if agent is None:
+            continue
+        agent.run_state.current_state = req.task
+        if provided_plan is not None:
+            agent.run_state.plan = provided_plan.as_text()
+            agent.run_state.tasks = list(provided_plan.steps)
     return _AutonomousAgent(
         worker,
         should_stop=should_stop,
@@ -1269,6 +1375,7 @@ def _build_solve_agent(
         guard=WorkspaceGuard(ws),
         workspace=ws,
         spine_workspace=ws,
+        repo_map=req.repo_map,
         on_event=on_event,
         # Persist the run receipt (step 3a) to the same append-only log GET /api/runs reads.
         run_log=settings.home / "runs.jsonl",
