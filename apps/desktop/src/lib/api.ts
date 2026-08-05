@@ -406,6 +406,132 @@ function dispatchRun(frame: string, h: RunStreamHandlers): void {
   else if (event === "error") h.onError?.(payload.message as string);
 }
 
+// --- Code conversation (turns that edit, streamed) ---
+
+export interface CodeTurnInput {
+  message: string;
+  // The conversation this turn belongs to. Omit to start a new one; the id arrives in the first
+  // frame and every later turn MUST send it back, or each message starts from nothing.
+  session_id?: string | null;
+  workspace?: string | null;
+  model?: string | null;
+  stream?: boolean;
+  // The file open in the viewer. Two real effects server-side: it focuses which AGENTS.md files
+  // apply, and it is what a compaction restores. Only the path travels — the agent re-reads it.
+  open_file?: string | null;
+  max_steps?: number | null;
+  context_budget?: number | null;
+  repo_map?: boolean;
+  explorer?: boolean;
+}
+
+/** One tool call, as it happens. `arguments` and `observation` arrive already clipped server-side
+ *  and SAY so when they were — the UI must never present a truncated observation as complete. */
+export interface CodeToolEvent {
+  name: string;
+  arguments: Record<string, string>;
+  ok: boolean;
+  observation: string;
+}
+
+/** The terminal `done` payload of a coding turn — what it did, what it cost, how close to the wall. */
+export interface CodeTurnDone {
+  answer: string;
+  steps: number;
+  stopped_reason: string;
+  tool_names: string[];
+  model: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  usd: number | null;
+  // The largest prompt this turn built. The number that says whether raising max_steps is safe —
+  // shown rather than hidden, because a ceiling raised without seeing its cost is a trap.
+  context_peak_tokens: number;
+  route_meta: Record<string, unknown> | null;
+}
+
+export interface CodeTurnHandlers {
+  onSession?: (id: string) => void;
+  onToken?: (text: string) => void;
+  onTool?: (e: CodeToolEvent) => void;
+  onEdit?: (path: string, patch: string) => void;
+  onDone?: (d: CodeTurnDone) => void;
+  onError?: (msg: string) => void;
+}
+
+/** Send one turn of a coding conversation and stream it. Mirrors {@link streamRun}: the SSE lives
+ *  on a POST, so we read the body and parse the frames ourselves.
+ *
+ *  This WRITES files in the workspace, like the run trigger — the difference is not permission, it
+ *  is that a turn is a conversation step (fast, no verify-or-revert) while a run is a transaction. */
+export async function streamCodeTurn(
+  req: CodeTurnInput,
+  handlers: CodeTurnHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch("/api/code/turn", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(req),
+      signal,
+    });
+  } catch (err) {
+    handlers.onError?.(err instanceof Error ? err.message : "network error");
+    return;
+  }
+  if (!res.ok || !res.body) {
+    handlers.onError?.(`HTTP ${res.status}`);
+    return;
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
+    let sep: number;
+    while ((sep = buffer.indexOf("\n\n")) !== -1) {
+      dispatchCodeTurn(buffer.slice(0, sep), handlers);
+      buffer = buffer.slice(sep + 2);
+    }
+  }
+  if (buffer.trim()) dispatchCodeTurn(buffer, handlers);
+}
+
+function dispatchCodeTurn(frame: string, h: CodeTurnHandlers): void {
+  let event = "message";
+  let data = "";
+  for (const line of frame.split("\n")) {
+    if (line.startsWith("event:")) event = line.slice(6).trim();
+    // A token delta can legitimately be whitespace, so this one is NOT trimmed — trimming it turns
+    // streamed prose into a wall of runtogetherwords.
+    else if (line.startsWith("data:")) data += line.slice(5).replace(/^ /, "");
+  }
+  if (!data) return;
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse(data);
+  } catch {
+    return;
+  }
+  if (event === "session") h.onSession?.(payload.session_id as string);
+  else if (event === "token") h.onToken?.(payload.text as string);
+  else if (event === "tool") h.onTool?.(payload as unknown as CodeToolEvent);
+  else if (event === "edit") h.onEdit?.(payload.path as string, payload.patch as string);
+  else if (event === "done") h.onDone?.(payload as unknown as CodeTurnDone);
+  else if (event === "error") h.onError?.(payload.message as string);
+}
+
+/** Forget a coding conversation. An unknown id is `{ok:false}`, not an error — that is exactly the
+ *  state a second click on Clear hits. */
+export const deleteCodeSession = (sessionId: string) =>
+  json<{ ok: boolean }>(`/api/code/sessions/${encodeURIComponent(sessionId)}`, {
+    method: "DELETE",
+  });
+
 /** A run that stopped before finalizing and is waiting for a human verdict. Arrives on the stream's
  *  `paused` frame INSTEAD of `done` — a pause is not a verdict, and treating it as a failed run
  *  would quietly throw away work that is sitting there to be released. */

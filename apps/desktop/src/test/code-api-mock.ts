@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+import type { CodeTurnDone, CodeTurnHandlers } from "@/lib/api";
 import type { AttemptReceipt, FsFile, FsNode, FsTree, GitStatus, RunReceipt } from "@/lib/types";
 
 /** The `@/lib/api` surface the Code screen touches. Used as the `vi.mock` factory (via a dynamic
@@ -18,6 +19,48 @@ export function makeCodeApiMock() {
     saveFile: vi.fn(),
     streamExec: vi.fn(),
     streamRun: vi.fn(),
+    streamCodeTurn: vi.fn(),
+    deleteCodeSession: vi.fn(),
+  };
+}
+
+/** A scripted coding turn: drive the handlers in the order the real SSE stream delivers them.
+ *
+ *  Kept here rather than in one test file because the conversation is now part of the Code screen,
+ *  so every Code test renders it — and a test that only mocks what IT uses will hit an undefined
+ *  `streamCodeTurn` the moment someone types into the composer. */
+export function scriptTurn(
+  script: {
+    session?: string;
+    tokens?: string[];
+    tools?: { name: string; arguments: Record<string, string>; ok: boolean; observation: string }[];
+    edits?: { path: string; patch: string }[];
+    done?: Partial<CodeTurnDone>;
+    error?: boolean;
+  } = {},
+) {
+  return async (_req: unknown, h: CodeTurnHandlers) => {
+    h.onSession?.(script.session ?? "s1");
+    for (const token of script.tokens ?? []) h.onToken?.(token);
+    for (const tool of script.tools ?? []) h.onTool?.(tool);
+    for (const edit of script.edits ?? []) h.onEdit?.(edit.path, edit.patch);
+    if (script.error) {
+      h.onError?.("boom");
+      return;
+    }
+    h.onDone?.({
+      answer: "done",
+      steps: 1,
+      stopped_reason: "final",
+      tool_names: [],
+      model: "vendor/model",
+      prompt_tokens: 0,
+      completion_tokens: 0,
+      usd: null,
+      context_peak_tokens: 0,
+      route_meta: null,
+      ...script.done,
+    });
   };
 }
 

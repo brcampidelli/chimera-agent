@@ -18,29 +18,9 @@ import { useT, type TFunc } from "@/lib/i18n";
 import type { AgentResult, AgentsBatch, FileDiff } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const fieldCls = "field w-full px-3 text-sm";
+import { DiffView } from "@/components/code/DiffView";
 
-/** A hand-rolled unified-diff renderer: + green, - red, @@ dim headers, file headers muted.
- *  (Kept local to this screen, mirroring the Code screen's own copy — a small presentational helper.) */
-function DiffLines({ patch }: { patch: string }) {
-  const lines = patch.split("\n");
-  return (
-    <pre className="overflow-x-auto rounded-chip bg-surface-2 p-2 font-mono text-xs leading-relaxed">
-      {lines.map((line, i) => {
-        let cls = "text-muted-foreground";
-        if (line.startsWith("+++") || line.startsWith("---")) cls = "text-foreground/50";
-        else if (line.startsWith("@@")) cls = "text-accent/70";
-        else if (line.startsWith("+")) cls = "text-ok";
-        else if (line.startsWith("-")) cls = "text-bad";
-        return (
-          <div key={i} className={cls}>
-            {line || " "}
-          </div>
-        );
-      })}
-    </pre>
-  );
-}
+const fieldCls = "field w-full px-3 text-sm";
 
 /** Map one tagged live event to a compact localized line (backend `text` is English; the attempt
  *  number is already inside `text`, so we don't read the numeric index here). */
@@ -229,7 +209,7 @@ function AgentCard({
                         {diff.truncated ? <Badge tone="muted">{t("agents.truncated")}</Badge> : null}
                       </summary>
                       <div className="px-2 pb-2">
-                        <DiffLines patch={diff.patch} />
+                        <DiffView patch={diff.patch} />
                       </div>
                     </details>
                   ))}

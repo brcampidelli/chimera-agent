@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import hljs from "highlight.js";
 import {
@@ -39,6 +39,8 @@ import {
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/panel";
+import { Conversation } from "@/components/code/Conversation";
+import { DiffView } from "@/components/code/DiffView";
 import { useT, type TFunc } from "@/lib/i18n";
 import type { AttemptReceipt, FileDiff, FsNode, GitFile, RunReceipt } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -379,26 +381,6 @@ function Viewer({ workspace, path }: { workspace: string; path: string | null })
 }
 
 /** A hand-rolled unified-diff renderer: + green, - red, @@ dim headers, file headers muted. */
-function DiffLines({ patch }: { patch: string }) {
-  const lines = patch.split("\n");
-  return (
-    <pre className="overflow-x-auto rounded-chip bg-surface-2 p-2 font-mono text-xs leading-relaxed">
-      {lines.map((line, i) => {
-        let cls = "text-muted-foreground";
-        if (line.startsWith("+++") || line.startsWith("---")) cls = "text-foreground/50";
-        else if (line.startsWith("@@")) cls = "text-accent/70";
-        else if (line.startsWith("+")) cls = "text-ok";
-        else if (line.startsWith("-")) cls = "text-bad";
-        return (
-          <div key={i} className={cls}>
-            {line || " "}
-          </div>
-        );
-      })}
-    </pre>
-  );
-}
-
 /** One attempt's diffs, honestly labeled: if the attempt was reverted, a banner says the changes
  *  were undone after verification failed (they are what it ATTEMPTED, not what is on disk). */
 function AttemptDiffs({ attempt, t }: { attempt: AttemptReceipt; t: TFunc }) {
@@ -422,7 +404,7 @@ function AttemptDiffs({ attempt, t }: { attempt: AttemptReceipt; t: TFunc }) {
             {diff.truncated ? <Badge tone="muted">{t("code.truncated")}</Badge> : null}
           </summary>
           <div className="px-2 pb-2">
-            <DiffLines patch={diff.patch} />
+            <DiffView patch={diff.patch} />
           </div>
         </details>
       ))}
@@ -460,7 +442,7 @@ function LiveEdits({ edits, t }: { edits: { path: string; patch: string }[]; t: 
             <span className="truncate">{e.path}</span>
           </summary>
           <div className="px-2 pb-2">
-            <DiffLines patch={e.patch} />
+            <DiffView patch={e.patch} />
           </div>
         </details>
       ))}
@@ -573,9 +555,18 @@ function VerifyPanel({ workspace }: { workspace: string }) {
 function RunPanel({
   workspace,
   onRan,
+  handOff,
+  onBusy,
 }: {
   workspace: string;
   onRan: () => void;
+  /** Text handed over from the conversation's "Run with verification". A new object each time, so
+   *  pressing the button twice with the same words still lands — a bare string would compare equal
+   *  and the second press would do nothing, which reads as the button being broken. */
+  handOff?: { text: string; at: number } | null;
+  /** Whether a run is in flight, lifted so the conversation can refuse to edit the same workspace
+   *  underneath it. */
+  onBusy?: (running: boolean) => void;
 }) {
   const t = useT();
   const qc = useQueryClient();
@@ -610,6 +601,17 @@ function RunPanel({
     queryFn: () => getGitStatus(workspace || null),
   });
   const isRepo = !!gitQ.data?.is_repo;
+
+  // A hand-off from the conversation fills the task field rather than starting the run outright.
+  // "Run with verification" is where the user chooses a verify command and how many attempts to
+  // allow — starting immediately would silently make those choices for them.
+  useEffect(() => {
+    if (handOff?.text) setTask(handOff.text);
+  }, [handOff]);
+
+  useEffect(() => {
+    onBusy?.(running);
+  }, [running, onBusy]);
 
   // The run's changed paths, de-duplicated across attempts — what a git-backed discard is scoped to.
   const changedPaths = useMemo(() => {
@@ -760,7 +762,7 @@ function RunPanel({
   }
 
   return (
-    <aside className="flex min-h-0 flex-col overflow-auto lg:w-96">
+    <section className="flex min-h-0 flex-col overflow-auto border-t border-hairline">
       <div className="space-y-2.5 border-b border-hairline p-3">
         <div className="flex items-center gap-2 text-accent">
           <Play className="h-4 w-4" />
@@ -975,7 +977,7 @@ function RunPanel({
         ) : null}
       </div>
       <VerifyPanel workspace={workspace} />
-    </aside>
+    </section>
   );
 }
 
@@ -1274,7 +1276,7 @@ function GitPanel({ workspace }: { workspace: string }) {
           {diffQ.isLoading ? (
             <div className="py-2 text-xs text-muted-foreground">…</div>
           ) : diffQ.data?.patch ? (
-            <DiffLines patch={diffQ.data.patch} />
+            <DiffView patch={diffQ.data.patch} />
           ) : (
             <p className="text-xs text-muted-foreground">{t("code.noDiff")}</p>
           )}
@@ -1291,6 +1293,14 @@ export function Code() {
   const qc = useQueryClient();
   const [workspace, setWorkspace] = useState("");
   const [openFile, setOpenFile] = useState<string | null>(null);
+  // The conversation and the run share one workspace, so they share two facts: what the user asked
+  // (handed over by "Run with verification") and whether a run is already in flight.
+  const [handOff, setHandOff] = useState<{ text: string; at: number } | null>(null);
+  const [runBusy, setRunBusy] = useState(false);
+
+  const refreshOpenFile = useCallback(() => {
+    if (openFile) void qc.invalidateQueries({ queryKey: ["fs-file", workspace, openFile] });
+  }, [qc, workspace, openFile]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -1314,13 +1324,22 @@ export function Code() {
           onOpen={setOpenFile}
         />
         <Viewer workspace={workspace} path={openFile} />
-        <RunPanel
-          workspace={workspace}
-          onRan={() => {
-            // Re-read the currently open file after the agent edited/reverted the workspace.
-            if (openFile) void qc.invalidateQueries({ queryKey: ["fs-file", workspace, openFile] });
-          }}
-        />
+        <aside className="flex min-h-0 flex-col overflow-hidden border-l border-hairline lg:w-96">
+          <Conversation
+            workspace={workspace}
+            openFile={openFile}
+            onHandOff={(text) => setHandOff({ text, at: Date.now() })}
+            onEdited={refreshOpenFile}
+            busyElsewhere={runBusy}
+          />
+          {/* Re-read the currently open file after the agent edited or reverted the workspace. */}
+          <RunPanel
+            workspace={workspace}
+            onRan={refreshOpenFile}
+            handOff={handOff}
+            onBusy={setRunBusy}
+          />
+        </aside>
       </div>
       <GitPanel workspace={workspace} />
       <CmdRunner workspace={workspace} />

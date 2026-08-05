@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **A coding conversation that keeps what it did — `POST /api/code/turn`.** The run endpoint is a
+  closed transaction (plan → execute → verify → revert → receipt), which is right for "make the
+  tests pass" and wrong for "what does this module do?", "ok, rename it", "no, the other one". Those
+  are turns, and a turn is only worth anything if it remembers the previous one. `ChatSession` could
+  not be that: it flattens the conversation to prose (`"User: …\nAssistant: …"`, six turns), which
+  is exactly right for chat and discards **every tool call**, so a coding agent starts each turn
+  blind and re-reads the files it read seconds ago. Nothing errors; it is just slower, dearer and
+  worse. `chimera.core.code_session` sits alongside it and keeps the real thing — the model's own
+  message list, tool calls included — because widening `ChatTurn` would change the messaging
+  gateway, the TUI, `/v1/chat/completions` and the benchmarks to fix none of them. `Agent.run` gains
+  one additive `history=` parameter; absent, behaviour is byte-identical. Trimming can only cut at a
+  `user` message: an assistant message carrying `tool_calls` and the `tool` results answering it are
+  one unit, and an orphaned `tool` message is a hard provider error, not a degradation. The seams
+  from the run endpoint (`max_steps`, `context_budget`, `repo_map`, `explorer`, allow/deny,
+  `write_region`) are **shared, not copied** — the registry assembly order is load-bearing, and a
+  second copy would drift silently, because an allowlist applied one line too late still looks
+  applied.
 - **The agent reads `AGENTS.md`.** This repository ships one written for AI agents to follow, and
   the agent of this project did not read it. `chimera.core.agents_md` now collects the instruction
   files on the path from the workspace root down to the file being worked on — general first, so the
@@ -40,6 +57,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   complete one will eventually draw a conclusion from half of one.
 
 ### Fixed
+- **A hung unit froze the program *after* it had already succeeded.** `run_isolated`'s timeout
+  worked — the hung unit was reported as a timeout and the batch returned on schedule — and then the
+  process sat in `Thread.join` until that unit finished, up to ten minutes later. The code said
+  "abandoned to die with the process"; it was not, because `ThreadPoolExecutor` threads are
+  non-daemon by design and **both** `concurrent.futures.thread._python_exit` and
+  `threading._shutdown` join every one of them at interpreter exit. This failure is nastier than the
+  one the timeout fixed, because it does not look like a hang in the batch — it looks like the test
+  suite, or the CLI, or CI, locking up after finishing successfully, intermittently, with a blocked
+  frame that has no visible connection to this file. Three separate private CPython structures decide
+  whether a started thread is joined at exit, so instead of prying at all three the units now run on
+  real daemon threads with a semaphore bounding concurrency. `run_in_processes` had the sibling
+  defect: `cancel_futures` only cancels units that have not *started*, so a genuinely hung one — the
+  exact case the timeout exists for — kept running with nobody waiting for it; its worker process is
+  now terminated. Both were present before today's work (verified against a clean checkout of the
+  previous commit).
 - **The repo map was dropping the code it existed to point at.** It sorted alphabetically and then
   truncated at a character budget. Measured on this repository: 48 lines survived, **473 files were
   omitted**, and the file that made the cut was `apps/desktop/src-tauri/build_sidecar.py` — while
