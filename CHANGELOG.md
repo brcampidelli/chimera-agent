@@ -127,6 +127,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   a scenario built to be satisfiable.
 
 ### Security
+- **Eighteen Dependabot alerts closed — seven packages, and the triage matters more than the count.**
+  The one marked *critical* is `vitest`, and its exploit needs the **Vitest UI server** to be
+  listening; this project never enables it (no `--ui`, no `api.host`, no browser mode), so it was
+  never reachable here. Fixed anyway. The two that were genuinely live are both **Windows-specific
+  and dev-server-only**: Vite's `server.fs.deny` bypass via alternate paths, and `launch-editor`'s
+  NTLMv2 hash disclosure via UNC handling — meaningful because development on this project happens
+  on Windows with `npm run dev` running. Neither vite 5 nor vitest 2 has a patched release, so this
+  is vite 5→6 and vitest 2→3 (with `@vitejs/plugin-react` 4→5 for the peer range); no config change
+  was needed and all 256 desktop tests pass unchanged. On the Python side only the *lockfile* moved,
+  and only three packages in it — all transitive, none named in `pyproject.toml`: `aiohttp` 3.14.1→
+  3.14.3 is the one in a real runtime path (litellm pulls it) and the suite ran against the patched
+  version; `cryptography` 49→50 arrives only with the `documents`/`full` extra, and `gitpython`
+  3.1.52→3.1.58 only via a benchmark dependency, so neither is installed by the default `[dev]`
+  environment and neither was exercised by the suite. `npm audit` now reports zero.
 - **The A2A SSE stream was a way around the bearer token.** `POST /a2a` with
   `{"method": "message/stream"}` reached the agent with no `CHIMERA_SERVER_TOKEN` at all. The cause
   was structural rather than an oversight: SSE emits many bodies and the pure `handle()` returns one,
