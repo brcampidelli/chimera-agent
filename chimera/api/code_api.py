@@ -54,6 +54,7 @@ from chimera.api.posture import (
 from chimera.api.posture import resolve as _resolve_posture
 from chimera.api.roles import Profile, RoleModels, RolePlan
 from chimera.api.roles import resolve as resolve_roles
+from chimera.api.worth import WorthReport, summarize_worth
 from chimera.telemetry import get_logger
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -395,6 +396,17 @@ def register_code_api(
         TypeScript would display a model the run does not actually use.
         """
         return resolve_roles(req.profile, settings).models
+
+    @app.get("/api/code/worth", dependencies=[guard], response_model=WorthReport)
+    def code_worth() -> WorthReport:
+        """What each configuration cost and got, over the runs that really happened here.
+
+        Read from the same append-only run log the receipts come from — no separate store to drift
+        out of sync with the evidence it summarises.
+        """
+        from chimera.api.runs import load_runs
+
+        return summarize_worth(load_runs(settings.home / "runs.jsonl"))
 
     @app.delete("/api/code/sessions/{session_id}", dependencies=[guard])
     def delete_code_session(session_id: str) -> dict[str, bool]:

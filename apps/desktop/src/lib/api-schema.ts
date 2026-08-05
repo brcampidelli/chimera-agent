@@ -192,6 +192,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/worth": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Code Worth
+         * @description What each configuration cost and got, over the runs that really happened here.
+         *
+         *     Read from the same append-only run log the receipts come from — no separate store to drift
+         *     out of sync with the evidence it summarises.
+         */
+        get: operations["code_worth_api_code_worth_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/config": {
         parameters: {
             query?: never;
@@ -1991,6 +2014,28 @@ export interface components {
             /** Workspace */
             workspace?: string | null;
         };
+        /**
+         * ProfileWorth
+         * @description One configuration's record, over the runs that actually happened here.
+         */
+        ProfileWorth: {
+            /** Attempts Total */
+            attempts_total: number;
+            /** Passed */
+            passed: number;
+            /** Profile */
+            profile: string | null;
+            /** Reverted */
+            reverted: number;
+            /** Runs */
+            runs: number;
+            /** Unproductive */
+            unproductive: number;
+            /** Usd Known Runs */
+            usd_known_runs: number;
+            /** Usd Total */
+            usd_total: number | null;
+        };
         /** ProjectDetailOut */
         ProjectDetailOut: {
             /** Columns */
@@ -2385,6 +2430,26 @@ export interface components {
             /** Version */
             version: string;
         };
+        /**
+         * WorthReport
+         * @description Every configuration seen in the run log, in a fixed order, with the caveat attached.
+         */
+        WorthReport: {
+            /**
+             * Any Readable
+             * @default false
+             */
+            any_readable: boolean;
+            /** Profiles */
+            profiles: components["schemas"]["ProfileWorth"][];
+            /**
+             * Readable N
+             * @default 10
+             */
+            readable_n: number;
+            /** Total Runs */
+            total_runs: number;
+        };
     };
     responses: never;
     parameters: never;
@@ -2694,6 +2759,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    code_worth_api_code_worth_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorthReport"];
                 };
             };
         };

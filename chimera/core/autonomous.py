@@ -215,6 +215,17 @@ class Attempt:
     #: third state is the whole point: collapsing "we could not tell" into either boolean is how a
     #: gate that reads honestly today starts lying later.
     diff_productive: bool | None = None
+    #: List-rate cost of the worker's model calls for THIS attempt, or ``None`` when the model's
+    #: price is unknown. Never 0.0 as a stand-in: "we do not know what this cost" and "this cost
+    #: nothing" are different facts, and a receipt that collapses them makes the cheap-looking
+    #: configuration the one nobody can check.
+    usd: float | None = None
+    #: Prompt/completion tokens for this attempt. Always known when the provider reported them, so
+    #: they remain comparable across runs even where the price is not.
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    #: The model slug that actually answered this attempt (the EDITOR's model under role routing).
+    model: str = ""
     #: Names of out-of-checkout side-effect tools this attempt actually called (send_email,
     #: http_post, …), read off the step log. Recorded, never acted on: an empty diff means
     #: something very different once a run has already sent mail, and a reader of the receipt
@@ -272,6 +283,7 @@ class AutonomousAgent:
         on_event: EventSink | None = None,
         checkpointer: RunCheckpointer | None = None,
         run_log: Path | None = None,
+        run_profile: str | None = None,
         config: AutonomousConfig | None = None,
     ) -> None:
         self.worker = worker
@@ -315,6 +327,11 @@ class AutonomousAgent:
         self.on_event = on_event
         self.checkpointer = checkpointer
         self.run_log = run_log
+        #: An opaque label for the configuration this run used, recorded on the receipt so runs can
+        #: be grouped later. The loop never interprets it — it does not know what a "profile" is,
+        #: and should not: the moment the core starts branching on this label it stops being a
+        #: record of what happened and becomes another thing that can be wrong.
+        self.run_profile = run_profile
         self.config = config or AutonomousConfig()
 
     def _emit(self, event: AgentEvent) -> None:
@@ -683,6 +700,13 @@ class AutonomousAgent:
             attempt.diffs = diffs
             attempt.diff_productive = diff_productive
             attempt.side_effects = _side_effects(steplog)
+            # What this attempt charged. Read off the worker's own result rather than recomputed:
+            # `usd` is None there whenever the model's price is unknown, and that None has to
+            # survive all the way to the receipt for the "was it worth it?" view to stay honest.
+            attempt.usd = getattr(agent_result, "usd", None)
+            attempt.prompt_tokens = int(getattr(agent_result, "prompt_tokens", 0) or 0)
+            attempt.completion_tokens = int(getattr(agent_result, "completion_tokens", 0) or 0)
+            attempt.model = str(getattr(agent_result, "model", "") or "")
             self._emit(_ev_result(index, ok, detail=(fb or vout)[:200]))
             if not ok and snapshot is not None and self.guard is not None:
                 self.guard.restore(snapshot)
@@ -946,7 +970,8 @@ class AutonomousAgent:
 
             verify_command = getattr(self.verifier, "command", None)
             receipt = build_receipt(
-                result, task, verify_command, datetime.now(UTC).isoformat()
+                result, task, verify_command, datetime.now(UTC).isoformat(),
+                profile=self.run_profile,
             )
             append_run(self.run_log, receipt)
         except Exception as exc:  # noqa: BLE001 — receipt persistence is best-effort, never fatal

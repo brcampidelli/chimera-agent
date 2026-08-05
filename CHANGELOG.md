@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **"Was it worth it?" — what each profile actually cost, and what it actually got.** Three facts per
+  configuration, over the runs that really happened in your workspace: passed, attempts, cost. The
+  reason it is worth building is that **no vendor can produce it** — a benchmark published by
+  whoever built the agent is always suspect, and one that ran on *your* repo against *your* verify
+  command is a different kind of claim. That advantage survives exactly as long as the numbers stay
+  honest, so what the panel **refuses** to do is the feature. It refuses to add up costs it does not
+  fully know: one unpriced attempt makes the run's cost `null`, one unpriced run makes the group's
+  `null`, and it reports how many runs *were* priced instead of showing a partial sum — which is not
+  conservative but confidently wrong in one direction, the direction where whichever profile used a
+  free tier looks cheaper than it was. It refuses to rank: these are observational groups from
+  whatever you happened to run, so they are sorted **by name**, and there is no field for a winner.
+  It refuses to attribute old runs to a profile they never used — receipts predating the field stay
+  in their own `null` group. And it says when n is too small to read, because a 100% pass rate over
+  two runs is a story about which tasks got run. A hollow success (a pass that changed no file) is
+  shown *beside* the pass count and never folded into it. Receipts now carry per-attempt cost,
+  tokens and model, plus the profile the run named — so the panel fills in from here, not
+  retroactively.
 - **A model per role — and the pre-registration that will decide whether it earns its keep.** The
   tempting way to be different here is a "fuse" switch on the coding loop, and it would be a lie for
   a reason that is easy to check and easy to miss: `RoutedBackend.complete` sends any turn carrying

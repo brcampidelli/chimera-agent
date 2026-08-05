@@ -1,5 +1,12 @@
 import { vi } from "vitest";
-import type { CodeTurnDone, CodeTurnHandlers, PostureFacts, RoleModels } from "@/lib/api";
+import type {
+  CodeTurnDone,
+  CodeTurnHandlers,
+  PostureFacts,
+  ProfileWorth,
+  RoleModels,
+  WorthReport,
+} from "@/lib/api";
 import type { AttemptReceipt, FsFile, FsNode, FsTree, GitStatus, RunReceipt } from "@/lib/types";
 
 /** The `@/lib/api` surface the Code screen touches. Used as the `vi.mock` factory (via a dynamic
@@ -23,6 +30,7 @@ export function makeCodeApiMock() {
     deleteCodeSession: vi.fn(),
     getPostureFacts: vi.fn(),
     getRoleModels: vi.fn(),
+    getWorth: vi.fn(),
   };
 }
 
@@ -52,6 +60,28 @@ export function roleModels(over: Partial<RoleModels> = {}): RoleModels {
     review: "vendor/top",
     fuse_plan: true,
     fuse_review: false,
+    ...over,
+  };
+}
+
+/** A "was it worth it?" report, as the server would compute it. */
+export function worthReport(profiles: Partial<ProfileWorth>[] = [], over: Partial<WorthReport> = {}): WorthReport {
+  const groups: ProfileWorth[] = profiles.map((p) => ({
+    profile: "balanced",
+    runs: 1,
+    passed: 1,
+    reverted: 0,
+    unproductive: 0,
+    attempts_total: 1,
+    usd_total: 0.01,
+    usd_known_runs: 1,
+    ...p,
+  }));
+  return {
+    profiles: groups,
+    total_runs: groups.reduce((n, g) => n + g.runs, 0),
+    readable_n: 10,
+    any_readable: groups.some((g) => g.runs >= 10),
     ...over,
   };
 }

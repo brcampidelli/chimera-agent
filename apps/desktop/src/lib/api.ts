@@ -590,6 +590,37 @@ export const getRoleModels = (profile: Profile) =>
     body: JSON.stringify({ profile }),
   });
 
+// --- "Was it worth it?" (what each profile cost, and what it got) ---
+
+export interface ProfileWorth {
+  profile: string | null;
+  runs: number;
+  passed: number;
+  reverted: number;
+  // Runs whose SUCCESSFUL attempt changed no file — the empty-patch failure, kept apart from
+  // `passed` so a configuration cannot look good at the thing it is bad at.
+  unproductive: number;
+  attempts_total: number;
+  // Null when ANY run in the group had an unknown cost. `usd_known_runs` is the denominator:
+  // without it, a null is indistinguishable from "no data" and a number from "all of it".
+  usd_total: number | null;
+  usd_known_runs: number;
+}
+
+export interface WorthReport {
+  profiles: ProfileWorth[];
+  total_runs: number;
+  readable_n: number;
+  any_readable: boolean;
+}
+
+/** What each configuration actually cost and got, over the runs that really happened here.
+ *
+ *  The groups arrive sorted BY NAME, never by outcome — they are observational (different tasks,
+ *  different days, no randomisation), and ordering them by pass rate would read as a ranking these
+ *  numbers cannot support. The comparison that can is the paired A/B in bench/role_routing. */
+export const getWorth = () => json<WorthReport>("/api/code/worth");
+
 /** Forget a coding conversation. An unknown id is `{ok:false}`, not an error — that is exactly the
  *  state a second click on Clear hits. */
 export const deleteCodeSession = (sessionId: string) =>

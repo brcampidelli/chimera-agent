@@ -62,6 +62,14 @@ class AttemptReceipt(BaseModel):
     #: changed". Serialized explicitly (never omitted) so the unknown survives the round trip; a
     #: field that disappears when it is None is indistinguishable from a field nobody set.
     diff_productive: bool | None = None
+    #: What this attempt charged, at list rate — ``null`` when the model's price is unknown, never
+    #: 0.0 as a stand-in. Serialized explicitly so the unknown survives the round trip: a receipt
+    #: that reports "we do not know" as "free" makes the cheapest-looking configuration the one
+    #: nobody can audit.
+    usd: float | None = None
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    model: str = ""  # the model that actually answered (the EDITOR's, under role routing)
     #: Out-of-checkout side effects this attempt actually performed (send_email, http_post, …).
     #: An empty diff means one thing for a run that only touched files and something else entirely
     #: for a run that already sent mail — the receipt should not force that inference.
@@ -78,10 +86,40 @@ class RunReceipt(BaseModel):
     verify_command: str | None = None  # the shell command that judged the run, or None (no verifier)
     answer: str = ""  # the final answer, truncated in the builder
     attempts: list[AttemptReceipt] = []
+    #: Which model-role configuration ran this — "economy" / "balanced" / "max", or ``null`` for a
+    #: run that predates the field or named none. Null is kept as its own group rather than folded
+    #: into the default: attributing old runs to a profile they never used would put fabricated
+    #: evidence into the one view whose whole job is to say whether a profile was worth it.
+    profile: str | None = None
+    #: The run's total cost, or ``null`` when ANY attempt's price was unknown. Not a partial sum:
+    #: adding up only the legs whose price we happen to know reports a number that is always too
+    #: low, and always too low in the direction that flatters whichever configuration used a free
+    #: tier. See :func:`total_usd`.
+    usd: float | None = None
+
+
+def total_usd(attempts: list[AttemptReceipt]) -> float | None:
+    """Sum the attempts' cost, or ``None`` if any single one is unknown.
+
+    All-or-nothing on purpose. A partial sum is not a conservative estimate — it is a number that
+    is confidently wrong in a predictable direction, and the direction is "the run that used a free
+    or unpriced model looks cheaper than the one that did not". Refusing to add is the only answer
+    that cannot mislead a cost comparison.
+    """
+    if not attempts:
+        return None
+    if any(a.usd is None for a in attempts):
+        return None
+    return round(sum(a.usd or 0.0 for a in attempts), 6)
 
 
 def build_receipt(
-    result: AutonomousResult, task: str, verify_command: str | None, ts: str
+    result: AutonomousResult,
+    task: str,
+    verify_command: str | None,
+    ts: str,
+    *,
+    profile: str | None = None,
 ) -> RunReceipt:
     """Map an ``AutonomousResult`` (and its attempts) into a receipt, truncating the bounded fields."""
     attempts = [
@@ -109,6 +147,10 @@ def build_receipt(
             evidence=getattr(a, "evidence", "none") or "none",
             diff_productive=getattr(a, "diff_productive", None),
             side_effects=list(getattr(a, "side_effects", None) or []),
+            usd=getattr(a, "usd", None),
+            prompt_tokens=int(getattr(a, "prompt_tokens", 0) or 0),
+            completion_tokens=int(getattr(a, "completion_tokens", 0) or 0),
+            model=str(getattr(a, "model", "") or ""),
         )
         for a in result.attempts
     ]
@@ -120,6 +162,8 @@ def build_receipt(
         verify_command=verify_command,
         answer=(result.answer or "")[:2000],
         attempts=attempts,
+        profile=profile,
+        usd=total_usd(attempts),
     )
 
 

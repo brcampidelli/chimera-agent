@@ -2499,6 +2499,69 @@
         "title": "PostureQuery",
         "type": "object"
       },
+      "ProfileWorth": {
+        "description": "One configuration's record, over the runs that actually happened here.",
+        "properties": {
+          "attempts_total": {
+            "title": "Attempts Total",
+            "type": "integer"
+          },
+          "passed": {
+            "title": "Passed",
+            "type": "integer"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          },
+          "reverted": {
+            "title": "Reverted",
+            "type": "integer"
+          },
+          "runs": {
+            "title": "Runs",
+            "type": "integer"
+          },
+          "unproductive": {
+            "title": "Unproductive",
+            "type": "integer"
+          },
+          "usd_known_runs": {
+            "title": "Usd Known Runs",
+            "type": "integer"
+          },
+          "usd_total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usd Total"
+          }
+        },
+        "required": [
+          "profile",
+          "runs",
+          "passed",
+          "reverted",
+          "unproductive",
+          "attempts_total",
+          "usd_total",
+          "usd_known_runs"
+        ],
+        "title": "ProfileWorth",
+        "type": "object"
+      },
       "ProjectDetailOut": {
         "properties": {
           "columns": {
@@ -3629,6 +3692,38 @@
         ],
         "title": "VersionOut",
         "type": "object"
+      },
+      "WorthReport": {
+        "description": "Every configuration seen in the run log, in a fixed order, with the caveat attached.",
+        "properties": {
+          "any_readable": {
+            "default": false,
+            "title": "Any Readable",
+            "type": "boolean"
+          },
+          "profiles": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileWorth"
+            },
+            "title": "Profiles",
+            "type": "array"
+          },
+          "readable_n": {
+            "default": 10,
+            "title": "Readable N",
+            "type": "integer"
+          },
+          "total_runs": {
+            "title": "Total Runs",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "profiles",
+          "total_runs"
+        ],
+        "title": "WorthReport",
+        "type": "object"
       }
     }
   },
@@ -3988,6 +4083,25 @@
           }
         },
         "summary": "Code Turn"
+      }
+    },
+    "/api/code/worth": {
+      "get": {
+        "description": "What each configuration cost and got, over the runs that really happened here.\n\nRead from the same append-only run log the receipts come from \u2014 no separate store to drift\nout of sync with the evidence it summarises.",
+        "operationId": "code_worth_api_code_worth_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorthReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Code Worth"
       }
     },
     "/api/config": {

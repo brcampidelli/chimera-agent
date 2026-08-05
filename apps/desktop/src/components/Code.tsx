@@ -45,6 +45,7 @@ import { Badge } from "@/components/ui/panel";
 import { Conversation } from "@/components/code/Conversation";
 import { PostureBar } from "@/components/code/PostureBar";
 import { RolesBar } from "@/components/code/RolesBar";
+import { WorthPanel } from "@/components/code/WorthPanel";
 import { DiffView } from "@/components/code/DiffView";
 import { useT, type TFunc } from "@/lib/i18n";
 import type { AttemptReceipt, FileDiff, FsNode, GitFile, RunReceipt } from "@/lib/types";
@@ -1372,6 +1373,7 @@ export function Code() {
             posture={posture}
             profile={profile}
           />
+          <WorthPanel />
         </aside>
       </div>
       <GitPanel workspace={workspace} />

@@ -1329,6 +1329,10 @@ def _build_solve_agent(
         on_event=on_event,
         # Persist the run receipt (step 3a) to the same append-only log GET /api/runs reads.
         run_log=settings.home / "runs.jsonl",
+        # An opaque label recorded on the receipt so runs can be grouped later. Only what the
+        # client actually named — never the resolved default, because attributing a run to a
+        # profile nobody chose is fabricated evidence in the one view built to judge profiles.
+        run_profile=req.profile,
         # HITL. The ledger tells the agent whether this run went tainted; the checkpointer is where
         # a paused run waits. Both only when the client supplied a thread — a pause with no durable
         # identity is a run nobody can ever come back to, which is worse than not pausing.
