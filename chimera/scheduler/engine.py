@@ -9,11 +9,11 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 
 from croniter import croniter
 
+from chimera.concurrency import call_with_deadline
 from chimera.scheduler.models import CreatedBy, CronJob
 from chimera.scheduler.store import CronStore
 from chimera.telemetry import get_logger
@@ -27,18 +27,15 @@ def _dispatch_bounded(
     """Run ``dispatch(job)``, raising :class:`TimeoutError` if it overruns ``timeout``.
 
     ``None`` runs it inline (the previous, unbounded behaviour) so nothing pays for a thread when
-    no deadline is set. With a deadline the call runs in a throwaway worker and the pool is shut
-    down WITHOUT waiting: an overrunning job cannot be killed in Python, so waiting for it here
-    would reproduce the very stall the timeout exists to prevent.
+    no deadline is set. With a deadline the job runs on a daemon thread and an overrun is abandoned
+    — a running job cannot be killed in Python, so waiting for it would reproduce the very stall the
+    timeout exists to prevent.
+
+    That abandonment used to be a lie: this ran on a ``ThreadPoolExecutor``, whose threads are joined
+    at interpreter exit no matter what ``shutdown(wait=False)`` says, so a stuck job let the tick
+    finish and then held the process open until it unstuck. See :mod:`chimera.concurrency`.
     """
-    if timeout is None:
-        dispatch(job)
-        return
-    pool = ThreadPoolExecutor(max_workers=1)
-    try:
-        pool.submit(dispatch, job).result(timeout=timeout)
-    finally:
-        pool.shutdown(wait=False, cancel_futures=True)
+    call_with_deadline(lambda: dispatch(job), timeout)
 
 
 def _next_after(cron_expr: str, after_epoch: float) -> float:

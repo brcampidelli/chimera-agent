@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -145,3 +146,51 @@ def test_run_in_processes_timeout_bounds_a_hung_unit() -> None:
     assert by_name["ok"].ok and by_name["ok"].value == 42
     assert not by_name["hung"].ok
     assert "timed out" in (by_name["hung"].error or "")
+
+
+def test_a_hung_thread_unit_does_not_block_interpreter_exit(tmp_path: Path) -> None:
+    """The batch returning on time is only half of it — the PROGRAM has to be able to end.
+
+    `ThreadPoolExecutor` threads are non-daemon, and both `_python_exit` and `threading._shutdown`
+    join every one at exit. So a unit that hung past `timeout` was reported correctly, the batch
+    returned on schedule, and then the process sat in `Thread.join` until the hung unit finished —
+    ten minutes, for the fixture above. That does not look like a hang in the batch; it looks like
+    the suite, or the CLI, freezing after finishing successfully.
+
+    Asserted on the flag rather than by timing a real exit, because the only honest way to test
+    "the process exits" by waiting for it is to reproduce the hang.
+    """
+    import threading
+
+    before = set(threading.enumerate())
+    run_isolated(tmp_path, [("hung", _hang)], timeout=1.0)
+    leftover = [t for t in threading.enumerate() if t not in before and t.is_alive()]
+    assert leftover, "expected the hung unit's thread to still be running (else this proves nothing)"
+    assert all(t.daemon for t in leftover), (
+        "a hung unit's thread is still joined at exit — the process will hang after reporting"
+    )
+
+
+def test_a_timed_out_unit_leaves_no_process_behind() -> None:
+    """Reporting a timeout is half the job; the other half is that the process actually stops.
+
+    `cancel_futures` only cancels units that have not STARTED, and a hung unit is by definition
+    already running — so before this was fixed it kept running with nobody waiting for it. The loud
+    symptom was not a runaway process: it was that `ProcessPoolExecutor`'s atexit hook waits for the
+    pool, so the interpreter that reported the timeout never exited. The whole suite passed and then
+    hung, intermittently, pointing at everything except the line responsible.
+
+    Asserted by counting live children rather than by timing an exit, because a test that proves
+    "the process exits" by waiting for it to exit is the same hang wearing a different hat.
+    """
+    import multiprocessing
+
+    before = len(multiprocessing.active_children())
+    run_in_processes([("hung", _sleep_forever)], timeout=1.0)
+    # terminate() is a signal, not a join — give the child a moment to actually die.
+    deadline = time.monotonic() + 10.0
+    while time.monotonic() < deadline and len(multiprocessing.active_children()) > before:
+        time.sleep(0.1)
+    assert len(multiprocessing.active_children()) <= before, (
+        "a timed-out unit left its worker process running — the interpreter will hang at exit"
+    )

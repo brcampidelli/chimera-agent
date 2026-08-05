@@ -22,11 +22,13 @@ repo :func:`run_isolated` runs in-place (documented, no false isolation).
 from __future__ import annotations
 
 from collections.abc import Callable
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, TimeoutError, as_completed
+from concurrent.futures import ProcessPoolExecutor, TimeoutError, as_completed
 from dataclasses import dataclass, field
+from functools import partial
 from pathlib import Path
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar, cast
 
+from chimera.concurrency import Outcome, run_all_with_deadline
 from chimera.core.worktree import GitWorktree, is_git_repo
 from chimera.telemetry import get_logger
 
@@ -94,30 +96,13 @@ def run_isolated(
 
     results: dict[str, IsolatedResult[T]] = {}
     try:
-        # `timeout` is a deadline for the WHOLE batch, not per unit: it must be passed to
-        # as_completed, which is what actually waits. Passing it only to future.result() (the old
-        # code) bounded nothing — as_completed yields futures that have ALREADY finished, so its
-        # result() never waits and the TimeoutError branch was unreachable. A single hung unit
-        # blocked the iteration forever, which is precisely what this parameter exists to prevent.
-        pool = ThreadPoolExecutor(max_workers=min(max_workers, len(units)))
-        try:
-            futures = {pool.submit(fn, paths[name]): name for name, fn in units}
-            try:
-                for future in as_completed(futures, timeout=timeout):
-                    name = futures[future]
-                    results[name] = _collect(name, future, trees[name], succeeded, timeout)
-            except TimeoutError:
-                for future, name in futures.items():
-                    if name in results:
-                        continue
-                    future.cancel()  # only helps if it has not started
-                    results[name] = IsolatedResult(name, ok=False, error=f"timed out after {timeout}s")
-        finally:
-            # Do NOT wait here. Python cannot kill a running thread, so waiting on a hung unit is
-            # the very hang the timeout exists to prevent — the batch would return late or never.
-            # Queued units are cancelled; a unit already running is abandoned to die with the
-            # process, and its slot is reported as a timeout above.
-            pool.shutdown(wait=False, cancel_futures=True)
+        outcomes = run_all_with_deadline(
+            [(name, partial(fn, paths[name])) for name, fn in units],
+            max_workers=max_workers,
+            timeout=timeout,
+        )
+        for name, _ in units:
+            results[name] = _collect(outcomes[name], trees[name], succeeded, timeout)
         conflicts, merged = _merge_back(workspace, trees, results)
     finally:
         for tree in trees.values():
@@ -130,21 +115,21 @@ def run_isolated(
 
 
 def _collect(
-    name: str,
-    future: object,
+    slot: Outcome[T],
     tree: GitWorktree | None,
     succeeded: Callable[[T], bool],
     timeout: float | None,
 ) -> IsolatedResult[T]:
-    try:
-        value: T = future.result(timeout=timeout)  # type: ignore[attr-defined]
-    except TimeoutError:
-        return IsolatedResult(name, ok=False, error=f"timed out after {timeout}s")
-    except Exception as exc:  # noqa: BLE001 — a crashing unit must not fail the batch
-        return IsolatedResult(name, ok=False, error=f"{type(exc).__name__}: {exc}")
+    if slot.timed_out:
+        return IsolatedResult(slot.name, ok=False, error=f"timed out after {timeout}s")
+    if slot.error is not None:
+        return IsolatedResult(
+            slot.name, ok=False, error=f"{type(slot.error).__name__}: {slot.error}"
+        )
+    value = cast("T", slot.value)
     ok = bool(succeeded(value))
     changed = tree.changed_paths() if (tree is not None and ok) else []
-    return IsolatedResult(name, ok=ok, value=value, changed_paths=changed)
+    return IsolatedResult(slot.name, ok=ok, value=value, changed_paths=changed)
 
 
 def _merge_back(
@@ -183,9 +168,9 @@ def run_in_processes(
     """Run self-contained, picklable units in separate processes (fault + CPU isolation).
 
     A unit that raises, hangs past ``timeout``, or crashes its worker becomes a failed
-    :class:`IsolatedResult` — the orchestrator survives. Only data crosses the process
-    boundary, so pass module-level callables that return picklable values (the RPC seam),
-    not closures over live backends.
+    :class:`IsolatedResult` — the orchestrator survives, and a hung unit's *process* is killed
+    rather than abandoned. Only data crosses the process boundary, so pass module-level callables
+    that return picklable values (the RPC seam), not closures over live backends.
     """
     if not units:
         return []
@@ -210,5 +195,43 @@ def run_in_processes(
                 future.cancel()
                 out[name] = IsolatedResult(name, ok=False, error=f"timed out after {timeout}s")
     finally:
+        # Snapshot the workers BEFORE shutting down: `shutdown` sets the executor's process map to
+        # None, so reading it afterwards finds nothing to kill and the straggler survives.
+        workers = list((getattr(pool, "_processes", None) or {}).values())
         pool.shutdown(wait=False, cancel_futures=True)
+        _kill_stragglers(pool, workers)
     return [out[name] for name, _ in units]
+
+
+def _kill_stragglers(pool: ProcessPoolExecutor, workers: list[Any]) -> None:
+    """Terminate worker processes still running after shutdown.
+
+    ``cancel_futures`` only cancels units that have not STARTED. A unit that is genuinely hung —
+    the exact case ``timeout`` exists for — is already running, so it cannot be cancelled and keeps
+    running with nobody waiting for it. Two things then go wrong, and only the second is loud:
+    a runaway process keeps burning CPU after ``solve-batch`` reported it as failed, and
+    ``ProcessPoolExecutor``'s own atexit hook waits for the pool at interpreter shutdown, so the
+    program that reported the timeout hangs forever on the way out.
+
+    That second failure is why this is not a tidy-up. It surfaced as the whole test suite passing
+    and then never exiting — which reads as "the tests hung", pointing at everything except the
+    line responsible. Intermittently, too, since it depends on which thread wins at exit.
+
+    3.14 added ``kill_workers()`` for exactly this; below it there is no public API, so ``workers``
+    is a snapshot of the executor's private process map, taken before shutdown emptied it. Every
+    access is defensive — this is a best-effort cleanup running in a ``finally``, and it must never
+    raise over the real result it is cleaning up after.
+    """
+    killer = getattr(pool, "kill_workers", None)
+    if callable(killer):
+        try:
+            killer()
+            return
+        except Exception as exc:  # noqa: BLE001 — fall through to the manual path
+            _log.debug("kill_workers failed, terminating individually: %s", exc)
+    for proc in workers:
+        try:
+            if proc.is_alive():
+                proc.terminate()
+        except Exception as exc:  # noqa: BLE001 — cleanup must not raise over the real result
+            _log.debug("could not terminate a straggling worker: %s", exc)
