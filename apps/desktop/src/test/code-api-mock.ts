@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { CodeTurnDone, CodeTurnHandlers, PostureFacts } from "@/lib/api";
+import type { CodeTurnDone, CodeTurnHandlers, PostureFacts, RoleModels } from "@/lib/api";
 import type { AttemptReceipt, FsFile, FsNode, FsTree, GitStatus, RunReceipt } from "@/lib/types";
 
 /** The `@/lib/api` surface the Code screen touches. Used as the `vi.mock` factory (via a dynamic
@@ -22,6 +22,7 @@ export function makeCodeApiMock() {
     streamCodeTurn: vi.fn(),
     deleteCodeSession: vi.fn(),
     getPostureFacts: vi.fn(),
+    getRoleModels: vi.fn(),
   };
 }
 
@@ -42,6 +43,19 @@ export function postureFacts(over: Partial<PostureFacts> = {}): PostureFacts {
  *  Kept here rather than in one test file because the conversation is now part of the Code screen,
  *  so every Code test renders it — and a test that only mocks what IT uses will hit an undefined
  *  `streamCodeTurn` the moment someone types into the composer. */
+/** The models a profile resolves to, as the server would report them. */
+export function roleModels(over: Partial<RoleModels> = {}): RoleModels {
+  return {
+    explore: "vendor/weak",
+    plan: "vendor/top",
+    edit: "vendor/mid",
+    review: "vendor/top",
+    fuse_plan: true,
+    fuse_review: false,
+    ...over,
+  };
+}
+
 export function scriptTurn(
   script: {
     session?: string;

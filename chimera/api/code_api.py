@@ -52,6 +52,8 @@ from chimera.api.posture import (
     describe,
 )
 from chimera.api.posture import resolve as _resolve_posture
+from chimera.api.roles import Profile, RoleModels, RolePlan
+from chimera.api.roles import resolve as resolve_roles
 from chimera.telemetry import get_logger
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -109,6 +111,17 @@ class CodeSeams(BaseModel):
     """Globs the write tools are confined to, relative to the workspace. None = the whole workspace
     (fenced by ``WorkspaceGuard`` as before). Fail-closed: a write outside the region is refused."""
 
+    profile: Profile | None = None
+    """Which tier each ROLE draws from: economy / balanced / max (see :mod:`chimera.api.roles`).
+
+    None = every role runs on the request's own ``model``, which is what every caller got before
+    roles existed. A profile is a starting point, never a ceiling — ``roles`` overrides it field by
+    field."""
+
+    roles: RoleModels | None = None
+    """Per-role model overrides, merged over the profile. Only the fields actually sent are applied,
+    so a partial override cannot blank the rest of the profile back to the default model."""
+
     posture: Posture | None = None
     """How far the agent may reach, and when it stops to ask (see :mod:`chimera.api.posture`).
 
@@ -126,6 +139,11 @@ def resolve_posture(posture: Posture | None) -> ResolvedPosture:
     break every existing client in a way that looks like the agent got worse at its job.
     """
     return _resolve_posture(posture) if posture is not None else ResolvedPosture([], False, False, False)
+
+
+def resolve_role_plan(seams: CodeSeams, settings: Settings) -> RolePlan:
+    """The roles this request runs with. No profile and no overrides = no role routing at all."""
+    return resolve_roles(seams.profile, settings, seams.roles)
 
 
 def clamp_steps(value: int | None) -> int | None:
@@ -192,7 +210,13 @@ def assemble_registry(
 
         # A narrow localisation question does not need the worker's model, and answering it in a
         # sub-agent keeps the finding — not the search — in the main loop's context.
-        registry.register(ExploreRepositoryTool(gateway, ws, max_turns=steps))
+        # A cheap model for the explorer is the point of the role: a narrow localisation
+        # question does not need the editor's model, and the sub-agent returns the finding rather
+        # than the search, so the main loop never pays for the hunt.
+        explore_model = resolve_role_plan(seams, settings).models.explore
+        registry.register(
+            ExploreRepositoryTool(gateway, ws, model=explore_model, max_turns=steps)
+        )
     ledger = TaintLedger()
     # A posture that asks to be told about suspicious input also arms taint-adaptive narrowing;
     # without one the env default (CHIMERA_TAINT_NARROW) still decides, as it always did.
@@ -210,6 +234,12 @@ class PostureQuery(BaseModel):
     reach: Reach = DEFAULT_REACH
     approval: Approval = DEFAULT_APPROVAL
     workspace: str | None = None
+
+
+class RolesQuery(BaseModel):
+    """Ask which model each role would run on, without committing to it."""
+
+    profile: Profile = "balanced"
 
 
 class CodeTurnRequest(CodeSeams):
@@ -355,6 +385,16 @@ def register_code_api(
         """
         ws = Path(req.workspace).expanduser().resolve() if req.workspace else workspace
         return describe(Posture(reach=req.reach, approval=req.approval), ws, settings)
+
+    @app.post("/api/code/roles", dependencies=[guard], response_model=RoleModels)
+    def code_roles(req: RolesQuery) -> RoleModels:
+        """The concrete model slugs a profile resolves to, so the UI can show them.
+
+        Resolved server-side rather than mirrored in the frontend: the tiers already honour the
+        user's cost mode and explicit per-tier settings, and a second copy of that resolution in
+        TypeScript would display a model the run does not actually use.
+        """
+        return resolve_roles(req.profile, settings).models
 
     @app.delete("/api/code/sessions/{session_id}", dependencies=[guard])
     def delete_code_session(session_id: str) -> dict[str, bool]:

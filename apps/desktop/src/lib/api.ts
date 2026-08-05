@@ -293,6 +293,8 @@ export interface RunRequestInput {
   // How far the agent may reach and when it stops to ask. The server resolves it into tool denials
   // and pause flags, and mints a thread when a pause is asked for and none was sent.
   posture?: { reach: Reach; approval: Approval } | null;
+  // Which tier each ROLE draws from. Not a claim that routing helps — see bench/role_routing.
+  profile?: Profile | null;
 }
 
 /** Preview a plan for a task: runs ONLY the planner (a single model call) — NO edits, NO tools, no
@@ -427,6 +429,7 @@ export interface CodeTurnInput {
   repo_map?: boolean;
   explorer?: boolean;
   posture?: { reach: Reach; approval: Approval } | null;
+  profile?: Profile | null;
 }
 
 /** One tool call, as it happens. `arguments` and `observation` arrive already clipped server-side
@@ -559,6 +562,32 @@ export const getPostureFacts = (
   json<PostureFacts>("/api/code/posture", {
     method: "POST",
     body: JSON.stringify({ reach, approval, workspace: workspace || null }),
+  });
+
+// --- Roles (which model does which job) ---
+
+export type Profile = "economy" | "balanced" | "max";
+
+/** One model slug per role. `verify` is absent rather than nullable: offering a field would imply a
+ *  choice exists, and the whole value of an executable verifier is that there isn't one. */
+export interface RoleModels {
+  explore: string | null;
+  plan: string | null;
+  edit: string | null;
+  review: string | null;
+  // Only the two TOOL-FREE turns can be fused. A `fuse` on the coding loop would never fire — the
+  // router sends any turn carrying tool schemas to a single model — and would report that it had.
+  fuse_plan: boolean;
+  fuse_review: boolean;
+}
+
+/** The concrete slugs a profile resolves to. Asked of the server rather than mirrored here: the
+ *  tiers honour the user's cost mode and per-tier settings, and a second copy of that resolution in
+ *  TypeScript would display a model the run does not actually use. */
+export const getRoleModels = (profile: Profile) =>
+  json<RoleModels>("/api/code/roles", {
+    method: "POST",
+    body: JSON.stringify({ profile }),
   });
 
 /** Forget a coding conversation. An unknown id is `{ok:false}`, not an error — that is exactly the

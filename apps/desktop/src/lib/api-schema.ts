@@ -130,6 +130,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Code Roles
+         * @description The concrete model slugs a profile resolves to, so the UI can show them.
+         *
+         *     Resolved server-side rather than mirrored in the frontend: the tiers already honour the
+         *     user's cost mode and explicit per-tier settings, and a second copy of that resolution in
+         *     TypeScript would display a model the run does not actually use.
+         */
+        post: operations["code_roles_api_code_roles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/sessions/{session_id}": {
         parameters: {
             query?: never;
@@ -1328,11 +1352,14 @@ export interface components {
             /** Open File */
             open_file?: string | null;
             posture?: components["schemas"]["Posture"] | null;
+            /** Profile */
+            profile?: ("economy" | "balanced" | "max") | null;
             /**
              * Repo Map
              * @default false
              */
             repo_map: boolean;
+            roles?: components["schemas"]["RoleModels"] | null;
             /** Session Id */
             session_id?: string | null;
             /**
@@ -2005,6 +2032,45 @@ export interface components {
             /** Retired */
             retired: boolean;
         };
+        /**
+         * RoleModels
+         * @description One model slug per role. ``None`` anywhere means "the run's default model".
+         *
+         *     ``verify`` is deliberately absent rather than nullable — offering a field for it would imply a
+         *     choice exists, and the whole value of an executable verifier is that there isn't one.
+         */
+        RoleModels: {
+            /** Edit */
+            edit?: string | null;
+            /** Explore */
+            explore?: string | null;
+            /**
+             * Fuse Plan
+             * @default false
+             */
+            fuse_plan: boolean;
+            /**
+             * Fuse Review
+             * @default false
+             */
+            fuse_review: boolean;
+            /** Plan */
+            plan?: string | null;
+            /** Review */
+            review?: string | null;
+        };
+        /**
+         * RolesQuery
+         * @description Ask which model each role would run on, without committing to it.
+         */
+        RolesQuery: {
+            /**
+             * Profile
+             * @default balanced
+             * @enum {string}
+             */
+            profile: "economy" | "balanced" | "max";
+        };
         /** RunReceiptOut */
         RunReceiptOut: {
             /** Answer */
@@ -2070,11 +2136,14 @@ export interface components {
             /** Plan */
             plan?: string | null;
             posture?: components["schemas"]["Posture"] | null;
+            /** Profile */
+            profile?: ("economy" | "balanced" | "max") | null;
             /**
              * Repo Map
              * @default false
              */
             repo_map: boolean;
+            roles?: components["schemas"]["RoleModels"] | null;
             /** Task */
             task: string;
             /** Thread Id */
@@ -2517,6 +2586,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PostureFacts"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    code_roles_api_code_roles_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RolesQuery"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleModels"];
                 };
             };
             /** @description Validation Error */

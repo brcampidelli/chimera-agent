@@ -7,6 +7,7 @@ import {
   type Approval,
   type CodeToolEvent,
   type CodeTurnDone,
+  type Profile,
   type Reach,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -80,12 +81,15 @@ export function Conversation({
   onEdited,
   busyElsewhere,
   posture,
+  profile,
 }: {
   workspace: string;
   openFile: string | null;
   /** The same reach/approval the verified run uses — pressing one button rather than the other must
    *  not change what the agent is allowed to do. */
   posture: { reach: Reach; approval: Approval };
+  /** Which tier each role draws from — the same profile the verified run uses. */
+  profile: Profile;
   /** Start a verified run with this text, in the panel that owns the run machinery. */
   onHandOff: (text: string) => void;
   /** A turn changed files — refresh the tree, the viewer and git status. */
@@ -127,6 +131,7 @@ export function Conversation({
         workspace: workspace || null,
         open_file: openFile,
         posture,
+        profile,
       },
       {
         // Sent on every turn, not just the first: a client that drops it silently restarts the

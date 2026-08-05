@@ -37,10 +37,12 @@ from chimera.api.code_api import (
     assemble_registry,
     register_code_api,
     resolve_posture,
+    resolve_role_plan,
     resolve_steps,
 )
 from chimera.api.governance import read_audit, run_injection_suite
 from chimera.api.maturity_api import maturity_report
+from chimera.api.roles import review_model_for
 from chimera.api.runs import load_runs
 from chimera.api.schemas import (
     AgentsBatchOut,
@@ -1247,6 +1249,21 @@ def _build_solve_agent(
         # Planning is a deep, tool-free reasoning turn — route the plan through fusion under --fuse.
         planner_backend = engine
 
+    # Roles. The multi-LLM story for coding is a model per JOB, not a fuse switch on the loop: the
+    # router sends any turn carrying tool schemas to a single model, and every turn in a coding loop
+    # carries tools, so "fuse the loop" would never fire and would report that it had. Planning and
+    # review are the two turns with no tools, which is exactly where fusion is both safe and useful.
+    roles = resolve_role_plan(req, settings)
+    if roles.models.fuse_plan and not (req.fuse or req.cascade):
+        from chimera.fusion import FusionEngine
+
+        planner_backend = FusionEngine(gateway)
+    manager_backend: SupportsComplete = gateway
+    if roles.models.fuse_review:
+        from chimera.fusion import FusionEngine
+
+        manager_backend = FusionEngine(gateway)
+
     # Registry assembly and the ledger watching it, shared with the conversational endpoint so the
     # two cannot drift — the order inside is load-bearing (see assemble_registry).
     #
@@ -1263,7 +1280,9 @@ def _build_solve_agent(
     # insist_on_action: solve is task completion, so a described-but-unexecuted plan is pushed back
     # to actually run (mirrors the CLI worker config).
     cfg = AgentConfig(
-        model=req.model,
+        # The EDITOR's model. Never fused: synthesising three different patches is how you get a
+        # patch that applies cleanly and means nothing.
+        model=roles.models.edit or req.model,
         max_steps=steps,
         context_budget=req.context_budget,
         insist_on_action=True,
@@ -1296,9 +1315,12 @@ def _build_solve_agent(
         worker,
         should_stop=should_stop,
         escalate_worker=escalate_worker,
-        planner=Planner(planner_backend, req.model),
+        planner=Planner(planner_backend, roles.models.plan or req.model),
         plan=provided_plan,
-        manager=Manager(gateway, req.model),
+        # review_model_for refuses to let the reviewer be the model that wrote the patch:
+        # generate-and-verify collapses when both are the same model, because it grades its own
+        # work and agrees with itself.
+        manager=Manager(manager_backend, review_model_for(roles) or req.model),
         verifier=CommandVerifier(req.verify, ws) if req.verify else None,
         guard=WorkspaceGuard(ws),
         workspace=ws,

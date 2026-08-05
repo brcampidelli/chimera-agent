@@ -756,10 +756,36 @@
               }
             ]
           },
+          "profile": {
+            "anyOf": [
+              {
+                "enum": [
+                  "economy",
+                  "balanced",
+                  "max"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          },
           "repo_map": {
             "default": false,
             "title": "Repo Map",
             "type": "boolean"
+          },
+          "roles": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleModels"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "session_id": {
             "anyOf": [
@@ -2587,6 +2613,84 @@
         "title": "RetiredOut",
         "type": "object"
       },
+      "RoleModels": {
+        "description": "One model slug per role. ``None`` anywhere means \"the run's default model\".\n\n``verify`` is deliberately absent rather than nullable \u2014 offering a field for it would imply a\nchoice exists, and the whole value of an executable verifier is that there isn't one.",
+        "properties": {
+          "edit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edit"
+          },
+          "explore": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Explore"
+          },
+          "fuse_plan": {
+            "default": false,
+            "title": "Fuse Plan",
+            "type": "boolean"
+          },
+          "fuse_review": {
+            "default": false,
+            "title": "Fuse Review",
+            "type": "boolean"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan"
+          },
+          "review": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review"
+          }
+        },
+        "title": "RoleModels",
+        "type": "object"
+      },
+      "RolesQuery": {
+        "description": "Ask which model each role would run on, without committing to it.",
+        "properties": {
+          "profile": {
+            "default": "balanced",
+            "enum": [
+              "economy",
+              "balanced",
+              "max"
+            ],
+            "title": "Profile",
+            "type": "string"
+          }
+        },
+        "title": "RolesQuery",
+        "type": "object"
+      },
       "RunReceiptOut": {
         "properties": {
           "answer": {
@@ -2750,10 +2854,36 @@
               }
             ]
           },
+          "profile": {
+            "anyOf": [
+              {
+                "enum": [
+                  "economy",
+                  "balanced",
+                  "max"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          },
           "repo_map": {
             "default": false,
             "title": "Repo Map",
             "type": "boolean"
+          },
+          "roles": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleModels"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "task": {
             "title": "Task",
@@ -3739,6 +3869,45 @@
           }
         },
         "summary": "Code Posture"
+      }
+    },
+    "/api/code/roles": {
+      "post": {
+        "description": "The concrete model slugs a profile resolves to, so the UI can show them.\n\nResolved server-side rather than mirrored in the frontend: the tiers already honour the\nuser's cost mode and explicit per-tier settings, and a second copy of that resolution in\nTypeScript would display a model the run does not actually use.",
+        "operationId": "code_roles_api_code_roles_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RolesQuery"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleModels"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Code Roles"
       }
     },
     "/api/code/sessions/{session_id}": {

@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **A model per role — and the pre-registration that will decide whether it earns its keep.** The
+  tempting way to be different here is a "fuse" switch on the coding loop, and it would be a lie for
+  a reason that is easy to check and easy to miss: `RoutedBackend.complete` sends any turn carrying
+  tool schemas to a single model and `FusionEngine` ignores tool schemas outright, so in a coding
+  loop — where **every** turn carries tools — fusion would never fire and the switch would report
+  that it had. So the routing is by *job*: **explore** (a search; a cheap model, in a sub-agent that
+  returns the finding rather than the search), **plan** (tool-free, judgeable — fusion belongs
+  here), **edit** (single model, **never fused**, because synthesising three patches produces one
+  that applies cleanly and means nothing), **review** (tool-free; fusion belongs here too, and the
+  reviewer is *prevented in code* from being the model that wrote the patch, since generate-and-
+  verify collapses when it grades its own work), and **verify** — which has no model field at all,
+  not a nullable one. That absence is the design: the thing deciding whether the work was good is
+  the one part with no opinion, which is what makes any of this measurable. Three profiles
+  (economy / balanced / max) draw each role from the existing tier ladder, so a profile never
+  contradicts the cost mode already configured; per-role overrides merge field by field, and
+  overrides without a profile route only the roles they name. **The claim is not made yet.**
+  `bench/role_routing/PREREGISTRATION.md` states the question, the paired McNemar design on
+  SWE-bench Verified, the 40–60% informative band, and five readings that would sink the feature —
+  and it is unrun and unfunded. Until it runs, the UI says so, on the screen, next to the control.
 - **Reach and approval, as two axes rather than a safety slider.** Chimera had both halves of this
   and showed neither: reach was spread across the tool registry, the write region, the workspace
   jail, `CHIMERA_SANDBOX` and `CHIMERA_HOST_EXEC`; asking was spread across the taint ledger,

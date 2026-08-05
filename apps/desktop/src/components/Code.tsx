@@ -36,6 +36,7 @@ import {
   streamExec,
   streamRun,
   type Approval,
+  type Profile,
   type Reach,
   type RunEvent,
 } from "@/lib/api";
@@ -43,6 +44,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/panel";
 import { Conversation } from "@/components/code/Conversation";
 import { PostureBar } from "@/components/code/PostureBar";
+import { RolesBar } from "@/components/code/RolesBar";
 import { DiffView } from "@/components/code/DiffView";
 import { useT, type TFunc } from "@/lib/i18n";
 import type { AttemptReceipt, FileDiff, FsNode, GitFile, RunReceipt } from "@/lib/types";
@@ -561,9 +563,12 @@ function RunPanel({
   handOff,
   onBusy,
   posture,
+  profile,
 }: {
   workspace: string;
   onRan: () => void;
+  /** Which tier each role draws from — the same profile the conversation uses. */
+  profile: Profile;
   /** The same reach/approval the conversation uses — the two buttons must not differ in what the
    *  agent is allowed to do, only in whether the change gets verified. */
   posture: { reach: Reach; approval: Approval };
@@ -735,6 +740,7 @@ function RunPanel({
         fuse: mode === "fuse",
         cascade: mode === "cascade",
         posture,
+        profile,
       },
       {
         onRunId: (id) => setRunId(id),
@@ -1310,6 +1316,7 @@ export function Code() {
   const [reach, setReach] = useState<Reach>("workspace");
   const [approval, setApproval] = useState<Approval>("suspicious");
   const posture = useMemo(() => ({ reach, approval }), [reach, approval]);
+  const [profile, setProfile] = useState<Profile>("balanced");
 
   const refreshOpenFile = useCallback(() => {
     if (openFile) void qc.invalidateQueries({ queryKey: ["fs-file", workspace, openFile] });
@@ -1346,6 +1353,7 @@ export function Code() {
             onApproval={setApproval}
             disabled={runBusy}
           />
+          <RolesBar profile={profile} onProfile={setProfile} disabled={runBusy} />
           <Conversation
             workspace={workspace}
             openFile={openFile}
@@ -1353,6 +1361,7 @@ export function Code() {
             onEdited={refreshOpenFile}
             busyElsewhere={runBusy}
             posture={posture}
+            profile={profile}
           />
           {/* Re-read the currently open file after the agent edited or reverted the workspace. */}
           <RunPanel
@@ -1361,6 +1370,7 @@ export function Code() {
             handOff={handOff}
             onBusy={setRunBusy}
             posture={posture}
+            profile={profile}
           />
         </aside>
       </div>
