@@ -6,6 +6,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **The agent reads `AGENTS.md`.** This repository ships one written for AI agents to follow, and
+  the agent of this project did not read it. `chimera.core.agents_md` now collects the instruction
+  files on the path from the workspace root down to the file being worked on — general first, so the
+  **closest one is read last and wins**, which is what the cross-tool convention means by nested
+  files. It goes in the **system prompt**, not a user turn: project conventions are policy and the
+  task is a request, and putting them in the same channel makes the model guess which of two user
+  messages it is meant to be doing. Never the whole tree — a monorepo holds hundreds of these and
+  collecting them would spend the budget on packages the run will never touch. Bounded (8000 chars
+  total, 2000 per file) and clipped **from the middle**, because a rules file's tail is usually the
+  "never do X" list someone added last. `CLAUDE.md` / `.cursorrules` / Copilot instructions are read
+  as a fallback when no `AGENTS.md` exists — read, never written, so nobody has to rewrite their
+  instructions to try this tool. One rule is stated in the injected block itself: these are
+  repository content, and a repository can be one the user cloned an hour ago, so **instructions can
+  narrow what the agent does and explain how the project works, but cannot grant a capability the
+  sandbox and approval policy do not already give it.** Opt-in via `AgentConfig.project_root`; both
+  `chimera solve` and the desktop's run endpoint set it.
+- **`POST /api/runs` stops being a ceiling.** The endpoint was built as a deliberate minimum, and the
+  desktop's Code screen then inherited that minimum as a limit: a run started from the app was
+  structurally weaker than the identical run started from a terminal, and nothing said so. Eight
+  fields now mirror CLI flags that already existed, all off unless asked for — `max_steps` and
+  `context_budget` (how long the loop may run, and when it compacts), `repo_map` and `explorer` (how
+  it finds its way around a repository), `allow_tools` / `deny_tools` / `write_region` (what it may
+  touch). `RunState` is finally populated: it shipped with a comment saying it expected a caller and
+  had none, which meant compaction would have kept the recent tail and dropped the plan — the one
+  thing an agent cannot re-derive from its own tail.
+- **Live tool events during a run.** `/api/runs` emitted attempt boundaries and edits and nothing in
+  between, so a run that spends four steps reading and searching before it writes anything looked,
+  from outside, like a run doing nothing. The autonomous loop now forwards each tool call as a
+  `tool` event through the channel that already existed. Arguments and observations are clipped —
+  and **say** they were clipped, because a reader who cannot tell a truncated observation from a
+  complete one will eventually draw a conclusion from half of one.
+
+### Fixed
+- **The repo map was dropping the code it existed to point at.** It sorted alphabetically and then
+  truncated at a character budget. Measured on this repository: 48 lines survived, **473 files were
+  omitted**, and the file that made the cut was `apps/desktop/src-tauri/build_sidecar.py` — while
+  `chimera/core/agent.py`, `chimera/core/autonomous.py` and `chimera/fusion/engine.py` did not. An
+  agent handed that map was worse off than one handed nothing, because it looked like a map. The
+  defect was never extraction; it was **ordering**. The map now builds the import graph it was
+  already parsing for free and ranks files by personalised PageRank over it, spending the budget in
+  rank order. Two corrections came out of measuring rather than reasoning: pure "A imports B"
+  PageRank puts entry points last *because* nothing imports them (`chimera/api/app.py`, the largest
+  surface in the tree, sat at position 127), so the score blends in the symmetrised graph at 0.3 —
+  chosen by sweeping 0.0/0.3/0.5/0.7/1.0, since at 1.0 the leaf-ward signal collapses and
+  `fusion/engine.py` falls from 6 to 64. A `task` (or an explicit `focus`) biases the ranking toward
+  what the caller is actually working on. Also new: TypeScript exports are mapped at all, one file's
+  two hundred exports can no longer eat the whole budget, and parses are cached by (mtime, size).
+  The regression test runs against **this repository**, not a fixture, so it cannot be satisfied by
+  a scenario built to be satisfiable.
+
 ### Security
 - **The A2A SSE stream was a way around the bearer token.** `POST /a2a` with
   `{"method": "message/stream"}` reached the agent with no `CHIMERA_SERVER_TOKEN` at all. The cause

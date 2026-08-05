@@ -25,6 +25,7 @@ if TYPE_CHECKING:
         AgentConfig,
         AgentResult,
     )
+    from chimera.core.agents_md import ProjectInstructions, load_agent_instructions
     from chimera.core.autonomous import (
         Attempt,
         AutonomousAgent,
@@ -96,6 +97,8 @@ _LAZY: dict[str, tuple[str, str]] = {
     "Plan": ("planner", "Plan"),
     "Planner": ("planner", "Planner"),
     "build_repo_map": ("repomap", "build_repo_map"),
+    "load_agent_instructions": ("agents_md", "load_agent_instructions"),
+    "ProjectInstructions": ("agents_md", "ProjectInstructions"),
     "RunCheckpointer": ("runstate", "RunCheckpointer"),
     "SpecTestGenerator": ("spec_test", "SpecTestGenerator"),
     "SpecTestVerifier": ("spec_test", "SpecTestVerifier"),
@@ -159,6 +162,8 @@ __all__ = [
     "TaskLedger",
     "RunCheckpointer",
     "build_repo_map",
+    "load_agent_instructions",
+    "ProjectInstructions",
     "RequirementChecklist",
     "SpecTestGenerator",
     "SpecTestVerifier",

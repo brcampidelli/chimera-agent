@@ -2540,6 +2540,9 @@ def solve(
             model=model,
             max_steps=max_steps,
             insist_on_action=True,
+            # The workspace's own AGENTS.md, so `chimera solve` follows the conventions of the
+            # repository it is solving in — the same instructions every other agent tool reads.
+            project_root=ws,
             # One JSONL line per worker run: per-step tokens, cache hit rate, the tools called, and
             # the drift assessment. This is the only place the step log is persisted, so without it
             # every measurement the loop takes dies with the process.

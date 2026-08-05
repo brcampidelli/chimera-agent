@@ -120,6 +120,12 @@ class AgentConfig:
     context_budget: float | None = None
     #: Turns kept verbatim at the tail when compacting — where the current sub-task lives.
     keep_recent: int = 6
+    # The workspace whose AGENTS.md the run should follow. None = read no project instructions,
+    # which is the historical behaviour and stays the default for any caller that does not know it
+    # has a repository (a bare `chimera run`, a messaging turn). Set it, and the loop reads the
+    # project's own conventions the way every other agent tool already does — see
+    # chimera.core.agents_md for what is read, in what order, and why it can never grant capability.
+    project_root: Path | None = None
     #: Where to append this run's trace (one JSONL line: per-step tokens, cache, tools, drift).
     #: None writes nothing. Off by default because a trace is disk the caller did not ask for — but
     #: a step log nothing ever persists is a measurement with no consumer, which is the failure this
@@ -216,6 +222,30 @@ class Agent:
             _log.debug("skill-context retrieval skipped: %s", exc)
             return ""
 
+    def _project_context(self) -> str:
+        """The workspace's own AGENTS.md, as a system-prompt block ("" when there is none).
+
+        Focused on the file the run has open when it has one, so a monorepo package's rules reach a
+        run editing that package. Same discipline as skill retrieval: any failure is a debug line,
+        never an exception — a project that cannot be read is a project with no conventions, not a
+        broken run.
+        """
+        if self.config.project_root is None:
+            return ""
+        try:
+            from chimera.core.agents_md import load_agent_instructions
+
+            focus = [self.run_state.open_file[0]] if self.run_state.open_file else []
+            found = load_agent_instructions(self.config.project_root, focus=focus)
+            if found.truncated:
+                # Said out loud rather than swallowed: an agent silently handed half a rules file
+                # will follow half the rules, and the half it dropped is unknowable after the fact.
+                _log.info("project instructions truncated to fit: %s", ", ".join(found.truncated))
+            return found.text
+        except Exception as exc:  # noqa: BLE001 — instructions must never break the loop
+            _log.debug("project instructions skipped: %s", exc)
+            return ""
+
     def run(
         self,
         task: str,
@@ -234,6 +264,12 @@ class Agent:
         skill_block = self._skill_context(task)
         if skill_block:
             system_prompt = f"{system_prompt}\n\n{skill_block}"
+        # Last, so the project's own conventions are the nearest thing to the task in the system
+        # message — a repository that says "never use bare except" should not be outranked by a
+        # generic skill card that happens to have been retrieved.
+        project_block = self._project_context()
+        if project_block:
+            system_prompt = f"{system_prompt}\n\n{project_block}"
         messages: list[MessageLike] = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": task},
