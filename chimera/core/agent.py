@@ -253,13 +253,21 @@ class Agent:
         on_token: Callable[[str], None] | None = None,
         on_tool: Callable[[ToolActivity], None] | None = None,
         on_edit: Callable[[str, str], None] | None = None,
+        history: list[MessageLike] | None = None,
     ) -> AgentResult:
         """Run the tool loop. ``on_token`` streams model text deltas as they arrive (when the backend
         supports it); ``on_tool`` fires once per tool call with its outcome. ``on_edit`` fires with
         ``(path, patch)`` once per write-tool call that actually changed a file — the REAL unified diff
         read from the file's on-disk content before and after the tool ran (never fabricated). All
         three are optional — with none, behaviour is exactly the pre-existing blocking run, and
-        ``on_edit`` adds zero extra file reads when absent."""
+        ``on_edit`` adds zero extra file reads when absent.
+
+        ``history`` is the previous turns of a continuing conversation, in the model's own message
+        format — ``AgentResult.transcript`` from the last turn, minus its system message. It is the
+        difference between a second turn that remembers reading a file and one that reads it again:
+        a caller that flattens the conversation to prose (as ``ChatSession`` does, by design, for
+        chat) necessarily discards every tool call, so the agent starts each turn blind. None keeps
+        the historical single-shot behaviour, byte-identical."""
         system_prompt = self.config.system_prompt
         skill_block = self._skill_context(task)
         if skill_block:
@@ -270,8 +278,12 @@ class Agent:
         project_block = self._project_context()
         if project_block:
             system_prompt = f"{system_prompt}\n\n{project_block}"
+        # The system message is rebuilt every turn rather than carried in ``history``: skills are
+        # retrieved for THIS task and the project instructions follow the file now in focus, so a
+        # stale system message would pin both to whatever the first turn happened to be about.
         messages: list[MessageLike] = [
             {"role": "system", "content": system_prompt},
+            *(history or []),
             {"role": "user", "content": task},
         ]
         tool_schema = self.tools.to_openai_schema(compact=self.config.compact_schemas) or None

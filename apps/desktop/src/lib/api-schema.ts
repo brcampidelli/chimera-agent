@@ -106,6 +106,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Code Session
+         * @description Forget a conversation. An unknown id is ``{ok: false}`` with a 200, not a 404 — that is
+         *     exactly the state a second click on Clear hits, and it is not an error.
+         */
+        delete: operations["delete_code_session_api_code_sessions__session_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/turn": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Code Turn */
+        post: operations["code_turn_api_code_turn_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/config": {
         parameters: {
             query?: never;
@@ -1241,6 +1279,47 @@ export interface components {
              */
             stream: boolean;
         };
+        /**
+         * CodeTurnRequest
+         * @description One turn of a coding conversation.
+         */
+        CodeTurnRequest: {
+            /** Allow Tools */
+            allow_tools?: string[] | null;
+            /** Context Budget */
+            context_budget?: number | null;
+            /** Deny Tools */
+            deny_tools?: string[] | null;
+            /**
+             * Explorer
+             * @default false
+             */
+            explorer: boolean;
+            /** Max Steps */
+            max_steps?: number | null;
+            /** Message */
+            message: string;
+            /** Model */
+            model?: string | null;
+            /** Open File */
+            open_file?: string | null;
+            /**
+             * Repo Map
+             * @default false
+             */
+            repo_map: boolean;
+            /** Session Id */
+            session_id?: string | null;
+            /**
+             * Stream
+             * @default true
+             */
+            stream: boolean;
+            /** Workspace */
+            workspace?: string | null;
+            /** Write Region */
+            write_region?: string[] | null;
+        };
         /** ConfigOut */
         ConfigOut: {
             automation: components["schemas"]["AutomationCfgOut"];
@@ -1849,7 +1928,15 @@ export interface components {
             /** Verify Command */
             verify_command: string | null;
         };
-        /** RunRequest */
+        /**
+         * RunRequest
+         * @description An autonomous run: plan → execute → verify-or-revert → receipt.
+         *
+         *     Inherits the coding seams (``max_steps``, ``context_budget``, ``repo_map``, ``explorer``,
+         *     ``allow_tools``/``deny_tools``, ``write_region``) from :class:`~chimera.api.code_api.CodeSeams`
+         *     rather than redeclaring them, so a run and a conversational turn cannot end up meaning different
+         *     things by the same field name.
+         */
         RunRequest: {
             /** Allow Tools */
             allow_tools?: string[] | null;
@@ -2292,6 +2379,72 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ChatRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_code_session_api_code_sessions__session_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: boolean;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    code_turn_api_code_turn_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeTurnRequest"];
             };
         };
         responses: {

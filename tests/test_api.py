@@ -792,7 +792,7 @@ def test_the_coding_seams_are_all_off_unless_asked(tmp_path: Any) -> None:
 
 def test_max_steps_is_clamped_at_both_ends(tmp_path: Any) -> None:
     """The ceiling is a UI field, so it is a number a client can get wrong in both directions."""
-    from chimera.api.app import MAX_RUN_STEPS
+    from chimera.api.code_api import MAX_RUN_STEPS
 
     assert _solve_agent(tmp_path, max_steps=40).worker.config.max_steps == 40
     assert _solve_agent(tmp_path, max_steps=0).worker.config.max_steps == 1

@@ -32,6 +32,7 @@ from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
 from chimera.api.benchmarks_api import benchmark_report
+from chimera.api.code_api import CodeSeams, assemble_registry, register_code_api, resolve_steps
 from chimera.api.governance import read_audit, run_injection_suite
 from chimera.api.maturity_api import maturity_report
 from chimera.api.runs import load_runs
@@ -163,7 +164,15 @@ class ScreenshotRequest(BaseModel):
     (the artifact is stored under the app's home, not the workspace)."""
 
 
-class RunRequest(BaseModel):
+class RunRequest(CodeSeams):
+    """An autonomous run: plan → execute → verify-or-revert → receipt.
+
+    Inherits the coding seams (``max_steps``, ``context_budget``, ``repo_map``, ``explorer``,
+    ``allow_tools``/``deny_tools``, ``write_region``) from :class:`~chimera.api.code_api.CodeSeams`
+    rather than redeclaring them, so a run and a conversational turn cannot end up meaning different
+    things by the same field name.
+    """
+
     task: str
     verify: str | None = None
     """A shell command that judges the run (exit 0 == success); runs in the workspace. None = no
@@ -190,48 +199,6 @@ class RunRequest(BaseModel):
     """Stop before finalizing a run that consumed untrusted content, and wait for a human verdict
     (POST /api/runs/{thread_id}/respond). Requires ``thread_id`` — there is nowhere to park an
     unfinished run without one. Off = finalize as before."""
-
-    # ---- Coding-agent seams -------------------------------------------------------------------
-    # Everything below is opt-in and defaults to the behaviour this endpoint already had. They exist
-    # because the endpoint was built as a deliberate minimum and the desktop's Code screen then
-    # inherited that minimum as a ceiling — a run started from the app was structurally weaker than
-    # the same run started from a terminal, for no reason anyone had written down.
-
-    max_steps: int | None = None
-    """Tool-loop steps the worker may take per attempt. None = the agent's own default.
-
-    This field replaces a hard-coded 6 that had no comment justifying it while ``AgentConfig``'s
-    documented default is 8 — so a run through the API was capped lower than the identical run
-    through ``chimera solve``, and nothing said so. Removing the magic number restores parity;
-    raising it beyond that is what a real coding task needs, and is now the caller's call.
-    Clamped to 1..100: a client asking for ten thousand steps is asking for a bill, not a run."""
-
-    context_budget: float | None = None
-    """Fraction of the model's advertised window to spend on the prompt before compacting.
-
-    None (default) keeps the historical behaviour: the message list only grows and an overflow is
-    terminal. This pairs with ``max_steps`` and should usually move with it — raising the step
-    ceiling without a budget raises the chance of dying on overflow instead of finishing."""
-
-    repo_map: bool = False
-    """Prepend a bounded structural digest of the repository to the worker's context, so it can aim
-    at the right file instead of exploring blind (mirrors ``chimera solve --repo-map``)."""
-
-    explorer: bool = False
-    """Give the worker an isolated read-only Context Explorer for repository search, so localisation
-    ("where does X live?") costs a cheap sub-agent rather than turns of the main loop
-    (mirrors ``chimera solve --explorer``)."""
-
-    allow_tools: list[str] | None = None
-    """Session allowlist of tool names. None = every tool. An explicit list — *including an empty
-    one* — is an allowlist, so ``[]`` is a fully locked, read-nothing session."""
-
-    deny_tools: list[str] | None = None
-    """Tool names removed from the session even when allowed (deny wins over allow)."""
-
-    write_region: list[str] | None = None
-    """Globs the write tools are confined to, relative to the workspace. None = the whole workspace
-    (fenced by ``WorkspaceGuard`` as before). Fail-closed: a write outside the region is refused."""
 
 
 # A builder for the per-run autonomous agent, injectable so the endpoint is testable without a real
@@ -1077,6 +1044,8 @@ def build_api_app(
     from chimera.api.openai_compat import register_openai_compat
 
     register_features(app, guard)  # Memory / Skills / Cron / Tasks (Fase C)
+    # POST /api/code/turn — a conversational coding turn that keeps the previous turn's tool calls.
+    register_code_api(app, guard, workspace, settings)
     # /v1/chat/completions — any OpenAI client or LLM benchmark harness can drive the agent loop.
     register_openai_compat(app, guard, manager)
 
@@ -1206,31 +1175,6 @@ def _api_cascade_backend(gateway: SupportsComplete, settings: Settings) -> Suppo
     return CascadeBackend(gateway, FusionEngine(gateway), config)
 
 
-#: Hard ceiling on ``RunRequest.max_steps``. Not a judgement about how many steps a task needs —
-#: it is the difference between a long run and a runaway one, and the client asking is a UI field.
-MAX_RUN_STEPS = 100
-
-
-def _clamp_steps(value: int | None) -> int | None:
-    """Clamp a requested step ceiling into 1..MAX_RUN_STEPS. None (not asked) stays None."""
-    if value is None:
-        return None
-    return max(1, min(MAX_RUN_STEPS, value))
-
-
-def _write_region(globs: list[str] | None, ws: Path) -> Any:
-    """Build a ``WriteRegion`` from the requested globs, or None when the caller named none.
-
-    Blank entries are dropped, and a list that contained nothing but blanks is treated as "no region
-    asked for" rather than as an empty region — an empty region forbids every write, which is a
-    thing a caller should have to say on purpose, not stumble into via a trailing comma.
-    """
-    from chimera.tools.write_region import WriteRegion
-
-    cleaned = [g.strip() for g in (globs or []) if g.strip()]
-    return WriteRegion(cleaned, ws) if cleaned else None
-
-
 def _build_solve_agent(
     req: RunRequest,
     ws: Path,
@@ -1270,7 +1214,6 @@ def _build_solve_agent(
     from chimera.core.runstate import RunCheckpointer
     from chimera.core.verify import CommandVerifier
     from chimera.providers import LLMGateway
-    from chimera.tools import default_registry
 
     gateway = LLMGateway()
     # Backend selection, mirroring the CLI's solve wiring (main.py). Default = plain gateway on every
@@ -1293,45 +1236,18 @@ def _build_solve_agent(
         # Planning is a deep, tool-free reasoning turn — route the plan through fusion under --fuse.
         planner_backend = engine
 
-    # Taint tracking on the API solve path (the CLI's `solve` has had it; the server previously ran a
-    # bare registry). ledger_registry fences + sanitizes untrusted fetch/document output (strips
-    # control tokens so a hidden instruction can't spoof a turn) and records the capability trail.
+    # Registry assembly and the ledger watching it, shared with the conversational endpoint so the
+    # two cannot drift — the order inside is load-bearing (see assemble_registry).
     #
-    # narrow_on_taint is now ARMED here by default (CHIMERA_TAINT_NARROW). It used to be hard-coded
-    # off because the server has no tool-level approver, so narrowing resolves to a refusal — but
-    # "no one can approve it" is an argument for refusing a dangerous tool after untrusted input, not
-    # for allowing it. Leaving it off meant the headless product surface was the one place the
-    # advertised defence did not run. A deployment that must keep acting autonomously after reading
-    # the web sets CHIMERA_TAINT_NARROW=0 deliberately. Routing the approval to the desktop's HITL UI
-    # (so it can be answered rather than only refused) is the follow-up.
-    from chimera.governance import TaintLedger, ledger_registry
-
-    # Held rather than passed inline: the same ledger has to reach the agent as ``taint=``, which is
-    # what lets it know the run read untrusted content and is therefore pausable. Building two
-    # ledgers would mean the run that got tainted and the run that gets asked about it are different
-    # objects, and the pause would never fire.
-    ledger = TaintLedger()
-
-    # Registry assembly, in the CLI's order (main.py `_run_solve`) — the order is load-bearing:
-    # the write region scopes the native write tools, the allowlist is applied BEFORE the meta-tools
-    # so a sub-agent inherits it, and the taint ledger wraps outermost so it sees every call.
-    region = _write_region(req.write_region, ws)
-    registry = default_registry(ws, write_region=region)
-    if req.allow_tools is not None or req.deny_tools:
-        from chimera.governance import restrict_registry
-
-        registry = restrict_registry(registry, allow=req.allow_tools, deny=req.deny_tools or None)
-    # A caller that said nothing about steps falls back to AgentConfig's own documented default,
-    # rather than to the hard-coded 6 this endpoint used to impose without saying why.
-    clamped = _clamp_steps(req.max_steps)
-    steps = clamped if clamped is not None else AgentConfig.max_steps
-    if req.explorer:
-        from chimera.core import ExploreRepositoryTool
-
-        # A narrow localisation question does not need the worker's model, and answering it in a
-        # sub-agent keeps the finding — not the search — in the main loop's context.
-        registry.register(ExploreRepositoryTool(gateway, ws, max_turns=steps))
-    registry = ledger_registry(registry, ledger, narrow_on_taint=settings.taint_narrow)
+    # narrow_on_taint is ARMED here by default (CHIMERA_TAINT_NARROW). It used to be hard-coded off
+    # because the server has no tool-level approver, so narrowing resolves to a refusal — but "no one
+    # can approve it" is an argument for refusing a dangerous tool after untrusted input, not for
+    # allowing it. Leaving it off meant the headless product surface was the one place the advertised
+    # defence did not run. A deployment that must keep acting autonomously after reading the web sets
+    # CHIMERA_TAINT_NARROW=0 deliberately. Routing the approval to the desktop's HITL UI (so it can
+    # be answered rather than only refused) is the follow-up.
+    steps = resolve_steps(req.max_steps)
+    registry, ledger = assemble_registry(req, ws, settings, gateway, steps=steps)
     # insist_on_action: solve is task completion, so a described-but-unexecuted plan is pushed back
     # to actually run (mirrors the CLI worker config).
     cfg = AgentConfig(

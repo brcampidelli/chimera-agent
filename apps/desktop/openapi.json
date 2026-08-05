@@ -662,6 +662,143 @@
         "title": "ChatRequest",
         "type": "object"
       },
+      "CodeTurnRequest": {
+        "description": "One turn of a coding conversation.",
+        "properties": {
+          "allow_tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allow Tools"
+          },
+          "context_budget": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Budget"
+          },
+          "deny_tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deny Tools"
+          },
+          "explorer": {
+            "default": false,
+            "title": "Explorer",
+            "type": "boolean"
+          },
+          "max_steps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Steps"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "open_file": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open File"
+          },
+          "repo_map": {
+            "default": false,
+            "title": "Repo Map",
+            "type": "boolean"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "stream": {
+            "default": true,
+            "title": "Stream",
+            "type": "boolean"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          },
+          "write_region": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Write Region"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "CodeTurnRequest",
+        "type": "object"
+      },
       "ConfigOut": {
         "properties": {
           "automation": {
@@ -2379,6 +2516,7 @@
         "type": "object"
       },
       "RunRequest": {
+        "description": "An autonomous run: plan \u2192 execute \u2192 verify-or-revert \u2192 receipt.\n\nInherits the coding seams (``max_steps``, ``context_budget``, ``repo_map``, ``explorer``,\n``allow_tools``/``deny_tools``, ``write_region``) from :class:`~chimera.api.code_api.CodeSeams`\nrather than redeclaring them, so a run and a conversational turn cannot end up meaning different\nthings by the same field name.",
         "properties": {
           "allow_tools": {
             "anyOf": [
@@ -3427,6 +3565,86 @@
           }
         },
         "summary": "Chat Stream"
+      }
+    },
+    "/api/code/sessions/{session_id}": {
+      "delete": {
+        "description": "Forget a conversation. An unknown id is ``{ok: false}`` with a 200, not a 404 \u2014 that is\nexactly the state a second click on Clear hits, and it is not an error.",
+        "operationId": "delete_code_session_api_code_sessions__session_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Delete Code Session Api Code Sessions  Session Id  Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Code Session"
+      }
+    },
+    "/api/code/turn": {
+      "post": {
+        "operationId": "code_turn_api_code_turn_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeTurnRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Code Turn"
       }
     },
     "/api/config": {
