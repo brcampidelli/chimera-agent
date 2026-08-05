@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { CodeTurnDone, CodeTurnHandlers } from "@/lib/api";
+import type { CodeTurnDone, CodeTurnHandlers, PostureFacts } from "@/lib/api";
 import type { AttemptReceipt, FsFile, FsNode, FsTree, GitStatus, RunReceipt } from "@/lib/types";
 
 /** The `@/lib/api` surface the Code screen touches. Used as the `vi.mock` factory (via a dynamic
@@ -21,6 +21,19 @@ export function makeCodeApiMock() {
     streamRun: vi.fn(),
     streamCodeTurn: vi.fn(),
     deleteCodeSession: vi.fn(),
+    getPostureFacts: vi.fn(),
+  };
+}
+
+/** The posture facts the server would report for an ordinary local setup. */
+export function postureFacts(over: Partial<PostureFacts> = {}): PostureFacts {
+  return {
+    writes: "workspace",
+    workspace: "/repo",
+    shell: "none",
+    pauses: "tainted",
+    fell_back_to_host: false,
+    ...over,
   };
 }
 

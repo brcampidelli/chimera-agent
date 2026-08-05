@@ -41,6 +41,17 @@ from pydantic import BaseModel
 # tests that exercise the endpoint have all passed.
 from sse_starlette.sse import EventSourceResponse
 
+from chimera.api.posture import (
+    DEFAULT_APPROVAL,
+    DEFAULT_REACH,
+    Approval,
+    Posture,
+    PostureFacts,
+    Reach,
+    ResolvedPosture,
+    describe,
+)
+from chimera.api.posture import resolve as _resolve_posture
 from chimera.telemetry import get_logger
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -98,6 +109,24 @@ class CodeSeams(BaseModel):
     """Globs the write tools are confined to, relative to the workspace. None = the whole workspace
     (fenced by ``WorkspaceGuard`` as before). Fail-closed: a write outside the region is refused."""
 
+    posture: Posture | None = None
+    """How far the agent may reach, and when it stops to ask (see :mod:`chimera.api.posture`).
+
+    A convenience over the fields above, not a second mechanism: it resolves into ``deny_tools`` and
+    the pause flags, and an explicit ``deny_tools`` is unioned with it rather than replaced — two
+    ways of saying "not this tool" must never cancel each other out. None = no posture applied, so
+    every existing caller behaves exactly as before."""
+
+
+def resolve_posture(posture: Posture | None) -> ResolvedPosture:
+    """The posture's effect, with None meaning "no posture" rather than "the default posture".
+
+    The distinction matters at the boundary: a caller that never heard of postures must keep the
+    behaviour it had, and the DEFAULT posture denies the exec tools. Silently applying it would
+    break every existing client in a way that looks like the agent got worse at its job.
+    """
+    return _resolve_posture(posture) if posture is not None else ResolvedPosture([], False, False, False)
+
 
 def clamp_steps(value: int | None) -> int | None:
     """Clamp a requested step ceiling into 1..MAX_RUN_STEPS. None (not asked) stays None."""
@@ -153,10 +182,11 @@ def assemble_registry(
     from chimera.tools import default_registry
 
     registry = default_registry(ws, write_region=build_write_region(seams.write_region, ws))
-    if seams.allow_tools is not None or seams.deny_tools:
-        registry = restrict_registry(
-            registry, allow=seams.allow_tools, deny=seams.deny_tools or None
-        )
+    # Union, never replace: a posture and an explicit denylist are two ways of saying "not this
+    # tool", and letting one overwrite the other means the stricter of two stated intentions loses.
+    denied = sorted({*(seams.deny_tools or ()), *resolve_posture(seams.posture).deny_tools})
+    if seams.allow_tools is not None or denied:
+        registry = restrict_registry(registry, allow=seams.allow_tools, deny=denied or None)
     if seams.explorer:
         from chimera.core import ExploreRepositoryTool
 
@@ -164,7 +194,22 @@ def assemble_registry(
         # sub-agent keeps the finding — not the search — in the main loop's context.
         registry.register(ExploreRepositoryTool(gateway, ws, max_turns=steps))
     ledger = TaintLedger()
-    return ledger_registry(registry, ledger, narrow_on_taint=settings.taint_narrow), ledger
+    # A posture that asks to be told about suspicious input also arms taint-adaptive narrowing;
+    # without one the env default (CHIMERA_TAINT_NARROW) still decides, as it always did.
+    narrow = (
+        resolve_posture(seams.posture).narrow_on_taint
+        if seams.posture is not None
+        else settings.taint_narrow
+    )
+    return ledger_registry(registry, ledger, narrow_on_taint=narrow), ledger
+
+
+class PostureQuery(BaseModel):
+    """Ask what a posture would mean, without committing to it — the selectors' live preview."""
+
+    reach: Reach = DEFAULT_REACH
+    approval: Approval = DEFAULT_APPROVAL
+    workspace: str | None = None
 
 
 class CodeTurnRequest(CodeSeams):
@@ -299,6 +344,17 @@ def register_code_api(
                 yield {"event": event, "data": json.dumps(payload)}
 
         return EventSourceResponse(events())
+
+    @app.post("/api/code/posture", dependencies=[guard], response_model=PostureFacts)
+    def code_posture(req: PostureQuery) -> PostureFacts:
+        """What the chosen posture MEANS on this machine, right now.
+
+        A POST rather than a GET because it reports the live state of the sandbox rather than a
+        stored resource, and because caching this answer is precisely the bug: a Docker daemon that
+        died since the last call must change the answer, not be served from a cache.
+        """
+        ws = Path(req.workspace).expanduser().resolve() if req.workspace else workspace
+        return describe(Posture(reach=req.reach, approval=req.approval), ws, settings)
 
     @app.delete("/api/code/sessions/{session_id}", dependencies=[guard])
     def delete_code_session(session_id: str) -> dict[str, bool]:

@@ -1,0 +1,132 @@
+"""Two axes, nine pairs, and every one of them checked against the mechanism it claims.
+
+The value of a posture control is entirely in whether the machine agrees with the label. A "read
+only" that leaves `write_file` in the registry is worse than no control at all, because the user
+stops watching. So the table below is exhaustive over the nine (reach × approval) pairs rather than
+sampled: the whole point of an orthogonal design is that the combinations are not special cases, and
+a test that only walks the diagonal would never notice if one of them were.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+import pytest
+
+from chimera.api.posture import Approval, Posture, Reach, describe, resolve
+from chimera.config import Settings
+from chimera.governance.ledger import EXEC_TOOLS, WRITE_TOOLS
+
+REACHES: list[Reach] = ["read_only", "workspace", "workspace_shell"]
+APPROVALS: list[Approval] = ["always", "suspicious", "never"]
+PAIRS = [(r, a) for r in REACHES for a in APPROVALS]
+_IDS = [f"{r}+{a}" for r, a in PAIRS]
+
+
+@pytest.mark.parametrize(("reach", "approval"), PAIRS, ids=_IDS)
+def test_every_pair_resolves_to_exactly_the_mechanism_it_names(reach: Reach, approval: Approval) -> None:
+    resolved = resolve(Posture(reach=reach, approval=approval))
+    denied = set(resolved.deny_tools)
+
+    # Reach, stated as set membership rather than as a name list, so a tool added to WRITE_TOOLS or
+    # EXEC_TOOLS tomorrow is covered by this assertion without anyone remembering to come back.
+    assert (denied >= WRITE_TOOLS) is (reach == "read_only")
+    assert (denied >= EXEC_TOOLS) is (reach in {"read_only", "workspace"})
+    if reach == "workspace_shell":
+        assert not denied
+
+    # Approval. Exactly one pause trigger is armed, and "never" arms neither.
+    assert resolved.pause_always is (approval == "always")
+    assert resolved.pause_on_taint is (approval == "suspicious")
+    assert resolved.needs_thread is (approval != "never")
+
+    # The two axes do not leak into each other: that is what makes them axes.
+    assert resolved.narrow_on_taint == resolved.pause_on_taint
+
+
+def test_read_only_removes_the_write_tools_from_a_real_registry(tmp_path: Any) -> None:
+    """Asserted through the registry the run would actually get. A posture the tool assembly does
+    not consult is a label, and a label is what people trust when they stop checking."""
+    from chimera.api.code_api import CodeSeams, assemble_registry
+    from chimera.providers import LLMGateway
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    seams = CodeSeams(posture=Posture(reach="read_only", approval="never"))
+    registry, _ = assemble_registry(seams, ws, settings, LLMGateway(), steps=8)
+
+    names = set(registry.names())
+    assert not (WRITE_TOOLS & names) and not (EXEC_TOOLS & names)
+    assert "read_file" in names  # reading is the whole point of read-only, not a side effect
+
+
+def test_a_posture_and_an_explicit_denylist_are_unioned_not_replaced(tmp_path: Any) -> None:
+    """Two ways of saying "not this tool" must not cancel each other out — the stricter of two
+    stated intentions has to survive, in both directions."""
+    from chimera.api.code_api import CodeSeams, assemble_registry
+    from chimera.providers import LLMGateway
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    seams = CodeSeams(
+        posture=Posture(reach="workspace", approval="never"), deny_tools=["read_file"]
+    )
+    registry, _ = assemble_registry(seams, ws, settings, LLMGateway(), steps=8)
+
+    names = set(registry.names())
+    assert "read_file" not in names  # the explicit denial survived the posture
+    assert not (EXEC_TOOLS & names)  # and the posture's survived the explicit denial
+
+
+def test_no_posture_means_no_posture_not_the_default_one(tmp_path: Any) -> None:
+    """A caller that never heard of postures must keep the behaviour it had. The DEFAULT posture
+    denies the exec tools, so applying it silently would break every existing client in a way that
+    reads as the agent having got worse at its job."""
+    from chimera.api.code_api import CodeSeams, assemble_registry
+    from chimera.providers import LLMGateway
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    registry, _ = assemble_registry(CodeSeams(), ws, settings, LLMGateway(), steps=8)
+
+    assert "run_shell" in set(registry.names())
+
+
+def test_the_described_facts_say_the_shell_does_not_run_at_all_under_read_only(tmp_path: Any) -> None:
+    facts = describe(
+        Posture(reach="read_only", approval="never"), tmp_path, Settings(CHIMERA_HOME=str(tmp_path))
+    )
+    assert facts.writes == "nothing" and facts.shell == "none" and facts.pauses == "never"
+
+
+def test_the_facts_report_the_HOST_when_docker_was_asked_for_but_is_not_there(
+    tmp_path: Any, monkeypatch: Any
+) -> None:
+    """The reason this is generated rather than echoed back.
+
+    Someone who configured a Docker sandbox and lost the daemon is in the one situation where the
+    honest answer contradicts their setup — and the setting still says "docker". Reading the config
+    here is exactly how "I thought it was sandboxed" happens.
+    """
+    monkeypatch.setattr(
+        "chimera.sandbox.confirm.sandbox_is_isolated", lambda _s: False, raising=True
+    )
+    settings = Settings(CHIMERA_HOME=str(tmp_path), CHIMERA_SANDBOX="docker", CHIMERA_HOST_EXEC="allow")
+
+    facts = describe(Posture(reach="workspace_shell", approval="never"), tmp_path, settings)
+    assert facts.shell == "host"
+    assert facts.fell_back_to_host, "a fallen-back docker sandbox must be reported, not hidden"
+
+
+def test_a_host_exec_deny_is_reported_as_refused_not_as_running(tmp_path: Any, monkeypatch: Any) -> None:
+    monkeypatch.setattr(
+        "chimera.sandbox.confirm.sandbox_is_isolated", lambda _s: False, raising=True
+    )
+    settings = Settings(CHIMERA_HOME=str(tmp_path), CHIMERA_HOST_EXEC="deny")
+
+    facts = describe(Posture(reach="workspace_shell", approval="never"), tmp_path, settings)
+    assert facts.shell == "refused"
+    assert not facts.fell_back_to_host  # nothing fell back — local was what was asked for

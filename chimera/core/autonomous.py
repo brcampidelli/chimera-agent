@@ -245,6 +245,7 @@ class AutonomousAgent:
         progress_ledger: ProgressLedger | None = None,
         replan_on_stall: bool = False,
         pause_on_taint: bool = False,
+        pause_always: bool = False,
         repo_map: bool = False,
         checklist: RequirementChecklist | None = None,
         spec_test_generator: SpecTestGenerator | None = None,
@@ -284,6 +285,7 @@ class AutonomousAgent:
         self.progress_ledger = progress_ledger
         self.replan_on_stall = replan_on_stall
         self.pause_on_taint = pause_on_taint
+        self.pause_always = pause_always
         self.repo_map = repo_map
         self.checklist = checklist
         self.spec_test_generator = spec_test_generator
@@ -713,16 +715,23 @@ class AutonomousAgent:
                 # Human-in-the-loop interrupt: a result produced under untrusted influence is
                 # not auto-accepted. Persist it and pause for sign-off (approve -> finalize,
                 # deny -> drop). The safety valve for the lethal trifecta.
-                if run_tainted and self.pause_on_taint:
+                # ``pause_always`` is the same interrupt with a different trigger: hold EVERY
+                # successful run for sign-off, not just a tainted one. Taint-triggered pausing is
+                # the right default because it stops only when there is a reason; a reviewer who
+                # wants to see each change before it counts as done has to be able to say so, and
+                # the alternative — a UI control that quietly maps onto the taint trigger — would
+                # be a switch that does nothing most of the time.
+                if (run_tainted and self.pause_on_taint) or self.pause_always:
                     self._save_checkpoint(
                         thread_id, task, index, feedback, plan, attempts,
-                        awaiting_approval=True, paused_answer=answer, was_tainted=True,
+                        awaiting_approval=True, paused_answer=answer, was_tainted=run_tainted,
                         # Persist the diff-gate verdict (M19-A2): a hollow success (empty diff) must
                         # STILL be blocked from minting a skill/memory when it's approved on resume —
                         # otherwise the HITL path silently bypasses the anti-hollow-learning gate.
                         productive=diff_productive,
                     )
-                    self._emit(_ev_status(f"paused for approval — tainted run (thread {thread_id})"))
+                    reason = "tainted run" if run_tainted else "every run held for sign-off"
+                    self._emit(_ev_status(f"paused for approval — {reason} (thread {thread_id})"))
                     return AutonomousResult(
                         answer=answer, success=False, attempts=attempts, plan=plan, paused=True
                     )

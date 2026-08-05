@@ -290,6 +290,9 @@ export interface RunRequestInput {
   model?: string | null;
   fuse?: boolean;
   cascade?: boolean;
+  // How far the agent may reach and when it stops to ask. The server resolves it into tool denials
+  // and pause flags, and mints a thread when a pause is asked for and none was sent.
+  posture?: { reach: Reach; approval: Approval } | null;
 }
 
 /** Preview a plan for a task: runs ONLY the planner (a single model call) — NO edits, NO tools, no
@@ -423,6 +426,7 @@ export interface CodeTurnInput {
   context_budget?: number | null;
   repo_map?: boolean;
   explorer?: boolean;
+  posture?: { reach: Reach; approval: Approval } | null;
 }
 
 /** One tool call, as it happens. `arguments` and `observation` arrive already clipped server-side
@@ -524,6 +528,38 @@ function dispatchCodeTurn(frame: string, h: CodeTurnHandlers): void {
   else if (event === "done") h.onDone?.(payload as unknown as CodeTurnDone);
   else if (event === "error") h.onError?.(payload.message as string);
 }
+
+// --- Posture (how far the agent reaches, and when it stops to ask) ---
+
+export type Reach = "read_only" | "workspace" | "workspace_shell";
+export type Approval = "always" | "suspicious" | "never";
+
+/** What the chosen posture means on THIS machine, right now. Structured rather than prose so the
+ *  sentence can be rendered in nine languages — a server that returned English would make this the
+ *  one untranslated line on the screen. */
+export interface PostureFacts {
+  writes: "nothing" | "workspace";
+  workspace: string;
+  shell: "none" | "isolated" | "host" | "asks" | "refused";
+  pauses: "always" | "tainted" | "never";
+  // True when the shell would run on this machine while the config asked for a container. The one
+  // case where the honest answer contradicts the user's setup, so it is never folded into `shell`.
+  fell_back_to_host: boolean;
+}
+
+/** Ask what a posture would mean, without committing to it.
+ *
+ *  A POST, and never cached: it reports the LIVE state of the sandbox, so a Docker daemon that died
+ *  since the last call has to change the answer rather than be served from a cache. */
+export const getPostureFacts = (
+  reach: Reach,
+  approval: Approval,
+  workspace?: string | null,
+) =>
+  json<PostureFacts>("/api/code/posture", {
+    method: "POST",
+    body: JSON.stringify({ reach, approval, workspace: workspace || null }),
+  });
 
 /** Forget a coding conversation. An unknown id is `{ok:false}`, not an error — that is exactly the
  *  state a second click on Clear hits. */

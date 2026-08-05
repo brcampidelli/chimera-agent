@@ -32,7 +32,13 @@ from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
 from chimera.api.benchmarks_api import benchmark_report
-from chimera.api.code_api import CodeSeams, assemble_registry, register_code_api, resolve_steps
+from chimera.api.code_api import (
+    CodeSeams,
+    assemble_registry,
+    register_code_api,
+    resolve_posture,
+    resolve_steps,
+)
 from chimera.api.governance import read_audit, run_injection_suite
 from chimera.api.maturity_api import maturity_report
 from chimera.api.runs import load_runs
@@ -568,6 +574,11 @@ def build_api_app(
         # guard + the localhost bind, and never runs outside ``ws``. It is the PLAIN solve core
         # (plan → run → verify-or-revert → receipt); the advanced CLI seams are intentionally omitted.
         ws = Path(req.workspace).expanduser().resolve() if req.workspace else workspace
+        # A pause needs somewhere to park. A client that asked for one via `posture` but sent no
+        # thread would otherwise get a run that quietly never pauses, so mint the identity here —
+        # once, before anything reads it, so the agent, `auto.run` and the `paused` frame all agree.
+        if resolve_posture(req.posture).needs_thread and not req.thread_id:
+            req.thread_id = uuid.uuid4().hex
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue[tuple[str, Any] | None] = asyncio.Queue()
         # Cooperative-cancel plumbing: a per-run id + stop Event. The frontend learns the id from the
@@ -1247,6 +1258,7 @@ def _build_solve_agent(
     # CHIMERA_TAINT_NARROW=0 deliberately. Routing the approval to the desktop's HITL UI (so it can
     # be answered rather than only refused) is the follow-up.
     steps = resolve_steps(req.max_steps)
+    posture = resolve_posture(req.posture)
     registry, ledger = assemble_registry(req, ws, settings, gateway, steps=steps)
     # insist_on_action: solve is task completion, so a described-but-unexecuted plan is pushed back
     # to actually run (mirrors the CLI worker config).
@@ -1300,7 +1312,10 @@ def _build_solve_agent(
         # identity is a run nobody can ever come back to, which is worse than not pausing.
         taint=ledger if req.thread_id else None,
         checkpointer=RunCheckpointer(settings.home / "runs.db") if req.thread_id else None,
-        pause_on_taint=bool(req.thread_id and req.pause_on_taint),
+        # Either the explicit flag or the posture can ask for a pause; both still need a thread,
+        # because a paused run with no durable identity is one nobody can ever come back to.
+        pause_on_taint=bool(req.thread_id and (req.pause_on_taint or posture.pause_on_taint)),
+        pause_always=bool(req.thread_id and posture.pause_always),
         config=AutonomousConfig(max_attempts=req.max_attempts),
     )
 

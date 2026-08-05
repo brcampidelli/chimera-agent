@@ -106,6 +106,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/posture": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Code Posture
+         * @description What the chosen posture MEANS on this machine, right now.
+         *
+         *     A POST rather than a GET because it reports the live state of the sandbox rather than a
+         *     stored resource, and because caching this answer is precisely the bug: a Docker daemon that
+         *     died since the last call must change the answer, not be served from a cache.
+         */
+        post: operations["code_posture_api_code_posture_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/sessions/{session_id}": {
         parameters: {
             query?: never;
@@ -1303,6 +1327,7 @@ export interface components {
             model?: string | null;
             /** Open File */
             open_file?: string | null;
+            posture?: components["schemas"]["Posture"] | null;
             /**
              * Repo Map
              * @default false
@@ -1870,6 +1895,75 @@ export interface components {
             /** Workspace */
             workspace?: string | null;
         };
+        /**
+         * Posture
+         * @description The two axes, as a client sends them.
+         */
+        Posture: {
+            /**
+             * Approval
+             * @default suspicious
+             * @enum {string}
+             */
+            approval: "always" | "suspicious" | "never";
+            /**
+             * Reach
+             * @default workspace
+             * @enum {string}
+             */
+            reach: "read_only" | "workspace" | "workspace_shell";
+        };
+        /**
+         * PostureFacts
+         * @description What is true right now, for the UI to render as one sentence.
+         *
+         *     Structured rather than prose because the sentence has to exist in nine languages, and a server
+         *     that returned English would quietly make this the one untranslated line on the screen.
+         */
+        PostureFacts: {
+            /**
+             * Fell Back To Host
+             * @default false
+             */
+            fell_back_to_host: boolean;
+            /**
+             * Pauses
+             * @enum {string}
+             */
+            pauses: "always" | "tainted" | "never";
+            /**
+             * Shell
+             * @enum {string}
+             */
+            shell: "none" | "isolated" | "host" | "asks" | "refused";
+            /** Workspace */
+            workspace: string;
+            /**
+             * Writes
+             * @enum {string}
+             */
+            writes: "nothing" | "workspace";
+        };
+        /**
+         * PostureQuery
+         * @description Ask what a posture would mean, without committing to it — the selectors' live preview.
+         */
+        PostureQuery: {
+            /**
+             * Approval
+             * @default suspicious
+             * @enum {string}
+             */
+            approval: "always" | "suspicious" | "never";
+            /**
+             * Reach
+             * @default workspace
+             * @enum {string}
+             */
+            reach: "read_only" | "workspace" | "workspace_shell";
+            /** Workspace */
+            workspace?: string | null;
+        };
         /** ProjectDetailOut */
         ProjectDetailOut: {
             /** Columns */
@@ -1975,6 +2069,7 @@ export interface components {
             pause_on_taint: boolean;
             /** Plan */
             plan?: string | null;
+            posture?: components["schemas"]["Posture"] | null;
             /**
              * Repo Map
              * @default false
@@ -2389,6 +2484,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    code_posture_api_code_posture_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostureQuery"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostureFacts"];
                 };
             };
             /** @description Validation Error */

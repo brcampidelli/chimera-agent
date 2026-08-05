@@ -35,11 +35,14 @@ import {
   saveFile,
   streamExec,
   streamRun,
+  type Approval,
+  type Reach,
   type RunEvent,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/panel";
 import { Conversation } from "@/components/code/Conversation";
+import { PostureBar } from "@/components/code/PostureBar";
 import { DiffView } from "@/components/code/DiffView";
 import { useT, type TFunc } from "@/lib/i18n";
 import type { AttemptReceipt, FileDiff, FsNode, GitFile, RunReceipt } from "@/lib/types";
@@ -557,9 +560,13 @@ function RunPanel({
   onRan,
   handOff,
   onBusy,
+  posture,
 }: {
   workspace: string;
   onRan: () => void;
+  /** The same reach/approval the conversation uses — the two buttons must not differ in what the
+   *  agent is allowed to do, only in whether the change gets verified. */
+  posture: { reach: Reach; approval: Approval };
   /** Text handed over from the conversation's "Run with verification". A new object each time, so
    *  pressing the button twice with the same words still lands — a bare string would compare equal
    *  and the second press would do nothing, which reads as the button being broken. */
@@ -727,6 +734,7 @@ function RunPanel({
         model: model.trim() || null,
         fuse: mode === "fuse",
         cascade: mode === "cascade",
+        posture,
       },
       {
         onRunId: (id) => setRunId(id),
@@ -1297,6 +1305,11 @@ export function Code() {
   // (handed over by "Run with verification") and whether a run is already in flight.
   const [handOff, setHandOff] = useState<{ text: string; at: number } | null>(null);
   const [runBusy, setRunBusy] = useState(false);
+  // Defaults chosen to match the backend's: edit the workspace, no shell, ask when the run read
+  // something untrusted. The permissive corner has to be picked, never arrived at.
+  const [reach, setReach] = useState<Reach>("workspace");
+  const [approval, setApproval] = useState<Approval>("suspicious");
+  const posture = useMemo(() => ({ reach, approval }), [reach, approval]);
 
   const refreshOpenFile = useCallback(() => {
     if (openFile) void qc.invalidateQueries({ queryKey: ["fs-file", workspace, openFile] });
@@ -1325,12 +1338,21 @@ export function Code() {
         />
         <Viewer workspace={workspace} path={openFile} />
         <aside className="flex min-h-0 flex-col overflow-hidden border-l border-hairline lg:w-96">
+          <PostureBar
+            workspace={workspace}
+            reach={reach}
+            approval={approval}
+            onReach={setReach}
+            onApproval={setApproval}
+            disabled={runBusy}
+          />
           <Conversation
             workspace={workspace}
             openFile={openFile}
             onHandOff={(text) => setHandOff({ text, at: Date.now() })}
             onEdited={refreshOpenFile}
             busyElsewhere={runBusy}
+            posture={posture}
           />
           {/* Re-read the currently open file after the agent edited or reverted the workspace. */}
           <RunPanel
@@ -1338,6 +1360,7 @@ export function Code() {
             onRan={refreshOpenFile}
             handOff={handOff}
             onBusy={setRunBusy}
+            posture={posture}
           />
         </aside>
       </div>

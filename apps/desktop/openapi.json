@@ -746,6 +746,16 @@
             ],
             "title": "Open File"
           },
+          "posture": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Posture"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "repo_map": {
             "default": false,
             "title": "Repo Map",
@@ -2348,6 +2358,121 @@
         "title": "PlanRequest",
         "type": "object"
       },
+      "Posture": {
+        "description": "The two axes, as a client sends them.",
+        "properties": {
+          "approval": {
+            "default": "suspicious",
+            "enum": [
+              "always",
+              "suspicious",
+              "never"
+            ],
+            "title": "Approval",
+            "type": "string"
+          },
+          "reach": {
+            "default": "workspace",
+            "enum": [
+              "read_only",
+              "workspace",
+              "workspace_shell"
+            ],
+            "title": "Reach",
+            "type": "string"
+          }
+        },
+        "title": "Posture",
+        "type": "object"
+      },
+      "PostureFacts": {
+        "description": "What is true right now, for the UI to render as one sentence.\n\nStructured rather than prose because the sentence has to exist in nine languages, and a server\nthat returned English would quietly make this the one untranslated line on the screen.",
+        "properties": {
+          "fell_back_to_host": {
+            "default": false,
+            "title": "Fell Back To Host",
+            "type": "boolean"
+          },
+          "pauses": {
+            "enum": [
+              "always",
+              "tainted",
+              "never"
+            ],
+            "title": "Pauses",
+            "type": "string"
+          },
+          "shell": {
+            "enum": [
+              "none",
+              "isolated",
+              "host",
+              "asks",
+              "refused"
+            ],
+            "title": "Shell",
+            "type": "string"
+          },
+          "workspace": {
+            "title": "Workspace",
+            "type": "string"
+          },
+          "writes": {
+            "enum": [
+              "nothing",
+              "workspace"
+            ],
+            "title": "Writes",
+            "type": "string"
+          }
+        },
+        "required": [
+          "writes",
+          "workspace",
+          "shell",
+          "pauses"
+        ],
+        "title": "PostureFacts",
+        "type": "object"
+      },
+      "PostureQuery": {
+        "description": "Ask what a posture would mean, without committing to it \u2014 the selectors' live preview.",
+        "properties": {
+          "approval": {
+            "default": "suspicious",
+            "enum": [
+              "always",
+              "suspicious",
+              "never"
+            ],
+            "title": "Approval",
+            "type": "string"
+          },
+          "reach": {
+            "default": "workspace",
+            "enum": [
+              "read_only",
+              "workspace",
+              "workspace_shell"
+            ],
+            "title": "Reach",
+            "type": "string"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          }
+        },
+        "title": "PostureQuery",
+        "type": "object"
+      },
       "ProjectDetailOut": {
         "properties": {
           "columns": {
@@ -2614,6 +2739,16 @@
               }
             ],
             "title": "Plan"
+          },
+          "posture": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Posture"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "repo_map": {
             "default": false,
@@ -3565,6 +3700,45 @@
           }
         },
         "summary": "Chat Stream"
+      }
+    },
+    "/api/code/posture": {
+      "post": {
+        "description": "What the chosen posture MEANS on this machine, right now.\n\nA POST rather than a GET because it reports the live state of the sandbox rather than a\nstored resource, and because caching this answer is precisely the bug: a Docker daemon that\ndied since the last call must change the answer, not be served from a cache.",
+        "operationId": "code_posture_api_code_posture_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostureQuery"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostureFacts"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Code Posture"
       }
     },
     "/api/code/sessions/{session_id}": {

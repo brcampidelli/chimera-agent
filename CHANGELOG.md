@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Reach and approval, as two axes rather than a safety slider.** Chimera had both halves of this
+  and showed neither: reach was spread across the tool registry, the write region, the workspace
+  jail, `CHIMERA_SANDBOX` and `CHIMERA_HOST_EXEC`; asking was spread across the taint ledger,
+  `narrow_on_taint` and the HITL checkpoint. The framing is Codex's and it is the right one — **the
+  sandbox decides what is technically possible; the approval policy decides when to stop and ask
+  before crossing it** — and they are orthogonal. Collapse them into one "safety level" and the
+  diagonal (full reach, no questions) stops being a corner someone chose and becomes one they slid
+  past. Every value maps to a mechanism that already refuses things: read-only removes the write and
+  exec tools from the registry, not from a label. The one gap — "ask me before *every* run", which
+  had no trigger because taint was the only pause condition — was closed in the loop rather than
+  faked, because a third selector value that quietly did the same as the second is worse than a
+  selector with two. The status line is **generated, never echoed back**: it asks the sandbox
+  whether it is actually isolated instead of reading the config that requested it, so a Docker
+  daemon that died turns "runs in a container" into "runs on YOUR machine" with nobody editing a
+  setting — the one case where the honest answer contradicts the user's setup, and exactly how
+  "I thought it was sandboxed" happens. The nine (reach × approval) pairs are checked exhaustively
+  against the mechanisms they name, because the whole point of an orthogonal design is that the
+  combinations are not special cases.
 - **A coding conversation that keeps what it did — `POST /api/code/turn`.** The run endpoint is a
   closed transaction (plan → execute → verify → revert → receipt), which is right for "make the
   tests pass" and wrong for "what does this module do?", "ok, rename it", "no, the other one". Those
