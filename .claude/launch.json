@@ -2,6 +2,12 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "chimera-api",
+      "runtimeExecutable": "chimera",
+      "runtimeArgs": ["app", "--port", "8765"],
+      "port": 8765
+    },
+    {
       "name": "desktop-ui",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "apps/desktop", "run", "dev"],

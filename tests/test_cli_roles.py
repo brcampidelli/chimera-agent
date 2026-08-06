@@ -81,12 +81,36 @@ def test_the_cli_and_the_desktop_resolve_through_the_same_function() -> None:
 
 
 def test_the_help_advertises_both_flags() -> None:
+    """Both flags reach the user — asserted twice, because the first way is not enough on its own.
+
+    This test used to substring-search the RAW ``--help`` output, which is Rich-rendered and full of
+    ANSI escapes. That made it depend on styling: whether ``--profile`` survives as a contiguous
+    substring is up to where Rich decides to emit a colour change, and colour detection differs
+    between a developer's terminal and a CI runner. It passed on three local configurations — full
+    suite, `COLUMNS` unset, and a clean clone at the same commit with the locked Typer — and failed
+    on all three Python versions in CI, which is the signature of an environment-dependent assertion
+    rather than a real regression.
+
+    Stripping the escapes is not a weakening: a genuinely missing flag still fails. The registration
+    check below is the part that cannot be faked by any renderer, and is what the test was actually
+    trying to say.
+
+    HONEST CAVEAT: the CI failure was never reproduced locally, so this hardening is reasoned from
+    the assertion's shape, not from a confirmed mechanism. If CI stays red, the cause is elsewhere.
+    """
+    import re
+
     from typer.testing import CliRunner
 
     from chimera.cli.main import app
 
-    out = CliRunner().invoke(app, ["solve", "--help"]).output
-    assert "--profile" in out and "--role-models" in out
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", CliRunner().invoke(app, ["solve", "--help"]).output)
+    assert "--profile" in plain and "--role-models" in plain
+
+    import typer.main
+
+    params = {opt for p in typer.main.get_command(app).commands["solve"].params for opt in p.opts}  # type: ignore[attr-defined]
+    assert {"--profile", "--role-models"} <= params
 
 
 def test_fused_if_only_wraps_when_asked(monkeypatch: Any) -> None:
