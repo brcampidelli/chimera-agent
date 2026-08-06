@@ -12,7 +12,12 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Cancel superseded runs everywhere EXCEPT main. On a branch, only the tip matters and killing the
+  # older run saves runner time. On main every commit is a candidate to release from, and a commit
+  # whose run was cancelled by the next push keeps whatever verdict it had — usually none. Pushing
+  # twice in an hour would then leave the first commit permanently unverified while `main` still
+  # looked green, because the green belonged to a different tree.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 # Least privilege, declared here rather than inherited. Without this block the token carries whatever
 # the repository default happens to be — a setting that lives in the web UI, is invisible in review,
@@ -241,3 +246,66 @@ jobs:
           uvx pip-audit --version
           uv export --format requirements-txt --no-hashes --no-emit-project > /tmp/reqs.txt
           uvx pip-audit --requirement /tmp/reqs.txt --strict || true
+
+  verdict:
+    name: verdict (what red actually means)
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [quality, integration, install-smoke, desktop, mutation, supply-chain]
+    steps:
+      # A run can go red without anything failing. On 2026-08-06 two of the three `quality` matrix
+      # jobs were created, never assigned a runner, and were cancelled 15 minutes later; the third
+      # ran the whole suite and passed. GitHub reported `failure`, and in the branch-protection UI
+      # that is indistinguishable from a broken test.
+      #
+      # This does NOT turn that red into green. A job that never ran told us nothing about the code,
+      # so the verdict stays red — but it says WHICH kind of red, because the two demand opposite
+      # responses: a failure means read the log and fix it, a cancellation means re-run and change
+      # nothing. Conflating them teaches people that red is negotiable, which is the expensive part.
+      - name: Classify
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "results: $RESULTS"
+          failed=0; cancelled=0
+          # if/case rather than `[ test ] && incr`: GitHub runs `run:` steps under `bash -e`, where a
+          # bare AND-list whose test is false is itself a failing statement and aborts the script. The
+          # job would then exit 1 on the first result that did not match — a verdict step that reports
+          # failure BY failing is the exact confusion this job exists to remove.
+          for r in $RESULTS; do
+            case "$r" in
+              failure) failed=$((failed + 1)) ;;
+              cancelled) cancelled=$((cancelled + 1)) ;;
+            esac
+          done
+
+          if [ "$failed" -gt 0 ]; then
+            {
+              echo "## Red: something actually failed"
+              echo ""
+              echo "$failed job group(s) reported \`failure\`. Read the log — a re-run will not help."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          if [ "$cancelled" -gt 0 ]; then
+            {
+              echo "## Red: infrastructure, not the code"
+              echo ""
+              echo "$cancelled job group(s) were \`cancelled\` and none failed — the usual cause is a"
+              echo "job that never got a runner. Re-run the cancelled jobs:"
+              echo ""
+              echo '```bash'
+              echo "gh run rerun ${{ github.run_id }} --failed"
+              echo '```'
+              echo ""
+              echo "If it cancels again at the same place, it is a pattern rather than a hiccup and"
+              echo "the queue wait is worth investigating instead of retrying."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          echo "## Green" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Nothing failed and nothing was cancelled." >> "$GITHUB_STEP_SUMMARY"
