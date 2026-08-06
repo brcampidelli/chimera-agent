@@ -48,6 +48,7 @@ import { RolesBar } from "@/components/code/RolesBar";
 import { WorthPanel } from "@/components/code/WorthPanel";
 import { DiffView } from "@/components/code/DiffView";
 import { useT, type TFunc } from "@/lib/i18n";
+import { readWorkspace, writeWorkspace } from "@/lib/workspace";
 import type { AttemptReceipt, FileDiff, FsNode, GitFile, RunReceipt } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -1306,7 +1307,8 @@ function GitPanel({ workspace }: { workspace: string }) {
 export function Code() {
   const t = useT();
   const qc = useQueryClient();
-  const [workspace, setWorkspace] = useState("");
+  // Lazy initialiser, not `useState(readWorkspace())`: the latter reads storage on every render.
+  const [workspace, setWorkspace] = useState(readWorkspace);
   const [openFile, setOpenFile] = useState<string | null>(null);
   // The conversation and the run share one workspace, so they share two facts: what the user asked
   // (handed over by "Run with verification") and whether a run is already in flight.
@@ -1337,6 +1339,7 @@ export function Code() {
           workspace={workspace}
           onWorkspace={(ws) => {
             setWorkspace(ws);
+            writeWorkspace(ws);
             setOpenFile(null);
             void qc.invalidateQueries({ queryKey: ["fs-tree"] });
             void qc.invalidateQueries({ queryKey: ["git-status"] });

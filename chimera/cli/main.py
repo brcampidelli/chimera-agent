@@ -19,6 +19,7 @@ Commands:
 from __future__ import annotations
 
 import contextlib
+import os
 import platform
 import sys
 from collections.abc import Callable
@@ -1130,13 +1131,35 @@ def _bind_app_socket(host: str, port: int) -> tuple[Any, int]:
     return sock, sock.getsockname()[1]
 
 
+def resolve_app_workspace(flag: str | None) -> Path:
+    """Which directory the desktop app roots its tools in: flag, then ``$CHIMERA_WORKSPACE``, then cwd.
+
+    The environment step exists for packaged builds. ``chimera app`` in a terminal inherits the
+    directory you were standing in, so the cwd fallback is right by accident. A shipped desktop app
+    inherits wherever its shortcut points — ``C:\\Program Files\\Chimera`` for an installed one,
+    which is not the user's project and, on Windows, is not writable without elevation. The agent's
+    edits then fail there in a way that reads like a bug in the agent rather than a wrong root.
+
+    Deliberately NOT falling back to the home directory. It would be writable and it would look
+    friendlier, but "the agent may edit anything under $HOME" is not a default anyone chose — and
+    reach is the one setting that must be arrived at deliberately. An empty, visible, wrong-looking
+    root that the user corrects beats a large, plausible-looking one they never agreed to.
+    """
+    return Path(flag or os.environ.get("CHIMERA_WORKSPACE") or ".")
+
+
 @app.command(name="app")
 def desktop_app(
     host: str = typer.Option("127.0.0.1", "--host", help="Bind host (localhost by default)."),
     port: int = typer.Option(8765, "--port", help="Bind port (0 = any free port; a busy port falls back to free)."),
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
     max_steps: int = typer.Option(6, "--max-steps", help="Max tool-calling steps per message."),
-    workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root for tools."),
+    workspace: str = typer.Option(
+        None, "--workspace", "-w",
+        help="Workspace root for tools. Falls back to $CHIMERA_WORKSPACE, then the current "
+             "directory — which is the wrong root for a packaged app, whose current directory is "
+             "wherever its shortcut points.",
+    ),
     fuse: bool = typer.Option(False, "--fuse", help="Route turns through fusion (no token streaming)."),
     no_memory: bool = typer.Option(False, "--no-memory", help="Don't recall long-term memory."),
     cron: bool = typer.Option(
@@ -1197,7 +1220,7 @@ def desktop_app(
     elif fuse:
         backend = RoutedBackend(llm, fuse_backend)
 
-    workspace_path = Path(workspace)
+    workspace_path = resolve_app_workspace(workspace)
     shared_memory = None if no_memory else _memory_manager()
     shared_graph = _recall_graph(shared_memory)
     shared_profile = shared_memory.profile() if shared_memory is not None else ""
