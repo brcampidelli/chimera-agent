@@ -52,6 +52,15 @@ bench/local_lift/results/
 bench/llm_benchmarks/results/
 bench/llm_benchmarks/data/   # downloaded HumanEval/GSM8K (their own licences; fetched on demand)
 
+# role_routing: same rule, but two files inside are evidence rather than output — the cost ledger a
+# claim gets cited from, and the slice that says which instances were run. Written as `results/*`
+# and not `results/`, because git cannot re-include a file whose parent DIRECTORY is excluded.
+# What stays out: runs.jsonl (carries the full SWE-bench task text and generated diffs), telemetry
+# and per-arm predictions — all reproducible, and large.
+bench/role_routing/results/*
+!bench/role_routing/results/pilot_cost.json
+!bench/role_routing/results/slice_pilot.jsonl
+
 # Terminal-Bench official runner: local venv, built wheel, run outputs (tracked: scripts only)
 bench/terminal_bench/.venv/
 bench/terminal_bench/dist/

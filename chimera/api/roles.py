@@ -101,10 +101,19 @@ def resolve(profile: Profile | None, settings: Settings, override: RoleModels | 
     if chosen == "economy":
         base = RoleModels(explore=ladder.weak, plan=ladder.mid, edit=ladder.mid, review=ladder.mid)
     elif chosen == "max":
+        # `edit` stays on `mid`, and this is the one place where "max" deliberately does not take the
+        # top tier. The ladder ranks models by REASONING strength, which is not the same property as
+        # tool-calling — and `edit` is the only role that both carries tools on every turn and has to
+        # actually finish. Escalating it was measured, not theorised: with `top` on edit, all three
+        # pilot solves burned the full 1800 s wall and produced an empty patch, at US$ 0.16 apiece —
+        # cheap because the arm was waiting on reasoning passes rather than working. See PILOT.md.
+        #
+        # So `max` escalates where reasoning IS the job (plan, review, and explore over `balanced`'s
+        # weak tier) and fuses the two tool-free roles. That is the module's own table, applied.
         base = RoleModels(
             explore=ladder.mid,
             plan=ladder.top,
-            edit=ladder.top,
+            edit=ladder.mid,
             review=ladder.top,
             fuse_plan=True,
             fuse_review=True,

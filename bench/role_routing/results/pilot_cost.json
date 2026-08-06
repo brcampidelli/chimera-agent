@@ -1,0 +1,56 @@
+[
+  {
+    "instance": "django__django-11964",
+    "arm": "roles_single",
+    "usd": 0.417659,
+    "seconds": 1718.3
+  },
+  {
+    "instance": "django__django-11964",
+    "arm": "roles_balanced",
+    "usd": 0.458088,
+    "seconds": 1290.1
+  },
+  {
+    "instance": "django__django-11964",
+    "arm": "roles_max",
+    "usd": 0.165294,
+    "seconds": 1803.9
+  },
+  {
+    "instance": "django__django-12125",
+    "arm": "roles_single",
+    "usd": 0.312391,
+    "seconds": 971.9
+  },
+  {
+    "instance": "django__django-12125",
+    "arm": "roles_balanced",
+    "usd": 0.5157,
+    "seconds": 1803.7
+  },
+  {
+    "instance": "django__django-12125",
+    "arm": "roles_max",
+    "usd": 0.140025,
+    "seconds": 1803.8
+  },
+  {
+    "instance": "django__django-12193",
+    "arm": "roles_single",
+    "usd": 0.394336,
+    "seconds": 632.0
+  },
+  {
+    "instance": "django__django-12193",
+    "arm": "roles_balanced",
+    "usd": 0.603068,
+    "seconds": 1803.8
+  },
+  {
+    "instance": "django__django-12193",
+    "arm": "roles_max",
+    "usd": 0.168465,
+    "seconds": 1803.9
+  }
+]

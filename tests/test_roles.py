@@ -98,10 +98,38 @@ def test_the_reviewer_refuses_to_be_the_model_that_wrote_the_patch() -> None:
     assert review_model_for(different) == "vendor/y"
 
 
-def test_max_does_not_accidentally_make_the_reviewer_the_editor() -> None:
-    """`max` puts the top tier on both edit and review, which is exactly the collapse above — so the
-    guard has to catch it on a real profile, not only on a hand-written override."""
-    assert review_model_for(resolve("max", _settings())) is None
+def test_max_keeps_the_editor_on_the_tool_calling_tier_not_the_top_one() -> None:
+    """The one place `max` deliberately does not take the best model.
+
+    The ladder ranks by REASONING strength; `edit` is the only role that carries tools every turn AND
+    has to finish. `bench/role_routing/PILOT.md` measured what happens when those are conflated: with
+    the top tier on edit, 3 of 3 solves burned the full 1800 s wall and produced an empty patch, at
+    US$ 0.16 each — cheap because the arm was waiting, not working.
+
+    Asserted against the ladder rather than a slug so it keeps meaning when the catalogue changes.
+    """
+    from chimera.providers.catalog import resolve_tiers
+
+    ladder = resolve_tiers(_settings())  # type: ignore[arg-type]
+    models = resolve("max", _settings()).models
+
+    assert models.edit == ladder.mid
+    assert models.edit != ladder.top
+    assert models.plan == ladder.top and models.review == ladder.top  # reasoning roles still escalate
+
+
+def test_max_now_gets_an_independent_reviewer_as_a_side_effect() -> None:
+    """This test replaces one that asserted the opposite, and the reason is worth keeping.
+
+    `max` used to put the top tier on edit AND review, which tripped the collapse guard — the
+    reviewer fell back to the run's default because it must not be the model that wrote the patch.
+    Moving edit off the top tier removes the collision, so `max` now routes a genuinely independent
+    reviewer instead of silently degrading to the default. That is strictly better, and it means the
+    old assertion (`review_model_for(...) is None`) is now false for a good reason rather than a bad
+    one. The guard itself stays covered by the override-based test above, which is where it belongs:
+    a guard should be tested on the condition it guards, not on a profile that happens to hit it.
+    """
+    assert review_model_for(resolve("max", _settings())) is not None
 
 
 def test_the_solve_agent_routes_each_role_to_its_own_model(tmp_path: Any) -> None:
