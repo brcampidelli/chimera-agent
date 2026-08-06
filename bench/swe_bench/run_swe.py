@@ -33,7 +33,11 @@ _SLICE = Path(os.environ.get("BENCH_SLICE", str(Path(__file__).resolve().parent 
 _OUT = Path(os.environ.get("BENCH_OUT", str(Path(__file__).resolve().parent / "results")))
 _REF = Path(os.environ.get("SWE_DJANGO_REF", "/tmp/swe-django-ref"))
 _WORK = Path(os.environ.get("SWE_WORK", "/tmp/swe-work"))
-_TIMEOUT = int(os.environ.get("BENCH_TIMEOUT", "900"))
+# 1800 s, not 900: runs 2-4 used 1800 (swe_bench Amendment 2) and the 900 default silently applied
+# to a costing pilot, censoring the expensive arm at 4/4 while the cheap one lost 2/4. An asymmetric
+# cap invalidates a paired comparison, and a default that quietly differs from the registered value
+# is how one gets applied without anyone deciding to.
+_TIMEOUT = int(os.environ.get("BENCH_TIMEOUT", "1800"))
 _ROLE_MODELS = os.environ.get("BENCH_ROLE_MODELS", "").strip()
 _REPO_URL = "https://github.com/django/django"
 

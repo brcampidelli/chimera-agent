@@ -37,7 +37,16 @@ Each arm solves the **same task** in its **own git worktree**, judged by the **s
 command. Pairing is what makes a small n readable: the two arms differ by routing and nothing else,
 so per-task agreement/disagreement is the unit rather than two independent rates.
 
-- **Runner**: `chimera solve-batch`, which already isolates each task in a worktree.
+- **Runner**: `bench/swe_bench/run_swe.py`, arms `roles_single` / `roles_balanced` / `roles_max` —
+  the same runner and the same sanitised-checkout recipe the scaffold runs used. (This said
+  `chimera solve-batch` when written, which was simply wrong: `solve-batch` is not what produces
+  SWE-bench predictions, and naming a tool the bench does not use is how a reader ends up unable to
+  reproduce it.)
+- **Per-solve timeout: 1800 s**, matching runs 2–4 (`bench/swe_bench` Amendment 2). Fixed here
+  because it was NOT fixed here: the costing pilot inherited `run_swe.py`'s 900 s file default by
+  accident and censored the expensive arm at 4/4 while the cheap one lost 2/4 — an asymmetry the
+  `swe_bench` pre-registration names as invalidating. A timeout the document does not state is a
+  timeout that gets chosen by whatever the file happened to say.
 - **Statistic**: McNemar's exact test on the discordant pairs, via the existing
   `chimera/eval/paired.py` — the module that is already under mutation testing, so the arithmetic
   is not new code written by the person hoping for a result.
@@ -54,9 +63,15 @@ and the honest headline is about model choice, not about roles.
 
 **SWE-bench Verified**, the 41-instance out-of-sample slice already used in `bench/swe_bench`. Not a
 suite authored here — three authored suites in `learning_lift` all landed at 84–92% pass, where no
-intervention has room to show anything, and that failure mode is now a standing rule in this repo:
-**a suite whose baseline sits outside 40–60% cannot answer this question**, and if A0 lands outside
-that band the run is reported as uninformative rather than mined for a subgroup that isn't.
+intervention has room to show anything, and that failure mode is a standing rule in this repo:
+**a suite whose baseline sits above ~75% cannot answer this question**, and if A0 lands there the
+run is reported as uninformative rather than mined for a subgroup that isn't.
+
+> This originally read "outside 40–60%". The floor was **withdrawn by Amendment 2** — it was
+> imported from a ceiling argument that never supported it, and it would have declared runs 3 and 4,
+> the two most informative this project has done, uninformative. The ceiling stands; a *low*
+> baseline is not a disqualification. What decides informativeness is the discordant-pair count in
+> the next paragraph, which is what McNemar actually consumes.
 
 n = 41 paired tasks per arm. Powered to detect a large effect only, and that is stated up front:
 with ~41 pairs, McNemar reaches p < 0.05 at roughly **10+ discordant pairs breaking 8:2 or better**.
@@ -70,7 +85,8 @@ From the receipts that already exist — nothing new is invented to make this me
 |---|---|
 | passed | the verify command's exit code |
 | attempts | `AutonomousResult.attempts` |
-| usd | summed `AgentResult.usd`; **null when any model's price is unknown** |
+| usd | worker + overhead, via `Attempt.usd`; **null when any leg's price is unknown** |
+| `overhead_usd` | the non-worker share — planner, manager, checklist, strong-verify |
 | tokens | prompt / completion, per role |
 | `route_meta` | which model actually answered each turn, and why |
 | diff size | `Attempt.diff_summary` |
@@ -79,6 +95,13 @@ From the receipts that already exist — nothing new is invented to make this me
 Cost is reported as **unknown** whenever any leg's price is unknown, never as zero and never as a
 partial sum. A cost comparison that silently drops the free tier's contribution would make the cheap
 arm look cheaper than it is, in the direction that flatters the feature.
+
+`overhead_usd` is split out, and it is not a nicety: when this document was written, the planner and
+the manager were priced **nowhere** — the receipt carried the worker alone. A model-per-role profile
+differs from single-model mostly in who plans and who reviews, so the row that would have decided
+this bench's cost comparison was the one row nobody was recording. Fixed in
+`chimera/orchestration/metering.py` before any arm runs; without that fix, every number in this
+table would have understated the expensive arms by exactly the amount that makes them expensive.
 
 ## 6. Readings that would make this feature not worth its default
 
@@ -90,8 +113,10 @@ Named now, so none of them can be reframed later as "a different question":
    stronger editor helps", which is not news, and the multi-role framing is dropped.
 3. **A1 wins only on `diff_productive=false` tasks.** That is the diff gate catching hollow
    successes, not routing working.
-4. **A0 outside 40–60%.** Uninformative run. Reported, not repeated with a different suite until it
-   lands where I want it.
+4. **A0 above 75%.** Uninformative run — no headroom left for routing to convert. Reported, not
+   repeated with a different suite until it lands where I want it. (Was "outside 40–60%"; the floor
+   is withdrawn by Amendment 2, and A0's best available estimate — 39.0%, Wilson [25.7%, 54.3%] —
+   is *expected* to sit below where that floor was.)
 5. **Fewer than 10 discordant pairs.** Inconclusive. The interval is published including the part
    of it that crosses zero.
 
@@ -100,6 +125,59 @@ Named now, so none of them can be reframed later as "a different question":
 Any change to the arms, the suite, the statistic or the band is an amendment committed **before** the
 run that uses it, in this file, with its reason. An amendment made after seeing a result is a
 retraction of this document, and will be labelled as one.
+
+### Amendment 2 — retracting the 40% floor, which I imported from an argument that never supported it
+
+**Labelled a retraction, per §7.** It changes a criterion in §4 and §6.4, and I am the one it
+benefits, so it is named for what it is rather than filed as a tidy-up.
+
+**What is wrong.** §4 justifies its band with one failure and one only: *"three authored suites in
+`learning_lift` all landed at 84–92% pass, where no intervention has room to show anything."* That
+is a **ceiling** argument. A baseline near 100% leaves nothing for an intervention to convert. It
+says nothing whatever about a baseline being too low — and yet I wrote a symmetric 40–60% band, as
+if the floor had been argued for. It had not. I took a one-sided concern and registered a two-sided
+rule.
+
+**The evidence against the floor was already published in this repo when I wrote it.** From
+`bench/swe_bench/RESULTS.md`, run 4, on this exact 41-instance slice:
+
+| arm | rate | Wilson 95% |
+|---|---|---|
+| baseline | 14/41 = 34.1% | [21.6%, 49.5%] |
+| scaffold (**identical flags to my A0**) | 16/41 = **39.0%** | [25.7%, 54.3%] |
+| scaffold + gate | 18/41 = 43.9% | [29.9%, 59.0%] |
+
+Both of run 4's comparisons ran against a **34.1%** baseline — well under my floor — and each
+produced **8 discordant pairs** (+5/−3 and +6/−2), the quantity McNemar actually consumes. Run 3,
+also at 34.1%, is the out-of-sample replication this project's headline rests on. My floor would
+have declared the two most informative runs this project has ever done **uninformative**.
+
+**And 39.0% is a point estimate with a 29-point interval.** [25.7%, 54.3%] straddles the band.
+Declaring a run dead because a point estimate sits 1.0 point under a threshold is exactly the
+over-reading of a small-n number that the rest of this document spends its length refusing.
+
+**What replaces it.** Nothing new — the criterion that does this job was already in §4, one
+paragraph below the band: *"McNemar reaches p < 0.05 at roughly 10+ discordant pairs breaking 8:2 or
+better. Anything smaller will be reported as inconclusive."* Discordant pairs are what the statistic
+consumes, and they depend on the effect, not on where the baseline happens to sit. The band was
+redundant with a better rule and weaker than it. So:
+
+- The **floor is withdrawn.** A low baseline is not a disqualification.
+- The **ceiling stays**, because its argument is real and one-sided: if A0 exceeds **75%**, the run
+  is reported as uninformative — there is not enough headroom left for a routing effect to appear.
+- Informativeness is decided by **discordant pairs**, as §4 already said.
+
+**Why this is not "the number was inconvenient, so I moved the line."** The test is whether the
+argument survives the number changing. It does: the floor was imported from a ceiling argument
+regardless of what A0 turns out to be, and runs 3 and 4 contradicted it before this bench existed. I
+did not discover a new fact; I failed to apply one that was already in the file I cited. What the
+inconvenient number did was make me look. That is a real difference from the redesign I proposed
+earlier and withdrew — that one reversed a principle I had written down *in this document*, and
+reversed it in the direction of a cheaper run.
+
+**What this does not change.** Not the arms, not the slice, not the statistic, not §6's other four
+sinking readings. §6.4 is rewritten from "A0 outside 40–60%" to "A0 above 75%"; everything else in
+§6 stands as registered.
 
 ### Amendment 1 — a costing pilot, committed before it runs
 
