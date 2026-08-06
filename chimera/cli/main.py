@@ -2563,6 +2563,12 @@ def solve(
     # the same function the desktop endpoint uses: a bench that drives the CLI has to exercise the
     # routing the app ships, or it measures something nobody uses.
     roles = _resolve_cli_roles(profile, role_models, settings)
+    # One meter per run, wrapping the gateway UNDERNEATH the non-worker backends — see
+    # chimera.orchestration.metering. The worker is not metered: it prices itself via
+    # AgentResult.usd, and routing it here too would double-count every step.
+    from chimera.orchestration.metering import MeteredBackend
+
+    meter = MeteredBackend(gateway, label="overhead")
 
     def _run_solve(ws: Path) -> AutonomousResult:
         from chimera.tools.write_region import WriteRegion
@@ -2696,12 +2702,12 @@ def solve(
             # Provenance gate: artifacts born from a tainted run are marked/held pending.
             taint=ledger,
             planner=None if no_plan else Planner(
-                _fused_if(planner_backend, roles.models.fuse_plan, gateway, settings), roles.models.plan or model
+                _fused_if(planner_backend, roles.models.fuse_plan, meter, settings), roles.models.plan or model
             ),
             # review_model_for refuses to let the reviewer be the model that wrote the patch —
             # generate-and-verify collapses when it grades its own work and agrees with itself.
             manager=None if no_manager else Manager(
-                _fused_if(gateway, roles.models.fuse_review, gateway, settings),
+                _fused_if(meter, roles.models.fuse_review, meter, settings),
                 review_model_for(roles) or model,
                 use_rubric=rubric,
             ),
@@ -2729,6 +2735,7 @@ def solve(
             # append-only log the desktop "Runs" screen reads read-only. Best-effort — never fails a run.
             run_log=settings.home / "runs.jsonl",
             run_profile=profile,
+            meter=meter,
             config=AutonomousConfig(
                 max_attempts=max_attempts,
                 use_planner=not no_plan,

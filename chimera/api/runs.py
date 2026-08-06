@@ -67,6 +67,10 @@ class AttemptReceipt(BaseModel):
     #: that reports "we do not know" as "free" makes the cheapest-looking configuration the one
     #: nobody can audit.
     usd: float | None = None
+    #: The share of ``usd`` that was NOT the worker — planner, manager, checklist, strong-verify.
+    #: Split out because it is precisely what a model-per-role profile moves, and for a year it was
+    #: priced nowhere at all: the panel built to judge expensive profiles omitted their expense.
+    overhead_usd: float | None = None
     prompt_tokens: int = 0
     completion_tokens: int = 0
     model: str = ""  # the model that actually answered (the EDITOR's, under role routing)
@@ -148,6 +152,7 @@ def build_receipt(
             diff_productive=getattr(a, "diff_productive", None),
             side_effects=list(getattr(a, "side_effects", None) or []),
             usd=getattr(a, "usd", None),
+            overhead_usd=getattr(a, "overhead_usd", None),
             prompt_tokens=int(getattr(a, "prompt_tokens", 0) or 0),
             completion_tokens=int(getattr(a, "completion_tokens", 0) or 0),
             model=str(getattr(a, "model", "") or ""),

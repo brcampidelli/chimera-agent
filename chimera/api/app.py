@@ -1254,14 +1254,30 @@ def _build_solve_agent(
     # carries tools, so "fuse the loop" would never fire and would report that it had. Planning and
     # review are the two turns with no tools, which is exactly where fusion is both safe and useful.
     roles = resolve_role_plan(req, settings)
+
+    # ONE meter per run, and it wraps the gateway UNDERNEATH everything non-worker rather than
+    # wrapping each collaborator on top. That placement is what makes it complete: a fusion engine
+    # built on the meter routes every panelist, the judge and the synthesizer through it, so a fused
+    # plan is counted call by call instead of being one opaque result. Wrapping the engine from
+    # outside would count the same run once and miss which stage spent it.
+    #
+    # Per run, never global: a module-level tally would blend the concurrent runs solve-batch
+    # starts, and be wrong in a way nobody notices because it would still look plausible.
+    from chimera.orchestration.metering import MeteredBackend
+
+    meter = cast("SupportsComplete", MeteredBackend(gateway, label="overhead"))
+    # The worker is deliberately NOT metered — it prices itself through AgentResult.usd, and routing
+    # it here too would double-count every step.
+    #
     # fusion_for_role, never a bare FusionEngine: a bare one falls through to the frontier default
     # panel, so a profile picked under a cheap cost mode silently convenes (and bills) Opus +
     # GPT-5.5 + Gemini. The panel has to mean what the profile means — see chimera.api.roles.
+    planner_backend = meter if planner_backend is gateway else planner_backend
     if roles.models.fuse_plan and not (req.fuse or req.cascade):
-        planner_backend = cast("SupportsComplete", fusion_for_role(gateway, settings))
-    manager_backend: SupportsComplete = gateway
+        planner_backend = cast("SupportsComplete", fusion_for_role(meter, settings))
+    manager_backend: SupportsComplete = meter
     if roles.models.fuse_review:
-        manager_backend = cast("SupportsComplete", fusion_for_role(gateway, settings))
+        manager_backend = cast("SupportsComplete", fusion_for_role(meter, settings))
 
     # Registry assembly and the ledger watching it, shared with the conversational endpoint so the
     # two cannot drift — the order inside is load-bearing (see assemble_registry).
@@ -1332,6 +1348,7 @@ def _build_solve_agent(
         # client actually named — never the resolved default, because attributing a run to a
         # profile nobody chose is fabricated evidence in the one view built to judge profiles.
         run_profile=req.profile,
+        meter=meter,
         # HITL. The ledger tells the agent whether this run went tainted; the checkpointer is where
         # a paused run waits. Both only when the client supplied a thread — a pause with no durable
         # identity is a run nobody can ever come back to, which is worse than not pausing.

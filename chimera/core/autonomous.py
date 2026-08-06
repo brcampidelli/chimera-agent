@@ -220,6 +220,11 @@ class Attempt:
     #: nothing" are different facts, and a receipt that collapses them makes the cheap-looking
     #: configuration the one nobody can check.
     usd: float | None = None
+    #: The share of ``usd`` that was NOT the worker — planner, manager, checklist, strong-verify.
+    #: Reported separately because it is the number a model-per-role profile actually moves: the
+    #: profiles differ mostly in who plans and who reviews, so a receipt that only shows the total
+    #: hides the thing the choice was about.
+    overhead_usd: float | None = None
     #: Prompt/completion tokens for this attempt. Always known when the provider reported them, so
     #: they remain comparable across runs even where the price is not.
     prompt_tokens: int = 0
@@ -284,6 +289,7 @@ class AutonomousAgent:
         checkpointer: RunCheckpointer | None = None,
         run_log: Path | None = None,
         run_profile: str | None = None,
+        meter: Any | None = None,
         config: AutonomousConfig | None = None,
     ) -> None:
         self.worker = worker
@@ -332,6 +338,11 @@ class AutonomousAgent:
         #: and should not: the moment the core starts branching on this label it stops being a
         #: record of what happened and becomes another thing that can be wrong.
         self.run_profile = run_profile
+        #: Records what the NON-worker parts cost — planner, manager, checklist, strong-verify.
+        #: Those call ``backend.complete`` directly and were never priced anywhere, which made a
+        #: model-per-role profile cheapest-looking exactly where it spends most. Optional: without
+        #: one, receipts carry the worker-only cost they always did.
+        self.meter = meter
         self.config = config or AutonomousConfig()
 
     def _emit(self, event: AgentEvent) -> None:
@@ -703,9 +714,21 @@ class AutonomousAgent:
             # What this attempt charged. Read off the worker's own result rather than recomputed:
             # `usd` is None there whenever the model's price is unknown, and that None has to
             # survive all the way to the receipt for the "was it worth it?" view to stay honest.
-            attempt.usd = getattr(agent_result, "usd", None)
-            attempt.prompt_tokens = int(getattr(agent_result, "prompt_tokens", 0) or 0)
-            attempt.completion_tokens = int(getattr(agent_result, "completion_tokens", 0) or 0)
+            # Worker + overhead. `take()` RESETS, so attempt 2's review is attributed to attempt 2
+            # rather than to a running total — and `add_usd` keeps `None` poisonous, because a
+            # receipt that adds only the legs it happened to price reports the run as cheaper than
+            # it was, always in the same direction.
+            from chimera.orchestration.metering import add_usd
+
+            over_usd, over_prompt, over_completion = (
+                self.meter.take() if self.meter is not None else (0.0, 0, 0)
+            )
+            attempt.usd = add_usd(getattr(agent_result, "usd", None), over_usd)
+            attempt.overhead_usd = over_usd
+            attempt.prompt_tokens = int(getattr(agent_result, "prompt_tokens", 0) or 0) + over_prompt
+            attempt.completion_tokens = (
+                int(getattr(agent_result, "completion_tokens", 0) or 0) + over_completion
+            )
             attempt.model = str(getattr(agent_result, "model", "") or "")
             self._emit(_ev_result(index, ok, detail=(fb or vout)[:200]))
             if not ok and snapshot is not None and self.guard is not None:
