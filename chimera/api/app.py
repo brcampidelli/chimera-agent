@@ -24,7 +24,7 @@ import uuid
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
@@ -42,7 +42,7 @@ from chimera.api.code_api import (
 )
 from chimera.api.governance import read_audit, run_injection_suite
 from chimera.api.maturity_api import maturity_report
-from chimera.api.roles import review_model_for
+from chimera.api.roles import fusion_for_role, review_model_for
 from chimera.api.runs import load_runs
 from chimera.api.schemas import (
     AgentsBatchOut,
@@ -1254,15 +1254,14 @@ def _build_solve_agent(
     # carries tools, so "fuse the loop" would never fire and would report that it had. Planning and
     # review are the two turns with no tools, which is exactly where fusion is both safe and useful.
     roles = resolve_role_plan(req, settings)
+    # fusion_for_role, never a bare FusionEngine: a bare one falls through to the frontier default
+    # panel, so a profile picked under a cheap cost mode silently convenes (and bills) Opus +
+    # GPT-5.5 + Gemini. The panel has to mean what the profile means — see chimera.api.roles.
     if roles.models.fuse_plan and not (req.fuse or req.cascade):
-        from chimera.fusion import FusionEngine
-
-        planner_backend = FusionEngine(gateway)
+        planner_backend = cast("SupportsComplete", fusion_for_role(gateway, settings))
     manager_backend: SupportsComplete = gateway
     if roles.models.fuse_review:
-        from chimera.fusion import FusionEngine
-
-        manager_backend = FusionEngine(gateway)
+        manager_backend = cast("SupportsComplete", fusion_for_role(gateway, settings))
 
     # Registry assembly and the ledger watching it, shared with the conversational endpoint so the
     # two cannot drift — the order inside is load-bearing (see assemble_registry).

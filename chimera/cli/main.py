@@ -125,18 +125,22 @@ def _resolve_cli_roles(profile: str | None, overrides: str | None, settings: Any
     return resolve_roles(profile, settings, override)  # type: ignore[arg-type]
 
 
-def _fused_if(backend: Any, fuse: bool, gateway: Any) -> Any:
+def _fused_if(backend: Any, fuse: bool, gateway: Any, settings: Any) -> Any:
     """Wrap a TOOL-FREE role's backend in the fusion engine when its profile asks for it.
 
     Only ever reached for planning and review. Both are turns with no tool schemas, which is the
     whole reason fusion can run at all: the router sends any turn carrying tools to a single model,
     so fusing the editor would be a switch that never fires and reports that it did.
+
+    The panel comes from ``fusion_for_role`` — the user's own tier ladder — and NOT from a bare
+    ``FusionEngine(gateway)``. The bare version was the bug: it fell through to the frontier default
+    panel, so a profile chosen under a cheap cost mode silently billed Opus + GPT-5.5 + Gemini.
     """
     if not fuse:
         return backend
-    from chimera.fusion import FusionEngine
+    from chimera.api.roles import fusion_for_role
 
-    return FusionEngine(gateway)
+    return fusion_for_role(gateway, settings)
 
 
 def _apply_tool_allowlist(
@@ -2692,12 +2696,12 @@ def solve(
             # Provenance gate: artifacts born from a tainted run are marked/held pending.
             taint=ledger,
             planner=None if no_plan else Planner(
-                _fused_if(planner_backend, roles.models.fuse_plan, gateway), roles.models.plan or model
+                _fused_if(planner_backend, roles.models.fuse_plan, gateway, settings), roles.models.plan or model
             ),
             # review_model_for refuses to let the reviewer be the model that wrote the patch —
             # generate-and-verify collapses when it grades its own work and agrees with itself.
             manager=None if no_manager else Manager(
-                _fused_if(gateway, roles.models.fuse_review, gateway),
+                _fused_if(gateway, roles.models.fuse_review, gateway, settings),
                 review_model_for(roles) or model,
                 use_rubric=rubric,
             ),

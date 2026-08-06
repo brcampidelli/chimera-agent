@@ -131,6 +131,59 @@ def _merge(base: RoleModels, override: RoleModels | None) -> RoleModels:
     return RoleModels(**merged)
 
 
+def fusion_for_role(gateway: object, settings: Settings) -> object:
+    """A fusion engine whose panel is the USER'S OWN tier ladder — not the frontier default.
+
+    This exists because the first version of role fusion was a lie, and a measured one. A profile
+    that said ``plan = <top tier>`` built ``FusionEngine(gateway)`` with no config; the engine then
+    fell back to ``FusionConfig.from_settings()``, whose ``CHIMERA_FUSION_PANEL`` default is three
+    frontier models. So ``--profile balanced`` — chosen under a cost mode that had picked cheap
+    tiers — silently convened Opus + GPT-5.5 + Gemini and billed at their rates. A costing pilot
+    caught it only because the arm was inexplicably slow; nothing in the run said which models had
+    answered, because a bare engine writes no route log.
+
+    Two failures, one line apart, and they compound: the role's model was **discarded** (a fusion
+    panel has no single model to honour, and ``FusionEngine.complete`` drops the argument), and what
+    replaced it came from a global default the caller never chose in this context.
+
+    The fix is to make the panel mean what the profile means. A profile is a statement about the
+    tier ladder, so a fused role draws its panel from that ladder — weak/mid/top, deduplicated,
+    strongest first — and is judged and synthesised by the top tier. Everything else (mode, probe_k,
+    thresholds, temperatures) still comes from settings, because those are behaviour the user tuned
+    and none of them silently changes which models are billed.
+
+    An **explicit** ``CHIMERA_FUSION_PANEL`` still wins: someone who named a panel meant it. The
+    check is ``model_fields_set``, which distinguishes "explicitly provided" from "happens to equal
+    the default" — the distinction that made this bug invisible in the first place.
+    """
+    from chimera.fusion.engine import FusionConfig, FusionEngine
+    from chimera.providers.catalog import resolve_tiers
+
+    # Built from the settings we were HANDED, not via FusionConfig.from_settings(), which reads the
+    # process-global get_settings(). Mixing the two would take behaviour from one object and models
+    # from another — the same class of split-brain that produced the bug this function exists to fix,
+    # and untestable besides, since a test's Settings would silently not apply.
+    config = FusionConfig(
+        panel=list(settings.fusion_panel),
+        judge=settings.fusion_judge,
+        synthesizer=settings.fusion_synthesizer,
+        mode="selective" if settings.fusion_mode == "selective" else "full",
+        probe_k=settings.fusion_probe_k,
+        agreement_threshold=settings.fusion_agreement_threshold,
+        task_typed=settings.fusion_task_typed,
+        panel_temperatures=list(settings.fusion_panel_temperatures),
+    )
+    if "fusion_panel" not in getattr(settings, "model_fields_set", set()):
+        ladder = resolve_tiers(settings)  # type: ignore[arg-type]
+        # dict.fromkeys: dedupe while keeping order. A cost mode can point two tiers at the same
+        # model (``cheap`` sets mid == top), and a panel that asks one model the same question twice
+        # is paying twice for one opinion and calling the agreement a signal.
+        config.panel = list(dict.fromkeys([ladder.top, ladder.mid, ladder.weak]))
+        config.judge = ladder.top
+        config.synthesizer = ladder.top
+    return FusionEngine(gateway, config)  # type: ignore[arg-type]
+
+
 def review_model_for(plan: RolePlan) -> str | None:
     """The reviewer's model, refusing to be the same one that wrote the patch.
 

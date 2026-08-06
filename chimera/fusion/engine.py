@@ -334,9 +334,23 @@ class FusionEngine:
         per-stage sampling (a diverse panel, a low-temperature judge, a synthesizer — all from
         ``self.config``), so a single protocol-level temperature has no coherent meaning here. They
         stay in the signature only for :class:`SupportsComplete` compatibility.
+
+        **``model`` is ignored too, and that one gets a warning rather than a debug line.** A panel
+        has no single model to honour, so the argument cannot be obeyed — but a caller who passes
+        one believes they chose the model, and until now they were wrong in silence. That silence
+        cost real money: role routing built a bare engine, passed it the role's model, and got the
+        frontier default panel instead; the only symptom was a benchmark arm that ran inexplicably
+        slowly. If you want a specific set of models, build the ``FusionConfig`` — see
+        :func:`chimera.api.roles.fusion_for_role`.
         """
         if tools:
             _log.debug("fusion ignores %d tool schema(s); use a single model for tools", len(tools))
+        if model:
+            _log.warning(
+                "fusion ignores model=%r — a panel has no single model. The panel actually running "
+                "is %s (judge=%s). Set FusionConfig.panel to choose.",
+                model, self.config.panel, self.config.judge,
+            )
         trace = self.run(messages)
         route_meta = {
             "kind": "fusion",

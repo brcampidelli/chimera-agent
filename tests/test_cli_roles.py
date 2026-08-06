@@ -98,5 +98,6 @@ def test_fused_if_only_wraps_when_asked(monkeypatch: Any) -> None:
     from chimera.providers import LLMGateway
 
     gateway = LLMGateway()
-    assert _fused_if(gateway, False, gateway) is gateway
-    assert isinstance(_fused_if(gateway, True, gateway), FusionEngine)
+    settings = _settings()
+    assert _fused_if(gateway, False, gateway, settings) is gateway
+    assert isinstance(_fused_if(gateway, True, gateway, settings), FusionEngine)
