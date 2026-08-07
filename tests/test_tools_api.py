@@ -88,10 +88,15 @@ def test_real_default_registry_is_readable_and_native(tmp_path: Any) -> None:
     assert by_name["write_file"]["tags"] == ["write"]
     assert by_name["run_shell"]["tags"] == ["exec"]
     assert by_name["http_get"]["tags"] == ["network"]
-    # read_document reads external files (PDF/DOCX/HTML) that can carry an injection, so it flags its
-    # output untrusted — the one native tool that does. Everything else in the native registry is
-    # trusted (MCP/OpenAPI tools, added separately, are the other untrusted sources).
-    assert by_name["read_document"]["untrusted_output"] is True
-    assert all(
-        i["untrusted_output"] is False for i in infos if i["name"] != "read_document"
-    )
+    # A native tool flags its output untrusted when it READS SOMETHING SOMEONE ELSE WROTE — a PDF or
+    # a DOCX, a transcript of a recording. Both can carry an injection, so their text must not reach
+    # the model looking like an instruction.
+    #
+    # This used to assert `read_document` was the only one, which was true only because the speech
+    # extra was absent from the test environment: `transcribe_audio` registers when faster-whisper
+    # is installed OR an OpenAI key is present, and it flags untrusted output for exactly the same
+    # reason. Naming the SET is the durable claim; "there is one of them" was a fact about a machine.
+    READS_EXTERNAL = {"read_document", "transcribe_audio"}
+    flagged = {i["name"] for i in infos if i["untrusted_output"]}
+    assert flagged <= READS_EXTERNAL
+    assert "read_document" in flagged  # always registered; the others depend on optional extras

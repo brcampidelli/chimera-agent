@@ -120,10 +120,24 @@ def test_plain_text_is_read_without_the_optional_converter(tmp_path: Path) -> No
     assert saved.note == ""
 
 
-def test_an_exotic_format_still_says_which_extra_it_needs(tmp_path: Path) -> None:
-    # The converter is genuinely required for a PDF or a DOCX. Naming the missing piece is the
-    # difference between "this is broken" and "this needs one thing installed".
+def test_an_exotic_format_says_which_extra_it_needs_when_the_converter_is_absent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Naming the missing piece is the difference between "broken" and "needs one thing installed".
+
+    The absence is SIMULATED rather than relied upon. This test used to pass because the converter
+    happened not to be installed in the test environment — so it asserted a fact about a machine, and
+    it started failing the moment the app began shipping that converter. A test that depends on
+    something being missing stops testing the code the day the code stops needing it.
+    """
+    import chimera.tools.documents as documents
+
+    def _absent(_path: str) -> str:
+        raise ImportError("markitdown is not installed")
+
+    monkeypatch.setattr(documents, "_markitdown_convert", _absent)
     saved = save(tmp_path, "paper.docx", b"not really a docx")
 
     assert saved.kind == "document"
-    assert saved.text == "" and saved.note
+    assert saved.text == ""
+    assert "documents" in saved.note  # the extra that actually provides it, not `docs`
