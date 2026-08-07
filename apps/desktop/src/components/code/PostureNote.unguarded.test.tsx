@@ -45,3 +45,20 @@ describe("PostureNote — the guard that is not there", () => {
     );
   });
 });
+
+describe("PostureNote — nothing to say without a project", () => {
+  it("stays silent until a project is chosen", async () => {
+    // The sentence names a directory the agent may edit. With no project it named the app's own
+    // launch directory, which on a fresh install is wherever the launcher happened to point — so a
+    // brand-new app opened on an empty screen announced write access to a folder the user had never
+    // seen, let alone picked. That turns a statement of fact into a claim about a decision nobody
+    // made, which is the one thing this line must never do.
+    vi.mocked(getPostureFacts).mockResolvedValue(postureFacts());
+    const { container } = renderWithProviders(
+      <PostureNote workspace="" reach="workspace" approval="suspicious" />,
+    );
+
+    expect(container).toBeEmptyDOMElement();
+    expect(getPostureFacts).not.toHaveBeenCalled();
+  });
+});

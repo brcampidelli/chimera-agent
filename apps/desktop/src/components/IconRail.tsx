@@ -29,8 +29,10 @@ export type View =
 const NAV: { view: View; labelKey: string; icon: ComponentType<{ className?: string }> }[] = [
   // Ordered by how often a person reaches for it: talk to it, watch it work, open the code, ask
   // what it knows, set up what it does unprompted.
-  { view: "work", labelKey: "nav.work", icon: ListChecks },
+  // Código first: it is where the work starts. Trabalho is where you go to look at what a run DID,
+  // which is a second step by definition — and the rail's order is the app's opinion about that.
   { view: "code", labelKey: "nav.code", icon: FileCode2 },
+  { view: "work", labelKey: "nav.work", icon: ListChecks },
   { view: "knowledge", labelKey: "nav.knowledge", icon: Brain },
   { view: "automation", labelKey: "nav.automation", icon: Clock },
   ...(import.meta.env.DEV

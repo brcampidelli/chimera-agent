@@ -88,9 +88,21 @@ fn start_sidecar(app: &tauri::App) -> Result<(Child, String), String> {
     let port_file = std::env::temp_dir().join(format!("chimera-app-port-{}.txt", std::process::id()));
     let _ = std::fs::remove_file(&port_file);
 
+    // Where this install keeps its data — memory, run receipts, sessions, traces.
+    //
+    // `Settings.home` defaults to the RELATIVE path `.chimera`, which is right for the CLI (data
+    // sits beside the project you ran it in) and wrong for a packaged app, which has no meaningful
+    // working directory. Without this the sidecar inherited whatever CWD the launcher happened to
+    // give it: the install directory under Program Files on Windows (not writable), or a different
+    // folder per shortcut — so the same app could show two different histories depending on how it
+    // was opened, and a fresh install could fail to write at all.
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&data_dir).map_err(|e| format!("cannot create {data_dir:?}: {e}"))?;
+
     let child = Command::new(&exe)
         .args(["--no-open", "--port", "0", "--emit-port-file"])
         .arg(&port_file)
+        .env("CHIMERA_HOME", data_dir.join("data"))
         .spawn()
         .map_err(|e| format!("failed to launch backend {exe:?}: {e}"))?;
 

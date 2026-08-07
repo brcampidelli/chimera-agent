@@ -4,12 +4,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Code } from "@/components/Code";
 import { getFsTree, getGitStatus, getPostureFacts, getRuns, streamCodeTurn } from "@/lib/api";
 import { emptyTree, gitStatus, postureFacts, scriptTurn } from "@/test/code-api-mock";
+import { WORKSPACE_KEY } from "@/lib/workspace";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", async () => (await import("@/test/code-api-mock")).makeCodeApiMock());
 
 describe("Code — reach & approval", () => {
   beforeEach(() => {
+    // The sentence names a directory the agent may edit, so it only exists once a project does.
+    // Without one it used to name the app's own launch directory — announcing write access to a
+    // folder nobody picked. Every test here is about what the sentence SAYS, so they all need a
+    // project chosen.
+    localStorage.setItem(WORKSPACE_KEY, "/repo");
     vi.mocked(getFsTree).mockResolvedValue(emptyTree());
     vi.mocked(getGitStatus).mockResolvedValue(gitStatus());
     vi.mocked(getRuns).mockResolvedValue([]);

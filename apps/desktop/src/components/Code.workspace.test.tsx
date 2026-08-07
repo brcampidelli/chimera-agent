@@ -28,10 +28,19 @@ describe("Code — the chosen workspace persists", () => {
 
   it("sends no workspace when the user has not chosen one", async () => {
     // Deliberately NOT a guessed default: inventing one would silently widen where the agent may
-    // write, and the backend's own fallback is at least visible in the posture sentence.
+    // write. What changed is that the app no longer ASKS what the posture means with no project
+    // either — the sentence names a directory the agent may edit, and with nothing chosen it named
+    // the app's own launch directory, announcing write access to a folder nobody picked.
+    const user = userEvent.setup();
     renderWithProviders(<Code />);
+    await screen.findByPlaceholderText(/^Ask about this code/);
+
+    expect(getPostureFacts).not.toHaveBeenCalled();
+
+    // Choose one, and the question gets asked — about that project, not about a default.
+    await user.type(await screen.findByPlaceholderText(/folder path/i), "/repo{Enter}");
     await waitFor(() => expect(getPostureFacts).toHaveBeenCalled());
-    expect(vi.mocked(getPostureFacts).mock.calls[0][2]).toBeNull();
+    expect(vi.mocked(getPostureFacts).mock.calls[0][2]).toBe("/repo");
   });
 
   it("remembers the root across a remount, which is what a restart is", async () => {

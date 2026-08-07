@@ -52,7 +52,9 @@ describe("Code — the profile the system applies", () => {
     // choices with no measured difference between them is a question the user cannot answer, and
     // the app asking it implies an answer exists.
     renderWithProviders(<Code />);
-    await waitFor(() => expect(getPostureFacts).toHaveBeenCalled());
+    // Wait on the composer, not on the posture call — the posture query is skipped entirely until a
+    // project is chosen, so it stopped being a "the screen has settled" signal.
+    await screen.findByPlaceholderText(/^Ask about this code/);
 
     expect(screen.queryByRole("button", { name: /^economy$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^max$/i })).not.toBeInTheDocument();

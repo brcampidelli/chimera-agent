@@ -36,6 +36,10 @@ function useFacts(reach: Reach, approval: Approval, workspace: string, surface: 
   return useQuery({
     queryKey: ["posture", reach, approval, workspace, surface],
     queryFn: () => getPostureFacts(reach, approval, workspace || null, surface),
+    // No project, no question. This probes the live sandbox on every call by design (a Docker daemon
+    // that died has to change the answer), so asking it when there is nothing to say is a round-trip
+    // spent on an answer that will not be rendered.
+    enabled: Boolean(workspace),
     staleTime: 0,
     gcTime: 0,
   });
@@ -58,6 +62,13 @@ export function PostureNote({
 }) {
   const t = useT();
   const facts = useFacts(reach, approval, workspace, surface);
+
+  // No project chosen, nothing to say. The sentence names a directory the agent may edit, and with
+  // no project it named the app's own launch directory — which on a fresh install is wherever the
+  // launcher happened to point. Announcing write access to a folder the user never picked is the
+  // opposite of what this line is for: it turned a statement of fact into a claim about a decision
+  // nobody made. It appears when a project does.
+  if (!workspace) return null;
 
   return (
     <div className="flex flex-col gap-1">
