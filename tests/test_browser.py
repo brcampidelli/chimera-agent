@@ -292,14 +292,17 @@ def test_read_text_blocks_ssrf_url() -> None:
     assert driver.calls == []
 
 
-def test_capture_local_allows_localhost_rejects_non_http(tmp_path) -> None:  # type: ignore[no-untyped-def]
-    """The user-initiated capture path (desktop 'Verify in browser') MUST reach the user's own
-    localhost app — unlike the SSRF-guarded `run(action=screenshot)` agent path — while still
-    rejecting non-http(s) schemes and an empty path. This is the localhost regression guard."""
-    tool, _driver = _tool()
-    png = tmp_path / "shot.png"
-    ok = tool.capture_local("http://localhost:5173", str(png))
-    assert "saved screenshot" in ok
-    assert png.exists()
-    assert "http(s)" in tool.capture_local("file:///etc/passwd", str(tmp_path / "x.png"))
-    assert "needs a path" in tool.capture_local("http://localhost:5173", "")
+def test_the_only_screenshot_path_left_keeps_the_SSRF_guard() -> None:
+    """`capture_local` is gone, and with it this codebase's one deliberate private-host exception.
+
+    It existed for a manual "verify in browser" panel that captured a URL the user typed — a button
+    that fed nothing: not `evidence`, not a receipt, not the cost panel, and the code said so ("NOT a
+    claim that the agent verified anything"). Deleting the panel left the method with no callers, and
+    dead code whose whole purpose is to bypass a guard is an invitation to wire it back up without
+    learning why it was permissive.
+
+    The agent keeps its own screenshot action, which never had the exception.
+    """
+    from chimera.tools.browser import BrowserTool
+
+    assert not hasattr(BrowserTool, "capture_local")

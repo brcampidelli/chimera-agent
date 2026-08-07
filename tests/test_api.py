@@ -619,54 +619,6 @@ def test_plan_endpoint_degrades_to_empty_steps_on_model_error(tmp_path: Any, mon
     assert resp.status_code == 200
     body = resp.json()
     assert body["steps"] == [] and body["text"] == "" and body["note"]
-
-
-def test_screenshot_endpoint_captures_and_serves(tmp_path: Any, monkeypatch: Any) -> None:
-    """POST /api/verify/screenshot captures a PNG (the driver mocked offline — no Chromium) and returns
-    an id; GET /api/artifacts/{id} then serves the stored bytes as image/png."""
-    from pathlib import Path
-
-    import chimera.api.app as app_mod
-    from chimera.api import build_api_app
-
-    def fake_capture(url: str, path: Path) -> None:
-        Path(path).write_bytes(b"\x89PNG\r\n\x1a\nfake")  # a real (stub) PNG on disk, no browser
-        return None
-
-    monkeypatch.setattr(app_mod, "_capture_screenshot", fake_capture)
-    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
-    client = TestClient(build_api_app(lambda: ChatSession(_FakeAgent()), settings=settings))
-
-    resp = client.post("/api/verify/screenshot", json={"url": "http://localhost:5173"})
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["ok"] is True and body["error"] is None
-    artifact_id = body["id"]
-    assert artifact_id
-
-    got = client.get(f"/api/artifacts/{artifact_id}")
-    assert got.status_code == 200
-    assert got.headers["content-type"] == "image/png"
-    assert got.content.startswith(b"\x89PNG")
-
-
-def test_screenshot_endpoint_missing_browser_degrades(tmp_path: Any, monkeypatch: Any) -> None:
-    """No browser runtime → a clean 200 {ok:false, id:null} carrying the honest install hint — no 500,
-    no fake image."""
-    import chimera.api.app as app_mod
-    from chimera.api import build_api_app
-
-    monkeypatch.setattr(app_mod, "_capture_screenshot", lambda url, path: app_mod._BROWSER_MISSING_HINT)
-    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
-    client = TestClient(build_api_app(lambda: ChatSession(_FakeAgent()), settings=settings))
-
-    resp = client.post("/api/verify/screenshot", json={"url": "http://localhost:5173"})
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["ok"] is False and body["id"] is None
-    assert "playwright install chromium" in body["error"]
-
-
 def test_artifact_id_validation_rejects_traversal(tmp_path: Any) -> None:
     """GET /api/artifacts/{id} is hex-only: a traversal / dotted / non-hex id is a 404 — it is NOT an
     arbitrary-file read. A secret planted outside the artifacts dir is never served."""
@@ -1238,3 +1190,21 @@ def test_a_batch_task_is_governed_exactly_like_a_single_run(tmp_path: Any) -> No
     assert {"posture", "profile", "roles", "write_region", "allow_tools", "deny_tools"} <= set(
         RunRequest.model_fields
     ) & set(AgentsRequest.model_fields)
+
+
+def test_the_screenshot_endpoint_is_gone_along_with_its_private_host_exception(tmp_path: Any) -> None:
+    """`POST /api/verify/screenshot` and `GET /api/artifacts/{id}` are deleted.
+
+    They served a manual "verify in browser" panel that captured a URL the user typed. Despite the
+    name and the `/api/verify/` path, it fed nothing — not `evidence`, not a receipt, not the cost
+    panel — and the code said so itself: "NOT a claim that the agent verified anything". Removing the
+    panel removed the endpoint's only caller, and the endpoint was the only caller of
+    `BrowserTool.capture_local`, which deliberately ALLOWED private hosts. That was this codebase's
+    single intentional SSRF exception, and it now has no reason to exist.
+
+    The agent's own screenshot action is untouched and never had the exception.
+    """
+    client = _client(tmp_path)
+
+    assert client.post("/api/verify/screenshot", json={"url": "http://localhost:5173"}).status_code == 404
+    assert client.get("/api/artifacts/anything").status_code == 404

@@ -181,3 +181,26 @@ def test_a_failed_run_counts_in_neither() -> None:
 
     (group,) = report.profiles
     assert group.passed == 0 and group.passed_by_verifier == 0
+
+
+def test_a_default_nobody_picked_is_its_own_group() -> None:
+    """The screen stopped asking, so most new runs carry a profile the app chose.
+
+    Counting those beside deliberate picks would answer "was this configuration worth it?" with runs
+    that were never a configuration decision — and the merge would be permanent, which is the same
+    reason this module refuses to back-attribute receipts written before the field existed.
+    """
+    report = summarize_worth([
+        _run("balanced"),
+        _run("balanced", profile_source="system"),
+    ])
+
+    by_key = {(g.profile, g.profile_source): g.runs for g in report.profiles}
+    assert by_key == {("balanced", "user"): 1, ("balanced", "system"): 1}
+
+
+def test_old_receipts_count_as_deliberate_because_they_were() -> None:
+    """Every receipt written before the field existed came from a screen that asked."""
+    from chimera.api.runs import RunReceipt
+
+    assert RunReceipt(task="t").profile_source == "user"

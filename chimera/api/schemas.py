@@ -445,13 +445,6 @@ class BatchCancelOut(BaseModel):
     # model-call — so this is a count of requests made, not of workers already stopped.
 
 
-# --- verify (browser screenshot verification artifact) --------------------------------------------
-
-
-class ScreenshotOut(BaseModel):
-    ok: bool  # True ONLY after a real full-page PNG of the given URL was captured and saved
-    id: str | None  # the artifact id (uuid hex) to fetch via GET /api/artifacts/{id}; null on failure
-    error: str | None  # a short honest message when ok is False (e.g. the missing-browser install hint)
 
 
 # --- agents (a parallel batch of isolated autonomous runs — the Agent Manager) --------------------

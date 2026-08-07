@@ -294,6 +294,9 @@ class AutonomousAgent:
         # the string it was handed, and whether a person typed it or this app read it off
         # `pyproject.toml` is a fact about the request — exactly the fact a receipt must not lose.
         verify_source: str = "user",
+        # Who chose the profile. Same discipline as `verify_source`: a receipt must never be
+        # readable as a decision nobody made.
+        profile_source: str = "user",
         meter: Any | None = None,
         config: AutonomousConfig | None = None,
     ) -> None:
@@ -344,6 +347,7 @@ class AutonomousAgent:
         #: record of what happened and becomes another thing that can be wrong.
         self.run_profile = run_profile
         self.verify_source = verify_source
+        self.profile_source = profile_source
         #: Records what the NON-worker parts cost — planner, manager, checklist, strong-verify.
         #: Those call ``backend.complete`` directly and were never priced anywhere, which made a
         #: model-per-role profile cheapest-looking exactly where it spends most. Optional: without
@@ -1002,6 +1006,7 @@ class AutonomousAgent:
                 result, task, verify_command, datetime.now(UTC).isoformat(),
                 profile=self.run_profile,
                 verify_source=self.verify_source,
+                profile_source=self.profile_source,
             )
             append_run(self.run_log, receipt)
         except Exception as exc:  # noqa: BLE001 — receipt persistence is best-effort, never fatal

@@ -14,7 +14,6 @@ import type { AttemptReceipt, FsFile, FsNode, FsTree, GitStatus, RunReceipt } fr
 export function makeCodeApiMock() {
   return {
     cancelRun: vi.fn(),
-    captureScreenshot: vi.fn(),
     getFsFile: vi.fn(),
     getFsTree: vi.fn(),
     getGitDiff: vi.fn(),

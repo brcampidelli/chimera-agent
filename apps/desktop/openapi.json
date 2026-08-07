@@ -2822,6 +2822,11 @@
             ],
             "title": "Profile"
           },
+          "profile_source": {
+            "default": "user",
+            "title": "Profile Source",
+            "type": "string"
+          },
           "reverted": {
             "title": "Reverted",
             "type": "integer"
@@ -3235,6 +3240,11 @@
             ],
             "title": "Profile"
           },
+          "profile_source": {
+            "default": "user",
+            "title": "Profile Source",
+            "type": "string"
+          },
           "repo_map": {
             "default": false,
             "title": "Repo Map",
@@ -3324,67 +3334,6 @@
           "image"
         ],
         "title": "SandboxCfgOut",
-        "type": "object"
-      },
-      "ScreenshotOut": {
-        "properties": {
-          "error": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Error"
-          },
-          "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Id"
-          },
-          "ok": {
-            "title": "Ok",
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "ok",
-          "id",
-          "error"
-        ],
-        "title": "ScreenshotOut",
-        "type": "object"
-      },
-      "ScreenshotRequest": {
-        "properties": {
-          "url": {
-            "title": "Url",
-            "type": "string"
-          },
-          "workspace": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Workspace"
-          }
-        },
-        "required": [
-          "url"
-        ],
-        "title": "ScreenshotRequest",
         "type": "object"
       },
       "ServerCfgOut": {
@@ -4136,43 +4085,6 @@
           }
         },
         "summary": "Cancel Agents"
-      }
-    },
-    "/api/artifacts/{artifact_id}": {
-      "get": {
-        "operationId": "get_artifact_api_artifacts__artifact_id__get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "artifact_id",
-            "required": true,
-            "schema": {
-              "title": "Artifact Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Get Artifact"
       }
     },
     "/api/benchmarks": {
@@ -6284,44 +6196,6 @@
           }
         },
         "summary": "Usage Endpoint"
-      }
-    },
-    "/api/verify/screenshot": {
-      "post": {
-        "operationId": "verify_screenshot_endpoint_api_verify_screenshot_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ScreenshotRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ScreenshotOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Verify Screenshot Endpoint"
       }
     },
     "/api/version": {

@@ -88,6 +88,10 @@ class RunReceipt(BaseModel):
     success: bool = False
     paused: bool = False  # interrupted for human approval (never persisted — kept for shape parity)
     verify_command: str | None = None  # the shell command that judged the run, or None (no verifier)
+    profile_source: str = "user"
+    """Who chose ``run_profile``: ``user`` or ``system``. Defaults to ``user`` because every receipt
+    written before the screen stopped asking came from a deliberate pick."""
+
     verify_source: str = "user"
     """Where ``verify_command`` came from: ``user`` | ``inferred:<file>`` | ``none``.
 
@@ -132,6 +136,7 @@ def build_receipt(
     *,
     profile: str | None = None,
     verify_source: str = "user",
+    profile_source: str = "user",
 ) -> RunReceipt:
     """Map an ``AutonomousResult`` (and its attempts) into a receipt, truncating the bounded fields."""
     attempts = [
@@ -174,6 +179,7 @@ def build_receipt(
         paused=result.paused,
         verify_command=verify_command,
         verify_source=verify_source,
+        profile_source=profile_source,
         answer=(result.answer or "")[:2000],
         attempts=attempts,
         profile=profile,

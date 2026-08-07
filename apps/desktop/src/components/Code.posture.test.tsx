@@ -50,38 +50,46 @@ describe("Code — reach & approval", () => {
     expect(screen.getByText(/A container was configured, but none is running/)).toBeInTheDocument();
   });
 
-  it("re-asks what the new posture means when either axis changes", async () => {
+  it("re-asks when the project changes, because the answer is about a folder", async () => {
+    // This replaces a test that changed the posture with the selectors. The axes are fixed now, so
+    // the claim it protected — "the sentence is re-derived rather than cached" — moved to the input
+    // that CAN still change it. Caching this answer is the bug the endpoint was written to avoid: a
+    // Docker daemon that died since the last call must change what the line says.
     const user = userEvent.setup();
     renderWithProviders(<Code />);
     await waitFor(() => expect(getPostureFacts).toHaveBeenCalled());
 
-    const lastCall = () => {
+    const field = await screen.findByPlaceholderText(/folder path/i);
+    await user.clear(field);
+    await user.type(field, "/home/me/other");
+    await user.click(screen.getByRole("button", { name: /open|abrir/i }));
+
+    await waitFor(() => {
       const calls = vi.mocked(getPostureFacts).mock.calls;
-      return calls[calls.length - 1];
-    };
-
-    await user.click(screen.getByRole("button", { name: "workspace + shell" }));
-    await waitFor(() => expect(lastCall()[0]).toBe("workspace_shell"));
-
-    await user.click(screen.getByRole("button", { name: "never" }));
-    await waitFor(() => expect(lastCall()[1]).toBe("never"));
+      expect(calls[calls.length - 1][2]).toBe("/home/me/other");
+    });
   });
 
-  it("sends the chosen posture with a conversation turn", async () => {
+  it("SENDS the posture with every turn rather than letting the server default it", async () => {
+    // The selectors are gone; sending them is not. Omitting `posture` does not mean "apply the
+    // default" — it resolves to no tool denials at all (the shell tools return to the registry) and
+    // no pause under any circumstance, which is more permissive than any corner of the grid a user
+    // could once have picked. Deleting a control must not quietly widen what the agent may do.
     const user = userEvent.setup();
     renderWithProviders(<Code />);
-    await user.click(screen.getByRole("button", { name: "read only" }));
     await user.type(screen.getByPlaceholderText(/^Ask about this code/), "what does this do?");
     await user.click(screen.getByRole("button", { name: "Send" }));
 
     await waitFor(() => expect(streamCodeTurn).toHaveBeenCalled());
     expect(vi.mocked(streamCodeTurn).mock.calls[0][0].posture).toEqual({
-      reach: "read_only",
+      reach: "workspace",
       approval: "suspicious",
     });
   });
 
-  it("says nothing is written under read-only", async () => {
+  it("says nothing is written when the server reports read-only", async () => {
+    // Asserted on the SERVER's answer, not on a selection — which is the point of the line: it
+    // reports what is true on this machine rather than echoing back what was configured.
     vi.mocked(getPostureFacts).mockResolvedValue(postureFacts({ writes: "nothing", shell: "none" }));
     renderWithProviders(<Code />);
 

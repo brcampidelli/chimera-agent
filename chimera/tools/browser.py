@@ -275,34 +275,6 @@ class BrowserTool(Tool):
         except Exception as exc:  # noqa: BLE001 — a page/driver failure is a tool error, not a crash
             return f"error: browser action failed: {exc}"
 
-    def capture_local(self, url: str, path: str) -> str:
-        """Screenshot a URL the LOCAL USER explicitly typed (the desktop "Verify in browser" panel).
-
-        Unlike the ``run(action="screenshot")`` path — a model-/content-supplied URL that keeps the
-        full SSRF guard (private IPs blocked) — this is reachable ONLY from Python (never the model's
-        action dispatch), so it deliberately ALLOWS private hosts: the whole point is to capture the
-        user's own ``localhost`` dev app. It still rejects non-http(s) schemes. Returns an honest
-        confirmation or ``"error: ..."``; never raises, never fabricates an image.
-        """
-        from urllib.parse import urlparse
-
-        if not path.strip():
-            return "error: screenshot needs a path"
-        if urlparse(url).scheme.lower() not in ("http", "https"):
-            return "error: only http(s) URLs can be captured"
-        try:
-            driver = self._ensure_driver()
-        except Exception as exc:  # noqa: BLE001 — driver bring-up failed (Chromium missing, etc.)
-            return f"error: browser unavailable: {exc}"
-        if driver is None:
-            return _INSTALL_HINT
-        try:
-            driver.navigate(url)
-            driver.screenshot(path)
-        except Exception as exc:  # noqa: BLE001 — a failed nav/capture is an honest error, not a crash
-            return f"error: {exc}"
-        return fence(f"saved screenshot to {path}")
-
     def close(self) -> None:
         if self._driver is not None and self._own_driver:
             self._driver.close()

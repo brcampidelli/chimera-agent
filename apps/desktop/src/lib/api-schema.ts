@@ -55,23 +55,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/artifacts/{artifact_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Artifact */
-        get: operations["get_artifact_api_artifacts__artifact_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/benchmarks": {
         parameters: {
             query?: never;
@@ -1046,23 +1029,6 @@ export interface paths {
         get: operations["usage_endpoint_api_usage_get"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/verify/screenshot": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Verify Screenshot Endpoint */
-        post: operations["verify_screenshot_endpoint_api_verify_screenshot_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2211,6 +2177,11 @@ export interface components {
             passed_by_verifier: number;
             /** Profile */
             profile: string | null;
+            /**
+             * Profile Source
+             * @default user
+             */
+            profile_source: string;
             /** Reverted */
             reverted: number;
             /** Runs */
@@ -2370,6 +2341,11 @@ export interface components {
             /** Profile */
             profile?: ("economy" | "balanced" | "max") | null;
             /**
+             * Profile Source
+             * @default user
+             */
+            profile_source: string;
+            /**
              * Repo Map
              * @default false
              */
@@ -2392,22 +2368,6 @@ export interface components {
             image: string;
             /** Mode */
             mode: string;
-        };
-        /** ScreenshotOut */
-        ScreenshotOut: {
-            /** Error */
-            error: string | null;
-            /** Id */
-            id: string | null;
-            /** Ok */
-            ok: boolean;
-        };
-        /** ScreenshotRequest */
-        ScreenshotRequest: {
-            /** Url */
-            url: string;
-            /** Workspace */
-            workspace?: string | null;
         };
         /** ServerCfgOut */
         ServerCfgOut: {
@@ -2720,37 +2680,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BatchCancelOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_artifact_api_artifacts__artifact_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                artifact_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -4519,39 +4448,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UsageSummaryOut"];
-                };
-            };
-        };
-    };
-    verify_screenshot_endpoint_api_verify_screenshot_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ScreenshotRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScreenshotOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

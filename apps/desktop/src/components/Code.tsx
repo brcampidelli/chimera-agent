@@ -2,12 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import hljs from "highlight.js";
 import {
-  Camera,
   Check,
   FileCode2,
   Folder,
   FolderGit2,
-  ListChecks,
   Loader2,
   Pencil,
   Play,
@@ -17,10 +15,8 @@ import {
   X,
 } from "lucide-react";
 import {
-  captureScreenshot,
   getFsFile,
   getGitStatus,
-  getPlan,
   getRuns,
   gitRevert,
   saveFile,
@@ -32,8 +28,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/panel";
 import { Conversation } from "@/components/code/Conversation";
-import { PostureBar } from "@/components/code/PostureBar";
-import { RolesBar } from "@/components/code/RolesBar";
+import { PostureNote } from "@/components/code/PostureNote";
 import { DiffView } from "@/components/code/DiffView";
 import { SessionSidebar } from "@/components/code/SessionSidebar";
 import { ProjectPicker } from "@/components/code/ProjectPicker";
@@ -43,7 +38,6 @@ import { liveLine } from "@/components/run/RunLauncher";
 import { useT, type TFunc } from "@/lib/i18n";
 import { readWorkspace, writeWorkspace } from "@/lib/workspace";
 import type { AttemptReceipt, FileDiff, RunReceipt } from "@/lib/types";
-import { cn } from "@/lib/utils";
 
 const fieldCls = "field w-full px-3 text-sm";
 
@@ -301,88 +295,6 @@ function planStepsOf(text: string): string[] {
     .filter(Boolean);
 }
 
-/** A user-driven browser screenshot VERIFICATION ARTIFACT: type a URL, Capture, and the headless
- *  browser saves a full-page PNG server-side that's shown inline (same-origin `<img>`). It is an
- *  honest capture of the URL you gave — NOT a claim the agent verified anything. If the browser
- *  runtime is missing (or the page fails to load), the honest error text is shown (e.g. the
- *  "playwright install chromium" hint) — never a placeholder image. */
-function VerifyPanel({ workspace }: { workspace: string }) {
-  const t = useT();
-  const [url, setUrl] = useState("");
-  const [capturing, setCapturing] = useState(false);
-  const [shot, setShot] = useState<{ id: string; url: string; at: string } | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  async function capture() {
-    const target = url.trim();
-    if (!target || capturing) return;
-    setCapturing(true);
-    setError(null);
-    try {
-      const res = await captureScreenshot(target, workspace || null);
-      if (res.ok && res.id) {
-        setShot({ id: res.id, url: target, at: new Date().toLocaleString() });
-      } else {
-        setShot(null);
-        setError(res.error || t("code.verify.failed"));
-      }
-    } catch {
-      setShot(null);
-      setError(t("code.verify.failed"));
-    } finally {
-      setCapturing(false);
-    }
-  }
-
-  return (
-    <section className="space-y-2.5 border-t border-hairline p-3">
-      <div className="flex items-center gap-2 text-accent">
-        <Camera className="h-4 w-4" />
-        <h2 className="text-sm font-semibold text-foreground">{t("code.verify.title")}</h2>
-      </div>
-      <p className="text-xs text-muted-foreground">{t("code.verify.note")}</p>
-      <div className="flex flex-wrap gap-2">
-        <input
-          className={`${fieldCls} h-9 min-w-0 flex-1 font-mono text-xs`}
-          placeholder={t("code.verify.urlPlaceholder")}
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              void capture();
-            }
-          }}
-          disabled={capturing}
-        />
-        <Button size="sm" disabled={!url.trim() || capturing} onClick={() => void capture()}>
-          {capturing ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" /> {t("code.verify.capturing")}
-            </>
-          ) : (
-            <>
-              <Camera className="h-4 w-4" /> {t("code.verify.capture")}
-            </>
-          )}
-        </Button>
-      </div>
-      {error ? <p className="text-xs text-bad">{error}</p> : null}
-      {shot ? (
-        <figure className="space-y-1.5">
-          <img
-            src={`/api/artifacts/${shot.id}`}
-            alt={t("code.verify.alt")}
-            className="max-w-full rounded-chip border border-border"
-          />
-          <figcaption className="text-xs text-muted-foreground">
-            {t("code.verify.caption")} <span className="break-all font-mono">{shot.url}</span> · {shot.at}
-          </figcaption>
-        </figure>
-      ) : null}
-    </section>
-  );
-}
 
 /** The right/bottom column: instruct + verify-or-revert run, then the newest run's real diffs. */
 function RunPanel({
@@ -412,15 +324,9 @@ function RunPanel({
   const qc = useQueryClient();
   const [task, setTask] = useState("");
   const [verify, setVerify] = useState("");
-  const [maxAttempts, setMaxAttempts] = useState(3);
-  const [model, setModel] = useState("");
-  const [mode, setMode] = useState<"single" | "fuse" | "cascade">("single");
-  // Plan preview (makes ZERO edits): the editable plan text, whether a preview has been fetched, its
-  // loading state + honest degrade note, and the steps the in-progress run is actually following.
-  const [planDraft, setPlanDraft] = useState("");
-  const [planPreviewed, setPlanPreviewed] = useState(false);
-  const [planning, setPlanning] = useState(false);
-  const [planNote, setPlanNote] = useState("");
+  // The steps a RUNNING run is following. Kept while the preview card goes, because it is evidence
+  // of what the agent is doing rather than a control asking what it should do — which is the whole
+  // distinction this screen now turns on.
   const [runPlan, setRunPlan] = useState<string[] | null>(null);
   // The run's lifecycle comes from the SHARED session, not from private state here.
   //
@@ -532,23 +438,6 @@ function RunPanel({
   }
 
   // Preview the plan: a pure planner call (NO edits, NO tools) so the steps can be reviewed/edited
-  // before any real run. A degrade returns empty steps + a note, never throws to the user.
-  async function previewPlan() {
-    if (!task.trim() || planning || running) return;
-    setPlanning(true);
-    setPlanNote("");
-    try {
-      const res = await getPlan(workspace || null, task.trim());
-      setPlanDraft(res.text);
-      setPlanNote(res.note);
-      setPlanPreviewed(true);
-    } catch {
-      setPlanNote(t("code.planError"));
-      setPlanPreviewed(true);
-    } finally {
-      setPlanning(false);
-    }
-  }
 
   // `plan`: when a non-empty string is passed, the run follows THIS approved plan verbatim (no
   // re-planning). `null`/undefined = the run plans for itself, as before.
@@ -575,13 +464,12 @@ function RunPanel({
         task: task.trim(),
         verify: verify.trim() || null,
         workspace: workspace || null,
-        max_attempts: maxAttempts,
+        max_attempts: 3,
         plan: plan && plan.trim() ? plan : null,
-        model: model.trim() || null,
-        fuse: mode === "fuse",
-        cascade: mode === "cascade",
+        model: null,
         posture,
         profile,
+        profile_source: "system",
         // Carried on a resume so the backend continues THAT run rather than starting a new one.
         // Kept armed rather than cleared: an "edit"/"accept" resume finalises without re-running, but
         // a "respond" makes a fresh attempt that can read untrusted content again and must be able
@@ -635,62 +523,13 @@ function RunPanel({
           onChange={(e) => setVerify(e.target.value)}
           disabled={running}
         />
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            className={`${fieldCls} h-9 min-w-0 flex-1 font-mono text-xs`}
-            placeholder={t("code.modelPlaceholder")}
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            disabled={running}
-          />
-          <div className="flex shrink-0 overflow-hidden rounded-chip border border-border">
-            {(["single", "fuse", "cascade"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setMode(m)}
-                disabled={running}
-                className={cn(
-                  "px-2.5 py-1.5 text-xs transition-colors disabled:opacity-50",
-                  mode === m
-                    ? "bg-accent/20 text-accent"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {t(`code.mode.${m}` as const)}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* No model field, no single/fusion/cascade toggle, no attempt budget, no plan preview.
+            Each asked the user to configure a run before starting one, and each now has a
+            server-side answer the receipt records — a default the system applied, never a decision
+            attributed to somebody who was not asked. The plan preview goes for a different reason:
+            approving a plan before any file is touched is a second confirmation step for a run that
+            already reverts itself when the verifier says no. */}
         <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            {t("code.maxAttempts")}
-            <input
-              type="number"
-              min={1}
-              max={10}
-              className="field h-9 w-16 px-2 text-sm"
-              value={maxAttempts}
-              onChange={(e) => setMaxAttempts(Math.min(10, Math.max(1, Number(e.target.value) || 1)))}
-              disabled={running}
-            />
-          </label>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={!task.trim() || running || planning}
-            onClick={() => void previewPlan()}
-          >
-            {planning ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" /> {t("code.planning")}
-              </>
-            ) : (
-              <>
-                <ListChecks className="h-4 w-4" /> {t("code.previewPlan")}
-              </>
-            )}
-          </Button>
           <Button size="sm" disabled={!task.trim() || running} onClick={() => start()}>
             {running ? (
               <>
@@ -722,45 +561,6 @@ function RunPanel({
             </Button>
           ) : null}
         </div>
-        {planPreviewed && !running ? (
-          <div className="space-y-2 rounded-chip border border-border bg-surface-2 p-2.5">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              <ListChecks className="h-3.5 w-3.5" /> {t("code.planTitle")}
-            </div>
-            <p className="text-xs text-muted-foreground">{t("code.planNote")}</p>
-            {planStepsOf(planDraft).length > 0 ? (
-              <ol className="space-y-1 pl-1">
-                {planStepsOf(planDraft).map((step, i) => (
-                  <li key={i} className="flex gap-2 text-xs text-foreground/80">
-                    <span className="shrink-0 font-mono text-muted-foreground">{i + 1}.</span>
-                    <span>{step}</span>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="text-xs text-muted-foreground">{t("code.planEmpty")}</p>
-            )}
-            {planNote ? <p className="text-xs text-bad">{planNote}</p> : null}
-            <textarea
-              className={`${fieldCls} min-h-[80px] resize-y py-2 font-mono text-xs`}
-              placeholder={t("code.planEditPlaceholder")}
-              value={planDraft}
-              onChange={(e) => setPlanDraft(e.target.value)}
-            />
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                size="sm"
-                disabled={!task.trim() || !planDraft.trim()}
-                onClick={() => start(planDraft)}
-              >
-                <Play className="h-3.5 w-3.5" /> {t("code.runWithPlan")}
-              </Button>
-              <Button size="sm" variant="ghost" disabled={!task.trim()} onClick={() => start()}>
-                {t("code.runPlain")}
-              </Button>
-            </div>
-          </div>
-        ) : null}
         {running && runPlan && runPlan.length > 0 ? (
           <div className="space-y-1 rounded-chip border border-border bg-surface-2 p-2.5">
             <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -839,7 +639,6 @@ function RunPanel({
           </>
         ) : null}
       </div>
-      <VerifyPanel workspace={workspace} />
     </section>
   );
 }
@@ -861,12 +660,17 @@ export function Code() {
   // (handed over by "Run with verification") and whether a run is already in flight.
   const [handOff, setHandOff] = useState<{ text: string; at: number } | null>(null);
   const [runBusy, setRunBusy] = useState(false);
-  // Defaults chosen to match the backend's: edit the workspace, no shell, ask when the run read
-  // something untrusted. The permissive corner has to be picked, never arrived at.
-  const [reach, setReach] = useState<Reach>("workspace");
-  const [approval, setApproval] = useState<Approval>("suspicious");
+  // Fixed, not chosen: edit the workspace, no shell, stop and ask if the run read something
+  // untrusted. These are still SENT on every request — omitting them resolves to no tool denials
+  // and no pause whatsoever, which is more permissive than any corner a user could have selected.
+  // What changed is that nobody is asked to configure them before typing; what the agent may do is
+  // stated in the transcript instead, which is where a capability belongs once it is not a control.
+  const reach: Reach = "workspace";
+  const approval: Approval = "suspicious";
   const posture = useMemo(() => ({ reach, approval }), [reach, approval]);
-  const [profile, setProfile] = useState<Profile>("balanced");
+  // Same: a default the system applies, and the receipt records `profile_source: "system"` so the
+  // cost panel never counts it beside a profile somebody deliberately picked.
+  const profile: Profile = "balanced";
 
   const refreshOpenFile = useCallback(() => {
     if (openFile) void qc.invalidateQueries({ queryKey: ["fs-file", workspace, openFile] });
@@ -972,20 +776,11 @@ export function Code() {
             busyElsewhere={runBusy}
             posture={posture}
             profile={profile}
-            controls={
-              <div className="space-y-1.5">
-                <PostureBar
-                  workspace={workspace}
-                  reach={reach}
-                  approval={approval}
-                  onReach={setReach}
-                  onApproval={setApproval}
-                  disabled={runBusy}
-                  compact
-                />
-                <RolesBar profile={profile} onProfile={setProfile} disabled={runBusy} compact />
-              </div>
-            }
+            /* No selectors. What they expressed is now a server default the app SENDS (never omits
+               — an absent posture means no tool denials and no pause at all, which is more permissive
+               than any corner of the grid a user could have chosen) and a line of evidence in the
+               transcript once it becomes relevant. */
+            controls={<PostureNote workspace={workspace} reach={reach} approval={approval} />}
           />
           {/* Folded away until it is doing something. The autonomous launcher is 389px of controls —
               attempts, plan preview, browser verification — and it was sitting under the

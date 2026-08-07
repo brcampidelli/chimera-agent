@@ -52,6 +52,12 @@ class ProfileWorth(BaseModel):
     """The configuration label, or ``null`` for runs that named none (including every run written
     before the field existed)."""
 
+    profile_source: str = "user"
+    """Who chose it: ``user`` or ``system``. Its own group, never folded into the same label — the
+    screen stopped asking, so most new runs carry a default nobody picked, and counting those beside
+    deliberate choices would quietly answer "was this configuration worth it?" with runs that were
+    never a configuration decision at all."""
+
     runs: int
     passed: int
     passed_by_verifier: int
@@ -103,20 +109,25 @@ class WorthReport(BaseModel):
 
 def summarize_worth(receipts: list[RunReceipt]) -> WorthReport:
     """Group finished runs by profile and count what happened. No inference, no ranking."""
-    groups: dict[str | None, list[RunReceipt]] = defaultdict(list)
+    # Keyed on WHO CHOSE the profile as well as which one. A run somebody picked "max" for and a run
+    # that got "balanced" because the screen stopped asking are not the same evidence, and merging
+    # them would be permanent: this module already refuses to back-attribute old receipts for the
+    # same reason. The label is the UI's problem; the separation is this function's.
+    groups: dict[tuple[str | None, str], list[RunReceipt]] = defaultdict(list)
     for receipt in receipts:
         # A paused run has not reached a verdict — counting it as a failure would blame a
         # configuration for a decision the human has not made yet.
         if getattr(receipt, "paused", False):
             continue
-        groups[receipt.profile or None].append(receipt)
+        groups[(receipt.profile or None, getattr(receipt, "profile_source", "user"))].append(receipt)
 
     out: list[ProfileWorth] = []
-    for profile, runs in groups.items():
+    for (profile, profile_source), runs in groups.items():
         priced = [r for r in runs if r.usd is not None]
         out.append(
             ProfileWorth(
                 profile=profile,
+                profile_source=profile_source,
                 runs=len(runs),
                 passed=sum(1 for r in runs if r.success),
                 # The WINNING attempt's evidence, not any attempt's: a run that failed twice with a

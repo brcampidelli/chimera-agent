@@ -23,7 +23,6 @@ import type {
   PlanResult,
   ProjectState,
   RunReceipt,
-  Screenshot,
   SessionMeta,
   SkillStat,
   TaskCard,
@@ -295,26 +294,19 @@ export interface RunRequestInput {
   posture?: { reach: Reach; approval: Approval } | null;
   // Which tier each ROLE draws from. Not a claim that routing helps — see bench/role_routing.
   profile?: Profile | null;
+  // Who chose `profile`: "user" or "system". The screen stopped asking, so the app sends a default;
+  // the receipt must not record that default as a decision somebody made.
+  profile_source?: string;
 }
 
 /** Preview a plan for a task: runs ONLY the planner (a single model call) — NO edits, NO tools, no
- *  workspace changes. Returns the concrete steps so the user can review/edit before approving a run.
- *  A model hiccup degrades to empty steps + a `note`, never an HTTP error. */
+ *  workspace changes. Kept on the client because the CLI and the Runs screen still use it; the Code
+ *  screen no longer previews a plan, since approving one before any file is touched is a second
+ *  confirmation for a run that already reverts itself when the verifier says no. */
 export const getPlan = (workspace: string | null | undefined, task: string) =>
   json<PlanResult>("/api/plan", {
     method: "POST",
     body: JSON.stringify({ task, workspace: workspace || null }),
-  });
-
-/** Capture a browser screenshot verification artifact of `url`: the headless browser navigates there
- *  and a full-page PNG is stored server-side, fetched back via `/api/artifacts/{id}`. It's an HONEST
- *  capture of whatever the URL renders — NOT a claim the agent verified anything. If the browser
- *  runtime is missing (or navigation fails), returns `{ok:false, error}` (the honest install hint),
- *  never a fake image and never an HTTP error. */
-export const captureScreenshot = (url: string, workspace?: string | null) =>
-  json<Screenshot>("/api/verify/screenshot", {
-    method: "POST",
-    body: JSON.stringify({ url, workspace: workspace || null }),
   });
 
 /** One live progress frame from the run loop (an AgentEvent, serialized). `kind` picks the shape. */
