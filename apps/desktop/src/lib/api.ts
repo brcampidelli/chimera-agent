@@ -575,6 +575,10 @@ export interface PostureFacts {
   // True when the shell would run on this machine while the config asked for a container. The one
   // case where the honest answer contradicts the user's setup, so it is never folded into `shell`.
   fell_back_to_host: boolean;
+  // True when this surface has NO taint ledger: nothing marks the conversation after it reads
+  // untrusted content, so the tools that would otherwise start refusing keep working. The default
+  // for a chat, deliberately — and therefore something the sentence has to admit.
+  unguarded: boolean;
 }
 
 /** Ask what a posture would mean, without committing to it.
@@ -585,10 +589,11 @@ export const getPostureFacts = (
   reach: Reach,
   approval: Approval,
   workspace?: string | null,
+  surface: "run" | "turn" | "chat" = "turn",
 ) =>
   json<PostureFacts>("/api/code/posture", {
     method: "POST",
-    body: JSON.stringify({ reach, approval, workspace: workspace || null }),
+    body: JSON.stringify({ reach, approval, workspace: workspace || null, surface }),
   });
 
 // --- Roles (which model does which job) ---

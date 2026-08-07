@@ -375,6 +375,21 @@ class Settings(BaseSettings):
     # real boundary for hostile code — see SECURITY.md.)
     trust_workspace: bool = Field(default=True, validation_alias="CHIMERA_TRUST_WORKSPACE")
 
+    # Should the CHAT agent be assembled with the same protections the coding turn gets — a write
+    # region, a posture denylist, and the taint ledger wrapped around every tool?
+    #
+    # Default False, and that default is a real exposure, chosen deliberately. The chat registry is
+    # shared with the messaging gateway and the OpenAI-compatible endpoint, so turning this on by
+    # default would silently take shell away from agents people already run in Discord. Off, the chat
+    # keeps the tools it has always had — and keeps the hole they come with: ask it to read a web page
+    # that carries a planted instruction, and nothing stops it from writing the file that instruction
+    # names. The coding turn refuses, because its ledger marks the run tainted.
+    #
+    # Because the default is the permissive one, the app STATES it: the posture line says, in a chat
+    # without a ledger, that this conversation can write after reading untrusted content. A silent
+    # permissive default is the one version of this decision that cannot be defended.
+    guard_chat: bool = Field(default=False, validation_alias="CHIMERA_GUARD_CHAT")
+
     # Base URL for a local Ollama server. A model like `ollama/llama3` runs on your machine with no
     # API key — set this only if Ollama listens somewhere other than the default. Reinforces the
     # fully-local, self-hostable path: `CHIMERA_MODEL=ollama/llama3` and no key needed.

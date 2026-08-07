@@ -33,7 +33,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel
 
@@ -122,10 +122,21 @@ class PostureFacts(BaseModel):
     #: is the one case where the honest answer contradicts what the user set up, and silently
     #: honouring the config here is exactly how "I thought it was sandboxed" happens.
     fell_back_to_host: bool = False
+    #: True when this surface has NO taint ledger — nothing marks the run after it reads untrusted
+    #: content, so the tools that would otherwise start refusing keep working. Reported because the
+    #: default is the permissive one (``CHIMERA_GUARD_CHAT`` is off), and a permissive default that
+    #: says nothing is the one version of that choice which cannot be defended. The coding turn is
+    #: always guarded; a chat is guarded only if the user turned it on.
+    unguarded: bool = False
 
 
 def describe(
-    posture: Posture, workspace: Path, settings: Settings, *, can_pause: bool = True
+    posture: Posture,
+    workspace: Path,
+    settings: Settings,
+    *,
+    can_pause: bool = True,
+    guarded: bool = True,
 ) -> PostureFacts:
     """Report what this posture means on THIS machine, right now.
 
@@ -171,4 +182,33 @@ def describe(
             else "never"
         ),
         fell_back_to_host=fell_back,
+        unguarded=not guarded,
     )
+
+
+def guard_chat_registry(registry: Any) -> tuple[Any, Any]:
+    """Apply the coding turn's protections to the CHAT registry — deny by posture, then the ledger.
+
+    The chat and the coding turn talk to the same agent over the same base tools, and until this
+    existed only one of them was protected. `chat_stream` applied no write region, no denylist, no
+    registry restriction and no taint ledger; the coding turn applied all four. So the chat kept the
+    three execution tools the coding turn removes, and none of the tools that refuse once a run has
+    read untrusted content. Ask the chat to summarise a page carrying a planted instruction and
+    nothing stops it from writing the file that instruction names.
+
+    Off by default (``CHIMERA_GUARD_CHAT``), because this registry is shared with the messaging
+    gateway and ``/v1/chat/completions``: turning it on by default would silently take shell away
+    from agents people already run. Off, the exposure stays — and the posture line says so, which is
+    the only thing that makes a permissive default defensible.
+
+    Deliberately takes an ALREADY-BUILT registry rather than building one: the chat's registry
+    carries MCP tools that a from-scratch build would drop, and applying the denylist here means it
+    reaches those tools too. A guard that covers only the tools we happened to write is not a guard.
+    """
+    from chimera.governance import TaintLedger, ledger_registry, restrict_registry
+
+    resolved = resolve(Posture(reach=DEFAULT_REACH, approval=DEFAULT_APPROVAL))
+    if resolved.deny_tools:
+        registry = restrict_registry(registry, allow=None, deny=resolved.deny_tools)
+    ledger = TaintLedger()
+    return ledger_registry(registry, ledger, narrow_on_taint=resolved.narrow_on_taint), ledger

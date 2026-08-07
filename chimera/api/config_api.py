@@ -55,6 +55,7 @@ _EDITABLE_SETTINGS = {
     "CHIMERA_CHAT_MEMORY",  # the "Remember from chat" toggle (opt-in durable memory from chat)
     "CHIMERA_APP_CRON",  # run the cron daemon inside the desktop app (proactivity)
     "CHIMERA_APP_MESSAGING",  # auto-start messaging adapters in the desktop app at boot
+    "CHIMERA_GUARD_CHAT",  # assemble the chat agent with the coding turn's denylist + taint ledger
     "CHIMERA_SANDBOX",
     "CHIMERA_SANDBOX_IMAGE",
     "CHIMERA_MCP_AUTOLOAD",
@@ -102,6 +103,9 @@ def read_config(settings: Settings) -> dict[str, Any]:
         },
         "cache": {"completion": settings.cache, "prompt": settings.prompt_cache},
         "sandbox": {"mode": settings.sandbox, "image": settings.sandbox_image},
+        # Off by default and that is a real exposure — see Settings.guard_chat. Exposed here because
+        # the posture line points at this switch by name when it reports a conversation as unguarded.
+        "guard": {"chat": settings.guard_chat},
         "server": {"token_set": bool(settings.server_token)},
         "mcp": {"autoload": settings.mcp_autoload},
         "automation": {"cron": settings.app_cron},

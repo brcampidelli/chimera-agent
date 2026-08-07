@@ -242,12 +242,14 @@ class PostureQuery(BaseModel):
     """Ask what a posture would mean, without committing to it — the selectors' live preview."""
 
     surface: str = "run"
-    """Which surface is asking: ``"run"`` or ``"turn"``.
+    """Which surface is asking: ``"run"``, ``"turn"`` or ``"chat"``.
 
-    The same posture means two different things on the two, and only one of them was ever reported.
-    A conversational turn is built without a checkpointer or a taint ledger, so it cannot stop and
-    ask — whatever the approval axis says. Defaulting to ``"run"`` keeps every existing caller
-    reading exactly what it read before."""
+    The same posture means different things on each, and only one of them was ever reported. A
+    conversational turn is built without a checkpointer, so it cannot stop and ask — whatever the
+    approval axis says. A CHAT is built without the ledger too unless ``CHIMERA_GUARD_CHAT`` is on,
+    which means nothing marks it after it reads untrusted content and the tools that would start
+    refusing keep working. Defaulting to ``"run"`` keeps every existing caller reading exactly what
+    it read before."""
 
     reach: Reach = DEFAULT_REACH
     approval: Approval = DEFAULT_APPROVAL
@@ -292,13 +294,20 @@ def register_code_api(
         with locks_guard:
             return locks.setdefault(session_id, threading.Lock())
 
-    def build_agent(req: CodeTurnRequest, ws: Path) -> Agent:
+    def build_agent(req: CodeTurnRequest, ws: Path) -> tuple[Agent, Any]:
+        """The agent for this turn, and the ledger watching it.
+
+        The ledger used to be built and thrown away, which left the turn unable to answer the one
+        question the posture claims to care about: did this run read untrusted content? Narrowing
+        still worked (it lives inside the wrapped tools), but nothing could REPORT it — so a turn
+        that had been steered by a planted instruction looked exactly like one that had not.
+        """
         from chimera.core import Agent, AgentConfig
         from chimera.providers import LLMGateway
 
         gateway = LLMGateway()
         steps = resolve_steps(req.max_steps)
-        registry, _ledger = assemble_registry(req, ws, settings, gateway, steps=steps)
+        registry, ledger = assemble_registry(req, ws, settings, gateway, steps=steps)
         agent = Agent(
             gateway,
             registry,
@@ -315,7 +324,7 @@ def register_code_api(
             # worked on. Re-reading it is the agent's job and it has a tool for that; a copy taken
             # at turn start would be restored stale, which is worse than restoring nothing.
             agent.run_state.open_file = (req.open_file, "")
-        return agent
+        return agent, ledger
 
     @app.post("/api/code/turn", dependencies=[guard])
     async def code_turn(req: CodeTurnRequest) -> EventSourceResponse:
@@ -331,7 +340,7 @@ def register_code_api(
                 raise HTTPException(status_code=400, detail="workspace not found")
         else:
             ws = workspace
-        agent = build_agent(req, ws)
+        agent, ledger = build_agent(req, ws)
         session = store.load(req.session_id, agent) if req.session_id else CodeSession(agent)
         session.agent = agent  # a loaded session carries messages, not the agent that made them
         # A conversation belongs to the project it STARTED in, and keeps it. Overwriting on every
@@ -431,6 +440,9 @@ def register_code_api(
                         # a ceiling the user can raise without seeing its cost is a trap.
                         "context_peak_tokens": result.steplog.context_peak_tokens,
                         "route_meta": result.route_meta,
+                        # Did this turn read anything untrusted? A turn steered by a planted
+                        # instruction used to be indistinguishable from one that was not.
+                        "tainted": bool(ledger.run_tainted()),
                     },
                 )
 
@@ -468,7 +480,11 @@ def register_code_api(
             Posture(reach=req.reach, approval=req.approval),
             ws,
             settings,
-            can_pause=req.surface != "turn",
+            can_pause=req.surface == "run",
+            # The coding turn is always assembled with a ledger. A chat only is when the user armed
+            # it — and when they have not, the sentence has to say so, because the whole product
+            # rests on stating what is true on this machine rather than what reads better.
+            guarded=req.surface != "chat" or settings.guard_chat,
         )
 
     @app.post("/api/code/roles", dependencies=[guard], response_model=RoleModels)

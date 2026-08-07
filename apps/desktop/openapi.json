@@ -1085,6 +1085,9 @@
           "cache": {
             "$ref": "#/components/schemas/CacheCfgOut"
           },
+          "guard": {
+            "$ref": "#/components/schemas/GuardCfgOut"
+          },
           "mcp": {
             "$ref": "#/components/schemas/McpCfgOut"
           },
@@ -1116,6 +1119,7 @@
           "server",
           "mcp",
           "automation",
+          "guard",
           "providers"
         ],
         "title": "ConfigOut",
@@ -1781,6 +1785,20 @@
           "populated"
         ],
         "title": "GovernanceAuditOut",
+        "type": "object"
+      },
+      "GuardCfgOut": {
+        "description": "Whether the CHAT agent is assembled with the coding turn's protections.\n\nOff by default, and that default is a real exposure rather than an oversight: this agent is\nshared with the messaging gateway and the OpenAI-compatible endpoint, so arming it silently would\ntake shell away from bots someone already runs. Readable here because the posture line names this\nswitch when it reports a conversation as unguarded \u2014 a warning that cannot point at its own\nremedy is half a warning.",
+        "properties": {
+          "chat": {
+            "title": "Chat",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "chat"
+        ],
+        "title": "GuardCfgOut",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -2730,6 +2748,11 @@
             ],
             "title": "Shell",
             "type": "string"
+          },
+          "unguarded": {
+            "default": false,
+            "title": "Unguarded",
+            "type": "boolean"
           },
           "workspace": {
             "title": "Workspace",

@@ -166,3 +166,44 @@ def test_the_other_facts_are_unchanged_by_the_surface(tmp_path: Any) -> None:
     assert run.writes == turn.writes == "nothing"
     assert run.shell == turn.shell
     assert run.pauses == "always" and turn.pauses == "never"
+
+
+# --- The chat's missing guard, said out loud ------------------------------------------------
+#
+# The chat and the coding turn talk to the same agent over the same base tools, and until now only
+# one was protected: no write region, no denylist, no registry restriction, no taint ledger. So the
+# chat kept the execution tools the coding turn removes, and none of the tools that refuse once a run
+# has read untrusted content. The default stays permissive on purpose — the registry is shared with
+# the messaging gateway, and arming it silently would take shell away from agents already running —
+# which is exactly why the sentence has to admit it.
+
+
+def test_a_chat_without_the_guard_says_it_is_unguarded(tmp_path: Any) -> None:
+    from chimera.api.posture import Posture, describe
+
+    settings = Settings(CHIMERA_HOME=str(tmp_path), CHIMERA_GUARD_CHAT=False)
+    facts = describe(Posture(), tmp_path, settings, guarded=False)
+    assert facts.unguarded is True
+
+
+def test_the_coding_turn_is_never_reported_as_unguarded(tmp_path: Any) -> None:
+    # It assembles its registry through the ledger on every request, with no switch to turn off.
+    from chimera.api.posture import Posture, describe
+
+    settings = Settings(CHIMERA_HOME=str(tmp_path))
+    assert describe(Posture(), tmp_path, settings).unguarded is False
+
+
+def test_the_guard_denies_the_execution_tools_and_wraps_the_rest(tmp_path: Any) -> None:
+    # Applied to an ALREADY-BUILT registry on purpose: the chat's registry carries MCP tools that a
+    # from-scratch rebuild would drop, and a guard that covers only the tools we wrote is not a guard.
+    from chimera.api.posture import guard_chat_registry
+    from chimera.governance.ledger import EXEC_TOOLS
+    from chimera.tools import default_registry
+
+    before = default_registry(tmp_path)
+    assert EXEC_TOOLS & set(before.names())  # the tools the chat has always had
+
+    after, ledger = guard_chat_registry(before)
+    assert not (EXEC_TOOLS & set(after.names()))
+    assert ledger.run_tainted() is False  # a fresh run is clean until something untrusted arrives

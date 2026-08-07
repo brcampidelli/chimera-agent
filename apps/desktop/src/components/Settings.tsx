@@ -408,6 +408,12 @@ export function Settings() {
               onChange={(v) => save({ CHIMERA_SANDBOX: v })}
             />
           </Row>
+          {/* The switch the posture line names when it reports a conversation as unguarded. Off by
+              default because this registry is shared with the messaging gateway: arming it silently
+              would take shell away from agents someone already runs in Discord. */}
+          <Row label={t("settings.row.guardChat")} hint={t("settings.hint.guardChat")}>
+            <Toggle on={c.guard.chat} onChange={(v) => save({ CHIMERA_GUARD_CHAT: String(v) })} />
+          </Row>
         </Card>
 
         <Card title={t("settings.card.mcp")}>

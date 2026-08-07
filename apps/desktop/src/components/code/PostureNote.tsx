@@ -32,26 +32,32 @@ function sentence(facts: NonNullable<ReturnType<typeof useFacts>["data"]>, t: TF
   return parts.join(" ");
 }
 
-function useFacts(reach: Reach, approval: Approval, workspace: string) {
+function useFacts(reach: Reach, approval: Approval, workspace: string, surface: Surface) {
   return useQuery({
-    queryKey: ["posture", reach, approval, workspace],
-    queryFn: () => getPostureFacts(reach, approval, workspace || null),
+    queryKey: ["posture", reach, approval, workspace, surface],
+    queryFn: () => getPostureFacts(reach, approval, workspace || null, surface),
     staleTime: 0,
     gcTime: 0,
   });
 }
 
+type Surface = "run" | "turn" | "chat";
+
 export function PostureNote({
   workspace,
   reach,
   approval,
+  surface = "turn",
 }: {
   workspace: string;
   reach: Reach;
   approval: Approval;
+  /** Which surface is asking. A chat is assembled WITHOUT the taint ledger unless the user armed it,
+   *  and that changes what is true — so it changes the sentence. */
+  surface?: Surface;
 }) {
   const t = useT();
-  const facts = useFacts(reach, approval, workspace);
+  const facts = useFacts(reach, approval, workspace, surface);
 
   return (
     <div className="flex flex-col gap-1">
@@ -64,6 +70,15 @@ export function PostureNote({
         // Silence here would read as "nothing to worry about", which is the opposite of what an
         // unknown posture means.
         <p className="text-xs text-bad">{t("code.posture.unknown")}</p>
+      ) : null}
+      {facts.data?.unguarded ? (
+        // The condition that makes a permissive default defensible. Nothing marks this conversation
+        // after it reads untrusted content, so a page carrying a planted instruction can still get
+        // a file written. Saying it is the whole difference between a trade-off and a trap.
+        <p className="flex items-start gap-1.5 text-xs text-warn">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          {t("code.posture.unguarded")}
+        </p>
       ) : null}
       {facts.data?.fell_back_to_host ? (
         // The one case where the honest answer contradicts what the user set up. Pre-emptive on

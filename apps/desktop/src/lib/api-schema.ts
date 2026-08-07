@@ -1546,6 +1546,7 @@ export interface components {
         ConfigOut: {
             automation: components["schemas"]["AutomationCfgOut"];
             cache: components["schemas"]["CacheCfgOut"];
+            guard: components["schemas"]["GuardCfgOut"];
             mcp: components["schemas"]["McpCfgOut"];
             memory: components["schemas"]["MemoryCfgOut"];
             models: components["schemas"]["ModelsCfgOut"];
@@ -1789,6 +1790,20 @@ export interface components {
             events: components["schemas"]["AuditEventOut"][];
             /** Populated */
             populated: boolean;
+        };
+        /**
+         * GuardCfgOut
+         * @description Whether the CHAT agent is assembled with the coding turn's protections.
+         *
+         *     Off by default, and that default is a real exposure rather than an oversight: this agent is
+         *     shared with the messaging gateway and the OpenAI-compatible endpoint, so arming it silently would
+         *     take shell away from bots someone already runs. Readable here because the posture line names this
+         *     switch when it reports a conversation as unguarded — a warning that cannot point at its own
+         *     remedy is half a warning.
+         */
+        GuardCfgOut: {
+            /** Chat */
+            chat: boolean;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -2154,6 +2169,11 @@ export interface components {
              * @enum {string}
              */
             shell: "none" | "isolated" | "host" | "asks" | "refused";
+            /**
+             * Unguarded
+             * @default false
+             */
+            unguarded: boolean;
             /** Workspace */
             workspace: string;
             /**

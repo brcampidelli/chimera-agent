@@ -1281,6 +1281,14 @@ def desktop_app(
         registry = default_registry(workspace_path)
         if mcp_connectors is not None:
             mcp_connectors.into_tool_registry(registry)  # MCP tools alongside the builtins
+        if settings.guard_chat:
+            # AFTER the MCP tools, so the denylist and the ledger reach those too — a guard that
+            # covers only the tools we wrote is not a guard. Off by default: this registry is shared
+            # with the messaging gateway and /v1/chat/completions, so arming it by default would take
+            # shell away from agents that already run.
+            from chimera.api.posture import guard_chat_registry
+
+            registry, _chat_ledger = guard_chat_registry(registry)
         runner = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
         return ChatSession(
             runner,

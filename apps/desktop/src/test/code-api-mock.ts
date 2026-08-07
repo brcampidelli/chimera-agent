@@ -56,6 +56,10 @@ export function postureFacts(over: Partial<PostureFacts> = {}): PostureFacts {
     shell: "none",
     pauses: "tainted",
     fell_back_to_host: false,
+    // The coding turn is always assembled with the ledger, so the fixture's default is the guarded
+    // case. A test that wants the unguarded chat has to ask for it — which is the right way round:
+    // the warning should never appear in a suite that is not about the warning.
+    unguarded: false,
     ...over,
   };
 }
