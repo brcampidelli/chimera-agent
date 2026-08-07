@@ -119,6 +119,18 @@ jobs:
         # swallowed error; this makes the next diagnosis read the actual message.
         run: |
           if [ "${{ runner.os }}" = "Linux" ]; then
+            # linuxdeploy walks every ELF file in the AppDir and resolves each NEEDED entry against
+            # the SYSTEM library paths. Wheels built for manylinux carry their native dependencies
+            # inside the package under mangled names — ctranslate2 needs `libgomp-e985bcbb.so.1.0.0`,
+            # which exists only in `ctranslate2.libs/` next to it — so the resolver reports
+            # "Could not find dependency" for a file that is sitting right there, and aborts.
+            #
+            # Point it at those directories. Every `*.libs` folder the freeze produced, not just the
+            # one that failed: onnxruntime and numpy package their natives the same way, and finding
+            # them one build at a time is a queue, not a fix.
+            LIBS=$(find apps/desktop/src-tauri/sidecar-dist -type d -name '*.libs' -printf '%p:')
+            export LD_LIBRARY_PATH="${LIBS}${LD_LIBRARY_PATH}"
+            echo "resolver path: $LD_LIBRARY_PATH"
             npm --prefix apps/desktop run tauri build -- --verbose --bundles ${{ matrix.bundles }}
           else
             npm --prefix apps/desktop run tauri build -- --bundles ${{ matrix.bundles }}
