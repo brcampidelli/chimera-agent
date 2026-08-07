@@ -4180,6 +4180,48 @@
         "summary": "Code Posture"
       }
     },
+    "/api/code/revert/{token}": {
+      "post": {
+        "description": "Undo an editing turn whose verification failed, if the user takes the offer.\n\nA token is single-use and dies with the process. An unknown one is ``{ok: false}`` rather\nthan a 404 \u2014 that is the state a second click hits, and a stale offer is not an error.",
+        "operationId": "revert_turn_api_code_revert__token__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Revert Turn Api Code Revert  Token  Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revert Turn"
+      }
+    },
     "/api/code/roles": {
       "post": {
         "description": "The concrete model slugs a profile resolves to, so the UI can show them.\n\nResolved server-side rather than mirrored in the frontend: the tiers already honour the\nuser's cost mode and explicit per-tier settings, and a second copy of that resolution in\nTypeScript would display a model the run does not actually use.",

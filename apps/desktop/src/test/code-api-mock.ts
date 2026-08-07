@@ -2,6 +2,7 @@ import { vi } from "vitest";
 import type {
   CodeTurnDone,
   CodeTurnHandlers,
+  CodeVerified,
   PostureFacts,
   ProfileWorth,
   RoleModels,
@@ -26,6 +27,7 @@ export function makeCodeApiMock() {
     streamExec: vi.fn(),
     streamRun: vi.fn(),
     streamCodeTurn: vi.fn(),
+    revertCodeTurn: vi.fn(),
     deleteCodeSession: vi.fn(),
     getPostureFacts: vi.fn(),
     getRoleModels: vi.fn(),
@@ -108,6 +110,7 @@ export function scriptTurn(
     tokens?: string[];
     tools?: { name: string; arguments: Record<string, string>; ok: boolean; observation: string }[];
     edits?: { path: string; patch: string }[];
+    verified?: CodeVerified;
     done?: Partial<CodeTurnDone>;
     error?: boolean;
   } = {},
@@ -121,6 +124,9 @@ export function scriptTurn(
       h.onError?.("boom");
       return;
     }
+    // Before `done`, as the server sends it — `done` is the terminal frame, and a verdict after it
+    // would never reach a client that finalises there.
+    if (script.verified) h.onVerified?.(script.verified);
     h.onDone?.({
       answer: "done",
       steps: 1,

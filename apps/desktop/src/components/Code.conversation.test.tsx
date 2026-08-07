@@ -94,12 +94,20 @@ describe("Code — the conversation", () => {
   });
 
   it("hands the same text to the verified run without starting it", async () => {
-    // "Run with verification" fills the task field rather than launching: the verify command and
-    // the attempt count are chosen there, and starting immediately would choose them silently.
-    const user = userEvent.setup();
-    renderWithProviders(<Code />);
-    await user.type(screen.getByPlaceholderText(/^Ask about this code/), "make the test pass");
-    await user.click(screen.getByRole("button", { name: "Run with verification" }));
+    // This used to be a second button in the composer, asking the user to guess in advance whether
+    // the work deserved retries. It is reached as a CONSEQUENCE now — the turn's verification failed
+    // and the multi-attempt run is one of the two things you can do about it. What has not changed
+    // is that it fills the task field rather than launching: the run's own settings are chosen
+    // there, and starting immediately would choose them silently.
+    vi.mocked(streamCodeTurn).mockImplementation(
+      scriptTurn({
+        verified: { command: "make test", source: "inferred:Makefile", state: "failed" },
+      }),
+    );
+    const user = await say("make the test pass");
+    vi.mocked(streamCodeTurn).mockClear();
+
+    await user.click(await screen.findByRole("button", { name: /try to fix it/i }));
 
     await waitFor(() =>
       expect(screen.getByPlaceholderText(/^Describe the change/)).toHaveValue("make the test pass"),

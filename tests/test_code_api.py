@@ -180,3 +180,87 @@ def test_the_run_endpoint_and_the_turn_endpoint_share_one_set_of_seams() -> None
     assert seams <= set(RunRequest.model_fields)
     assert seams <= set(CodeTurnRequest.model_fields)
     assert issubclass(RunRequest, CodeSeams) and issubclass(CodeTurnRequest, CodeSeams)
+
+
+# --- What the turn WROTE gets a verdict, and a failing one offers an undo ---------------------
+#
+# This is the pair that made one button honest. Send used to edit your workspace and keep whatever
+# it wrote, while a second button beside it ran the same text through plan → verify → revert. The
+# screen never said which was which, so pressing Enter was silently the weaker option. These tests
+# hold the two halves that make the collapse safe: the turn is judged, and the judgement is
+# reversible on request rather than on its own.
+
+
+class _EditingAgent(_ScriptedAgent):
+    """Like the scripted agent, but its edit actually lands on disk — the snapshot needs a file."""
+
+    def __init__(self, ws: Path) -> None:
+        super().__init__()
+        self._ws = ws
+
+    def run(self, task: str, **kw: Any) -> AgentResult:
+        (self._ws / "a.py").write_text("x = 2\n", encoding="utf-8")
+        return super().run(task, **kw)
+
+
+def _editing_client(tmp_path: Path, monkeypatch: Any) -> tuple[TestClient, Path]:
+    from chimera.api import build_api_app
+
+    ws = tmp_path / "ws"
+    ws.mkdir(exist_ok=True)
+    import chimera.core
+
+    monkeypatch.setattr(chimera.core, "Agent", lambda *_a, **_k: _EditingAgent(ws), raising=True)
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    app = build_api_app(lambda: ChatSession(_ScriptedAgent()), workspace=ws, settings=settings)
+    return TestClient(app), ws
+
+
+def _verdict(response: Any) -> dict[str, Any]:
+    return next(payload for event, payload in _frames(response) if event == "verified")
+
+
+def test_a_project_with_no_verify_command_says_so_rather_than_staying_quiet(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    # The case a user would otherwise assume was checked, because the run on the other screen does
+    # check. Silence here reads as approval.
+    client, _ = _editing_client(tmp_path, monkeypatch)
+    verdict = _verdict(client.post("/api/code/turn", json={"message": "edit a.py"}))
+    assert verdict == {"command": None, "source": "none", "state": "none"}
+
+
+def test_a_failing_verification_offers_an_undo_and_does_not_take_it(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    client, ws = _editing_client(tmp_path, monkeypatch)
+    (ws / "tests").mkdir()
+    (ws / "tests" / "test_it.py").write_text("def test_it():\n    assert False\n", encoding="utf-8")
+
+    verdict = _verdict(client.post("/api/code/turn", json={"message": "edit a.py"}))
+    assert verdict["state"] == "failed"
+    assert verdict["source"] == "inferred:tests/"
+    assert verdict["revert_token"]
+    # Offered, NOT applied: the edit the user watched being typed is still there.
+    assert (ws / "a.py").read_text(encoding="utf-8") == "x = 2\n"
+
+    assert client.post(f"/api/code/revert/{verdict['revert_token']}").json()["ok"] is True
+    assert not (ws / "a.py").exists()  # the snapshot predates the file
+
+
+def test_a_revert_token_is_single_use(tmp_path: Path, monkeypatch: Any) -> None:
+    # A second press must not restore a snapshot the user has since typed on top of.
+    client, ws = _editing_client(tmp_path, monkeypatch)
+    (ws / "tests").mkdir()
+    (ws / "tests" / "test_it.py").write_text("def test_it():\n    assert False\n", encoding="utf-8")
+
+    token = _verdict(client.post("/api/code/turn", json={"message": "edit a.py"}))["revert_token"]
+    assert client.post(f"/api/code/revert/{token}").json()["ok"] is True
+    assert client.post(f"/api/code/revert/{token}").json() == {"ok": False, "restored": 0}
+
+
+def test_an_unknown_revert_token_is_refused_rather_than_erroring(
+    tmp_path: Path, patched: Any
+) -> None:
+    client = _client(tmp_path, patched)
+    assert client.post("/api/code/revert/nope").json() == {"ok": False, "restored": 0}

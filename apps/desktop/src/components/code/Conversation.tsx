@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef, useState , type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Eraser, Loader2, MessageSquare, Send, ShieldCheck, Wrench } from "lucide-react";
+import { Eraser, Loader2, MessageSquare, Send, ShieldCheck, Undo2, Wrench } from "lucide-react";
 import {
   deleteCodeSession,
   getCodeSession,
+  revertCodeTurn,
   streamCodeTurn,
   type Approval,
   type CodeToolEvent,
   type CodeTurnDone,
+  type CodeVerified,
   type Profile,
   type Reach,
 } from "@/lib/api";
@@ -27,6 +29,70 @@ interface Exchange {
   edits: { path: string; patch: string }[];
   done: CodeTurnDone | null;
   failed?: boolean;
+  /** The verdict on what this turn WROTE. Absent when the turn wrote nothing. */
+  verified?: CodeVerified;
+  /** Set once the offered undo was taken (or refused by the server) — the offer is single-use. */
+  undone?: "ok" | "gone";
+}
+
+/** What happened to the files after the turn finished writing them.
+ *
+ *  This is the sentence that made one button honest. Before it, Send edited your workspace and kept
+ *  whatever it wrote, while a second button next to it ran the same text through plan → verify →
+ *  revert. Nothing on the screen said which one you were pressing, so the default was silently the
+ *  weaker one. Now the default checks, and says what checked it.
+ *
+ *  The undo is OFFERED. A run reverts itself because the user asked for a verdict; a conversation is
+ *  a conversation, and silently undoing what someone watched being typed is a worse surprise than a
+ *  failing test. The other offer — hand the same text to the autonomous run, which retries — is how
+ *  the multi-attempt path is reached now: as a consequence of a failure, not as a second button
+ *  asking the user to guess in advance which kind of work this was. */
+function Verdict({
+  v,
+  undone,
+  onUndo,
+  onFix,
+  t,
+}: {
+  v: CodeVerified;
+  undone?: "ok" | "gone";
+  onUndo: () => void;
+  onFix: () => void;
+  t: TFunc;
+}) {
+  if (v.state === "none") return <p className="text-xs text-warn">{t("code.chat.verdict.none")}</p>;
+  const cmd = v.command ?? "";
+  const args = { cmd, src: v.source };
+  if (v.state === "abstained")
+    return <p className="text-xs text-warn">{t("code.chat.verdict.abstained", args)}</p>;
+  if (v.state === "passed")
+    return <p className="text-xs text-ok">{t("code.chat.verdict.passed", args)}</p>;
+  return (
+    <div className="space-y-1.5 rounded-chip border border-bad/40 p-2">
+      <p className="text-xs text-bad">{t("code.chat.verdict.failed", args)}</p>
+      {v.output ? (
+        <pre className="max-h-40 overflow-auto whitespace-pre-wrap font-mono text-xs text-muted-foreground">
+          {v.output}
+        </pre>
+      ) : null}
+      {undone ? (
+        <p className={cn("text-xs", undone === "ok" ? "text-ok" : "text-bad")}>
+          {t(undone === "ok" ? "code.chat.verdict.reverted" : "code.chat.verdict.revertFailed")}
+        </p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {v.revert_token ? (
+            <Button size="sm" variant="ghost" onClick={onUndo}>
+              <Undo2 className="h-3.5 w-3.5" /> {t("code.chat.verdict.revert")}
+            </Button>
+          ) : null}
+          <Button size="sm" variant="ghost" onClick={onFix}>
+            <ShieldCheck className="h-3.5 w-3.5" /> {t("code.chat.verdict.fix")}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** A tool call, compactly: what ran, on what, and whether it worked.
@@ -192,6 +258,7 @@ export function Conversation({
           touchedFiles = true;
           patchLast((e) => ({ ...e, edits: [...e.edits, { path, patch }] }));
         },
+        onVerified: (v) => patchLast((e) => ({ ...e, verified: v })),
         onDone: (done) => {
           // The streamed tokens and the final answer are the same text; prefer the final one, which
           // is complete even when the backend never streamed (a non-streaming model, `stream:false`).
@@ -210,6 +277,23 @@ export function Conversation({
         },
       },
     );
+  }
+
+  async function undo(index: number, token: string) {
+    let outcome: "ok" | "gone" = "gone";
+    try {
+      outcome = (await revertCodeTurn(token)).ok ? "ok" : "gone";
+    } catch {
+      // A failed call and a refused token mean the same thing to the user: the edits are still
+      // there. Saying "gone" is the honest read of both, and it is the one that does not imply the
+      // files were restored.
+    }
+    setExchanges((prev) => prev.map((e, j) => (j === index ? { ...e, undone: outcome } : e)));
+    if (outcome === "ok") {
+      void qc.invalidateQueries({ queryKey: ["fs-file"] });
+      void qc.invalidateQueries({ queryKey: ["git-status"] });
+      onEdited();
+    }
   }
 
   async function clear() {
@@ -272,6 +356,15 @@ export function Conversation({
               <div className="whitespace-pre-wrap text-sm text-foreground/90">{e.answer}</div>
             ) : null}
             {e.failed ? <p className="text-xs text-bad">{t("code.chat.error")}</p> : null}
+            {e.verified ? (
+              <Verdict
+                v={e.verified}
+                undone={e.undone}
+                onUndo={() => void undo(i, e.verified?.revert_token ?? "")}
+                onFix={() => onHandOff(e.you)}
+                t={t}
+              />
+            ) : null}
             {e.done ? <TurnReceipt done={e.done} t={t} /> : null}
           </div>
         ))}
@@ -309,16 +402,6 @@ export function Conversation({
               </>
             )}
           </Button>
-          <span title={t("code.chat.verifiedRunHint")}>
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={!draft.trim() || busy || busyElsewhere}
-              onClick={() => onHandOff(draft.trim())}
-            >
-              <ShieldCheck className="h-4 w-4" /> {t("code.chat.verifiedRun")}
-            </Button>
-          </span>
           <span className="ml-auto text-xs text-muted-foreground">{t("code.chat.hint")}</span>
         </div>
       </div>

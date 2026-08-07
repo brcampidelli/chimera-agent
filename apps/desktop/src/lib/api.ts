@@ -449,13 +449,34 @@ export interface CodeTurnDone {
   route_meta: Record<string, unknown> | null;
 }
 
+/** The verdict on what a turn WROTE, emitted only when the turn edited something.
+ *
+ *  `state: "none"` is not an omission — it is the project having no verification command, said out
+ *  loud, because the alternative is a user assuming the edits were checked when nothing checked
+ *  them. `revert_token` is present only on `"failed"`, and the undo is OFFERED rather than applied:
+ *  silently undoing what someone watched being typed is a worse surprise than a failing test. */
+export interface CodeVerified {
+  command: string | null;
+  source: string;
+  state: "none" | "passed" | "failed" | "abstained";
+  output?: string;
+  revert_token?: string;
+}
+
 export interface CodeTurnHandlers {
   onSession?: (id: string) => void;
   onToken?: (text: string) => void;
   onTool?: (e: CodeToolEvent) => void;
   onEdit?: (path: string, patch: string) => void;
+  onVerified?: (v: CodeVerified) => void;
   onDone?: (d: CodeTurnDone) => void;
   onError?: (msg: string) => void;
+}
+
+/** Undo the edits of a turn whose verification failed. Single-use: the token is consumed by the
+ *  server, so a second press cannot restore a snapshot the user has since typed on top of. */
+export async function revertCodeTurn(token: string): Promise<{ ok: boolean; restored: number }> {
+  return json<{ ok: boolean; restored: number }>(`/api/code/revert/${token}`, { method: "POST" });
 }
 
 /** Send one turn of a coding conversation and stream it. Mirrors {@link streamRun}: the SSE lives
@@ -520,6 +541,7 @@ function dispatchCodeTurn(frame: string, h: CodeTurnHandlers): void {
   else if (event === "token") h.onToken?.(payload.text as string);
   else if (event === "tool") h.onTool?.(payload as unknown as CodeToolEvent);
   else if (event === "edit") h.onEdit?.(payload.path as string, payload.patch as string);
+  else if (event === "verified") h.onVerified?.(payload as unknown as CodeVerified);
   else if (event === "done") h.onDone?.(payload as unknown as CodeTurnDone);
   else if (event === "error") h.onError?.(payload.message as string);
 }

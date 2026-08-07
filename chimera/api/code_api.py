@@ -26,6 +26,7 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
+import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -131,6 +132,13 @@ class CodeSeams(BaseModel):
     the pause flags, and an explicit ``deny_tools`` is unioned with it rather than replaced — two
     ways of saying "not this tool" must never cancel each other out. None = no posture applied, so
     every existing caller behaves exactly as before."""
+
+
+#: Snapshots kept so a failed editing turn can be undone if the user asks. Bounded and in-memory: an
+#: offer that outlives the app is an offer nobody remembers making, and persisting whole-workspace
+#: snapshots to disk to support one button is a much larger promise than this button makes.
+_pending_reverts: dict[str, tuple[Any, Any]] = {}
+_MAX_PENDING_REVERTS = 8
 
 
 def resolve_posture(posture: Posture | None) -> ResolvedPosture:
@@ -340,11 +348,26 @@ def register_code_api(
             emit("tool", tool_event(activity.name, activity.arguments, activity.ok,
                                     activity.observation).data)
 
+        edited: list[str] = []
+
         def on_edit(path: str, patch: str) -> None:
+            edited.append(path)
             emit("edit", {"path": path, "patch": patch})
 
         def work() -> None:
             try:
+                # Taken BEFORE the turn, so a turn that edits can be judged and undone like a run.
+                #
+                # Until now the two buttons on this screen were not two ways of doing one thing: Send
+                # edited your files and kept whatever it wrote, while "Run with verification" planned,
+                # verified, and reverted on failure. Nothing on the screen said so. Collapsing them to
+                # one button would have made pressing Enter silently the weaker of the two, so the
+                # weaker one had to stop being weaker first.
+                from chimera.core.checkpoint import WorkspaceGuard
+
+                guard = WorkspaceGuard(ws)
+                before = guard.snapshot()
+
                 with lock_for(session_id):
                     result = session.send(
                         req.message,
@@ -353,6 +376,37 @@ def register_code_api(
                         on_edit=on_edit,
                     )
                     store.save(session)
+                # Judge what the turn wrote, if it wrote anything and the project says how.
+                if edited:
+                    from chimera.api.app import resolve_verify
+                    from chimera.core.verify import CommandVerifier
+
+                    command, source = resolve_verify(None, ws)
+                    if command is None:
+                        # Said out loud rather than left as an absence: an editing turn that nothing
+                        # checked is exactly the case a user would otherwise assume was checked,
+                        # because the other button on this screen does check.
+                        emit("verified", {"command": None, "source": source, "state": "none"})
+                    else:
+                        outcome = CommandVerifier(command, ws).verify()
+                        state = (
+                            "abstained" if outcome.abstained
+                            else "passed" if outcome.passed
+                            else "failed"
+                        )
+                        token = ""
+                        if state == "failed":
+                            # OFFERED, not applied. A run reverts itself because the user asked for a
+                            # verdict; a conversation is a conversation, and silently undoing what
+                            # someone watched being typed is a worse surprise than a failing test.
+                            token = uuid.uuid4().hex
+                            _pending_reverts[token] = (guard, before)
+                            while len(_pending_reverts) > _MAX_PENDING_REVERTS:
+                                _pending_reverts.pop(next(iter(_pending_reverts)))
+                        emit("verified", {
+                            "command": command, "source": source, "state": state,
+                            "output": outcome.output[:4000], "revert_token": token,
+                        })
                 emit(
                     "done",
                     {
@@ -370,6 +424,7 @@ def register_code_api(
                         "route_meta": result.route_meta,
                     },
                 )
+
             except Exception as exc:  # noqa: BLE001 — surfaced to the client as an error event
                 _log.warning("code turn failed: %s", exc)
                 emit("error", {"message": "the coding turn failed"})
@@ -465,6 +520,19 @@ def register_code_api(
             "workspace": str(data.get("workspace") or ""),
             "exchanges": exchanges_from_messages(messages),
         }
+
+    @app.post("/api/code/revert/{token}", dependencies=[guard])
+    def revert_turn(token: str) -> dict[str, Any]:
+        """Undo an editing turn whose verification failed, if the user takes the offer.
+
+        A token is single-use and dies with the process. An unknown one is ``{ok: false}`` rather
+        than a 404 — that is the state a second click hits, and a stale offer is not an error.
+        """
+        pending = _pending_reverts.pop(token, None)
+        if pending is None:
+            return {"ok": False, "restored": 0}
+        workspace_guard, snapshot = pending
+        return {"ok": True, "restored": workspace_guard.restore(snapshot)}
 
     @app.delete("/api/code/sessions/{session_id}", dependencies=[guard])
     def delete_code_session(session_id: str) -> dict[str, bool]:

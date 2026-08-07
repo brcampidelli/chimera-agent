@@ -113,6 +113,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/revert/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revert Turn
+         * @description Undo an editing turn whose verification failed, if the user takes the offer.
+         *
+         *     A token is single-use and dies with the process. An unknown one is ``{ok: false}`` rather
+         *     than a 404 — that is the state a second click hits, and a stale offer is not an error.
+         */
+        post: operations["revert_turn_api_code_revert__token__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/roles": {
         parameters: {
             query?: never;
@@ -2766,6 +2789,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PostureFacts"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revert_turn_api_code_revert__token__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */
