@@ -54,7 +54,7 @@
       "treatment_rate": 0.025
     }
   ],
-  "generated_for": "0.40.0",
+  "generated_for": "0.40.1",
   "internal_lift": {
     "baseline_rate": 0.48,
     "ci": [

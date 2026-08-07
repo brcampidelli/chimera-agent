@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.40.1] - 2026-08-08
+
+### Fixed
+
+- **A plain `.txt` asked you to install a document converter.** Everything that was not an image
+  went through markitdown, an optional dependency — so attaching a README answered "reading this
+  format needs the `docs` extra", which reads like the feature is broken rather than like the file
+  is exotic, and put a wall in front of the simplest thing anyone will attach. Text is read
+  directly now; a PDF or a DOCX still needs the converter and still names the missing piece.
+  Undecodable bytes fall through to the converter, which may know an encoding we do not.
+
 ## [0.40.0] - 2026-08-08
 
 ### Added
