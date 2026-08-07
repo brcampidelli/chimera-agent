@@ -113,7 +113,17 @@ jobs:
       # let the bundler produce the Minisign `.sig` files next to each update bundle. Without them the
       # build would fail once createUpdaterArtifacts is on, so they must be present on release runs.
       - name: Build the Tauri app (signed updater artifacts)
-        run: npm --prefix apps/desktop run tauri build -- --bundles ${{ matrix.bundles }}
+        # `--verbose` on Linux only, and it is not decoration: when the AppImage bundler fails,
+        # Tauri reports `failed to run linuxdeploy` and discards linuxdeploy's own stderr, so the
+        # log names the tool that failed and nothing about why. One guess was already spent on a
+        # swallowed error; this makes the next diagnosis read the actual message.
+        run: |
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            npm --prefix apps/desktop run tauri build -- --verbose --bundles ${{ matrix.bundles }}
+          else
+            npm --prefix apps/desktop run tauri build -- --bundles ${{ matrix.bundles }}
+          fi
+        shell: bash
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
