@@ -741,6 +741,11 @@ export interface AgentsRequestInput {
   model?: string | null;
   fuse?: boolean;
   cascade?: boolean;
+  // Sent, never omitted. An absent posture resolves server-side to no tool denials and no pause,
+  // and an absent profile to a Manager reviewing with the very model that wrote the patch — so a
+  // task run as one of several would be quietly weaker than the same task run alone.
+  posture?: { reach: Reach; approval: Approval } | null;
+  profile?: Profile | null;
 }
 
 /** The `start` frame: the batch is underway (the task list + the resolved workspace). */

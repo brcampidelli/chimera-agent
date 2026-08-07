@@ -15,7 +15,9 @@ import {
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/panel";
+import { BatchProposal } from "@/components/code/BatchProposal";
 import { DiffView } from "@/components/code/DiffView";
+import { decompose } from "@/lib/decompose";
 import { useT, type TFunc } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -160,6 +162,7 @@ export function Conversation({
   workspace,
   openFile,
   onHandOff,
+  onBatch,
   onEdited,
   busyElsewhere,
   posture,
@@ -177,6 +180,8 @@ export function Conversation({
   profile: Profile;
   /** Start a verified run with this text, in the panel that owns the run machinery. */
   onHandOff: (text: string) => void;
+  /** The user confirmed a decomposition: run these in parallel, each in its own worktree. */
+  onBatch: (tasks: string[]) => void;
   /** A turn changed files — refresh the tree, the viewer and git status. */
   onEdited: () => void;
   /** A run is in flight; sending a turn at the same time would race it in the same workspace. */
@@ -224,6 +229,8 @@ export function Conversation({
     };
   }, [resumeSession]);
 
+  const [proposal, setProposal] = useState<string[] | null>(null);
+
   /** Mutate the turn currently streaming — always the last one, which is the only one that moves. */
   const patchLast = useCallback((fn: (e: Exchange) => Exchange) => {
     setExchanges((prev) =>
@@ -231,9 +238,18 @@ export function Conversation({
     );
   }, []);
 
-  function send() {
+  function send(force = false) {
     const message = draft.trim();
     if (!message || busy || busyElsewhere) return;
+    // Several jobs in one message is the request for a parallel batch. It is proposed rather than
+    // taken, because worktrees are a real side effect — and `force` is how "send it as one message"
+    // gets past this without the proposal reappearing on every keystroke.
+    const jobs = force ? [] : decompose(message);
+    if (jobs.length >= 2) {
+      setProposal(jobs);
+      return;
+    }
+    setProposal(null);
     setDraft("");
     setBusy(true);
     setExchanges((prev) => [...prev, { you: message, answer: "", tools: [], edits: [], done: null }]);
@@ -376,6 +392,18 @@ export function Conversation({
             selector sits in a composer. They used to be two titled panels stacked above the
             conversation, which is how the conversation ended up with no room: a control that
             describes the next turn does not need more vertical space than the turn itself. */}
+        {proposal ? (
+          <BatchProposal
+            tasks={proposal}
+            workspace={workspace}
+            onConfirm={() => {
+              onBatch(proposal);
+              setProposal(null);
+              setDraft("");
+            }}
+            onDecline={() => send(true)}
+          />
+        ) : null}
         {controls ? <div className="pb-1">{controls}</div> : null}
         <textarea
           className="field min-h-[64px] w-full resize-y px-3 py-2 text-sm"
@@ -391,7 +419,7 @@ export function Conversation({
           disabled={busy}
         />
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" disabled={!draft.trim() || busy || busyElsewhere} onClick={send}>
+          <Button size="sm" disabled={!draft.trim() || busy || busyElsewhere} onClick={() => send()}>
             {busy ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" /> {t("code.chat.sending")}

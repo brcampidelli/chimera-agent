@@ -1,7 +1,6 @@
 import { useId, useState } from "react";
 import { ListChecks } from "lucide-react";
 
-import { Agents } from "@/components/Agents";
 import { Runs } from "@/components/Runs";
 import { GitPanel } from "@/components/code/GitPanel";
 import { WorthPanel } from "@/components/code/WorthPanel";
@@ -9,14 +8,15 @@ import { Tabs, TabPanel } from "@/components/ui/tabs";
 import { useT } from "@/lib/i18n";
 import { readWorkspace } from "@/lib/workspace";
 
-type Tab = "run" | "agents" | "git" | "worth";
+type Tab = "run" | "git" | "worth";
 
 /**
  * The agent working on its own.
  *
- * Runs is one task with verify-or-revert; Agents is several of the same in parallel git worktrees.
- * They were separate destinations that both started the same kind of run — and both shipped their
- * own copy of the launcher, which is now shared code rather than shared screen space.
+ * Runs is one task with verify-or-revert. Several of the same, in parallel git worktrees, used to be
+ * the tab beside it — a destination chosen before anyone knew whether the work was parallel. It is
+ * reached from the conversation now, by asking for several things and confirming the split, so the
+ * only remaining question is asked before the worktrees exist rather than reported after.
  *
  * Git and "was it worth it?" moved here from the Code screen. Both are about work that already
  * happened — reviewing the diff a run produced, and asking whether the expensive profile earned its
@@ -39,7 +39,6 @@ export function Work() {
 
   const items = [
     { value: "run" as const, label: t("nav.runs") },
-    { value: "agents" as const, label: t("nav.agents") },
     { value: "git" as const, label: t("code.git.title") },
     { value: "worth" as const, label: t("code.worth.title") },
   ];
@@ -53,14 +52,10 @@ export function Work() {
       <Tabs items={items} value={tab} onChange={setTab} aria-label={t("nav.work")} className="px-6" />
       <div className="min-h-0 flex-1 overflow-y-auto">
         <TabPanel tabsId={id} value={tab}>
-          {/* Agents lays itself out full-bleed; Runs wants the centred column. Each keeps what it
-              needs rather than being forced into one shape. */}
           {tab === "run" ? (
             <div className="mx-auto max-w-3xl px-6 py-6">
               <Runs embedded />
             </div>
-          ) : tab === "agents" ? (
-            <Agents workspace={workspace} />
           ) : tab === "git" ? (
             <div className="mx-auto max-w-5xl px-6 py-4">
               {/* Which folder this is the git of. The root is chosen on the Code screen, so without

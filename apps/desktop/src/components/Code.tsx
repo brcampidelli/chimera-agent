@@ -27,6 +27,7 @@ import {
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/panel";
+import { Agents } from "@/components/Agents";
 import { Conversation } from "@/components/code/Conversation";
 import { PostureNote } from "@/components/code/PostureNote";
 import { DiffView } from "@/components/code/DiffView";
@@ -659,6 +660,10 @@ export function Code() {
   // The conversation and the run share one workspace, so they share two facts: what the user asked
   // (handed over by "Run with verification") and whether a run is already in flight.
   const [handOff, setHandOff] = useState<{ text: string; at: number } | null>(null);
+  // A confirmed decomposition. Keyed by `at` so a second batch is a new board rather than a restart
+  // of the old one — the board starts its runs on mount, which is only correct if mounting is what a
+  // new batch does.
+  const [batch, setBatch] = useState<{ tasks: string[]; at: number } | null>(null);
   const [runBusy, setRunBusy] = useState(false);
   // Fixed, not chosen: edit the workspace, no shell, stop and ask if the run read something
   // untrusted. These are still SENT on every request — omitting them resolves to no tool denials
@@ -772,6 +777,7 @@ export function Code() {
             openFile={openFile}
             onOpenFile={setOpenFile}
             onHandOff={(text) => setHandOff({ text, at: Date.now() })}
+            onBatch={(tasks) => setBatch({ tasks, at: Date.now() })}
             onEdited={refreshOpenFile}
             busyElsewhere={runBusy}
             posture={posture}
@@ -805,6 +811,22 @@ export function Code() {
               profile={profile}
             />
           </details>
+          {/* Several agents at once, once someone said yes to running several agents at once. This
+              was a destination — a tab you picked before knowing whether the work was parallel, with
+              its own launcher asking for tasks, a model, a worker count and a fusion mode. It is a
+              consequence now, and the only question it still asks was asked before the worktrees
+              existed rather than reported after they did. */}
+          {batch ? (
+            <div className="min-h-0 shrink-0 border-t border-hairline">
+              <Agents
+                key={batch.at}
+                workspace={workspace}
+                tasks={batch.tasks}
+                posture={posture}
+                profile={profile}
+              />
+            </div>
+          ) : null}
         </main>
         {/* The viewer is a consequence of opening a file, not a permanent third of the window. */}
         {openFile ? (

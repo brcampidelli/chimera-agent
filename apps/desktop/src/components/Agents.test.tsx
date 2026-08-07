@@ -28,19 +28,19 @@ function batch(over: Partial<AgentsBatch> = {}): AgentsBatch {
   return { is_repo: true, merged: 0, conflicts: [], results: [result()], ...over };
 }
 
-/** Drive the mocked stream: fill in two tasks, click Run all, and hand the component the given
- *  `batch_done` payload — the same shape the real SSE delivers. */
+/** Mount the board for a confirmed batch and hand it the given `batch_done` payload — the same
+ *  shape the real SSE delivers.
+ *
+ *  There is nothing to fill in and nothing to click. The launcher this used to drive is gone: the
+ *  confirmation happened on a card in the conversation, before the worktrees existed, and a board
+ *  that offered a second Run would mean that card was not the decision it looked like. */
 async function runBatch(done: AgentsBatch, tasks: string[] = ["add a test", "fix the lint"]) {
   const user = userEvent.setup();
   mockStreamAgents.mockImplementation(async (_req, handlers: AgentsStreamHandlers) => {
     handlers.onStart?.({ tasks, workspace: "/repo", max_workers: 4 });
     handlers.onBatchDone?.(done);
   });
-  renderWithProviders(<Agents workspace="/repo" />);
-
-  const boxes = screen.getAllByPlaceholderText(/Describe a change the agent should make/);
-  for (const [i, text] of tasks.entries()) await user.type(boxes[i], text);
-  await user.click(screen.getByRole("button", { name: /Run all/ }));
+  renderWithProviders(<Agents workspace="/repo" tasks={tasks} {...seams} />);
   return user;
 }
 
@@ -58,11 +58,7 @@ async function startHangingBatch(
     handlers.onStart?.({ tasks, workspace: "/repo", max_workers: 4 });
     return new Promise<void>(() => {}); // never settles: the batch is in flight
   });
-  renderWithProviders(<Agents workspace="/repo" />);
-
-  const boxes = screen.getAllByPlaceholderText(/Describe a change the agent should make/);
-  for (const [i, text] of tasks.entries()) await user.type(boxes[i], text);
-  await user.click(screen.getByRole("button", { name: /Run all/ }));
+  renderWithProviders(<Agents workspace="/repo" tasks={tasks} {...seams} />);
   return { user, handlers: () => captured };
 }
 
@@ -72,6 +68,11 @@ function cardStop(label: string) {
   return within(card).queryByRole("button", { name: /Stop/ });
 }
 
+/** Posture and profile travel with every batch. Omitting them is not neutral: server-side an absent
+ *  posture means no tool denials and no pause, and an absent profile means the reviewer is the model
+ *  that wrote the patch. */
+const seams = { posture: { reach: "workspace" as const, approval: "suspicious" as const }, profile: "balanced" as const };
+
 describe("Agents", () => {
   beforeEach(() => {
     mockStreamAgents.mockReset();
@@ -79,10 +80,14 @@ describe("Agents", () => {
     mockCancelAgents.mockResolvedValue({ ok: true, cancelled: 1 });
   });
 
-  it("shows the empty state before any batch has run", () => {
-    renderWithProviders(<Agents workspace="/repo" />);
+  it("offers no launcher of its own", async () => {
+    // The regression this guards is the old screen creeping back: eight task boxes, a model field,
+    // a worker count and three fusion modes, all asked before anyone knew whether the work was
+    // parallel. What the batch needs, the system resolves — the same way it does for a single run.
+    await runBatch(batch());
 
-    expect(screen.getByText("Add tasks above and Run all to start a parallel batch.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Run all/ })).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(/Describe a change/)).not.toBeInTheDocument();
   });
 
   it("renders one card per submitted task", async () => {
@@ -161,30 +166,37 @@ describe("Agents", () => {
   });
 
   it("surfaces a stream error instead of leaving the board silently empty", async () => {
-    const user = userEvent.setup();
     mockStreamAgents.mockImplementation(async (_req, handlers: AgentsStreamHandlers) => {
       handlers.onError?.("HTTP 500");
     });
-    renderWithProviders(<Agents workspace="/repo" />);
-
-    await user.type(screen.getAllByPlaceholderText(/Describe a change/)[0], "add a test");
-    await user.click(screen.getByRole("button", { name: /Run all/ }));
+    renderWithProviders(<Agents workspace="/repo" tasks={["add a test"]} {...seams} />);
 
     expect(await screen.findByText("HTTP 500")).toBeInTheDocument();
   });
 
-  it("only submits tasks that were actually filled in", async () => {
-    const user = userEvent.setup();
+  it("submits exactly the confirmed tasks, and asks for no verify command", async () => {
+    // No `verify` per task any more. The project's own command is resolved server-side, the same
+    // way a single run resolves it — a batch that asked again would be the one place still asking.
     mockStreamAgents.mockImplementation(async () => {});
-    renderWithProviders(<Agents workspace="/repo" />);
+    renderWithProviders(<Agents workspace="/repo" tasks={["add a test", "  ", "fix the lint"]} {...seams} />);
 
-    // Row 2 is left blank on purpose.
-    await user.type(screen.getAllByPlaceholderText(/Describe a change/)[0], "add a test");
-    await user.type(screen.getAllByPlaceholderText(/exit 0/i)[0], "npm test");
-    await user.click(screen.getByRole("button", { name: /Run all/ }));
+    await waitFor(() => expect(mockStreamAgents).toHaveBeenCalledOnce());
+    expect(mockStreamAgents.mock.calls[0][0].tasks).toEqual([
+      { task: "add a test", verify: null },
+      { task: "fix the lint", verify: null },
+    ]);
+  });
 
-    expect(mockStreamAgents).toHaveBeenCalledOnce();
-    expect(mockStreamAgents.mock.calls[0][0].tasks).toEqual([{ task: "add a test", verify: "npm test" }]);
+  it("is not structurally weaker than the same task run alone", async () => {
+    // Omitting these is not neutral. Server-side an absent posture resolves to no tool denials and
+    // no pause — more permissive than any corner of the grid a user could pick — and an absent
+    // profile makes the reviewer the model that wrote the patch. Being one of several must not
+    // quietly change what an agent is allowed to do.
+    mockStreamAgents.mockImplementation(async () => {});
+    renderWithProviders(<Agents workspace="/repo" tasks={["add a test"]} {...seams} />);
+
+    await waitFor(() => expect(mockStreamAgents).toHaveBeenCalledOnce());
+    expect(mockStreamAgents.mock.calls[0][0]).toMatchObject(seams);
   });
 });
 
@@ -196,7 +208,7 @@ describe("Agents — stopping tasks", () => {
   });
 
   it("offers no Stop until a batch is in flight", () => {
-    renderWithProviders(<Agents workspace="/repo" />);
+    renderWithProviders(<Agents workspace="/repo" tasks={[]} {...seams} />);
 
     expect(screen.queryByRole("button", { name: /Stop/ })).not.toBeInTheDocument();
   });
@@ -271,21 +283,14 @@ describe("Agents — the project comes from one place", () => {
     // There used to be a second path field here. Two boxes asking one question meant you could
     // point Code at your app and this at somewhere else, launch a parallel batch, and find the
     // worktrees in a repository you had stopped thinking about.
-    renderWithProviders(<Agents workspace="/repo" />);
+    renderWithProviders(<Agents workspace="/repo" tasks={["do the thing"]} {...seams} />);
 
     expect(screen.queryByPlaceholderText(/workspace path|folder path/i)).not.toBeInTheDocument();
     expect(await screen.findByText("/repo")).toBeInTheDocument();
   });
 
   it("sends the chosen project to the batch, not an empty string", async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<Agents workspace="/repo" />);
-
-    await user.type(
-      screen.getAllByPlaceholderText(/Describe a change the agent should make/)[0],
-      "do the thing",
-    );
-    await user.click(screen.getByRole("button", { name: /Run all/ }));
+    renderWithProviders(<Agents workspace="/repo" tasks={["do the thing"]} {...seams} />);
 
     await waitFor(() => expect(streamAgents).toHaveBeenCalled());
     expect(vi.mocked(streamAgents).mock.calls[0][0]).toMatchObject({ workspace: "/repo" });

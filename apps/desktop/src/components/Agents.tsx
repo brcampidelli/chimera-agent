@@ -1,26 +1,27 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   Boxes,
   CheckCircle2,
   GitMerge,
   Loader2,
-  Play,
-  Plus,
   Square,
-  Trash2,
   XCircle,
 } from "lucide-react";
-import { cancelAgents, streamAgents, type AgentTaggedEvent } from "@/lib/api";
+import {
+  cancelAgents,
+  streamAgents,
+  type AgentTaggedEvent,
+  type Approval,
+  type Profile,
+  type Reach,
+} from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/panel";
 import { useT, type TFunc } from "@/lib/i18n";
 import type { AgentResult, AgentsBatch, FileDiff } from "@/lib/types";
-import { cn } from "@/lib/utils";
 
 import { DiffView } from "@/components/code/DiffView";
-
-const fieldCls = "field w-full px-3 text-sm";
 
 /** Map one tagged live event to a compact localized line (backend `text` is English; the attempt
  *  number is already inside `text`, so we don't read the numeric index here). */
@@ -30,64 +31,6 @@ function liveLine(e: AgentTaggedEvent, t: TFunc): string | null {
   if (e.kind === "result") return e.text; // e.g. "attempt 2 passed/failed"
   if (e.kind === "edit" && e.path) return `${t("agents.edited")} ${e.path}`;
   return null;
-}
-
-/** One task's input row: a task textarea + optional verify command, with a remove button. */
-function TaskRow({
-  index,
-  task,
-  verify,
-  disabled,
-  removable,
-  onTask,
-  onVerify,
-  onRemove,
-}: {
-  index: number;
-  task: string;
-  verify: string;
-  disabled: boolean;
-  removable: boolean;
-  onTask: (v: string) => void;
-  onVerify: (v: string) => void;
-  onRemove: () => void;
-}) {
-  const t = useT();
-  return (
-    <div className="space-y-1.5 rounded-chip border border-border bg-surface-2 p-2.5">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {t("agents.task")} {index + 1}
-        </span>
-        {removable ? (
-          <button
-            type="button"
-            onClick={onRemove}
-            disabled={disabled}
-            title={t("agents.removeTask")}
-            aria-label={t("agents.removeTask")}
-            className="text-muted-foreground transition-colors hover:text-bad disabled:opacity-40"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        ) : null}
-      </div>
-      <textarea
-        className={`${fieldCls} min-h-[56px] resize-y py-2`}
-        placeholder={t("agents.taskPlaceholder")}
-        value={task}
-        onChange={(e) => onTask(e.target.value)}
-        disabled={disabled}
-      />
-      <input
-        className={`${fieldCls} h-8 font-mono text-xs`}
-        placeholder={t("agents.verifyPlaceholder")}
-        value={verify}
-        onChange={(e) => onVerify(e.target.value)}
-        disabled={disabled}
-      />
-    </div>
-  );
 }
 
 /** One task card on the board: its live status while running, then its real final result. */
@@ -223,16 +166,28 @@ function AgentCard({
   );
 }
 
-export function Agents({ workspace }: { workspace: string }) {
+/** The board for a confirmed parallel batch: N isolated runs, live, with their conflicts.
+ *
+ *  It used to be a destination with its own launcher — eight task boxes, a worker count, a model
+ *  field and three fusion modes, all chosen before anyone knew whether the work was parallel. The
+ *  launcher is gone. Asking for several things IS the request for a batch; this renders the batch
+ *  that was confirmed, and nothing else.
+ *
+ *  `tasks` is the confirmed decomposition and starting is not conditional on anything here: the
+ *  confirmation already happened, on a card that showed the split and whether isolation was real. */
+export function Agents({
+  workspace,
+  tasks,
+  posture,
+  profile,
+}: {
+  workspace: string;
+  tasks: string[];
+  /** The same reach/approval a single run gets — a batch must not be structurally weaker. */
+  posture: { reach: Reach; approval: Approval };
+  profile: Profile;
+}) {
   const t = useT();
-  const [tasks, setTasks] = useState<{ task: string; verify: string }[]>([
-    { task: "", verify: "" },
-    { task: "", verify: "" },
-  ]);
-  const [maxWorkers, setMaxWorkers] = useState(4);
-  const [model, setModel] = useState("");
-  const [mode, setMode] = useState<"single" | "fuse" | "cascade">("single");
-
   const [running, setRunning] = useState(false);
   const [labels, setLabels] = useState<string[]>([]); // the submitted task texts, in order
   const [live, setLive] = useState<Record<number, string[]>>({});
@@ -243,19 +198,6 @@ export function Agents({ workspace }: { workspace: string }) {
   // model step can't be interrupted). Both clear when the next batch starts.
   const [batchId, setBatchId] = useState<string | null>(null);
   const [stopping, setStopping] = useState<Record<number, boolean>>({});
-
-  const canRun = !running && tasks.some((r) => r.task.trim());
-
-  function setTaskAt(i: number, patch: Partial<{ task: string; verify: string }>) {
-    setTasks((prev) => prev.map((row, idx) => (idx === i ? { ...row, ...patch } : row)));
-  }
-  function addTask() {
-    if (tasks.length >= 8) return;
-    setTasks((prev) => [...prev, { task: "", verify: "" }]);
-  }
-  function removeTask(i: number) {
-    setTasks((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));
-  }
 
   // Cooperative Stop, per task: ask the backend to halt task `index` BEFORE its next attempt. An
   // in-flight model step can't be interrupted, so this never kills instantly — the task stops after
@@ -282,27 +224,32 @@ export function Agents({ workspace }: { workspace: string }) {
     }
   }
 
-  function runAll() {
-    const submitted = tasks.filter((r) => r.task.trim());
-    if (submitted.length === 0 || running) return;
+  // Start once, on mount, for the tasks that were confirmed. Not a button: the button was the
+  // confirmation, and offering a second one here would mean the card the user approved was not the
+  // decision it looked like.
+  useEffect(() => {
+    const submitted = tasks.map((task) => task.trim()).filter(Boolean);
+    if (submitted.length === 0) return;
     setRunning(true);
     setBatch(null);
     setError(null);
     setLive({});
     setBatchId(null);
     setStopping({});
-    setLabels(submitted.map((r) => r.task.trim()));
+    setLabels(submitted);
     const append = (index: number, line: string) =>
       setLive((prev) => ({ ...prev, [index]: [...(prev[index] ?? []), line] }));
 
     void streamAgents(
       {
-        tasks: submitted.map((r) => ({ task: r.task.trim(), verify: r.verify.trim() || null })),
+        // No verify command, no model, no fusion mode: the system resolves each from the project
+        // and the profile, the same way a single run does. A batch that asked for them again would
+        // be four questions the user has already stopped being asked everywhere else.
+        tasks: submitted.map((task) => ({ task, verify: null })),
         workspace: workspace || null,
-        max_workers: maxWorkers,
-        model: model.trim() || null,
-        fuse: mode === "fuse",
-        cascade: mode === "cascade",
+        max_workers: Math.min(submitted.length, 4),
+        posture,
+        profile,
       },
       {
         onBatchId: (id) => setBatchId(id),
@@ -325,7 +272,10 @@ export function Agents({ workspace }: { workspace: string }) {
         },
       },
     );
-  }
+    // Deliberately once per mount: the parent gives this component a key per confirmed batch, so a
+    // new batch is a new component rather than a re-run of an old one.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // The cards to render: the final results once the batch lands, else the in-flight task labels.
   const cards: { index: number; label: string; result: AgentResult | null }[] = batch
@@ -343,13 +293,14 @@ export function Agents({ workspace }: { workspace: string }) {
       </p>
 
       <div className="min-h-0 flex-1 overflow-auto">
-        {/* --- Config + task rows --- */}
+        {/* What is running, against what, and the one control that still applies. The config that
+            used to live here — a model field, three fusion modes, a worker count, eight task boxes
+            — is resolved by the system now, the same way it is for a single run. */}
         <div className="space-y-3 border-b border-hairline p-4">
           {/* The project comes from the one place a project is chosen, not from a field of its own.
               A second box asking for a path meant two answers to one question: you could point Code
               at your app and this at somewhere else, launch a parallel batch, and find the worktrees
-              in a repository you had stopped thinking about. The label stays so it is clear WHICH
-              project these run against — it just states the answer instead of asking again. */}
+              in a repository you had stopped thinking about. */}
           <div>
             <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {t("agents.workspace")}
@@ -359,77 +310,12 @@ export function Agents({ workspace }: { workspace: string }) {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <input
-              className={`${fieldCls} h-9 min-w-0 flex-1 font-mono text-xs`}
-              placeholder={t("agents.modelPlaceholder")}
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              disabled={running}
-            />
-            <div className="flex shrink-0 overflow-hidden rounded-chip border border-border">
-              {(["single", "fuse", "cascade"] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setMode(m)}
-                  disabled={running}
-                  className={cn(
-                    "px-2.5 py-1.5 text-xs transition-colors disabled:opacity-50",
-                    mode === m
-                      ? "bg-accent/20 text-accent"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {t(`agents.mode.${m}` as const)}
-                </button>
-              ))}
-            </div>
-            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              {t("agents.maxWorkers")}
-              <input
-                type="number"
-                min={1}
-                max={8}
-                className="field h-9 w-16 px-2 text-sm"
-                value={maxWorkers}
-                onChange={(e) => setMaxWorkers(Math.min(8, Math.max(1, Number(e.target.value) || 1)))}
-                disabled={running}
-              />
-            </label>
-          </div>
-
-          <div className="grid gap-2 lg:grid-cols-2">
-            {tasks.map((row, i) => (
-              <TaskRow
-                key={i}
-                index={i}
-                task={row.task}
-                verify={row.verify}
-                disabled={running}
-                removable={tasks.length > 1}
-                onTask={(v) => setTaskAt(i, { task: v })}
-                onVerify={(v) => setTaskAt(i, { verify: v })}
-                onRemove={() => removeTask(i)}
-              />
-            ))}
-          </div>
-
           <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="ghost" onClick={addTask} disabled={running || tasks.length >= 8}>
-              <Plus className="h-4 w-4" /> {t("agents.addTask")}
-            </Button>
-            <Button size="sm" disabled={!canRun} onClick={runAll}>
-              {running ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> {t("agents.running")}
-                </>
-              ) : (
-                <>
-                  <Play className="h-4 w-4" /> {t("agents.runAll")}
-                </>
-              )}
-            </Button>
+            {running ? (
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> {t("agents.running")}
+              </span>
+            ) : null}
             {/* Cooperative Stop for the WHOLE batch: every task halts before its next attempt. */}
             {running ? (
               <Button
@@ -504,9 +390,7 @@ export function Agents({ workspace }: { workspace: string }) {
               />
             ))}
           </div>
-        ) : (
-          <div className="px-5 py-8 text-center text-xs text-muted-foreground">{t("agents.empty")}</div>
-        )}
+        ) : null}
       </div>
     </div>
   );
