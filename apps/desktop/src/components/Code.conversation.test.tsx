@@ -2,7 +2,14 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Code } from "@/components/Code";
-import { deleteCodeSession, getFsTree, getGitStatus, getRuns, streamCodeTurn } from "@/lib/api";
+import {
+  deleteCodeSession,
+  getFsTree,
+  getGitStatus,
+  getRuns,
+  streamCodeTurn,
+  streamRun,
+} from "@/lib/api";
 import { emptyTree, gitStatus, scriptTurn } from "@/test/code-api-mock";
 import { renderWithProviders } from "@/test/utils";
 
@@ -93,26 +100,26 @@ describe("Code — the conversation", () => {
     expect(await screen.findByText("That turn failed.")).toBeInTheDocument();
   });
 
-  it("hands the same text to the verified run without starting it", async () => {
+  it("hands a failed turn to the verified run, which retries and reverts", async () => {
     // This used to be a second button in the composer, asking the user to guess in advance whether
-    // the work deserved retries. It is reached as a CONSEQUENCE now — the turn's verification failed
-    // and the multi-attempt run is one of the two things you can do about it. What has not changed
-    // is that it fills the task field rather than launching: the run's own settings are chosen
-    // there, and starting immediately would choose them silently.
+    // the work deserved retries. It is a CONSEQUENCE now — the turn's verification failed, and the
+    // multi-attempt run is one of the two things you can do about it.
+    //
+    // It also used to fill a form and wait for a second press, so the verify command and the attempt
+    // count could be set first. Those fields no longer exist and the server infers the command from
+    // the project, so waiting for a press on a form with nothing left to fill in is not consent. The
+    // global status bar shows the run and can stop it from any screen.
     vi.mocked(streamCodeTurn).mockImplementation(
       scriptTurn({
         verified: { command: "make test", source: "inferred:Makefile", state: "failed" },
       }),
     );
     const user = await say("make the test pass");
-    vi.mocked(streamCodeTurn).mockClear();
 
     await user.click(await screen.findByRole("button", { name: /try to fix it/i }));
 
-    await waitFor(() =>
-      expect(screen.getByPlaceholderText(/^Describe the change/)).toHaveValue("make the test pass"),
-    );
-    expect(streamCodeTurn).not.toHaveBeenCalled();
+    await waitFor(() => expect(streamRun).toHaveBeenCalled());
+    expect(vi.mocked(streamRun).mock.calls[0][0]).toMatchObject({ task: "make the test pass" });
   });
 
   it("forgets the conversation server-side when cleared", async () => {

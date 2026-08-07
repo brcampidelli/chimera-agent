@@ -85,3 +85,47 @@ describe("out-of-checkout effects", () => {
     await waitFor(() => expect(screen.queryByText(/side effects/i)).not.toBeInTheDocument());
   });
 });
+
+/**
+ * What a receipt is allowed to claim.
+ *
+ * These four moved here from a run panel folded under the Code screen — a second implementation of
+ * this screen's launcher, with fewer features, now deleted. None of them was ever about that panel:
+ * each one names something the interface must not say. They are asserted against the surface that
+ * still says it.
+ *
+ * Two of the original seven did not survive the move, and it is worth writing down which. The panel
+ * offered Accept and Discard on a finished run — a git revert scoped to the run's own changed paths
+ * — with an honest disabled state outside a repo. This screen has no such control, so those two
+ * assertions describe a capability that was removed rather than relocated. The Work screen's git tab
+ * can still discard changes, just not scoped to one run.
+ */
+describe("what a receipt is allowed to claim", () => {
+  it("renders the verifier's real captured output when the attempt produced some", async () => {
+    await show(attempt({ verify_output: "1 passed in 0.42s" }));
+
+    expect(await screen.findByText(/1 passed in 0.42s/)).toBeInTheDocument();
+  });
+
+  it("fabricates no verify panel when the verifier produced none", async () => {
+    // An empty box where output goes reads as "the verifier said nothing", which is a different
+    // claim from "we never captured any".
+    await show(attempt({ verify_output: "", diff_summary: "1 file changed" }));
+
+    expect(await screen.findByText(/1 file changed/)).toBeInTheDocument();
+    expect(screen.queryByText(/passed in/)).not.toBeInTheDocument();
+  });
+
+  it("labels a reverted attempt as attempted-and-undone, never as applied", async () => {
+    await show(attempt({ success: false, verified: false, reverted: true, evidence: "none" }));
+
+    expect(await screen.findByText(/reverted/)).toBeInTheDocument();
+  });
+
+  it("does not label a successful attempt as reverted", async () => {
+    await show(attempt({ reverted: false }));
+
+    await waitFor(() => expect(mockGetRuns).toHaveBeenCalled());
+    expect(screen.queryByText(/↩/)).not.toBeInTheDocument();
+  });
+});
