@@ -110,7 +110,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   and **say** they were clipped, because a reader who cannot tell a truncated observation from a
   complete one will eventually draw a conclusion from half of one.
 
+- **The Code screen stops asking, and starts telling.** It opened with a folder field, a file tree, a
+  command runner, two three-value safety selectors, a profile table, a verify command, an attempt
+  count, a fusion mode, a plan preview and a screenshot panel — eleven decisions before typing a
+  word, most of them questions the system can answer better. What replaced them is not silence,
+  because silence would have been a lie: omitting posture resolves server-side to *no* tool denials
+  and *no* pause, and omitting the profile makes the reviewer the very model that wrote the patch,
+  so the app now **sends** what the selectors expressed and **states** it. A line above the composer
+  says what is true on this machine right now — asked of the sandbox rather than read off the config
+  — and the one case where the honest answer contradicts what you configured (a container set up,
+  none running) is pre-emptive, because telling someone their sandbox was down *after* a shell
+  command already ran on their machine is a report, not a warning.
+- **The verify command is inferred, and the receipt says who chose it.** `package.json` scripts
+  (excluding the npm scaffold that exits 1 and would fail everything), a `Makefile` `test:` target,
+  pytest config or a `tests/` directory, `Cargo.toml`, `go.mod` — and **`None`, never a guess**. No
+  model and no execution are involved, which is what keeps `evidence == "verifier"` meaning exactly
+  what it meant before: a real command judged, and its exit code was the authority. Receipts carry
+  `verify_source`, so a stored run can never be read as "the user chose this". When nothing is found,
+  the run says so out loud — *this is judged by a model reading the answer, not by tests* — which was
+  always true when the field was left empty, and which the interface never said.
+- **One honest button.** The composer had two, and they were not two ways of doing one thing: Send
+  edited your files and kept whatever it wrote, while "Run with verification" beside it planned,
+  verified and reverted on failure. Nothing on the screen said so, so pressing Enter was silently the
+  weaker choice — and Enter is what people press. A conversation turn that edits now takes a
+  workspace snapshot first, resolves the same verify command a run would, and reports the verdict.
+  The undo is **offered, not applied**: a run reverts itself because you asked for a verdict, but
+  silently undoing what someone watched being typed is a worse surprise than a failing test. The
+  token is single-use.
+- **Running several agents stops being a place you go.** The parallel batch was a destination chosen
+  before anyone knew whether the work was parallel, and it asked eight questions first. Asking for
+  several things IS the request now: a numbered or bulleted list of at least two substantial items
+  proposes a split, deterministically, and everything ambiguous stays one job. One confirmation, on a
+  card that shows the jobs **and whether isolation is real, before any worktree exists** — the old
+  screen reported "this batch ran WITHOUT isolation" in its results banner, after N agents had
+  already edited the same directory.
+
 ### Fixed
+- **Tier resolution never looked at which providers you actually have.** `resolve_tiers` returned a
+  preset ladder of three OpenRouter slugs regardless of configured keys, so a user with a single
+  Anthropic key who picked any profile had their run routed to models they could not call — around
+  the one model that worked, silently. A ladder whose slugs are all unreachable now falls back to the
+  configured default model, and says it did (`source: "fallback_single_model"`). Matching is on the
+  slug's **first segment**, which is what the gateway itself uses. With no keys configured at all the
+  filter does nothing, so it only bites when you have *some* keys and the ladder wants *others*.
+- **The conversation claimed it would pause, and could not.** The posture sentence reported
+  `pauses: "tainted"` on every surface, but `/api/code/turn` passes neither a taint ledger nor a
+  checkpointer — a conversation has no mechanism to stop for a verdict. `describe()` now knows which
+  surface is asking and resolves to `"never"` where pausing is impossible.
+- **The `max` profile could not finish, and the costing pilot is what found it.** Its top tier on the
+  `edit` role timed out 3/3 with empty patches. `edit` now draws from the mid tier. The pilot's own
+  numbers, and three retractions it forced, are written up in `bench/role_routing/PILOT.md`.
+- **The chosen project was chosen every launch and remembered never.** The workspace field always
+  reached runs, the tree and git; what it did not do was persist, so every restart began in the app's
+  default directory.
+- **"Was it worth it?" counted a pass by a model the same as a pass by a test.** The panel now reports
+  `passed_by_verifier` beside `passed`, reading the `evidence` field it had been ignoring.
 - **A hung unit froze the program *after* it had already succeeded.** `run_isolated`'s timeout
   worked — the hung unit was reported as a timeout and the batch returned on schedule — and then the
   process sat in `Thread.join` until that unit finished, up to ten minutes later. The code said
@@ -175,6 +229,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   armed. The safest-looking invocation was the undefended one. The marker is now declared on the
   `Tool` interface and resolved through the whole wrapper chain (`is_untrusted_output`), so wrapper
   order no longer matters and a future wrapper that forgets to mirror it cannot reopen the hole.
+
+
+### Removed
+
+- **`POST /api/verify/screenshot`, and with it the codebase's one deliberate SSRF exception.** The
+  panel was a screenshot of a URL you typed, next to a coding conversation, and deleting it removed
+  the only caller of `capture_local` — the single place a private host was reachable on purpose. The
+  agent keeps its own browser tool, which is subject to the same guards as everything else.
+- **The file tree and the command runner.** A conversation that can read and edit does not need a
+  second way to browse and a third way to run things; what the agent touched is a link in the
+  transcript, which is how a terminal that linkifies paths already works.
 
 ## [0.38.0] - 2026-07-30
 
