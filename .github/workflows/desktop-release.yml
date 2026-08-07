@@ -80,7 +80,7 @@ jobs:
       # source tree (no _desktop_dist) and --add-data supplies the built SPA — no double-include clash.
       - name: Install the backend (editable) + PyInstaller
         run: |
-          uv sync --extra desktop
+          uv sync --extra desktop --extra documents --extra stt
           uv pip install pyinstaller
 
       - name: Freeze the backend sidecar

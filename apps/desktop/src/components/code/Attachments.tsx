@@ -182,10 +182,18 @@ export function DictateButton({ onText }: { onText: (text: string) => void }) {
 
   async function send(audio: Blob) {
     setState("working");
+    // The first recording on a machine downloads the speech model — a few hundred megabytes, on a
+    // click that promised to type a sentence. The app ships the transcriber but not the weights, so
+    // this wait exists exactly once and looks identical to a hang if nobody says why.
+    setNote(t("code.dictate.working"));
     try {
       const result = await transcribe(audio);
-      if (result.text) onText(result.text);
-      else setNote(result.note || t("code.dictate.nothing"));
+      if (result.text) {
+        onText(result.text);
+        setNote("");
+      } else {
+        setNote(result.note || t("code.dictate.nothing"));
+      }
     } catch {
       setNote(t("code.dictate.failed"));
     }

@@ -64,6 +64,16 @@ def main() -> int:
         "--collect-all", "litellm",
         "--collect-all", "tiktoken",
         "--collect-all", "tiktoken_ext",
+        # Attachments and dictation, shipped so both work without the user installing anything.
+        # Neither survives a naive freeze: markitdown picks its converters at runtime, and
+        # faster-whisper's real work happens in ctranslate2 and onnxruntime, whose native libraries
+        # no import graph reveals. Collecting them whole is the only thing that reliably works —
+        # and each one costs real megabytes, which is why they are listed one by one rather than
+        # swept in, so removing one later is a single line.
+        "--collect-all", "markitdown",
+        "--collect-all", "faster_whisper",
+        "--collect-all", "ctranslate2",
+        "--collect-all", "onnxruntime",
         "--collect-data", "chimera",
         "--add-data", add_data,
         "--hidden-import", "uvicorn",

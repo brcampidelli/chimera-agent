@@ -228,6 +228,15 @@ strict = true
 ignore_missing_imports = true
 warn_unused_ignores = false
 
+# Do not type-check inside third-party packages we merely import. This surfaced when the `stt` extra
+# pulled numpy in: its shipped stubs use `type` statements, which are Python 3.12 syntax, and we
+# check against 3.11 — so an optional dependency of an optional feature could fail the type gate of
+# the whole project. What a library's own stubs claim about itself is not a fact about our code.
+[[tool.mypy.overrides]]
+module = ["numpy.*", "faster_whisper.*", "ctranslate2.*", "onnxruntime.*", "markitdown.*"]
+follow_imports = "skip"
+follow_imports_for_stubs = true
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

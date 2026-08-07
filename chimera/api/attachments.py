@@ -98,7 +98,7 @@ def save(home: Path, name: str, data: bytes) -> Attachment:
     except ImportError:
         return Attachment(
             id=ident, name=name, kind="document", path=path,
-            note="reading this format needs the `docs` extra — install it to attach documents",
+            note="reading this format needs the `documents` extra — install it to attach this file type",
         )
     except Exception as exc:  # noqa: BLE001 — an unreadable file is a bad upload, not a crash
         return Attachment(id=ident, name=name, kind="document", path=path, note=f"could not read: {exc}")
