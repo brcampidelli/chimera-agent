@@ -1338,6 +1338,24 @@ def _build_solve_agent(
     # what lets the control disappear and the capability stay.
     verify_command, verify_source = resolve_verify(req.verify, ws)
 
+    # The flywheel: experience, trajectories, memory, the auto-evolver, skill cards and the playbook.
+    #
+    # The desktop app has always been the surface that does the most work and learned the least from
+    # it — `chimera solve` in a terminal accumulated memory, minted skills and grew a playbook, while
+    # every run started from the app threw all of it away. The same shared factory the Kanban lanes,
+    # the orchestration lifecycle and the workflow executors already use, with the same flags, so
+    # this is a path joining the flywheel rather than a second copy of the wiring.
+    from chimera.evolution import build_evolution_context
+
+    evo = build_evolution_context(
+        settings,
+        gateway,
+        roles.models.edit or req.model,
+        home=settings.home,
+        include_memory=True,
+        include_playbook=True,
+    )
+
     return _AutonomousAgent(
         worker,
         should_stop=should_stop,
@@ -1363,10 +1381,18 @@ def _build_solve_agent(
         profile_source=req.profile_source,
         verify_source=verify_source,
         meter=meter,
-        # HITL. The ledger tells the agent whether this run went tainted; the checkpointer is where
-        # a paused run waits. Both only when the client supplied a thread — a pause with no durable
-        # identity is a run nobody can ever come back to, which is worse than not pausing.
-        taint=ledger if req.thread_id else None,
+        # Every learning seam the CLI has. Passed AFTER the explicit arguments so a future field
+        # here cannot silently shadow one of them.
+        **evo.apply_to(),
+        # The ledger, ALWAYS — decoupled from the thread id, which used to gate it alongside the
+        # checkpointer. That gating was right for the checkpointer (a pause with no durable identity
+        # is a run nobody can come back to) and wrong for the ledger, which only observes. With no
+        # ledger the agent answers "was this run tainted?" with False rather than "I don't know", and
+        # now that the run WRITES to long-term memory that false answer would store a fact learned
+        # from untrusted content as clean — the exact poisoning path the provenance field exists to
+        # prevent. Passing it always costs nothing: pausing is still governed by `pause_on_taint`,
+        # which stays gated on the thread.
+        taint=ledger,
         checkpointer=RunCheckpointer(settings.home / "runs.db") if req.thread_id else None,
         # Either the explicit flag or the posture can ask for a pause; both still need a thread,
         # because a paused run with no durable identity is one nobody can ever come back to.
