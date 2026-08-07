@@ -6,6 +6,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **One conversation, and the door without a guard closes.** There were two ways into the same
+  agent. The chat and the coding turn ran the same base tools, and only one of them was assembled
+  with a write region, a posture denylist and a taint ledger — so the unguarded door was also the
+  more permissive one, and nothing on either screen said which you had walked through. Ask the chat
+  to summarise a page carrying a planted instruction and nothing stopped it from writing the file
+  that instruction named; the coding turn refuses, because its ledger marks the run tainted. The
+  conversation absorbed what only the chat had (markdown with highlighting, scrolling that
+  disengages when you scroll up, `role="log"`, Stop, fusion, memory recall) and the chat's
+  destination is gone. The BACKEND stays: `ChatSession` and `/api/chat/stream` still serve the
+  messaging gateway, the OpenAI-compatible endpoint and the benchmarks — removing a door is not
+  removing the room.
+- **`CHIMERA_GUARD_CHAT`** assembles the chat agent like the coding turn. It ships **off**, because
+  that registry is shared with the messaging gateway and arming it by default would silently take
+  shell away from bots people already run — which makes the default a real exposure, and the
+  condition it ships under is that the app says so. The posture line now reports an unguarded
+  conversation as one that can still write after reading untrusted content, and names the switch.
+- **The desktop app learns from its own work.** It was the surface that did the most work and
+  learned the least: `chimera solve` in a terminal accumulated long-term memory, minted skills and
+  grew a playbook, while every run started from the app threw all of it away. Wired through the same
+  shared factory the Kanban lanes and workflow executors already use. What is written stays one
+  short keyed fact per verified success — never a transcript, never file content — and the diff gate
+  still means a hollow success mints nothing. Trajectory collection stays **off**: it writes every
+  step to a dataset for export, which is a deliberate act with a disk cost, not learning.
+- **The coding turn reads memory.** Reading is the safe half — a recalled fact from untrusted
+  content arrives labelled `[unverified]` and the admission gate still rejects injection patterns.
+  Writing from a conversation stays off, because with the workspace trusted by default a poisoned
+  README would enter looking clean, and a memory item has no project scope.
+
+### Fixed
+
+- **A fused turn answered about files it never opened.** "Fuse this turn" hands the agent's backend
+  to the fusion engine, and the engine drops the tool schemas — it logs at DEBUG and moves on. A
+  panel of models has nothing to call a tool with, so the turn finished in ONE step having touched
+  nothing and answered from the prompt alone, with the authority of three models agreeing. From
+  outside it was indistinguishable from a turn that legitimately needed no tool: both report zero
+  tool calls. Not fixed by routing the button through `RoutedBackend`, which would have made it a
+  silent no-op in every conversation that touches a file — the other way to lie. The turn now
+  declares itself, the answer is marked where someone is reading it, and the tooltip states the
+  consequence instead of selling the upside. The test that pins this did not exist.
+- **The taint ledger never reached a run without a thread id**, so `run_tainted()` answered `False`
+  rather than "unknown". Harmless while nothing was written; the precondition for everything above
+  once a run writes to memory, because a fact learned from untrusted content would have been stored
+  as clean. Pausing stays gated on the thread — that gating was right for the checkpointer and wrong
+  for the ledger, which only observes.
+- **The verify frame never reached the screen.** The server has always announced what will judge a
+  run before its first step, including the case that matters most — nothing executable will, so a
+  model reads the answer. The client had no branch for that event and dropped it, so the sentence
+  arrived afterwards in the receipt, when the run was over. A warning after the fact is a report.
+- **The conversation sidebar never refreshed**: its query key was read in one place and invalidated
+  in none, so a new or cleared conversation appeared only after a remount.
+- **A coding turn accepted any workspace path**, and ran against a directory the agent would then
+  create files in. It validates like the read-only file endpoints do — the one axis on which it was
+  more permissive than the chat it replaces.
+
+### Removed
+
+- **"Instruct and run"**, the folded panel under the conversation. It was never the shared launcher
+  — it was a second implementation of it, private to this screen, with fewer features than the one
+  on Work, and the smaller one was the one people met first. Its verify field protected nothing: an
+  empty box already sent `null`, and `null` already made the server read the project for a command.
+  Two capabilities did NOT survive the move and are named rather than dropped quietly: Accept and
+  Discard on a finished run (a git revert scoped to that run's own changed paths), and watching a
+  run's edits arrive as live diffs. The Work screen's git tab can still discard, but not scoped to
+  one run; a run's diffs are read from its receipt.
+
 ## [0.39.0] - 2026-08-07
 
 ### Added
