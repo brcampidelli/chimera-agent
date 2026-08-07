@@ -11,6 +11,7 @@ import {
   type Approval,
   type CodeToolEvent,
   type CodeTurnDone,
+  type Attachment,
   type CodeVerified,
   type Profile,
   type Reach,
@@ -18,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/panel";
 import { BrandMark } from "@/components/BrandMark";
+import { AttachButton, AttachmentTray, DictateButton } from "@/components/code/Attachments";
 import { BatchProposal } from "@/components/code/BatchProposal";
 import { DiffView } from "@/components/code/DiffView";
 import { decompose } from "@/lib/decompose";
@@ -248,6 +250,7 @@ export function Conversation({
 
   const [proposal, setProposal] = useState<string[] | null>(null);
   const [fuse, setFuse] = useState(false);
+  const [attached, setAttached] = useState<Attachment[]>([]);
   // Publish what this turn is doing, so the shell's footer and the activity panel keep working from
   // any screen. There is a test that exists precisely to say the agent must stay visible when you
   // navigate away mid-turn.
@@ -273,6 +276,7 @@ export function Conversation({
     }
     setProposal(null);
     setDraft("");
+    setAttached([]);
     setBusy(true);
     setExchanges((prev) => [...prev, { you: message, answer: "", tools: [], edits: [], done: null }]);
     let touchedFiles = false;
@@ -291,6 +295,7 @@ export function Conversation({
         posture,
         profile,
         fuse,
+        attachments: attached.map((a) => a.id),
       },
       {
         // Sent on every turn, not just the first: a client that drops it silently restarts the
@@ -491,6 +496,7 @@ export function Conversation({
           />
         ) : null}
         {controls ? <div className="pb-1">{controls}</div> : null}
+        <AttachmentTray items={attached} onRemove={(id) => setAttached((p) => p.filter((a) => a.id !== id))} />
         <textarea
           className="field min-h-[64px] w-full resize-y px-3 py-2 text-sm"
           placeholder={t("code.chat.placeholder")}
@@ -508,6 +514,10 @@ export function Conversation({
           disabled={busy}
         />
         <div className="flex flex-wrap items-center gap-2">
+          <AttachButton onAdded={(a) => setAttached((prev) => [...prev, a])} />
+          <DictateButton
+            onText={(text) => setDraft((prev) => (prev ? `${prev} ${text}` : text))}
+          />
           {/* Fusion is a per-turn choice, next to the box you type in — and it turns OFF the
               agent's ability to act, which the tooltip says before the click and `fusedAnswer` says
               at the answer. */}

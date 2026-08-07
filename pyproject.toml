@@ -148,6 +148,10 @@ desktop = [
     "fastapi>=0.110",
     "uvicorn>=0.29",
     "sse-starlette>=2.0",
+    # Multipart parsing for the two upload endpoints (attachments, dictation). FastAPI raises at
+    # REQUEST time without it, not at import, so a missing dependency here would ship as a working
+    # app whose attach button fails the first time anyone presses it.
+    "python-multipart>=0.0.9",
 ]
 # Build the documentation site (mkdocs-material). Only needed to render/deploy docs.
 docs = [

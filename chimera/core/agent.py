@@ -254,6 +254,7 @@ class Agent:
         on_tool: Callable[[ToolActivity], None] | None = None,
         on_edit: Callable[[str, str], None] | None = None,
         history: list[MessageLike] | None = None,
+        images: list[str] | None = None,
     ) -> AgentResult:
         """Run the tool loop. ``on_token`` streams model text deltas as they arrive (when the backend
         supports it); ``on_tool`` fires once per tool call with its outcome. ``on_edit`` fires with
@@ -284,7 +285,15 @@ class Agent:
         messages: list[MessageLike] = [
             {"role": "system", "content": system_prompt},
             *(history or []),
-            {"role": "user", "content": task},
+            # Images ride on THIS turn's user message, never on the history: the gateway base64-
+            # encodes each one into the request, so carrying them forward would re-send the same
+            # picture on every subsequent turn of the conversation — paid for again each time, and
+            # for a model with a small context window, eventually instead of the conversation.
+            (
+                {"role": "user", "content": task, "images": list(images)}
+                if images
+                else {"role": "user", "content": task}
+            ),
         ]
         tool_schema = self.tools.to_openai_schema(compact=self.config.compact_schemas) or None
         tool_calls_made = 0

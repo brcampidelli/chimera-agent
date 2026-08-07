@@ -28,6 +28,8 @@ export function makeCodeApiMock() {
     streamRun: vi.fn(),
     streamCodeTurn: vi.fn(),
     revertCodeTurn: vi.fn(),
+    uploadAttachment: vi.fn(),
+    transcribe: vi.fn(),
     deleteCodeSession: vi.fn(),
     getPostureFacts: vi.fn(),
     getRoleModels: vi.fn(),

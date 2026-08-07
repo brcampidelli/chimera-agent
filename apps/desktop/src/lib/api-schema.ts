@@ -55,6 +55,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Attachment
+         * @description Take one file for the agent to look at or read.
+         *
+         *     The response carries an id, never the content. Documents are converted to text HERE rather
+         *     than at turn time, so an unreadable PDF or a missing optional dependency surfaces while the
+         *     user is still looking at the attach button, instead of halfway through a turn they are
+         *     paying for. Images are stored as-is; the gateway encodes them into the request.
+         */
+        post: operations["upload_attachment_api_attachments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/benchmarks": {
         parameters: {
             query?: never;
@@ -1041,6 +1066,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/transcribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Transcribe Audio
+         * @description Speech to text, for dictating a message instead of typing it.
+         *
+         *     Runs through the same tool the agent uses — a local model when the `stt` extra is installed,
+         *     the API otherwise. Deliberately not a second implementation: a person dictating and an agent
+         *     transcribing a recording must not be able to get different answers, or to have one path work
+         *     while the other is quietly unconfigured.
+         */
+        post: operations["transcribe_audio_api_transcribe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/usage": {
         parameters: {
             query?: never;
@@ -1169,6 +1219,8 @@ export interface components {
         AgentsRequest: {
             /** Allow Tools */
             allow_tools?: string[] | null;
+            /** Attachments */
+            attachments?: string[];
             /**
              * Cascade
              * @default false
@@ -1227,6 +1279,32 @@ export interface components {
         ApprovedOut: {
             /** Approved */
             approved: boolean;
+        };
+        /**
+         * AttachmentOut
+         * @description One stored attachment: an id to send with a turn, and what we managed to make of the file.
+         *
+         *     Never the content. ``chars`` is how much text a document yielded, which is the honest way to say
+         *     "we read it" — a document that converted to nothing is not the same as one we never opened, and
+         *     ``note`` carries the reason when there is one.
+         */
+        AttachmentOut: {
+            /**
+             * Chars
+             * @default 0
+             */
+            chars: number;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Name */
+            name: string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
         };
         /** AttemptReceiptOut */
         AttemptReceiptOut: {
@@ -1362,6 +1440,16 @@ export interface components {
             /** Generated For */
             generated_for: string | null;
             internal_lift: components["schemas"]["BenchmarkLiftOut"] | null;
+        };
+        /** Body_transcribe_audio_api_transcribe_post */
+        Body_transcribe_audio_api_transcribe_post: {
+            /** File */
+            file: string;
+        };
+        /** Body_upload_attachment_api_attachments_post */
+        Body_upload_attachment_api_attachments_post: {
+            /** File */
+            file: string;
         };
         /** CacheCfgOut */
         CacheCfgOut: {
@@ -1504,6 +1592,8 @@ export interface components {
         CodeTurnRequest: {
             /** Allow Tools */
             allow_tools?: string[] | null;
+            /** Attachments */
+            attachments?: string[];
             /** Context Budget */
             context_budget?: number | null;
             /** Deny Tools */
@@ -2350,6 +2440,8 @@ export interface components {
         RunRequest: {
             /** Allow Tools */
             allow_tools?: string[] | null;
+            /** Attachments */
+            attachments?: string[];
             /**
              * Cascade
              * @default false
@@ -2509,6 +2601,19 @@ export interface components {
             count: number;
             /** Tools */
             tools: components["schemas"]["ToolInfoOut"][];
+        };
+        /**
+         * TranscriptOut
+         * @description Dictated speech, as text. ``note`` is non-empty when transcription could not be done.
+         */
+        TranscriptOut: {
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            /** Text */
+            text: string;
         };
         /** TurnOut */
         TurnOut: {
@@ -2728,6 +2833,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BatchCancelOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_attachment_api_attachments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_attachment_api_attachments_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentOut"];
                 };
             };
             /** @description Validation Error */
@@ -4509,6 +4647,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ToolsOut"];
+                };
+            };
+        };
+    };
+    transcribe_audio_api_transcribe_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_transcribe_audio_api_transcribe_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TranscriptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

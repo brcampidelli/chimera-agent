@@ -436,6 +436,9 @@ export interface CodeTurnInput {
   explorer?: boolean;
   posture?: { reach: Reach; approval: Approval } | null;
   profile?: Profile | null;
+  /** Ids from {@link uploadAttachment}. This turn only — an image re-sent on every later turn is
+   *  paid for again each time, for what is, after the first answer, no new information. */
+  attachments?: string[];
   /** Route this turn through the fusion panel. It will not be able to use tools — see
    *  {@link CodeTurnDone.fused}, which is how the answer says so. */
   fuse?: boolean;
@@ -501,6 +504,42 @@ export interface CodeTurnHandlers {
   onVerified?: (v: CodeVerified) => void;
   onDone?: (d: CodeTurnDone) => void;
   onError?: (msg: string) => void;
+}
+
+/** One file handed to the agent: an image to look at, or a document converted to text on arrival.
+ *
+ *  The response never carries the content back — `chars` is how much text a document yielded, which
+ *  is the honest way to say "we read it": a document that converted to nothing is not the same as
+ *  one we never opened, and `note` carries the reason when there is one. */
+export interface Attachment {
+  id: string;
+  name: string;
+  kind: string;
+  chars: number;
+  note: string;
+}
+
+export async function uploadAttachment(file: File): Promise<Attachment> {
+  const body = new FormData();
+  body.append("file", file);
+  const res = await fetch("/api/attachments", { method: "POST", headers: authHeaders(), body });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return (await res.json()) as Attachment;
+}
+
+/** Dictated speech, as text. `note` is non-empty when transcription could not be done — which the
+ *  composer shows rather than pasting an error message in as if it were what you said. */
+export interface Transcript {
+  text: string;
+  note: string;
+}
+
+export async function transcribe(audio: Blob): Promise<Transcript> {
+  const body = new FormData();
+  body.append("file", audio, "speech.webm");
+  const res = await fetch("/api/transcribe", { method: "POST", headers: authHeaders(), body });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return (await res.json()) as Transcript;
 }
 
 /** Undo the edits of a turn whose verification failed. Single-use: the token is consumed by the

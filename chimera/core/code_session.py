@@ -57,6 +57,7 @@ class SupportsCodeRun(Protocol):
         on_tool: Callable[[ToolActivity], None] | None = ...,
         on_edit: Callable[[str, str], None] | None = ...,
         history: list[MessageLike] | None = ...,
+        images: list[str] | None = ...,
     ) -> AgentResult: ...
 
 
@@ -130,14 +131,26 @@ class CodeSession:
         on_token: Callable[[str], None] | None = None,
         on_tool: Callable[[ToolActivity], None] | None = None,
         on_edit: Callable[[str, str], None] | None = None,
+        images: list[str] | None = None,
     ) -> AgentResult:
-        """Run one turn with the previous turns as history, and absorb the result."""
+        """Run one turn with the previous turns as history, and absorb the result.
+
+        ``images`` belong to THIS turn only. They are not stored with the conversation: the
+        transcript keeps the text of what was said, and re-sending a picture on every later turn
+        would be paid for again each time — for what is, after the first answer, no new information.
+        """
+        # Forwarded only when there ARE images. `SupportsCodeRun` is a published protocol in an
+        # open-source framework, so an implementation written before images existed is a reasonable
+        # thing to find in the wild — and passing `images=None` to it would break it for the sake of
+        # sending nothing.
+        extra: dict[str, Any] = {"images": images} if images else {}
         result = self.agent.run(
             task,
             on_token=on_token,
             on_tool=on_tool,
             on_edit=on_edit,
             history=list(self.messages),
+            **extra,
         )
         self.absorb(result)
         return result

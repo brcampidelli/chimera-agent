@@ -31,8 +31,8 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from fastapi import FastAPI, HTTPException, params
-from pydantic import BaseModel
+from fastapi import FastAPI, File, HTTPException, UploadFile, params
+from pydantic import BaseModel, Field
 
 # Module level, not inside the registration function, and that is load-bearing rather than tidiness:
 # this file uses `from __future__ import annotations`, so a `-> EventSourceResponse` return
@@ -55,7 +55,12 @@ from chimera.api.posture import (
 from chimera.api.posture import resolve as _resolve_posture
 from chimera.api.roles import Profile, RoleModels, RolePlan
 from chimera.api.roles import resolve as resolve_roles
-from chimera.api.schemas import CodeSessionMetaOut, CodeSessionOut
+from chimera.api.schemas import (
+    AttachmentOut,
+    CodeSessionMetaOut,
+    CodeSessionOut,
+    TranscriptOut,
+)
 from chimera.api.worth import WorthReport, summarize_worth
 from chimera.telemetry import get_logger
 
@@ -125,6 +130,14 @@ class CodeSeams(BaseModel):
     """Per-role model overrides, merged over the profile. Only the fields actually sent are applied,
     so a partial override cannot blank the rest of the profile back to the default model."""
 
+    attachments: list[str] = Field(default_factory=list)
+    """Ids from ``POST /api/attachments`` — images for the model to look at, documents for it to read.
+
+    Ids rather than inline data: a base64 image in the request body would be re-sent on every retry
+    and logged wherever the request is logged. They belong to THIS turn only, and are not stored with
+    the conversation — re-sending a picture on every later turn costs again for no new information.
+    """
+
     fuse: bool = False
     """Route THIS turn through the fusion panel.
 
@@ -150,6 +163,10 @@ class CodeSeams(BaseModel):
 #: snapshots to disk to support one button is a much larger promise than this button makes.
 _pending_reverts: dict[str, tuple[Any, Any]] = {}
 _MAX_PENDING_REVERTS = 8
+
+#: FastAPI's upload marker, hoisted out of the signatures so a call in an argument default does not
+#: trip the linter. Same object, same behaviour.
+_UPLOAD = File(...)
 
 
 def resolve_posture(posture: Posture | None) -> ResolvedPosture:
@@ -378,6 +395,32 @@ def register_code_api(
                 raise HTTPException(status_code=400, detail="workspace not found")
         else:
             ws = workspace
+        # Attachments: images the model looks at, documents it reads. Resolved here rather than in
+        # the request so a stale or forged id is simply skipped instead of reaching the model.
+        from chimera.api.attachments import load as load_attachment
+
+        images: list[str] = []
+        doc_blocks: list[str] = []
+        for ident in req.attachments:
+            found = load_attachment(settings.home, ident)
+            if found is None:
+                continue
+            if found.kind == "image":
+                images.append(str(found.path))
+            else:
+                # Extracted at upload and fenced there. Folded into the message rather than handed
+                # over as a file path, so it works with every model — including the ones that cannot
+                # see — and so the user does not need the document tool installed to attach a PDF.
+                from chimera.api.attachments import save as _save
+
+                text = _save(settings.home, found.name, found.path.read_bytes()).text
+                if text:
+                    doc_blocks.append(f"Attached document `{found.name}`:\n{text}")
+
+        message = req.message
+        if doc_blocks:
+            message = message + "\n\n" + "\n\n".join(doc_blocks)
+
         # Read memory BEFORE building the agent: the facts go into this turn's system prompt.
         facts, memory_layer = recall_facts(req.message, memory=memory, graph=graph)
         agent, ledger = build_agent(req, ws, facts)
@@ -436,12 +479,13 @@ def register_code_api(
                     agent.backend = fuse_backend  # type: ignore[assignment]
                 with lock_for(session_id):
                     result = session.send(
-                        req.message,
+                        message,
                         # Fusion has no token stream (the engine only implements `complete`), so
                         # asking for one would leave the screen blank until the whole panel lands.
                         on_token=on_token if (req.stream and not fused) else None,
                         on_tool=on_tool,
                         on_edit=on_edit,
+                        images=images or None,
                     )
                     if fused:
                         agent.backend = original_backend  # type: ignore[assignment]
@@ -566,6 +610,46 @@ def register_code_api(
         from chimera.api.runs import load_runs
 
         return summarize_worth(load_runs(settings.home / "runs.jsonl"))
+
+    @app.post("/api/attachments", dependencies=[guard], response_model=AttachmentOut)
+    async def upload_attachment(file: UploadFile = _UPLOAD) -> AttachmentOut:
+        """Take one file for the agent to look at or read.
+
+        The response carries an id, never the content. Documents are converted to text HERE rather
+        than at turn time, so an unreadable PDF or a missing optional dependency surfaces while the
+        user is still looking at the attach button, instead of halfway through a turn they are
+        paying for. Images are stored as-is; the gateway encodes them into the request.
+        """
+        from chimera.api.attachments import save as save_attachment
+
+        data = await file.read()
+        try:
+            saved = save_attachment(settings.home, file.filename or "file", data)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return AttachmentOut(
+            id=saved.id, name=saved.name, kind=saved.kind, chars=len(saved.text), note=saved.note
+        )
+
+    @app.post("/api/transcribe", dependencies=[guard], response_model=TranscriptOut)
+    async def transcribe_audio(file: UploadFile = _UPLOAD) -> TranscriptOut:
+        """Speech to text, for dictating a message instead of typing it.
+
+        Runs through the same tool the agent uses — a local model when the `stt` extra is installed,
+        the API otherwise. Deliberately not a second implementation: a person dictating and an agent
+        transcribing a recording must not be able to get different answers, or to have one path work
+        while the other is quietly unconfigured.
+        """
+        from chimera.api.attachments import save as save_attachment
+        from chimera.api.attachments import transcribe
+
+        saved = save_attachment(settings.home, file.filename or "speech.webm", await file.read())
+        text = transcribe(saved.path)
+        # The tool reports its own failures as text rather than raising. Passing "error: ..." into
+        # the composer as if it were dictation is the one outcome worth intercepting.
+        if text.lower().startswith("error"):
+            return TranscriptOut(text="", note=text)
+        return TranscriptOut(text=text.strip(), note="")
 
     @app.get("/api/code/sessions", dependencies=[guard], response_model=list[CodeSessionMetaOut])
     def list_code_sessions() -> list[dict[str, Any]]:

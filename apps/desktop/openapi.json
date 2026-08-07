@@ -125,6 +125,13 @@
             ],
             "title": "Allow Tools"
           },
+          "attachments": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Attachments",
+            "type": "array"
+          },
           "cascade": {
             "default": false,
             "title": "Cascade",
@@ -305,6 +312,40 @@
           "approved"
         ],
         "title": "ApprovedOut",
+        "type": "object"
+      },
+      "AttachmentOut": {
+        "description": "One stored attachment: an id to send with a turn, and what we managed to make of the file.\n\nNever the content. ``chars`` is how much text a document yielded, which is the honest way to say\n\"we read it\" \u2014 a document that converted to nothing is not the same as one we never opened, and\n``note`` carries the reason when there is one.",
+        "properties": {
+          "chars": {
+            "default": 0,
+            "title": "Chars",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind"
+        ],
+        "title": "AttachmentOut",
         "type": "object"
       },
       "AttemptReceiptOut": {
@@ -670,6 +711,34 @@
         "title": "BenchmarksOut",
         "type": "object"
       },
+      "Body_transcribe_audio_api_transcribe_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_transcribe_audio_api_transcribe_post",
+        "type": "object"
+      },
+      "Body_upload_attachment_api_attachments_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_attachment_api_attachments_post",
+        "type": "object"
+      },
       "CacheCfgOut": {
         "properties": {
           "completion": {
@@ -920,6 +989,13 @@
               }
             ],
             "title": "Allow Tools"
+          },
+          "attachments": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Attachments",
+            "type": "array"
           },
           "context_budget": {
             "anyOf": [
@@ -3159,6 +3235,13 @@
             ],
             "title": "Allow Tools"
           },
+          "attachments": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Attachments",
+            "type": "array"
+          },
           "cascade": {
             "default": false,
             "title": "Cascade",
@@ -3643,6 +3726,25 @@
         "title": "ToolsOut",
         "type": "object"
       },
+      "TranscriptOut": {
+        "description": "Dictated speech, as text. ``note`` is non-empty when transcription could not be done.",
+        "properties": {
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "TranscriptOut",
+        "type": "object"
+      },
       "TurnOut": {
         "properties": {
           "assistant": {
@@ -4113,6 +4215,45 @@
           }
         },
         "summary": "Cancel Agents"
+      }
+    },
+    "/api/attachments": {
+      "post": {
+        "description": "Take one file for the agent to look at or read.\n\nThe response carries an id, never the content. Documents are converted to text HERE rather\nthan at turn time, so an unreadable PDF or a missing optional dependency surfaces while the\nuser is still looking at the attach button, instead of halfway through a turn they are\npaying for. Images are stored as-is; the gateway encodes them into the request.",
+        "operationId": "upload_attachment_api_attachments_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_attachment_api_attachments_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Attachment"
       }
     },
     "/api/benchmarks": {
@@ -6248,6 +6389,45 @@
           }
         },
         "summary": "Tools Endpoint"
+      }
+    },
+    "/api/transcribe": {
+      "post": {
+        "description": "Speech to text, for dictating a message instead of typing it.\n\nRuns through the same tool the agent uses \u2014 a local model when the `stt` extra is installed,\nthe API otherwise. Deliberately not a second implementation: a person dictating and an agent\ntranscribing a recording must not be able to get different answers, or to have one path work\nwhile the other is quietly unconfigured.",
+        "operationId": "transcribe_audio_api_transcribe_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_transcribe_audio_api_transcribe_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranscriptOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Transcribe Audio"
       }
     },
     "/api/usage": {

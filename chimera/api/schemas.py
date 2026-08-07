@@ -38,6 +38,28 @@ class SessionMetaOut(BaseModel):
     updated_at: float
 
 
+class AttachmentOut(BaseModel):
+    """One stored attachment: an id to send with a turn, and what we managed to make of the file.
+
+    Never the content. ``chars`` is how much text a document yielded, which is the honest way to say
+    "we read it" — a document that converted to nothing is not the same as one we never opened, and
+    ``note`` carries the reason when there is one.
+    """
+
+    id: str
+    name: str
+    kind: str
+    chars: int = 0
+    note: str = ""
+
+
+class TranscriptOut(BaseModel):
+    """Dictated speech, as text. ``note`` is non-empty when transcription could not be done."""
+
+    text: str
+    note: str = ""
+
+
 class CodeSessionMetaOut(BaseModel):
     """One row of the coding-conversation list.
 
