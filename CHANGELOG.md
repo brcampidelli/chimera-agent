@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-08-07
+
 ### Added
 - **"Was it worth it?" — what each profile actually cost, and what it actually got.** Three facts per
   configuration, over the runs that really happened in your workspace: passed, attempts, cost. The
