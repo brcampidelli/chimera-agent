@@ -267,7 +267,12 @@ export function Conversation({
       {
         // Sent on every turn, not just the first: a client that drops it silently restarts the
         // conversation, and the symptom is only that the agent seems forgetful.
-        onSession: (id) => setSessionId(id),
+        onSession: (id) => {
+          // Invalidate on the FIRST turn's id, not on every turn: the sidebar lists conversations,
+          // and a conversation that already exists in the list has not changed by gaining a message.
+          if (id !== sessionId) void qc.invalidateQueries({ queryKey: ["code-sessions"] });
+          setSessionId(id);
+        },
         onToken: (text) => patchLast((e) => ({ ...e, answer: e.answer + text })),
         onTool: (tool) => patchLast((e) => ({ ...e, tools: [...e.tools, tool] })),
         onEdit: (path, patch) => {
@@ -319,6 +324,7 @@ export function Conversation({
     if (!id) return;
     try {
       await deleteCodeSession(id);
+      void qc.invalidateQueries({ queryKey: ["code-sessions"] });
     } catch {
       // Forgetting the id locally is what the user asked for; a failed server delete leaves an
       // orphan file, which is not worth an error message they can do nothing about.

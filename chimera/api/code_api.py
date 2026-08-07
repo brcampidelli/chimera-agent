@@ -31,7 +31,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from fastapi import FastAPI, params
+from fastapi import FastAPI, HTTPException, params
 from pydantic import BaseModel
 
 # Module level, not inside the registration function, and that is load-bearing rather than tidiness:
@@ -321,7 +321,16 @@ def register_code_api(
     async def code_turn(req: CodeTurnRequest) -> EventSourceResponse:
         # SAFETY POSTURE: identical to the run endpoint — file writes and shell inside ``ws``, behind
         # the bearer guard and the localhost bind, scoped by whatever seams the caller declared.
-        ws = Path(req.workspace).expanduser().resolve() if req.workspace else workspace
+        # Validated the same way the read-only fs endpoints and POST /api/runs validate theirs. A
+        # path that does not exist used to be accepted silently, and the turn would run against a
+        # directory the agent then created files in — the one axis on which this endpoint was more
+        # permissive than the chat it is replacing.
+        if req.workspace:
+            ws = Path(req.workspace).expanduser().resolve()
+            if not ws.is_dir():
+                raise HTTPException(status_code=400, detail="workspace not found")
+        else:
+            ws = workspace
         agent = build_agent(req, ws)
         session = store.load(req.session_id, agent) if req.session_id else CodeSession(agent)
         session.agent = agent  # a loaded session carries messages, not the agent that made them

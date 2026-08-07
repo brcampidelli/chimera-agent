@@ -264,3 +264,17 @@ def test_an_unknown_revert_token_is_refused_rather_than_erroring(
 ) -> None:
     client = _client(tmp_path, patched)
     assert client.post("/api/code/revert/nope").json() == {"ok": False, "restored": 0}
+
+
+def test_a_workspace_that_does_not_exist_is_refused_rather_than_created(
+    tmp_path: Path, patched: Any
+) -> None:
+    # The one axis on which this endpoint was more permissive than the chat it replaces: any path was
+    # accepted, and the turn ran against a directory the agent would then create files in. The
+    # read-only fs endpoints and POST /api/runs both validate; this one did not.
+    client = _client(tmp_path, patched)
+    response = client.post(
+        "/api/code/turn", json={"message": "hi", "workspace": str(tmp_path / "nope")}
+    )
+    assert response.status_code == 400
+    assert not (tmp_path / "nope").exists()

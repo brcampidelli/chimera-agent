@@ -2,6 +2,7 @@ import { useRef } from "react";
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import { cn } from "@/lib/utils";
+import { Network } from "lucide-react";
 import { BrandMark } from "@/components/BrandMark";
 import { focusRing } from "@/components/ui/focus";
 import { useT } from "@/lib/i18n";
@@ -18,11 +19,14 @@ function Bubble({
   role,
   content,
   streaming,
+  fused,
 }: {
   role: "user" | "assistant";
   content: string;
   streaming?: boolean;
+  fused?: boolean;
 }) {
+  const t = useT();
   if (role === "user") {
     return (
       <div className="flex justify-end">
@@ -46,6 +50,17 @@ function Bubble({
         ) : (
           <Markdown rehypePlugins={[rehypeHighlight]}>{content}</Markdown>
         )}
+        {/* Said AT the answer, which is the only place it lands in time. The composer's hint warns
+            before the click and the tooltip warns before that, but neither is visible at the moment
+            someone reads a confident description of a file that was never opened — and a fused turn
+            reports zero tool calls, which is indistinguishable from a turn that simply did not need
+            any. */}
+        {fused ? (
+          <p className="mt-1.5 flex items-start gap-1.5 text-xs text-warn">
+            <Network className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            {t("composer.fusedAnswer")}
+          </p>
+        ) : null}
       </div>
     </div>
   );
@@ -86,7 +101,7 @@ export function Chat({ messages, live, busy }: Props) {
           ) : (
             <>
               {messages.map((m, i) => (
-                <Bubble key={i} role={m.role} content={m.content} />
+                <Bubble key={i} role={m.role} content={m.content} fused={m.fused} />
               ))}
               {busy && live && <Bubble role="assistant" content={live} streaming />}
             </>

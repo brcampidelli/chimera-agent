@@ -1208,3 +1208,58 @@ def test_the_screenshot_endpoint_is_gone_along_with_its_private_host_exception(t
 
     assert client.post("/api/verify/screenshot", json={"url": "http://localhost:5173"}).status_code == 404
     assert client.get("/api/artifacts/anything").status_code == 404
+
+
+def test_a_fused_turn_says_it_could_not_use_tools(tmp_path: Any) -> None:
+    """The failure this pins is the worst kind the app can produce, and it shipped for months.
+
+    `FusionEngine.complete` drops the tool schemas it is handed (it logs at DEBUG and moves on), and
+    a panel of models has nothing to call a tool with. So a fused turn finishes in ONE step having
+    touched nothing, and answers from the prompt alone. Ask it to read a file and it describes a file
+    it never opened — with the authority of three models agreeing.
+
+    From outside, that turn was indistinguishable from a turn that legitimately needed no tool: both
+    report zero tool calls. `fused` is the entire difference, and it is what lets the UI say which
+    happened at the moment someone is reading the answer.
+    """
+    from chimera.api import build_api_app
+
+    fuse_backend = object()
+
+    class _ToollessWhenFused:
+        def __init__(self) -> None:
+            self.backend: Any = object()
+
+        def run(self, task: str, *, on_token: Any = None, on_tool: Any = None) -> AgentResult:
+            # Exactly what the real engine produces: one step, no tool call, a confident answer.
+            return AgentResult(answer="the config looks fine", steps=1, stopped_reason="final")
+
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    client = TestClient(
+        build_api_app(
+            lambda: ChatSession(_ToollessWhenFused()), settings=settings, fuse_backend=fuse_backend
+        )
+    )
+
+    fused = next(
+        d
+        for e, d in _read_sse(
+            client.post(
+                "/api/chat/stream", json={"message": "read config.yaml and tell me what is wrong", "fuse": True}
+            ).text
+        )
+        if e == "done"
+    )
+    assert fused["fused"] is True
+    assert fused["tool_names"] == []  # the point: zero tools, and now the turn admits why
+
+    plain = next(
+        d
+        for e, d in _read_sse(
+            client.post("/api/chat/stream", json={"message": "hello"}).text
+        )
+        if e == "done"
+    )
+    # A turn that simply did not need a tool must NOT be marked — otherwise the warning means nothing.
+    assert plain["fused"] is False
+    assert plain["tool_names"] == []

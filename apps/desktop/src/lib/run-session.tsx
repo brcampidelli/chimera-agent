@@ -8,6 +8,7 @@ import {
   type RunDone,
   type RunEvent,
   type RunRequestInput,
+  type RunVerify,
 } from "@/lib/api";
 
 /**
@@ -47,6 +48,13 @@ export interface RunSession {
   broken: boolean;
   /** The run stopped for a human verdict. Not a failure and not a success — an open question. */
   paused: PausedRun | null;
+  /**
+   * What is about to judge this run, from the frame the server sends BEFORE the first step.
+   *
+   * Held in the session rather than in the launcher because it must survive navigating away: a run
+   * judged by a model reading the answer is the same run whichever screen you are looking at.
+   */
+  verify: RunVerify | null;
   start: (req: RunRequestInput, handlers?: RunSessionHandlers) => void;
   stop: () => void;
   /** Clear a resolved pause once its resume has been launched. */
@@ -69,6 +77,7 @@ export function RunSessionProvider({ children }: { children: ReactNode }) {
   const [stopping, setStopping] = useState(false);
   const [broken, setBroken] = useState(false);
   const [paused, setPaused] = useState<PausedRun | null>(null);
+  const [verify, setVerify] = useState<RunVerify | null>(null);
   // Read inside the stream callbacks, which close over the value at start(). A ref rather than
   // state because a mid-run subscriber change must reach the in-flight stream, not the next one.
   const handlers = useRef<RunSessionHandlers>({});
@@ -84,6 +93,7 @@ export function RunSessionProvider({ children }: { children: ReactNode }) {
       setEvents([]);
       setDone(null);
       setPaused(null);
+      setVerify(null);
       setTask(req.task);
 
       const finish = (frame: RunDone | null, success: boolean) => {
@@ -97,6 +107,7 @@ export function RunSessionProvider({ children }: { children: ReactNode }) {
       void streamRun(req, {
         onRunId: (id) => setRunId(id),
         onEvent: (e) => setEvents((prev) => [...prev, e]),
+        onVerify: (v) => setVerify(v),
         onDone: (d) => finish(d, d.success),
         // A pause resolves the STREAM without resolving the RUN. It ends as neither success nor
         // failure, because it has not reached a verdict — it is waiting on a person.
@@ -127,8 +138,8 @@ export function RunSessionProvider({ children }: { children: ReactNode }) {
   }, [runId, stopping]);
 
   const value = useMemo(
-    () => ({ running, task, runId, events, done, stopping, broken, paused, start, stop, clearPaused }),
-    [running, task, runId, events, done, stopping, broken, paused, start, stop, clearPaused],
+    () => ({ running, task, runId, events, done, stopping, broken, paused, verify, start, stop, clearPaused }),
+    [running, task, runId, events, done, stopping, broken, paused, verify, start, stop, clearPaused],
   );
   return <RunSessionContext.Provider value={value}>{children}</RunSessionContext.Provider>;
 }
@@ -151,6 +162,7 @@ export function useRunSession(): RunSession {
       stopping: false,
       broken: false,
       paused: null,
+      verify: null,
       start: () => {},
       stop: () => {},
       clearPaused: () => {},

@@ -172,6 +172,17 @@ export function RunLauncher({
         </span>
       </div>
       <p className="text-xs text-muted-foreground">{t("runs.safetyNote")}</p>
+      {/* What is about to judge this run, said BEFORE the first step. The server has always sent
+          this frame; the client dropped it, so the sentence that mattered most — "nothing executable
+          is judging this, a model will read the answer" — reached the user only afterwards, in the
+          receipt, when the run was already over. A warning that arrives after the fact is a report. */}
+      {run.verify ? (
+        <p className={cn("text-xs", run.verify.command ? "text-muted-foreground" : "text-warn")}>
+          {run.verify.command
+            ? t("runs.judgedBy", { cmd: run.verify.command, src: run.verify.source })
+            : t("runs.judgedByModel")}
+        </p>
+      ) : null}
       <RunStream lines={lines} />
 
       {/* The live pause first, then any parked from before this window existed — deduplicated, so a

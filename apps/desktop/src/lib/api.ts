@@ -332,8 +332,20 @@ export interface RunDone {
   stopped_reason?: string;
 }
 
+/** What is about to judge this run, delivered BEFORE the first step.
+ *
+ *  `source` is `user` when someone typed the command, `inferred:<file>` when the project was read for
+ *  it, and `none` when nothing executable was found. That last case is the one this frame exists for:
+ *  it has always been true whenever the box was left empty, and the interface never once said it. */
+export interface RunVerify {
+  command: string | null;
+  source: string;
+}
+
 export interface RunStreamHandlers {
   onEvent?: (e: RunEvent) => void;
+  /** Arrives once, before the run starts — what will judge it, and who chose that. */
+  onVerify?: (v: RunVerify) => void;
   onDone?: (d: RunDone) => void;
   onError?: (msg: string) => void;
   // The run's id, delivered on the first `run` frame — the handle for POST /api/runs/{id}/cancel.
@@ -397,6 +409,7 @@ function dispatchRun(frame: string, h: RunStreamHandlers): void {
     return;
   }
   if (event === "run") h.onRunId?.(payload.run_id as string);
+  else if (event === "verify") h.onVerify?.(payload as unknown as RunVerify);
   else if (event === "event") h.onEvent?.(payload as unknown as RunEvent);
   else if (event === "done") h.onDone?.(payload as unknown as RunDone);
   else if (event === "paused") h.onPaused?.(payload as unknown as PausedRun);

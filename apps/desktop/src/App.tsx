@@ -168,7 +168,7 @@ export default function App() {
           },
           onTool: (t) => setTools((prev) => [...prev, t]),
           onDone: (r) => {
-            setMessages((m) => [...m, { role: "assistant", content: r.answer }]);
+            setMessages((m) => [...m, { role: "assistant", content: r.answer, fused: r.fused }]);
             setReport(r);
             setStatus("done");
             setLive("");

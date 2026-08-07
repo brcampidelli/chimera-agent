@@ -1000,7 +1000,7 @@ def build_api_app(
                             agent.backend = original
                     manager.persist(session_id)  # durable transcript now includes this turn
                     _append_usage(report, session_id, settings)
-                emit("done", _report_dict(report, session_id))
+                emit("done", _report_dict(report, session_id, fused=swap))
             except Exception as exc:  # noqa: BLE001 — surfaced to the client as an error event
                 _log.warning("chat turn failed: %s", exc)
                 emit("error", {"message": "the agent turn failed"})
@@ -1387,10 +1387,19 @@ def _append_usage(report: Any, session_id: str, settings: Settings) -> None:
         _log.debug("usage logging skipped: %s", exc)
 
 
-def _report_dict(report: Any, session_id: str) -> dict[str, Any]:
-    """Serialize a TurnReport for the ``done`` event (all real signals; ``usd`` may be null)."""
+def _report_dict(report: Any, session_id: str, *, fused: bool = False) -> dict[str, Any]:
+    """Serialize a TurnReport for the ``done`` event (all real signals; ``usd`` may be null).
+
+    ``fused`` is not decoration. A fused turn cannot call tools — ``FusionEngine.complete`` drops the
+    tool schemas and a panel has nothing to call them with — so the agent finishes in one step having
+    touched nothing, and answers from the prompt alone. Ask it to read a file and it will describe a
+    file it never opened, with the authority of three models agreeing. From outside, that turn is
+    indistinguishable from one that legitimately needed no tool: both report zero tool calls. This
+    flag is the difference, and it is the only thing that lets the UI say which happened.
+    """
     return {
         "session_id": session_id,
+        "fused": fused,
         "answer": report.answer,
         "prompt_tokens": report.prompt_tokens,
         "completion_tokens": report.completion_tokens,

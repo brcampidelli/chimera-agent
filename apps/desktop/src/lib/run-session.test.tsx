@@ -34,12 +34,13 @@ function Launcher() {
 
 /** A screen that only observes — stands in for the status bar, or for any other view. */
 function Observer() {
-  const { running, task, events, stopping } = useRunSession();
+  const { running, task, events, stopping, verify } = useRunSession();
   return (
     <div>
       <span data-testid="state">{running ? `running:${task}` : "idle"}</span>
       <span data-testid="events">{events.length}</span>
       <span data-testid="stopping">{String(stopping)}</span>
+      <span data-testid="verify">{verify ? `${verify.command ?? "none"}:${verify.source}` : "-"}</span>
     </div>
   );
 }
@@ -161,5 +162,40 @@ describe("the run session", () => {
     // The backend run may well still be going. What ended is our view of it, and `done` stays
     // null rather than inventing a verdict we never received.
     await waitFor(() => expect(screen.getByTestId("verdict")).toHaveTextContent("broken:none"));
+  });
+});
+
+describe("what is about to judge the run", () => {
+  it("carries the verdict source, which the client used to drop on the floor", async () => {
+    // The server has always sent this frame before the first step (`api/app.py`), and the client had
+    // no branch for it. The sentence that mattered most — "nothing executable is judging this" —
+    // reached the user only afterwards, in the receipt, when the run was already over.
+    const user = userEvent.setup();
+    render(
+      <RunSessionProvider>
+        <Launcher />
+        <Observer />
+      </RunSessionProvider>,
+    );
+    await user.click(screen.getByText("start"));
+
+    live.onVerify?.({ command: null, source: "none" });
+    await waitFor(() => expect(screen.getByTestId("verify")).toHaveTextContent("none:none"));
+  });
+
+  it("clears between runs, so a stale verdict cannot describe the next one", async () => {
+    const user = userEvent.setup();
+    render(
+      <RunSessionProvider>
+        <Launcher />
+        <Observer />
+      </RunSessionProvider>,
+    );
+    await user.click(screen.getByText("start"));
+    live.onVerify?.({ command: "pytest -q", source: "inferred:tests/" });
+    await waitFor(() => expect(screen.getByTestId("verify")).toHaveTextContent("pytest -q"));
+
+    await user.click(screen.getByText("start"));
+    await waitFor(() => expect(screen.getByTestId("verify")).toHaveTextContent("-"));
   });
 });

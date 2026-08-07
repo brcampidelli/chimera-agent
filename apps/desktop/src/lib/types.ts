@@ -110,6 +110,16 @@ export interface TurnReport {
   steps: number;
   stopped_reason: string;
   route_meta?: RouteMeta | null;
+  /**
+   * This turn ran through the fusion panel, which means it could NOT use tools.
+   *
+   * `FusionEngine.complete` drops the tool schemas, so the agent finishes in one step having touched
+   * nothing and answers from the prompt alone. Ask it to read a file and it describes a file it
+   * never opened — with the authority of three models agreeing. From the outside that is
+   * indistinguishable from a turn that legitimately needed no tool: both report zero tool calls.
+   * This flag is the entire difference.
+   */
+  fused?: boolean;
 }
 
 export interface ToolEvent {
@@ -122,4 +132,8 @@ export type Role = "user" | "assistant";
 export interface Message {
   role: Role;
   content: string;
+  /** This answer came from the fusion panel, which cannot call tools — see {@link TurnReport.fused}.
+   *  Carried on the MESSAGE rather than read from the latest report, because the warning has to stay
+   *  attached to the answer it is about once the next turn has moved on. */
+  fused?: boolean;
 }
