@@ -117,6 +117,16 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # AppImage only. `linuxdeploy` walks the whole AppDir, finds every ELF file and runs
+          # `strip` on it — which now includes the native libraries the speech model runs on
+          # (ctranslate2, onnxruntime) and the PyInstaller-frozen backend itself. Those are not
+          # ordinary shared objects, strip fails on them, and the bundler reports only "failed to
+          # run linuxdeploy" with the real reason swallowed.
+          #
+          # Stripping buys a few megabytes on a bundle that is already hundreds. Not stripping buys
+          # a Linux build that exists. Set for every OS because it is inert where linuxdeploy does
+          # not run, and a conditional here would be a second thing to keep in sync.
+          NO_STRIP: "true"
 
       # BOTH macOS jobs (arm64 + Intel) emit an updater bundle named plainly `Chimera.app.tar.gz` —
       # the nsis (.exe) and AppImage names already carry their arch, but this one doesn't. Two jobs
