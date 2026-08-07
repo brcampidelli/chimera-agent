@@ -103,3 +103,27 @@ def test_a_model_the_table_has_never_heard_of_reports_unknown() -> None:
 
     assert vision_support("some-vendor/a-model-released-last-tuesday") == "unknown"
     assert vision_support("") == "unknown"
+
+
+def test_plain_text_is_read_without_the_optional_converter(tmp_path: Path) -> None:
+    """The easiest possible attachment must not need an optional dependency.
+
+    Everything that was not an image went through the document converter, so attaching a README or a
+    `.txt` answered "install the docs extra" — which reads like the feature is broken rather than
+    like the file is exotic. Sending a text file through a converter to get its own bytes back is a
+    wall in front of the simplest case.
+    """
+    saved = save(tmp_path, "notes.txt", b"the parser lives in src/parse.py")
+
+    assert saved.kind == "document"
+    assert saved.text  # read, not deferred to an optional dependency
+    assert saved.note == ""
+
+
+def test_an_exotic_format_still_says_which_extra_it_needs(tmp_path: Path) -> None:
+    # The converter is genuinely required for a PDF or a DOCX. Naming the missing piece is the
+    # difference between "this is broken" and "this needs one thing installed".
+    saved = save(tmp_path, "paper.docx", b"not really a docx")
+
+    assert saved.kind == "document"
+    assert saved.text == "" and saved.note

@@ -22,6 +22,15 @@ from typing import Any
 #: also what makes an unknown format degrade to "we tried to read it" rather than to a broken request.
 IMAGE_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"})
 
+#: Text we can read ourselves. Everything else goes through the converter, which is an optional
+#: dependency — so without this a plain `.txt` or a README reported "install the docs extra", which
+#: is a wall in front of the simplest possible attachment.
+TEXT_SUFFIXES = frozenset({
+    ".txt", ".md", ".markdown", ".rst", ".log", ".csv", ".tsv", ".json", ".yaml", ".yml",
+    ".toml", ".ini", ".cfg", ".py", ".js", ".ts", ".tsx", ".jsx", ".rs", ".go", ".java",
+    ".c", ".h", ".cpp", ".sh", ".sql", ".xml", ".html", ".css",
+})
+
 #: A hard ceiling per file. Images are base64-encoded into the request, so a 40 MB photo is not a big
 #: attachment, it is a failed turn and a bill for it.
 MAX_BYTES = 20 * 1024 * 1024
@@ -66,6 +75,23 @@ def save(home: Path, name: str, data: bytes) -> Attachment:
     from chimera.governance.ledger_tool import fence
     from chimera.governance.sanitize import sanitize_untrusted
     from chimera.tools.documents import _MAX_CHARS, _markitdown_convert
+
+    if suffix in TEXT_SUFFIXES:
+        # Read directly. Sending a README through a document converter to get its own bytes back is
+        # a dependency in front of the easiest thing anyone will attach — and the error it produced
+        # ("install the docs extra") reads like the feature is broken rather than like the file is
+        # exotic. Undecodable bytes fall through to the converter, which may know the encoding.
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError:
+            text = ""
+        if text:
+            if len(text) > _MAX_CHARS:
+                text = text[:_MAX_CHARS] + f"\n... [truncated, {len(text)} chars total]"
+            return Attachment(
+                id=ident, name=name, kind="document", path=path,
+                text=fence(sanitize_untrusted(text)),
+            )
 
     try:
         text = _markitdown_convert(str(path))
