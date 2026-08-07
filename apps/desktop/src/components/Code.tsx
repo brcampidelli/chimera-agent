@@ -4,37 +4,26 @@ import hljs from "highlight.js";
 import {
   Camera,
   Check,
-  ChevronDown,
-  ChevronRight,
-  File as FileIcon,
   FileCode2,
   Folder,
-  FolderOpen,
-  GitBranch,
+  FolderGit2,
   ListChecks,
   Loader2,
   Pencil,
   Play,
   Save,
   Square,
-  Terminal,
   Undo2,
   X,
 } from "lucide-react";
 import {
-  cancelRun,
   captureScreenshot,
   getFsFile,
-  getFsTree,
-  getGitDiff,
   getGitStatus,
   getPlan,
   getRuns,
-  gitCommit,
   gitRevert,
   saveFile,
-  streamExec,
-  streamRun,
   type Approval,
   type Profile,
   type Reach,
@@ -45,11 +34,15 @@ import { Badge } from "@/components/ui/panel";
 import { Conversation } from "@/components/code/Conversation";
 import { PostureBar } from "@/components/code/PostureBar";
 import { RolesBar } from "@/components/code/RolesBar";
-import { WorthPanel } from "@/components/code/WorthPanel";
 import { DiffView } from "@/components/code/DiffView";
+import { SessionSidebar } from "@/components/code/SessionSidebar";
+import { ProjectPicker } from "@/components/code/ProjectPicker";
+import { useRunSession } from "@/lib/run-session";
+import { PausedRunCard } from "@/components/run/PausedRunCard";
+import { liveLine } from "@/components/run/RunLauncher";
 import { useT, type TFunc } from "@/lib/i18n";
 import { readWorkspace, writeWorkspace } from "@/lib/workspace";
-import type { AttemptReceipt, FileDiff, FsNode, GitFile, RunReceipt } from "@/lib/types";
+import type { AttemptReceipt, FileDiff, RunReceipt } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const fieldCls = "field w-full px-3 text-sm";
@@ -90,165 +83,6 @@ function highlightFile(content: string, name: string): string {
     div.textContent = content;
     return div.innerHTML;
   }
-}
-
-/** One lazy tree node. A directory fetches its children (one level) only when expanded. */
-function TreeNode({
-  workspace,
-  node,
-  depth,
-  activePath,
-  onOpen,
-}: {
-  workspace: string;
-  node: FsNode;
-  depth: number;
-  activePath: string | null;
-  onOpen: (path: string) => void;
-}) {
-  const t = useT();
-  const [open, setOpen] = useState(false);
-  const q = useQuery({
-    queryKey: ["fs-tree", workspace, node.path],
-    queryFn: () => getFsTree(workspace || null, node.path),
-    enabled: node.is_dir && open,
-  });
-  const pad = { paddingLeft: `${depth * 12 + 8}px` };
-
-  if (!node.is_dir) {
-    const active = activePath === node.path;
-    return (
-      <button
-        onClick={() => onOpen(node.path)}
-        style={pad}
-        title={node.path}
-        className={cn(
-          "flex w-full items-center gap-1.5 py-1 pr-2 text-left text-xs transition-colors",
-          active ? "bg-accent/15 text-accent" : "text-muted-foreground hover:text-foreground",
-        )}
-      >
-        <FileIcon className="h-3.5 w-3.5 shrink-0 opacity-70" />
-        <span className="truncate">{node.name}</span>
-      </button>
-    );
-  }
-
-  return (
-    <div>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        style={pad}
-        title={node.path}
-        className="flex w-full items-center gap-1 py-1 pr-2 text-left text-xs text-foreground/80 hover:text-foreground"
-      >
-        {open ? (
-          <ChevronDown className="h-3.5 w-3.5 shrink-0" />
-        ) : (
-          <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-        )}
-        {open ? (
-          <FolderOpen className="h-3.5 w-3.5 shrink-0 text-accent/80" />
-        ) : (
-          <Folder className="h-3.5 w-3.5 shrink-0 text-accent/80" />
-        )}
-        <span className="truncate">{node.name}</span>
-      </button>
-      {open ? (
-        q.isLoading ? (
-          <div style={{ paddingLeft: `${depth * 12 + 24}px` }} className="py-1 text-muted-foreground">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          </div>
-        ) : q.isError ? (
-          <div style={{ paddingLeft: `${depth * 12 + 24}px` }} className="py-1 text-xs text-bad">
-            {t("code.treeError")}
-          </div>
-        ) : (
-          (q.data?.entries ?? []).map((child) => (
-            <TreeNode
-              key={child.path}
-              workspace={workspace}
-              node={child}
-              depth={depth + 1}
-              activePath={activePath}
-              onOpen={onOpen}
-            />
-          ))
-        )
-      ) : null}
-    </div>
-  );
-}
-
-/** The left column: a workspace path input and a lazy file tree rooted at it. */
-function TreePanel({
-  workspace,
-  onWorkspace,
-  activePath,
-  onOpen,
-}: {
-  workspace: string;
-  onWorkspace: (ws: string) => void;
-  activePath: string | null;
-  onOpen: (path: string) => void;
-}) {
-  const t = useT();
-  const [input, setInput] = useState(workspace);
-  const rootQ = useQuery({
-    queryKey: ["fs-tree", workspace, ""],
-    queryFn: () => getFsTree(workspace || null, ""),
-  });
-
-  return (
-    <aside className="flex min-h-0 flex-col border-hairline lg:w-72 lg:border-r">
-      <div className="border-b border-hairline p-3">
-        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {t("code.workspace")}
-        </label>
-        <form
-          className="mt-1.5 flex gap-1.5"
-          onSubmit={(e) => {
-            e.preventDefault();
-            onWorkspace(input.trim());
-          }}
-        >
-          <input
-            className={`${fieldCls} h-8 font-mono text-xs`}
-            placeholder={t("code.workspacePlaceholder")}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-          />
-          <Button size="sm" type="submit" variant="ghost">
-            {t("code.open")}
-          </Button>
-        </form>
-      </div>
-      <div className="min-h-0 flex-1 overflow-auto py-1">
-        {rootQ.isLoading ? (
-          <div className="flex justify-center py-6 text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-          </div>
-        ) : rootQ.isError ? (
-          <div className="px-3 py-4 text-xs text-bad">{t("code.treeError")}</div>
-        ) : (rootQ.data?.entries.length ?? 0) === 0 ? (
-          <div className="px-3 py-4 text-xs text-muted-foreground">{t("code.treeEmpty")}</div>
-        ) : (
-          rootQ.data?.entries.map((node) => (
-            <TreeNode
-              key={node.path}
-              workspace={workspace}
-              node={node}
-              depth={0}
-              activePath={activePath}
-              onOpen={onOpen}
-            />
-          ))
-        )}
-        {rootQ.data?.capped ? (
-          <div className="px-3 py-2 text-xs text-muted-foreground">{t("code.treeCapped")}</div>
-        ) : null}
-      </div>
-    </aside>
-  );
 }
 
 /** The center column: a syntax-highlighted viewer with an opt-in editor. Read-only is the default;
@@ -457,14 +291,6 @@ function LiveEdits({ edits, t }: { edits: { path: string; patch: string }[]; t: 
   );
 }
 
-/** Map a live run event to a compact localized line (backend `text` is English). */
-function liveLine(e: RunEvent, t: TFunc): string | null {
-  if (e.kind === "status") return /planning/i.test(e.text) ? t("code.planning") : e.text;
-  if (e.kind === "attempt") return `${t("code.attempt")} ${e.index} — ${t("code.verifying")}`;
-  if (e.kind === "result")
-    return `${t("code.attempt")} ${e.index}: ${e.success ? t("runs.passed") : t("runs.failed")}`;
-  return null;
-}
 
 /** Parse plan text into display steps (strip a leading "N." / "N)"), mirroring the backend parser.
  *  Used only to render the approved plan as a numbered checklist — the backend re-parses the raw text. */
@@ -596,17 +422,53 @@ function RunPanel({
   const [planning, setPlanning] = useState(false);
   const [planNote, setPlanNote] = useState("");
   const [runPlan, setRunPlan] = useState<string[] | null>(null);
-  const [running, setRunning] = useState(false);
-  // Cooperative Stop: the in-flight run's id (from the first `run` frame) is the cancel handle, and
-  // `stopping` marks that a Stop was requested (halts AFTER the current attempt — a model step can't
-  // be interrupted). Both clear when the run ends.
-  const [runId, setRunId] = useState<string | null>(null);
-  const [stopping, setStopping] = useState(false);
-  const [lines, setLines] = useState<string[]>([]);
-  // The live per-edit diffs streamed during THIS run, in edit order (the play-by-play).
-  const [liveEdits, setLiveEdits] = useState<{ path: string; patch: string }[]>([]);
+  // The run's lifecycle comes from the SHARED session, not from private state here.
+  //
+  // This panel used to keep its own `running`/`runId`/`stopping`/`lines` and call `streamRun`
+  // directly — with `onDone` and `onError` and no `onPaused`. The dispatcher does
+  // `h.onPaused?.(…)`, so with the default approval ("suspicious" → pause_on_taint → a thread is
+  // minted) a run that consumed untrusted content emitted `paused` INSTEAD of `done`, the frame fell
+  // on the floor, and this panel said "running" forever while the work sat waiting for a verdict
+  // nobody could see or give. `useRunSession` already handles pause, renders the card, and survives
+  // navigation; `RunLauncher` was extracted to end three copies of this state and had acquired one
+  // consumer. This is the adoption that never happened.
+  const session = useRunSession();
+  const { running, stopping } = session;
+  // Derived at RENDER time from the raw events, so a language change cannot leave half a transcript
+  // frozen in the previous locale — the reason the session stores events rather than strings.
+  const lines = useMemo(() => {
+    const out = session.events
+      .map((e: RunEvent) => liveLine(e, t))
+      .filter((l): l is string => !!l);
+    // The ending, derived like the rest. A cooperative Stop ends the run with stopped_reason
+    // "cancelled" — said honestly rather than reading as a plain failure.
+    if (session.done) {
+      out.push(
+        session.done.stopped_reason === "cancelled"
+          ? t("code.doneCancelled")
+          : session.done.success
+            ? t("code.doneOk")
+            : t("code.doneFail"),
+      );
+    } else if (session.broken) {
+      // Our view of the run broke, which is NOT the run failing — but the user is owed an ending
+      // either way, and silence would read as "still going".
+      out.push(t("code.doneFail"));
+    }
+    return out;
+  }, [session.events, session.done, session.broken, t]);
+  const liveEdits = useMemo(
+    () =>
+      session.events
+        .filter((e: RunEvent) => e.kind === "edit" && e.path && e.patch)
+        .map((e: RunEvent) => ({ path: e.path as string, patch: e.patch as string })),
+    [session.events],
+  );
   const [receipt, setReceipt] = useState<RunReceipt | null>(null);
   const [reverting, setReverting] = useState(false);
+  // Shown after a git-backed discard. A flag rather than a line pushed into the transcript, because
+  // the transcript is now derived from the run's own events and must keep saying what the RUN did.
+  const [reverted, setReverted] = useState(false);
   const [revertErr, setRevertErr] = useState(false);
   // Whether the workspace is a git repo — gates the git-backed "Discard changes" control. Shares the
   // ["git-status", workspace] cache with the GitPanel, so a commit/revert there refreshes this too.
@@ -637,9 +499,10 @@ function RunPanel({
 
   // Accept: a successful run's changes are already on disk — just clear the pending-review UI.
   function accept() {
+    // Only the pending-review UI is cleared. The transcript and the diffs are derived from the
+    // session's events and belong to the run that produced them — blanking them here used to erase
+    // the record of what was just accepted.
     setReceipt(null);
-    setLines([]);
-    setLiveEdits([]);
     setRevertErr(false);
   }
 
@@ -656,8 +519,7 @@ function RunPanel({
         return;
       }
       setReceipt(null);
-      setLiveEdits([]);
-      setLines([t("code.git.reverted")]);
+      setReverted(true);
       void qc.invalidateQueries({ queryKey: ["fs-tree"] });
       void qc.invalidateQueries({ queryKey: ["fs-file"] });
       void qc.invalidateQueries({ queryKey: ["git-status"] });
@@ -693,46 +555,23 @@ function RunPanel({
   // Cooperative Stop: ask the backend to halt this run BEFORE its next attempt. An in-flight model
   // step can't be interrupted, so this never kills instantly — it stops after the current attempt
   // finishes. `stopping` stays set (disabling re-click) until the run's own `done` clears the state.
-  async function stop() {
-    if (!runId || stopping) return;
-    setStopping(true);
-    try {
-      await cancelRun(runId);
-    } catch {
-      // A cancel that fails (e.g. the run just finished) is a no-op — the run's `done` clears state.
-    }
-  }
+  // Cooperative Stop: the session owns the cancel handle and the "stopping until the terminal frame"
+  // rule, so there is one implementation of it rather than three that drift.
+  const stop = session.stop;
 
   function start(plan?: string | null) {
     if (!task.trim() || running) return;
-    setRunning(true);
-    setRunId(null);
-    setStopping(false);
-    setLines([]);
-    setLiveEdits([]);
     setReceipt(null);
+    setReverted(false);
     // Only surface a task list when we injected a real plan — never fabricate steps for a plain run.
     setRunPlan(plan && plan.trim() ? planStepsOf(plan) : null);
-    const append = (s: string) => setLines((prev) => [...prev, s]);
-    const finish = async () => {
-      setRunning(false);
-      setRunId(null);
-      setStopping(false);
-      // The stream's `done` payload has no diffs — the newest receipt carries the real per-file diffs.
-      try {
-        const runs = await getRuns();
-        setReceipt(runs[0] ?? null);
-      } catch {
-        setReceipt(null);
-      }
-      // The workspace may have changed (or been reverted) — refresh the tree + open file + git status.
-      void qc.invalidateQueries({ queryKey: ["fs-tree"] });
-      void qc.invalidateQueries({ queryKey: ["fs-file"] });
-      void qc.invalidateQueries({ queryKey: ["git-status"] });
-      onRan();
-    };
-    void streamRun(
-      {
+
+    session.start(runRequest(plan), { onDone: afterRun });
+  }
+
+  /** The request this panel sends, in one place so a resume cannot drift from a first start. */
+  function runRequest(plan?: string | null, threadId?: string) {
+    return {
         task: task.trim(),
         verify: verify.trim() || null,
         workspace: workspace || null,
@@ -743,47 +582,45 @@ function RunPanel({
         cascade: mode === "cascade",
         posture,
         profile,
-      },
-      {
-        onRunId: (id) => setRunId(id),
-        onEvent: (e) => {
-          // An `edit` frame carries a real per-file diff — collect it into the live play-by-play.
-          if (e.kind === "edit" && e.path && e.patch) {
-            const path = e.path;
-            const patch = e.patch;
-            setLiveEdits((prev) => [...prev, { path, patch }]);
-            return;
-          }
-          const line = liveLine(e, t);
-          if (line) append(line);
-        },
-        onDone: (d) => {
-          // A cooperative Stop ends the run with stopped_reason "cancelled" — say so honestly rather
-          // than reading as a plain failure.
-          append(
-            d.stopped_reason === "cancelled"
-              ? t("code.doneCancelled")
-              : d.success
-                ? t("code.doneOk")
-                : t("code.doneFail"),
-          );
-          void finish();
-        },
-        onError: () => {
-          append(t("code.doneFail"));
-          void finish();
-        },
-      },
-    );
+        // Carried on a resume so the backend continues THAT run rather than starting a new one.
+        // Kept armed rather than cleared: an "edit"/"accept" resume finalises without re-running, but
+        // a "respond" makes a fresh attempt that can read untrusted content again and must be able
+        // to stop and ask a second time.
+        thread_id: threadId ?? null,
+    };
+  }
+
+  // Reached for a finished run AND for a transport failure, but NOT for a pause — a paused run has
+  // not reached a verdict, so fetching its receipt would show the PREVIOUS run's as if it were this
+  // one's. The card the session renders is what the user acts on instead.
+  function afterRun() {
+          void (async () => {
+            // The stream's `done` payload has no diffs — the newest receipt carries the real ones.
+            try {
+              const runs = await getRuns();
+              setReceipt(runs[0] ?? null);
+            } catch {
+              setReceipt(null);
+            }
+            // The workspace may have changed (or been reverted) — refresh tree, file and git status.
+            void qc.invalidateQueries({ queryKey: ["fs-tree"] });
+            void qc.invalidateQueries({ queryKey: ["fs-file"] });
+            void qc.invalidateQueries({ queryKey: ["git-status"] });
+            onRan();
+          })();
+  }
+
+  /** Continue a run that stopped for a verdict, under its own thread id. */
+  function resume(threadId: string) {
+    session.clearPaused();
+    session.start(runRequest(null, threadId), { onDone: afterRun });
   }
 
   return (
     <section className="flex min-h-0 flex-col overflow-auto border-t border-hairline">
       <div className="space-y-2.5 border-b border-hairline p-3">
-        <div className="flex items-center gap-2 text-accent">
-          <Play className="h-4 w-4" />
-          <h2 className="text-sm font-semibold text-foreground">{t("code.instruction")}</h2>
-        </div>
+        {/* No heading here: the <details> summary that reveals this panel already carries the same
+            words, and printing them twice reads as two sections when it is one. */}
         <textarea
           className={`${fieldCls} min-h-[72px] resize-y py-2`}
           placeholder={t("code.taskPlaceholder")}
@@ -869,7 +706,7 @@ function RunPanel({
             <Button
               size="sm"
               variant="ghost"
-              disabled={!runId || stopping}
+              disabled={!session.runId || stopping}
               onClick={() => void stop()}
               title={t("code.stopTooltip")}
             >
@@ -944,7 +781,17 @@ function RunPanel({
             {lines.map((line, i) => (
               <div key={i}>{line}</div>
             ))}
+            {/* Appended, not substituted for the transcript: what the run did and what you then did
+                about it are two facts, and overwriting the first with the second used to erase the
+                record of the work being discarded. */}
+            {reverted ? <div className="text-warn">{t("code.git.reverted")}</div> : null}
           </div>
+        ) : null}
+        {/* The run stopped for a verdict. This is the frame that used to fall on the floor: the
+            panel passed no `onPaused`, the dispatcher's optional chaining swallowed it, and the run
+            sat here reading "running" forever. */}
+        {session.paused ? (
+          <PausedRunCard run={session.paused} onResolved={(threadId) => resume(threadId)} />
         ) : null}
       </div>
 
@@ -997,319 +844,19 @@ function RunPanel({
   );
 }
 
-/** An HONEST command-runner (NOT an interactive terminal): a command input + optional cwd, streamed
- *  line by line into a scrolling <pre> (combined stdout+stderr), then the exit code. Each Run is a
- *  fresh subprocess — cwd/env don't persist between commands — so we render no fake prompt/TTY. */
-function CmdRunner({ workspace }: { workspace: string }) {
-  const t = useT();
-  const [command, setCommand] = useState("");
-  const [cwd, setCwd] = useState("");
-  const [running, setRunning] = useState(false);
-  const [lines, setLines] = useState<string[]>([]);
-  const [exitCode, setExitCode] = useState<number | null>(null);
-
-  function run() {
-    if (!command.trim() || running) return;
-    setRunning(true);
-    setLines([]);
-    setExitCode(null);
-    void streamExec(
-      { command: command.trim(), workspace: workspace || null, cwd: cwd.trim() },
-      {
-        onLine: (text) => setLines((prev) => [...prev, text]),
-        onExit: (code) => {
-          setExitCode(code);
-          setRunning(false);
-        },
-        onError: (msg) => {
-          setLines((prev) => [...prev, msg]);
-          setRunning(false);
-        },
-      },
-    );
-  }
-
-  return (
-    <section className="border-t border-hairline">
-      <div className="flex items-center gap-2 px-4 pt-2.5 text-accent">
-        <Terminal className="h-4 w-4" />
-        <h2 className="text-sm font-semibold text-foreground">{t("code.cmdRunner")}</h2>
-      </div>
-      <div className="flex flex-wrap gap-2 px-4 pt-2">
-        <input
-          className="field h-9 min-w-0 flex-1 px-3 font-mono text-xs"
-          placeholder={t("code.cmdPlaceholder")}
-          value={command}
-          onChange={(e) => setCommand(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              run();
-            }
-          }}
-          disabled={running}
-        />
-        <input
-          className="field h-9 w-56 px-3 font-mono text-xs"
-          placeholder={t("code.cwd")}
-          value={cwd}
-          onChange={(e) => setCwd(e.target.value)}
-          disabled={running}
-        />
-        {/* Labelled "Run command": the screen has a second, unrelated Run (the agent RunPanel), and
-            an icon+"Run" alone is ambiguous to a screen reader (and to a test) about which it is. */}
-        <Button
-          size="sm"
-          aria-label={t("code.cmdRun")}
-          disabled={!command.trim() || running}
-          onClick={run}
-        >
-          {running ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" /> {t("code.running")}
-            </>
-          ) : (
-            <>
-              <Play className="h-4 w-4" /> {t("code.run")}
-            </>
-          )}
-        </Button>
-      </div>
-      <p className="px-4 pt-2 text-xs text-muted-foreground">{t("code.freshProcNote")}</p>
-      <p className="px-4 pb-1 text-xs text-muted-foreground">{t("code.execSecurityNote")}</p>
-      {lines.length > 0 || exitCode !== null ? (
-        <pre className="mx-4 mb-3 max-h-56 overflow-auto rounded-chip bg-surface-2 p-2 font-mono text-xs leading-relaxed text-muted-foreground">
-          {lines.map((line, i) => (
-            <div key={i} className="whitespace-pre-wrap break-all">
-              {line || " "}
-            </div>
-          ))}
-          {exitCode !== null ? (
-            <div className={cn("mt-1", exitCode === 0 ? "text-ok" : "text-bad")}>
-              {t("code.exit")} {exitCode}
-            </div>
-          ) : null}
-        </pre>
-      ) : null}
-    </section>
-  );
-}
-
-/** One changed-file row in the git panel: a clickable name (toggles its diff), its porcelain status
- *  code, and a checkbox that selects it for the explicit-path commit. */
-function GitRow({
-  file,
-  checked,
-  active,
-  onToggleCheck,
-  onSelect,
-}: {
-  file: GitFile;
-  checked: boolean;
-  active: boolean;
-  onToggleCheck: () => void;
-  onSelect: () => void;
-}) {
-  const code = `${file.x === " " ? "·" : file.x}${file.y === " " ? "·" : file.y}`;
-  return (
-    <div
-      className={cn(
-        "flex items-center gap-2 px-2 py-1 text-xs",
-        active ? "bg-accent/10" : "hover:bg-surface-hover",
-      )}
-    >
-      <input
-        type="checkbox"
-        className="h-3 w-3 shrink-0 accent-accent"
-        checked={checked}
-        onChange={onToggleCheck}
-      />
-      <button
-        onClick={onSelect}
-        title={file.path}
-        className={cn(
-          "min-w-0 flex-1 truncate text-left font-mono",
-          active ? "text-accent" : "text-foreground/80 hover:text-foreground",
-        )}
-      >
-        {file.path}
-      </button>
-      <span className="shrink-0 font-mono text-xs text-muted-foreground">{code}</span>
-    </div>
-  );
-}
-
-/** The git panel: real `git status` grouped by staged / modified / untracked, a per-file diff on
- *  click, and a commit box that stages the EXPLICITLY selected paths (never `git add -A`). When the
- *  folder isn't a git repo (or git is missing), an honest empty-state invites `git init`. */
-function GitPanel({ workspace }: { workspace: string }) {
-  const t = useT();
-  const qc = useQueryClient();
-  const statusQ = useQuery({
-    queryKey: ["git-status", workspace],
-    queryFn: () => getGitStatus(workspace || null),
-  });
-  const status = statusQ.data;
-  const files = useMemo(() => status?.files ?? [], [status]);
-  const staged = files.filter((f) => f.staged);
-  const modified = files.filter((f) => !f.staged && !f.untracked);
-  const untracked = files.filter((f) => f.untracked);
-
-  const [message, setMessage] = useState("");
-  const [checked, setChecked] = useState<Record<string, boolean>>({});
-  const [selected, setSelected] = useState<{ path: string; staged: boolean } | null>(null);
-  const [committing, setCommitting] = useState(false);
-  const [commitErr, setCommitErr] = useState(false);
-  const [commitHash, setCommitHash] = useState<string | null>(null);
-
-  // Default-select the modified + untracked paths whenever the changed-file set changes.
-  const filesKey = files.map((f) => `${f.path}:${f.staged}`).join("\n");
-  useEffect(() => {
-    const next: Record<string, boolean> = {};
-    for (const f of files) next[f.path] = !f.staged; // modified/untracked default-checked
-    setChecked(next);
-    setSelected(null);
-    setCommitHash(null);
-    setCommitErr(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filesKey]);
-
-  const diffQ = useQuery({
-    queryKey: ["git-diff", workspace, selected?.path, selected?.staged],
-    queryFn: () => getGitDiff(workspace || null, selected!.path, selected!.staged),
-    enabled: selected !== null,
-  });
-
-  const selectedPaths = files.filter((f) => checked[f.path]).map((f) => f.path);
-
-  async function commit() {
-    if (!message.trim() || selectedPaths.length === 0 || committing) return;
-    setCommitting(true);
-    setCommitErr(false);
-    setCommitHash(null);
-    try {
-      const res = await gitCommit(workspace || null, message.trim(), selectedPaths);
-      if (res.ok) {
-        setCommitHash(res.commit);
-        setMessage("");
-        await qc.invalidateQueries({ queryKey: ["git-status", workspace] });
-        void qc.invalidateQueries({ queryKey: ["fs-tree"] });
-      } else {
-        setCommitErr(true);
-      }
-    } catch {
-      setCommitErr(true);
-    } finally {
-      setCommitting(false);
-    }
-  }
-
-  function toggle(path: string) {
-    setChecked((prev) => ({ ...prev, [path]: !prev[path] }));
-  }
-  function pick(path: string, isStaged: boolean) {
-    setSelected((prev) => (prev?.path === path && prev.staged === isStaged ? null : { path, staged: isStaged }));
-  }
-
-  function group(label: string, list: GitFile[], isStaged: boolean) {
-    if (list.length === 0) return null;
-    return (
-      <div>
-        <div className="px-2 pt-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {label}
-        </div>
-        {list.map((f) => (
-          <GitRow
-            key={`${isStaged ? "s" : "w"}:${f.path}`}
-            file={f}
-            checked={!!checked[f.path]}
-            active={selected?.path === f.path && selected.staged === isStaged}
-            onToggleCheck={() => toggle(f.path)}
-            onSelect={() => pick(f.path, isStaged)}
-          />
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <section className="border-t border-hairline">
-      <div className="flex items-center gap-2 px-4 pt-2.5 text-accent">
-        <GitBranch className="h-4 w-4" />
-        <h2 className="text-sm font-semibold text-foreground">{t("code.git.title")}</h2>
-        {status?.is_repo ? (
-          <span className="font-mono text-xs text-muted-foreground">
-            {t("code.git.branch")}: {status.branch || "—"}
-          </span>
-        ) : null}
-      </div>
-
-      {statusQ.isLoading ? (
-        <div className="flex justify-center py-4 text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-        </div>
-      ) : !status?.is_repo ? (
-        <p className="px-4 py-3 text-xs text-muted-foreground">{t("code.git.notRepo")}</p>
-      ) : files.length === 0 ? (
-        <p className="px-4 py-3 text-xs text-muted-foreground">{t("code.git.clean")}</p>
-      ) : (
-        <div className="flex flex-col gap-2 px-2 py-2 lg:flex-row lg:items-start">
-          <div className="min-w-0 flex-1 rounded-chip bg-surface-2 py-1">
-            {group(t("code.git.staged"), staged, true)}
-            {group(t("code.git.modified"), modified, false)}
-            {group(t("code.git.untracked"), untracked, false)}
-          </div>
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <input
-              className="field h-9 px-3 text-xs"
-              placeholder={t("code.git.commitMsg")}
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              disabled={committing}
-            />
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                disabled={!message.trim() || selectedPaths.length === 0 || committing}
-                onClick={() => void commit()}
-              >
-                {committing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                {t("code.git.commit")} ({selectedPaths.length})
-              </Button>
-              {commitHash ? (
-                <span className="font-mono text-xs text-ok">
-                  {t("code.git.committed")} {commitHash}
-                </span>
-              ) : null}
-              {commitErr ? <span className="text-xs text-bad">{t("code.git.commitError")}</span> : null}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {selected ? (
-        <div className="px-4 pb-3">
-          {diffQ.isLoading ? (
-            <div className="py-2 text-xs text-muted-foreground">…</div>
-          ) : diffQ.data?.patch ? (
-            <DiffView patch={diffQ.data.patch} />
-          ) : (
-            <p className="text-xs text-muted-foreground">{t("code.noDiff")}</p>
-          )}
-        </div>
-      ) : null}
-
-      <p className="px-4 pb-2 text-xs text-muted-foreground">{t("code.git.gitNote")}</p>
-    </section>
-  );
-}
-
 export function Code() {
   const t = useT();
   const qc = useQueryClient();
   // Lazy initialiser, not `useState(readWorkspace())`: the latter reads storage on every render.
   const [workspace, setWorkspace] = useState(readWorkspace);
   const [openFile, setOpenFile] = useState<string | null>(null);
+  const [projectDraft, setProjectDraft] = useState(readWorkspace);
+  // Which stored conversation is on screen, and a key that remounts the transcript when it
+  // changes — the conversation holds its exchanges in state, so switching sessions has to
+  // discard them rather than let the previous project's turns sit above the new one.
+  const [picking, setPicking] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [conversationKey, setConversationKey] = useState(0);
   // The conversation and the run share one workspace, so they share two facts: what the user asked
   // (handed over by "Run with verification") and whether a run is already in flight.
   const [handOff, setHandOff] = useState<{ text: string; at: number } | null>(null);
@@ -1331,59 +878,146 @@ export function Code() {
         <FileCode2 className="h-5 w-5" />
         <h1 className="text-sm font-semibold text-foreground">{t("code.title")}</h1>
       </div>
-      <p className="border-b border-hairline px-5 py-2 text-xs text-muted-foreground">
-        {t("code.safetyNote")}
-      </p>
-      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        <TreePanel
-          workspace={workspace}
-          onWorkspace={(ws) => {
-            setWorkspace(ws);
-            writeWorkspace(ws);
-            setOpenFile(null);
-            void qc.invalidateQueries({ queryKey: ["fs-tree"] });
-            void qc.invalidateQueries({ queryKey: ["git-status"] });
-          }}
-          activePath={openFile}
-          onOpen={setOpenFile}
+      {/* Which project, on one line, the way a coding tool names the repo it is pointed at. What
+          used to be here was a file TREE: a quarter of the window asking the user to navigate to
+          the file they wanted changed. That is the job the agent is for — it greps, it reads, it
+          finds. A browser in front of an agent that can search is the user doing the agent's work,
+          and it also framed the screen as "maintain THIS folder" rather than "get MY work done".
+          Files still open — from the transcript, by clicking a path the agent actually touched. */}
+      <form
+        className="flex items-center gap-2 border-b border-hairline px-5 py-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const next = projectDraft.trim();
+          setWorkspace(next);
+          writeWorkspace(next);
+          setOpenFile(null);
+          void qc.invalidateQueries({ queryKey: ["fs-file"] });
+          void qc.invalidateQueries({ queryKey: ["git-status"] });
+        }}
+      >
+        <FolderGit2 className="h-4 w-4 shrink-0 text-accent" />
+        <input
+          className={`${fieldCls} h-7 max-w-xl font-mono text-xs`}
+          placeholder={t("code.workspacePlaceholder")}
+          value={projectDraft}
+          onChange={(e) => setProjectDraft(e.target.value)}
         />
-        <Viewer workspace={workspace} path={openFile} />
-        <aside className="flex min-h-0 flex-col overflow-hidden border-l border-hairline lg:w-96">
-          <PostureBar
-            workspace={workspace}
-            reach={reach}
-            approval={approval}
-            onReach={setReach}
-            onApproval={setApproval}
-            disabled={runBusy}
+        <Button size="sm" type="submit" variant="ghost">
+          {t("code.open")}
+        </Button>
+        {/* The typed field stays: someone who knows the path should not have to click through to
+            it, and it is what the tests and a paste from a terminal both use. The picker is for
+            everyone else. */}
+        <Button size="sm" variant="ghost" onClick={() => setPicking((p) => !p)}>
+          <Folder className="h-4 w-4" /> {t("code.picker.browse")}
+        </Button>
+      </form>
+      {picking ? (
+        <div className="border-b border-hairline px-5 py-2">
+          <ProjectPicker
+            onCancel={() => setPicking(false)}
+            onPick={(path) => {
+              setPicking(false);
+              setWorkspace(path);
+              writeWorkspace(path);
+              setProjectDraft(path);
+              setOpenFile(null);
+              void qc.invalidateQueries({ queryKey: ["git-status"] });
+            }}
           />
-          <RolesBar profile={profile} onProfile={setProfile} disabled={runBusy} />
+        </div>
+      ) : null}
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        <SessionSidebar
+          workspace={workspace}
+          activeSession={sessionId}
+          onNew={() => {
+            // A new conversation, not a cleared one: the old transcript stays on disk and stays in
+            // the list. Clearing used to be the only way to start over, and it deleted the session.
+            setSessionId(null);
+            setConversationKey((n) => n + 1);
+            setOpenFile(null);
+          }}
+          onResume={(session) => {
+            setSessionId(session.id);
+            setConversationKey((n) => n + 1);
+            setOpenFile(null);
+            if (session.workspace !== workspace) {
+              setWorkspace(session.workspace);
+              writeWorkspace(session.workspace);
+              setProjectDraft(session.workspace);
+            }
+          }}
+          onProject={(next) => {
+            setWorkspace(next);
+            writeWorkspace(next);
+            setProjectDraft(next);
+            setOpenFile(null);
+          }}
+        />
+        {/* The conversation IS the screen. It used to be one of five panels in a 384px column, and
+            the arithmetic did not work: the panels that could not shrink took every pixel and this
+            was laid out at zero height. Git and the cost table now live on Work, where reviewing
+            what a run did belongs; the two settings became one row inside the composer. */}
+        <main className="flex min-h-0 flex-1 flex-col">
           <Conversation
+            key={conversationKey}
+            resumeSession={sessionId}
             workspace={workspace}
             openFile={openFile}
+            onOpenFile={setOpenFile}
             onHandOff={(text) => setHandOff({ text, at: Date.now() })}
             onEdited={refreshOpenFile}
             busyElsewhere={runBusy}
             posture={posture}
             profile={profile}
+            controls={
+              <div className="space-y-1.5">
+                <PostureBar
+                  workspace={workspace}
+                  reach={reach}
+                  approval={approval}
+                  onReach={setReach}
+                  onApproval={setApproval}
+                  disabled={runBusy}
+                  compact
+                />
+                <RolesBar profile={profile} onProfile={setProfile} disabled={runBusy} compact />
+              </div>
+            }
           />
-          {/* Re-read the currently open file after the agent edited or reverted the workspace. */}
-          <RunPanel
-            workspace={workspace}
-            onRan={refreshOpenFile}
-            handOff={handOff}
-            onBusy={setRunBusy}
-            posture={posture}
-            profile={profile}
-          />
-          <WorthPanel />
-        </aside>
+          {/* Folded away until it is doing something. The autonomous launcher is 389px of controls —
+              attempts, plan preview, browser verification — and it was sitting under the
+              conversation permanently, taking half the column from the thing people actually type
+              in. It stays MOUNTED (details hides, it does not unmount) because the conversation's
+              "run with verification" button hands text to it, and it opens itself when a run is in
+              flight so a running agent is never something you have to go looking for. */}
+          <details
+            open={runBusy || handOff !== null}
+            className="shrink-0 border-t border-hairline"
+          >
+            <summary className="cursor-pointer px-4 py-2 text-sm text-muted-foreground hover:text-foreground">
+              {t("code.instruction")}
+            </summary>
+            {/* Re-read the currently open file after the agent edited or reverted the workspace. */}
+            <RunPanel
+              workspace={workspace}
+              onRan={refreshOpenFile}
+              handOff={handOff}
+              onBusy={setRunBusy}
+              posture={posture}
+              profile={profile}
+            />
+          </details>
+        </main>
+        {/* The viewer is a consequence of opening a file, not a permanent third of the window. */}
+        {openFile ? (
+          <div className="flex min-h-0 flex-col border-hairline lg:w-[28rem] lg:border-l">
+            <Viewer workspace={workspace} path={openFile} />
+          </div>
+        ) : null}
       </div>
-      <GitPanel workspace={workspace} />
-      <CmdRunner workspace={workspace} />
-      <p className="border-t border-hairline px-5 py-2 text-xs text-muted-foreground">
-        {t("code.phase2note")}
-      </p>
     </div>
   );
 }

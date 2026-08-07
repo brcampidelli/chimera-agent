@@ -2,8 +2,16 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Code } from "@/components/Code";
-import { getFsFile, getFsTree, getGitStatus, getRuns, saveFile, streamRun } from "@/lib/api";
-import { fsFile, gitStatus, treeWith } from "@/test/code-api-mock";
+import {
+  getFsFile,
+  getGitStatus,
+  getPostureFacts,
+  getRuns,
+  saveFile,
+  streamCodeTurn,
+  streamRun,
+} from "@/lib/api";
+import { fsFile, gitStatus, postureFacts, scriptTurn } from "@/test/code-api-mock";
 import { renderWithProviders } from "@/test/utils";
 import type { FsFile } from "@/lib/types";
 
@@ -18,19 +26,35 @@ function editorOf(): HTMLElement {
   return screen.getByDisplayValue(LOADED);
 }
 
-/** Render the screen and open `src/app.py` from the tree — the viewer's only entry point. */
+/** Render the screen and open `src/app.py` the way the app now offers files: by clicking a path the
+ *  agent actually touched, in the transcript.
+ *
+ *  The file TREE used to be the entry point, and deleting it deleted the only way in — so the
+ *  viewer needed a new one rather than deletion. This is the honest replacement: you look at what
+ *  the agent read or wrote, not at a browser you have to navigate yourself. It also means the
+ *  viewer can only show files that are part of the conversation, which is a real narrowing and the
+ *  intended one. */
 async function openFile(file: FsFile = fsFile()) {
   const user = userEvent.setup();
   vi.mocked(getFsFile).mockResolvedValue(file);
+  vi.mocked(streamCodeTurn).mockImplementation(
+    scriptTurn({
+      tools: [
+        { name: "read_file", arguments: { path: "src/app.py" }, ok: true, observation: "" },
+      ],
+    }),
+  );
   renderWithProviders(<Code />);
 
-  await user.click(await screen.findByRole("button", { name: "app.py" }));
+  await user.type(screen.getByPlaceholderText(/Ask about this code/i), "look at it");
+  await user.click(screen.getByRole("button", { name: /Send/ }));
+  await user.click(await screen.findByRole("button", { name: "src/app.py" }));
   return user;
 }
 
 describe("Code — the file viewer", () => {
   beforeEach(() => {
-    vi.mocked(getFsTree).mockResolvedValue(treeWith());
+    vi.mocked(getPostureFacts).mockResolvedValue(postureFacts());
     vi.mocked(getGitStatus).mockResolvedValue(gitStatus());
     vi.mocked(getRuns).mockResolvedValue([]);
     vi.mocked(streamRun).mockImplementation(async () => {});

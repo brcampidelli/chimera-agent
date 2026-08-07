@@ -1212,3 +1212,29 @@ def test_messaging_unavailable_without_a_manager(tmp_path: Any) -> None:
     client = _messaging_client(tmp_path, None)
     assert client.get("/api/messaging").json() == {}
     assert client.post("/api/messaging/discord/start").status_code == 503
+
+
+def test_a_batch_task_is_governed_exactly_like_a_single_run(tmp_path: Any) -> None:
+    """A batch used to carry no posture, no profile, and a hard-coded three attempts.
+
+    So the same task run as one of five was quietly granted different tool permissions, a different
+    reviewer, and a different attempt budget than the same task run alone. That was survivable while
+    the user had to choose the Agents screen deliberately. It stops being survivable the moment the
+    composer can route into a batch on its own, because the downgrade becomes invisible AND unchosen.
+    """
+    from chimera.api.app import AgentsRequest, RunRequest
+    from chimera.api.posture import Posture
+
+    req = AgentsRequest(
+        tasks=[{"task": "a"}, {"task": "b"}],
+        posture=Posture(reach="read_only", approval="always"),
+        profile="max",
+        max_attempts=5,
+    )
+
+    # The seams exist on the batch at all — the regression this guards is a field silently absent.
+    assert req.posture is not None and req.profile == "max" and req.max_attempts == 5
+    # And they are the SAME fields a single run declares, not a parallel set that can drift.
+    assert {"posture", "profile", "roles", "write_region", "allow_tools", "deny_tools"} <= set(
+        RunRequest.model_fields
+    ) & set(AgentsRequest.model_fields)

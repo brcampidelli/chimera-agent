@@ -114,3 +114,34 @@ def test_verification_result_defaults_are_not_an_abstention() -> None:
     result = VerificationResult(True)
     assert result.output == ""
     assert result.abstained is False
+
+
+def test_a_command_that_does_not_exist_abstains_rather_than_failing(tmp_path: Path) -> None:
+    """"I could not run it" is not "the work is bad".
+
+    Exit 127 is the shell saying the command is missing. Reporting that as a failed verification
+    reverted the attempt and wrote a test failure into the receipt that never happened — survivable
+    while a human typed the command and could see the typo, and not survivable once the command is
+    inferred from the project.
+    """
+    result = CommandVerifier("definitely-not-a-real-command-xyz", tmp_path).verify()
+
+    assert result.abstained is True
+    assert result.passed is True  # abstention is not a failure either — it is silence
+
+
+def test_pytest_collecting_nothing_abstains(tmp_path: Path) -> None:
+    """Exit 5 is pytest saying it found no tests. A repository whose tests live somewhere the
+    inference did not look would otherwise have every change thrown away by a verifier that ran
+    nothing at all."""
+    result = CommandVerifier("exit 5", tmp_path).verify()
+
+    assert result.abstained is True
+
+
+def test_an_ordinary_failure_is_still_a_failure(tmp_path: Path) -> None:
+    """The abstention list is two specific codes, not "any awkward exit". A test suite that fails
+    must still revert the work."""
+    result = CommandVerifier("exit 1", tmp_path).verify()
+
+    assert result.passed is False and result.abstained is False

@@ -30,8 +30,8 @@ describe("Code — the chosen workspace persists", () => {
     // Deliberately NOT a guessed default: inventing one would silently widen where the agent may
     // write, and the backend's own fallback is at least visible in the posture sentence.
     renderWithProviders(<Code />);
-    await waitFor(() => expect(getFsTree).toHaveBeenCalled());
-    expect(vi.mocked(getFsTree).mock.calls[0][0]).toBeNull();
+    await waitFor(() => expect(getPostureFacts).toHaveBeenCalled());
+    expect(vi.mocked(getPostureFacts).mock.calls[0][2]).toBeNull();
   });
 
   it("remembers the root across a remount, which is what a restart is", async () => {
@@ -46,20 +46,21 @@ describe("Code — the chosen workspace persists", () => {
     await waitFor(() => expect(localStorage.getItem(WORKSPACE_KEY)).toBe("/home/me/project"));
 
     unmount();
-    vi.mocked(getFsTree).mockClear();
+    vi.mocked(getPostureFacts).mockClear();
     renderWithProviders(<Code />);
 
-    await waitFor(() => expect(getFsTree).toHaveBeenCalled());
-    expect(vi.mocked(getFsTree).mock.calls[0][0]).toBe("/home/me/project");
+    await waitFor(() => expect(getPostureFacts).toHaveBeenCalled());
+    expect(vi.mocked(getPostureFacts).mock.calls[0][2]).toBe("/home/me/project");
   });
 
-  it("a stored root reaches the RUN, not only the file tree", async () => {
-    // The tree pointing at the right place while edits land somewhere else would be worse than the
-    // original bug: it would look correct.
+  it("a stored root reaches what the agent is ALLOWED to touch, not just what is displayed", async () => {
+    // Asserted through the posture query because that is the one that answers "where may it write".
+    // A screen that displays the right project while the agent edits somewhere else would be worse
+    // than the original bug: it would look correct.
     localStorage.setItem(WORKSPACE_KEY, "/home/me/project");
     renderWithProviders(<Code />);
 
-    await waitFor(() => expect(getGitStatus).toHaveBeenCalled());
-    expect(vi.mocked(getGitStatus).mock.calls[0][0]).toBe("/home/me/project");
+    await waitFor(() => expect(getPostureFacts).toHaveBeenCalled());
+    expect(vi.mocked(getPostureFacts).mock.calls[0][2]).toBe("/home/me/project");
   });
 });

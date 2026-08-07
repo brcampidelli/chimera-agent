@@ -124,11 +124,20 @@ class PostureFacts(BaseModel):
     fell_back_to_host: bool = False
 
 
-def describe(posture: Posture, workspace: Path, settings: Settings) -> PostureFacts:
+def describe(
+    posture: Posture, workspace: Path, settings: Settings, *, can_pause: bool = True
+) -> PostureFacts:
     """Report what this posture means on THIS machine, right now.
 
     Never derived from the config alone: whether the shell is isolated is asked of the sandbox
     object, which knows whether its daemon actually answered.
+
+    ``can_pause`` is the same discipline applied to the pause. The approval axis resolves to
+    ``pause_on_taint`` for BOTH surfaces, but only the run wires a checkpointer and a taint ledger:
+    ``build_agent`` for a conversational turn passes neither (``chimera/api/code_api.py``), so a turn
+    cannot stop and ask no matter what the user selected. Reporting "pauses when tainted" there was
+    a sentence about a capability the surface does not have — and this line exists precisely because
+    a user should not have to read the source to know what the agent may do to their files.
     """
     resolved = resolve(posture)
     from chimera.governance.ledger import EXEC_TOOLS
@@ -156,6 +165,10 @@ def describe(posture: Posture, workspace: Path, settings: Settings) -> PostureFa
         writes="nothing" if posture.reach == "read_only" else "workspace",
         workspace=str(workspace),
         shell=shell,
-        pauses="always" if resolved.pause_always else ("tainted" if resolved.pause_on_taint else "never"),
+        pauses=(
+            ("always" if resolved.pause_always else "tainted" if resolved.pause_on_taint else "never")
+            if can_pause
+            else "never"
+        ),
         fell_back_to_host=fell_back,
     )

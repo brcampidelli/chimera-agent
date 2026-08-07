@@ -1,7 +1,7 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Code } from "@/components/Code";
+import { Work } from "@/components/Work";
 import { getFsTree, getGitStatus, getRuns, gitCommit, streamRun } from "@/lib/api";
 import { emptyTree, gitStatus } from "@/test/code-api-mock";
 import { renderWithProviders } from "@/test/utils";
@@ -13,7 +13,17 @@ function file(over: Partial<GitFile> = {}): GitFile {
   return { path: "src/app.py", staged: false, untracked: false, x: " ", y: "M", ...over };
 }
 
-describe("Code — the git panel", () => {
+/** Render Work and open the tab this panel now lives on.
+ *
+ * The assertions below are unchanged from when these ran against the Code screen — only the host
+ * moved. Keeping them verbatim is the point: if relocating a panel had changed what it DOES, these
+ * would say so, and a rewritten test could not. */
+async function openTab(name: RegExp) {
+  renderWithProviders(<Work />);
+  await userEvent.click(await screen.findByRole("tab", { name }));
+}
+
+describe("Work — the git panel", () => {
   beforeEach(() => {
     vi.mocked(getFsTree).mockResolvedValue(emptyTree());
     vi.mocked(getRuns).mockResolvedValue([]);
@@ -23,7 +33,7 @@ describe("Code — the git panel", () => {
 
   it("shows an honest empty state, and no commit UI, when the folder is not a git repo", async () => {
     vi.mocked(getGitStatus).mockResolvedValue(gitStatus({ is_repo: false, branch: "" }));
-    renderWithProviders(<Code />);
+    await openTab(/^Git$/);
 
     expect(
       await screen.findByText("Not a git repo — run `git init` in this folder to enable the panel."),
@@ -33,7 +43,7 @@ describe("Code — the git panel", () => {
   });
 
   it("says the tree is clean rather than showing an empty file list", async () => {
-    renderWithProviders(<Code />);
+    await openTab(/^Git$/);
 
     expect(await screen.findByText("Working tree clean — no changes to commit.")).toBeInTheDocument();
   });
@@ -48,7 +58,7 @@ describe("Code — the git panel", () => {
         ],
       }),
     );
-    renderWithProviders(<Code />);
+    await openTab(/^Git$/);
 
     expect(await screen.findByText("Staged")).toBeInTheDocument();
     expect(screen.getByText("Modified")).toBeInTheDocument();
@@ -65,7 +75,7 @@ describe("Code — the git panel", () => {
     vi.mocked(getGitStatus).mockResolvedValue(
       gitStatus({ files: [file({ path: "src/a.py" }), file({ path: "src/b.py" })] }),
     );
-    renderWithProviders(<Code />);
+    await openTab(/^Git$/);
 
     // Both modified files default-checked; untick one so the commit is genuinely a subset.
     const boxes = await screen.findAllByRole("checkbox");
@@ -79,7 +89,7 @@ describe("Code — the git panel", () => {
 
   it("refuses to commit without a message", async () => {
     vi.mocked(getGitStatus).mockResolvedValue(gitStatus({ files: [file()] }));
-    renderWithProviders(<Code />);
+    await openTab(/^Git$/);
 
     expect(await screen.findByRole("button", { name: /Commit \(1\)/ })).toBeDisabled();
     expect(gitCommit).not.toHaveBeenCalled();
@@ -94,7 +104,7 @@ describe("Code — the git panel", () => {
       output: "",
     });
     vi.mocked(getGitStatus).mockResolvedValue(gitStatus({ files: [file()] }));
-    renderWithProviders(<Code />);
+    await openTab(/^Git$/);
 
     await user.type(await screen.findByPlaceholderText(/commit message/), "fix it");
     await user.click(screen.getByRole("button", { name: /Commit \(1\)/ }));

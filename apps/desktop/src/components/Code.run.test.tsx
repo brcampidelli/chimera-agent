@@ -87,10 +87,9 @@ describe("Code — the run receipt", () => {
     expect(
       screen.getByText("Discard needs a git repo — edit manually or run `git init`."),
     ).toBeInTheDocument();
-    // The git panel's own empty state says the same thing honestly, and offers no commit UI.
-    expect(
-      screen.getByText("Not a git repo — run `git init` in this folder to enable the panel."),
-    ).toBeInTheDocument();
+    // The git panel's matching empty state is asserted where the panel now lives — see
+    // Work.git.test.tsx, "shows an honest empty state, and no commit UI". Dropped here rather than
+    // deleted: the claim survives, on the screen that can still make it.
     expect(screen.queryByPlaceholderText(/commit message/)).not.toBeInTheDocument();
   });
 

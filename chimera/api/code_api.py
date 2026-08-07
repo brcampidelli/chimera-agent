@@ -54,6 +54,7 @@ from chimera.api.posture import (
 from chimera.api.posture import resolve as _resolve_posture
 from chimera.api.roles import Profile, RoleModels, RolePlan
 from chimera.api.roles import resolve as resolve_roles
+from chimera.api.schemas import CodeSessionMetaOut, CodeSessionOut
 from chimera.api.worth import WorthReport, summarize_worth
 from chimera.telemetry import get_logger
 
@@ -232,6 +233,14 @@ def assemble_registry(
 class PostureQuery(BaseModel):
     """Ask what a posture would mean, without committing to it — the selectors' live preview."""
 
+    surface: str = "run"
+    """Which surface is asking: ``"run"`` or ``"turn"``.
+
+    The same posture means two different things on the two, and only one of them was ever reported.
+    A conversational turn is built without a checkpointer or a taint ledger, so it cannot stop and
+    ask — whatever the approval axis says. Defaulting to ``"run"`` keeps every existing caller
+    reading exactly what it read before."""
+
     reach: Reach = DEFAULT_REACH
     approval: Approval = DEFAULT_APPROVAL
     workspace: str | None = None
@@ -308,6 +317,12 @@ def register_code_api(
         agent = build_agent(req, ws)
         session = store.load(req.session_id, agent) if req.session_id else CodeSession(agent)
         session.agent = agent  # a loaded session carries messages, not the agent that made them
+        # A conversation belongs to the project it STARTED in, and keeps it. Overwriting on every
+        # turn would let a session drift between projects in the sidebar as the user switches
+        # around, so an old conversation would file itself under whatever codebase happened to be
+        # selected when it was last reopened — which is the one thing a grouped list must not do.
+        if not session.workspace:
+            session.workspace = req.workspace or ""
         session_id = session.session_id
 
         loop = asyncio.get_running_loop()
@@ -385,7 +400,12 @@ def register_code_api(
         died since the last call must change the answer, not be served from a cache.
         """
         ws = Path(req.workspace).expanduser().resolve() if req.workspace else workspace
-        return describe(Posture(reach=req.reach, approval=req.approval), ws, settings)
+        return describe(
+            Posture(reach=req.reach, approval=req.approval),
+            ws,
+            settings,
+            can_pause=req.surface != "turn",
+        )
 
     @app.post("/api/code/roles", dependencies=[guard], response_model=RoleModels)
     def code_roles(req: RolesQuery) -> RoleModels:
@@ -407,6 +427,44 @@ def register_code_api(
         from chimera.api.runs import load_runs
 
         return summarize_worth(load_runs(settings.home / "runs.jsonl"))
+
+    @app.get("/api/code/sessions", dependencies=[guard], response_model=list[CodeSessionMetaOut])
+    def list_code_sessions() -> list[dict[str, Any]]:
+        """Past coding conversations, newest first, each carrying the project it belongs to.
+
+        The list is what makes a sidebar possible: without the project on each row, past
+        conversations are a flat pile you cannot file. Titles are the first thing the user asked,
+        derived on read — never generated, so a row is never a paraphrase of the conversation it
+        points at.
+        """
+        return store.list_meta()
+
+    @app.get("/api/code/sessions/{session_id}", dependencies=[guard], response_model=CodeSessionOut)
+    def get_code_session(session_id: str) -> dict[str, Any]:
+        """A stored conversation as the exchanges a person had, ready to render.
+
+        Resuming used to show an empty screen while the agent silently carried the whole history —
+        the worst of both, because the next question worked for reasons the user could not see.
+
+        An unknown id returns an empty conversation rather than a 404: the store treats a missing
+        file as the ordinary first-turn case, and a screen that errors on a session someone just
+        deleted in another window would be reporting a race as a fault.
+        """
+        from chimera.api.code_replay import exchanges_from_messages
+
+        path = store._path(session_id)
+        if not path.is_file():
+            return {"id": session_id, "workspace": "", "exchanges": []}
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            messages = [m for m in data.get("messages", []) if isinstance(m, dict)]
+        except (OSError, ValueError):
+            return {"id": session_id, "workspace": "", "exchanges": []}
+        return {
+            "id": session_id,
+            "workspace": str(data.get("workspace") or ""),
+            "exchanges": exchanges_from_messages(messages),
+        }
 
     @app.delete("/api/code/sessions/{session_id}", dependencies=[guard])
     def delete_code_session(session_id: str) -> dict[str, bool]:

@@ -109,17 +109,77 @@
         "type": "object"
       },
       "AgentsRequest": {
-        "description": "A batch of coding tasks for the Agent Manager: each runs concurrently in its OWN git worktree.\n\nMirrors ``chimera solve-batch``. Isolation is REAL only in a git repo \u2014 outside one the tasks run\nin-place against ``workspace`` with no isolation (so concurrent edits can collide and conflicts\ncan't be detected); the response's ``is_repo`` flag says which happened, honestly.",
+        "description": "A batch of coding tasks for the Agent Manager: each runs concurrently in its OWN git worktree.\n\nMirrors ``chimera solve-batch``. Isolation is REAL only in a git repo \u2014 outside one the tasks run\nin-place against ``workspace`` with no isolation (so concurrent edits can collide and conflicts\ncan't be detected); the response's ``is_repo`` flag says which happened, honestly.\n\n**Inherits ``CodeSeams`` so a batch is not structurally weaker than a single run.** It used to\ncarry no posture and no profile, and to hard-code three attempts \u2014 so the same task run as one of\ntwo was quietly granted different tool permissions, a different reviewer, and a different attempt\nbudget than the same task run alone. That was survivable while the user had to choose the Agents\nscreen deliberately; it stops being survivable the moment the composer can route into a batch on\nits own, because then the downgrade is invisible AND unchosen.",
         "properties": {
+          "allow_tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allow Tools"
+          },
           "cascade": {
             "default": false,
             "title": "Cascade",
+            "type": "boolean"
+          },
+          "context_budget": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Budget"
+          },
+          "deny_tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deny Tools"
+          },
+          "explorer": {
+            "default": false,
+            "title": "Explorer",
             "type": "boolean"
           },
           "fuse": {
             "default": false,
             "title": "Fuse",
             "type": "boolean"
+          },
+          "max_attempts": {
+            "default": 3,
+            "title": "Max Attempts",
+            "type": "integer"
+          },
+          "max_steps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Steps"
           },
           "max_workers": {
             "default": 4,
@@ -136,6 +196,47 @@
               }
             ],
             "title": "Model"
+          },
+          "posture": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Posture"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "enum": [
+                  "economy",
+                  "balanced",
+                  "max"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          },
+          "repo_map": {
+            "default": false,
+            "title": "Repo Map",
+            "type": "boolean"
+          },
+          "roles": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleModels"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "tasks": {
             "items": {
@@ -154,6 +255,20 @@
               }
             ],
             "title": "Workspace"
+          },
+          "write_region": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Write Region"
           }
         },
         "required": [
@@ -662,6 +777,133 @@
         "title": "ChatRequest",
         "type": "object"
       },
+      "CodeExchangeOut": {
+        "description": "One question and everything the agent did answering it.\n\n``edits`` is always empty on a REPLAY: a diff was streamed live and never entered the message\nlist, so a resumed turn can show the tool call that wrote a file but not the coloured patch. The\nfield is here so a replayed exchange has the same shape as a live one, and the UI says which is\nwhich rather than letting the absence read as \"it changed nothing\".",
+        "properties": {
+          "answer": {
+            "title": "Answer",
+            "type": "string"
+          },
+          "edits": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Edits",
+            "type": "array"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/CodeToolOut"
+            },
+            "title": "Tools",
+            "type": "array"
+          },
+          "you": {
+            "title": "You",
+            "type": "string"
+          }
+        },
+        "required": [
+          "you",
+          "answer",
+          "tools",
+          "edits"
+        ],
+        "title": "CodeExchangeOut",
+        "type": "object"
+      },
+      "CodeSessionMetaOut": {
+        "description": "One row of the coding-conversation list.\n\nSeparate from ``SessionMetaOut`` because it carries ``workspace`` \u2014 the field that lets the list\nbe grouped by project instead of being a flat pile of past questions with no owner.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "turns": {
+            "title": "Turns",
+            "type": "integer"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "number"
+          },
+          "workspace": {
+            "title": "Workspace",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "workspace",
+          "turns",
+          "updated_at"
+        ],
+        "title": "CodeSessionMetaOut",
+        "type": "object"
+      },
+      "CodeSessionOut": {
+        "properties": {
+          "exchanges": {
+            "items": {
+              "$ref": "#/components/schemas/CodeExchangeOut"
+            },
+            "title": "Exchanges",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "workspace": {
+            "title": "Workspace",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "workspace",
+          "exchanges"
+        ],
+        "title": "CodeSessionOut",
+        "type": "object"
+      },
+      "CodeToolOut": {
+        "properties": {
+          "arguments": {
+            "additionalProperties": true,
+            "title": "Arguments",
+            "type": "object"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "observation": {
+            "title": "Observation",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "arguments",
+          "ok",
+          "observation"
+        ],
+        "title": "CodeToolOut",
+        "type": "object"
+      },
       "CodeTurnRequest": {
         "description": "One turn of a coding conversation.",
         "properties": {
@@ -1130,6 +1372,56 @@
           "truncated"
         ],
         "title": "FileDiffOut",
+        "type": "object"
+      },
+      "FsBrowseOut": {
+        "description": "One level of the folder picker: where we are, where up is, and what is inside.",
+        "properties": {
+          "capped": {
+            "title": "Capped",
+            "type": "boolean"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/FsDirOut"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "parent": {
+            "title": "Parent",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "parent",
+          "entries",
+          "capped"
+        ],
+        "title": "FsBrowseOut",
+        "type": "object"
+      },
+      "FsDirOut": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "path"
+        ],
+        "title": "FsDirOut",
         "type": "object"
       },
       "FsFileOut": {
@@ -2484,6 +2776,11 @@
             "title": "Reach",
             "type": "string"
           },
+          "surface": {
+            "default": "run",
+            "title": "Surface",
+            "type": "string"
+          },
           "workspace": {
             "anyOf": [
               {
@@ -2508,6 +2805,10 @@
           },
           "passed": {
             "title": "Passed",
+            "type": "integer"
+          },
+          "passed_by_verifier": {
+            "title": "Passed By Verifier",
             "type": "integer"
           },
           "profile": {
@@ -2553,6 +2854,7 @@
           "profile",
           "runs",
           "passed",
+          "passed_by_verifier",
           "reverted",
           "unproductive",
           "attempts_total",
@@ -4005,6 +4307,29 @@
         "summary": "Code Roles"
       }
     },
+    "/api/code/sessions": {
+      "get": {
+        "description": "Past coding conversations, newest first, each carrying the project it belongs to.\n\nThe list is what makes a sidebar possible: without the project on each row, past\nconversations are a flat pile you cannot file. Titles are the first thing the user asked,\nderived on read \u2014 never generated, so a row is never a paraphrase of the conversation it\npoints at.",
+        "operationId": "list_code_sessions_api_code_sessions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CodeSessionMetaOut"
+                  },
+                  "title": "Response List Code Sessions Api Code Sessions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Code Sessions"
+      }
+    },
     "/api/code/sessions/{session_id}": {
       "delete": {
         "description": "Forget a conversation. An unknown id is ``{ok: false}`` with a 200, not a 404 \u2014 that is\nexactly the state a second click on Clear hits, and it is not an error.",
@@ -4047,6 +4372,44 @@
           }
         },
         "summary": "Delete Code Session"
+      },
+      "get": {
+        "description": "A stored conversation as the exchanges a person had, ready to render.\n\nResuming used to show an empty screen while the agent silently carried the whole history \u2014\nthe worst of both, because the next question worked for reasons the user could not see.\n\nAn unknown id returns an empty conversation rather than a 404: the store treats a missing\nfile as the ordinary first-turn case, and a screen that errors on a session someone just\ndeleted in another window would be reporting a race as a fault.",
+        "operationId": "get_code_session_api_code_sessions__session_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Code Session"
       }
     },
     "/api/code/turn": {
@@ -4392,6 +4755,47 @@
           }
         },
         "summary": "Doctor Endpoint"
+      }
+    },
+    "/api/fs/browse": {
+      "get": {
+        "description": "Sub-directories of ``path`` (home when empty), so a person can PICK a project.\n\nThe tree endpoint cannot answer this: it is scoped inside a workspace, and the question here\nis which workspace. Directories only, no hidden entries, nothing read \u2014 it enumerates folder\nnames and that is all it can do.",
+        "operationId": "fs_browse_endpoint_api_fs_browse_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "path",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FsBrowseOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Fs Browse Endpoint"
       }
     },
     "/api/fs/exec": {

@@ -596,6 +596,10 @@ export interface ProfileWorth {
   profile: string | null;
   runs: number;
   passed: number;
+  // Of `passed`, how many an EXECUTABLE command judged. The rest were approved by a model reading
+  // the answer text, which never sees the diff, the transcript, or a file. Both really passed; only
+  // one was verified, and the panel exists to say whether a configuration earned its cost.
+  passed_by_verifier: number;
   reverted: number;
   // Runs whose SUCCESSFUL attempt changed no file — the empty-patch failure, kept apart from
   // `passed` so a configuration cannot look good at the thing it is bad at.
@@ -620,6 +624,52 @@ export interface WorthReport {
  *  different days, no randomisation), and ordering them by pass rate would read as a ranking these
  *  numbers cannot support. The comparison that can is the paired A/B in bench/role_routing. */
 export const getWorth = () => json<WorthReport>("/api/code/worth");
+
+/** One past coding conversation, as a sidebar row. */
+export interface CodeSessionMeta {
+  id: string;
+  title: string;
+  /** The project it was about. Empty means the server's own workspace. */
+  workspace: string;
+  turns: number;
+  updated_at: number;
+}
+
+/** Past coding conversations, newest first, each carrying the project it belongs to.
+ *
+ * `workspace` is what makes the list groupable. Without it these are a flat pile of old questions
+ * with no owner — you can see that you asked something on Tuesday but not which codebase about. */
+export const listCodeSessions = () => json<CodeSessionMeta[]>("/api/code/sessions");
+
+/** Sub-directories of `path` (home when empty), for picking a project by clicking.
+ *
+ * Directories only, nothing read — it enumerates folder names. The tree endpoint cannot answer this
+ * because it is scoped inside a workspace, and the question here is which workspace. */
+export const browseDirs = (path: string) =>
+  json<{ path: string; parent: string; entries: { name: string; path: string }[]; capped: boolean }>(
+    `/api/fs/browse?path=${encodeURIComponent(path)}`,
+  );
+
+/** A stored conversation, already folded into exchanges by the backend.
+ *
+ * The fold (model messages → "I asked this, it did these things, it answered that") lives on the
+ * server because it is a rule about the model's wire format, and because its edge cases — a tool
+ * result whose call was trimmed, arguments that are not valid JSON — are worth testing where the
+ * transcript is produced rather than re-derived here.
+ *
+ * `edits` comes back empty on a replay: a diff was streamed live and never entered the message
+ * list, so a resumed turn shows the tool call that wrote a file, not the coloured patch. */
+export const getCodeSession = (sessionId: string) =>
+  json<{
+    id: string;
+    workspace: string;
+    exchanges: {
+      you: string;
+      answer: string;
+      tools: CodeToolEvent[];
+      edits: { path: string; patch: string }[];
+    }[];
+  }>(`/api/code/sessions/${encodeURIComponent(sessionId)}`);
 
 /** Forget a coding conversation. An unknown id is `{ok:false}`, not an error — that is exactly the
  *  state a second click on Clear hits. */

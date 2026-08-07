@@ -54,6 +54,19 @@ class ProfileWorth(BaseModel):
 
     runs: int
     passed: int
+    passed_by_verifier: int
+    """Of ``passed``, how many were judged by something EXECUTABLE.
+
+    Without this column the table was silently merging two different claims. A run whose winning
+    attempt carries ``evidence == "verifier"`` was approved by a command's exit code. Every other
+    passing run was approved by a Manager LLM reading the answer text — it never sees the diff, the
+    transcript, or a file (``chimera/core/autonomous.py:684-690``), and the only thing separating it
+    from "the model wrote a convincing paragraph" is that some file changed.
+
+    Both are true uses of the word "passed", and the run really did pass. But a view whose entire job
+    is to say whether a configuration earned its cost cannot count them as the same evidence — that
+    is the thing this module's own docstring refuses to do with profiles, applied to verdicts."""
+
     reverted: int
     """Runs where at least one attempt was made and undone — work that was done and thrown away."""
     unproductive: int
@@ -106,6 +119,14 @@ def summarize_worth(receipts: list[RunReceipt]) -> WorthReport:
                 profile=profile,
                 runs=len(runs),
                 passed=sum(1 for r in runs if r.success),
+                # The WINNING attempt's evidence, not any attempt's: a run that failed twice with a
+                # verifier and then passed on a manager-only retry was not verified.
+                passed_by_verifier=sum(
+                    1
+                    for r in runs
+                    if r.success
+                    and any(a.success and a.evidence == "verifier" for a in r.attempts)
+                ),
                 reverted=sum(1 for r in runs if any(a.reverted for a in r.attempts)),
                 # Only successes: an unproductive FAILURE is just a failure, and counting it here
                 # would double-punish the same run in two columns.

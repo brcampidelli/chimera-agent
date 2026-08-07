@@ -180,3 +180,42 @@ def test_fuse_review_puts_a_panel_behind_the_manager_and_not_behind_the_editor(t
     # The editor is the one that must NEVER be a panel: three synthesised patches produce a patch
     # that applies cleanly and means nothing.
     assert not isinstance(agent.worker.backend, FusionEngine)
+
+
+def test_one_model_means_no_role_routing_and_says_so() -> None:
+    """The ordinary state for a user with a single provider key.
+
+    With one model on every rung there is nothing to route: all four roles would resolve to the same
+    slug, `review_model_for` would return None, and the Manager would review with the very model
+    that wrote the patch — the self-grading collapse the reviewer rule exists to prevent. Offering
+    three profiles here would charge the user attention for a distinction that does not exist, and a
+    `max` that costs exactly what `economy` costs while reporting itself as different is the kind of
+    claim this project keeps deleting.
+    """
+    from chimera.api.roles import resolve
+
+    settings = _settings()
+    settings.weak_model = "solo/model"
+    settings.mid_model = "solo/model"
+    settings.orchestrator_model = "solo/model"
+
+    plan = resolve("max", settings)
+
+    assert plan.single_model == "solo/model"
+    assert plan.models.explore is None and plan.models.plan is None
+    assert plan.models.edit is None and plan.models.review is None
+    # And no fusion: a one-model "panel" is one model asked three times.
+    assert not plan.models.fuse_plan and not plan.models.fuse_review
+
+
+def test_a_single_model_still_honours_an_explicit_per_role_override() -> None:
+    """Someone naming a second model is precisely the person who has one."""
+    from chimera.api.roles import RoleModels, resolve
+
+    settings = _settings()
+    settings.weak_model = settings.mid_model = settings.orchestrator_model = "solo/model"
+
+    plan = resolve("balanced", settings, RoleModels(review="other/reviewer"))
+
+    assert plan.models.review == "other/reviewer"
+    assert plan.single_model == "solo/model"

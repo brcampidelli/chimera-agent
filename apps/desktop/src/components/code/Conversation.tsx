@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState , type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Eraser, Loader2, MessageSquare, Send, ShieldCheck, Wrench } from "lucide-react";
 import {
   deleteCodeSession,
+  getCodeSession,
   streamCodeTurn,
   type Approval,
   type CodeToolEvent,
@@ -33,8 +34,13 @@ interface Exchange {
  *  The observation is deliberately behind a title rather than inline — it is clipped server-side,
  *  and a clipped build log rendered as if it were the whole thing is how someone concludes the
  *  tests passed from the first four hundred characters of output. */
-function ToolRow({ tool }: { tool: CodeToolEvent }) {
-  const primary = Object.values(tool.arguments)[0] ?? "";
+function ToolRow({ tool, onOpenFile }: { tool: CodeToolEvent; onOpenFile?: (p: string) => void }) {
+  const primary = String(Object.values(tool.arguments)[0] ?? "");
+  // A path the agent touched is the handle for looking at it. With the file tree gone this is
+  // how the viewer opens — the same way you would click a filename in a terminal that linkifies
+  // them. Heuristic on purpose: an argument that looks like a path is offered as one, and one
+  // that is not stays plain text rather than becoming a button that does nothing.
+  const looksLikePath = /[/\.]/.test(primary) && !primary.includes(" ");
   return (
     <div
       className="flex items-baseline gap-2 font-mono text-xs"
@@ -42,7 +48,17 @@ function ToolRow({ tool }: { tool: CodeToolEvent }) {
     >
       <span className={cn("shrink-0", tool.ok ? "text-ok" : "text-bad")}>{tool.ok ? "✓" : "✗"}</span>
       <span className="shrink-0 text-foreground/80">{tool.name}</span>
-      <span className="truncate text-muted-foreground">{primary}</span>
+      {looksLikePath && onOpenFile ? (
+        <button
+          type="button"
+          onClick={() => onOpenFile(primary)}
+          className="truncate text-left text-muted-foreground underline decoration-dotted hover:text-accent"
+        >
+          {primary}
+        </button>
+      ) : (
+        <span className="truncate text-muted-foreground">{primary}</span>
+      )}
     </div>
   );
 }
@@ -82,6 +98,9 @@ export function Conversation({
   busyElsewhere,
   posture,
   profile,
+  controls,
+  onOpenFile,
+  resumeSession,
 }: {
   workspace: string;
   openFile: string | null;
@@ -96,10 +115,16 @@ export function Conversation({
   onEdited: () => void;
   /** A run is in flight; sending a turn at the same time would race it in the same workspace. */
   busyElsewhere: boolean;
+  /** Rendered just above the input: the settings that govern the next message. */
+  controls?: ReactNode;
+  /** Open a file the agent touched — the transcript replaced the tree as the way in. */
+  onOpenFile?: (path: string) => void;
+  /** Continue a stored conversation: its turns are fetched and rendered above the composer. */
+  resumeSession?: string | null;
 }) {
   const t = useT();
   const qc = useQueryClient();
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(resumeSession ?? null);
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -108,6 +133,30 @@ export function Conversation({
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
   }, [exchanges]);
+
+  // Load a resumed conversation's turns. Without this the agent silently carried the whole history
+  // while the screen showed nothing — the worst combination, because the next question then worked
+  // for reasons the user could not see. `replayed` distinguishes "still loading" from "this
+  // conversation really is empty", which otherwise render identically and mean opposite things.
+  const [replayed, setReplayed] = useState(!resumeSession);
+  useEffect(() => {
+    if (!resumeSession) return;
+    let live = true;
+    void getCodeSession(resumeSession)
+      .then((session) => {
+        if (!live) return;
+        setExchanges(session.exchanges.map((e) => ({ ...e, done: null })));
+        setReplayed(true);
+      })
+      .catch(() => {
+        // A conversation we cannot read is reported as such rather than shown as empty: "nothing
+        // here" and "we failed to fetch it" look the same and are not the same.
+        if (live) setReplayed(true);
+      });
+    return () => {
+      live = false;
+    };
+  }, [resumeSession]);
 
   /** Mutate the turn currently streaming — always the last one, which is the only one that moves. */
   const patchLast = useCallback((fn: (e: Exchange) => Exchange) => {
@@ -189,7 +238,7 @@ export function Conversation({
       </div>
 
       <div className="min-h-0 flex-1 space-y-3 overflow-auto p-3">
-        {exchanges.length === 0 ? (
+        {exchanges.length === 0 && replayed ? (
           <p className="text-xs text-muted-foreground">{t("code.chat.empty")}</p>
         ) : null}
         {exchanges.map((e, i) => (
@@ -203,13 +252,19 @@ export function Conversation({
                   <Wrench className="h-3 w-3" /> {t("code.chat.tools")}
                 </div>
                 {e.tools.map((tool, j) => (
-                  <ToolRow key={j} tool={tool} />
+                  <ToolRow key={j} tool={tool} onOpenFile={onOpenFile} />
                 ))}
               </div>
             ) : null}
             {e.edits.map((edit, j) => (
               <div key={j} className="space-y-1">
-                <div className="font-mono text-xs text-accent">{edit.path}</div>
+                <button
+                  type="button"
+                  onClick={() => onOpenFile?.(edit.path)}
+                  className="font-mono text-xs text-accent underline decoration-dotted"
+                >
+                  {edit.path}
+                </button>
                 <DiffView patch={edit.patch} />
               </div>
             ))}
@@ -224,6 +279,11 @@ export function Conversation({
       </div>
 
       <div className="space-y-2 border-t border-hairline p-3">
+        {/* The settings that govern THIS message, next to the box you type it in — the way a model
+            selector sits in a composer. They used to be two titled panels stacked above the
+            conversation, which is how the conversation ended up with no room: a control that
+            describes the next turn does not need more vertical space than the turn itself. */}
+        {controls ? <div className="pb-1">{controls}</div> : null}
         <textarea
           className="field min-h-[64px] w-full resize-y px-3 py-2 text-sm"
           placeholder={t("code.chat.placeholder")}

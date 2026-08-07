@@ -88,6 +88,13 @@ class RunReceipt(BaseModel):
     success: bool = False
     paused: bool = False  # interrupted for human approval (never persisted — kept for shape parity)
     verify_command: str | None = None  # the shell command that judged the run, or None (no verifier)
+    verify_source: str = "user"
+    """Where ``verify_command`` came from: ``user`` | ``inferred:<file>`` | ``none``.
+
+    A receipt that cannot tell a typed command from one this app read off the project is a receipt
+    that will eventually be cited as evidence of a decision nobody made. The default is ``user``
+    because every receipt written before this field existed came from a typed command — the field
+    was the only way to supply one."""
     answer: str = ""  # the final answer, truncated in the builder
     attempts: list[AttemptReceipt] = []
     #: Which model-role configuration ran this — "economy" / "balanced" / "max", or ``null`` for a
@@ -124,6 +131,7 @@ def build_receipt(
     ts: str,
     *,
     profile: str | None = None,
+    verify_source: str = "user",
 ) -> RunReceipt:
     """Map an ``AutonomousResult`` (and its attempts) into a receipt, truncating the bounded fields."""
     attempts = [
@@ -165,6 +173,7 @@ def build_receipt(
         success=result.success,
         paused=result.paused,
         verify_command=verify_command,
+        verify_source=verify_source,
         answer=(result.answer or "")[:2000],
         attempts=attempts,
         profile=profile,

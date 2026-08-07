@@ -103,3 +103,42 @@ def write_file(
         path.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_text(path, text, newline=newline)
     return {"path": rel, "bytes": path.stat().st_size}
+
+
+def browse_dirs(path: str, *, max_entries: int = 300) -> dict[str, Any]:
+    """List sub-DIRECTORIES of ``path`` so a person can pick a project. Empty path = home.
+
+    Deliberately narrower than :func:`list_tree`, which is scoped inside a chosen workspace and so
+    cannot answer "which workspace?" at all. This one is not scoped — that is the point, and it is
+    also the whole risk, so it is cut down to the least that answers the question:
+
+    * **Directories only.** No files are listed and nothing is read. This enumerates folder NAMES;
+      it is not a second way to read the disk.
+    * **No hidden entries**, which keeps `.ssh` and friends out of a listing nobody asked to see.
+    * **Capped**, and an unreadable directory returns an empty listing rather than raising: a
+      permission error while browsing is an ordinary fact about somebody's home directory, not a
+      failure of the app.
+
+    The caller is still the localhost bind and the bearer guard; this adds no new door, only a
+    smaller window in the one that exists.
+    """
+    root = Path(path).expanduser() if path else Path.home()
+    try:
+        root = root.resolve()
+    except OSError:
+        root = Path.home()
+    entries: list[dict[str, str]] = []
+    capped = False
+    if root.is_dir():
+        try:
+            children = sorted(
+                (c for c in root.iterdir() if c.is_dir() and not c.name.startswith(".")),
+                key=lambda c: c.name.lower(),
+            )
+        except OSError:
+            children = []
+        if len(children) > max_entries:
+            children, capped = children[:max_entries], True
+        entries = [{"name": c.name, "path": str(c)} for c in children]
+    parent = str(root.parent) if root.parent != root else ""
+    return {"path": str(root), "parent": parent, "entries": entries, "capped": capped}

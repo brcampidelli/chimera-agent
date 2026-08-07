@@ -154,6 +154,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Code Sessions
+         * @description Past coding conversations, newest first, each carrying the project it belongs to.
+         *
+         *     The list is what makes a sidebar possible: without the project on each row, past
+         *     conversations are a flat pile you cannot file. Titles are the first thing the user asked,
+         *     derived on read — never generated, so a row is never a paraphrase of the conversation it
+         *     points at.
+         */
+        get: operations["list_code_sessions_api_code_sessions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/sessions/{session_id}": {
         parameters: {
             query?: never;
@@ -161,7 +186,18 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Get Code Session
+         * @description A stored conversation as the exchanges a person had, ready to render.
+         *
+         *     Resuming used to show an empty screen while the agent silently carried the whole history —
+         *     the worst of both, because the next question worked for reasons the user could not see.
+         *
+         *     An unknown id returns an empty conversation rather than a 404: the store treats a missing
+         *     file as the ordinary first-turn case, and a screen that errors on a session someone just
+         *     deleted in another window would be reporting a race as a fault.
+         */
+        get: operations["get_code_session_api_code_sessions__session_id__get"];
         put?: never;
         post?: never;
         /**
@@ -332,6 +368,30 @@ export interface paths {
         };
         /** Doctor Endpoint */
         get: operations["doctor_endpoint_api_doctor_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/fs/browse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fs Browse Endpoint
+         * @description Sub-directories of ``path`` (home when empty), so a person can PICK a project.
+         *
+         *     The tree endpoint cannot answer this: it is scoped inside a workspace, and the question here
+         *     is which workspace. Directories only, no hidden entries, nothing read — it enumerates folder
+         *     names and that is all it can do.
+         */
+        get: operations["fs_browse_endpoint_api_fs_browse_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1109,18 +1169,43 @@ export interface components {
          *     Mirrors ``chimera solve-batch``. Isolation is REAL only in a git repo — outside one the tasks run
          *     in-place against ``workspace`` with no isolation (so concurrent edits can collide and conflicts
          *     can't be detected); the response's ``is_repo`` flag says which happened, honestly.
+         *
+         *     **Inherits ``CodeSeams`` so a batch is not structurally weaker than a single run.** It used to
+         *     carry no posture and no profile, and to hard-code three attempts — so the same task run as one of
+         *     two was quietly granted different tool permissions, a different reviewer, and a different attempt
+         *     budget than the same task run alone. That was survivable while the user had to choose the Agents
+         *     screen deliberately; it stops being survivable the moment the composer can route into a batch on
+         *     its own, because then the downgrade is invisible AND unchosen.
          */
         AgentsRequest: {
+            /** Allow Tools */
+            allow_tools?: string[] | null;
             /**
              * Cascade
              * @default false
              */
             cascade: boolean;
+            /** Context Budget */
+            context_budget?: number | null;
+            /** Deny Tools */
+            deny_tools?: string[] | null;
+            /**
+             * Explorer
+             * @default false
+             */
+            explorer: boolean;
             /**
              * Fuse
              * @default false
              */
             fuse: boolean;
+            /**
+             * Max Attempts
+             * @default 3
+             */
+            max_attempts: number;
+            /** Max Steps */
+            max_steps?: number | null;
             /**
              * Max Workers
              * @default 4
@@ -1128,10 +1213,21 @@ export interface components {
             max_workers: number;
             /** Model */
             model?: string | null;
+            posture?: components["schemas"]["Posture"] | null;
+            /** Profile */
+            profile?: ("economy" | "balanced" | "max") | null;
+            /**
+             * Repo Map
+             * @default false
+             */
+            repo_map: boolean;
+            roles?: components["schemas"]["RoleModels"] | null;
             /** Tasks */
             tasks: components["schemas"]["AgentTaskIn"][];
             /** Workspace */
             workspace?: string | null;
+            /** Write Region */
+            write_region?: string[] | null;
         };
         /** ApproveBody */
         ApproveBody: {
@@ -1351,6 +1447,68 @@ export interface components {
             stream: boolean;
         };
         /**
+         * CodeExchangeOut
+         * @description One question and everything the agent did answering it.
+         *
+         *     ``edits`` is always empty on a REPLAY: a diff was streamed live and never entered the message
+         *     list, so a resumed turn can show the tool call that wrote a file but not the coloured patch. The
+         *     field is here so a replayed exchange has the same shape as a live one, and the UI says which is
+         *     which rather than letting the absence read as "it changed nothing".
+         */
+        CodeExchangeOut: {
+            /** Answer */
+            answer: string;
+            /** Edits */
+            edits: {
+                [key: string]: string;
+            }[];
+            /** Tools */
+            tools: components["schemas"]["CodeToolOut"][];
+            /** You */
+            you: string;
+        };
+        /**
+         * CodeSessionMetaOut
+         * @description One row of the coding-conversation list.
+         *
+         *     Separate from ``SessionMetaOut`` because it carries ``workspace`` — the field that lets the list
+         *     be grouped by project instead of being a flat pile of past questions with no owner.
+         */
+        CodeSessionMetaOut: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Turns */
+            turns: number;
+            /** Updated At */
+            updated_at: number;
+            /** Workspace */
+            workspace: string;
+        };
+        /** CodeSessionOut */
+        CodeSessionOut: {
+            /** Exchanges */
+            exchanges: components["schemas"]["CodeExchangeOut"][];
+            /** Id */
+            id: string;
+            /** Workspace */
+            workspace: string;
+        };
+        /** CodeToolOut */
+        CodeToolOut: {
+            /** Arguments */
+            arguments: {
+                [key: string]: unknown;
+            };
+            /** Name */
+            name: string;
+            /** Observation */
+            observation: string;
+            /** Ok */
+            ok: boolean;
+        };
+        /**
          * CodeTurnRequest
          * @description One turn of a coding conversation.
          */
@@ -1500,6 +1658,27 @@ export interface components {
             path: string;
             /** Truncated */
             truncated: boolean;
+        };
+        /**
+         * FsBrowseOut
+         * @description One level of the folder picker: where we are, where up is, and what is inside.
+         */
+        FsBrowseOut: {
+            /** Capped */
+            capped: boolean;
+            /** Entries */
+            entries: components["schemas"]["FsDirOut"][];
+            /** Parent */
+            parent: string;
+            /** Path */
+            path: string;
+        };
+        /** FsDirOut */
+        FsDirOut: {
+            /** Name */
+            name: string;
+            /** Path */
+            path: string;
         };
         /** FsFileOut */
         FsFileOut: {
@@ -2023,6 +2202,8 @@ export interface components {
             attempts_total: number;
             /** Passed */
             passed: number;
+            /** Passed By Verifier */
+            passed_by_verifier: number;
             /** Profile */
             profile: string | null;
             /** Reverted */
@@ -2697,6 +2878,57 @@ export interface operations {
             };
         };
     };
+    list_code_sessions_api_code_sessions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSessionMetaOut"][];
+                };
+            };
+        };
+    };
+    get_code_session_api_code_sessions__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     delete_code_session_api_code_sessions__session_id__delete: {
         parameters: {
             query?: never;
@@ -3033,6 +3265,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DoctorOut"];
+                };
+            };
+        };
+    };
+    fs_browse_endpoint_api_fs_browse_get: {
+        parameters: {
+            query?: {
+                path?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FsBrowseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

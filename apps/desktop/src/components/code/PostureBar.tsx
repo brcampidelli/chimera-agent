@@ -90,6 +90,7 @@ export function PostureBar({
   onReach,
   onApproval,
   disabled,
+  compact,
 }: {
   workspace: string;
   reach: Reach;
@@ -97,9 +98,54 @@ export function PostureBar({
   onReach: (r: Reach) => void;
   onApproval: (a: Approval) => void;
   disabled?: boolean;
+  /** Render as one row for the composer strip instead of a titled block. */
+  compact?: boolean;
 }) {
   const t = useT();
   const facts = useFacts(reach, approval, workspace);
+
+  // Compact: one row beside the composer instead of a 167px block above it.
+  //
+  // The sentence stays VISIBLE. A first draft moved it into the row's `title` — one hover away —
+  // and the test suite caught that as three failures, correctly: this line is what the agent is
+  // allowed to do to your files, not a tooltip. It was three wrapped lines only because it lived in
+  // a 384px column; across the composer it is one. Hiding it would have been the whole point of the
+  // screen (say what is happening) traded for the appearance of tidiness.
+  if (compact) {
+    return (
+      <div className="flex flex-col gap-1">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <ShieldHalf className="h-4 w-4 shrink-0 text-accent" />
+          <Choice
+            label={t("code.posture.reach")}
+            value={reach}
+            options={REACHES}
+            onChange={onReach}
+            render={(r) => t(`code.posture.reach.${r}` as const)}
+            disabled={disabled}
+          />
+          <Choice
+            label={t("code.posture.approval")}
+            value={approval}
+            options={APPROVALS}
+            onChange={onApproval}
+            render={(a) => t(`code.posture.approval.${a}` as const)}
+            disabled={disabled}
+          />
+        </div>
+        {facts.data ? (
+          <p className="text-xs text-muted-foreground">{sentence(facts.data, t)}</p>
+        ) : null}
+        {facts.data?.fell_back_to_host ? (
+          <p className="flex items-start gap-1.5 text-xs text-bad">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            {t("code.posture.fellBack")}
+          </p>
+        ) : null}
+        {facts.isError ? <p className="text-xs text-bad">{t("code.posture.unknown")}</p> : null}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2 border-b border-hairline p-3">

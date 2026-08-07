@@ -1,6 +1,7 @@
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Code } from "@/components/Code";
+import { Work } from "@/components/Work";
 import {
   getFsTree,
   getGitStatus,
@@ -20,7 +21,17 @@ import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", async () => (await import("@/test/code-api-mock")).makeCodeApiMock());
 
-describe("Code — was it worth it?", () => {
+/** Render Work and open the tab this panel now lives on.
+ *
+ * The assertions below are unchanged from when these ran against the Code screen — only the host
+ * moved. Keeping them verbatim is the point: if relocating a panel had changed what it DOES, these
+ * would say so, and a rewritten test could not. */
+async function openTab(name: RegExp) {
+  renderWithProviders(<Work />);
+  await userEvent.click(await screen.findByRole("tab", { name }));
+}
+
+describe("Work — was it worth it?", () => {
   beforeEach(() => {
     vi.mocked(getFsTree).mockResolvedValue(emptyTree());
     vi.mocked(getGitStatus).mockResolvedValue(gitStatus());
@@ -32,7 +43,7 @@ describe("Code — was it worth it?", () => {
 
   it("says there is nothing to show yet rather than showing an empty table", async () => {
     expect(vi.mocked(getWorth)).toBeDefined();
-    renderWithProviders(<Code />);
+    await openTab(/Valeu a pena|Was it worth/);
     expect(await screen.findByText(/No finished runs yet/)).toBeInTheDocument();
   });
 
@@ -40,7 +51,7 @@ describe("Code — was it worth it?", () => {
     vi.mocked(getWorth).mockResolvedValue(
       worthReport([{ profile: "balanced", runs: 12, passed: 9, usd_total: 1.2345, usd_known_runs: 12 }]),
     );
-    renderWithProviders(<Code />);
+    await openTab(/Valeu a pena|Was it worth/);
     expect(await screen.findByText("$1.2345")).toBeInTheDocument();
   });
 
@@ -51,7 +62,7 @@ describe("Code — was it worth it?", () => {
     vi.mocked(getWorth).mockResolvedValue(
       worthReport([{ profile: "economy", runs: 12, usd_total: null, usd_known_runs: 5 }]),
     );
-    renderWithProviders(<Code />);
+    await openTab(/Valeu a pena|Was it worth/);
 
     expect(await screen.findByText("5/12 priced")).toBeInTheDocument();
     expect(screen.queryByText(/^\$0/)).not.toBeInTheDocument();
@@ -63,7 +74,7 @@ describe("Code — was it worth it?", () => {
     vi.mocked(getWorth).mockResolvedValue(
       worthReport([{ profile: "max", runs: 12, passed: 8, unproductive: 3 }]),
     );
-    renderWithProviders(<Code />);
+    await openTab(/Valeu a pena|Was it worth/);
 
     expect(await screen.findByText("8")).toBeInTheDocument();
     expect(screen.getByText("(−3)")).toBeInTheDocument();
@@ -71,7 +82,7 @@ describe("Code — was it worth it?", () => {
 
   it("warns while every group is still too small to read", async () => {
     vi.mocked(getWorth).mockResolvedValue(worthReport([{ runs: 3, passed: 3 }]));
-    renderWithProviders(<Code />);
+    await openTab(/Valeu a pena|Was it worth/);
     expect(await screen.findByText(/read these as anecdotes, not as a result/)).toBeInTheDocument();
   });
 
@@ -79,7 +90,7 @@ describe("Code — was it worth it?", () => {
     // The caveat is about the DESIGN of the data — observational, unrandomised — so it does not
     // stop being true when more rows arrive.
     vi.mocked(getWorth).mockResolvedValue(worthReport([{ runs: 500, passed: 480 }]));
-    renderWithProviders(<Code />);
+    await openTab(/Valeu a pena|Was it worth/);
 
     expect(await screen.findByText(/They are a record, not an experiment/)).toBeInTheDocument();
     expect(screen.queryByText(/read these as anecdotes/)).not.toBeInTheDocument();
@@ -87,7 +98,7 @@ describe("Code — was it worth it?", () => {
 
   it("labels runs that named no profile as their own group", async () => {
     vi.mocked(getWorth).mockResolvedValue(worthReport([{ profile: null, runs: 40 }]));
-    renderWithProviders(<Code />);
+    await openTab(/Valeu a pena|Was it worth/);
     expect(await screen.findByText("none")).toBeInTheDocument();
   });
 
@@ -100,10 +111,31 @@ describe("Code — was it worth it?", () => {
         { profile: "economy", runs: 10, passed: 9 },
       ]),
     );
-    renderWithProviders(<Code />);
+    await openTab(/Valeu a pena|Was it worth/);
 
     const rows = (await screen.findAllByRole("row")).slice(1); // drop the header
     expect(rows[0]).toHaveTextContent("balanced");
     expect(rows[1]).toHaveTextContent("economy");
+  });
+});
+
+describe("Work — which kind of pass", () => {
+  beforeEach(() => {
+    vi.mocked(getFsTree).mockResolvedValue(emptyTree());
+    vi.mocked(getGitStatus).mockResolvedValue(gitStatus());
+    vi.mocked(getRuns).mockResolvedValue([]);
+  });
+
+  it("says how many passes a command judged, not just how many passed", async () => {
+    // Without this the number merged two claims: a run approved by an exit code, and one approved
+    // by a model reading the answer text. Both passed; only one was verified.
+    vi.mocked(getWorth).mockResolvedValue(
+      worthReport([{ profile: "balanced", runs: 4, passed: 3, passed_by_verifier: 1 }]),
+    );
+    await openTab(/Valeu a pena|Was it worth/);
+
+    const row = (await screen.findAllByRole("row"))[1];
+    expect(row).toHaveTextContent("3");
+    expect(row).toHaveTextContent(/1.*with tests|1.*com testes/);
   });
 });

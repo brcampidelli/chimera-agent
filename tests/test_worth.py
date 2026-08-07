@@ -135,3 +135,49 @@ def test_a_paused_run_is_not_counted_as_a_failure() -> None:
 def test_an_empty_log_is_an_empty_report_not_an_error() -> None:
     report = summarize_worth([])
     assert report.profiles == [] and report.total_runs == 0 and not report.any_readable
+
+
+# --- verdict quality: which "passed" is which ---------------------------------------------------
+
+
+def test_a_pass_judged_by_a_command_is_counted_apart_from_a_pass_judged_by_a_model() -> None:
+    """The column that stops two different claims from wearing one number.
+
+    A run whose winning attempt has `evidence == "verifier"` was approved by an exit code. Every
+    other passing run was approved by a Manager LLM reading the answer text — it never sees the diff,
+    the transcript, or a file (`chimera/core/autonomous.py:684-690`). Both really did pass; only one
+    was verified, and a view whose whole job is to say whether a configuration earned its cost cannot
+    count them as the same evidence.
+    """
+    report = summarize_worth([
+        _run(attempts=[_attempt(evidence="verifier")]),
+        _run(attempts=[_attempt(evidence="diff+manager")]),
+    ])
+
+    (group,) = report.profiles
+    assert group.passed == 2
+    assert group.passed_by_verifier == 1
+
+
+def test_it_reads_the_WINNING_attempt_not_any_attempt() -> None:
+    """A run that failed under a verifier and then passed on a manager-only retry was not verified.
+    Crediting the earlier attempt would count evidence that judged different, discarded work."""
+    report = summarize_worth([
+        _run(attempts=[
+            _attempt(index=1, success=False, evidence="verifier"),
+            _attempt(index=2, success=True, evidence="manager"),
+        ])
+    ])
+
+    (group,) = report.profiles
+    assert group.passed == 1
+    assert group.passed_by_verifier == 0
+
+
+def test_a_failed_run_counts_in_neither() -> None:
+    report = summarize_worth([
+        _run(success=False, attempts=[_attempt(success=False, evidence="none")])
+    ])
+
+    (group,) = report.profiles
+    assert group.passed == 0 and group.passed_by_verifier == 0

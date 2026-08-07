@@ -130,3 +130,39 @@ def test_a_host_exec_deny_is_reported_as_refused_not_as_running(tmp_path: Any, m
     facts = describe(Posture(reach="workspace_shell", approval="never"), tmp_path, settings)
     assert facts.shell == "refused"
     assert not facts.fell_back_to_host  # nothing fell back — local was what was asked for
+
+
+def test_a_conversation_turn_reports_that_it_cannot_pause(tmp_path: Any) -> None:
+    """The approval axis resolves to `pause_on_taint` for both surfaces, but only the run wires a
+    checkpointer and a taint ledger — `build_agent` for a turn passes neither. So a turn cannot stop
+    and ask, whatever the user selected, and saying "pauses when tainted" there described a
+    capability that surface does not have.
+
+    This line exists precisely so nobody has to read the source to know what the agent may do to
+    their files. A sentence that is wrong on the surface people use most is worse than no sentence.
+    """
+    from chimera.api.posture import Posture, describe
+    from chimera.config import Settings
+
+    settings = Settings(CHIMERA_HOME=str(tmp_path))
+    posture = Posture(reach="workspace", approval="suspicious")
+
+    assert describe(posture, tmp_path, settings).pauses == "tainted"
+    assert describe(posture, tmp_path, settings, can_pause=False).pauses == "never"
+
+
+def test_the_other_facts_are_unchanged_by_the_surface(tmp_path: Any) -> None:
+    """Only the pause differs. Reach and the shell are the same on both surfaces, and quietly
+    changing them here would make one screen's sentence a different claim than the other's."""
+    from chimera.api.posture import Posture, describe
+    from chimera.config import Settings
+
+    settings = Settings(CHIMERA_HOME=str(tmp_path))
+    posture = Posture(reach="read_only", approval="always")
+
+    run = describe(posture, tmp_path, settings)
+    turn = describe(posture, tmp_path, settings, can_pause=False)
+
+    assert run.writes == turn.writes == "nothing"
+    assert run.shell == turn.shell
+    assert run.pauses == "always" and turn.pauses == "never"

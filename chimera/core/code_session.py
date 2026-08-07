@@ -60,6 +60,16 @@ class SupportsCodeRun(Protocol):
     ) -> AgentResult: ...
 
 
+def _title_of(content: str) -> str:
+    """A one-line label for a conversation, from the message that started it.
+
+    Newlines collapse to spaces so a pasted stack trace does not become a five-line row, and the cut
+    is at 80 characters — long enough to tell two similar questions apart, short enough that the
+    list stays a list.
+    """
+    return " ".join(content.split())[:80]
+
+
 def _as_dict(message: MessageLike) -> dict[str, Any]:
     """A message as a plain dict, whether it arrived as one or as a ``Message``."""
     return message if isinstance(message, dict) else message.as_dict()
@@ -93,6 +103,17 @@ class CodeSession:
 
     agent: SupportsCodeRun
     session_id: str = field(default_factory=lambda: uuid.uuid4().hex)
+    workspace: str = ""
+    """Which project this conversation is about.
+
+    Stored so a session list can be GROUPED by project. Without it a list of past conversations is
+    a flat pile with no owner — you can see that you asked something last Tuesday but not which
+    codebase you asked it about, which is most of what makes an old conversation findable.
+
+    Empty means "the server's own workspace", the same convention the request uses, and it is
+    deliberately not resolved to an absolute path here: two sessions started from the same relative
+    root should group together rather than splitting on how the caller spelled it.
+    """
     messages: list[MessageLike] = field(default_factory=list)
     """The conversation in the model's own format, WITHOUT the system message.
 
@@ -142,8 +163,26 @@ class CodeSession:
 
     # -- persistence ---------------------------------------------------------------------------
 
+    def title(self) -> str:
+        """What to call this conversation in a list: the first thing the user asked.
+
+        Derived rather than stored, and derived from the FIRST user message rather than the last:
+        a conversation is findable by how it started ("fix the login redirect"), not by whatever it
+        drifted to. Nothing is summarised by a model — a title that costs a model call is a title
+        that is sometimes missing, and one that paraphrases is a title that can be wrong.
+        """
+        for message in self.messages:
+            data = _as_dict(message)
+            if data.get("role") == "user":
+                return _title_of(str(data.get("content") or ""))
+        return ""
+
     def to_dict(self) -> dict[str, Any]:
-        return {"session_id": self.session_id, "messages": [_as_dict(m) for m in self.messages]}
+        return {
+            "session_id": self.session_id,
+            "workspace": self.workspace,
+            "messages": [_as_dict(m) for m in self.messages],
+        }
 
 
 class CodeSessionStore:
@@ -187,12 +226,55 @@ class CodeSessionStore:
         except (OSError, ValueError) as exc:
             _log.warning("code session %s unreadable, starting fresh: %s", session_id, exc)
             return CodeSession(agent, session_id=session_id)
-        return CodeSession(agent, session_id=session_id, messages=list(messages))
+        return CodeSession(
+            agent,
+            session_id=session_id,
+            workspace=str(data.get("workspace") or ""),
+            messages=list(messages),
+        )
 
     def list_ids(self) -> list[str]:
         if not self.root.is_dir():
             return []
         return sorted(p.stem for p in self.root.glob("*.json"))
+
+    def list_meta(self) -> list[dict[str, Any]]:
+        """Every stored conversation, newest first, with just enough to draw a list.
+
+        Reads each file rather than keeping an index. An index is a second source of truth that
+        drifts the first time a write is interrupted, and the alternative it saves us from — a few
+        hundred small JSON reads — is not a cost anyone will notice on a local machine.
+
+        An unreadable file is SKIPPED rather than raising: one bad write must not make the whole
+        list refuse to render, which would look like "you have no conversations".
+        """
+        if not self.root.is_dir():
+            return []
+        out: list[dict[str, Any]] = []
+        for path in self.root.glob("*.json"):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                messages = [m for m in data.get("messages", []) if isinstance(m, dict)]
+            except (OSError, ValueError) as exc:
+                _log.warning("code session %s unreadable, omitted from the list: %s", path.stem, exc)
+                continue
+            title = ""
+            for message in messages:
+                if message.get("role") == "user":
+                    title = _title_of(str(message.get("content") or ""))
+                    break
+            out.append({
+                "id": str(data.get("session_id") or path.stem),
+                "title": title,
+                "workspace": str(data.get("workspace") or ""),
+                # Turns, not messages: a user asking twice is two turns, but the transcript between
+                # them holds every tool call the agent made, and counting those would report a
+                # number that grows with the agent's verbosity rather than with the conversation.
+                "turns": sum(1 for m in messages if m.get("role") == "user"),
+                "updated_at": path.stat().st_mtime,
+            })
+        out.sort(key=lambda m: float(m["updated_at"]), reverse=True)
+        return out
 
     def delete(self, session_id: str) -> bool:
         path = self._path(session_id)

@@ -76,6 +76,16 @@ class RolePlan:
     models: RoleModels
     profile: Profile | None
 
+    single_model: str | None = None
+    """Set when the tier ladder collapsed to ONE model, and therefore no routing happened.
+
+    Carried rather than inferred by each caller, because the fact it stands for is uncomfortable and
+    easy to leave unsaid: with one model there is nothing to route, ``review_model_for`` returns
+    ``None``, and the Manager reviews with the very model that wrote the patch — the self-grading
+    collapse the reviewer rule exists to prevent. A profile selector that still offered three
+    choices here would be charging the user attention for a distinction that does not exist.
+    """
+
 
 def resolve(profile: Profile | None, settings: Settings, override: RoleModels | None = None) -> RolePlan:
     """Turn a profile into concrete models, then let any explicit override win field by field.
@@ -97,6 +107,14 @@ def resolve(profile: Profile | None, settings: Settings, override: RoleModels | 
         return RolePlan(_merge(RoleModels(), override), None)
 
     ladder = resolve_tiers(settings)  # type: ignore[arg-type]
+
+    # One model on every rung: routing has nothing to route. This is the ordinary state for a user
+    # with a single provider key, and pretending otherwise would produce a `max` profile that costs
+    # exactly what `economy` costs and reports itself as something else. An explicit per-role
+    # override still wins — someone naming a second model is exactly the person who has one.
+    if ladder.weak == ladder.mid == ladder.top:
+        return RolePlan(_merge(RoleModels(), override), profile, single_model=ladder.weak)
+
     chosen = profile
     if chosen == "economy":
         base = RoleModels(explore=ladder.weak, plan=ladder.mid, edit=ladder.mid, review=ladder.mid)

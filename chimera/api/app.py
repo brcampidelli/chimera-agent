@@ -53,6 +53,7 @@ from chimera.api.schemas import (
     ConfigTestOut,
     DeletedOut,
     DoctorOut,
+    FsBrowseOut,
     FsFileOut,
     FsFileWrittenOut,
     FsTreeOut,
@@ -224,14 +225,24 @@ class AgentTaskIn(BaseModel):
     worktree. None = no executable verifier for this task (the Manager's approval is then its gate)."""
 
 
-class AgentsRequest(BaseModel):
+class AgentsRequest(CodeSeams):
     """A batch of coding tasks for the Agent Manager: each runs concurrently in its OWN git worktree.
 
     Mirrors ``chimera solve-batch``. Isolation is REAL only in a git repo — outside one the tasks run
     in-place against ``workspace`` with no isolation (so concurrent edits can collide and conflicts
-    can't be detected); the response's ``is_repo`` flag says which happened, honestly."""
+    can't be detected); the response's ``is_repo`` flag says which happened, honestly.
+
+    **Inherits ``CodeSeams`` so a batch is not structurally weaker than a single run.** It used to
+    carry no posture and no profile, and to hard-code three attempts — so the same task run as one of
+    two was quietly granted different tool permissions, a different reviewer, and a different attempt
+    budget than the same task run alone. That was survivable while the user had to choose the Agents
+    screen deliberately; it stops being survivable the moment the composer can route into a batch on
+    its own, because then the downgrade is invisible AND unchosen."""
 
     tasks: list[AgentTaskIn]
+    max_attempts: int = 3
+    """Attempts per task before giving up. Was hard-coded; a batch task now gets the same budget a
+    single run does."""
     workspace: str | None = None
     """The workspace root (ideally a git repo, to isolate). None = the app's launch workspace."""
     max_workers: int = 4
@@ -602,6 +613,15 @@ def build_api_app(
         # this run from the first moment — before any attempt has run.
         emit("run", {"run_id": run_id})
 
+        # What is about to judge this run, said BEFORE it starts, in the transcript rather than in a
+        # form field. Both branches matter and the second matters more: "no verify command found —
+        # this run is judged by a model reading the answer, not by tests" has ALWAYS been true
+        # whenever the box was left empty, and the interface never once said it. A user could not
+        # tell an executable verdict from an approving paragraph, and the panel that counts passes
+        # called them the same thing.
+        _verify_cmd, _verify_src = resolve_verify(req.verify, ws)
+        emit("verify", {"command": _verify_cmd, "source": _verify_src})
+
         def work() -> None:
             try:
                 auto = solve_factory(req, ws, on_event, settings, cancel.is_set)
@@ -746,10 +766,23 @@ def build_api_app(
             sub = RunRequest(
                 task=spec.task,
                 verify=spec.verify,
-                max_attempts=3,
+                max_attempts=req.max_attempts,
                 model=req.model,
                 fuse=req.fuse,
                 cascade=req.cascade,
+                # The seams travel with the batch, so one task of five is governed exactly as it
+                # would be alone. `workspace` is deliberately NOT copied: each task gets its own
+                # isolated worktree path, handed to the closure below.
+                posture=req.posture,
+                profile=req.profile,
+                roles=req.roles,
+                write_region=req.write_region,
+                allow_tools=req.allow_tools,
+                deny_tools=req.deny_tools,
+                max_steps=req.max_steps,
+                context_budget=req.context_budget,
+                repo_map=req.repo_map,
+                explorer=req.explorer,
             )
 
             def run(ws_i: Path) -> AutonomousResult:
@@ -838,6 +871,18 @@ def build_api_app(
         if not ws.is_dir():
             raise HTTPException(status_code=400, detail="workspace not found")
         return ws
+
+    @app.get("/api/fs/browse", dependencies=[guard], response_model=FsBrowseOut)
+    def fs_browse_endpoint(path: str = "") -> dict[str, Any]:
+        """Sub-directories of ``path`` (home when empty), so a person can PICK a project.
+
+        The tree endpoint cannot answer this: it is scoped inside a workspace, and the question here
+        is which workspace. Directories only, no hidden entries, nothing read — it enumerates folder
+        names and that is all it can do.
+        """
+        from chimera.api.fs_api import browse_dirs
+
+        return browse_dirs(path)
 
     @app.get("/api/fs/tree", dependencies=[guard], response_model=FsTreeOut)
     def fs_tree_endpoint(path: str = "", workspace: str | None = None) -> dict[str, Any]:
@@ -1188,6 +1233,27 @@ def _api_cascade_backend(gateway: SupportsComplete, settings: Settings) -> Suppo
     return CascadeBackend(gateway, FusionEngine(gateway), config)
 
 
+def resolve_verify(requested: str | None, workspace: Path) -> tuple[str | None, str]:
+    """``(command, source)`` — where ``source`` is ``user`` | ``inferred:<file>`` | ``none``.
+
+    The source travels into the receipt so a stored run can never be read as "the user chose this".
+    A receipt that cannot tell a typed command from an inferred one is a receipt that will eventually
+    be cited as evidence of a decision nobody made.
+
+    An empty STRING is an explicit "no verifier": someone who cleared the field asked for exactly
+    that, and inferring over the top of it would be overriding a choice with a guess. Only ``None``
+    — the field absent from the request — means "look at the project".
+    """
+    if requested is not None:
+        return (requested or None), ("user" if requested else "none")
+    from chimera.core.verify_infer import infer_verify
+
+    found = infer_verify(workspace)
+    if found is None:
+        return None, "none"
+    return found.command, f"inferred:{found.source_file}"
+
+
 def _build_solve_agent(
     req: RunRequest,
     ws: Path,
@@ -1326,6 +1392,14 @@ def _build_solve_agent(
         if provided_plan is not None:
             agent.run_state.plan = provided_plan.as_text()
             agent.run_state.tasks = list(provided_plan.steps)
+    # The verify command: what the caller typed, or what the project says about itself.
+    #
+    # `None` means "look", not "none". The field is gone from the screen, and deleting it without
+    # this would have quietly demoted every desktop run from an executable verdict to "a model read
+    # the answer and approved it" — while `worth.py` kept calling both of them "passed". Inference is
+    # what lets the control disappear and the capability stay.
+    verify_command, verify_source = resolve_verify(req.verify, ws)
+
     return _AutonomousAgent(
         worker,
         should_stop=should_stop,
@@ -1336,7 +1410,7 @@ def _build_solve_agent(
         # generate-and-verify collapses when both are the same model, because it grades its own
         # work and agrees with itself.
         manager=Manager(manager_backend, review_model_for(roles) or req.model),
-        verifier=CommandVerifier(req.verify, ws) if req.verify else None,
+        verifier=CommandVerifier(verify_command, ws) if verify_command else None,
         guard=WorkspaceGuard(ws),
         workspace=ws,
         spine_workspace=ws,
@@ -1348,6 +1422,7 @@ def _build_solve_agent(
         # client actually named — never the resolved default, because attributing a run to a
         # profile nobody chose is fabricated evidence in the one view built to judge profiles.
         run_profile=req.profile,
+        verify_source=verify_source,
         meter=meter,
         # HITL. The ledger tells the agent whether this run went tainted; the checkpointer is where
         # a paused run waits. Both only when the client supplied a thread — a pause with no durable

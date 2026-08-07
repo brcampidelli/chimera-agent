@@ -12,6 +12,8 @@ contract check with no change to the handler bodies.
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel
 
 # --- health / sessions ----------------------------------------------------------------------------
@@ -34,6 +36,62 @@ class SessionMetaOut(BaseModel):
     title: str
     turns: int
     updated_at: float
+
+
+class CodeSessionMetaOut(BaseModel):
+    """One row of the coding-conversation list.
+
+    Separate from ``SessionMetaOut`` because it carries ``workspace`` — the field that lets the list
+    be grouped by project instead of being a flat pile of past questions with no owner.
+    """
+
+    id: str
+    title: str
+    workspace: str
+    turns: int
+    updated_at: float
+
+
+class FsDirOut(BaseModel):
+    name: str
+    path: str
+
+
+class FsBrowseOut(BaseModel):
+    """One level of the folder picker: where we are, where up is, and what is inside."""
+
+    path: str
+    parent: str
+    entries: list[FsDirOut]
+    capped: bool
+
+
+class CodeToolOut(BaseModel):
+    name: str
+    arguments: dict[str, Any]
+    ok: bool
+    observation: str
+
+
+class CodeExchangeOut(BaseModel):
+    """One question and everything the agent did answering it.
+
+    ``edits`` is always empty on a REPLAY: a diff was streamed live and never entered the message
+    list, so a resumed turn can show the tool call that wrote a file but not the coloured patch. The
+    field is here so a replayed exchange has the same shape as a live one, and the UI says which is
+    which rather than letting the absence read as "it changed nothing".
+    """
+
+    you: str
+    answer: str
+    tools: list[CodeToolOut]
+    edits: list[dict[str, str]]
+
+
+class CodeSessionOut(BaseModel):
+    id: str
+    workspace: str
+    exchanges: list[CodeExchangeOut]
 
 
 class TurnOut(BaseModel):

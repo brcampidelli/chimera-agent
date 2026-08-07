@@ -31,6 +31,19 @@ export function makeCodeApiMock() {
     getPostureFacts: vi.fn(),
     getRoleModels: vi.fn(),
     getWorth: vi.fn(),
+    // Git and the cost table moved to the Work screen, which also mounts Runs and Agents on its
+    // other tabs — and a tab that is not shown still renders its screen's shared queries. Mounting
+    // a bigger host means mocking a bigger surface; leaving these out fails as "No export is
+    // defined on the mock", which reads like a broken test rather than a missing stub.
+    // Resolved by default, unlike its neighbours, and that is deliberate: every Code test now
+    // mounts the session sidebar, so a bare `vi.fn()` would resolve undefined and react-query would
+    // throw "Query data cannot be undefined" in a dozen suites that have nothing to do with
+    // sessions. A default of "no past conversations" is also the honest starting state.
+    listCodeSessions: vi.fn(async () => []),
+    getPausedRuns: vi.fn(),
+    respondToRun: vi.fn(),
+    streamAgents: vi.fn(),
+    cancelAgents: vi.fn(),
   };
 }
 
@@ -70,6 +83,10 @@ export function worthReport(profiles: Partial<ProfileWorth>[] = [], over: Partia
     profile: "balanced",
     runs: 1,
     passed: 1,
+    // The fixture's default pass is a VERIFIED one, so a test that says nothing about evidence gets
+    // the strong case. A default of 0 would quietly make every unrelated test assert the warning
+    // colour, which is how a fixture starts deciding what the tests are about.
+    passed_by_verifier: 1,
     reverted: 0,
     unproductive: 0,
     attempts_total: 1,

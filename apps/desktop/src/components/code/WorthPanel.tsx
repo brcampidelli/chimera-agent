@@ -28,6 +28,19 @@ function Row({ group, t }: { group: ProfileWorth; t: TFunc }) {
       <td className="py-1 pr-3 text-right tabular-nums">{group.runs}</td>
       <td className="py-1 pr-3 text-right tabular-nums">
         {group.passed}
+        {/* How many of those passes an executable command judged. Without it the number merged two
+            different claims: a run approved by an exit code, and a run approved by a model reading
+            the answer text — which never sees the diff, the transcript, or a file. Both passed; only
+            one was verified. Shown as a fraction rather than a second column because the question is
+            always "of these passes, how many", never "how many verifier passes exist". */}
+        <span
+          className={group.passed_by_verifier < group.passed ? "text-warn" : "text-ok"}
+          title={t("code.worth.verifierNote")}
+        >
+          {" "}
+          ({group.passed_by_verifier}
+          {t("code.worth.withTests")})
+        </span>
         {/* Beside the pass count, never folded into it: a "success" that changed no file is the
             empty-patch failure this project measured, and it must not inflate a pass rate. */}
         {group.unproductive > 0 ? (

@@ -36,7 +36,7 @@ async function runBatch(done: AgentsBatch, tasks: string[] = ["add a test", "fix
     handlers.onStart?.({ tasks, workspace: "/repo", max_workers: 4 });
     handlers.onBatchDone?.(done);
   });
-  renderWithProviders(<Agents />);
+  renderWithProviders(<Agents workspace="/repo" />);
 
   const boxes = screen.getAllByPlaceholderText(/Describe a change the agent should make/);
   for (const [i, text] of tasks.entries()) await user.type(boxes[i], text);
@@ -58,7 +58,7 @@ async function startHangingBatch(
     handlers.onStart?.({ tasks, workspace: "/repo", max_workers: 4 });
     return new Promise<void>(() => {}); // never settles: the batch is in flight
   });
-  renderWithProviders(<Agents />);
+  renderWithProviders(<Agents workspace="/repo" />);
 
   const boxes = screen.getAllByPlaceholderText(/Describe a change the agent should make/);
   for (const [i, text] of tasks.entries()) await user.type(boxes[i], text);
@@ -80,7 +80,7 @@ describe("Agents", () => {
   });
 
   it("shows the empty state before any batch has run", () => {
-    renderWithProviders(<Agents />);
+    renderWithProviders(<Agents workspace="/repo" />);
 
     expect(screen.getByText("Add tasks above and Run all to start a parallel batch.")).toBeInTheDocument();
   });
@@ -165,7 +165,7 @@ describe("Agents", () => {
     mockStreamAgents.mockImplementation(async (_req, handlers: AgentsStreamHandlers) => {
       handlers.onError?.("HTTP 500");
     });
-    renderWithProviders(<Agents />);
+    renderWithProviders(<Agents workspace="/repo" />);
 
     await user.type(screen.getAllByPlaceholderText(/Describe a change/)[0], "add a test");
     await user.click(screen.getByRole("button", { name: /Run all/ }));
@@ -176,7 +176,7 @@ describe("Agents", () => {
   it("only submits tasks that were actually filled in", async () => {
     const user = userEvent.setup();
     mockStreamAgents.mockImplementation(async () => {});
-    renderWithProviders(<Agents />);
+    renderWithProviders(<Agents workspace="/repo" />);
 
     // Row 2 is left blank on purpose.
     await user.type(screen.getAllByPlaceholderText(/Describe a change/)[0], "add a test");
@@ -196,7 +196,7 @@ describe("Agents — stopping tasks", () => {
   });
 
   it("offers no Stop until a batch is in flight", () => {
-    renderWithProviders(<Agents />);
+    renderWithProviders(<Agents workspace="/repo" />);
 
     expect(screen.queryByRole("button", { name: /Stop/ })).not.toBeInTheDocument();
   });
@@ -263,5 +263,31 @@ describe("Agents — stopping tasks", () => {
     await waitFor(() => expect(cardStop("add a test")).not.toBeInTheDocument());
     expect(cardStop("fix the lint")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Stop all/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("Agents — the project comes from one place", () => {
+  it("does not ask for a workspace of its own", async () => {
+    // There used to be a second path field here. Two boxes asking one question meant you could
+    // point Code at your app and this at somewhere else, launch a parallel batch, and find the
+    // worktrees in a repository you had stopped thinking about.
+    renderWithProviders(<Agents workspace="/repo" />);
+
+    expect(screen.queryByPlaceholderText(/workspace path|folder path/i)).not.toBeInTheDocument();
+    expect(await screen.findByText("/repo")).toBeInTheDocument();
+  });
+
+  it("sends the chosen project to the batch, not an empty string", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Agents workspace="/repo" />);
+
+    await user.type(
+      screen.getAllByPlaceholderText(/Describe a change the agent should make/)[0],
+      "do the thing",
+    );
+    await user.click(screen.getByRole("button", { name: /Run all/ }));
+
+    await waitFor(() => expect(streamAgents).toHaveBeenCalled());
+    expect(vi.mocked(streamAgents).mock.calls[0][0]).toMatchObject({ workspace: "/repo" });
   });
 });

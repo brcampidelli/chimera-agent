@@ -223,9 +223,8 @@ function AgentCard({
   );
 }
 
-export function Agents() {
+export function Agents({ workspace }: { workspace: string }) {
   const t = useT();
-  const [workspace, setWorkspace] = useState("");
   const [tasks, setTasks] = useState<{ task: string; verify: string }[]>([
     { task: "", verify: "" },
     { task: "", verify: "" },
@@ -299,7 +298,7 @@ export function Agents() {
     void streamAgents(
       {
         tasks: submitted.map((r) => ({ task: r.task.trim(), verify: r.verify.trim() || null })),
-        workspace: workspace.trim() || null,
+        workspace: workspace || null,
         max_workers: maxWorkers,
         model: model.trim() || null,
         fuse: mode === "fuse",
@@ -346,17 +345,18 @@ export function Agents() {
       <div className="min-h-0 flex-1 overflow-auto">
         {/* --- Config + task rows --- */}
         <div className="space-y-3 border-b border-hairline p-4">
+          {/* The project comes from the one place a project is chosen, not from a field of its own.
+              A second box asking for a path meant two answers to one question: you could point Code
+              at your app and this at somewhere else, launch a parallel batch, and find the worktrees
+              in a repository you had stopped thinking about. The label stays so it is clear WHICH
+              project these run against — it just states the answer instead of asking again. */}
           <div>
             <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {t("agents.workspace")}
             </label>
-            <input
-              className={`${fieldCls} mt-1.5 h-9 font-mono text-xs`}
-              placeholder={t("agents.workspacePlaceholder")}
-              value={workspace}
-              onChange={(e) => setWorkspace(e.target.value)}
-              disabled={running}
-            />
+            <p className="mt-1 truncate font-mono text-xs text-muted-foreground" title={workspace}>
+              {workspace || t("code.sessions.defaultProject")}
+            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">

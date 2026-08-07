@@ -143,6 +143,15 @@ class TierLadder:
     entry: Tier = "weak"
     """Which tier handles a request first (the cascade escalates from here)."""
 
+    source: str = "preset"
+    """Where these slugs came from: ``override`` | ``preset`` | ``fallback_single_model``.
+
+    Carried rather than recomputed because two screens and the CLI need to explain the ladder, and a
+    second copy of the reasoning is a second thing to keep in sync. ``fallback_single_model`` is the
+    one that has to be SAID: it means the presets were unreachable and every tier collapsed onto the
+    user's own model, so role routing has nothing left to route.
+    """
+
     def ladder(self) -> list[str]:
         return [self.weak, self.mid, self.top]
 
@@ -188,21 +197,71 @@ class _TierSettings(Protocol):
     mid_model: str
     orchestrator_model: str
     cost_mode: str
+    default_model: str
+
+    def configured_providers(self) -> list[str]: ...
+
+
+def _reachable(slug: str, providers: list[str]) -> bool:
+    """Can this slug actually be called with the keys this user has?
+
+    Matched on the slug's FIRST SEGMENT, because that is what the gateway itself derives the
+    provider from. Matching on the catalogue's ``vendor`` field would produce the exact opposite
+    answer for the most common case: ``openrouter/anthropic/claude-opus-4-8`` is vendored by
+    Anthropic and reachable with an **OpenRouter** key.
+    """
+    return slug.split("/", 1)[0] in providers
 
 
 def resolve_tiers(settings: _TierSettings) -> TierLadder:
-    """Explicit override > cost mode preset > balanced default.
+    """Explicit override > cost mode preset > the one model this user can actually call.
 
-    An empty string in a tier field means "let the cost mode decide"; any
-    non-empty value is the user's explicit choice and always wins.
+    An empty string in a tier field means "let the cost mode decide"; any non-empty value is the
+    user's explicit choice and always wins.
+
+    **The presets are all OpenRouter slugs**, and until this checked the keys, a user with a single
+    non-OpenRouter key got a ladder of three models they could not call — silently, and *instead of*
+    the one model they had configured. Choosing any role profile then routed the run away from the
+    only thing that worked. That is a bad failure when the user picks the profile; it is a worse one
+    now that the system picks it for them, so the check has to exist before the picking does.
+
+    **No keys at all means no filtering.** Nothing is reachable, so "unreachable" carries no
+    information, and the presets remain the documented answer for a machine that is not configured
+    yet. The filter only bites when the user has SOME keys and the ladder wants OTHERS.
     """
     mode = settings.cost_mode if settings.cost_mode in _PRESETS else "auto"
     preset = _PRESETS[mode]  # type: ignore[index]
-    return TierLadder(
+    chosen = TierLadder(
         weak=settings.weak_model or preset.weak,
         mid=settings.mid_model or preset.mid,
         top=settings.orchestrator_model or preset.top,
         entry=preset.entry,
+        source="override"
+        if (settings.weak_model or settings.mid_model or settings.orchestrator_model)
+        else "preset",
+    )
+
+    providers = settings.configured_providers()
+    if not providers or chosen.source == "override":
+        # Only slugs WE chose are second-guessed. A tier the user typed stands even when it looks
+        # unreachable: they may be pointing at a proxy, a local gateway, or a provider this does not
+        # enumerate, and overriding an explicit choice because of an inference about their keys is
+        # the same silent rerouting this function exists to stop — just aimed at a different target.
+        return chosen
+    if any(_reachable(slug, providers) for slug in chosen.ladder()):
+        # At least one rung is callable: leave the ladder alone. A partially reachable ladder still
+        # escalates through something real, and silently rewriting the reachable rungs would hide a
+        # misconfiguration the user is better off seeing in the receipt.
+        return chosen
+
+    fallback = settings.default_model
+    if not fallback or not _reachable(fallback, providers):
+        # Even the default is unreachable. Nothing here can improve that, and inventing a slug would
+        # be a guess about which of their keys to spend.
+        return chosen
+    return TierLadder(
+        weak=fallback, mid=fallback, top=fallback, entry=preset.entry,
+        source="fallback_single_model",
     )
 
 

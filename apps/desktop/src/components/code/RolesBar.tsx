@@ -28,10 +28,13 @@ export function RolesBar({
   profile,
   onProfile,
   disabled,
+  compact,
 }: {
   profile: Profile;
   onProfile: (p: Profile) => void;
   disabled?: boolean;
+  /** Render as one row for the composer strip instead of a titled block. */
+  compact?: boolean;
 }) {
   const t = useT();
   const roles = useQuery({
@@ -48,52 +51,73 @@ export function RolesBar({
     [t("code.roles.review"), roles.data?.review, !!roles.data?.fuse_review],
   ];
 
+  const picker = (
+    <div className="flex overflow-hidden rounded-chip border border-border">
+      {PROFILES.map((p) => (
+        <button
+          key={p}
+          type="button"
+          disabled={disabled}
+          onClick={() => onProfile(p)}
+          className={cn(
+            "px-2.5 py-1 text-xs transition-colors disabled:opacity-50",
+            profile === p ? "bg-accent/20 text-accent" : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {t(`code.roles.profile.${p}` as const)}
+        </button>
+      ))}
+    </div>
+  );
+
+  const table = (
+    <details className="text-xs">
+      <summary className="cursor-pointer text-muted-foreground">{t("code.roles.show")}</summary>
+      <div className="mt-1.5 space-y-1">
+        {rows.map(([label, model, fused]) => (
+          <div key={label} className="flex items-baseline gap-2">
+            <span className="w-20 shrink-0 text-muted-foreground">{label}</span>
+            <span className="truncate font-mono text-foreground/80">
+              {model ?? t("code.roles.default")}
+            </span>
+            {fused ? <span className="shrink-0 text-accent">· {t("code.roles.panel")}</span> : null}
+          </div>
+        ))}
+        <div className="flex items-baseline gap-2">
+          <span className="w-20 shrink-0 text-muted-foreground">{t("code.roles.verify")}</span>
+          {/* The one row with no model, and the reason the rest can be measured at all: the thing
+              that decides whether the work was good is the part with no opinion. */}
+          <span className="text-muted-foreground">{t("code.roles.verifyNote")}</span>
+        </div>
+      </div>
+    </details>
+  );
+
+  // Compact: the picker sits beside the composer like a model selector. `unproven` stays VISIBLE
+  // rather than moving into the disclosure — it is the status of the feature, not a footnote, and a
+  // selector that offers three profiles while hiding "this has not been shown to help" is the exact
+  // claim-without-a-number this project keeps refusing to make.
+  if (compact) {
+    return (
+      <div className="flex flex-col gap-1">
+        <div className="flex flex-wrap items-center gap-3">
+          <Layers className="h-4 w-4 shrink-0 text-accent" />
+          {picker}
+          {table}
+        </div>
+        <p className="text-xs text-muted-foreground">{t("code.roles.unproven")}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-2 border-b border-hairline p-3">
       <div className="flex flex-wrap items-center gap-2">
         <Layers className="h-4 w-4 text-accent" />
         <h2 className="text-sm font-semibold text-foreground">{t("code.roles.title")}</h2>
-        <div className="ml-auto flex overflow-hidden rounded-chip border border-border">
-          {PROFILES.map((p) => (
-            <button
-              key={p}
-              type="button"
-              disabled={disabled}
-              onClick={() => onProfile(p)}
-              className={cn(
-                "px-2.5 py-1 text-xs transition-colors disabled:opacity-50",
-                profile === p
-                  ? "bg-accent/20 text-accent"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {t(`code.roles.profile.${p}` as const)}
-            </button>
-          ))}
-        </div>
+        <div className="ml-auto">{picker}</div>
       </div>
-
-      <details className="text-xs">
-        <summary className="cursor-pointer text-muted-foreground">{t("code.roles.show")}</summary>
-        <div className="mt-1.5 space-y-1">
-          {rows.map(([label, model, fused]) => (
-            <div key={label} className="flex items-baseline gap-2">
-              <span className="w-20 shrink-0 text-muted-foreground">{label}</span>
-              <span className="truncate font-mono text-foreground/80">
-                {model ?? t("code.roles.default")}
-              </span>
-              {fused ? <span className="shrink-0 text-accent">· {t("code.roles.panel")}</span> : null}
-            </div>
-          ))}
-          <div className="flex items-baseline gap-2">
-            <span className="w-20 shrink-0 text-muted-foreground">{t("code.roles.verify")}</span>
-            {/* The one row with no model, and the reason the rest can be measured at all: the thing
-                that decides whether the work was good is the part with no opinion. */}
-            <span className="text-muted-foreground">{t("code.roles.verifyNote")}</span>
-          </div>
-        </div>
-      </details>
-
+      {table}
       <p className="text-xs text-muted-foreground">{t("code.roles.unproven")}</p>
     </div>
   );

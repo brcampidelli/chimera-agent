@@ -3,10 +3,13 @@ import { ListChecks } from "lucide-react";
 
 import { Agents } from "@/components/Agents";
 import { Runs } from "@/components/Runs";
+import { GitPanel } from "@/components/code/GitPanel";
+import { WorthPanel } from "@/components/code/WorthPanel";
 import { Tabs, TabPanel } from "@/components/ui/tabs";
 import { useT } from "@/lib/i18n";
+import { readWorkspace } from "@/lib/workspace";
 
-type Tab = "run" | "agents";
+type Tab = "run" | "agents" | "git" | "worth";
 
 /**
  * The agent working on its own.
@@ -14,15 +17,31 @@ type Tab = "run" | "agents";
  * Runs is one task with verify-or-revert; Agents is several of the same in parallel git worktrees.
  * They were separate destinations that both started the same kind of run — and both shipped their
  * own copy of the launcher, which is now shared code rather than shared screen space.
+ *
+ * Git and "was it worth it?" moved here from the Code screen. Both are about work that already
+ * happened — reviewing the diff a run produced, and asking whether the expensive profile earned its
+ * cost — which is this screen's subject, not the subject of a screen you use to write code. On Code
+ * they were two of five panels sharing one column, and the arithmetic did not work: the panels that
+ * could not shrink took every pixel and the conversation was laid out at zero height.
+ *
+ * Maturity would have been the other candidate for the cost panel and was rejected on a fact rather
+ * than a preference: `App.tsx` renders it only under `import.meta.env.DEV`, so a shipped build would
+ * have hidden the one panel that answers whether a profile paid for itself.
  */
 export function Work() {
   const t = useT();
   const id = useId();
   const [tab, setTab] = useState<Tab>("run");
+  // Read on mount, and this screen remounts on every navigation, so choosing a root in Code and
+  // coming back here shows the new one. Deliberately not lifted into a provider: the value already
+  // survives in storage, and a provider would be a second source of truth for the same string.
+  const [workspace] = useState(readWorkspace);
 
   const items = [
     { value: "run" as const, label: t("nav.runs") },
     { value: "agents" as const, label: t("nav.agents") },
+    { value: "git" as const, label: t("code.git.title") },
+    { value: "worth" as const, label: t("code.worth.title") },
   ];
 
   return (
@@ -40,8 +59,27 @@ export function Work() {
             <div className="mx-auto max-w-3xl px-6 py-6">
               <Runs embedded />
             </div>
+          ) : tab === "agents" ? (
+            <Agents workspace={workspace} />
+          ) : tab === "git" ? (
+            <div className="mx-auto max-w-5xl px-6 py-4">
+              {/* Which folder this is the git of. The root is chosen on the Code screen, so without
+                  saying so here the panel would be "git of somewhere" — and the answer to "why is
+                  this empty?" would be invisible from the screen showing the emptiness. */}
+              {/* Only when there IS one. The placeholder used to render here when no project was
+                  chosen, so a fresh install showed "folder path (optional — defaults to the app's
+                  workspace)" in monospace, where a path goes — a hint dressed up as a fact. */}
+              {workspace ? (
+                <p className="px-4 pb-2 font-mono text-xs text-muted-foreground">{workspace}</p>
+              ) : (
+                <p className="px-4 pb-2 text-xs text-muted-foreground">{t("code.sessions.defaultProject")}</p>
+              )}
+              <GitPanel workspace={workspace} />
+            </div>
           ) : (
-            <Agents />
+            <div className="mx-auto max-w-5xl px-6 py-4">
+              <WorthPanel />
+            </div>
           )}
         </TabPanel>
       </div>
