@@ -278,3 +278,92 @@ def test_a_workspace_that_does_not_exist_is_refused_rather_than_created(
     )
     assert response.status_code == 400
     assert not (tmp_path / "nope").exists()
+
+
+# --- What the conversation reads, and what a fused turn cannot do ------------------------------
+
+
+def test_a_coding_turn_reads_memory_and_reports_what_it_recalled(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    # A coding conversation used to accumulate nothing and recall nothing. Reading is the safe half:
+    # a fact from untrusted content arrives labelled, and the admission gate still rejects injection
+    # patterns — so the worst case is a wasted line of context. Writing stays off, because a poisoned
+    # README would enter memory looking clean and a memory item has no project scope.
+    from chimera.api import build_api_app
+
+    class _Fact:
+        content = "the parser lives in src/parse.py"
+        provenance = "clean"
+
+    class _Memory:
+        def search(self, q: str, k: int = 3, on_layer: Any = None) -> list[Any]:
+            if on_layer:
+                on_layer("keyword")
+            return [_Fact()]
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    agent = _ScriptedAgent()
+    import chimera.core
+
+    monkeypatch.setattr(chimera.core, "Agent", lambda *_a, **_k: agent, raising=True)
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    client = TestClient(
+        build_api_app(
+            lambda: ChatSession(_ScriptedAgent()),
+            workspace=ws,
+            settings=settings,
+            memory=_Memory(),
+        )
+    )
+
+    done = next(
+        d
+        for e, d in _frames(client.post("/api/code/turn", json={"message": "where is the parser?"}))
+        if e == "done"
+    )
+    assert done["memory_facts_used"] == 1
+    assert done["memory_layer"] == "keyword"
+
+
+def test_a_fused_coding_turn_declares_that_it_touched_nothing(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    # Sharper here than in a chat: ask a fused turn to fix a file and it describes a fix it never
+    # applied. Offered anyway — a panel is genuinely good at "which of these two designs is better?"
+    # — but a zero tool count is the same number a turn that needed no tool reports, so the turn has
+    # to say which it was.
+    from chimera.api import build_api_app
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    agent = _ScriptedAgent()
+    import chimera.core
+
+    monkeypatch.setattr(chimera.core, "Agent", lambda *_a, **_k: agent, raising=True)
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    client = TestClient(
+        build_api_app(
+            lambda: ChatSession(_ScriptedAgent()),
+            workspace=ws,
+            settings=settings,
+            fuse_backend=object(),
+        )
+    )
+
+    fused = next(
+        d
+        for e, d in _frames(
+            client.post("/api/code/turn", json={"message": "fix the parser", "fuse": True})
+        )
+        if e == "done"
+    )
+    assert fused["fused"] is True
+
+    plain = next(
+        d
+        for e, d in _frames(client.post("/api/code/turn", json={"message": "fix the parser"}))
+        if e == "done"
+    )
+    assert plain["fused"] is False  # or the marking would mean nothing

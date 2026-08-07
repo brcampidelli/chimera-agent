@@ -11,7 +11,9 @@ import type { TurnReport } from "@/lib/types";
 
 vi.mock("@/components/VersionBadge", () => ({ VersionBadge: () => null }));
 
-function idle(overrides: Partial<AgentState> = {}): AgentState {
+type Seed = Partial<Omit<AgentState, "publish">>;
+
+function idle(overrides: Seed = {}): Seed {
   return { status: "idle", tools: [], report: null, busy: false, stop: () => {}, ...overrides };
 }
 
@@ -32,7 +34,7 @@ function report(): TurnReport {
   };
 }
 
-function renderBar(state: AgentState, onOpenUsage?: () => void) {
+function renderBar(state: Seed, onOpenUsage?: () => void) {
   return render(
     <I18nProvider>
       <AgentProvider value={state}>

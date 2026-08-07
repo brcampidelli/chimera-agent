@@ -1,9 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { IconRail, type View } from "@/components/IconRail";
-import { Sessions } from "@/components/Sessions";
-import { Chat } from "@/components/Chat";
-import { Composer } from "@/components/Composer";
 import { Settings } from "@/components/Settings";
 import { Knowledge } from "@/components/Knowledge";
 import { Automation } from "@/components/Automation";
@@ -11,7 +8,7 @@ import { Code } from "@/components/Code";
 import { Work } from "@/components/Work";
 import { Maturity } from "@/components/Maturity";
 import { Onboarding } from "@/components/Onboarding";
-import { Activity, type Status } from "@/components/Activity";
+import { Activity } from "@/components/Activity";
 import { AppShell } from "@/components/shell/AppShell";
 import { CommandPalette, type Command } from "@/components/shell/CommandPalette";
 import { useHotkeys } from "@/lib/hotkeys";
@@ -19,9 +16,8 @@ import { AgentProvider } from "@/lib/agent-context";
 import { RunSessionProvider } from "@/lib/run-session";
 import { Spinner } from "@/components/ui/panel";
 import { ErrorState } from "@/components/ui/async";
-import { deleteSession, getDoctor, getSession, listSessions, streamChat } from "@/lib/api";
+import { getDoctor } from "@/lib/api";
 import { useT } from "@/lib/i18n";
-import type { Message, ToolEvent, TurnReport } from "@/lib/types";
 import { applyTheme, readTheme, resolveTheme, type Theme } from "@/lib/theme";
 import { useIgnition } from "@/lib/useIgnition";
 
@@ -57,149 +53,43 @@ function useTheme() {
 }
 
 export default function App() {
-  const qc = useQueryClient();
   const t = useT();
   const { dark, toggle } = useTheme();
   // The app's one piece of choreography. Runs on cold start only; see useIgnition.
   const ignite = useIgnition();
-  const { data: sessions = [] } = useQuery({ queryKey: ["sessions"], queryFn: listSessions });
   // First-run gate: no provider key => show the Onboarding wizard instead of the app (a keyed user
   // never sees it). Session-local "skip" lets a GUI-first user jump to Settings without a key yet.
   const doctor = useQuery({ queryKey: ["doctor"], queryFn: getDoctor });
   const [skipOnboarding, setSkipOnboarding] = useState(false);
-
-  const [view, setView] = useState<View>("chat");
+  const [view, setView] = useState<View>("code");
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [currentId, setCurrentId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [live, setLive] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState<Status>("idle");
-  const [tools, setTools] = useState<ToolEvent[]>([]);
-  const [report, setReport] = useState<TurnReport | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
-
-  const openSession = useCallback(async (id: string) => {
-    setView("chat");
-    setCurrentId(id);
-    setLive("");
-    setTools([]);
-    setReport(null);
-    setStatus("idle");
-    const data = await getSession(id);
-    const msgs: Message[] = [];
-    for (const t of data.turns) {
-      msgs.push({ role: "user", content: t.user });
-      msgs.push({ role: "assistant", content: t.assistant });
-    }
-    setMessages(msgs);
-  }, []);
-
-  const newChat = useCallback(() => {
-    setView("chat");
-    setCurrentId(null);
-    setMessages([]);
-    setLive("");
-    setTools([]);
-    setReport(null);
-    setStatus("idle");
-  }, []);
 
   // Every destination, plus every session by title. This is the long tail the rail no longer
   // carries — and the reason collapsing the rail cost nothing in reach.
   const commands: Command[] = useMemo(() => {
-    const views: View[] = ["chat", "work", "code", "knowledge", "automation", "settings"];
-    return [
-      { id: "new-chat", label: t("sessions.new"), group: t("nav.chat"), run: newChat },
-      ...views.map((v) => ({
-        id: `go-${v}`,
-        label: t(`nav.${v}`),
-        group: t("palette.group.go"),
-        run: () => setView(v),
-      })),
-      ...sessions.map((s) => ({
-        id: `session-${s.id}`,
-        label: s.title || t("chat.header.chat"),
-        group: t("palette.group.session"),
-        run: () => void openSession(s.id),
-      })),
-    ];
-  }, [sessions, t, newChat, openSession]);
+    const views: View[] = ["code", "work", "knowledge", "automation", "settings"];
+    return views.map((v) => ({
+      id: `go-${v}`,
+      label: t(`nav.${v}`),
+      group: t("palette.group.go"),
+      run: () => setView(v),
+    }));
+  }, [t]);
 
   useHotkeys({
     onPalette: () => setPaletteOpen((o) => !o),
     onSettings: () => setView("settings"),
-    onNewChat: newChat,
+    // The conversation owns its own "new" now — it lives beside the list of past ones, which is
+    // where someone looks for it. A global shortcut that jumps you to a screen AND clears it is two
+    // actions wearing one key.
+    onNewChat: () => setView("code"),
     onNavigate: (i) => {
-      const order: View[] = ["chat", "work", "code", "knowledge", "automation"];
+      const order: View[] = ["code", "work", "knowledge", "automation"];
       const target = order[i - 1];
       if (target) setView(target);
     },
   });
 
-  const removeSession = useCallback(
-    async (id: string) => {
-      await deleteSession(id);
-      if (id === currentId) newChat();
-      qc.invalidateQueries({ queryKey: ["sessions"] });
-    },
-    [currentId, newChat, qc],
-  );
-
-  const send = useCallback(
-    async (text: string, fuse = false) => {
-      setMessages((m) => [...m, { role: "user", content: text }]);
-      setBusy(true);
-      setStatus("thinking");
-      setLive("");
-      setTools([]);
-      setReport(null);
-      const controller = new AbortController();
-      abortRef.current = controller;
-
-      await streamChat(
-        text,
-        currentId,
-        {
-          onSession: (id) => setCurrentId(id),
-          onToken: (t) => {
-            setStatus("streaming");
-            setLive((prev) => prev + t);
-          },
-          onTool: (t) => setTools((prev) => [...prev, t]),
-          onDone: (r) => {
-            setMessages((m) => [...m, { role: "assistant", content: r.answer, fused: r.fused }]);
-            setReport(r);
-            setStatus("done");
-            setLive("");
-            qc.invalidateQueries({ queryKey: ["sessions"] });
-          },
-          onError: (msg) => {
-            setMessages((m) => [...m, { role: "assistant", content: `⚠️ ${msg}` }]);
-            setStatus("idle");
-            setLive("");
-          },
-        },
-        controller.signal,
-        fuse,
-      );
-      setBusy(false);
-      abortRef.current = null;
-    },
-    [currentId, qc],
-  );
-
-  const stop = useCallback(() => {
-    abortRef.current?.abort();
-    setBusy(false);
-    setStatus("idle");
-    setLive("");
-  }, []);
-
-  // Gate the first render on the doctor's key check (all hooks above always run, so this stays a
-  // safe early return). This is also the app's readiness gate: `doctor` is the first backend call,
-  // so while the sidecar is still booting it retries (fast, per the QueryClient backoff) behind one
-  // "starting…" screen — every inner screen then mounts against a warm backend.
   if (doctor.isLoading) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
@@ -226,9 +116,11 @@ export default function App() {
     );
   }
 
-  const isChat = view === "chat";
   return (
-    <AgentProvider value={{ status, tools, report, busy, stop }}>
+    // Stateful now: whichever screen is working publishes into it, so the footer keeps showing the
+    // agent from anywhere. It used to be fed by the chat screen alone, which meant the merged
+    // conversation would have left it mute.
+    <AgentProvider>
       {/* Above the view switch on purpose: a run outlives the screen that started it, so its state
           cannot live inside that screen. This is what keeps the progress and the Stop alive when
           you navigate away mid-run. */}
@@ -237,7 +129,7 @@ export default function App() {
       <AppShell
         ignite={ignite}
         viewKey={view}
-        viewLabel={t(view === "chat" ? "nav.chat" : `nav.${view}`)}
+        viewLabel={t(`nav.${view}`)}
         // Usage lives in Settings now; the cost chip still takes you straight there.
         onOpenUsage={() => setView("settings")}
         rail={
@@ -249,47 +141,11 @@ export default function App() {
             ignite={ignite}
           />
         }
-        // Left = what exists. Right = what the agent is doing. Chat fills both today; the other
-        // screens grow into them in the next phase.
-        context={
-          isChat ? (
-            <Sessions
-              sessions={sessions}
-              currentId={currentId}
-              onSelect={openSession}
-              onNew={newChat}
-              onDelete={removeSession}
-            />
-          ) : undefined
-        }
-        inspector={isChat ? <Activity status={status} tools={tools} report={report} /> : undefined}
-        header={
-          isChat ? (
-            <header className="relative flex items-center border-b border-hairline px-5 py-3">
-              <span className="text-sm font-medium text-muted-foreground">
-                {currentId
-                  ? (sessions.find((s) => s.id === currentId)?.title ?? t("chat.header.chat"))
-                  : t("chat.header.new")}
-              </span>
-              {/* The landing beat: one accent hairline drawing itself left to right. Everything
-                  before it converges inward; this is the single gesture that says "arrived". */}
-              {ignite && (
-                <span
-                  aria-hidden
-                  data-ignite="sweep"
-                  className="absolute inset-x-0 bottom-0 h-px bg-accent-grad"
-                />
-              )}
-            </header>
-          ) : undefined
-        }
+        // Right = what the agent is doing. The conversation keeps its own list of past sessions
+        // inside itself (grouped by project, which the flat chat list could not do), so the left
+        // slot stays empty rather than holding a second list of the same thing.
+        inspector={view === "code" ? <Activity /> : undefined}
       >
-        {isChat && (
-          <>
-            <Chat messages={messages} live={live} busy={busy} />
-            <Composer busy={busy} onSend={send} onStop={stop} />
-          </>
-        )}
         {view === "knowledge" && <Knowledge />}
         {view === "automation" && <Automation />}
         {view === "work" && <Work />}

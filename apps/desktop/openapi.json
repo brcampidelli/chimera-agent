@@ -951,6 +951,11 @@
             "title": "Explorer",
             "type": "boolean"
           },
+          "fuse": {
+            "default": false,
+            "title": "Fuse",
+            "type": "boolean"
+          },
           "max_steps": {
             "anyOf": [
               {

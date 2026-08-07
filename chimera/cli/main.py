@@ -1312,6 +1312,9 @@ def desktop_app(
         fuse_backend=fuse_backend,
         workspace=workspace_path,
         messaging_manager=messaging,
+        # The same memory the chat reads, now reachable from a coding turn too — read-only.
+        memory=shared_memory,
+        graph=shared_graph,
     )
 
     # Bind BEFORE announcing so the URL reflects the real port (a busy 8765 falls back to a free one

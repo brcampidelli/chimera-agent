@@ -1,6 +1,5 @@
 import type { ComponentType, CSSProperties } from "react";
 import {
-  MessageSquare,
   Brain,
   Clock,
   ListChecks,
@@ -17,7 +16,6 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useT } from "@/lib/i18n";
 
 export type View =
-  | "chat"
   | "knowledge"
   | "automation"
   | "work"
@@ -31,7 +29,6 @@ export type View =
 const NAV: { view: View; labelKey: string; icon: ComponentType<{ className?: string }> }[] = [
   // Ordered by how often a person reaches for it: talk to it, watch it work, open the code, ask
   // what it knows, set up what it does unprompted.
-  { view: "chat", labelKey: "nav.chat", icon: MessageSquare },
   { view: "work", labelKey: "nav.work", icon: ListChecks },
   { view: "code", labelKey: "nav.code", icon: FileCode2 },
   { view: "knowledge", labelKey: "nav.knowledge", icon: Brain },

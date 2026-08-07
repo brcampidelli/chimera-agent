@@ -5,7 +5,7 @@ import { IconRail, type View } from "@/components/IconRail";
 import { I18nProvider } from "@/lib/i18n";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-function renderRail(view: View = "chat") {
+function renderRail(view: View = "code") {
   return render(
     <I18nProvider>
       <TooltipProvider>
@@ -16,14 +16,15 @@ function renderRail(view: View = "chat") {
 }
 
 describe("IconRail", () => {
-  it("carries five destinations, not fifteen", () => {
+  it("carries four destinations, not fifteen", () => {
     renderRail();
-    // Fifteen icons stopped being words and became positions to memorise. Five plus Settings is
-    // the whole point of the regrouping — if this number creeps back up, so has the problem.
-    // (Maturity adds a sixth in development only; this asserts the shipped shape.)
+    // Fifteen icons stopped being words and became positions to memorise. The regrouping cut them
+    // to five, and merging the chat into the conversation cut one more — there was never a reason
+    // for two doors to the same agent, and the one without the guard was the more permissive door.
+    // If this number creeps back up, so has the problem. (Maturity adds one in development only.)
     const nav = screen.getByRole("navigation");
     const destinations = nav.querySelectorAll("button");
-    expect(destinations.length).toBeLessThanOrEqual(6);
+    expect(destinations.length).toBeLessThanOrEqual(5);
   });
 
   it("names every icon-only button", () => {

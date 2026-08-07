@@ -11,6 +11,7 @@ import type {
   GitDiff,
   GitRevertResult,
   GitStatus,
+  RouteMeta,
   Benchmarks,
   GovernanceAudit,
   InjectionReport,
@@ -435,6 +436,9 @@ export interface CodeTurnInput {
   explorer?: boolean;
   posture?: { reach: Reach; approval: Approval } | null;
   profile?: Profile | null;
+  /** Route this turn through the fusion panel. It will not be able to use tools — see
+   *  {@link CodeTurnDone.fused}, which is how the answer says so. */
+  fuse?: boolean;
 }
 
 /** One tool call, as it happens. `arguments` and `observation` arrive already clipped server-side
@@ -459,7 +463,20 @@ export interface CodeTurnDone {
   // The largest prompt this turn built. The number that says whether raising max_steps is safe —
   // shown rather than hidden, because a ceiling raised without seeing its cost is a trap.
   context_peak_tokens: number;
-  route_meta: Record<string, unknown> | null;
+  // Typed as the real shape rather than an opaque bag: the fusion panel renders it, and an opaque
+  // record forced every consumer to cast — which is how a field silently stops being rendered.
+  route_meta: RouteMeta | null;
+  /** This turn read untrusted content. Reported because a turn steered by a planted instruction
+   *  otherwise looks exactly like one that was not. */
+  tainted?: boolean;
+  /** Facts recalled from long-term memory for this turn, and which retrieval layer produced them.
+   *  Never guessed: a layer that returned nothing is not named. */
+  memory_facts_used?: number;
+  memory_layer?: string | null;
+  /** This turn went through the fusion panel and therefore could NOT use tools — it answered from
+   *  the prompt alone. Zero tool calls is the same number a turn that needed none reports, so
+   *  without this flag the two are indistinguishable. */
+  fused?: boolean;
 }
 
 /** The verdict on what a turn WROTE, emitted only when the turn edited something.

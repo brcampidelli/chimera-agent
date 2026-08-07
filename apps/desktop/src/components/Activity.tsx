@@ -3,15 +3,9 @@ import { Check, X, Wrench, Cpu, Brain, CircleDollarSign } from "lucide-react";
 import { Fusion } from "@/components/Fusion";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import type { TurnReport, ToolEvent } from "@/lib/types";
+import { useAgent } from "@/lib/agent-context";
 
 export type Status = "idle" | "thinking" | "streaming" | "done";
-
-interface Props {
-  status: Status;
-  tools: ToolEvent[];
-  report: TurnReport | null;
-}
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -24,8 +18,14 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-export function Activity({ status, tools, report }: Props) {
+/** What the agent is doing, read from the shared state rather than handed down.
+ *
+ *  It used to take props from App, which meant only the chat could fill it. Reading the context lets
+ *  the merged conversation feed the same panel — and stops App from being the one place that knows
+ *  what an agent turn looks like. */
+export function Activity() {
   const t = useT();
+  const { status, tools, report } = useAgent();
   const cost =
     report == null
       ? null
@@ -80,7 +80,7 @@ export function Activity({ status, tools, report }: Props) {
           {report ? (
             <span className="font-mono">
               in {report.prompt_tokens} · out {report.completion_tokens}
-              {report.cache_read_tokens > 0 && ` · cache ${report.cache_read_tokens}`}
+              {(report.cache_read_tokens ?? 0) > 0 && ` · cache ${report.cache_read_tokens}`}
             </span>
           ) : (
             <span className="text-muted-foreground">—</span>
@@ -98,7 +98,9 @@ export function Activity({ status, tools, report }: Props) {
       <Section title={t("activity.memory")}>
         <div className="flex items-center gap-2 text-sm">
           <Brain className="h-3.5 w-3.5 text-muted-foreground" />
-          {report ? (
+          {/* An absent count is NOT zero: a surface that does not report recall would otherwise
+              render "0 facts recalled", which is a measurement nobody took. */}
+          {report && report.memory_facts_used != null ? (
             <span>
               {t("activity.factsRecalled", { n: report.memory_facts_used })}
               {report.memory_layer && (

@@ -303,6 +303,8 @@ def build_api_app(
     workspace: Path | None = None,
     solve_agent_factory: SolveAgentFactory | None = None,
     messaging_manager: MessagingManager | None = None,
+    memory: Any = None,
+    graph: Any = None,
 ) -> FastAPI:
     """Build the desktop API app over a session ``factory`` (the real agent stack).
 
@@ -1029,7 +1031,17 @@ def build_api_app(
 
     register_features(app, guard)  # Memory / Skills / Cron / Tasks (Fase C)
     # POST /api/code/turn — a conversational coding turn that keeps the previous turn's tool calls.
-    register_code_api(app, guard, workspace, settings)
+    register_code_api(
+        app,
+        guard,
+        workspace,
+        settings,
+        # Read-only, and one-way on purpose — see register_code_api. Passed explicitly rather than
+        # dug out of a probe session, so the direction of the dependency is visible here.
+        memory=memory,
+        graph=graph,
+        fuse_backend=fuse_backend,
+    )
     # /v1/chat/completions — any OpenAI client or LLM benchmark harness can drive the agent loop.
     register_openai_compat(app, guard, manager)
 

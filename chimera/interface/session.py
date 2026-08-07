@@ -181,49 +181,20 @@ class ChatSession:
         return False
 
     def _recall(self, message: str) -> tuple[list[str], str | None]:
-        """Recall long-term facts for this message: gated keyword/semantic hits + graph-linked facts.
+        """Recall long-term facts for this message. Delegates to :func:`recall_facts`.
 
-        Returns ``(facts, layer)``. ``layer`` names the retrieval layer(s) that actually contributed —
-        e.g. ``"semantic"``, ``"fts"``, ``"keyword"``, ``"keyword+graph"`` — or None when nothing was
-        recalled. It reflects real hits (never guessed): a layer that returns nothing is not listed.
+        The logic lives at module level because a second surface needs it — the coding turn reads
+        memory too — and the part that must never be reimplemented is the taint labelling. A copy
+        that forgot it would let a poisoned memory re-enter a prompt looking clean.
         """
-        facts: list[str] = []
-        layers: list[str] = []
-        if self.memory is not None:
-            captured: dict[str, str] = {}
-            items = self._memory_search(message, lambda name: captured.__setitem__("layer", name))
-            if self.gate is not None:
-                items = self.gate.filter(items, message)  # admission gate (trust boundary)
-            if items:
-                # Surface trust provenance on recall, exactly as the autonomous readback and the
-                # persona preamble do: a fact learned from untrusted content must not read to the
-                # model as verified. Dropping the label here (taking .content raw) was a taint leak —
-                # a poisoned memory could re-enter the next turn's prompt looking clean.
-                facts = [
-                    item.content
-                    + (
-                        " [unverified: learned from untrusted content]"
-                        if getattr(item, "provenance", "clean") == "tainted"
-                        else ""
-                    )
-                    for item in items
-                ]
-                if "layer" in captured:
-                    layers.append(captured["layer"])
-        if self.graph is not None:
-            # Entity-aware recall: facts linked (via the graph) to entities named in the
-            # message, even when they share no keyword with it. Deduped against keyword hits.
-            graph_added = 0
-            for related in self.graph.related_facts(message, k=self.memory_k):
-                # Entity-linked facts skip the keyword-similarity gate (they intentionally may not
-                # overlap the query), but they must STILL pass the injection check — a graph-reachable
-                # tainted memory could otherwise inject override text the gate exists to block.
-                if related not in facts and (self.gate is None or self.gate.is_clean(related)):
-                    facts.append(related)
-                    graph_added += 1
-            if graph_added:
-                layers.append("graph")
-        return facts, ("+".join(layers) if layers else None)
+        return recall_facts(
+            message,
+            memory=self.memory,
+            graph=self.graph,
+            gate=self.gate,
+            k=self.memory_k,
+            search=self._memory_search,
+        )
 
     def _memory_search(
         self, message: str, on_layer: Callable[[str], None]
@@ -252,3 +223,66 @@ class ChatSession:
             parts.append("Conversation so far:\n" + convo)
         parts.append(f"User: {message}")
         return "\n\n".join(parts)
+
+
+def recall_facts(
+    message: str,
+    *,
+    memory: Any = None,
+    graph: Any = None,
+    gate: Any = None,
+    k: int = 3,
+    search: Any = None,
+) -> tuple[list[str], str | None]:
+    """Long-term facts relevant to ``message``: gated keyword/semantic hits + graph-linked facts.
+
+    Returns ``(facts, layer)``. ``layer`` names the retrieval layer(s) that actually contributed —
+    e.g. ``"semantic"``, ``"fts"``, ``"keyword"``, ``"keyword+graph"`` — or None when nothing was
+    recalled. It reflects real hits (never guessed): a layer that returns nothing is not listed.
+    """
+    facts: list[str] = []
+    layers: list[str] = []
+    if memory is not None:
+        captured: dict[str, str] = {}
+        def on_layer(name: str) -> None:
+            captured["layer"] = name
+
+        if search is not None:
+            items = search(message, on_layer)
+        else:
+            try:
+                items = memory.search(message, k=k, on_layer=on_layer)
+            except TypeError:  # a minimal SupportsRecall fake that doesn't accept on_layer
+                items = memory.search(message, k=k)
+        if gate is not None:
+            items = gate.filter(items, message)  # admission gate (trust boundary)
+        if items:
+            # Surface trust provenance on recall, exactly as the autonomous readback and the persona
+            # preamble do: a fact learned from untrusted content must not read to the model as
+            # verified. Dropping the label here (taking .content raw) was a taint leak — a poisoned
+            # memory could re-enter the next turn's prompt looking clean.
+            facts = [
+                item.content
+                + (
+                    " [unverified: learned from untrusted content]"
+                    if getattr(item, "provenance", "clean") == "tainted"
+                    else ""
+                )
+                for item in items
+            ]
+            if "layer" in captured:
+                layers.append(captured["layer"])
+    if graph is not None:
+        # Entity-aware recall: facts linked (via the graph) to entities named in the message, even
+        # when they share no keyword with it. Deduped against keyword hits.
+        graph_added = 0
+        for related in graph.related_facts(message, k=k):
+            # Entity-linked facts skip the keyword-similarity gate (they intentionally may not
+            # overlap the query), but they must STILL pass the injection check — a graph-reachable
+            # tainted memory could otherwise inject override text the gate exists to block.
+            if related not in facts and (gate is None or gate.is_clean(related)):
+                facts.append(related)
+                graph_added += 1
+        if graph_added:
+            layers.append("graph")
+    return facts, ("+".join(layers) if layers else None)

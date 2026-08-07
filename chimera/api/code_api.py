@@ -125,6 +125,17 @@ class CodeSeams(BaseModel):
     """Per-role model overrides, merged over the profile. Only the fields actually sent are applied,
     so a partial override cannot blank the rest of the profile back to the default model."""
 
+    fuse: bool = False
+    """Route THIS turn through the fusion panel.
+
+    A fused turn CANNOT call tools: ``FusionEngine.complete`` drops the tool schemas, so the agent
+    finishes in one step having touched nothing and answers from the prompt alone. In a coding
+    conversation that is a sharper edge than in a chat — ask it to fix a file and it will describe a
+    fix it never applied. It is offered anyway, because a deliberative question ("which of these two
+    designs is better?") is exactly what a panel is good at, and refusing to offer it would be
+    deciding for the user. What is NOT optional is that the turn says so, which ``done.fused`` does.
+    """
+
     posture: Posture | None = None
     """How far the agent may reach, and when it stops to ask (see :mod:`chimera.api.posture`).
 
@@ -278,11 +289,27 @@ class CodeTurnRequest(CodeSeams):
 
 
 def register_code_api(
-    app: FastAPI, guard: params.Depends, workspace: Path, settings: Settings
+    app: FastAPI,
+    guard: params.Depends,
+    workspace: Path,
+    settings: Settings,
+    *,
+    memory: Any = None,
+    graph: Any = None,
+    fuse_backend: Any = None,
 ) -> None:
-    """Mount ``POST /api/code/turn`` — a conversational coding turn, streamed."""
+    """Mount ``POST /api/code/turn`` — a conversational coding turn, streamed.
+
+    ``memory``/``graph`` are READ from, never written to. Reading is safe in a way writing is not: a
+    recalled fact learned from untrusted content carries its ``[unverified]`` label into the prompt
+    and the admission gate still rejects injection patterns, so the worst case is a wasted line of
+    context. Writing is the opposite — with the workspace trusted by default, a poisoned README would
+    enter memory looking clean, and a memory item has no project scope, so it would be recalled into
+    every other project too. That asymmetry is the whole reason this is one-way.
+    """
     from chimera.core.code_session import CodeSession, CodeSessionStore
     from chimera.core.events import tool as tool_event
+    from chimera.interface.session import recall_facts
 
     store = CodeSessionStore(settings.home / "code_sessions")
     # One lock per session: two concurrent turns on the same conversation would interleave their
@@ -294,7 +321,7 @@ def register_code_api(
         with locks_guard:
             return locks.setdefault(session_id, threading.Lock())
 
-    def build_agent(req: CodeTurnRequest, ws: Path) -> tuple[Agent, Any]:
+    def build_agent(req: CodeTurnRequest, ws: Path, facts: list[str]) -> tuple[Agent, Any]:
         """The agent for this turn, and the ledger watching it.
 
         The ledger used to be built and thrown away, which left the turn unable to answer the one
@@ -308,11 +335,22 @@ def register_code_api(
         gateway = LLMGateway()
         steps = resolve_steps(req.max_steps)
         registry, ledger = assemble_registry(req, ws, settings, gateway, steps=steps)
+        # Recalled facts ride in the SYSTEM prompt, and that placement is load-bearing: `absorb`
+        # drops system messages when it stores the transcript, so the recall is refreshed each turn
+        # instead of accumulating stale copies of itself in the conversation forever.
+        from chimera.core.agent import DEFAULT_SYSTEM_PROMPT
+
+        system_prompt = DEFAULT_SYSTEM_PROMPT
+        if facts:
+            system_prompt += "\n\nRelevant facts from memory:\n" + "\n".join(
+                f"- {f}" for f in facts
+            )
         agent = Agent(
             gateway,
             registry,
             AgentConfig(
                 model=req.model,
+                system_prompt=system_prompt,
                 max_steps=steps,
                 context_budget=req.context_budget,
                 project_root=ws,
@@ -340,7 +378,9 @@ def register_code_api(
                 raise HTTPException(status_code=400, detail="workspace not found")
         else:
             ws = workspace
-        agent, ledger = build_agent(req, ws)
+        # Read memory BEFORE building the agent: the facts go into this turn's system prompt.
+        facts, memory_layer = recall_facts(req.message, memory=memory, graph=graph)
+        agent, ledger = build_agent(req, ws, facts)
         session = store.load(req.session_id, agent) if req.session_id else CodeSession(agent)
         session.agent = agent  # a loaded session carries messages, not the agent that made them
         # A conversation belongs to the project it STARTED in, and keeps it. Overwriting on every
@@ -386,13 +426,25 @@ def register_code_api(
                 guard = WorkspaceGuard(ws)
                 before = guard.snapshot()
 
+                # Same swap the chat turn uses, under the same per-session lock: hand the agent the
+                # fusion engine for this call and restore it in `finally`. Fusion ignores tools, so
+                # this turn will not touch a file — reported as `fused` rather than left to look like
+                # a turn that simply did not need to.
+                fused = bool(req.fuse) and fuse_backend is not None
+                original_backend = getattr(agent, "backend", None) if fused else None
+                if fused:
+                    agent.backend = fuse_backend  # type: ignore[assignment]
                 with lock_for(session_id):
                     result = session.send(
                         req.message,
-                        on_token=on_token if req.stream else None,
+                        # Fusion has no token stream (the engine only implements `complete`), so
+                        # asking for one would leave the screen blank until the whole panel lands.
+                        on_token=on_token if (req.stream and not fused) else None,
                         on_tool=on_tool,
                         on_edit=on_edit,
                     )
+                    if fused:
+                        agent.backend = original_backend  # type: ignore[assignment]
                     store.save(session)
                 # Judge what the turn wrote, if it wrote anything and the project says how.
                 if edited:
@@ -443,6 +495,13 @@ def register_code_api(
                         # Did this turn read anything untrusted? A turn steered by a planted
                         # instruction used to be indistinguishable from one that was not.
                         "tainted": bool(ledger.run_tainted()),
+                        # What the conversation remembered, and from which layer. A coding turn used
+                        # to accumulate nothing and recall nothing; it now READS what the chat reads.
+                        "memory_facts_used": len(facts),
+                        "memory_layer": memory_layer,
+                        # This turn could not use tools, and a reader cannot tell that from a zero
+                        # tool count alone — the same count a turn that needed none reports.
+                        "fused": fused,
                     },
                 )
 

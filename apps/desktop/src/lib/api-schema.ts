@@ -1513,6 +1513,11 @@ export interface components {
              * @default false
              */
             explorer: boolean;
+            /**
+             * Fuse
+             * @default false
+             */
+            fuse: boolean;
             /** Max Steps */
             max_steps?: number | null;
             /** Message */

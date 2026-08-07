@@ -3,7 +3,7 @@ import type {
   FusionMeta,
   FusionPanelEntry,
   FusionStage,
-  TurnReport,
+  RouteMeta,
 } from "@/lib/types";
 import { Badge, EmptyState, Panel } from "@/components/ui/panel";
 import { cn } from "@/lib/utils";
@@ -158,7 +158,7 @@ function CascadeRoute({ meta, t }: { meta: CascadeMeta; t: TFunc }) {
  * section of the activity inspector it sits beside the turn it describes, and is more discoverable
  * for losing its icon, not less.
  */
-export function Fusion({ report }: { report?: TurnReport | null }) {
+export function Fusion({ report }: { report?: { route_meta?: RouteMeta | null } | null }) {
   const t = useT();
   const meta = report?.route_meta;
   // Nothing to show unless this turn actually routed through fusion or the cascade. Rendering an

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState , type ReactNode } from "react";
+import Markdown from "react-markdown";
+import rehypeHighlight from "rehype-highlight";
 import { useQueryClient } from "@tanstack/react-query";
-import { Eraser, Loader2, MessageSquare, Send, ShieldCheck, Undo2, Wrench } from "lucide-react";
+import { ArrowDown, Eraser, MessageSquare, Network, Send, ShieldCheck, Square, Undo2, Wrench } from "lucide-react";
 import {
   deleteCodeSession,
   getCodeSession,
@@ -15,10 +17,13 @@ import {
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/panel";
+import { BrandMark } from "@/components/BrandMark";
 import { BatchProposal } from "@/components/code/BatchProposal";
 import { DiffView } from "@/components/code/DiffView";
 import { decompose } from "@/lib/decompose";
 import { useT, type TFunc } from "@/lib/i18n";
+import { useAgent } from "@/lib/agent-context";
+import { useStickToBottom } from "@/lib/useStickToBottom";
 import { cn } from "@/lib/utils";
 
 /** One exchange. The assistant side carries what the agent DID (tools, edits) alongside what it
@@ -146,6 +151,12 @@ function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
       <Badge tone={done.usd === null ? "warn" : undefined}>
         {done.usd === null ? t("code.chat.unknownCost") : `$${done.usd.toFixed(4)}`}
       </Badge>
+      {/* Only when a layer actually contributed. "0 facts" and "we did not look" render the same and
+          mean different things, so the absent case says nothing rather than saying zero. */}
+      {done.memory_facts_used ? (
+        <Badge>{t("code.chat.recalled", { n: done.memory_facts_used, layer: done.memory_layer ?? "" })}</Badge>
+      ) : null}
+      {done.tainted ? <Badge tone="warn">{t("code.chat.tainted")}</Badge> : null}
     </div>
   );
 }
@@ -199,11 +210,17 @@ export function Conversation({
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
-  const endRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "end" });
-  }, [exchanges]);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  // Follows the stream by writing scrollTop once per frame, and stops the moment the reader scrolls
+  // up. Replaces a `scrollIntoView` on every state change, which yanked the reader back mid-read —
+  // and a coding transcript is read backwards far more often than a chat is.
+  const { stuck, scrollToBottom } = useStickToBottom(scrollRef, [exchanges]);
+  // The turn in flight, so it can be abandoned. `streamCodeTurn` always accepted a signal; nothing
+  // ever passed one, so a turn that went wrong had to be waited out.
+  const abortRef = useRef<AbortController | null>(null);
+  // The tools of the turn in flight, in a ref because `publish` is not a React state updater and
+  // reading the previous value from a closure would drop every call after the first.
+  const toolsRef = useRef<{ name: string; ok: boolean }[]>([]);
 
   // Load a resumed conversation's turns. Without this the agent silently carried the whole history
   // while the screen showed nothing — the worst combination, because the next question then worked
@@ -230,6 +247,11 @@ export function Conversation({
   }, [resumeSession]);
 
   const [proposal, setProposal] = useState<string[] | null>(null);
+  const [fuse, setFuse] = useState(false);
+  // Publish what this turn is doing, so the shell's footer and the activity panel keep working from
+  // any screen. There is a test that exists precisely to say the agent must stay visible when you
+  // navigate away mid-turn.
+  const { publish } = useAgent();
 
   /** Mutate the turn currently streaming — always the last one, which is the only one that moves. */
   const patchLast = useCallback((fn: (e: Exchange) => Exchange) => {
@@ -255,6 +277,11 @@ export function Conversation({
     setExchanges((prev) => [...prev, { you: message, answer: "", tools: [], edits: [], done: null }]);
     let touchedFiles = false;
 
+    const controller = new AbortController();
+    abortRef.current = controller;
+    toolsRef.current = [];
+    publish({ status: "thinking", tools: [], report: null, busy: true, stop: abandon });
+
     void streamCodeTurn(
       {
         message,
@@ -263,6 +290,7 @@ export function Conversation({
         open_file: openFile,
         posture,
         profile,
+        fuse,
       },
       {
         // Sent on every turn, not just the first: a client that drops it silently restarts the
@@ -273,8 +301,15 @@ export function Conversation({
           if (id !== sessionId) void qc.invalidateQueries({ queryKey: ["code-sessions"] });
           setSessionId(id);
         },
-        onToken: (text) => patchLast((e) => ({ ...e, answer: e.answer + text })),
-        onTool: (tool) => patchLast((e) => ({ ...e, tools: [...e.tools, tool] })),
+        onToken: (text) => {
+          publish({ status: "streaming" });
+          patchLast((e) => ({ ...e, answer: e.answer + text }));
+        },
+        onTool: (tool) => {
+          publish({ tools: [...toolsRef.current, { name: tool.name, ok: tool.ok }] });
+          toolsRef.current = [...toolsRef.current, { name: tool.name, ok: tool.ok }];
+          patchLast((e) => ({ ...e, tools: [...e.tools, tool] }));
+        },
         onEdit: (path, patch) => {
           touchedFiles = true;
           patchLast((e) => ({ ...e, edits: [...e.edits, { path, patch }] }));
@@ -284,6 +319,7 @@ export function Conversation({
           // The streamed tokens and the final answer are the same text; prefer the final one, which
           // is complete even when the backend never streamed (a non-streaming model, `stream:false`).
           patchLast((e) => ({ ...e, answer: done.answer || e.answer, done }));
+          publish({ status: "done", busy: false, report: done });
           setBusy(false);
           if (touchedFiles) {
             void qc.invalidateQueries({ queryKey: ["fs-tree"] });
@@ -294,10 +330,21 @@ export function Conversation({
         },
         onError: () => {
           patchLast((e) => ({ ...e, failed: true }));
+          publish({ status: "idle", busy: false });
           setBusy(false);
         },
       },
+      controller.signal,
     );
+  }
+
+  /** Abandon the turn in flight. The model call cannot be un-made, but the stream stops arriving and
+   *  the composer comes back — which is the difference between waiting and being stuck. */
+  function abandon() {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    publish({ status: "idle", busy: false });
+    setBusy(false);
   }
 
   async function undo(index: number, token: string) {
@@ -332,7 +379,7 @@ export function Conversation({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="relative flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-2 border-b border-hairline px-3 py-2 text-accent">
         <MessageSquare className="h-4 w-4" />
         <h2 className="text-sm font-semibold text-foreground">{t("code.chat.title")}</h2>
@@ -343,9 +390,17 @@ export function Conversation({
         ) : null}
       </div>
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-auto p-3">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
+        {/* `role="log"` tells a screen reader this region accumulates; `aria-busy` says the agent is
+            still writing. The streaming text is deliberately NOT a live region — announcing it would
+            re-read the whole growing answer on every token. */}
+        <div role="log" aria-busy={busy} className="mx-auto max-w-3xl space-y-3 p-3">
         {exchanges.length === 0 && replayed ? (
-          <p className="text-xs text-muted-foreground">{t("code.chat.empty")}</p>
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <BrandMark className="mb-4 h-14 w-14" glow />
+            <h2 className="text-base font-semibold">Chimera</h2>
+            <p className="mt-1 max-w-sm text-sm text-muted-foreground">{t("code.chat.empty")}</p>
+          </div>
         ) : null}
         {exchanges.map((e, i) => (
           <div key={i} className="space-y-2">
@@ -375,9 +430,23 @@ export function Conversation({
               </div>
             ))}
             {e.answer ? (
-              <div className="whitespace-pre-wrap text-sm text-foreground/90">{e.answer}</div>
+              // Markdown with syntax highlighting, which the chat had and this did not — a coding
+              // conversation rendering a fenced block as prose is the one formatting failure that
+              // matters here.
+              <div className="md min-w-0 text-sm leading-relaxed text-foreground/90">
+                <Markdown rehypePlugins={[rehypeHighlight]}>{e.answer}</Markdown>
+              </div>
             ) : null}
             {e.failed ? <p className="text-xs text-bad">{t("code.chat.error")}</p> : null}
+            {e.done?.fused ? (
+              // At the answer, which is the only place it lands in time. The composer warns before
+              // the click; neither warning is visible at the moment someone reads a confident
+              // description of a file that was never opened.
+              <p className="flex items-start gap-1.5 text-xs text-warn">
+                <Network className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                {t("composer.fusedAnswer")}
+              </p>
+            ) : null}
             {e.verified ? (
               <Verdict
                 v={e.verified}
@@ -390,8 +459,19 @@ export function Conversation({
             {e.done ? <TurnReceipt done={e.done} t={t} /> : null}
           </div>
         ))}
-        <div ref={endRef} />
+        </div>
       </div>
+      {/* Only while there is something to miss: reading back through a finished answer should not
+          nag you to return to the bottom. */}
+      {!stuck && busy ? (
+        <button
+          type="button"
+          onClick={scrollToBottom}
+          className="absolute bottom-24 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-chip border border-border bg-surface-2 px-3 py-1.5 text-xs shadow-btn"
+        >
+          <ArrowDown className="h-3.5 w-3.5" /> {t("code.chat.jumpToLatest")}
+        </button>
+      ) : null}
 
       <div className="space-y-2 border-t border-hairline p-3">
         {/* The settings that govern THIS message, next to the box you type it in — the way a model
@@ -417,7 +497,10 @@ export function Conversation({
           value={draft}
           onChange={(ev) => setDraft(ev.target.value)}
           onKeyDown={(ev) => {
-            if (ev.key === "Enter" && (ev.metaKey || ev.ctrlKey)) {
+            // Enter sends, Shift+Enter breaks the line — the chat's habit, chosen for the merged
+            // screen. It is the riskier of the two now that a turn edits files, and what makes it
+            // affordable is that the turn is verified and the edits are reversible.
+            if (ev.key === "Enter" && !ev.shiftKey) {
               ev.preventDefault();
               send();
             }
@@ -425,18 +508,33 @@ export function Conversation({
           disabled={busy}
         />
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" disabled={!draft.trim() || busy || busyElsewhere} onClick={() => send()}>
-            {busy ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" /> {t("code.chat.sending")}
-              </>
-            ) : (
-              <>
-                <Send className="h-4 w-4" /> {t("code.chat.send")}
-              </>
-            )}
+          {/* Fusion is a per-turn choice, next to the box you type in — and it turns OFF the
+              agent's ability to act, which the tooltip says before the click and `fusedAnswer` says
+              at the answer. */}
+          <Button
+            size="sm"
+            variant={fuse ? "primary" : "ghost"}
+            aria-pressed={fuse}
+            title={t("composer.fuseHint")}
+            onClick={() => setFuse((f) => !f)}
+          >
+            <Network className="h-4 w-4" /> {t("composer.fuse")}
           </Button>
-          <span className="ml-auto text-xs text-muted-foreground">{t("code.chat.hint")}</span>
+          {busy ? (
+            <Button size="sm" variant="outline" onClick={abandon}>
+              <Square className="h-4 w-4" /> {t("code.chat.stop")}
+            </Button>
+          ) : (
+            <Button size="sm" disabled={!draft.trim() || busyElsewhere} onClick={() => send()}>
+              <Send className="h-4 w-4" /> {t("code.chat.send")}
+            </Button>
+          )}
+          {/* Three warnings, at three moments, because each catches a different person: the tooltip
+              before the click, this while the toggle is armed and the message is being typed, and
+              the mark on the answer for whoever was not reading either. */}
+          <span className={cn("ml-auto text-xs", fuse ? "text-warn" : "text-muted-foreground")}>
+            {fuse ? t("composer.fuseOn") : t("code.chat.hint")}
+          </span>
         </div>
       </div>
     </div>
