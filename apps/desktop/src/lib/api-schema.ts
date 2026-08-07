@@ -2190,6 +2190,11 @@ export interface components {
              * @enum {string}
              */
             reach: "read_only" | "workspace" | "workspace_shell";
+            /**
+             * Surface
+             * @default run
+             */
+            surface: string;
             /** Workspace */
             workspace?: string | null;
         };
