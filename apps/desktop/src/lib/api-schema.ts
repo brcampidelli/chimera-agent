@@ -1125,6 +1125,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/vision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Vision
+         * @description Can the model that answers a turn look at an image?
+         *
+         *     Asked when someone attaches one, so the answer arrives while they can still act on it. An
+         *     image sent to a model without vision is either a provider error or — worse — silently
+         *     ignored, and a confident answer about a picture nobody looked at is indistinguishable from
+         *     one about a picture that was.
+         */
+        get: operations["vision_api_vision_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/chat/completions": {
         parameters: {
             query?: never;
@@ -2728,6 +2753,19 @@ export interface components {
             update_available: boolean;
             /** Version */
             version: string;
+        };
+        /**
+         * VisionOut
+         * @description Whether the model that would answer a turn can look at an image.
+         *
+         *     ``support`` is ``"yes"``, ``"no"`` or ``"unknown"`` — three states because the source is a lookup
+         *     table, and a table that has never heard of a model must not be allowed to report it as blind.
+         */
+        VisionOut: {
+            /** Model */
+            model: string;
+            /** Support */
+            support: string;
         };
         /**
          * WorthReport
@@ -4720,6 +4758,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VersionOut"];
+                };
+            };
+        };
+    };
+    vision_api_vision_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VisionOut"];
                 };
             };
         };

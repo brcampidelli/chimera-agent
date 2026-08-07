@@ -53,6 +53,17 @@ class AttachmentOut(BaseModel):
     note: str = ""
 
 
+class VisionOut(BaseModel):
+    """Whether the model that would answer a turn can look at an image.
+
+    ``support`` is ``"yes"``, ``"no"`` or ``"unknown"`` — three states because the source is a lookup
+    table, and a table that has never heard of a model must not be allowed to report it as blind.
+    """
+
+    model: str
+    support: str
+
+
 class TranscriptOut(BaseModel):
     """Dictated speech, as text. ``note`` is non-empty when transcription could not be done."""
 

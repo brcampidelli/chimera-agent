@@ -74,3 +74,32 @@ def test_an_unknown_id_is_none_rather_than_an_error(tmp_path: Path) -> None:
 def test_the_image_suffixes_are_the_ones_a_vision_model_accepts() -> None:
     assert ".png" in IMAGE_SUFFIXES and ".jpg" in IMAGE_SUFFIXES
     assert ".pdf" not in IMAGE_SUFFIXES  # a PDF is read as text, not looked at
+
+
+# --- Can the model look at what was attached? -------------------------------------------------
+
+
+def test_a_model_the_table_knows_can_see_reports_yes() -> None:
+    from chimera.api.attachments import vision_support
+
+    assert vision_support("gpt-4o") == "yes"
+
+
+def test_a_model_the_table_knows_cannot_see_reports_no() -> None:
+    from chimera.api.attachments import vision_support
+
+    assert vision_support("gpt-3.5-turbo") == "no"
+
+
+def test_a_model_the_table_has_never_heard_of_reports_unknown() -> None:
+    """The state that exists because the alternative is a confident wrong answer.
+
+    LiteLLM's `supports_vision` returns False both for a model it knows is blind and for one it has
+    never seen. Collapsing those two tells someone running a brand-new vision model that it cannot
+    see — and they would go and turn off a capability that works. Not knowing is a real answer, and
+    the only honest one here.
+    """
+    from chimera.api.attachments import vision_support
+
+    assert vision_support("some-vendor/a-model-released-last-tuesday") == "unknown"
+    assert vision_support("") == "unknown"

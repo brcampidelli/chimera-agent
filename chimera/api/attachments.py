@@ -112,3 +112,28 @@ def transcribe(path: Path, language: str | None = None) -> str:
     tool = TranscribeAudioTool(path.parent)
     result: Any = tool.run(path=path.name, language=language)
     return str(result)
+
+
+def vision_support(model: str) -> str:
+    """``"yes"`` | ``"no"`` | ``"unknown"`` — can this model look at an image?
+
+    Three states, and the third is the whole point. The answer comes from LiteLLM's model table, and
+    a table has an edge: ``supports_vision`` returns False both for a model it knows cannot see AND
+    for a model it has never heard of. Collapsing those two would tell someone running a brand-new
+    vision model that it is blind — a confident wrong answer, which is worse than saying nothing,
+    because they would go and disable a capability that works.
+
+    So an unknown model reports ``unknown``, and the interface says "we do not know" rather than
+    picking whichever guess reads better.
+    """
+    if not model:
+        return "unknown"
+    try:
+        import litellm
+    except ImportError:  # pragma: no cover — litellm is a hard dependency of the gateway
+        return "unknown"
+    try:
+        info = litellm.get_model_info(model=model)
+    except Exception:  # noqa: BLE001 — an unknown model raises, and unknown is a real answer here
+        return "unknown"
+    return "yes" if info.get("supports_vision") else "no"

@@ -9,6 +9,7 @@ import {
   getRuns,
   streamCodeTurn,
   uploadAttachment,
+  getVisionSupport,
 } from "@/lib/api";
 import { emptyTree, gitStatus, postureFacts, scriptTurn } from "@/test/code-api-mock";
 import { renderWithProviders } from "@/test/utils";
@@ -83,5 +84,57 @@ describe("Code — attaching a file", () => {
 
     await user.type(screen.getByPlaceholderText(/^Ask about this code/), "what is this?{Enter}");
     await waitFor(() => expect(screen.queryByText("screen.png")).not.toBeInTheDocument());
+  });
+});
+
+describe("Code — whether the model can actually look", () => {
+  beforeEach(() => {
+    vi.mocked(getFsTree).mockResolvedValue(emptyTree());
+    vi.mocked(getGitStatus).mockResolvedValue(gitStatus());
+    vi.mocked(getRuns).mockResolvedValue([]);
+    vi.mocked(getPostureFacts).mockResolvedValue(postureFacts());
+    vi.mocked(streamCodeTurn).mockImplementation(scriptTurn());
+  });
+
+  async function attachImage(support: "yes" | "no" | "unknown") {
+    const user = userEvent.setup();
+    vi.mocked(uploadAttachment).mockResolvedValue(IMAGE);
+    vi.mocked(getVisionSupport).mockResolvedValue({ model: "vendor/m", support });
+    renderWithProviders(<Code />);
+    await user.upload(screen.getByLabelText("Attach") as HTMLInputElement, new File(["x"], "s.png"));
+    await screen.findByText("screen.png");
+    return user;
+  }
+
+  it("warns when the model is known not to see", async () => {
+    await attachImage("no");
+    await screen.findByText(/cannot look at images/i);
+  });
+
+  it("says it does not KNOW rather than guessing blind", async () => {
+    // The state that exists because the alternative is a confident wrong answer: the source is a
+    // lookup table, and a model it has never heard of returns the same False as a model it knows is
+    // blind. Reporting the second would send someone off to disable a capability that works.
+    await attachImage("unknown");
+    await screen.findByText(/do not know whether/i);
+  });
+
+  it("stays quiet when the model can see", async () => {
+    await attachImage("yes");
+    expect(screen.queryByText(/cannot look at images/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/do not know whether/i)).not.toBeInTheDocument();
+  });
+
+  it("asks nothing about vision for a document, which needs none", async () => {
+    // A PDF is converted to text on arrival, so it works with every model. A caveat about pictures
+    // beside a document is a warning about a problem this attachment does not have.
+    const user = userEvent.setup();
+    vi.mocked(uploadAttachment).mockResolvedValue(DOC);
+    vi.mocked(getVisionSupport).mockClear();
+    renderWithProviders(<Code />);
+    await user.upload(screen.getByLabelText("Attach") as HTMLInputElement, new File(["x"], "s.pdf"));
+
+    await screen.findByText("spec.pdf");
+    expect(getVisionSupport).not.toHaveBeenCalled();
   });
 });

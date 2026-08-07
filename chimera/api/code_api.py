@@ -60,6 +60,7 @@ from chimera.api.schemas import (
     CodeSessionMetaOut,
     CodeSessionOut,
     TranscriptOut,
+    VisionOut,
 )
 from chimera.api.worth import WorthReport, summarize_worth
 from chimera.telemetry import get_logger
@@ -630,6 +631,20 @@ def register_code_api(
         return AttachmentOut(
             id=saved.id, name=saved.name, kind=saved.kind, chars=len(saved.text), note=saved.note
         )
+
+    @app.get("/api/vision", dependencies=[guard], response_model=VisionOut)
+    def vision() -> VisionOut:
+        """Can the model that answers a turn look at an image?
+
+        Asked when someone attaches one, so the answer arrives while they can still act on it. An
+        image sent to a model without vision is either a provider error or — worse — silently
+        ignored, and a confident answer about a picture nobody looked at is indistinguishable from
+        one about a picture that was.
+        """
+        from chimera.api.attachments import vision_support
+
+        model = settings.default_model
+        return VisionOut(model=model, support=vision_support(model))
 
     @app.post("/api/transcribe", dependencies=[guard], response_model=TranscriptOut)
     async def transcribe_audio(file: UploadFile = _UPLOAD) -> TranscriptOut:

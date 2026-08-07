@@ -527,6 +527,18 @@ export async function uploadAttachment(file: File): Promise<Attachment> {
   return (await res.json()) as Attachment;
 }
 
+/** Whether the model that answers a turn can look at an image.
+ *
+ *  Three states, and `unknown` is the important one: the source is a lookup table, and a table that
+ *  has never heard of a model must not be allowed to report it as blind — someone would go and turn
+ *  off a capability that works. */
+export interface VisionSupport {
+  model: string;
+  support: "yes" | "no" | "unknown";
+}
+
+export const getVisionSupport = () => json<VisionSupport>("/api/vision");
+
 /** Dictated speech, as text. `note` is non-empty when transcription could not be done — which the
  *  composer shows rather than pasting an error message in as if it were what you said. */
 export interface Transcript {

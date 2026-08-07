@@ -1,7 +1,18 @@
 import { useRef, useState } from "react";
-import { FileText, Image as ImageIcon, Loader2, Mic, Paperclip, Square, X } from "lucide-react";
+import {
+  AlertTriangle,
+  FileText,
+  Image as ImageIcon,
+  Loader2,
+  Mic,
+  Paperclip,
+  Square,
+  X,
+} from "lucide-react";
 
-import { transcribe, uploadAttachment, type Attachment } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
+
+import { getVisionSupport, transcribe, uploadAttachment, type Attachment } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -25,6 +36,16 @@ export function AttachmentTray({
   onRemove: (id: string) => void;
 }) {
   const t = useT();
+  const hasImage = items.some((a) => a.kind === "image");
+  // Asked only once an image is actually attached: it is a question about THIS message, and asking
+  // it up front would put a caveat about vision on a screen where nobody had mentioned pictures.
+  const vision = useQuery({
+    queryKey: ["vision"],
+    queryFn: getVisionSupport,
+    enabled: hasImage,
+    staleTime: 60_000,
+  });
+
   if (items.length === 0) return null;
   return (
     <div className="flex flex-wrap gap-1.5 pb-1.5">
@@ -58,6 +79,24 @@ export function AttachmentTray({
           </button>
         </span>
       ))}
+      {/* An image sent to a model without vision is a provider error at best and silence at worst —
+          and an answer about a picture nobody looked at reads exactly like one about a picture that
+          was. Three states, because "we have never heard of this model" is not "this model is
+          blind": saying the second would send someone off to disable something that works. */}
+      {hasImage && vision.data && vision.data.support !== "yes" ? (
+        <span
+          className={cn(
+            "flex items-center gap-1.5 text-xs",
+            vision.data.support === "no" ? "text-bad" : "text-warn",
+          )}
+        >
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+          {t(
+            vision.data.support === "no" ? "code.attach.modelBlind" : "code.attach.visionUnknown",
+            { model: vision.data.model },
+          )}
+        </span>
+      ) : null}
     </div>
   );
 }

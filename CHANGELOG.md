@@ -6,8 +6,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-08-08
+
 ### Added
 
+- **Attach an image or a document, and dictate instead of typing.** Three ways to put something into
+  a message that is not typing, sharing one decision: an attachment is content the user CHOSE to
+  send but did not WRITE, so its extracted text is sanitized and data-fenced exactly like a fetched
+  web page — a PDF carries a prompt injection as well as a website does, and picking the file does
+  not make its contents yours.
+  - **Images** required opening the multimodal path. The gateway has always known how to build a
+    multimodal request, but the only producer was one CLI command: `Agent.run` took a task string
+    and nothing else. Images ride on THIS turn's message only — they are base64-encoded into the
+    request, so carrying them in history would re-send the same picture every turn, paid for again
+    each time.
+  - **Documents need no vision, and that is the point.** A PDF is converted to text on arrival and
+    folded into the message, so it works with every model — including the ones that cannot see — and
+    does not need the optional document tool at run time. Conversion happens at UPLOAD so an
+    unreadable file fails while you are still looking at the attach button, not halfway through a
+    turn you are paying for.
+  - Files land in the app's own home, never in the workspace. Copying a file into someone's
+    repository because they attached it to a message would be writing to their project unasked.
+  - **Dictation** goes through the same tool the agent uses — local faster-whisper when installed,
+    the API otherwise. A failed transcription shows its reason rather than pasting `error: ...` into
+    the composer as if it were what you said.
+- **Whether the model can actually look, in three states.** An image sent to a model without vision
+  is a provider error at best and silence at worst, and an answer about a picture nobody looked at
+  reads exactly like one about a picture that was. The source is LiteLLM's model table, and a table
+  has an edge: it returns False both for a model it knows is blind and for one it has never heard
+  of. Collapsing those two would tell someone running a brand-new vision model that it cannot see,
+  and they would go and disable something that works. So `unknown` is its own answer, and the
+  interface says "we do not know" instead of picking whichever guess reads better.
 - **One conversation, and the door without a guard closes.** There were two ways into the same
   agent. The chat and the coding turn ran the same base tools, and only one of them was assembled
   with a write region, a posture denylist and a taint ledger — so the unguarded door was also the
@@ -38,6 +67,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A packaged install had no fixed place to keep its own data.** `Settings.home` defaults to the
+  RELATIVE path `.chimera`, which is right for the CLI — data sits beside the project you ran it in
+  — and wrong for a packaged app, which has no meaningful working directory. The launcher pinned
+  nothing, so a fresh install kept its memory, receipts and sessions wherever the launcher happened
+  to point: the install directory under Program Files (not writable), or a different folder per
+  shortcut, which means the same app could show two different histories depending on how it was
+  opened. Now pinned to the OS app-data directory. (To be explicit, since the report that prompted
+  this asked: no user data ships in the installer. `.chimera/` sits at the repository root, is
+  gitignored, and PyInstaller collects data from the `chimera` PACKAGE — verified by searching the
+  built bundle. Data visible in a dev run is the developer's own.)
+- **The posture sentence announced write access to a folder nobody chose.** It names a directory the
+  agent may edit, and with no project selected it named the app's own launch directory — so a
+  brand-new app, opened on an empty screen, claimed a decision the user had never made. It waits for
+  a project now, and the query waits with it: that endpoint probes the live sandbox on every call.
 - **A fused turn answered about files it never opened.** "Fuse this turn" hands the agent's backend
   to the fusion engine, and the engine drops the tool schemas — it logs at DEBUG and moves on. A
   panel of models has nothing to call a tool with, so the turn finished in ONE step having touched
@@ -61,6 +104,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **A coding turn accepted any workspace path**, and ran against a directory the agent would then
   create files in. It validates like the read-only file endpoints do — the one axis on which it was
   more permissive than the chat it replaces.
+
+### Changed
+
+- **Código is the first destination.** It is where the work starts; Trabalho is where you go to look
+  at what a run DID, which is a second step by definition — and the rail's order is the app's
+  opinion about that.
 
 ### Removed
 

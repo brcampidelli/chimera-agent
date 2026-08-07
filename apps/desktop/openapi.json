@@ -4074,6 +4074,25 @@
         "title": "VersionOut",
         "type": "object"
       },
+      "VisionOut": {
+        "description": "Whether the model that would answer a turn can look at an image.\n\n``support`` is ``\"yes\"``, ``\"no\"`` or ``\"unknown\"`` \u2014 three states because the source is a lookup\ntable, and a table that has never heard of a model must not be allowed to report it as blind.",
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "support": {
+            "title": "Support",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model",
+          "support"
+        ],
+        "title": "VisionOut",
+        "type": "object"
+      },
       "WorthReport": {
         "description": "Every configuration seen in the run log, in a fixed order, with the caveat attached.",
         "properties": {
@@ -6464,6 +6483,25 @@
           }
         },
         "summary": "Version Endpoint"
+      }
+    },
+    "/api/vision": {
+      "get": {
+        "description": "Can the model that answers a turn look at an image?\n\nAsked when someone attaches one, so the answer arrives while they can still act on it. An\nimage sent to a model without vision is either a provider error or \u2014 worse \u2014 silently\nignored, and a confident answer about a picture nobody looked at is indistinguishable from\none about a picture that was.",
+        "operationId": "vision_api_vision_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Vision"
       }
     },
     "/v1/chat/completions": {
