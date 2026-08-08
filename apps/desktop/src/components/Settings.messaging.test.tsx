@@ -65,4 +65,24 @@ describe("MessagingCard", () => {
 
     expect(await screen.findByText(/bad token/i)).toBeInTheDocument();
   });
+
+  it("asks for a Telegram token on the Telegram card, not a Discord one", async () => {
+    // The card has taken a `platform` since Telegram was added and used it for the title — while
+    // the two rows inside kept the Discord strings. So the Telegram card asked for a "Discord bot
+    // token", and someone reading that field has every reason to paste the wrong one into it.
+    vi.mocked(getMessaging).mockResolvedValue({
+      telegram: { configured: false, running: false, error: null },
+    } as never);
+    renderWithProviders(
+      <MessagingCard
+        save={vi.fn()}
+        platform="telegram"
+        tokenEnv="CHIMERA_TELEGRAM_BOT_TOKEN"
+      />,
+    );
+
+    expect(await screen.findByText("Telegram bot token")).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Run the Telegram bot" })).toBeInTheDocument();
+    expect(screen.queryByText(/Discord/)).not.toBeInTheDocument();
+  });
 });

@@ -225,7 +225,10 @@ export function MessagingCard({
 
   return (
     <Card title={`${t("settings.card.messaging")} · ${label}`}>
-      <Row label={t("settings.row.discordToken")} hint={t("settings.hint.discordToken")}>
+      <Row
+        label={t("settings.row.botToken", { platform: label })}
+        hint={t("settings.hint.botToken", { platform: label })}
+      >
         {editing ? (
           <>
             <input
@@ -264,7 +267,10 @@ export function MessagingCard({
           </>
         )}
       </Row>
-      <Row label={t("settings.row.discordRun")} hint={t("settings.hint.discordRun")}>
+      <Row
+        label={t("settings.row.botRun", { platform: label })}
+        hint={t("settings.hint.botRun")}
+      >
         <div className="flex items-center gap-2">
           {d?.error && !running && (
             <span className="max-w-[16rem] truncate text-xs text-bad" title={d.error}>
