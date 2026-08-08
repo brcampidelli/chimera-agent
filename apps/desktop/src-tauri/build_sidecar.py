@@ -73,6 +73,9 @@ def main() -> int:
         # which is more than the rest of the app. Dictation goes through the hosted path instead,
         # and the interface says so when the key for it is missing.
         "--collect-all", "markitdown",
+        "--collect-all", "faster_whisper",
+        "--collect-all", "ctranslate2",
+        "--collect-all", "onnxruntime",
         "--collect-data", "chimera",
         "--add-data", add_data,
         "--hidden-import", "uvicorn",

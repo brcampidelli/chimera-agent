@@ -85,7 +85,7 @@ jobs:
           # complete ffmpeg — x264, x265, AV1 encoders — to decode microphone audio. A video codec
           # suite in every download so that dictation can avoid one API call is the wrong trade, and
           # on Linux the AppImage bundler then copies much of it a second time.
-          uv sync --extra desktop --extra documents
+          uv sync --extra desktop --extra documents --extra stt
           uv pip install pyinstaller
 
       - name: Freeze the backend sidecar
@@ -239,10 +239,13 @@ jobs:
         if: github.event_name != 'release'
         shell: bash
         run: |
+          # Only the files a user fetches. `du --max-depth` is GNU-only and fails on macOS, which
+          # is how the first version of this step broke two jobs while reporting nothing — a
+          # measurement that takes down the thing it measures is worse than no measurement.
           cd apps/desktop/src-tauri/target/release/bundle
-          du -h --max-depth=1 . | sort -h
-          echo "--- what a user downloads ---"
-          find . -maxdepth 2 -type f -size +1M -not -path '*.AppDir*' -exec du -h {} +
+          find . -type f -size +1M -not -path '*.AppDir*' -not -path '*.app/*' -print0 |
+            xargs -0 ls -l | awk '{printf "%8.1f MB  %s
+", $5/1048576, $NF}' | sort -rn | head -20
 
       - name: Upload installers as workflow artifacts (manual runs)
         if: github.event_name != 'release'
