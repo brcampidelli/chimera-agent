@@ -1,14 +1,16 @@
 import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Settings } from "@/components/Settings";
-import { getConfig, getDoctor, getMessaging } from "@/lib/api";
+import { getConfig, getDoctor, getInstructions, getMessaging } from "@/lib/api";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", () => ({
   getConfig: vi.fn(),
   getDoctor: vi.fn(),
+  getInstructions: vi.fn(),
   getMessaging: vi.fn(),
   patchConfig: vi.fn(),
+  putInstructions: vi.fn(),
   startMessaging: vi.fn(),
   stopMessaging: vi.fn(),
 }));
@@ -71,6 +73,9 @@ describe("Settings — when a saved change starts applying", () => {
       sandbox: "local",
     } as never);
     vi.mocked(getMessaging).mockResolvedValue({} as never);
+    vi.mocked(getInstructions).mockResolvedValue(
+      { name: "", language: "", instructions: "" } as never,
+    );
   });
 
   it("says so on the two that a relaunch is genuinely required for", async () => {

@@ -44,6 +44,7 @@ from chimera.api.maturity_api import maturity_report
 from chimera.api.roles import fusion_for_role, review_model_for
 from chimera.api.runs import load_runs
 from chimera.api.schemas import (
+    AgentIdentityOut,
     AgentsBatchOut,
     BatchCancelOut,
     BenchmarksOut,
@@ -364,6 +365,29 @@ def build_api_app(
             return patch_config(updates)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get("/api/instructions", dependencies=[guard], response_model=AgentIdentityOut)
+    def read_instructions_endpoint() -> dict[str, Any]:
+        from chimera.core.instructions import load as load_identity
+
+        return load_identity(live_settings().home).model_dump()
+
+    @app.put("/api/instructions", dependencies=[guard], response_model=AgentIdentityOut)
+    def write_instructions_endpoint(identity: AgentIdentityOut) -> dict[str, Any]:
+        # Returns the STORED record, not the submitted one — the free text is capped, and someone
+        # who pasted more than the budget has to see what the agent will actually read.
+        from chimera.core.instructions import AgentIdentity
+        from chimera.core.instructions import save as save_identity
+
+        stored = save_identity(
+            live_settings().home,
+            AgentIdentity(
+                name=identity.name,
+                language=identity.language,
+                instructions=identity.instructions,
+            ),
+        )
+        return stored.model_dump()
 
     @app.get("/api/doctor", dependencies=[guard], response_model=DoctorOut)
     def doctor_endpoint() -> dict[str, Any]:
@@ -1250,6 +1274,8 @@ def _build_solve_agent(
     from chimera.core import (
         AutonomousAgent as _AutonomousAgent,
     )
+    from chimera.core.instructions import load as load_identity
+    from chimera.core.instructions import render as render_identity
     from chimera.core.planner import Plan
     from chimera.core.runstate import RunCheckpointer
     from chimera.core.verify import CommandVerifier
@@ -1331,6 +1357,9 @@ def _build_solve_agent(
         # The workspace's own AGENTS.md. This repository ships one written for AI agents to follow
         # and, until this line, the agent of this project did not read it.
         project_root=ws,
+        # And the owner's own instructions, which outrank it — a repository is a convention, this is
+        # the person who runs the agent. Read per run, not held from boot.
+        instructions=render_identity(load_identity(settings.home)),
         # Same trace the CLI writes, in the same place — a run started from the app and one started
         # from a terminal should leave the same evidence.
         trace_path=settings.home / "traces.jsonl",

@@ -126,6 +126,13 @@ class AgentConfig:
     # project's own conventions the way every other agent tool already does — see
     # chimera.core.agents_md for what is read, in what order, and why it can never grant capability.
     project_root: Path | None = None
+    #: The owner's own instructions, already rendered (see chimera.core.instructions).
+    #:
+    #: Passed in rather than read from disk here, unlike ``project_root``: an AGENTS.md is workspace
+    #: content that changes with the run, while this is one global record the caller already has
+    #: loaded. Appended LAST — after the project block — because a repository is a convention and
+    #: this is the person who runs the agent, so the owner wins where the two disagree.
+    instructions: str = ""
     #: Where to append this run's trace (one JSONL line: per-step tokens, cache, tools, drift).
     #: None writes nothing. Off by default because a trace is disk the caller did not ask for — but
     #: a step log nothing ever persists is a measurement with no consumer, which is the failure this
@@ -273,12 +280,20 @@ class Agent:
         skill_block = self._skill_context(task)
         if skill_block:
             system_prompt = f"{system_prompt}\n\n{skill_block}"
-        # Last, so the project's own conventions are the nearest thing to the task in the system
-        # message — a repository that says "never use bare except" should not be outranked by a
-        # generic skill card that happens to have been retrieved.
+        # After the skills, so the project's own conventions outrank a generic skill card that
+        # happens to have been retrieved — a repository that says "never use bare except" should
+        # win over one. Not last any more: see the owner's instructions below.
         project_block = self._project_context()
         if project_block:
             system_prompt = f"{system_prompt}\n\n{project_block}"
+        # Last, and the ordering is the point: `agents_md` says in its own injected text that a
+        # repository is a convention rather than an authority, and an AGENTS.md can come from a repo
+        # cloned an hour ago. This is the owner speaking, so it is read last and wins. Appended,
+        # never substituted — the default prompt carries the act-rather-than-describe rule and the
+        # untrusted-data fence, and a customisation that could delete those would delete them
+        # silently.
+        if self.config.instructions:
+            system_prompt = f"{system_prompt}\n\n{self.config.instructions}"
         # The system message is rebuilt every turn rather than carried in ``history``: skills are
         # retrieved for THIS task and the project instructions follow the file now in focus, so a
         # stale system message would pin both to whatever the first turn happened to be about.

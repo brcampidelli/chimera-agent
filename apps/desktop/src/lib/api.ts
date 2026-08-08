@@ -1,4 +1,5 @@
 import type {
+  AgentIdentity,
   AgentsBatch,
   AppConfig,
   ConfigTest,
@@ -64,6 +65,7 @@ export const deleteSession = (id: string) =>
 export const getVersion = () => json<VersionInfo>("/api/version");
 
 export const getConfig = () => json<AppConfig>("/api/config");
+export const getInstructions = () => json<AgentIdentity>("/api/instructions");
 export const getDoctor = () => json<DoctorInfo>("/api/doctor");
 export const getUsage = () => json<UsageSummary>("/api/usage");
 export const getRuns = () => json<RunReceipt[]>("/api/runs");
@@ -128,6 +130,13 @@ export const getMaturity = () => json<Maturity>("/api/maturity");
 export const getBenchmarks = () => json<Benchmarks>("/api/benchmarks");
 export const patchConfig = (updates: Record<string, string>) =>
   json<{ updated: string[] }>("/api/config", { method: "PATCH", body: JSON.stringify(updates) });
+// Returns the STORED identity, not the submitted one: the free text is capped server-side, so the
+// screen must show what the agent will actually be told rather than what was typed into it.
+export const putInstructions = (identity: AgentIdentity) =>
+  json<AgentIdentity>("/api/instructions", {
+    method: "PUT",
+    body: JSON.stringify(identity),
+  });
 // The ONLY honest "key works" call: makes a real 1-token completion server-side. `ok:true` means it
 // authenticated; otherwise `error` carries a short, secret-free message. Used by the onboarding wizard.
 export const testProviderKey = (model?: string) =>

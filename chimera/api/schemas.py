@@ -252,6 +252,19 @@ class ConfigOut(BaseModel):
     labelled — see ``chimera.api.config_api.APPLIES_WHEN``."""
 
 
+class AgentIdentityOut(BaseModel):
+    """Who the agent is, in the words of the person who runs it.
+
+    Returned on write as well as on read, and deliberately not an echo of what was sent: the free
+    text is capped, so a caller that pasted more than the budget must see what the agent will
+    actually be told rather than what they typed.
+    """
+
+    name: str = ""
+    language: str = ""
+    instructions: str = ""
+
+
 class UpdatedOut(BaseModel):
     updated: list[str]
 

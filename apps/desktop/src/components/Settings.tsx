@@ -4,8 +4,10 @@ import { Check, KeyRound, Loader2 } from "lucide-react";
 import {
   getConfig,
   getDoctor,
+  getInstructions,
   getMessaging,
   patchConfig,
+  putInstructions,
   startMessaging,
   stopMessaging,
 } from "@/lib/api";
@@ -17,12 +19,20 @@ import { Connections } from "@/components/Connections";
 import { Governance } from "@/components/Governance";
 import { Usage } from "@/components/Usage";
 import { LANGS, useI18n, useT } from "@/lib/i18n";
-import type { AppConfig, DoctorInfo, ProviderCfg } from "@/lib/types";
+import type { AgentIdentity, AppConfig, DoctorInfo, ProviderCfg } from "@/lib/types";
 
 function Card({ title, children }: { title: string; children: ReactNode }) {
+  // Named region rather than a bare section: this screen stacks eleven of them, and unnamed they
+  // announce as eleven identical "section" landmarks with no way to tell which one you are in.
+  const headingId = useId();
   return (
-    <section className="surface overflow-hidden">
-      <h2 className="border-b border-hairline px-4 py-2.5 text-sm font-semibold">{title}</h2>
+    <section className="surface overflow-hidden" aria-labelledby={headingId}>
+      <h2
+        id={headingId}
+        className="border-b border-hairline px-4 py-2.5 text-sm font-semibold"
+      >
+        {title}
+      </h2>
       <div className="divide-y divide-hairline">{children}</div>
     </section>
   );
@@ -45,6 +55,98 @@ function AppliesNote({ when }: { when?: string }) {
     <div className="text-xs text-warn">
       {t(when === "next_launch" ? "settings.applies.nextLaunch" : "settings.applies.nextConversation")}
     </div>
+  );
+}
+
+/**
+ * Who the agent is — the one thing this screen could not say.
+ *
+ * The three places that looked like they already did this did not: `profile.json` has no reader in
+ * the API, persona memory facts are retrieved by relevance so a standing instruction applied only on
+ * the turns whose wording matched it, and the unconditional preamble slot was filled by two paths
+ * the app never takes. So the Profile screen showed a profile the agent never applied, and the
+ * language selector below changed the interface while the agent kept answering in English.
+ *
+ * Saved as one record rather than three settings because it is one idea, and because the fields are
+ * already the shape a second agent would need.
+ */
+function IdentityCard() {
+  const t = useT();
+  const { lang } = useI18n();
+  const qc = useQueryClient();
+  const saved = useQuery({ queryKey: ["instructions"], queryFn: getInstructions });
+  const [draft, setDraft] = useState<AgentIdentity | null>(null);
+
+  const mutation = useMutation({
+    mutationFn: putInstructions,
+    onSuccess: (stored) => {
+      // The server's record, not the draft: the free text is capped, and someone who pasted more
+      // than the budget has to see what the agent will actually read.
+      qc.setQueryData(["instructions"], stored);
+      setDraft(null);
+    },
+  });
+
+  const current = draft ?? saved.data ?? { name: "", language: "", instructions: "" };
+  const dirty = draft !== null && JSON.stringify(draft) !== JSON.stringify(saved.data);
+  const edit = (patch: Partial<AgentIdentity>) => setDraft({ ...current, ...patch });
+  const uiLanguage = LANGS.find((l) => l.code === lang)?.label ?? "";
+
+  return (
+    <Card title={t("settings.card.agent")}>
+      <Row label={t("settings.row.agentName")} hint={t("settings.hint.agentName")}>
+        <input
+          className={inputCls}
+          value={current.name}
+          placeholder="Chimera"
+          aria-label={t("settings.row.agentName")}
+          onChange={(e) => edit({ name: e.target.value })}
+        />
+      </Row>
+      <Row label={t("settings.row.agentLanguage")} hint={t("settings.hint.agentLanguage")}>
+        <input
+          className={inputCls}
+          value={current.language}
+          placeholder={t("settings.placeholder.agentLanguage")}
+          aria-label={t("settings.row.agentLanguage")}
+          onChange={(e) => edit({ language: e.target.value })}
+        />
+        {/* One click for the answer the app already knows. Not applied automatically: an agent that
+            silently switched language because someone changed the interface would be a surprise,
+            and the two are genuinely separate choices — a Brazilian reading English docs may want
+            exactly that split. */}
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!uiLanguage || current.language === uiLanguage}
+          onClick={() => edit({ language: uiLanguage })}
+        >
+          {t("settings.action.useUiLanguage")}
+        </Button>
+      </Row>
+      <div className="flex flex-col gap-2 px-4 py-3">
+        <div>
+          <div className="text-sm font-medium">{t("settings.row.agentInstructions")}</div>
+          <div className="text-xs text-muted-foreground">{t("settings.hint.agentInstructions")}</div>
+        </div>
+        <textarea
+          className="field min-h-32 w-full p-2.5 text-sm"
+          value={current.instructions}
+          placeholder={t("settings.placeholder.agentInstructions")}
+          aria-label={t("settings.row.agentInstructions")}
+          onChange={(e) => edit({ instructions: e.target.value })}
+        />
+        {/* Said where it is decided, not in a tooltip. Someone writing "you may run any command"
+            here and then watching the agent refuse deserves to have been told in the same breath. */}
+        <p className="text-xs text-muted-foreground">{t("settings.hint.agentNoGrant")}</p>
+        <div className="flex items-center gap-2">
+          <Button size="sm" disabled={!dirty || mutation.isPending} onClick={() => mutation.mutate(current)}>
+            {t("common.save")}
+          </Button>
+          {dirty && <span className="text-xs text-warn">{t("settings.unsaved")}</span>}
+        </div>
+      </div>
+    </Card>
   );
 }
 
@@ -356,6 +458,8 @@ export function Settings() {
             <LanguageSelect />
           </Row>
         </Card>
+
+        <IdentityCard />
 
         {d && (
           <Card title={t("settings.card.status")}>

@@ -385,6 +385,8 @@ def register_code_api(
     """
     from chimera.core.code_session import CodeSession, CodeSessionStore
     from chimera.core.events import tool as tool_event
+    from chimera.core.instructions import load as load_identity
+    from chimera.core.instructions import render as render_identity
     from chimera.interface.session import recall_facts
 
     # `settings` is the snapshot taken when the routes were mounted. It is the right thing for
@@ -437,6 +439,9 @@ def register_code_api(
                 max_steps=steps,
                 context_budget=req.context_budget,
                 project_root=ws,
+                # Read per turn, so editing the identity applies to the next question rather than
+                # to the next launch.
+                instructions=render_identity(load_identity(settings.home)),
                 trace_path=settings.home / "traces.jsonl",
             ),
         )

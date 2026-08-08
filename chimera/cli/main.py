@@ -1193,6 +1193,8 @@ def desktop_app(
         raise typer.Exit(code=1) from None
 
     from chimera.core import Agent, AgentConfig
+    from chimera.core.instructions import load as load_identity
+    from chimera.core.instructions import render as render_identity
     from chimera.interface import ChatSession
     from chimera.providers import LLMGateway
     from chimera.tools import default_registry
@@ -1310,7 +1312,17 @@ def desktop_app(
             from chimera.api.posture import guard_chat_registry
 
             registry, _chat_ledger = guard_chat_registry(registry)
-        runner = Agent(session_backend(), registry, AgentConfig(model=model, max_steps=max_steps))
+        runner = Agent(
+            session_backend(),
+            registry,
+            AgentConfig(
+                model=model,
+                max_steps=max_steps,
+                # The same identity the coding turn applies. Without it a Discord bot and the app
+                # would answer as two different agents from one configuration.
+                instructions=render_identity(load_identity(live.home)),
+            ),
+        )
         return ChatSession(
             runner,
             memory=shared_memory,

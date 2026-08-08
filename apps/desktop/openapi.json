@@ -1,6 +1,28 @@
 {
   "components": {
     "schemas": {
+      "AgentIdentityOut": {
+        "description": "Who the agent is, in the words of the person who runs it.\n\nReturned on write as well as on read, and deliberately not an echo of what was sent: the free\ntext is capped, so a caller that pasted more than the budget must see what the agent will\nactually be told rather than what they typed.",
+        "properties": {
+          "instructions": {
+            "default": "",
+            "title": "Instructions",
+            "type": "string"
+          },
+          "language": {
+            "default": "",
+            "title": "Language",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "title": "AgentIdentityOut",
+        "type": "object"
+      },
       "AgentResultOut": {
         "properties": {
           "attempts": {
@@ -5429,6 +5451,60 @@
           }
         },
         "summary": "Health"
+      }
+    },
+    "/api/instructions": {
+      "get": {
+        "operationId": "read_instructions_endpoint_api_instructions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentIdentityOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Read Instructions Endpoint"
+      },
+      "put": {
+        "operationId": "write_instructions_endpoint_api_instructions_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentIdentityOut"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentIdentityOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Write Instructions Endpoint"
       }
     },
     "/api/kanban": {
