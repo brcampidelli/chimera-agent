@@ -2537,6 +2537,11 @@
           "semantic": {
             "title": "Semantic",
             "type": "boolean"
+          },
+          "skill_cards": {
+            "default": false,
+            "title": "Skill Cards",
+            "type": "boolean"
           }
         },
         "required": [

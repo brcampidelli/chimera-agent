@@ -273,6 +273,10 @@ function TextField({
         className={inputCls}
         value={v}
         placeholder={placeholder}
+        // Named from its Row, the last of the three controls here that was not. Unlabelled, every
+        // text field on this screen announced as "edit text" — the value with no statement of what
+        // it is the value OF, which for a field holding a model slug is the whole content.
+        aria-label={useContext(RowLabelContext)}
         onChange={(e) => setV(e.target.value)}
       />
       <Button size="sm" disabled={!dirty} onClick={() => onSave(v)}>
@@ -581,6 +585,48 @@ export function Settings() {
               onChange={(v) => save({ CHIMERA_COST_MODE: v })}
             />
           </Row>
+          {/* The three rungs. The Status card above SHOWS the resolved ladder and, until now, there
+              was no way to pin any of it: someone who wanted cheap-on-easy and strong-on-hard could
+              read what they were getting and not change it. Empty means "let the cost mode decide",
+              which is what every install has. */}
+          <Row label={t("settings.row.weakModel")} hint={t("settings.hint.roleModels")}>
+            <TextField
+              value={c.models.weak}
+              placeholder={t("settings.placeholder.byCostMode")}
+              onSave={(v) => save({ CHIMERA_WEAK_MODEL: v })}
+            />
+          </Row>
+          <Row label={t("settings.row.midModel")}>
+            <TextField
+              value={c.models.mid}
+              placeholder={t("settings.placeholder.byCostMode")}
+              onSave={(v) => save({ CHIMERA_MID_MODEL: v })}
+            />
+          </Row>
+          <Row label={t("settings.row.orchestratorModel")}>
+            <TextField
+              value={c.models.orchestrator}
+              placeholder={t("settings.placeholder.byCostMode")}
+              onSave={(v) => save({ CHIMERA_ORCHESTRATOR_MODEL: v })}
+            />
+          </Row>
+          {/* What makes a fully local install reachable from the interface rather than from a file.
+              Ollama and vLLM both speak the OpenAI protocol, so this one field is the difference
+              between "supports local models" and "supports local models if you edit .env". */}
+          <Row label={t("settings.row.apiBase")} hint={t("settings.hint.apiBase")}>
+            <TextField
+              value={c.models.api_base ?? ""}
+              placeholder="http://localhost:11434/v1"
+              onSave={(v) => save({ CHIMERA_API_BASE: v })}
+            />
+          </Row>
+          <Row label={t("settings.row.fallbackModels")} hint={t("settings.hint.fallbackModels")}>
+            <TextField
+              value={c.models.fallback_models.join(", ")}
+              placeholder="openrouter/…, openrouter/…"
+              onSave={(v) => save({ CHIMERA_FALLBACK_MODELS: v })}
+            />
+          </Row>
           <Row
             label={t("settings.row.cascade")}
             hint={t("settings.hint.cascade")}
@@ -612,6 +658,20 @@ export function Settings() {
               onChange={(v) => save({ CHIMERA_SEMANTIC_MEMORY: String(v) })}
             />
           </Row>
+          <Row label={t("settings.row.autoConsolidate")} hint={t("settings.hint.autoConsolidate")}>
+            <Toggle
+              on={c.memory.auto_consolidate}
+              onChange={(v) => save({ CHIMERA_AUTO_CONSOLIDATE: String(v) })}
+            />
+          </Row>
+          {/* The one that closes the loop. Skills are extracted from successful runs either way;
+              without this they are never read back, so the agent learns and does not use it. */}
+          <Row label={t("settings.row.skillCards")} hint={t("settings.hint.skillCards")}>
+            <Toggle
+              on={c.memory.skill_cards}
+              onChange={(v) => save({ CHIMERA_SKILL_CARDS: String(v) })}
+            />
+          </Row>
           <Row
             label={t("settings.row.rememberChat")}
             hint={t("settings.hint.rememberChat")}
@@ -635,6 +695,9 @@ export function Settings() {
           <Row label={t("settings.row.completionCache")} hint={t("settings.hint.completionCache")}>
             <Toggle on={c.cache.completion} onChange={(v) => save({ CHIMERA_CACHE: String(v) })} />
           </Row>
+          <Row label={t("settings.row.promptCache")} hint={t("settings.hint.promptCache")}>
+            <Toggle on={c.cache.prompt} onChange={(v) => save({ CHIMERA_PROMPT_CACHE: String(v) })} />
+          </Row>
           <Row label={t("settings.row.sandbox")}>
             <Select
               value={c.sandbox.mode}
@@ -642,6 +705,17 @@ export function Settings() {
               onChange={(v) => save({ CHIMERA_SANDBOX: v })}
             />
           </Row>
+          {/* Only meaningful under the docker sandbox, so it is shown only then — a field that
+              changes nothing is a field someone will change and then wonder about. */}
+          {c.sandbox.mode === "docker" ? (
+            <Row label={t("settings.row.sandboxImage")}>
+              <TextField
+                value={c.sandbox.image}
+                placeholder="python:3.12-slim"
+                onSave={(v) => save({ CHIMERA_SANDBOX_IMAGE: v })}
+              />
+            </Row>
+          ) : null}
           {/* The switch the posture line names when it reports a conversation as unguarded. Off by
               default because this registry is shared with the messaging gateway: arming it silently
               would take shell away from agents someone already runs in Discord. */}

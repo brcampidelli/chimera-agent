@@ -183,6 +183,12 @@ class MemoryCfgOut(BaseModel):
     semantic: bool
     auto_consolidate: bool
     remember_from_chat: bool
+    skill_cards: bool = False
+    """Whether a learned skill is injected back into the prompt when it matches the task.
+
+    Off by default, and that default is the gap between what this project says it does and what an
+    install does: the agent extracts skills from successful runs either way, and without this it
+    never reads one of them again."""
 
 
 class CacheCfgOut(BaseModel):

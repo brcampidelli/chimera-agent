@@ -2254,6 +2254,11 @@ export interface components {
             remember_from_chat: boolean;
             /** Semantic */
             semantic: boolean;
+            /**
+             * Skill Cards
+             * @default false
+             */
+            skill_cards: boolean;
         };
         /** MemoryItemOut */
         MemoryItemOut: {

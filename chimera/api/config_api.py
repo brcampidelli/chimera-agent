@@ -59,6 +59,9 @@ _EDITABLE_SETTINGS = {
     "CHIMERA_SANDBOX",
     "CHIMERA_SANDBOX_IMAGE",
     "CHIMERA_MCP_AUTOLOAD",
+    # The learn-to-use wire. Off by default, which means the agent writes skills and never reads one
+    # back — the promise of the product with the switch missing from the product.
+    "CHIMERA_SKILL_CARDS",
     # How much the agent may do. Editable because "configure my right hand" is unanswerable without
     # them, and because the alternative — hand-editing .env — is what people were already doing,
     # unaided, on the three settings with the largest blast radius here.
@@ -132,6 +135,7 @@ def read_config(settings: Settings) -> dict[str, Any]:
             "semantic": settings.semantic_memory,
             "auto_consolidate": settings.auto_consolidate,
             "remember_from_chat": settings.remember_from_chat,
+            "skill_cards": settings.skill_cards,
         },
         "cache": {"completion": settings.cache, "prompt": settings.prompt_cache},
         "sandbox": {"mode": settings.sandbox, "image": settings.sandbox_image},
