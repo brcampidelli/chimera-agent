@@ -33,7 +33,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from pydantic import BaseModel
 
@@ -95,6 +95,41 @@ def resolve(posture: Posture) -> ResolvedPosture:
         # Taint-adaptive narrowing rides with "ask if suspicious": both are the same judgement —
         # that untrusted input in the run is a reason to be more careful, not less.
         narrow_on_taint=posture.approval == "suspicious",
+    )
+
+
+def deployment_posture(settings: Settings) -> ResolvedPosture:
+    """The posture this deployment states, resolved. Nothing denied when it states none.
+
+    A FLOOR rather than a default, and the difference matters: a default is what a request gets when
+    it sends nothing, so any client could step around it by sending something. This unions with
+    whatever the request sent, so the owner's answer to "how much may my agent do" survives a client
+    that disagrees — the same rule, for the same reason, as CHIMERA_TOOL_DENYLIST.
+
+    Empty strings mean "this deployment states no posture", which is deliberately NOT the same as
+    stating a permissive one. Every caller that predates this setting sends no posture and gets
+    nothing denied; making the empty value mean ``workspace`` would silently take the shell away from
+    all of them, and it would read as the agent having got worse at its job.
+    """
+    reach = settings.reach.strip()
+    approval = settings.approval.strip()
+    # Resolved axis by axis, each against the NEUTRAL value of the other, because the two do not
+    # leak into each other — that is what makes them axes, and it is asserted a few tests up. Filling
+    # an unset axis with its default instead would mean that setting "stop and ask me when something
+    # smells wrong" silently takes away the shell, which nobody asked for and nothing would report.
+    denied = (
+        resolve(Posture(reach=cast("Reach", reach), approval="never")).deny_tools if reach else []
+    )
+    pauses = (
+        resolve(Posture(reach="workspace_shell", approval=cast("Approval", approval)))
+        if approval
+        else None
+    )
+    return ResolvedPosture(
+        deny_tools=denied,
+        pause_on_taint=bool(pauses and pauses.pause_on_taint),
+        pause_always=bool(pauses and pauses.pause_always),
+        narrow_on_taint=bool(pauses and pauses.narrow_on_taint),
     )
 
 

@@ -36,6 +36,13 @@ export function makeCodeApiMock() {
     // Available by default so a suite that is not about dictation never renders the caveat.
     getDictationSupport: vi.fn(async () => ({ support: "yes", how: "local" })),
     deleteCodeSession: vi.fn(),
+    // Resolved by default with an unset posture: the Code screen reads the deployment's posture
+    // instead of hardcoding one now, and an unset posture is what every install starts with — so
+    // the fallbacks (edit the workspace, stop and ask if the run read something untrusted) are what
+    // these suites exercise, exactly as before the setting existed.
+    getConfig: vi.fn(async () => ({
+      autonomy: { reach: "", approval: "", host_exec: "ask", denied_tools: [] },
+    })),
     getPostureFacts: vi.fn(),
     getRoleModels: vi.fn(),
     getWorth: vi.fn(),

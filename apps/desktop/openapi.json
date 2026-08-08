@@ -483,6 +483,35 @@
         "title": "AutomationCfgOut",
         "type": "object"
       },
+      "AutonomyCfgOut": {
+        "description": "How much the agent may do \u2014 the three controls that decide it, in one place.\n\n``reach`` and ``approval`` are empty when the deployment states no posture, which is not the same\nas stating a permissive one: empty means a request's own posture is the only one in force, and\nthat is the behaviour every existing client has. Set either and it becomes a floor the request\ncannot raise.",
+        "properties": {
+          "approval": {
+            "default": "",
+            "title": "Approval",
+            "type": "string"
+          },
+          "denied_tools": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Denied Tools",
+            "type": "array"
+          },
+          "host_exec": {
+            "default": "ask",
+            "title": "Host Exec",
+            "type": "string"
+          },
+          "reach": {
+            "default": "",
+            "title": "Reach",
+            "type": "string"
+          }
+        },
+        "title": "AutonomyCfgOut",
+        "type": "object"
+      },
       "BatchCancelOut": {
         "properties": {
           "cancelled": {
@@ -1192,6 +1221,9 @@
           "automation": {
             "$ref": "#/components/schemas/AutomationCfgOut"
           },
+          "autonomy": {
+            "$ref": "#/components/schemas/AutonomyCfgOut"
+          },
           "cache": {
             "$ref": "#/components/schemas/CacheCfgOut"
           },
@@ -1226,6 +1258,7 @@
           "memory",
           "cache",
           "sandbox",
+          "autonomy",
           "server",
           "mcp",
           "automation",

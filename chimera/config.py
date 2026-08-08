@@ -331,6 +331,18 @@ class Settings(BaseSettings):
     # Ignored when the sandbox is an isolated container (nothing to confirm).
     host_exec: str = Field(default="ask", validation_alias="CHIMERA_HOST_EXEC")
 
+    # The deployment's own posture — how far the agent may reach, and when it stops to ask. Both
+    # empty by default, and that emptiness is load-bearing: "" means "this deployment states no
+    # posture", which is the behaviour every existing caller has (a request that sends none gets
+    # nothing denied). Setting either makes it a FLOOR — it unions with the request's posture rather
+    # than replacing it, so a client cannot widen what the owner narrowed. Same rule, same reason, as
+    # CHIMERA_TOOL_DENYLIST.
+    #
+    # reach:    read_only | workspace | workspace_shell   ("" = state nothing)
+    # approval: always | suspicious | never               ("" = state nothing)
+    reach: str = Field(default="", validation_alias="CHIMERA_REACH")
+    approval: str = Field(default="", validation_alias="CHIMERA_APPROVAL")
+
     # Per-request deadline (seconds) for every model call. A provider that accepts the connection
     # and then never answers would otherwise stall a run forever — step/attempt budgets bound how
     # many calls happen, not how long one may take. Generous by default so a long legitimate

@@ -44,6 +44,7 @@ const CONFIG = {
     remember_from_chat: false,
   },
   cache: { completion: false, prompt: false },
+  autonomy: { reach: "", approval: "", host_exec: "ask", denied_tools: [] },
   sandbox: { mode: "local", image: "python:3.12-slim" },
   server: { token_set: false },
   mcp: { autoload: false },

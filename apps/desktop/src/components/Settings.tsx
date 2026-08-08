@@ -150,6 +150,84 @@ function IdentityCard() {
   );
 }
 
+/** How much the agent may do — the three controls that decide it, together.
+ *
+ * They were spread across a dead component, a hardcoded pair in the Code screen, and an env var that
+ * `PATCH /api/config` refused. Reading them separately never told anyone the answer, which is why
+ * they render as one card: "what may my right hand do" is one question.
+ *
+ * Empty reach/approval mean "state nothing", which is not the same as stating a permissive posture:
+ * unset, the conversation's own posture is the only one in force. Set either and it becomes a floor
+ * the request cannot raise — the same rule as the tool denylist, for the same reason.
+ */
+function AutonomyCard({ c, save }: { c: AppConfig; save: (u: Record<string, string>) => void }) {
+  const t = useT();
+  const [confirmingHostExec, setConfirmingHostExec] = useState(false);
+
+  return (
+    <Card title={t("settings.card.autonomy")}>
+      <Row label={t("settings.row.reach")} hint={t("settings.hint.reach")}>
+        <Select
+          value={c.autonomy.reach || "unset"}
+          options={["unset", "read_only", "workspace", "workspace_shell"]}
+          onChange={(v) => save({ CHIMERA_REACH: v === "unset" ? "" : v })}
+        />
+      </Row>
+      <Row label={t("settings.row.approval")} hint={t("settings.hint.approval")}>
+        <Select
+          value={c.autonomy.approval || "unset"}
+          options={["unset", "always", "suspicious", "never"]}
+          onChange={(v) => save({ CHIMERA_APPROVAL: v === "unset" ? "" : v })}
+        />
+      </Row>
+      <Row label={t("settings.row.hostExec")} hint={t("settings.hint.hostExec")}>
+        <Select
+          value={c.autonomy.host_exec}
+          options={["ask", "deny", "allow"]}
+          onChange={(v) => {
+            // `allow` is the only value here that removes a human from the loop on the user's own
+            // machine, so it does not get to be the third entry in a silent dropdown. Everything
+            // else applies straight away — asking to confirm a narrowing would train people to
+            // click through the one confirmation that matters.
+            if (v === "allow") setConfirmingHostExec(true);
+            else {
+              setConfirmingHostExec(false);
+              save({ CHIMERA_HOST_EXEC: v });
+            }
+          }}
+        />
+      </Row>
+      {confirmingHostExec && (
+        <div className="flex flex-col gap-2 px-4 py-3">
+          <p className="text-xs text-bad">{t("settings.hostExec.warning")}</p>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                save({ CHIMERA_HOST_EXEC: "allow" });
+                setConfirmingHostExec(false);
+              }}
+            >
+              {t("settings.hostExec.confirm")}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setConfirmingHostExec(false)}>
+              {t("common.cancel")}
+            </Button>
+          </div>
+        </div>
+      )}
+      {(c.autonomy.denied_tools ?? []).length > 0 && (
+        <Row label={t("settings.row.deniedTools")} hint={t("settings.hint.deniedTools")}>
+          <span className="max-w-56 truncate font-mono text-xs text-muted-foreground">
+            {(c.autonomy.denied_tools ?? []).join(", ")}
+          </span>
+        </Row>
+      )}
+    </Card>
+  );
+}
+
 function Row({
   label,
   hint,
@@ -236,8 +314,16 @@ function Select({
   options: string[];
   onChange: (v: string) => void;
 }) {
+  // Named from its Row, the same way Toggle is: before this, every select on the screen — cost
+  // mode, memory backend, sandbox, and now the three autonomy controls — announced as an unlabelled
+  // combobox, which is the whole list of choices with no statement of what is being chosen.
   return (
-    <select className={inputCls} value={value} onChange={(e) => onChange(e.target.value)}>
+    <select
+      className={inputCls}
+      value={value}
+      aria-label={useContext(RowLabelContext)}
+      onChange={(e) => onChange(e.target.value)}
+    >
       {options.map((o) => (
         <option key={o} value={o}>
           {o}
@@ -460,6 +546,8 @@ export function Settings() {
         </Card>
 
         <IdentityCard />
+
+        <AutonomyCard c={c} save={save} />
 
         {d && (
           <Card title={t("settings.card.status")}>

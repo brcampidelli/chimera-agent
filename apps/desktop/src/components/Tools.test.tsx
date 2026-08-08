@@ -6,7 +6,17 @@ import { getTools } from "@/lib/api";
 import { renderWithProviders } from "@/test/utils";
 import type { ToolInfo, Tools as ToolsOut } from "@/lib/types";
 
-vi.mock("@/lib/api", () => ({ getTools: vi.fn() }));
+vi.mock("@/lib/api", () => ({
+  getTools: vi.fn(),
+  // The screen reads the denylist now, so it can show which capabilities are switched off — and
+  // let you switch them. Empty by default here: nothing in this suite is about the denylist, and a
+  // fixture that quietly denied something would make an unrelated assertion fail for a hidden
+  // reason.
+  getConfig: vi.fn(async () => ({
+    autonomy: { reach: "", approval: "", host_exec: "ask", denied_tools: [] },
+  })),
+  patchConfig: vi.fn(async () => ({ updated: ["CHIMERA_TOOL_DENYLIST"] })),
+}));
 
 const mockGetTools = vi.mocked(getTools);
 

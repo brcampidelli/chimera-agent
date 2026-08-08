@@ -1440,6 +1440,34 @@ export interface components {
             /** Cron */
             cron: boolean;
         };
+        /**
+         * AutonomyCfgOut
+         * @description How much the agent may do — the three controls that decide it, in one place.
+         *
+         *     ``reach`` and ``approval`` are empty when the deployment states no posture, which is not the same
+         *     as stating a permissive one: empty means a request's own posture is the only one in force, and
+         *     that is the behaviour every existing client has. Set either and it becomes a floor the request
+         *     cannot raise.
+         */
+        AutonomyCfgOut: {
+            /**
+             * Approval
+             * @default
+             */
+            approval: string;
+            /** Denied Tools */
+            denied_tools?: string[];
+            /**
+             * Host Exec
+             * @default ask
+             */
+            host_exec: string;
+            /**
+             * Reach
+             * @default
+             */
+            reach: string;
+        };
         /** BatchCancelOut */
         BatchCancelOut: {
             /** Cancelled */
@@ -1732,6 +1760,7 @@ export interface components {
                 [key: string]: string;
             };
             automation: components["schemas"]["AutomationCfgOut"];
+            autonomy: components["schemas"]["AutonomyCfgOut"];
             cache: components["schemas"]["CacheCfgOut"];
             guard: components["schemas"]["GuardCfgOut"];
             mcp: components["schemas"]["McpCfgOut"];

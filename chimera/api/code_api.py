@@ -50,6 +50,7 @@ from chimera.api.posture import (
     PostureFacts,
     Reach,
     ResolvedPosture,
+    deployment_posture,
     describe,
 )
 from chimera.api.posture import resolve as _resolve_posture
@@ -273,6 +274,7 @@ def assemble_registry(
     denied = sorted({
         *(seams.deny_tools or ()),
         *resolve_posture(seams.posture).deny_tools,
+        *deployment_posture(settings).deny_tools,
         *settings.tool_denylist,
     })
     allowed = _intersect_allow(seams.allow_tools, settings.tool_allowlist or None)
@@ -305,7 +307,7 @@ def assemble_registry(
         resolve_posture(seams.posture).narrow_on_taint
         if seams.posture is not None
         else settings.taint_narrow
-    )
+    ) or deployment_posture(settings).narrow_on_taint
     # The audit trail starts here, and only here. `LedgeredTool` records the three things worth a
     # permanent line — a dangerous tool narrowed after untrusted input, a call escalated for review,
     # a side effect suppressed as a duplicate — and each is rare by construction.

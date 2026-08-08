@@ -59,6 +59,13 @@ _EDITABLE_SETTINGS = {
     "CHIMERA_SANDBOX",
     "CHIMERA_SANDBOX_IMAGE",
     "CHIMERA_MCP_AUTOLOAD",
+    # How much the agent may do. Editable because "configure my right hand" is unanswerable without
+    # them, and because the alternative — hand-editing .env — is what people were already doing,
+    # unaided, on the three settings with the largest blast radius here.
+    "CHIMERA_REACH",
+    "CHIMERA_APPROVAL",
+    "CHIMERA_HOST_EXEC",
+    "CHIMERA_TOOL_DENYLIST",
 }
 ALLOWED_KEYS = _SECRET_KEYS | _EDITABLE_SETTINGS
 
@@ -128,6 +135,12 @@ def read_config(settings: Settings) -> dict[str, Any]:
         },
         "cache": {"completion": settings.cache, "prompt": settings.prompt_cache},
         "sandbox": {"mode": settings.sandbox, "image": settings.sandbox_image},
+        "autonomy": {
+            "reach": settings.reach,
+            "approval": settings.approval,
+            "host_exec": settings.host_exec,
+            "denied_tools": list(settings.tool_denylist),
+        },
         # Off by default and that is a real exposure — see Settings.guard_chat. Exposed here because
         # the posture line points at this switch by name when it reports a conversation as unguarded.
         "guard": {"chat": settings.guard_chat},

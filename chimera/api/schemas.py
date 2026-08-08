@@ -195,6 +195,21 @@ class SandboxCfgOut(BaseModel):
     image: str
 
 
+class AutonomyCfgOut(BaseModel):
+    """How much the agent may do — the three controls that decide it, in one place.
+
+    ``reach`` and ``approval`` are empty when the deployment states no posture, which is not the same
+    as stating a permissive one: empty means a request's own posture is the only one in force, and
+    that is the behaviour every existing client has. Set either and it becomes a floor the request
+    cannot raise.
+    """
+
+    reach: str = ""
+    approval: str = ""
+    host_exec: str = "ask"
+    denied_tools: list[str] = Field(default_factory=list)
+
+
 class ServerCfgOut(BaseModel):
     token_set: bool
 
@@ -239,6 +254,7 @@ class ConfigOut(BaseModel):
     memory: MemoryCfgOut
     cache: CacheCfgOut
     sandbox: SandboxCfgOut
+    autonomy: AutonomyCfgOut
     server: ServerCfgOut
     mcp: McpCfgOut
     automation: AutomationCfgOut

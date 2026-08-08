@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import {
+  getConfig,
   getFsFile,
   saveFile,
   type Approval,
@@ -229,13 +230,18 @@ export function Code() {
   // is writing in this workspace, not just one started here.
   const run = useRunSession();
   const runBusy = run.running;
-  // Fixed, not chosen: edit the workspace, no shell, stop and ask if the run read something
-  // untrusted. These are still SENT on every request — omitting them resolves to no tool denials
-  // and no pause whatsoever, which is more permissive than any corner a user could have selected.
-  // What changed is that nobody is asked to configure them before typing; what the agent may do is
-  // stated in the transcript instead, which is where a capability belongs once it is not a control.
-  const reach: Reach = "workspace";
-  const approval: Approval = "suspicious";
+  // Not chosen here, and not chosen before typing either: what the agent may do is a standing
+  // decision, so it lives in Settings and this screen reads it. The fallbacks are the pair this was
+  // hardcoded to — edit the workspace, no shell, stop and ask if the run read something untrusted —
+  // so an install that has configured nothing behaves exactly as it did.
+  //
+  // Still SENT on every request rather than omitted: omitting resolves to no tool denials and no
+  // pause at all, which is more permissive than any corner someone could have picked. The server
+  // applies the configured posture as a floor regardless; sending it keeps the two in agreement, so
+  // the posture line in the transcript describes the run that is actually happening.
+  const cfg = useQuery({ queryKey: ["config"], queryFn: getConfig });
+  const reach = (cfg.data?.autonomy.reach || "workspace") as Reach;
+  const approval = (cfg.data?.autonomy.approval || "suspicious") as Approval;
   const posture = useMemo(() => ({ reach, approval }), [reach, approval]);
   // Same: a default the system applies, and the receipt records `profile_source: "system"` so the
   // cost panel never counts it beside a profile somebody deliberately picked.
