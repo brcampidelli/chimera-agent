@@ -6,6 +6,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.41.0] - 2026-08-08
+
+### Added
+
+- **Attaching a PDF and dictating work without installing anything.** Both features shipped in
+  0.40.0 and neither worked out of the box: the document reader and the speech model were optional
+  extras, which for a desktop app means they were absent. Both are in the bundled backend now.
+  - Installers roughly double: Windows 72 → 153 MB, the Linux AppImage 172 → 311 MB, macOS 106 →
+    209 MB (arm64) and 110 → 246 MB (Intel). Measured on the files a user downloads, after three
+    earlier estimates of mine were wrong — twice too low, once nearly six times too high.
+  - The first recording on a machine also downloads the speech model, a few hundred megabytes that
+    no installer size includes. The app ships the transcriber, not the weights, and that wait now
+    says what it is: it is indistinguishable from a hang otherwise.
+- **Dictation says what it needs BEFORE the microphone opens.** It used to record, upload, fail, and
+  report "could not transcribe" — accurate and useless, because it does not say that nothing was
+  ever going to transcribe it, so the natural read is that the recording was bad and the natural
+  response is to try again, louder. The button is disabled with the reason when neither route
+  exists, and it names the right remedy: the hosted route needs an OpenAI key **specifically**,
+  since transcription is not something an OpenAI-compatible gateway generally proxies, so "add an
+  API key" would send someone to add the wrong one.
+
+### Fixed
+
+- **A plain text file asked you to install a document converter.** Anything that was not an image
+  went through markitdown, so attaching a README answered "install the `documents` extra". Text,
+  markdown, CSV, JSON, YAML and source files are read directly; a PDF or DOCX still uses the
+  converter. (Also released as 0.40.1.)
+- **The install hint named the wrong extra.** `docs` builds the documentation site; the reader is
+  `documents`.
+- **Two tests were passing because a dependency was missing.** One claimed `read_document` was the
+  only native tool flagging untrusted output — `transcribe_audio` does too, and registers when the
+  speech model is present. The other asserted a DOCX fails without the converter, which held only
+  while the converter was absent. A test that depends on something being missing stops testing the
+  code the day the code stops needing it.
+
+### Build
+
+- **The Linux bundler could not package the speech model's native libraries.** Wheels built for
+  manylinux keep their dependencies inside the package under mangled names, and `linuxdeploy`
+  resolves against system paths — so it reported "could not find" a file sitting next to the library
+  that needed it, and aborted. It is told where to look now, with absolute paths.
+- **The release build prints installer sizes, and its dry-run artifact carries only installers.** It
+  previously uploaded the whole bundle directory including the unpacked AppDir — the raw material
+  the AppImage is built from — so reading that artifact's size as a download size overstated Linux
+  by a factor of five and cost a round of investigation into megabytes nobody would ever fetch.
+- **`--verbose` on the Linux build stays.** Tauri discards the bundler's stderr, so three dry runs
+  were spent reading an error that was being thrown away.
+
 ## [0.40.1] - 2026-08-08
 
 ### Fixed
