@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
@@ -532,3 +533,71 @@ def test_non_credential_failure_keeps_its_original_exception(monkeypatch: pytest
         LLMGateway().complete([Message(role="user", content="hi")], model="openrouter/x")
     assert not isinstance(excinfo.value, CredentialRejectedError)
     assert "503" in str(excinfo.value)
+def test_settings_changed_after_boot_reach_the_next_call(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The gateway the app builds at boot must not outlive the Settings screen.
+
+    `chimera app` constructs ONE gateway for the life of the process. While the constructor
+    snapshotted `get_settings()`, `PATCH /api/config` wrote the value, cleared the settings cache and
+    returned success, the screen re-read it and showed the new model — and every later completion
+    still went to the old one. Saving a setting that silently does nothing is worse than not offering
+    it, because the confirmation is what makes it a lie.
+    """
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    monkeypatch.setenv("CHIMERA_DEFAULT_MODEL", "prov/old")
+    monkeypatch.delenv("CHIMERA_API_BASE", raising=False)
+    monkeypatch.delenv("CHIMERA_FALLBACK_MODELS", raising=False)
+    get_settings.cache_clear()
+    from chimera.providers import LLMGateway
+
+    gateway = LLMGateway()  # built once, at boot
+    assert gateway._resolve_model(None) == "prov/old"
+    assert "api_base" not in gateway._provider_kwargs()
+
+    # Exactly what PATCH /api/config does: write the environment, drop the cached Settings.
+    monkeypatch.setenv("CHIMERA_DEFAULT_MODEL", "prov/new")
+    monkeypatch.setenv("CHIMERA_API_BASE", "http://localhost:11434")
+    monkeypatch.setenv("CHIMERA_FALLBACK_MODELS", "prov/backup")
+    get_settings.cache_clear()
+
+    assert gateway._resolve_model(None) == "prov/new"
+    assert gateway._provider_kwargs()["api_base"] == "http://localhost:11434"
+    assert gateway._model_candidates("prov/new") == ["prov/new", "prov/backup"]
+
+
+def test_explicit_settings_override_stays_pinned(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Passing Settings means "use THIS one" — and a bench comparing two configs must not drift."""
+    monkeypatch.setenv("CHIMERA_DEFAULT_MODEL", "prov/pinned")
+    get_settings.cache_clear()
+    from chimera.providers import LLMGateway
+
+    gateway = LLMGateway(Settings())
+    monkeypatch.setenv("CHIMERA_DEFAULT_MODEL", "prov/other")
+    get_settings.cache_clear()
+
+    assert gateway._resolve_model(None) == "prov/pinned"
+
+
+def test_completion_cache_follows_the_setting_and_keeps_its_entries(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Toggling the cache takes effect on the next call, and toggling it twice is not a reset."""
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path))
+    monkeypatch.setenv("CHIMERA_CACHE", "0")
+    get_settings.cache_clear()
+    from chimera.providers import LLMGateway
+
+    gateway = LLMGateway()
+    assert gateway.cache is None
+
+    monkeypatch.setenv("CHIMERA_CACHE", "1")
+    get_settings.cache_clear()
+    live = gateway.cache
+    assert live is not None
+
+    monkeypatch.setenv("CHIMERA_CACHE", "0")
+    get_settings.cache_clear()
+    assert gateway.cache is None
+
+    monkeypatch.setenv("CHIMERA_CACHE", "1")
+    get_settings.cache_clear()
+    assert gateway.cache is live  # the same store, not a fresh empty one

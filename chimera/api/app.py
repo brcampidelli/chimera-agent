@@ -320,9 +320,26 @@ def build_api_app(
     ``solve_agent_factory`` builds the per-run autonomous agent; it defaults to the real LLM-backed
     builder and is injectable so the run endpoint is testable without a provider (see tests).
     """
+    settings_override = settings
     settings = settings or get_settings()
     workspace = (workspace or Path.cwd()).expanduser().resolve()
     solve_factory = solve_agent_factory or _build_solve_agent
+
+    def live_settings() -> Settings:
+        """Settings as they are NOW — for everything a run reads that the user can change.
+
+        The app builds this once and keeps it for the life of the process, so the ``settings`` above
+        is a photograph taken at launch. It is the right thing for ``home`` (the data directory must
+        not move under an open session) and the wrong thing for the model, the sandbox or the
+        allowlists: ``PATCH /api/config`` writes those, clears the cached ``Settings`` and returns
+        success, and a run built from the photograph would still use the old ones. Saving a setting
+        that silently does nothing is worse than not offering it, because the confirmation is what
+        turns it into a lie.
+
+        An explicitly injected ``settings`` stays frozen: passing one means "use THIS", which is what
+        a test or a bench comparing two configurations is asking for.
+        """
+        return settings_override or get_settings()
     store = SessionStore(settings.home / "sessions")
     manager = SessionManager(factory, store)
     guard = Depends(_require_token())
@@ -552,7 +569,7 @@ def build_api_app(
 
         def work() -> None:
             try:
-                auto = solve_factory(req, ws, on_event, settings, cancel.is_set)
+                auto = solve_factory(req, ws, on_event, live_settings(), cancel.is_set)
                 # The receipt persists itself via the agent's run_log at run() — no extra write here.
                 result = auto.run(req.task, thread_id=req.thread_id)
                 if getattr(result, "paused", False):
@@ -723,7 +740,7 @@ def build_api_app(
 
                 # This task's OWN cooperative-stop probe: the Event registered for THIS index, so a
                 # Stop on one card halts only that task (the batch's other workers run on).
-                agent = solve_factory(sub, ws_i, on_event, settings, cancels[index].is_set)
+                agent = solve_factory(sub, ws_i, on_event, live_settings(), cancels[index].is_set)
                 return agent.run(spec.task)
 
             return run
@@ -1036,6 +1053,9 @@ def build_api_app(
         guard,
         workspace,
         settings,
+        # `settings` above stays the mount-time snapshot (it is what `home` should be read from);
+        # everything the Settings screen can change reads through this instead.
+        live_settings=live_settings,
         # Read-only, and one-way on purpose — see register_code_api. Passed explicitly rather than
         # dug out of a probe session, so the direction of the dependency is visible here.
         memory=memory,

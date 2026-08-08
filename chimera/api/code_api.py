@@ -27,7 +27,7 @@ import asyncio
 import json
 import threading
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -313,6 +313,7 @@ def register_code_api(
     workspace: Path,
     settings: Settings,
     *,
+    live_settings: Callable[[], Settings] | None = None,
     memory: Any = None,
     graph: Any = None,
     fuse_backend: Any = None,
@@ -329,6 +330,13 @@ def register_code_api(
     from chimera.core.code_session import CodeSession, CodeSessionStore
     from chimera.core.events import tool as tool_event
     from chimera.interface.session import recall_facts
+
+    # `settings` is the snapshot taken when the routes were mounted. It is the right thing for
+    # `home` — the data directory must not move under an open conversation — and the wrong thing for
+    # anything the Settings screen can change, which is why those read through `live()`. Without a
+    # reader supplied (a test mounting its own Settings), the snapshot IS the answer: an explicit
+    # injection means "use THIS one".
+    live: Callable[[], Settings] = live_settings or (lambda: settings)
 
     store = CodeSessionStore(settings.home / "code_sessions")
     # One lock per session: two concurrent turns on the same conversation would interleave their
@@ -353,7 +361,7 @@ def register_code_api(
 
         gateway = LLMGateway()
         steps = resolve_steps(req.max_steps)
-        registry, ledger = assemble_registry(req, ws, settings, gateway, steps=steps)
+        registry, ledger = assemble_registry(req, ws, live(), gateway, steps=steps)
         # Recalled facts ride in the SYSTEM prompt, and that placement is load-bearing: `absorb`
         # drops system messages when it stores the transcript, so the recall is refreshed each turn
         # instead of accumulating stale copies of itself in the conversation forever.
@@ -589,7 +597,7 @@ def register_code_api(
             # The coding turn is always assembled with a ledger. A chat only is when the user armed
             # it — and when they have not, the sentence has to say so, because the whole product
             # rests on stating what is true on this machine rather than what reads better.
-            guarded=req.surface != "chat" or settings.guard_chat,
+            guarded=req.surface != "chat" or live().guard_chat,
         )
 
     @app.post("/api/code/roles", dependencies=[guard], response_model=RoleModels)
@@ -644,7 +652,7 @@ def register_code_api(
         """
         from chimera.api.attachments import vision_support
 
-        model = settings.default_model
+        model = live().default_model
         return VisionOut(model=model, support=vision_support(model))
 
     @app.get("/api/dictation", dependencies=[guard], response_model=DictationOut)

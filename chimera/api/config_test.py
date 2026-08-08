@@ -35,8 +35,11 @@ def test_provider(model: str | None = None) -> dict[str, Any]:
     settings = get_settings()
     resolved = model or settings.default_model
     try:
-        gateway = LLMGateway(settings)
-        gateway.cache = None  # a test MUST be a real call — never served from the completion cache
+        # A test MUST be a real call, never served from the completion cache — and it must stay that
+        # way for the whole call, which is why caching is turned off in the settings this gateway is
+        # pinned to rather than by blanking the attribute afterwards. The gateway now decides per
+        # access whether caching is on, so a value assigned here would simply be recomputed.
+        gateway = LLMGateway(settings.model_copy(update={"cache": False}))
         result = gateway.complete(
             [Message(role="user", content="ping")],
             model=resolved,

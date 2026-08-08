@@ -231,24 +231,53 @@ class LLMGateway:
     Parameters
     ----------
     settings:
-        Optional settings override; defaults to the process-wide settings. On
-        construction, any configured provider keys are exported to ``os.environ``
-        so LiteLLM (which reads from the environment) can see keys that were only
-        provided via ``.env``.
+        Optional settings override. Passing one **freezes** it for this gateway's lifetime — that is
+        what an override means, and it is what a test or a bench harness is asking for. Passing
+        nothing reads the process-wide settings on every access instead (see ``settings`` below). On
+        construction, any configured provider keys are exported to ``os.environ`` so LiteLLM (which
+        reads from the environment) can see keys that were only provided via ``.env``.
     """
 
     def __init__(self, settings: Settings | None = None) -> None:
-        self.settings = settings or get_settings()
+        self._settings_override = settings
         self._rotators: dict[str, _KeyRotator] = {}
         self._rotators_lock = threading.Lock()  # the fusion panel calls _key_order from many threads
         # M15-C2: per-credential cooldown pool — a rate-limited/revoked key is rested, not hammered.
         self._cred_pool = CredentialPool()
-        self.cache: CompletionCache | None = (
-            CompletionCache(self.settings.home / "cache" / "completions.json")
-            if self.settings.cache
-            else None
-        )
+        self._cache: CompletionCache | None = None
         self._export_keys_to_env()
+
+    @property
+    def settings(self) -> Settings:
+        """The live settings, unless this gateway was built with an explicit override.
+
+        The app builds ONE gateway at boot and keeps it for the life of the process, so a snapshot
+        taken here would outlive every setting the user can change from the Settings screen. That is
+        not a stale cache, it is a lie with a confirmation dialog: ``PATCH /api/config`` writes the
+        value, clears the settings cache and returns success, the screen re-reads it and shows the
+        new model — and the next completion still goes to the old one, because the gateway is
+        holding a photograph of the settings as they were at launch.
+
+        Reading through costs nothing: ``get_settings`` is an ``lru_cache(maxsize=1)``, and the one
+        writer already invalidates it. What the property buys is that *when* the answer changes, this
+        object notices.
+        """
+        return self._settings_override or get_settings()
+
+    @property
+    def cache(self) -> CompletionCache | None:
+        """The completion cache, or None while caching is off — decided per access, not at boot.
+
+        Built lazily and kept: the cache holds in-memory state on top of its file, so rebuilding it
+        on every access would quietly turn every hit into a miss. Toggling the setting off and back
+        on therefore keeps the entries it already had, which is what someone flipping a switch twice
+        expects.
+        """
+        if not self.settings.cache:
+            return None
+        if self._cache is None:
+            self._cache = CompletionCache(self.settings.home / "cache" / "completions.json")
+        return self._cache
 
     def _export_keys_to_env(self) -> None:
         for field, env_var in _KEY_ENV_VARS.items():
@@ -347,8 +376,11 @@ class LLMGateway:
         # serve byte-identical content for every "independent" sample, collapsing the k-sample
         # consensus / self-consistency / cascade-agreement checks into fake unanimity (they resample
         # the SAME request at temp>0 expecting variation) — silent, and it reports false confidence.
+        # Bound once for the whole call: `cache` is now decided per access, and a turn that read the
+        # setting as on and wrote it as off would be half-cached — worse than either answer.
+        cache = self.cache
         cache_key: str | None = None
-        if self.cache is not None and tools is None and temperature == 0:
+        if cache is not None and tools is None and temperature == 0:
             # Fold the other response-affecting request fields into the key so e.g. two calls that
             # differ only in top_p / seed / stop / response_format / api_base don't collide.
             key_params = {k: v for k, v in {**extra, **kwargs}.items() if k != "api_key"}
@@ -359,7 +391,7 @@ class LLMGateway:
                 max_tokens=max_tokens,
                 params=key_params,
             )
-            hit = self.cache.get(cache_key)
+            hit = cache.get(cache_key)
             if hit is not None:
                 _log.debug("cache hit model=%s", resolved)
                 # A cache hit made NO API call and billed nothing: report 0 fresh tokens and surface
@@ -404,13 +436,13 @@ class LLMGateway:
                     # a primary request even after the primary recovers.
                     if (
                         cache_key is not None
-                        and self.cache is not None
+                        and cache is not None
                         and result.tool_calls is None
                         and result.content  # never cache an empty-content result (one malformed
                         # response would otherwise serve "" forever for this key at $0)
                         and candidate == resolved
                     ):
-                        self.cache.put(
+                        cache.put(
                             cache_key,
                             {
                                 "content": result.content,
