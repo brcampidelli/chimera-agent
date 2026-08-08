@@ -231,12 +231,30 @@ jobs:
           if-no-files-found: error
           retention-days: 5
 
+      # What a USER downloads, and nothing else. `bundle/**/*` also swept in `Chimera.AppDir` — the
+      # unpacked tree the AppImage is built FROM — so the artifact was the installer plus its own raw
+      # material, and reading its size as a download size overstated it several times over. That
+      # mistake cost a round of investigation into megabytes nobody would ever fetch.
+      - name: Report installer sizes
+        if: github.event_name != 'release'
+        shell: bash
+        run: |
+          cd apps/desktop/src-tauri/target/release/bundle
+          du -h --max-depth=1 . | sort -h
+          echo "--- what a user downloads ---"
+          find . -maxdepth 2 -type f -size +1M -not -path '*.AppDir*' -exec du -h {} +
+
       - name: Upload installers as workflow artifacts (manual runs)
         if: github.event_name != 'release'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: chimera-installers-${{ matrix.os }}
-          path: apps/desktop/src-tauri/target/release/bundle/**/*
+          path: |
+            apps/desktop/src-tauri/target/release/bundle/*/*.AppImage
+            apps/desktop/src-tauri/target/release/bundle/*/*.deb
+            apps/desktop/src-tauri/target/release/bundle/*/*.exe
+            apps/desktop/src-tauri/target/release/bundle/*/*.dmg
+            apps/desktop/src-tauri/target/release/bundle/*/*.tar.gz
           if-no-files-found: warn
           retention-days: 5
 
