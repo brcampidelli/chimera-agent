@@ -22,6 +22,8 @@ export type ProjectState = Schemas["ProjectStateOut"];
 export type ProviderCfg = Schemas["ProviderOut"];
 export type AppConfig = Schemas["ConfigOut"];
 export type AgentIdentity = Schemas["AgentIdentityOut"];
+/** An agent you dispatch work to, as opposed to the one you converse with. */
+export type AgentDef = Schemas["AgentDefOut"];
 export type DoctorInfo = Schemas["DoctorOut"];
 export type ConfigTest = Schemas["ConfigTestOut"];
 export type UsageSummary = Schemas["UsageSummaryOut"];

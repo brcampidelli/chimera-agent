@@ -509,6 +509,89 @@ def models_set(
 app.add_typer(models_app, name="models")
 
 
+agents_app = typer.Typer(
+    help="The agents you dispatch work to — as distinct from the one you converse with."
+)
+
+
+@agents_app.command("list")
+def agents_list() -> None:
+    """Show the registry."""
+    from chimera.core.registry import load as load_agents
+
+    entries = load_agents(get_settings().home)
+    if not entries:
+        console.print(
+            "[dim]No agents yet — add one with "
+            '`chimera agents set <id> --name "..." --instructions "..."`.[/dim]'
+        )
+        return
+    table = Table(box=None)
+    table.add_column("id", style="bold")
+    table.add_column("name")
+    table.add_column("model")
+    table.add_column("tools")
+    for entry in entries:
+        table.add_row(
+            entry.id,
+            entry.label,
+            entry.model or "[dim]ladder[/dim]",
+            ", ".join(entry.allowed_tools) or "[dim]all[/dim]",
+        )
+    console.print(table)
+
+
+@agents_app.command("set")
+def agents_set(
+    agent_id: str = typer.Argument(..., help="Its handle: a lowercase slug. Also its Kanban lane."),
+    name: str = typer.Option("", "--name", help="What to call it on screen."),
+    instructions: str = typer.Option("", "--instructions", help="Its role, in your words."),
+    model: str = typer.Option("", "--model", help="Pin a model; empty inherits the ladder."),
+    tools: str = typer.Option(
+        "", "--tools", help="Comma-separated allowlist; empty means NO restriction."
+    ),
+) -> None:
+    """Add an agent, or replace the one with this id.
+
+    Replace rather than merge, matching the API: a partial write that kept what you left out would
+    make clearing a pinned model impossible.
+    """
+    from chimera.core.registry import AgentDef
+    from chimera.core.registry import upsert as upsert_agent
+
+    try:
+        entry = AgentDef(
+            id=agent_id,
+            name=name,
+            instructions=instructions,
+            model=model,
+            allowed_tools=[t.strip() for t in tools.split(",") if t.strip()],
+        )
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    upsert_agent(get_settings().home, entry)
+    console.print(f"[green]Saved[/green] {entry.id}")
+    agents_list()
+
+
+@agents_app.command("rm")
+def agents_rm(agent_id: str = typer.Argument(..., help="The agent to forget.")) -> None:
+    """Forget an agent. Cards already filed under its lane are left exactly where they are."""
+    from chimera.core.registry import get as get_agent
+    from chimera.core.registry import remove as remove_agent
+
+    home = get_settings().home
+    if get_agent(home, agent_id) is None:
+        console.print(f"[yellow]No agent[/yellow] {agent_id}")
+        raise typer.Exit(1)
+    remove_agent(home, agent_id)
+    console.print(f"[green]Removed[/green] {agent_id}")
+
+
+app.add_typer(agents_app, name="agents")
+
+
 profile_app = typer.Typer(help="Persistent user profile — the assistant's stable, cacheable preamble.")
 
 

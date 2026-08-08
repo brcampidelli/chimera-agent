@@ -44,6 +44,7 @@ from chimera.api.maturity_api import maturity_report
 from chimera.api.roles import fusion_for_role, review_model_for
 from chimera.api.runs import load_runs
 from chimera.api.schemas import (
+    AgentDefOut,
     AgentIdentityOut,
     AgentsBatchOut,
     BatchCancelOut,
@@ -388,6 +389,35 @@ def build_api_app(
             ),
         )
         return stored.model_dump()
+
+    @app.get("/api/agents/registry", dependencies=[guard], response_model=list[AgentDefOut])
+    def list_agents_endpoint() -> list[Any]:
+        from chimera.core.registry import load as load_agents
+
+        return [a.model_dump() for a in load_agents(live_settings().home)]
+
+    @app.put("/api/agents/registry", dependencies=[guard], response_model=list[AgentDefOut])
+    def upsert_agent_endpoint(agent: AgentDefOut) -> list[Any]:
+        # Whole-record replace, not merge: a PUT that kept fields the caller omitted would make
+        # clearing a pinned model impossible, and "I removed that and it came back" is the shape of
+        # bug nobody reports because they assume they did it wrong.
+        from chimera.core.registry import AgentDef
+        from chimera.core.registry import upsert as upsert_agent
+
+        try:
+            entry = AgentDef.model_validate(agent.model_dump())
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return [a.model_dump() for a in upsert_agent(live_settings().home, entry)]
+
+    @app.delete("/api/agents/registry/{agent_id}", dependencies=[guard],
+                response_model=list[AgentDefOut])
+    def remove_agent_endpoint(agent_id: str) -> list[Any]:
+        # Cards already filed under this agent's lane are deliberately untouched: they keep their
+        # lane and stop being dispatched, which is recoverable. Deleting the work is not.
+        from chimera.core.registry import remove as remove_agent
+
+        return [a.model_dump() for a in remove_agent(live_settings().home, agent_id)]
 
     @app.get("/api/doctor", dependencies=[guard], response_model=DoctorOut)
     def doctor_endpoint() -> dict[str, Any]:

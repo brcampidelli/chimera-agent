@@ -21,6 +21,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/agents/registry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Agents Endpoint */
+        get: operations["list_agents_endpoint_api_agents_registry_get"];
+        /** Upsert Agent Endpoint */
+        put: operations["upsert_agent_endpoint_api_agents_registry_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agents/registry/{agent_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Agent Endpoint */
+        delete: operations["remove_agent_endpoint_api_agents_registry__agent_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/agents/schema": {
         parameters: {
             query?: never;
@@ -1229,6 +1264,35 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AgentDefOut
+         * @description One agent you can send work to — as distinct from the one you converse with.
+         *
+         *     Shares its field names with ``AgentIdentityOut`` on purpose: an agent is an agent, and the two
+         *     should be copyable between each other without a translation layer. What it adds is an ``id``
+         *     (its handle, and the Kanban lane it answers on) and a tool allowlist.
+         */
+        AgentDefOut: {
+            /** Allowed Tools */
+            allowed_tools?: string[];
+            /** Id */
+            id: string;
+            /**
+             * Instructions
+             * @default
+             */
+            instructions: string;
+            /**
+             * Model
+             * @default
+             */
+            model: string;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+        };
         /**
          * AgentIdentityOut
          * @description Who the agent is, in the words of the person who runs it.
@@ -2951,6 +3015,90 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_agents_endpoint_api_agents_registry_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentDefOut"][];
+                };
+            };
+        };
+    };
+    upsert_agent_endpoint_api_agents_registry_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentDefOut"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentDefOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_agent_endpoint_api_agents_registry__agent_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentDefOut"][];
                 };
             };
             /** @description Validation Error */

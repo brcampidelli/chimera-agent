@@ -287,6 +287,24 @@ class AgentIdentityOut(BaseModel):
     instructions: str = ""
 
 
+class AgentDefOut(BaseModel):
+    """One agent you can send work to — as distinct from the one you converse with.
+
+    Shares its field names with ``AgentIdentityOut`` on purpose: an agent is an agent, and the two
+    should be copyable between each other without a translation layer. What it adds is an ``id``
+    (its handle, and the Kanban lane it answers on) and a tool allowlist.
+    """
+
+    id: str
+    name: str = ""
+    instructions: str = ""
+    model: str = ""
+    allowed_tools: list[str] = Field(default_factory=list)
+    """Empty means NO RESTRICTION, not "no tools" — the same reading every other list in this
+    project's configuration has. The conversion to ``Role``'s opposite convention happens in one
+    place, server-side."""
+
+
 class UpdatedOut(BaseModel):
     updated: list[str]
 

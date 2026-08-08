@@ -1,6 +1,42 @@
 {
   "components": {
     "schemas": {
+      "AgentDefOut": {
+        "description": "One agent you can send work to \u2014 as distinct from the one you converse with.\n\nShares its field names with ``AgentIdentityOut`` on purpose: an agent is an agent, and the two\nshould be copyable between each other without a translation layer. What it adds is an ``id``\n(its handle, and the Kanban lane it answers on) and a tool allowlist.",
+        "properties": {
+          "allowed_tools": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Tools",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "instructions": {
+            "default": "",
+            "title": "Instructions",
+            "type": "string"
+          },
+          "model": {
+            "default": "",
+            "title": "Model",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "AgentDefOut",
+        "type": "object"
+      },
       "AgentIdentityOut": {
         "description": "Who the agent is, in the words of the person who runs it.\n\nReturned on write as well as on read, and deliberately not an echo of what was sent: the free\ntext is capped, so a caller that pasted more than the budget must see what the agent will\nactually be told rather than what they typed.",
         "properties": {
@@ -4273,6 +4309,111 @@
           }
         },
         "summary": "Agents Stream"
+      }
+    },
+    "/api/agents/registry": {
+      "get": {
+        "operationId": "list_agents_endpoint_api_agents_registry_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AgentDefOut"
+                  },
+                  "title": "Response List Agents Endpoint Api Agents Registry Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Agents Endpoint"
+      },
+      "put": {
+        "operationId": "upsert_agent_endpoint_api_agents_registry_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentDefOut"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AgentDefOut"
+                  },
+                  "title": "Response Upsert Agent Endpoint Api Agents Registry Put",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upsert Agent Endpoint"
+      }
+    },
+    "/api/agents/registry/{agent_id}": {
+      "delete": {
+        "operationId": "remove_agent_endpoint_api_agents_registry__agent_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "title": "Agent Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AgentDefOut"
+                  },
+                  "title": "Response Remove Agent Endpoint Api Agents Registry  Agent Id  Delete",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Agent Endpoint"
       }
     },
     "/api/agents/schema": {

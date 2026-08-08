@@ -1,4 +1,5 @@
 import type {
+  AgentDef,
   AgentIdentity,
   AgentsBatch,
   AppConfig,
@@ -66,6 +67,13 @@ export const getVersion = () => json<VersionInfo>("/api/version");
 
 export const getConfig = () => json<AppConfig>("/api/config");
 export const getInstructions = () => json<AgentIdentity>("/api/instructions");
+// The agents you send work to. Every call returns the WHOLE registry, so a screen never has
+// to guess what the list looks like after a change it just made.
+export const getAgentRegistry = () => json<AgentDef[]>("/api/agents/registry");
+export const putAgent = (agent: AgentDef) =>
+  json<AgentDef[]>("/api/agents/registry", { method: "PUT", body: JSON.stringify(agent) });
+export const deleteAgent = (id: string) =>
+  json<AgentDef[]>(`/api/agents/registry/${encodeURIComponent(id)}`, { method: "DELETE" });
 export const getDoctor = () => json<DoctorInfo>("/api/doctor");
 export const getUsage = () => json<UsageSummary>("/api/usage");
 // `workspace` narrows to one project; omitted returns every project's runs, which is what a
