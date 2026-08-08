@@ -2022,6 +2022,11 @@ export interface components {
         };
         /** InjectionReportOut */
         InjectionReportOut: {
+            /**
+             * Armed
+             * @default true
+             */
+            armed: boolean;
             /** Attacks */
             attacks: components["schemas"]["InjectionAttackOut"][];
             /** By Category */
@@ -2030,10 +2035,20 @@ export interface components {
             defended_asr: number;
             /** Defended Block Rate */
             defended_block_rate: number;
+            /**
+             * Defense
+             * @default taint_narrowing
+             */
+            defense: string;
             /** Leaks Defended */
             leaks_defended: string[];
             /** Total Attacks */
             total_attacks: number;
+            /**
+             * Trust Kernel
+             * @default false
+             */
+            trust_kernel: boolean;
             /** Undefended Asr */
             undefended_asr: number;
             /** Undefended Block Rate */

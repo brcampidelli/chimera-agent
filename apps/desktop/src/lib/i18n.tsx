@@ -488,8 +488,10 @@ const en: Dict = {
   "governance.injection.note":
     "Measures defense-in-depth of an already-injected agent (synthetic corpus, no model) — not the model's susceptibility to being injected.",
   "governance.audit.title": "Audit log",
+  "governance.injection.disarmed": "Switched OFF in this install (CHIMERA_TAINT_NARROW=0) — the defended column below describes a configuration you are not running.",
+  "governance.injection.kernel": "The BLOCK/REVIEW policy rules are not on this path: they run under `chimera run --guard` and `solve --guard` only, so nothing here measures them.",
   "governance.audit.empty":
-    "No audit events yet. The desktop chat isn't governed by default — `chimera run --guard` or `solve --guard/--taint` write governance decisions to `.chimera/audit.jsonl`.",
+    "No audit events — here that means nothing has been narrowed, escalated or suppressed, not that nothing is watching. The app records an entry whenever a defence fires; `chimera run --guard` and `solve --guard/--taint` also write their policy decisions.",
   "nav.maturity": "Maturity",
   "maturity.title": "Maturity",
   "maturity.overall": "Overall",
@@ -1025,8 +1027,10 @@ const pt: Dict = {
   "governance.injection.note":
     "Mede defesa-em-profundidade de um agente já injetado (corpus sintético, sem modelo) — não a suscetibilidade do modelo a ser injetado.",
   "governance.audit.title": "Registro de auditoria",
+  "governance.injection.disarmed": "Desligada nesta instalação (CHIMERA_TAINT_NARROW=0) — a coluna com defesa abaixo descreve uma configuração que você não está usando.",
+  "governance.injection.kernel": "As regras de política BLOCK/REVIEW não estão neste caminho: rodam só em `chimera run --guard` e `solve --guard`, então nada aqui as mede.",
   "governance.audit.empty":
-    "Nenhum evento de auditoria ainda. O chat do desktop não é governado por padrão — `chimera run --guard` ou `solve --guard/--taint` gravam as decisões de governança em `.chimera/audit.jsonl`.",
+    "Nenhum evento de auditoria — aqui isso significa que nada foi estreitado, escalado ou suprimido, não que ninguém está observando. O aplicativo registra uma entrada sempre que uma defesa dispara; `chimera run --guard` e `solve --guard/--taint` também gravam suas decisões de política.",
   "nav.maturity": "Maturidade",
   "maturity.title": "Maturidade",
   "maturity.overall": "Geral",
@@ -1562,8 +1566,10 @@ const es: Dict = {
   "governance.injection.note":
     "Mide la defensa en profundidad de un agente ya inyectado (corpus sintético, sin modelo) — no la susceptibilidad del modelo a ser inyectado.",
   "governance.audit.title": "Registro de auditoría",
+  "governance.injection.disarmed": "Desactivada en esta instalación (CHIMERA_TAINT_NARROW=0) — la columna con defensa de abajo describe una configuración que no estás usando.",
+  "governance.injection.kernel": "Las reglas de política BLOCK/REVIEW no están en esta ruta: solo se ejecutan con `chimera run --guard` y `solve --guard`, así que nada aquí las mide.",
   "governance.audit.empty":
-    "Aún no hay eventos de auditoría. El chat de escritorio no está gobernado por defecto — `chimera run --guard` o `solve --guard/--taint` escriben las decisiones de gobernanza en `.chimera/audit.jsonl`.",
+    "Ningún evento de auditoría — aquí eso significa que nada se ha restringido, escalado ni suprimido, no que nadie esté vigilando. La app registra una entrada cada vez que una defensa se activa; `chimera run --guard` y `solve --guard/--taint` también escriben sus decisiones de política.",
   "nav.maturity": "Madurez",
   "maturity.title": "Madurez",
   "maturity.overall": "General",
@@ -2099,8 +2105,10 @@ const fr: Dict = {
   "governance.injection.note":
     "Mesure la défense en profondeur d'un agent déjà injecté (corpus synthétique, sans modèle) — pas la susceptibilité du modèle à être injecté.",
   "governance.audit.title": "Journal d'audit",
+  "governance.injection.disarmed": "Désactivée sur cette installation (CHIMERA_TAINT_NARROW=0) — la colonne défendue ci-dessous décrit une configuration que vous n'utilisez pas.",
+  "governance.injection.kernel": "Les règles de politique BLOCK/REVIEW ne sont pas sur ce chemin : elles ne tournent que sous `chimera run --guard` et `solve --guard`, donc rien ici ne les mesure.",
   "governance.audit.empty":
-    "Aucun événement d'audit pour l'instant. Le chat de bureau n'est pas gouverné par défaut — `chimera run --guard` ou `solve --guard/--taint` écrivent les décisions de gouvernance dans `.chimera/audit.jsonl`.",
+    "Aucun événement d'audit — ici cela veut dire que rien n'a été restreint, escaladé ni supprimé, pas que personne ne surveille. L'app enregistre une entrée dès qu'une défense se déclenche ; `chimera run --guard` et `solve --guard/--taint` écrivent aussi leurs décisions de politique.",
   "nav.maturity": "Maturité",
   "maturity.title": "Maturité",
   "maturity.overall": "Global",
@@ -2636,8 +2644,10 @@ const de: Dict = {
   "governance.injection.note":
     "Misst die tiefengestaffelte Abwehr eines bereits injizierten Agenten (synthetischer Korpus, kein Modell) — nicht die Anfälligkeit des Modells, injiziert zu werden.",
   "governance.audit.title": "Audit-Protokoll",
+  "governance.injection.disarmed": "In dieser Installation AUS (CHIMERA_TAINT_NARROW=0) — die Spalte „mit Abwehr“ unten beschreibt eine Konfiguration, die du nicht fährst.",
+  "governance.injection.kernel": "Die BLOCK/REVIEW-Policy-Regeln liegen nicht auf diesem Pfad: sie laufen nur unter `chimera run --guard` und `solve --guard`, hier misst sie also nichts.",
   "governance.audit.empty":
-    "Noch keine Audit-Ereignisse. Der Desktop-Chat wird standardmäßig nicht überwacht — `chimera run --guard` oder `solve --guard/--taint` schreiben Governance-Entscheidungen nach `.chimera/audit.jsonl`.",
+    "Keine Audit-Ereignisse — das heißt hier, dass nichts eingeschränkt, eskaliert oder unterdrückt wurde, nicht dass niemand hinsieht. Die App schreibt einen Eintrag, sobald eine Abwehr greift; `chimera run --guard` und `solve --guard/--taint` schreiben zusätzlich ihre Policy-Entscheidungen.",
   "nav.maturity": "Reife",
   "maturity.title": "Reife",
   "maturity.overall": "Gesamt",
@@ -3171,8 +3181,10 @@ const zh: Dict = {
   "governance.injection.note":
     "衡量已被注入的智能体的纵深防御（合成语料，无模型）——并非模型被注入的易感性。",
   "governance.audit.title": "审计日志",
+  "governance.injection.disarmed": "本安装中已关闭（CHIMERA_TAINT_NARROW=0）——下方“有防御”一列描述的并不是你正在运行的配置。",
+  "governance.injection.kernel": "BLOCK/REVIEW 策略规则不在这条路径上：它们只在 `chimera run --guard` 和 `solve --guard` 下运行，因此这里不做衡量。",
   "governance.audit.empty":
-    "还没有审计事件。桌面聊天默认不受治理——`chimera run --guard` 或 `solve --guard/--taint` 会将治理决策写入 `.chimera/audit.jsonl`。",
+    "没有审计事件——在这里这意味着没有任何调用被收紧、升级或抑制，而不是没人在看。防御一旦触发，应用就会记录一条；`chimera run --guard` 和 `solve --guard/--taint` 也会写入各自的策略决策。",
   "nav.maturity": "成熟度",
   "maturity.title": "成熟度",
   "maturity.overall": "总体",
@@ -3706,8 +3718,10 @@ const ja: Dict = {
   "governance.injection.note":
     "すでに注入されたエージェントの多層防御を測定します（合成コーパス、モデルなし）— モデルが注入されやすさそのものではありません。",
   "governance.audit.title": "監査ログ",
+  "governance.injection.disarmed": "このインストールではオフです（CHIMERA_TAINT_NARROW=0）——下の「防御あり」の列は、あなたが動かしていない構成を示しています。",
+  "governance.injection.kernel": "BLOCK/REVIEW のポリシー規則はこの経路にはありません。`chimera run --guard` と `solve --guard` でのみ動くため、ここでは測定していません。",
   "governance.audit.empty":
-    "監査イベントはまだありません。デスクトップのチャットは既定ではガバナンス対象外です——`chimera run --guard` または `solve --guard/--taint` がガバナンスの判断を `.chimera/audit.jsonl` に記録します。",
+    "監査イベントはありません——ここではそれは、絞り込み・エスカレーション・抑止のいずれも起きていないという意味であり、誰も見ていないという意味ではありません。防御が働くたびにアプリが記録します。`chimera run --guard` と `solve --guard/--taint` もポリシー判断を書き込みます。",
   "nav.maturity": "成熟度",
   "maturity.title": "成熟度",
   "maturity.overall": "全体",
@@ -4226,7 +4240,9 @@ const it: Dict = {
   "governance.injection.leaksNote": "Passano ancora anche con la difesa attiva (lacuna dichiarata onestamente)",
   "governance.injection.note": "Misura la difesa in profondità di un agente già iniettato (corpus sintetico, nessun modello) — non la suscettibilità del modello a essere iniettato.",
   "governance.audit.title": "Registro di audit",
-  "governance.audit.empty": "Ancora nessun evento di audit. La chat desktop non è governata di default — `chimera run --guard` o `solve --guard/--taint` scrivono le decisioni di governance in `.chimera/audit.jsonl`.",
+  "governance.injection.disarmed": "Disattivata in questa installazione (CHIMERA_TAINT_NARROW=0) — la colonna con difesa qui sotto descrive una configurazione che non stai usando.",
+  "governance.injection.kernel": "Le regole di policy BLOCK/REVIEW non sono su questo percorso: girano solo con `chimera run --guard` e `solve --guard`, quindi qui nulla le misura.",
+  "governance.audit.empty": "Nessun evento di audit — qui significa che nulla è stato ristretto, escalato o soppresso, non che nessuno stia guardando. L'app registra una voce ogni volta che una difesa scatta; anche `chimera run --guard` e `solve --guard/--taint` scrivono le loro decisioni di policy.",
   "nav.maturity": "Maturità",
   "maturity.title": "Maturità",
   "maturity.overall": "Complessivo",
@@ -4738,7 +4754,9 @@ const pl: Dict = {
   "governance.injection.leaksNote": "Nadal przechodzą nawet przy włączonej obronie (uczciwie wskazana luka)",
   "governance.injection.note": "Mierzy obronę w głąb agenta już zainfekowanego (korpus syntetyczny, bez modelu) — a nie podatność modelu na zainfekowanie.",
   "governance.audit.title": "Dziennik audytu",
-  "governance.audit.empty": "Jeszcze brak zdarzeń audytu. Czat w aplikacji desktopowej domyślnie nie podlega governance — `chimera run --guard` albo `solve --guard/--taint` zapisują decyzje governance do `.chimera/audit.jsonl`.",
+  "governance.injection.disarmed": "Wyłączone w tej instalacji (CHIMERA_TAINT_NARROW=0) — kolumna z obroną poniżej opisuje konfigurację, której nie używasz.",
+  "governance.injection.kernel": "Reguły policy BLOCK/REVIEW nie są na tej ścieżce: działają tylko pod `chimera run --guard` i `solve --guard`, więc nic tutaj ich nie mierzy.",
+  "governance.audit.empty": "Brak zdarzeń audytu — tutaj znaczy to, że nic nie zostało zawężone, eskalowane ani wstrzymane, a nie że nikt nie patrzy. Aplikacja zapisuje wpis za każdym razem, gdy zadziała zabezpieczenie; `chimera run --guard` i `solve --guard/--taint` zapisują też swoje decyzje policy.",
   "nav.maturity": "Dojrzałość",
   "maturity.title": "Dojrzałość",
   "maturity.overall": "Ogółem",

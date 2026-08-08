@@ -2061,6 +2061,11 @@
       },
       "InjectionReportOut": {
         "properties": {
+          "armed": {
+            "default": true,
+            "title": "Armed",
+            "type": "boolean"
+          },
           "attacks": {
             "items": {
               "$ref": "#/components/schemas/InjectionAttackOut"
@@ -2083,6 +2088,11 @@
             "title": "Defended Block Rate",
             "type": "number"
           },
+          "defense": {
+            "default": "taint_narrowing",
+            "title": "Defense",
+            "type": "string"
+          },
           "leaks_defended": {
             "items": {
               "type": "string"
@@ -2093,6 +2103,11 @@
           "total_attacks": {
             "title": "Total Attacks",
             "type": "integer"
+          },
+          "trust_kernel": {
+            "default": false,
+            "title": "Trust Kernel",
+            "type": "boolean"
           },
           "undefended_asr": {
             "title": "Undefended Asr",

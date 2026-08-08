@@ -257,6 +257,7 @@ def assemble_registry(
     """
     from chimera.core import ExploreRepositoryTool
     from chimera.governance import TaintLedger, ledger_registry, restrict_registry
+    from chimera.governance.audit import AuditLog
     from chimera.tools import default_registry
 
     registry = default_registry(ws, write_region=build_write_region(seams.write_region, ws))
@@ -305,7 +306,22 @@ def assemble_registry(
         if seams.posture is not None
         else settings.taint_narrow
     )
-    return ledger_registry(registry, ledger, narrow_on_taint=narrow), ledger
+    # The audit trail starts here, and only here. `LedgeredTool` records the three things worth a
+    # permanent line — a dangerous tool narrowed after untrusted input, a call escalated for review,
+    # a side effect suppressed as a duplicate — and each is rare by construction.
+    #
+    # Deliberately NOT passed to `restrict_registry` above: the default posture excludes the exec
+    # tools on every single turn, so that would append an identical entry per turn and bury the
+    # events someone opens this log to find. A trail nobody can read is the same as no trail.
+    #
+    # Until now the app wrote nothing here at all, which made the Security screen's empty state mean
+    # "nothing is recording" while it read as "nothing has happened". Those are opposite claims.
+    return ledger_registry(
+        registry,
+        ledger,
+        narrow_on_taint=narrow,
+        audit=AuditLog(settings.home / "audit.jsonl"),
+    ), ledger
 
 
 class PostureQuery(BaseModel):

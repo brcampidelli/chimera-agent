@@ -98,6 +98,15 @@ function AttackRowView({ row, t }: { row: AttackRow; t: TFunc }) {
 function InjectionPanel({ data, t }: { data: InjectionReport; t: TFunc }) {
   return (
     <Panel title={t("governance.injection.title")}>
+      {/* Above the numbers, not below them: a reader who has already absorbed a good defended score
+          has formed the belief this line exists to prevent. The layer measured here is switchable,
+          and with it off the defended column describes a configuration nobody on this machine is
+          running. */}
+      {!data.armed ? (
+        <p className="border-b border-hairline px-4 py-3 text-xs text-bad">
+          {t("governance.injection.disarmed")}
+        </p>
+      ) : null}
       <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-3">
         <Tile
           label={t("governance.injection.undefendedAsr")}
@@ -144,6 +153,13 @@ function InjectionPanel({ data, t }: { data: InjectionReport; t: TFunc }) {
       ) : null}
 
       <p className="px-4 py-3 text-xs text-muted-foreground">{t("governance.injection.note")}</p>
+      {/* Naming the layer that is NOT here. A scoreboard invites the reader to assume every defence
+          they have heard of is behind it, and the trust kernel is the one that isn't. */}
+      {!data.trust_kernel ? (
+        <p className="px-4 pb-3 text-xs text-muted-foreground">
+          {t("governance.injection.kernel")}
+        </p>
+      ) : null}
     </Panel>
   );
 }

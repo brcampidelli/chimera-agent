@@ -9,8 +9,13 @@ Two pure, read/compute helpers, both honest by construction:
   hidden. The corpus is synthetic and needs no LLM key, so this is instant and side-effect free. It
   measures defense-in-depth of an already-injected agent, NOT the model's susceptibility to injection.
 - :func:`read_audit` reads the append-only governance audit log (JSONL) newest-first. It is written
-  only by CLI guarded/tainted runs (``chimera run --guard`` / ``solve --guard/--taint``); the desktop
-  chat does not write it, so an empty log is the honest, expected state — never a fabricated event.
+  by CLI guarded/tainted runs (``chimera run --guard`` / ``solve --guard/--taint``) and by the app's
+  own tool stack when a defence actually fires. An empty log is still the expected state — but it
+  now means "nothing has happened", not "nothing is recording", and those are opposite claims.
+
+Both helpers take ``settings`` so they can report what is armed **in this install** rather than what
+the code is capable of. A scoreboard that describes a build the reader does not have is the same
+failure as a control that saves and does nothing.
 """
 
 from __future__ import annotations
@@ -18,17 +23,28 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from chimera.config import Settings, get_settings
 from chimera.eval.injection import default_attacks, run_redteam
 from chimera.governance.audit import AuditLog
 
 
-def run_injection_suite() -> dict[str, Any]:
+def run_injection_suite(settings: Settings | None = None) -> dict[str, Any]:
     """Run the red-team corpus with and without the defenses; return the honest comparison.
 
     Both runs use the SAME ordered corpus, so the two ``.outcomes`` lists join cleanly by ``.id``.
     ``defended_asr`` should sit well below ``undefended_asr``; ``leaks_defended`` names the attacks
     the defenses still miss (the honest gap), so the scoreboard can never over-claim.
+
+    The suite measures ONE layer: the taint ledger's adaptive narrowing, which it exercises with
+    ``narrow_on_taint=True``. That layer is armed on every app surface — but it is switchable, and
+    with ``CHIMERA_TAINT_NARROW=0`` this same defended figure would describe a build the reader does
+    not have. So ``armed`` reports the install rather than the capability, and ``trust_kernel``
+    reports the layer that is NOT here: the BLOCK/REVIEW policy rules exist and are wired only into
+    ``chimera run --guard`` / ``solve --guard``, so nothing on this screen measures them and nothing
+    on the app path runs them. Naming an absent layer is cheaper than having someone infer it is
+    present from a good score.
     """
+    settings = settings or get_settings()
     defended = run_redteam(default_attacks(), defended=True)
     undefended = run_redteam(default_attacks(), defended=False)
     dsum = defended.summary()
@@ -74,6 +90,11 @@ def run_injection_suite() -> dict[str, Any]:
         "attacks": attacks,
         # The attacks that STILL get through with defenses on — the honest gap, named out loud.
         "leaks_defended": defended.leaks(),
+        # What this scoreboard is about, and whether it is switched on where you are reading it.
+        "defense": "taint_narrowing",
+        "armed": bool(settings.taint_narrow),
+        # The governance layer that exists in the codebase and is NOT on this path.
+        "trust_kernel": False,
     }
 
 
@@ -81,7 +102,7 @@ def read_audit(path: Path, *, limit: int = 200) -> list[dict[str, Any]]:
     """Read the governance audit log newest-first (highest ``seq`` first), capped at ``limit``.
 
     Returns ``[]`` when the file is missing (``AuditLog.entries`` already handles that). Read-only —
-    each entry is the arbitrary dict the CLI persisted; the app.py handler flattens it for the UI.
+    each entry is the arbitrary dict its writer persisted; the app.py handler flattens it for the UI.
     """
     entries = AuditLog(Path(path)).entries()
     return list(reversed(entries))[:limit]

@@ -630,6 +630,16 @@ class InjectionReportOut(BaseModel):
     by_category: list[InjectionCategoryOut]
     attacks: list[InjectionAttackOut]
     leaks_defended: list[str]  # attack ids that get through EVEN defended — the named honest gap
+    defense: str = "taint_narrowing"
+    """Which layer these numbers are about. One layer, named, so the score cannot be read as a
+    verdict on the whole stack."""
+    armed: bool = True
+    """Whether that layer is switched ON in this install (CHIMERA_TAINT_NARROW). False means the
+    defended column describes a build the reader does not have."""
+    trust_kernel: bool = False
+    """Whether the BLOCK/REVIEW policy rules are on this path. They are wired into `chimera run
+    --guard` / `solve --guard` only, so nothing here measures them — said out loud, because a good
+    score invites the reader to assume every layer they have heard of is present."""
 
 
 class AuditEventOut(BaseModel):

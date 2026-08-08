@@ -478,13 +478,16 @@ def build_api_app(
     @app.get("/api/governance/injection", dependencies=[guard], response_model=InjectionReportOut)
     def governance_injection_endpoint() -> dict[str, Any]:
         # Cheap synthetic compute (no LLM, no side effects): the red-team corpus run with and without
-        # the defenses, side by side. GET is fine — it reads nothing and writes nothing.
-        return run_injection_suite()
+        # the defenses, side by side. GET is fine — it reads nothing and writes nothing. Settings go
+        # in so the report describes THIS install: the layer it measures is switchable, and a
+        # scoreboard for a build the reader does not have is worse than no scoreboard.
+        return run_injection_suite(live_settings())
 
     @app.get("/api/governance/audit", dependencies=[guard], response_model=GovernanceAuditOut)
     def governance_audit_endpoint() -> dict[str, Any]:
-        # Read-only: the governance audit log (written by CLI guarded/tainted runs), newest-first.
-        # The desktop chat doesn't write it, so an empty log is the honest, expected state.
+        # Read-only, newest-first. Written by CLI guarded/tainted runs AND, since the ledger got an
+        # audit log, by the app itself whenever a defence fires. Empty is still expected — it just
+        # stopped meaning "nothing is recording" and started meaning "nothing has happened".
         events = [_audit_event(e) for e in read_audit(settings.home / "audit.jsonl")]
         return {"events": events, "count": len(events), "populated": bool(events)}
 
