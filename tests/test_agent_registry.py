@@ -94,18 +94,18 @@ def test_an_empty_allowlist_means_no_restriction_not_no_tools() -> None:
     agent for leaving a field blank.
     """
     unrestricted = as_role(AgentDef(id="a"))
-    assert unrestricted.allowed_tools is None  # type: ignore[attr-defined]
+    assert unrestricted.allowed_tools is None
 
     restricted = as_role(AgentDef(id="b", allowed_tools=["read_file"]))
-    assert restricted.allowed_tools == ["read_file"]  # type: ignore[attr-defined]
+    assert restricted.allowed_tools == ["read_file"]
 
 
 def test_the_role_carries_the_label_and_an_unpinned_model() -> None:
     role = as_role(AgentDef(id="reviewer", name="Quinn", instructions="be strict"))
-    assert role.name == "Quinn"  # type: ignore[attr-defined]
-    assert role.system_prompt == "be strict"  # type: ignore[attr-defined]
+    assert role.name == "Quinn"
+    assert role.system_prompt == "be strict"
     # Empty means "inherit the ladder", and `Role` spells that None too.
-    assert role.model is None  # type: ignore[attr-defined]
+    assert role.model is None
 
 
 def test_the_registry_is_reachable_over_http(tmp_path: Path) -> None:

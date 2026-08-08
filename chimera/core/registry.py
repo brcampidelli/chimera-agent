@@ -23,10 +23,14 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, field_validator
 
 from chimera.telemetry import get_logger
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from chimera.orchestration.roles import Role
 
 _log = get_logger("core.registry")
 
@@ -158,7 +162,7 @@ def get(home: Path, agent_id: str) -> AgentDef | None:
     return next((a for a in load(home) if a.id == agent_id), None)
 
 
-def as_role(agent: AgentDef) -> object:
+def as_role(agent: AgentDef) -> Role:
     """The registry entry as an ``orchestration.roles.Role``, which is what actually runs.
 
     The one place the allowlist convention is translated: empty here means "no restriction", and

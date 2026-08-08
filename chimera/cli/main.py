@@ -3966,7 +3966,12 @@ def _board() -> KanbanBoard:
 def kanban_add(
     title: str = typer.Argument(..., help="Short card title."),
     action: str = typer.Option(None, "--action", "-a", help="Task text to run (defaults to title)."),
-    lane: str = typer.Option("solve", "--lane", "-l", help="Worker lane: solve | crew."),
+    lane: str = typer.Option(
+        "solve",
+        "--lane",
+        "-l",
+        help="Who works it: solve | crew | the id of one of your agents (`chimera agents`).",
+    ),
     verify: str = typer.Option(None, "--verify", help="Verify command for the solve lane (exit 0)."),
 ) -> None:
     """Add a card to the backlog."""
@@ -4020,14 +4025,20 @@ def kanban_run(
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
 ) -> None:
     """Dispatch backlog cards through their lanes (solve/crew). Requires a key."""
+    from chimera.core.registry import load as load_agents
     from chimera.kanban import LaneRunner, dispatch
-    from chimera.kanban.lanes import CrewLane, SolveLane
+    from chimera.kanban.lanes import CrewLane, SolveLane, runners_for
 
-    if not get_settings().has_any_key():
+    settings = get_settings()
+    if not settings.has_any_key():
         console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
     board = _board()
+    # The registered agents FIRST, so the two built-in lanes cannot be shadowed by an agent that
+    # happens to be called `solve`. Naming an agent after a built-in should not silently take over
+    # every card already filed under it.
     runners: dict[str, LaneRunner] = {
+        **runners_for(load_agents(settings.home), workspace=Path(workspace), model=model),
         "solve": SolveLane(workspace=Path(workspace), model=model),
         "crew": CrewLane(model=model),
     }
