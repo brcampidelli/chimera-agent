@@ -80,7 +80,12 @@ jobs:
       # source tree (no _desktop_dist) and --add-data supplies the built SPA — no double-include clash.
       - name: Install the backend (editable) + PyInstaller
         run: |
-          uv sync --extra desktop --extra documents --extra stt
+          # `documents` ships (28 MB, and it makes attaching a PDF work out of the box). `stt`
+          # does NOT: it is ~300 MB of native code, and the largest single piece is PyAV bundling a
+          # complete ffmpeg — x264, x265, AV1 encoders — to decode microphone audio. A video codec
+          # suite in every download so that dictation can avoid one API call is the wrong trade, and
+          # on Linux the AppImage bundler then copies much of it a second time.
+          uv sync --extra desktop --extra documents
           uv pip install pyinstaller
 
       - name: Freeze the backend sidecar
@@ -119,18 +124,13 @@ jobs:
         # swallowed error; this makes the next diagnosis read the actual message.
         run: |
           if [ "${{ runner.os }}" = "Linux" ]; then
-            # linuxdeploy walks every ELF file in the AppDir and resolves each NEEDED entry against
-            # the SYSTEM library paths. Wheels built for manylinux carry their native dependencies
-            # inside the package under mangled names — ctranslate2 needs `libgomp-e985bcbb.so.1.0.0`,
-            # which exists only in `ctranslate2.libs/` next to it — so the resolver reports
-            # "Could not find dependency" for a file that is sitting right there, and aborts.
-            #
-            # Point it at those directories. Every `*.libs` folder the freeze produced, not just the
-            # one that failed: onnxruntime and numpy package their natives the same way, and finding
-            # them one build at a time is a queue, not a fix.
-            # ABSOLUTE paths. The first attempt used relative ones, which the log showed being set
-            # correctly and having no effect: linuxdeploy is an AppImage that runs from its own
-            # working directory, so a relative entry points at nothing by the time it looks.
+            # linuxdeploy resolves each ELF file's NEEDED entries against the SYSTEM library paths,
+            # while wheels built for manylinux keep their natives inside the package under mangled,
+            # content-hashed names. It reports "could not find" a file sitting next to the library
+            # that needs it, and aborts. Kept after the speech stack left, because numpy and pillow
+            # package their natives the same way and would hit it the day something else pulls one
+            # in. Absolute paths: relative ones were set correctly and had no effect, since
+            # linuxdeploy runs from its own working directory.
             LIBS=$(find "$PWD/apps/desktop/src-tauri/sidecar-dist" -type d -name '*.libs' -printf '%p:')
             export LD_LIBRARY_PATH="${LIBS}${LD_LIBRARY_PATH}"
             echo "resolver path: $LD_LIBRARY_PATH"

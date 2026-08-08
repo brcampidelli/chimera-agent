@@ -163,3 +163,27 @@ def vision_support(model: str) -> str:
     except Exception:  # noqa: BLE001 — an unknown model raises, and unknown is a real answer here
         return "unknown"
     return "yes" if info.get("supports_vision") else "no"
+
+
+def dictation_support(settings: Any) -> tuple[str, str]:
+    """``(support, how)`` — can this machine turn speech into text, and by which route?
+
+    Asked BEFORE recording rather than after. Dictation used to record, upload, fail, and report
+    "could not transcribe" — which is true and useless: it does not say that nothing was ever going
+    to transcribe it, so the natural read is that the recording was bad and the natural response is
+    to try again, louder.
+
+    Two routes, and the app ships neither by default. The local model (`faster-whisper`) is ~300 MB
+    of native code once its dependencies are counted, most of it a video codec suite that exists to
+    decode a microphone recording — too much to put in every download for a feature many people will
+    not use. The hosted route needs an OpenAI key SPECIFICALLY: transcription is not something an
+    OpenAI-compatible gateway generally proxies, so having a key for some other provider does not
+    help here, and saying "add an API key" would send someone to add the wrong one.
+    """
+    import importlib.util
+
+    if importlib.util.find_spec("faster_whisper") is not None:
+        return "yes", "local"
+    if settings.key_pool("openai"):
+        return "yes", "openai"
+    return "no", ""

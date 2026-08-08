@@ -141,3 +141,62 @@ def test_an_exotic_format_says_which_extra_it_needs_when_the_converter_is_absent
     assert saved.kind == "document"
     assert saved.text == ""
     assert "documents" in saved.note  # the extra that actually provides it, not `docs`
+
+
+# --- Can this machine turn speech into text at all? -------------------------------------------
+
+
+def test_dictation_prefers_the_local_model_when_it_is_installed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Local first: it costs nothing per use and the audio never leaves the machine.
+    import importlib
+
+    from chimera.api.attachments import dictation_support
+
+    monkeypatch.setattr(
+        importlib.util, "find_spec", lambda name: object() if name == "faster_whisper" else None
+    )
+
+    class _S:
+        def key_pool(self, _p: str) -> list[str]:
+            return ["k"]  # a hosted route exists too, and the local one still wins
+
+    assert dictation_support(_S()) == ("yes", "local")
+
+
+def test_dictation_reports_no_when_neither_route_exists(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The answer the button needs BEFORE opening the microphone.
+
+    Without this it recorded, uploaded, failed, and said "could not transcribe" — true and useless.
+    It does not say that nothing was ever going to transcribe it, so the natural read is that the
+    recording was bad and the natural response is to try again, louder.
+    """
+    import importlib
+
+    from chimera.api.attachments import dictation_support
+
+    monkeypatch.setattr(importlib.util, "find_spec", lambda name: None)
+
+    class _S:
+        def key_pool(self, _p: str) -> list[str]:
+            return []
+
+    support, how = dictation_support(_S())
+    assert support == "no" and how == ""
+
+
+def test_a_key_for_another_provider_does_not_count(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Transcription needs an OpenAI key SPECIFICALLY — it is not something an OpenAI-compatible
+    # gateway generally proxies. Accepting any key would send someone to add the wrong one.
+    import importlib
+
+    from chimera.api.attachments import dictation_support
+
+    monkeypatch.setattr(importlib.util, "find_spec", lambda name: None)
+
+    class _S:
+        def key_pool(self, provider: str) -> list[str]:
+            return ["k"] if provider == "openai" else []
+
+    assert dictation_support(_S()) == ("yes", "openai")

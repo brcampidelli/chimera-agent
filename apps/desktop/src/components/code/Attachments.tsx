@@ -12,7 +12,13 @@ import {
 
 import { useQuery } from "@tanstack/react-query";
 
-import { getVisionSupport, transcribe, uploadAttachment, type Attachment } from "@/lib/api";
+import {
+  getDictationSupport,
+  getVisionSupport,
+  transcribe,
+  uploadAttachment,
+  type Attachment,
+} from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -154,6 +160,12 @@ export function DictateButton({ onText }: { onText: (text: string) => void }) {
   const chunks = useRef<Blob[]>([]);
   const [state, setState] = useState<"idle" | "recording" | "working">("idle");
   const [note, setNote] = useState("");
+  // Asked up front, not after a failed recording. The app ships neither transcriber: the local
+  // model is ~300 MB of native code (most of it a video codec suite, to decode a microphone), and
+  // the hosted route needs an OpenAI key specifically — a key for another provider does not help,
+  // so "add an API key" would send someone to add the wrong one.
+  const support = useQuery({ queryKey: ["dictation"], queryFn: getDictationSupport });
+  const unavailable = support.data?.support === "no";
 
   async function start() {
     setNote("");
@@ -210,8 +222,8 @@ export function DictateButton({ onText }: { onText: (text: string) => void }) {
       <Button
         size="sm"
         variant={state === "recording" ? "primary" : "ghost"}
-        disabled={state === "working"}
-        title={t("code.dictate.hint")}
+        disabled={state === "working" || unavailable}
+        title={unavailable ? t("code.dictate.unavailable") : t("code.dictate.hint")}
         aria-pressed={state === "recording"}
         onClick={() => (state === "recording" ? stop() : void start())}
       >
@@ -224,7 +236,11 @@ export function DictateButton({ onText }: { onText: (text: string) => void }) {
         )}
         {t(state === "recording" ? "code.dictate.stop" : "code.dictate.label")}
       </Button>
-      {note ? <span className="text-xs text-warn">{note}</span> : null}
+      {unavailable ? (
+        <span className="text-xs text-muted-foreground">{t("code.dictate.unavailable")}</span>
+      ) : note ? (
+        <span className="text-xs text-warn">{note}</span>
+      ) : null}
     </>
   );
 }

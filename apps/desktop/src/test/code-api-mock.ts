@@ -33,6 +33,8 @@ export function makeCodeApiMock() {
     // Resolved by default so a suite that is not about vision never renders the caveat: the warning
     // must appear because a model cannot see, not because a fixture forgot to say it could.
     getVisionSupport: vi.fn(async () => ({ model: "vendor/model", support: "yes" })),
+    // Available by default so a suite that is not about dictation never renders the caveat.
+    getDictationSupport: vi.fn(async () => ({ support: "yes", how: "local" })),
     deleteCodeSession: vi.fn(),
     getPostureFacts: vi.fn(),
     getRoleModels: vi.fn(),

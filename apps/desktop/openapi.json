@@ -1357,6 +1357,25 @@
         "title": "DeletedOut",
         "type": "object"
       },
+      "DictationOut": {
+        "description": "Whether speech can become text here, and by which route.\n\nReported before recording. The alternative \u2014 record, upload, fail \u2014 tells someone their audio\ncould not be transcribed, which reads as \"the recording was bad\" rather than \"nothing was ever\ngoing to transcribe it\".",
+        "properties": {
+          "how": {
+            "title": "How",
+            "type": "string"
+          },
+          "support": {
+            "title": "Support",
+            "type": "string"
+          }
+        },
+        "required": [
+          "support",
+          "how"
+        ],
+        "title": "DictationOut",
+        "type": "object"
+      },
       "DoctorOut": {
         "properties": {
           "cache": {
@@ -4879,6 +4898,25 @@
           }
         },
         "summary": "Enable Cron"
+      }
+    },
+    "/api/dictation": {
+      "get": {
+        "description": "Can speech become text here? Asked before the microphone opens, not after.",
+        "operationId": "dictation_api_dictation_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DictationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Dictation"
       }
     },
     "/api/doctor": {

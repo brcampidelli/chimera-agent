@@ -390,6 +390,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dictation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Dictation
+         * @description Can speech become text here? Asked before the microphone opens, not after.
+         */
+        get: operations["dictation_api_dictation_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/doctor": {
         parameters: {
             query?: never;
@@ -1726,6 +1746,20 @@ export interface components {
         DeletedOut: {
             /** Deleted */
             deleted: boolean;
+        };
+        /**
+         * DictationOut
+         * @description Whether speech can become text here, and by which route.
+         *
+         *     Reported before recording. The alternative — record, upload, fail — tells someone their audio
+         *     could not be transcribed, which reads as "the recording was bad" rather than "nothing was ever
+         *     going to transcribe it".
+         */
+        DictationOut: {
+            /** How */
+            how: string;
+            /** Support */
+            support: string;
         };
         /** DoctorOut */
         DoctorOut: {
@@ -3436,6 +3470,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dictation_api_dictation_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DictationOut"];
                 };
             };
         };

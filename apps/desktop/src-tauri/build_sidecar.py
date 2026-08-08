@@ -64,16 +64,15 @@ def main() -> int:
         "--collect-all", "litellm",
         "--collect-all", "tiktoken",
         "--collect-all", "tiktoken_ext",
-        # Attachments and dictation, shipped so both work without the user installing anything.
-        # Neither survives a naive freeze: markitdown picks its converters at runtime, and
-        # faster-whisper's real work happens in ctranslate2 and onnxruntime, whose native libraries
-        # no import graph reveals. Collecting them whole is the only thing that reliably works —
-        # and each one costs real megabytes, which is why they are listed one by one rather than
-        # swept in, so removing one later is a single line.
+        # Document reading, shipped so attaching a PDF works without installing anything.
+        # markitdown picks its converters at runtime, so a naive freeze misses them.
+        #
+        # The speech model is NOT here, and that is the shape of the decision rather than an
+        # oversight: faster-whisper drags ctranslate2, onnxruntime and PyAV — the last of which
+        # bundles a whole ffmpeg to decode a microphone recording. Together ~300 MB per platform,
+        # which is more than the rest of the app. Dictation goes through the hosted path instead,
+        # and the interface says so when the key for it is missing.
         "--collect-all", "markitdown",
-        "--collect-all", "faster_whisper",
-        "--collect-all", "ctranslate2",
-        "--collect-all", "onnxruntime",
         "--collect-data", "chimera",
         "--add-data", add_data,
         "--hidden-import", "uvicorn",

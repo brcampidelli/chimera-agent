@@ -64,6 +64,18 @@ class VisionOut(BaseModel):
     support: str
 
 
+class DictationOut(BaseModel):
+    """Whether speech can become text here, and by which route.
+
+    Reported before recording. The alternative — record, upload, fail — tells someone their audio
+    could not be transcribed, which reads as "the recording was bad" rather than "nothing was ever
+    going to transcribe it".
+    """
+
+    support: str  # "yes" | "no"
+    how: str  # "local" | "openai" | ""
+
+
 class TranscriptOut(BaseModel):
     """Dictated speech, as text. ``note`` is non-empty when transcription could not be done."""
 

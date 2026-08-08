@@ -539,6 +539,18 @@ export interface VisionSupport {
 
 export const getVisionSupport = () => json<VisionSupport>("/api/vision");
 
+/** Whether speech can become text on this machine, and by which route.
+ *
+ *  Asked before the microphone opens. Recording, uploading and then failing tells someone their
+ *  audio could not be transcribed — which reads as "the recording was bad" rather than "nothing was
+ *  ever going to transcribe it". */
+export interface DictationSupport {
+  support: "yes" | "no";
+  how: "local" | "openai" | "";
+}
+
+export const getDictationSupport = () => json<DictationSupport>("/api/dictation");
+
 /** Dictated speech, as text. `note` is non-empty when transcription could not be done — which the
  *  composer shows rather than pasting an error message in as if it were what you said. */
 export interface Transcript {

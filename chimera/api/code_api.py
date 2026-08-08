@@ -59,6 +59,7 @@ from chimera.api.schemas import (
     AttachmentOut,
     CodeSessionMetaOut,
     CodeSessionOut,
+    DictationOut,
     TranscriptOut,
     VisionOut,
 )
@@ -645,6 +646,14 @@ def register_code_api(
 
         model = settings.default_model
         return VisionOut(model=model, support=vision_support(model))
+
+    @app.get("/api/dictation", dependencies=[guard], response_model=DictationOut)
+    def dictation() -> DictationOut:
+        """Can speech become text here? Asked before the microphone opens, not after."""
+        from chimera.api.attachments import dictation_support
+
+        support, how = dictation_support(settings)
+        return DictationOut(support=support, how=how)
 
     @app.post("/api/transcribe", dependencies=[guard], response_model=TranscriptOut)
     async def transcribe_audio(file: UploadFile = _UPLOAD) -> TranscriptOut:
