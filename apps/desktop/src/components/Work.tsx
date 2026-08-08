@@ -54,7 +54,7 @@ export function Work() {
         <TabPanel tabsId={id} value={tab}>
           {tab === "run" ? (
             <div className="mx-auto max-w-3xl px-6 py-6">
-              <Runs embedded />
+              <Runs embedded workspace={workspace} />
             </div>
           ) : tab === "git" ? (
             <div className="mx-auto max-w-5xl px-6 py-4">
@@ -73,7 +73,7 @@ export function Work() {
             </div>
           ) : (
             <div className="mx-auto max-w-5xl px-6 py-4">
-              <WorthPanel />
+              <WorthPanel workspace={workspace} />
             </div>
           )}
         </TabPanel>

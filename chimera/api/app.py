@@ -451,10 +451,13 @@ def build_api_app(
         return summarize_usage(load_usage(settings.home / "usage.jsonl"))
 
     @app.get("/api/runs", dependencies=[guard], response_model=list[RunReceiptOut])
-    def runs_endpoint() -> list[Any]:
+    def runs_endpoint(workspace: str | None = None) -> list[Any]:
         # Read-only: the last 100 run receipts, most recent first. Each was persisted by the
         # autonomous loop (CLI `solve` or the POST trigger below) via its ``run_log``.
-        return list(reversed(load_runs(settings.home / "runs.jsonl")))[:100]
+        #
+        # `workspace` narrows to one project; omitting it returns every project's runs, which is
+        # what this endpoint has always done and what a client with no project selected wants.
+        return list(reversed(load_runs(settings.home / "runs.jsonl", workspace=workspace)))[:100]
 
     @app.get("/api/tools", dependencies=[guard], response_model=ToolsOut)
     def tools_endpoint() -> dict[str, Any]:
@@ -1151,7 +1154,10 @@ def _agents_batch_dict(req: AgentsRequest, ws: Path, batch: IsolatedBatch[Any]) 
     for index, (spec, isolated) in enumerate(zip(req.tasks, batch.results, strict=True)):
         auto = isolated.value  # AutonomousResult | None (None if the unit itself crashed)
         if auto is not None:
-            receipt = build_receipt(auto, spec.task, spec.verify, ts)
+            # The PROJECT, not the worktree the task actually edited. A worktree is an ephemeral
+            # checkout of `ws` whose changes merge back into it and whose path never exists again —
+            # recording it would file every batch run under an address nothing can be grouped by.
+            receipt = build_receipt(auto, spec.task, spec.verify, ts, workspace=str(ws))
             terminal = receipt.attempts[-1] if receipt.attempts else None
             diffs = [d.model_dump() for d in (terminal.diffs if terminal else [])]
             results.append(

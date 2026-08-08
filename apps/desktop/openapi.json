@@ -3300,6 +3300,11 @@
               }
             ],
             "title": "Verify Command"
+          },
+          "workspace": {
+            "default": "",
+            "title": "Workspace",
+            "type": "string"
           }
         },
         "required": [
@@ -4690,6 +4695,24 @@
       "get": {
         "description": "What each configuration cost and got, over the runs that really happened here.\n\nRead from the same append-only run log the receipts come from \u2014 no separate store to drift\nout of sync with the evidence it summarises.",
         "operationId": "code_worth_api_code_worth_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workspace"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -4700,6 +4723,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Code Worth"
@@ -6188,6 +6221,24 @@
     "/api/runs": {
       "get": {
         "operationId": "runs_endpoint_api_runs_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workspace"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -6202,6 +6253,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Runs Endpoint"

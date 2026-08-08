@@ -106,6 +106,15 @@ class RunReceipt(BaseModel):
     #: into the default: attributing old runs to a profile they never used would put fabricated
     #: evidence into the one view whose whole job is to say whether a profile was worth it.
     profile: str | None = None
+    workspace: str = ""
+    """The project this run happened in. Empty for a run that predates the field, or one whose agent
+    was built without a workspace.
+
+    Empty is kept as its own value rather than filled in with a plausible guess: attributing a run
+    to a project it may not have come from would put fabricated evidence into the two views whose
+    entire job is to judge what happened where. A per-project filter must show those runs as
+    unattributed, never as belonging to whichever project is open."""
+
     #: The run's total cost, or ``null`` when ANY attempt's price was unknown. Not a partial sum:
     #: adding up only the legs whose price we happen to know reports a number that is always too
     #: low, and always too low in the direction that flatters whichever configuration used a free
@@ -137,6 +146,7 @@ def build_receipt(
     profile: str | None = None,
     verify_source: str = "user",
     profile_source: str = "user",
+    workspace: str = "",
 ) -> RunReceipt:
     """Map an ``AutonomousResult`` (and its attempts) into a receipt, truncating the bounded fields."""
     attempts = [
@@ -183,6 +193,7 @@ def build_receipt(
         answer=(result.answer or "")[:2000],
         attempts=attempts,
         profile=profile,
+        workspace=workspace,
         usd=total_usd(attempts),
     )
 
@@ -197,8 +208,17 @@ def append_run(path: Path, receipt: RunReceipt) -> None:
         handle.write(line)
 
 
-def load_runs(path: Path) -> list[RunReceipt]:
-    """Load persisted run receipts; malformed lines are skipped."""
+def load_runs(path: Path, *, workspace: str | None = None) -> list[RunReceipt]:
+    """Load persisted run receipts; malformed lines are skipped.
+
+    ``workspace`` filters to one project. ``None`` (the default) returns everything, which is what
+    every existing caller means and what a client with no project in hand should get.
+
+    A receipt with no workspace is NOT included in a filtered result. It predates the field or came
+    from an agent built without one, and there is no honest way to place it: showing it under
+    whichever project happens to be open is fabricated evidence in the one view whose job is to say
+    what a configuration was worth, and it would be fabricated differently for each reader.
+    """
     path = Path(path)
     if not path.exists():
         return []
@@ -207,7 +227,10 @@ def load_runs(path: Path) -> list[RunReceipt]:
         if not line.strip():
             continue
         try:
-            out.append(RunReceipt.model_validate_json(line))
+            receipt = RunReceipt.model_validate_json(line)
         except ValueError:  # pragma: no cover - defensive
             _log.warning("skipping malformed run receipt line")
+            continue
+        if workspace is None or receipt.workspace == workspace:
+            out.append(receipt)
     return out

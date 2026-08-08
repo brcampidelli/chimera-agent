@@ -1007,6 +1007,10 @@ class AutonomousAgent:
                 profile=self.run_profile,
                 verify_source=self.verify_source,
                 profile_source=self.profile_source,
+                # The directory this run was actually confined to, not the one a caller meant. A run
+                # built without a workspace records none rather than the process cwd, which would be
+                # a guess wearing the same clothes as a fact.
+                workspace=str(self.workspace) if self.workspace else "",
             )
             append_run(self.run_log, receipt)
         except Exception as exc:  # noqa: BLE001 — receipt persistence is best-effort, never fatal

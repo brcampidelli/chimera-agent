@@ -68,7 +68,10 @@ export const getConfig = () => json<AppConfig>("/api/config");
 export const getInstructions = () => json<AgentIdentity>("/api/instructions");
 export const getDoctor = () => json<DoctorInfo>("/api/doctor");
 export const getUsage = () => json<UsageSummary>("/api/usage");
-export const getRuns = () => json<RunReceipt[]>("/api/runs");
+// `workspace` narrows to one project; omitted returns every project's runs, which is what a
+// caller with no project selected means and what this endpoint has always done.
+export const getRuns = (workspace?: string) =>
+  json<RunReceipt[]>(`/api/runs${workspace ? `?workspace=${encodeURIComponent(workspace)}` : ""}`);
 export const getGovernanceInjection = () =>
   json<InjectionReport>("/api/governance/injection");
 export const getGovernanceAudit = () => json<GovernanceAudit>("/api/governance/audit");
@@ -744,7 +747,10 @@ export interface WorthReport {
  *  The groups arrive sorted BY NAME, never by outcome — they are observational (different tasks,
  *  different days, no randomisation), and ordering them by pass rate would read as a ranking these
  *  numbers cannot support. The comparison that can is the paired A/B in bench/role_routing. */
-export const getWorth = () => json<WorthReport>("/api/code/worth");
+export const getWorth = (workspace?: string) =>
+  json<WorthReport>(
+    `/api/code/worth${workspace ? `?workspace=${encodeURIComponent(workspace)}` : ""}`,
+  );
 
 /** One past coding conversation, as a sidebar row. */
 export interface CodeSessionMeta {

@@ -674,7 +674,7 @@ def register_code_api(
         return resolve_roles(req.profile, settings).models
 
     @app.get("/api/code/worth", dependencies=[guard], response_model=WorthReport)
-    def code_worth() -> WorthReport:
+    def code_worth(workspace: str | None = None) -> WorthReport:
         """What each configuration cost and got, over the runs that really happened here.
 
         Read from the same append-only run log the receipts come from — no separate store to drift
@@ -682,7 +682,7 @@ def register_code_api(
         """
         from chimera.api.runs import load_runs
 
-        return summarize_worth(load_runs(settings.home / "runs.jsonl"))
+        return summarize_worth(load_runs(settings.home / "runs.jsonl", workspace=workspace))
 
     @app.post("/api/attachments", dependencies=[guard], response_model=AttachmentOut)
     async def upload_attachment(file: UploadFile = _UPLOAD) -> AttachmentOut:

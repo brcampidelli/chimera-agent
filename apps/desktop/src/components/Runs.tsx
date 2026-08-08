@@ -106,9 +106,14 @@ function RunCard({ run, t }: { run: RunReceipt; t: TFunc }) {
 /** Render one streamed run event as a compact live line, or null to skip (e.g. the `final` event —
  *  the `done` payload drives the terminal line). Backend `text` is English; map to the UI language. */
 
-export function Runs({ embedded = false }: { embedded?: boolean } = {}) {
+export function Runs({
+  embedded = false,
+  workspace,
+}: { embedded?: boolean; workspace?: string } = {}) {
   const t = useT();
-  const q = useQuery({ queryKey: ["runs"], queryFn: getRuns });
+  // Keyed by project, so switching project refetches rather than showing the previous one's runs
+  // until something else happens to invalidate.
+  const q = useQuery({ queryKey: ["runs", workspace], queryFn: () => getRuns(workspace) });
   const runs = q.data ?? [];
 
   return (

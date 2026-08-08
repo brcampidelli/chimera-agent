@@ -498,6 +498,12 @@ class RunReceiptOut(BaseModel):
     verify_command: str | None  # the shell command that judged the run, or null (no verifier)
     answer: str  # the final answer, truncated
     attempts: list[AttemptReceiptOut]  # the per-attempt verify-or-revert proof trail
+    workspace: str = ""
+    """The project this run happened in. Empty for a receipt written before the field existed.
+
+    On the wire so a screen can label a row rather than only filter by it: a Runs list that has been
+    narrowed to one project and a Runs list that happens to contain one project look identical, and
+    the reader is the one who has to tell them apart."""
 
 
 class CancelOut(BaseModel):

@@ -63,9 +63,11 @@ function Row({ group, t }: { group: ProfileWorth; t: TFunc }) {
  *  REFUSES to do is the feature — it does not rank, does not fill in unknown costs, does not credit
  *  old runs to a profile they never used, and says out loud when n is too small to read.
  */
-export function WorthPanel() {
+export function WorthPanel({ workspace }: { workspace?: string } = {}) {
   const t = useT();
-  const worth = useQuery({ queryKey: ["worth"], queryFn: getWorth });
+  // Keyed by project: a verdict that pooled three projects would still look like an answer to
+  // "was this configuration worth it HERE", which is the only question this panel is asked.
+  const worth = useQuery({ queryKey: ["worth", workspace], queryFn: () => getWorth(workspace) });
 
   if (!worth.data || worth.data.total_runs === 0) {
     return (

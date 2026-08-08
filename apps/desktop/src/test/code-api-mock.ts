@@ -213,6 +213,9 @@ export function receipt(over: Partial<RunReceipt> = {}): RunReceipt {
     ts: "2026-07-16T12:00:00Z",
     verify_command: "pytest -q",
     attempts: [attempt()],
+    // Empty, matching a receipt written before the field existed — the case every upgrade has and
+    // the one a per-project filter must not silently attribute to whatever project is open.
+    workspace: "",
     ...over,
   };
 }
