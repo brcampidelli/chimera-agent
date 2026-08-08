@@ -229,7 +229,10 @@ export function Code() {
   // screen, which the local flag never did — so the conversation now refuses to send while ANY run
   // is writing in this workspace, not just one started here.
   const run = useRunSession();
-  const runBusy = run.running;
+  // Only when the run is in THIS project. A run elsewhere cannot race this workspace, and
+  // blocking on it would be a lie about why. A run with no workspace still blocks: not
+  // knowing which directory it is editing is a reason to be careful, not a reason to allow.
+  const runBusy = run.running && (run.workspace === null || run.workspace === workspace);
   // Not chosen here, and not chosen before typing either: what the agent may do is a standing
   // decision, so it lives in Settings and this screen reads it. The fallbacks are the pair this was
   // hardcoded to — edit the workspace, no shell, stop and ask if the run read something untrusted —
@@ -246,6 +249,32 @@ export function Code() {
   // Same: a default the system applies, and the receipt records `profile_source: "system"` so the
   // cost panel never counts it beside a profile somebody deliberately picked.
   const profile: Profile = "balanced";
+
+  /** Change the project this screen is working in. One function, because it was three near-copies.
+   *
+   * Clearing `sessionId` is the part all three were missing, and it is the part that matters: the
+   * server fixes a conversation's project when the conversation is created and never moves it, so
+   * carrying the id across a project change left the next turn writing into a conversation filed
+   * under the OLD project. The screen said one thing and the disk said another, and the disk was
+   * right. Invisible with one workspace; routine with several.
+   *
+   * Resuming a conversation is deliberately NOT this: it also changes the project, but it is
+   * arriving at an existing conversation rather than leaving one.
+   */
+  const switchProject = useCallback(
+    (next: string) => {
+      if (next === workspace) return;
+      setWorkspace(next);
+      writeWorkspace(next);
+      setProjectDraft(next);
+      setSessionId(null);
+      setConversationKey((n) => n + 1);
+      setOpenFile(null);
+      void qc.invalidateQueries({ queryKey: ["fs-file"] });
+      void qc.invalidateQueries({ queryKey: ["git-status"] });
+    },
+    [qc, workspace],
+  );
 
   const refreshOpenFile = useCallback(() => {
     if (openFile) void qc.invalidateQueries({ queryKey: ["fs-file", workspace, openFile] });
@@ -267,12 +296,7 @@ export function Code() {
         className="flex items-center gap-2 border-b border-hairline px-5 py-2"
         onSubmit={(e) => {
           e.preventDefault();
-          const next = projectDraft.trim();
-          setWorkspace(next);
-          writeWorkspace(next);
-          setOpenFile(null);
-          void qc.invalidateQueries({ queryKey: ["fs-file"] });
-          void qc.invalidateQueries({ queryKey: ["git-status"] });
+          switchProject(projectDraft.trim());
         }}
       >
         <FolderGit2 className="h-4 w-4 shrink-0 text-accent" />
@@ -298,11 +322,7 @@ export function Code() {
             onCancel={() => setPicking(false)}
             onPick={(path) => {
               setPicking(false);
-              setWorkspace(path);
-              writeWorkspace(path);
-              setProjectDraft(path);
-              setOpenFile(null);
-              void qc.invalidateQueries({ queryKey: ["git-status"] });
+              switchProject(path);
             }}
           />
         </div>
@@ -328,12 +348,7 @@ export function Code() {
               setProjectDraft(session.workspace);
             }
           }}
-          onProject={(next) => {
-            setWorkspace(next);
-            writeWorkspace(next);
-            setProjectDraft(next);
-            setOpenFile(null);
-          }}
+          onProject={switchProject}
         />
         {/* The conversation IS the screen. It used to be one of five panels in a 384px column, and
             the arithmetic did not work: the panels that could not shrink took every pixel and this

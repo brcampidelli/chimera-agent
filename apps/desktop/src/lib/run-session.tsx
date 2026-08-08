@@ -46,6 +46,15 @@ export interface RunSession {
   stopping: boolean;
   /** Set when our view of the run broke (network/stream), which is NOT the run failing. */
   broken: boolean;
+  /**
+   * The project the in-flight run is working in, or null when nothing is running.
+   *
+   * Exposed because "a run is in progress" and "a run is in progress HERE" stopped being the same
+   * question the moment a second project existed. The reason a screen blocks typing while a run is
+   * live is that a turn and a run editing the same directory would race each other — which is not
+   * true of a run in another project, and blocking there is a lie about why.
+   */
+  workspace: string | null;
   /** The run stopped for a human verdict. Not a failure and not a success — an open question. */
   paused: PausedRun | null;
   /**
@@ -78,6 +87,7 @@ export function RunSessionProvider({ children }: { children: ReactNode }) {
   const [broken, setBroken] = useState(false);
   const [paused, setPaused] = useState<PausedRun | null>(null);
   const [verify, setVerify] = useState<RunVerify | null>(null);
+  const [workspace, setWorkspace] = useState<string | null>(null);
   // Read inside the stream callbacks, which close over the value at start(). A ref rather than
   // state because a mid-run subscriber change must reach the in-flight stream, not the next one.
   const handlers = useRef<RunSessionHandlers>({});
@@ -94,12 +104,14 @@ export function RunSessionProvider({ children }: { children: ReactNode }) {
       setDone(null);
       setPaused(null);
       setVerify(null);
+      setWorkspace(req.workspace ?? null);
       setTask(req.task);
 
       const finish = (frame: RunDone | null, success: boolean) => {
         setRunning(false);
         setStopping(false);
         setRunId(null);
+        setWorkspace(null);
         setDone(frame);
         handlers.current.onDone?.(frame, success);
       };
@@ -138,8 +150,11 @@ export function RunSessionProvider({ children }: { children: ReactNode }) {
   }, [runId, stopping]);
 
   const value = useMemo(
-    () => ({ running, task, runId, events, done, stopping, broken, paused, verify, start, stop, clearPaused }),
-    [running, task, runId, events, done, stopping, broken, paused, verify, start, stop, clearPaused],
+    () => ({
+      running, task, runId, events, done, stopping, broken, workspace, paused, verify,
+      start, stop, clearPaused,
+    }),
+    [running, task, runId, events, done, stopping, broken, workspace, paused, verify, start, stop, clearPaused],
   );
   return <RunSessionContext.Provider value={value}>{children}</RunSessionContext.Provider>;
 }
@@ -161,6 +176,7 @@ export function useRunSession(): RunSession {
       done: null,
       stopping: false,
       broken: false,
+      workspace: null,
       paused: null,
       verify: null,
       start: () => {},
