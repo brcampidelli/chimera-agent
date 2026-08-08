@@ -1213,12 +1213,23 @@ def desktop_app(
     # Always available for the per-turn "Fuse this turn" toggle (cheap to construct; runs only on
     # request). Reused as the fusion arm of RoutedBackend when the whole session runs under --fuse.
     fuse_backend = FusionEngine(llm)
-    backend: SupportsComplete = llm
-    if settings.cascade:
-        # Honor the Settings "Cascade" toggle: tiered routing (weak -> mid -> fusion).
-        backend = _cascade_backend(llm, settings)
-    elif fuse:
-        backend = RoutedBackend(llm, fuse_backend)
+    def session_backend() -> SupportsComplete:
+        """The backend for ONE conversation, decided when that conversation is built.
+
+        Deciding it once at boot meant the Cascade toggle needed a relaunch to mean anything: the
+        screen saved it, re-read it, showed it on — and every later turn still went straight to the
+        single model. Built per session instead, it applies to the next conversation. The cron
+        daemon keeps the boot-time choice, because it has no conversation to be next to.
+        """
+        live = get_settings()
+        if live.cascade:
+            # Honor the Settings "Cascade" toggle: tiered routing (weak -> mid -> fusion).
+            return _cascade_backend(llm, live)
+        if fuse:
+            return RoutedBackend(llm, fuse_backend)
+        return llm
+
+    backend: SupportsComplete = session_backend()
 
     workspace_path = resolve_app_workspace(workspace)
     shared_memory = None if no_memory else _memory_manager()
@@ -1278,10 +1289,15 @@ def desktop_app(
         console.print(f"[dim]MCP autoload: {loaded} server(s) connected[/dim]")
 
     def factory() -> ChatSession:
+        # Read fresh: `settings` above is the boot snapshot, and a conversation built from it would
+        # ignore every toggle flipped since launch. These cost nothing to re-read and are decided
+        # per conversation anyway, so "next conversation" is the honest scope — a relaunch was never
+        # actually required for them.
+        live = get_settings()
         registry = default_registry(workspace_path)
         if mcp_connectors is not None:
             mcp_connectors.into_tool_registry(registry)  # MCP tools alongside the builtins
-        if settings.guard_chat:
+        if live.guard_chat:
             # AFTER the MCP tools, so the denylist and the ledger reach those too — a guard that
             # covers only the tools we wrote is not a guard. Off by default: this registry is shared
             # with the messaging gateway and /v1/chat/completions, so arming it by default would take
@@ -1289,13 +1305,13 @@ def desktop_app(
             from chimera.api.posture import guard_chat_registry
 
             registry, _chat_ledger = guard_chat_registry(registry)
-        runner = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
+        runner = Agent(session_backend(), registry, AgentConfig(model=model, max_steps=max_steps))
         return ChatSession(
             runner,
             memory=shared_memory,
             graph=shared_graph,
             profile=shared_profile,
-            remember_from_chat=settings.remember_from_chat,
+            remember_from_chat=live.remember_from_chat,
         )
 
     # The built SPA, if present, is served same-origin (no CORS). Absent = API-only (dev uses Vite).

@@ -1160,6 +1160,13 @@
       },
       "ConfigOut": {
         "properties": {
+          "applies": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Applies",
+            "type": "object"
+          },
           "automation": {
             "$ref": "#/components/schemas/AutomationCfgOut"
           },

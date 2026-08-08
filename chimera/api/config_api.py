@@ -62,6 +62,31 @@ _EDITABLE_SETTINGS = {
 }
 ALLOWED_KEYS = _SECRET_KEYS | _EDITABLE_SETTINGS
 
+#: When a saved setting actually starts applying, for the ones where the answer is not "now".
+#:
+#: Declared here, beside the allowlist, because the answer is a property of where the value is READ
+#: — not of the screen that writes it. A list maintained in the frontend would go stale the first
+#: time a read moves, and it would go stale silently, which is the failure this whole field exists
+#: to stop: a control that confirms and does nothing spends the user's trust in every other control
+#: on the screen.
+#:
+#: Anything absent from this map applies to the next call. That is the common case now that the
+#: gateway and the request handlers read through instead of holding a boot-time snapshot.
+NEXT_CONVERSATION = "next_conversation"
+NEXT_LAUNCH = "next_launch"
+APPLIES_WHEN: dict[str, str] = {
+    # Decided when a conversation is built (`factory()` in `chimera app`), so an open conversation
+    # keeps the behaviour it started with — deliberately: changing a running chat's guard or backend
+    # underneath it would make its transcript describe two different agents.
+    "CHIMERA_CASCADE": NEXT_CONVERSATION,
+    "CHIMERA_GUARD_CHAT": NEXT_CONVERSATION,
+    "CHIMERA_CHAT_MEMORY": NEXT_CONVERSATION,
+    # These start something at boot — a daemon thread and a set of MCP subprocesses. Re-reading the
+    # value would not undo that, so the honest answer is the relaunch, not a re-read.
+    "CHIMERA_APP_CRON": NEXT_LAUNCH,
+    "CHIMERA_MCP_AUTOLOAD": NEXT_LAUNCH,
+}
+
 
 def _hint(value: str | None) -> str:
     """A safe recognition hint: the last 4 chars of a long secret, else empty. Never the whole value."""
@@ -110,6 +135,8 @@ def read_config(settings: Settings) -> dict[str, Any]:
         "mcp": {"autoload": settings.mcp_autoload},
         "automation": {"cron": settings.app_cron},
         "providers": providers,
+        # Keys absent here apply to the next call; see APPLIES_WHEN.
+        "applies": dict(APPLIES_WHEN),
     }
 
 

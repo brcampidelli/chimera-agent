@@ -948,6 +948,37 @@ def test_read_config_masks_every_secret(tmp_path: Any) -> None:
     assert cfg["server"]["token_set"] is True  # server token: presence only, no hint field leaked
 
 
+def test_read_config_declares_when_a_saved_setting_starts_applying(tmp_path: Any) -> None:
+    """The screen must not have to guess, and must not keep its own copy of the answer.
+
+    Whether a saved value takes effect now, on the next conversation or on the next launch is a
+    property of where it is READ. Publishing it from beside the allowlist is what lets the label stay
+    true when a read moves — a list maintained in the frontend would go stale silently, which is the
+    exact failure the label exists to prevent.
+    """
+    from chimera.api.config_api import _EDITABLE_SETTINGS, APPLIES_WHEN, read_config
+
+    cfg = read_config(Settings(CHIMERA_HOME=str(tmp_path)))
+    applies = cfg["applies"]
+
+    # These start something at boot — a daemon thread, a set of MCP subprocesses — so re-reading the
+    # value cannot undo it.
+    assert applies["CHIMERA_APP_CRON"] == "next_launch"
+    assert applies["CHIMERA_MCP_AUTOLOAD"] == "next_launch"
+    # These are decided when a conversation is built, so an open one keeps what it started with.
+    assert applies["CHIMERA_CASCADE"] == "next_conversation"
+    assert applies["CHIMERA_GUARD_CHAT"] == "next_conversation"
+    assert applies["CHIMERA_CHAT_MEMORY"] == "next_conversation"
+    # Absence is the claim "this applies to the next call" — the default after the gateway and the
+    # request handlers stopped holding a boot-time snapshot. Naming one of these would be a caveat
+    # about a delay that no longer exists.
+    assert "CHIMERA_DEFAULT_MODEL" not in applies
+    assert "CHIMERA_CACHE" not in applies
+    assert "CHIMERA_SANDBOX" not in applies
+    # A delay declared for something nobody can change from the screen is dead text.
+    assert set(APPLIES_WHEN) <= _EDITABLE_SETTINGS
+
+
 def test_patch_config_rejects_unknown_keys(tmp_path: Any) -> None:
     from chimera.api.config_api import patch_config
 

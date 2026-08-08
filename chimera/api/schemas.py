@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # --- health / sessions ----------------------------------------------------------------------------
 
@@ -244,6 +244,12 @@ class ConfigOut(BaseModel):
     automation: AutomationCfgOut
     guard: GuardCfgOut
     providers: list[ProviderOut]
+    applies: dict[str, str] = Field(default_factory=dict)
+    """Env-var name -> when a saved change starts applying, for the ones where it is not "now".
+
+    Only the exceptions are listed; a key absent here applies to the next call. The screen reads
+    this instead of carrying its own list, so a control can never quietly outlive the reason it was
+    labelled — see ``chimera.api.config_api.APPLIES_WHEN``."""
 
 
 class UpdatedOut(BaseModel):

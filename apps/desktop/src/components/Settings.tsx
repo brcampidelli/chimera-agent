@@ -31,12 +31,40 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
 /** The label of the enclosing Row, so a control inside it can name itself without repeating it. */
 const RowLabelContext = createContext("");
 
-function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+/** When a saved change starts applying, for the settings where the answer is not "the next call".
+ *
+ * The value comes from the server (`config.applies`), never from a list kept here: the answer is a
+ * property of where the setting is READ, so a copy on this side would go stale the first time a read
+ * moves — and it would go stale silently, which is the whole failure this label exists to stop. A
+ * control that confirms and does nothing spends the user's trust in every other control on screen.
+ */
+function AppliesNote({ when }: { when?: string }) {
+  const t = useT();
+  if (when !== "next_conversation" && when !== "next_launch") return null;
+  return (
+    <div className="text-xs text-warn">
+      {t(when === "next_launch" ? "settings.applies.nextLaunch" : "settings.applies.nextConversation")}
+    </div>
+  );
+}
+
+function Row({
+  label,
+  hint,
+  applies,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  applies?: string;
+  children: ReactNode;
+}) {
   return (
     <div className="flex items-center justify-between gap-4 px-4 py-3">
       <div className="min-w-0">
         <div className="text-sm font-medium">{label}</div>
         {hint && <div className="text-xs text-muted-foreground">{hint}</div>}
+        <AppliesNote when={applies} />
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <RowLabelContext.Provider value={label}>{children}</RowLabelContext.Provider>
@@ -355,7 +383,11 @@ export function Settings() {
               onChange={(v) => save({ CHIMERA_COST_MODE: v })}
             />
           </Row>
-          <Row label={t("settings.row.cascade")} hint={t("settings.hint.cascade")}>
+          <Row
+            label={t("settings.row.cascade")}
+            hint={t("settings.hint.cascade")}
+            applies={c.applies?.CHIMERA_CASCADE}
+          >
             <Toggle on={c.models.cascade} onChange={(v) => save({ CHIMERA_CASCADE: String(v) })} />
           </Row>
         </Card>
@@ -382,7 +414,11 @@ export function Settings() {
               onChange={(v) => save({ CHIMERA_SEMANTIC_MEMORY: String(v) })}
             />
           </Row>
-          <Row label={t("settings.row.rememberChat")} hint={t("settings.hint.rememberChat")}>
+          <Row
+            label={t("settings.row.rememberChat")}
+            hint={t("settings.hint.rememberChat")}
+            applies={c.applies?.CHIMERA_CHAT_MEMORY}
+          >
             <Toggle
               on={c.memory.remember_from_chat}
               onChange={(v) => save({ CHIMERA_CHAT_MEMORY: String(v) })}
@@ -411,13 +447,21 @@ export function Settings() {
           {/* The switch the posture line names when it reports a conversation as unguarded. Off by
               default because this registry is shared with the messaging gateway: arming it silently
               would take shell away from agents someone already runs in Discord. */}
-          <Row label={t("settings.row.guardChat")} hint={t("settings.hint.guardChat")}>
+          <Row
+            label={t("settings.row.guardChat")}
+            hint={t("settings.hint.guardChat")}
+            applies={c.applies?.CHIMERA_GUARD_CHAT}
+          >
             <Toggle on={c.guard.chat} onChange={(v) => save({ CHIMERA_GUARD_CHAT: String(v) })} />
           </Row>
         </Card>
 
         <Card title={t("settings.card.mcp")}>
-          <Row label={t("settings.row.mcpAutoload")} hint={t("settings.hint.mcpAutoload")}>
+          <Row
+            label={t("settings.row.mcpAutoload")}
+            hint={t("settings.hint.mcpAutoload")}
+            applies={c.applies?.CHIMERA_MCP_AUTOLOAD}
+          >
             <Toggle
               on={c.mcp.autoload}
               onChange={(v) => save({ CHIMERA_MCP_AUTOLOAD: String(v) })}
@@ -426,7 +470,11 @@ export function Settings() {
         </Card>
 
         <Card title={t("settings.card.automation")}>
-          <Row label={t("settings.row.appCron")} hint={t("settings.hint.appCron")}>
+          <Row
+            label={t("settings.row.appCron")}
+            hint={t("settings.hint.appCron")}
+            applies={c.applies?.CHIMERA_APP_CRON}
+          >
             <Toggle
               on={c.automation.cron}
               onChange={(v) => save({ CHIMERA_APP_CRON: String(v) })}

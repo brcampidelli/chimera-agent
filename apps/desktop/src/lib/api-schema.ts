@@ -1684,6 +1684,10 @@ export interface components {
         };
         /** ConfigOut */
         ConfigOut: {
+            /** Applies */
+            applies?: {
+                [key: string]: string;
+            };
             automation: components["schemas"]["AutomationCfgOut"];
             cache: components["schemas"]["CacheCfgOut"];
             guard: components["schemas"]["GuardCfgOut"];
