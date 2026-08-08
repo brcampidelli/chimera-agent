@@ -444,6 +444,23 @@ class KanbanMoveIn(BaseModel):
     column: str
 
 
+class ProjectStartIn(BaseModel):
+    """Create a project from a spec.
+
+    ``spec`` is a PATH, not spec text. The spec is the acceptance authority — the only thing that
+    decides whether the project is done — so it belongs in the repository, versioned and reviewable,
+    not in a text box whose contents nobody else can see. Writing one is a job for the coding
+    conversation; starting a project against it is this.
+    """
+
+    spec: str
+    workspace: str | None = None
+    max_iterations: int = 20
+    auto_approve: bool = False
+    """Skip the plan-approval pause. Off by default, because the pause is the point: a project that
+    starts working before anyone read its plan is a project nobody chose to run."""
+
+
 class KanbanRunIn(BaseModel):
     """Dispatch the backlog. Every field optional, because the common case is "work the board"."""
 

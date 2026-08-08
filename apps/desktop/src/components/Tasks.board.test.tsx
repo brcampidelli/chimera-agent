@@ -21,6 +21,8 @@ vi.mock("@/lib/api", () => ({
   getProjects: vi.fn(),
   moveKanbanCard: vi.fn(),
   removeKanbanCard: vi.fn(),
+  startProject: vi.fn(),
+  stepProject: vi.fn(),
   streamKanbanRun: vi.fn(),
 }));
 

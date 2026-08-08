@@ -971,7 +971,16 @@ export interface paths {
         /** List Projects */
         get: operations["list_projects_api_projects_get"];
         put?: never;
-        post?: never;
+        /**
+         * Start Project
+         * @description Create a project. Deliberately does NOT advance it.
+         *
+         *     The CLI's `project start` creates and runs in one command, which is right for a terminal
+         *     where the output scrolls past you. Here they are separate calls so the screen can show what
+         *     was created — its id, its plan-approval pause — before anything spends a token. Advancing is
+         *     `POST /api/projects/{id}/step`.
+         */
+        post: operations["start_project_api_projects_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1023,6 +1032,34 @@ export interface paths {
         put?: never;
         /** Deny Project */
         post: operations["deny_project_api_projects__project_id__deny_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/step": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Step Project
+         * @description Advance one iteration: check the spec, sync cards, work at most ONE ready card.
+         *
+         *     One step per call, and no server-side `run` loop, which is a decision rather than an
+         *     omission. `run()` is repeated `step()`, so a client that has this can loop it — and a
+         *     client-side loop can be stopped between iterations and shows the state after each one. A
+         *     server-side run would be neither interruptible nor observable until it ended.
+         *
+         *     Runs on a worker thread: a step calls models, and holding the event loop for it would freeze
+         *     every other request for as long as a card takes.
+         */
+        post: operations["step_project_api_projects__project_id__step_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2657,6 +2694,31 @@ export interface components {
                 [key: string]: components["schemas"]["TaskCardOut"][];
             };
             state: components["schemas"]["ProjectStateOut"];
+        };
+        /**
+         * ProjectStartIn
+         * @description Create a project from a spec.
+         *
+         *     ``spec`` is a PATH, not spec text. The spec is the acceptance authority — the only thing that
+         *     decides whether the project is done — so it belongs in the repository, versioned and reviewable,
+         *     not in a text box whose contents nobody else can see. Writing one is a job for the coding
+         *     conversation; starting a project against it is this.
+         */
+        ProjectStartIn: {
+            /**
+             * Auto Approve
+             * @default false
+             */
+            auto_approve: boolean;
+            /**
+             * Max Iterations
+             * @default 20
+             */
+            max_iterations: number;
+            /** Spec */
+            spec: string;
+            /** Workspace */
+            workspace?: string | null;
         };
         /** ProjectStateOut */
         ProjectStateOut: {
@@ -4856,6 +4918,39 @@ export interface operations {
             };
         };
     };
+    start_project_api_projects_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectStartIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectStateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_project_api_projects__project_id__get: {
         parameters: {
             query?: never;
@@ -4936,6 +5031,37 @@ export interface operations {
                 "application/json": components["schemas"]["ApproveBody"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectStateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    step_project_api_projects__project_id__step_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

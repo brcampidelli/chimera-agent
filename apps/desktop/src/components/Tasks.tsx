@@ -10,6 +10,8 @@ import {
   getProjects,
   moveKanbanCard,
   removeKanbanCard,
+  startProject,
+  stepProject,
   streamKanbanRun,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -35,11 +37,15 @@ function ProjectRow({
   onChange,
   selected,
   onSelect,
+  onStep,
+  stepping,
 }: {
   p: ProjectState;
   onChange: () => void;
   selected: boolean;
   onSelect: () => void;
+  onStep: () => void;
+  stepping: boolean;
 }) {
   const t = useT();
   const approve = useMutation({
@@ -63,9 +69,19 @@ function ProjectRow({
           {p.id}
         </button>
         <Badge tone={statusTone(p.status)}>{p.status.replace("_", " ")}</Badge>
-        <span className="text-xs text-muted-foreground">
+        <span className="flex-1 text-xs text-muted-foreground">
           {t("tasks.iter", { a: p.iterations, b: p.max_iterations })}
         </span>
+        {/* One iteration per press, and the label says so rather than promising completion. A
+            project is finished when its SPEC says so, which can take several — and a button that
+            implied otherwise would be making a claim only the spec gets to make.
+            Absent once done: `done` is terminal, and offering to advance it invites someone to
+            restart work they already accepted. */}
+        {p.status !== "done" && !awaiting && (
+          <Button size="sm" variant="ghost" disabled={stepping} onClick={onStep}>
+            <Play className="h-3.5 w-3.5" /> {t("tasks.step")}
+          </Button>
+        )}
       </div>
       {p.note && <div className="mt-1 text-xs text-muted-foreground">{p.note}</div>}
       {awaiting && (
@@ -200,6 +216,40 @@ function Board({
   );
 }
 
+/** Start a project from a spec.
+ *
+ * The field is a PATH, not spec text. The spec is the acceptance authority — the only thing that
+ * decides whether the project is done — so it belongs in the repository, versioned and reviewable.
+ * Writing one is a job for the coding conversation; pointing a project at it is this.
+ */
+function StartProject({ onStart }: { onStart: (spec: string) => void }) {
+  const t = useT();
+  const [spec, setSpec] = useState("");
+  return (
+    <form
+      className="flex flex-wrap items-center gap-2 px-3 pb-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const value = spec.trim();
+        if (!value) return;
+        onStart(value);
+        setSpec("");
+      }}
+    >
+      <input
+        className="field h-7 min-w-48 flex-1 px-2 font-mono text-xs"
+        placeholder={t("tasks.specPath")}
+        aria-label={t("tasks.specPath")}
+        value={spec}
+        onChange={(e) => setSpec(e.target.value)}
+      />
+      <Button size="sm" type="submit" disabled={!spec.trim()}>
+        <Plus className="h-3.5 w-3.5" /> {t("tasks.startProject")}
+      </Button>
+    </form>
+  );
+}
+
 /** The board's live dispatch: start it, stop it, and say what it is doing while it runs.
  *
  * A dispatch calls models for as long as the backlog has cards, so the button has to be a Stop as
@@ -264,6 +314,17 @@ export function Tasks({ embedded = false }: { embedded?: boolean } = {}) {
     onSuccess: refetchBoard,
   });
   const remove = useMutation({ mutationFn: removeKanbanCard, onSuccess: refetchBoard });
+  const refetchProjects = () => {
+    void qc.invalidateQueries({ queryKey: ["projects"] });
+    refetchBoard();
+  };
+  const start = useMutation({
+    mutationFn: (spec: string) => startProject({ spec }),
+    onSuccess: refetchProjects,
+  });
+  // One call per iteration, and the button says so. A "run to completion" button over an endpoint
+  // that cannot be interrupted would be a promise this screen could not keep.
+  const step = useMutation({ mutationFn: stepProject, onSuccess: refetchProjects });
   const dispatch = useDispatch(refetchBoard);
   const kanban = useQuery({ queryKey: ["kanban"], queryFn: getKanban });
   // Which project's board to show. `null` is the global board — every card from every project,
@@ -287,19 +348,27 @@ export function Tasks({ embedded = false }: { embedded?: boolean } = {}) {
         ) : projects.isLoading ? (
           <Spinner />
         ) : !projects.data || projects.data.length === 0 ? (
-          <EmptyState text={t("tasks.projectsEmpty")} />
+          <>
+            <StartProject onStart={(spec) => start.mutate(spec)} />
+            <EmptyState text={t("tasks.projectsEmpty")} />
+          </>
         ) : (
           projects.data.map((p) => (
             <ProjectRow
               key={p.id}
               p={p}
               onChange={refresh}
+              onStep={() => step.mutate(p.id)}
+              stepping={step.isPending}
               selected={selected === p.id}
               // Clicking the selected project clears the filter, so there is always a way back to
               // the whole board without hunting for a "show all" control.
               onSelect={() => setSelected((cur: string | null) => (cur === p.id ? null : p.id))}
             />
           ))
+        )}
+        {projects.data && projects.data.length > 0 && (
+          <StartProject onStart={(spec) => start.mutate(spec)} />
         )}
       </Panel>
 

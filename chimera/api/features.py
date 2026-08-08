@@ -25,6 +25,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, params
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
+from starlette.concurrency import run_in_threadpool
 
 from chimera.api.schemas import (
     ApprovedOut,
@@ -39,6 +40,7 @@ from chimera.api.schemas import (
     MemoryLayersOut,
     MemoryProfileOut,
     ProjectDetailOut,
+    ProjectStartIn,
     ProjectStateOut,
     RetiredOut,
     SkillsOut,
@@ -368,6 +370,57 @@ def register_features(
                 yield frame
 
         return EventSourceResponse(stream())
+
+    @app.post("/api/projects", dependencies=[guard], response_model=ProjectStateOut)
+    def start_project(req: ProjectStartIn) -> dict[str, Any]:
+        """Create a project. Deliberately does NOT advance it.
+
+        The CLI's `project start` creates and runs in one command, which is right for a terminal
+        where the output scrolls past you. Here they are separate calls so the screen can show what
+        was created — its id, its plan-approval pause — before anything spends a token. Advancing is
+        `POST /api/projects/{id}/step`.
+        """
+        from chimera.kanban.lanes import SolveLane
+        from chimera.orchestration.project import ProjectConfig, ProjectOrchestrator
+
+        spec = Path(req.spec).expanduser()
+        if not spec.is_file():
+            raise HTTPException(status_code=400, detail=f"spec not found: {req.spec}")
+        ws = Path(req.workspace).expanduser().resolve() if req.workspace else default_workspace
+        try:
+            proj = ProjectOrchestrator.start(
+                spec,
+                ws,
+                home=get_settings().home,
+                # Constructing the lane makes NO model call — the LLM runs inside step()/run(), and
+                # this endpoint calls neither.
+                solve_card=SolveLane(workspace=ws),
+                config=ProjectConfig(
+                    max_iterations=req.max_iterations,
+                    require_plan_approval=not req.auto_approve,
+                ),
+            )
+        except ValueError as exc:
+            # A spec with no required requirements would report "done" having verified nothing.
+            # Refusing it is the orchestrator's rule; surfacing the reason is this endpoint's job.
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return _state_dict(proj.state)
+
+    @app.post("/api/projects/{project_id}/step", dependencies=[guard],
+              response_model=ProjectStateOut)
+    async def step_project(project_id: str) -> dict[str, Any]:
+        """Advance one iteration: check the spec, sync cards, work at most ONE ready card.
+
+        One step per call, and no server-side `run` loop, which is a decision rather than an
+        omission. `run()` is repeated `step()`, so a client that has this can loop it — and a
+        client-side loop can be stopped between iterations and shows the state after each one. A
+        server-side run would be neither interruptible nor observable until it ended.
+
+        Runs on a worker thread: a step calls models, and holding the event loop for it would freeze
+        every other request for as long as a card takes.
+        """
+        proj = _load_project(project_id)
+        return _state_dict(await run_in_threadpool(proj.step))
 
     @app.get("/api/projects", dependencies=[guard], response_model=list[ProjectStateOut])
     def list_projects() -> list[dict[str, Any]]:

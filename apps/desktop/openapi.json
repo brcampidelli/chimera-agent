@@ -3221,6 +3221,41 @@
         "title": "ProjectDetailOut",
         "type": "object"
       },
+      "ProjectStartIn": {
+        "description": "Create a project from a spec.\n\n``spec`` is a PATH, not spec text. The spec is the acceptance authority \u2014 the only thing that\ndecides whether the project is done \u2014 so it belongs in the repository, versioned and reviewable,\nnot in a text box whose contents nobody else can see. Writing one is a job for the coding\nconversation; starting a project against it is this.",
+        "properties": {
+          "auto_approve": {
+            "default": false,
+            "title": "Auto Approve",
+            "type": "boolean"
+          },
+          "max_iterations": {
+            "default": 20,
+            "title": "Max Iterations",
+            "type": "integer"
+          },
+          "spec": {
+            "title": "Spec",
+            "type": "string"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          }
+        },
+        "required": [
+          "spec"
+        ],
+        "title": "ProjectStartIn",
+        "type": "object"
+      },
       "ProjectStateOut": {
         "properties": {
           "id": {
@@ -6495,6 +6530,43 @@
           }
         },
         "summary": "List Projects"
+      },
+      "post": {
+        "description": "Create a project. Deliberately does NOT advance it.\n\nThe CLI's `project start` creates and runs in one command, which is right for a terminal\nwhere the output scrolls past you. Here they are separate calls so the screen can show what\nwas created \u2014 its id, its plan-approval pause \u2014 before anything spends a token. Advancing is\n`POST /api/projects/{id}/step`.",
+        "operationId": "start_project_api_projects_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectStartIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectStateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Project"
       }
     },
     "/api/projects/{project_id}": {
@@ -6632,6 +6704,46 @@
           }
         },
         "summary": "Deny Project"
+      }
+    },
+    "/api/projects/{project_id}/step": {
+      "post": {
+        "description": "Advance one iteration: check the spec, sync cards, work at most ONE ready card.\n\nOne step per call, and no server-side `run` loop, which is a decision rather than an\nomission. `run()` is repeated `step()`, so a client that has this can loop it \u2014 and a\nclient-side loop can be stopped between iterations and shows the state after each one. A\nserver-side run would be neither interruptible nor observable until it ended.\n\nRuns on a worker thread: a step calls models, and holding the event loop for it would freeze\nevery other request for as long as a card takes.",
+        "operationId": "step_project_api_projects__project_id__step_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectStateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Step Project"
       }
     },
     "/api/runs": {

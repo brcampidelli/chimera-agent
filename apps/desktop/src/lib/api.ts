@@ -299,6 +299,16 @@ export async function streamKanbanRun(
   }
 }
 export const getProjects = () => json<ProjectState[]>("/api/projects");
+export const startProject = (req: {
+  spec: string;
+  workspace?: string | null;
+  max_iterations?: number;
+  auto_approve?: boolean;
+}) => json<ProjectState>("/api/projects", { method: "POST", body: JSON.stringify(req) });
+/** Advance one iteration. There is no server-side run loop on purpose: a client that has this can
+ *  loop it, stop between iterations, and show the state after each one. */
+export const stepProject = (id: string) =>
+  json<ProjectState>(`/api/projects/${encodeURIComponent(id)}/step`, { method: "POST" });
 export const getProject = (id: string) =>
   json<{ state: ProjectState; columns: Record<string, TaskCard[]> }>(`/api/projects/${id}`);
 export const approveProject = (id: string, card?: string) =>
