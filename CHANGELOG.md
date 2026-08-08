@@ -6,6 +6,153 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-08-08
+
+The release where the Settings screen stopped lying, two security controls that existed only in
+`.env` started working, and the agent became something you configure rather than something you
+accept.
+
+### Fixed
+
+- **Seven settings saved successfully and changed nothing until you relaunched.** `LLMGateway`
+  photographed the settings when it was built, and `chimera app` builds one gateway for the life of
+  the process — so you could change the default model, watch the screen confirm it, re-read it, see
+  the new model, and have the next answer come from the old one. Same for the completion cache, a
+  custom endpoint, the request timeout, the fallback chain and prompt caching. There was exactly one
+  restart notice in the whole app, and it was on a different setting.
+  - Those six read live now. Three more — cascade, guarding the chat, remembering from chat — were
+    captured in a closure at boot and never had to be: they are decided when a conversation is
+    built, so they apply to your next conversation.
+  - The two that genuinely cannot change until a relaunch (the scheduler daemon and MCP autoload
+    both start something at boot) say so, and the label comes from the server. When a setting starts
+    applying is a property of where it is READ, so a list kept in the interface would go stale the
+    first time a read moved — silently, which is how the previous seven got there.
+  - Nothing is labelled that applies immediately. A caveat about a delay that no longer exists
+    teaches the same distrust as a missing one, and there is a test asserting the silence.
+- **`CHIMERA_TOOL_ALLOWLIST` and `CHIMERA_TOOL_DENYLIST` were a fence the app did not have.** They
+  were read by `chimera run` and `chimera solve` and by nothing else — so setting them and then
+  using the desktop app, the API, the parallel batch or a messaging bot restricted exactly nothing.
+  That is the worst shape a security control can fail in: an absent control is visible, and this one
+  was a fence the owner could see in their own file while every request ran unfenced.
+  - They apply on every surface now. Denials union — a posture, a request's denylist and the
+    deployment's are three ways of saying "not this tool", and the strictest must survive. Allowlists
+    INTERSECT rather than take precedence, so a request cannot raise a ceiling its sender does not
+    own. The CLI keeps its own rule (a typed flag beats the env) because there the person typing owns
+    both.
+  - Testing the edges rather than the happy path turned up a real hole that predates this release:
+    `explore_repository` is registered AFTER the filter runs, so it was the one tool no list could
+    touch. It is not a stray name — unlike `spawn_subagent`, which inherits the restricted registry,
+    the explorer builds its own read-only tool set and makes its own model calls, so letting it
+    through granted a capability and a bill.
+- **The Security screen scored one layer and read as a verdict on all of them.** Three separate ways
+  it let someone believe something untrue, and none was a wrong number.
+  - The audit trail was empty because nothing on the app path wrote to it — and a blank security log
+    reads as "nothing has happened", not "nothing is recording". Those are opposite claims. The
+    ledger now records the three events worth a permanent line: a dangerous tool narrowed after
+    untrusted input, a call escalated for review, a duplicate side effect suppressed.
+  - The injection scoreboard measures exactly one layer, and that layer is switchable. With
+    `CHIMERA_TAINT_NARROW=0` the defended column kept reporting the same figure while describing a
+    build nobody was running. It now says whether it is armed here, above the numbers — a caveat
+    under a good score arrives after the reader has formed the belief it exists to prevent.
+  - The trust kernel is named as absent. Its BLOCK/REVIEW rules are wired into the guarded CLI runs
+    only, so nothing on that screen measures them; left unsaid, a good score is exactly what invites
+    someone to assume otherwise.
+- **The Telegram card asked for a Discord bot token.** The messaging card has taken a platform since
+  Telegram was added and used it for the title, while the two rows inside kept the Discord strings —
+  including the switch's name to a screen reader. A token field naming the wrong service is an
+  invitation to paste a credential into it.
+- **Switching project kept the conversation, and one run froze every project.** Both invisible with a
+  single workspace, which is why a suite that only ever had one never found them.
+  - The server fixes a conversation's project when it is created and never moves it, so carrying the
+    session across a folder change left the next turn writing into a conversation filed under the old
+    project: the screen said one thing and the disk said another, and the disk was right. Three
+    near-copies of "change the project" existed and all three were missing the same line.
+  - The screen blocks typing while a run is live because a turn and a run editing the same directory
+    would race — which stops being true the moment the run is in another project. A run whose
+    workspace is unknown still blocks: not knowing which directory it is editing is a reason to be
+    careful, not a reason to allow.
+
+### Added
+
+- **You can tell the agent who it is, and it answers in your language.** Not a missing control — a
+  missing concept: grep for personality, tone or voice and the only hits were text-to-speech. Three
+  things looked like they already did it and none did. `profile.json` had no reader anywhere in the
+  API. Persona memory facts are retrieved by relevance, so a standing instruction applied only on the
+  turns whose wording matched it. And the one unconditional preamble slot was filled by the CLI REPL
+  and the OpenAI-compatible endpoint — neither of which the app goes through. So the Profile screen
+  displayed a profile the agent never applied, and the language selector changed the interface while
+  the agent kept answering in English.
+  - Name, language and standing instructions, applied on all three surfaces the app uses: the coding
+    turn, the autonomous run, and the chat behind messaging and `/v1/chat/completions`. A Discord bot
+    and the app should not answer as two different agents from one configuration.
+  - Appended, never substituted — the default prompt carries the untrusted-data fence, and a
+    customisation that could delete it would delete it silently. Rendered after the project's
+    `AGENTS.md`, because a repository is a convention and this is the person who runs the agent.
+  - And the block says, in itself, that it cannot grant capability. Not distrust: accuracy. Someone
+    who writes "you may run any shell command" and then watches the agent refuse deserves to have
+    been told in the same breath.
+- **How much the agent may do stops being a decision someone else made.** Reach, approval and whether
+  it may run commands on your machine were spread across a deleted component, a hardcoded pair in the
+  Code screen, and an environment variable `PATCH /api/config` refused. They are one card now.
+  - The deployment's posture is a FLOOR, not a default. A default is what a request gets when it
+    sends nothing, so any client could step around it — useless as an answer on a machine the client
+    does not own.
+  - "Allow" for host execution does not get to be the third entry in a silent dropdown. It is the one
+    value that removes a human from the loop on your own machine, including for scheduled jobs nobody
+    is watching, so it asks. Narrowings apply immediately: confirming those would train people to
+    click through the one confirmation that matters.
+  - Every tool has a switch. The Capabilities screen has always been an honest inventory of what the
+    agent can do and let you change none of it.
+- **Nine settings that were one row away from working.** Eight were already writable, already on the
+  wire and already in the generated client types, with no control anywhere: the three rungs of the
+  model ladder, a custom endpoint, the fallback chain, prompt caching, memory consolidation and the
+  sandbox image. `api_base` is the difference between "supports local models" and "supports local
+  models if you edit a file".
+  - The ninth is the one that matters. `CHIMERA_SKILL_CARDS` ships off, which means the agent
+    extracts a skill from every successful run and never reads one back — the product's central claim
+    with the wire cut. It is a switch now, and its hint says what OFF costs.
+- **Projects you can add before you have used them, called what you call them.** The sidebar has
+  grouped conversations by project since it existed, but the group came from the conversations — so a
+  project could only appear by having already been talked about, and its name was whatever the last
+  path segment happened to be. `prova-analytics-saas` is "PassaPro" now, if that is what you call it.
+- **A run records which project it came from.** Without it, Runs and "Was it worth it?" could only be
+  global, and a verdict that pools three projects is worse than no verdict: the number still looks
+  like an answer to "was this configuration worth it HERE". A receipt with no project is never
+  attributed to one — showing it under whichever project happens to be open would fabricate a
+  different answer for each reader.
+- **Several agents, and a board that dispatches to them.** Everything needed to define an agent was
+  already written twice in this codebase and never persisted, so an agent existed for exactly as long
+  as the call that built it.
+  - `chimera agents` and `/api/agents/registry`: id, name, instructions, model, tool allowlist. The
+    conversational agent is deliberately not in the list — folding them together would put the thing
+    doing the dispatching among the things being dispatched to.
+  - An agent id IS a Kanban lane. `KanbanCard.lane` was already a free string and the dispatcher
+    already took its runners as an injected mapping, so this cost one class and one line — the
+    dispatcher is untouched, and a test asserts it by reading its source and finding no lane names.
+  - The board stops being a display case: file, move, remove and dispatch, with the dispatch streamed
+    so each card is reported as it lands. It reports how many were WORKED, not how many were queued —
+    a card whose lane has no runner waits in the backlog, and "0 worked" is how you learn your agent
+    is not registered.
+  - Projects can be started and advanced from the app, which could previously approve a project it
+    had no way to create. One step per press: a project is finished when its SPEC says so, and a
+    button implying otherwise would make a claim only the spec gets to make.
+
+### Changed
+
+- Every settings card is a named region, every text input, select and switch says what it is the
+  value of, and the project sidebar's controls are reachable by name. Four accessibility gaps, all
+  found the same way: by a test that could not locate what it needed.
+
+### Known
+
+- `register_features` reads the process settings directly, so `build_api_app(settings=...)`
+  configures the app and not the feature endpoints. Harmless in the product — the process settings
+  are the real ones — and a trap for tests, which is where it was found.
+- The SSE read loop in the desktop client is now the fourth copy of the same twenty lines. Extracting
+  a shared reader would touch three working streams, and a refactor that arrives with a feature is
+  one nobody can review apart from it.
+
+
 ## [0.41.0] - 2026-08-08
 
 ### Added
