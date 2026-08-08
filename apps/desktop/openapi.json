@@ -2222,6 +2222,94 @@
         "title": "InjectionReportOut",
         "type": "object"
       },
+      "KanbanCardIn": {
+        "description": "A card as a client files it.",
+        "properties": {
+          "action": {
+            "default": "",
+            "title": "Action",
+            "type": "string"
+          },
+          "lane": {
+            "default": "solve",
+            "title": "Lane",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "verify": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verify"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "KanbanCardIn",
+        "type": "object"
+      },
+      "KanbanMoveIn": {
+        "properties": {
+          "column": {
+            "title": "Column",
+            "type": "string"
+          }
+        },
+        "required": [
+          "column"
+        ],
+        "title": "KanbanMoveIn",
+        "type": "object"
+      },
+      "KanbanRunIn": {
+        "description": "Dispatch the backlog. Every field optional, because the common case is \"work the board\".",
+        "properties": {
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          }
+        },
+        "title": "KanbanRunIn",
+        "type": "object"
+      },
       "MaturityOut": {
         "properties": {
           "available": {
@@ -3746,6 +3834,16 @@
             "title": "Id",
             "type": "string"
           },
+          "lane": {
+            "default": "solve",
+            "title": "Lane",
+            "type": "string"
+          },
+          "result": {
+            "default": "",
+            "title": "Result",
+            "type": "string"
+          },
           "risk": {
             "anyOf": [
               {
@@ -3771,6 +3869,17 @@
           "title": {
             "title": "Title",
             "type": "string"
+          },
+          "verify": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verify"
           }
         },
         "required": [
@@ -5742,6 +5851,167 @@
           }
         },
         "summary": "Get Kanban"
+      }
+    },
+    "/api/kanban/cards": {
+      "post": {
+        "operationId": "add_kanban_card_api_kanban_cards_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KanbanCardIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskCardOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Kanban Card"
+      }
+    },
+    "/api/kanban/cards/{card_id}": {
+      "delete": {
+        "operationId": "remove_kanban_card_api_kanban_cards__card_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "card_id",
+            "required": true,
+            "schema": {
+              "title": "Card Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Kanban Card"
+      },
+      "patch": {
+        "operationId": "move_kanban_card_api_kanban_cards__card_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "card_id",
+            "required": true,
+            "schema": {
+              "title": "Card Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KanbanMoveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskCardOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Move Kanban Card"
+      }
+    },
+    "/api/kanban/run": {
+      "post": {
+        "description": "Dispatch backlog cards through their lanes, streamed as each one finishes.\n\nThe dispatch itself is unchanged and runs on a worker thread: it is a blocking loop that\ncalls models, and running it on the event loop would freeze every other request for the\nlength of the board.\n\nA card whose lane has no runner is deliberately left in the backlog rather than failed \u2014\nthat is what makes deleting an agent recoverable, and it is why the terminal frame reports\nhow many were actually worked rather than how many were queued.",
+        "operationId": "run_kanban_api_kanban_run_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KanbanRunIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Kanban"
       }
     },
     "/api/maturity": {

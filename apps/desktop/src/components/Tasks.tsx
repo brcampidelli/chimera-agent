@@ -1,7 +1,17 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { KanbanSquare, ShieldAlert } from "lucide-react";
-import { approveProject, denyProject, getKanban, getProject, getProjects } from "@/lib/api";
+import { KanbanSquare, Play, Plus, ShieldAlert, Square, Trash2 } from "lucide-react";
+import {
+  addKanbanCard,
+  approveProject,
+  denyProject,
+  getKanban,
+  getProject,
+  getProjects,
+  moveKanbanCard,
+  removeKanbanCard,
+  streamKanbanRun,
+} from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
 import { ErrorState } from "@/components/ui/async";
@@ -80,7 +90,59 @@ function ProjectRow({
   );
 }
 
-function Board({ columns }: { columns: Record<string, TaskCard[]> }) {
+/** Add a card, and say who works it.
+ *
+ * The lane is the interesting field and it is a free text box rather than a list of your agents:
+ * `lane` has always been a plain string, an agent that does not exist yet is a perfectly good thing
+ * to file work against (the card waits in the backlog until it does), and a dropdown would quietly
+ * make "the agents you have right now" the limit of what you can plan for.
+ */
+function AddCard({ onAdd }: { onAdd: (card: { title: string; lane: string }) => void }) {
+  const t = useT();
+  const [title, setTitle] = useState("");
+  const [lane, setLane] = useState("solve");
+
+  return (
+    <form
+      className="flex flex-wrap items-center gap-2 px-3 pb-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const value = title.trim();
+        if (!value) return;
+        onAdd({ title: value, lane: lane.trim() || "solve" });
+        setTitle("");
+      }}
+    >
+      <input
+        className="field h-7 min-w-48 flex-1 px-2 text-xs"
+        placeholder={t("tasks.newCard")}
+        aria-label={t("tasks.newCard")}
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+      />
+      <input
+        className="field h-7 w-32 px-2 font-mono text-xs"
+        placeholder="solve"
+        aria-label={t("tasks.lane")}
+        value={lane}
+        onChange={(e) => setLane(e.target.value)}
+      />
+      <Button size="sm" type="submit" disabled={!title.trim()}>
+        <Plus className="h-3.5 w-3.5" /> {t("tasks.add")}
+      </Button>
+    </form>
+  );
+}
+
+function Board({
+  columns,
+  onMove,
+  onRemove,
+}: {
+  columns: Record<string, TaskCard[]>;
+  onMove: (id: string, column: string) => void;
+  onRemove: (id: string) => void;
+}) {
   const t = useT();
   const cols = COLUMN_ORDER.filter((c) => (columns[c]?.length ?? 0) > 0);
   if (cols.length === 0) return <EmptyState text={t("tasks.boardEmpty")} />;
@@ -95,16 +157,40 @@ function Board({ columns }: { columns: Record<string, TaskCard[]> }) {
             {columns[col].map((c) => (
               <div
                 key={c.id}
-                className={`rounded-lg border border-hairline bg-card px-3 py-2.5 shadow-elev transition hover:brightness-105 ${
+                className={`group/card rounded-lg border border-hairline bg-card px-3 py-2.5 shadow-elev transition hover:brightness-105 ${
                   c.risk === "high" ? "ring-1 ring-bad/30" : ""
                 }`}
               >
                 <div className="text-sm">{c.title}</div>
-                {c.risk === "high" && (
-                  <div className="mt-1.5">
-                    <Badge tone="bad">{t("tasks.highRisk")}</Badge>
-                  </div>
-                )}
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  {/* Which agent picks this up is the question a board is asked, so it is on the
+                      card rather than behind it. */}
+                  <Badge tone="muted">{c.lane}</Badge>
+                  {c.verify && <Badge tone="accent">{t("tasks.verified")}</Badge>}
+                  {c.risk === "high" && <Badge tone="bad">{t("tasks.highRisk")}</Badge>}
+                </div>
+                <div className="mt-1.5 flex items-center gap-1 opacity-0 focus-within:opacity-100 group-hover/card:opacity-100">
+                  <select
+                    className="field h-6 flex-1 px-1 text-xs"
+                    aria-label={t("tasks.moveCard", { title: c.title })}
+                    value={c.column}
+                    onChange={(e) => onMove(c.id, e.target.value)}
+                  >
+                    {COLUMN_ORDER.map((target) => (
+                      <option key={target} value={target}>
+                        {target}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    aria-label={t("tasks.removeCard", { title: c.title })}
+                    className="px-1 text-muted-foreground hover:text-bad"
+                    onClick={() => onRemove(c.id)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -114,10 +200,71 @@ function Board({ columns }: { columns: Record<string, TaskCard[]> }) {
   );
 }
 
+/** The board's live dispatch: start it, stop it, and say what it is doing while it runs.
+ *
+ * A dispatch calls models for as long as the backlog has cards, so the button has to be a Stop as
+ * well as a Play — and the board is refetched as each card lands rather than once at the end, since
+ * watching a column empty is the whole reason someone presses it and stays.
+ */
+function useDispatch(onCard: () => void) {
+  const t = useT();
+  const [running, setRunning] = useState(false);
+  const [line, setLine] = useState("");
+  const abort = useRef<AbortController | null>(null);
+
+  const toggle = () => {
+    if (running) {
+      abort.current?.abort();
+      abort.current = null;
+      setRunning(false);
+      setLine("");
+      return;
+    }
+    const controller = new AbortController();
+    abort.current = controller;
+    setRunning(true);
+    setLine(t("tasks.dispatching"));
+    void streamKanbanRun(
+      {},
+      {
+        onCard: (outcome) => {
+          setLine(`${outcome.card_id} → ${outcome.moved_to}`);
+          onCard();
+        },
+        onDone: (summary) => {
+          setRunning(false);
+          // The count of cards actually WORKED, which is not the count that was queued: a card
+          // whose lane has no runner waits rather than failing, and saying "0 worked" is how
+          // someone learns their agent is not registered.
+          setLine(summary.error ?? t("tasks.dispatched", { n: summary.worked }));
+          onCard();
+        },
+        onError: (message) => {
+          setRunning(false);
+          setLine(message);
+        },
+      },
+      controller.signal,
+    );
+  };
+
+  return { running, line, toggle };
+}
+
 export function Tasks({ embedded = false }: { embedded?: boolean } = {}) {
   const t = useT();
   const qc = useQueryClient();
   const projects = useQuery({ queryKey: ["projects"], queryFn: getProjects });
+  const refetchBoard = () => {
+    void qc.invalidateQueries({ queryKey: ["kanban"] });
+  };
+  const add = useMutation({ mutationFn: addKanbanCard, onSuccess: refetchBoard });
+  const move = useMutation({
+    mutationFn: ({ id, column }: { id: string; column: string }) => moveKanbanCard(id, column),
+    onSuccess: refetchBoard,
+  });
+  const remove = useMutation({ mutationFn: removeKanbanCard, onSuccess: refetchBoard });
+  const dispatch = useDispatch(refetchBoard);
   const kanban = useQuery({ queryKey: ["kanban"], queryFn: getKanban });
   // Which project's board to show. `null` is the global board — every card from every project,
   // which is the right default and a poor way to follow one piece of work.
@@ -162,13 +309,46 @@ export function Tasks({ embedded = false }: { embedded?: boolean } = {}) {
             ? `${t("tasks.board")} · ${selected}`
             : t("tasks.board")
         }
+        action={
+          // Only on the whole board: a project's cards are dispatched by the project loop, which
+          // has its own approval gate. A Run button here would step around it.
+          selected ? undefined : (
+            <div className="flex items-center gap-2">
+              {dispatch.line && (
+                <span className="max-w-56 truncate text-xs text-muted-foreground">
+                  {dispatch.line}
+                </span>
+              )}
+              <Button size="sm" variant={dispatch.running ? "outline" : "ghost"} onClick={dispatch.toggle}>
+                {dispatch.running ? (
+                  <>
+                    <Square className="h-3.5 w-3.5" /> {t("common.stop")}
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-3.5 w-3.5" /> {t("tasks.run")}
+                  </>
+                )}
+              </Button>
+            </div>
+          )
+        }
       >
         {kanban.isError ? (
           <ErrorState error={kanban.error} onRetry={() => kanban.refetch()} />
         ) : kanban.isLoading || (selected && project.isLoading) ? (
           <Spinner />
         ) : (
-          <Board columns={(selected ? project.data?.columns : kanban.data) ?? {}} />
+          <>
+            {/* Cards are added to the board, never to a project: a project's cards come from its
+                spec, and one typed in by hand would be work its drift check does not know about. */}
+            {!selected && <AddCard onAdd={(card) => add.mutate(card)} />}
+            <Board
+              columns={(selected ? project.data?.columns : kanban.data) ?? {}}
+              onMove={(id, column) => move.mutate({ id, column })}
+              onRemove={(id) => remove.mutate(id)}
+            />
+          </>
         )}
       </Panel>
     </Screen>

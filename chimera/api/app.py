@@ -1106,7 +1106,8 @@ def build_api_app(
     from chimera.api.features import register_features
     from chimera.api.openai_compat import register_openai_compat
 
-    register_features(app, guard)  # Memory / Skills / Cron / Tasks (Fase C)
+    # `workspace` is where a dispatched Kanban card works when the request names none.
+    register_features(app, guard, workspace=workspace)
     # POST /api/code/turn — a conversational coding turn that keeps the previous turn's tool calls.
     register_code_api(
         app,

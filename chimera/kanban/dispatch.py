@@ -8,6 +8,7 @@ injected, so the dispatch logic is fully testable without a model or a network.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -43,8 +44,14 @@ def dispatch(
     runners: dict[str, LaneRunner],
     *,
     limit: int | None = None,
+    on_outcome: Callable[[DispatchOutcome], None] | None = None,
 ) -> list[DispatchOutcome]:
-    """Run queued backlog cards through their lanes; returns one outcome per card run."""
+    """Run queued backlog cards through their lanes; returns one outcome per card run.
+
+    ``on_outcome`` fires as each card finishes, for a caller that is streaming rather than waiting.
+    Without it the behaviour is byte-identical — a board dispatched from a terminal has nobody to
+    tell, and a callback nobody passed should cost nothing.
+    """
     outcomes: list[DispatchOutcome] = []
     queued = board.cards("backlog")
     if limit is not None:
@@ -62,5 +69,8 @@ def dispatch(
         board.record_result(card.id, success=result.success, result=result.answer)
         target: Column = "done" if result.success else "review"
         board.move(card.id, target)
-        outcomes.append(DispatchOutcome(card.id, card.lane, result.success, target))
+        outcome = DispatchOutcome(card.id, card.lane, result.success, target)
+        outcomes.append(outcome)
+        if on_outcome is not None:
+            on_outcome(outcome)
     return outcomes

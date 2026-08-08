@@ -215,6 +215,89 @@ export const testMcpServer = (name: string) =>
 
 // --- Tasks (kanban + projects, HITL) ---
 export const getKanban = () => json<Record<string, TaskCard[]>>("/api/kanban");
+export const addKanbanCard = (card: {
+  title: string;
+  action?: string;
+  lane?: string;
+  verify?: string | null;
+}) => json<TaskCard>("/api/kanban/cards", { method: "POST", body: JSON.stringify(card) });
+export const moveKanbanCard = (id: string, column: string) =>
+  json<TaskCard>(`/api/kanban/cards/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ column }),
+  });
+export const removeKanbanCard = (id: string) =>
+  json<{ deleted: boolean }>(`/api/kanban/cards/${encodeURIComponent(id)}`, { method: "DELETE" });
+
+/** One card, worked. Hand-typed like every other stream here: SSE frames are not response models,
+ *  so they never reach the generated OpenAPI types. */
+export interface DispatchOutcome {
+  card_id: string;
+  lane: string;
+  success: boolean;
+  moved_to: string;
+}
+
+/** Dispatch the backlog, reporting each card as it lands rather than once at the end.
+ *
+ * The read loop is the fourth copy of the same twenty lines in this file. Extracting a shared reader
+ * is the obvious cleanup and is deliberately NOT done here: it would touch three working streams,
+ * and a refactor that arrives with a feature is a refactor nobody can review separately from it.
+ */
+export async function streamKanbanRun(
+  req: { limit?: number | null; workspace?: string | null; model?: string | null },
+  handlers: {
+    onCard?: (outcome: DispatchOutcome) => void;
+    onDone?: (summary: { worked: number; error?: string }) => void;
+    onError?: (message: string) => void;
+  },
+  signal?: AbortSignal,
+): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch("/api/kanban/run", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(req),
+      signal,
+    });
+  } catch (err) {
+    handlers.onError?.(err instanceof Error ? err.message : "network error");
+    return;
+  }
+  if (!res.ok || !res.body) {
+    handlers.onError?.(`HTTP ${res.status}`);
+    return;
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
+    let sep: number;
+    while ((sep = buffer.indexOf("\n\n")) !== -1) {
+      const block = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+      let event = "";
+      let payload = "";
+      for (const line of block.split("\n")) {
+        if (line.startsWith("event:")) event = line.slice(6).trim();
+        else if (line.startsWith("data:")) payload += line.slice(5).trim();
+      }
+      if (!payload) continue;
+      try {
+        const data = JSON.parse(payload);
+        if (event === "card") handlers.onCard?.(data as DispatchOutcome);
+        else if (event === "done") handlers.onDone?.(data as { worked: number; error?: string });
+      } catch {
+        // A frame we cannot parse is one frame lost, not a broken dispatch: the board is the
+        // source of truth and a refetch will show what actually happened.
+      }
+    }
+  }
+}
 export const getProjects = () => json<ProjectState[]>("/api/projects");
 export const getProject = (id: string) =>
   json<{ state: ProjectState; columns: Record<string, TaskCard[]> }>(`/api/projects/${id}`);

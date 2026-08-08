@@ -692,6 +692,69 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/kanban/cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Kanban Card */
+        post: operations["add_kanban_card_api_kanban_cards_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kanban/cards/{card_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Kanban Card */
+        delete: operations["remove_kanban_card_api_kanban_cards__card_id__delete"];
+        options?: never;
+        head?: never;
+        /** Move Kanban Card */
+        patch: operations["move_kanban_card_api_kanban_cards__card_id__patch"];
+        trace?: never;
+    };
+    "/api/kanban/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Kanban
+         * @description Dispatch backlog cards through their lanes, streamed as each one finishes.
+         *
+         *     The dispatch itself is unchanged and runs on a worker thread: it is a blocking loop that
+         *     calls models, and running it on the event loop would freeze every other request for the
+         *     length of the board.
+         *
+         *     A card whose lane has no runner is deliberately left in the backlog rather than failed —
+         *     that is what makes deleting an agent recoverable, and it is why the terminal frame reports
+         *     how many were actually worked rather than how many were queued.
+         */
+        post: operations["run_kanban_api_kanban_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/maturity": {
         parameters: {
             query?: never;
@@ -2190,6 +2253,43 @@ export interface components {
             /** Undefended Block Rate */
             undefended_block_rate: number;
         };
+        /**
+         * KanbanCardIn
+         * @description A card as a client files it.
+         */
+        KanbanCardIn: {
+            /**
+             * Action
+             * @default
+             */
+            action: string;
+            /**
+             * Lane
+             * @default solve
+             */
+            lane: string;
+            /** Title */
+            title: string;
+            /** Verify */
+            verify?: string | null;
+        };
+        /** KanbanMoveIn */
+        KanbanMoveIn: {
+            /** Column */
+            column: string;
+        };
+        /**
+         * KanbanRunIn
+         * @description Dispatch the backlog. Every field optional, because the common case is "work the board".
+         */
+        KanbanRunIn: {
+            /** Limit */
+            limit?: number | null;
+            /** Model */
+            model?: string | null;
+            /** Workspace */
+            workspace?: string | null;
+        };
         /** MaturityOut */
         MaturityOut: {
             /** Available */
@@ -2790,12 +2890,24 @@ export interface components {
             depends_on: string[];
             /** Id */
             id: string;
+            /**
+             * Lane
+             * @default solve
+             */
+            lane: string;
+            /**
+             * Result
+             * @default
+             */
+            result: string;
             /** Risk */
             risk: string | null;
             /** Success */
             success: boolean | null;
             /** Title */
             title: string;
+            /** Verify */
+            verify?: string | null;
         };
         /** TiersOut */
         TiersOut: {
@@ -4196,6 +4308,138 @@ export interface operations {
                     "application/json": {
                         [key: string]: components["schemas"]["TaskCardOut"][];
                     };
+                };
+            };
+        };
+    };
+    add_kanban_card_api_kanban_cards_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KanbanCardIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskCardOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_kanban_card_api_kanban_cards__card_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                card_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    move_kanban_card_api_kanban_cards__card_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                card_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KanbanMoveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskCardOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_kanban_api_kanban_run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KanbanRunIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

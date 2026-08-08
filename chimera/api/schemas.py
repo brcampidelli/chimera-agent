@@ -414,6 +414,47 @@ class TaskCardOut(BaseModel):
     success: bool | None
     risk: str | None
     depends_on: list[str]
+    lane: str = "solve"
+    """Who works this card: a built-in lane, or the id of one of your agents.
+
+    On the wire because a board where every card looks identical cannot show what it is actually
+    about — which of your agents is going to pick this up is the question a lane answers."""
+
+    verify: str | None = None
+    """The command that judges this card, or null. Shown rather than only stored: a card with an
+    executable gate and a card judged by a model reading prose are different promises."""
+
+    result: str = ""
+    """What the lane answered, once it has run. Empty until then."""
+
+
+class KanbanCardIn(BaseModel):
+    """A card as a client files it."""
+
+    title: str
+    action: str = ""
+    """What to actually do. Empty falls back to the title, matching the CLI: a one-line card should
+    not have to say the same sentence twice."""
+
+    lane: str = "solve"
+    verify: str | None = None
+
+
+class KanbanMoveIn(BaseModel):
+    column: str
+
+
+class KanbanRunIn(BaseModel):
+    """Dispatch the backlog. Every field optional, because the common case is "work the board"."""
+
+    limit: int | None = None
+    """How many cards to take. None works the whole backlog."""
+
+    workspace: str | None = None
+    """Where the cards are worked. None uses the app's workspace."""
+
+    model: str | None = None
+    """A model for the lanes that have none pinned. An agent's own pin still wins over it."""
 
 
 class ProjectStateOut(BaseModel):

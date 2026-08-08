@@ -5,22 +5,35 @@ builds), so the UI is a view over the real state, never a reimplementation. Read
 approve/deny writes are pure file I/O — no live LLM call. The token-spending paths (running a project
 step, executing a skill, consolidating memory) are deliberately NOT exposed here; the app drives those
 through the streaming chat / solve flows instead.
+
+The one exception is ``POST /api/kanban/run``, and it is streamed for the same reason those are: a
+board dispatch calls models for as long as it has cards, so it reports each card as it lands rather
+than returning once at the end. Without it the board was a display case — every route it had was a
+read, so the screen could show the work and change nothing about it.
 """
 
 from __future__ import annotations
 
+import asyncio
+import json
+import threading
 import time
+from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, params
 from pydantic import BaseModel
+from sse_starlette.sse import EventSourceResponse
 
 from chimera.api.schemas import (
     ApprovedOut,
     CronCreateIn,
     CronJobOut,
     DeletedOut,
+    KanbanCardIn,
+    KanbanMoveIn,
+    KanbanRunIn,
     MemoryAddOut,
     MemoryItemOut,
     MemoryLayersOut,
@@ -73,6 +86,9 @@ def _card_dict(card: Any) -> dict[str, Any]:
         "success": card.success,
         "risk": card.metadata.get("risk"),
         "depends_on": card.metadata.get("depends_on", []),
+        "lane": card.lane,
+        "verify": card.verify,
+        "result": card.result or "",
     }
 
 
@@ -133,8 +149,16 @@ class ApproveBody(BaseModel):
     card: str | None = None
 
 
-def register_features(app: FastAPI, guard: params.Depends) -> None:
-    """Attach the Fase C feature routes to ``app``. ``guard`` enforces the bearer token on mutations."""
+def register_features(
+    app: FastAPI, guard: params.Depends, *, workspace: Path | None = None
+) -> None:
+    """Attach the Fase C feature routes to ``app``. ``guard`` enforces the bearer token on mutations.
+
+    ``workspace`` is where a dispatched card works when the request names none. Optional so every
+    existing caller keeps working; absent, it falls back to the process directory, which is what the
+    board did before it could be dispatched from here at all.
+    """
+    default_workspace = workspace or Path.cwd()
 
     # ---- Memory -----------------------------------------------------------------------------------
     @app.get("/api/memory", dependencies=[guard], response_model=list[MemoryItemOut])
@@ -245,6 +269,105 @@ def register_features(app: FastAPI, guard: params.Depends) -> None:
 
         board = KanbanBoard(get_settings().home / "kanban.json")
         return {col: [_card_dict(c) for c in board.cards(col)] for col in COLUMNS}
+
+    @app.post("/api/kanban/cards", dependencies=[guard], response_model=TaskCardOut)
+    def add_kanban_card(card: KanbanCardIn) -> dict[str, Any]:
+        from chimera.kanban import KanbanBoard
+
+        board = KanbanBoard(get_settings().home / "kanban.json")
+        # Action falls back to the title, matching the CLI: a one-line card should not have to say
+        # the same sentence twice to be worth filing.
+        created = board.add(
+            card.title, card.action or card.title, lane=card.lane, verify=card.verify
+        )
+        return _card_dict(created)
+
+    @app.patch("/api/kanban/cards/{card_id}", dependencies=[guard], response_model=TaskCardOut)
+    def move_kanban_card(card_id: str, move: KanbanMoveIn) -> dict[str, Any]:
+        from chimera.kanban import KanbanBoard
+        from chimera.kanban.models import COLUMNS
+
+        if move.column not in COLUMNS:
+            raise HTTPException(status_code=400, detail=f"unknown column {move.column!r}")
+        board = KanbanBoard(get_settings().home / "kanban.json")
+        if board.get(card_id) is None:
+            raise HTTPException(status_code=404, detail="card not found")
+        return _card_dict(board.move(card_id, move.column))  # type: ignore[arg-type]
+
+    @app.delete("/api/kanban/cards/{card_id}", dependencies=[guard], response_model=DeletedOut)
+    def remove_kanban_card(card_id: str) -> dict[str, bool]:
+        from chimera.kanban import KanbanBoard
+
+        board = KanbanBoard(get_settings().home / "kanban.json")
+        return {"deleted": board.remove(card_id)}
+
+    @app.post("/api/kanban/run", dependencies=[guard])
+    async def run_kanban(req: KanbanRunIn) -> EventSourceResponse:
+        """Dispatch backlog cards through their lanes, streamed as each one finishes.
+
+        The dispatch itself is unchanged and runs on a worker thread: it is a blocking loop that
+        calls models, and running it on the event loop would freeze every other request for the
+        length of the board.
+
+        A card whose lane has no runner is deliberately left in the backlog rather than failed —
+        that is what makes deleting an agent recoverable, and it is why the terminal frame reports
+        how many were actually worked rather than how many were queued.
+        """
+        from chimera.core.registry import load as load_agents
+        from chimera.kanban import KanbanBoard, LaneRunner, dispatch
+        from chimera.kanban.lanes import CrewLane, SolveLane, runners_for
+
+        settings = get_settings()
+        ws = Path(req.workspace).expanduser().resolve() if req.workspace else default_workspace
+        board = KanbanBoard(settings.home / "kanban.json")
+        # Registered agents first, so an agent named after a built-in cannot take over the cards
+        # already filed under it — the same ordering the CLI uses, for the same reason.
+        runners: dict[str, LaneRunner] = {
+            **runners_for(load_agents(settings.home), workspace=ws, model=req.model),
+            "solve": SolveLane(workspace=ws, model=req.model),
+            "crew": CrewLane(model=req.model),
+        }
+
+        queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
+        loop = asyncio.get_running_loop()
+
+        def emit(outcome: Any) -> None:
+            loop.call_soon_threadsafe(
+                queue.put_nowait,
+                {
+                    "event": "card",
+                    "data": json.dumps(
+                        {
+                            "card_id": outcome.card_id,
+                            "lane": outcome.lane,
+                            "success": outcome.success,
+                            "moved_to": outcome.moved_to,
+                        }
+                    ),
+                },
+            )
+
+        def work() -> None:
+            done: dict[str, Any]
+            try:
+                outcomes = dispatch(board, runners, limit=req.limit, on_outcome=emit)
+                done = {"worked": len(outcomes)}
+            except Exception as exc:  # noqa: BLE001 — a dispatch failure is a frame, not a 500
+                done = {"worked": 0, "error": str(exc)}
+            loop.call_soon_threadsafe(
+                queue.put_nowait, {"event": "done", "data": json.dumps(done)}
+            )
+            loop.call_soon_threadsafe(queue.put_nowait, None)
+
+        async def stream() -> AsyncIterator[dict[str, Any]]:
+            threading.Thread(target=work, daemon=True).start()
+            while True:
+                frame = await queue.get()
+                if frame is None:
+                    return
+                yield frame
+
+        return EventSourceResponse(stream())
 
     @app.get("/api/projects", dependencies=[guard], response_model=list[ProjectStateOut])
     def list_projects() -> list[dict[str, Any]]:
