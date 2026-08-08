@@ -1297,6 +1297,11 @@ def desktop_app(
         registry = default_registry(workspace_path)
         if mcp_connectors is not None:
             mcp_connectors.into_tool_registry(registry)  # MCP tools alongside the builtins
+        # AFTER the MCP tools, for the same reason the guard below is: a denylist that covers only
+        # the tools we wrote is not a denylist. CHIMERA_TOOL_ALLOWLIST/_DENYLIST reached `chimera
+        # run` and `chimera solve` and nothing else, so an owner who fenced their agent in `.env`
+        # got no fence on this surface — the one a Discord bot and /v1/chat/completions run on.
+        registry = _apply_tool_allowlist(registry, allow=None, deny=None, settings=live)
         if live.guard_chat:
             # AFTER the MCP tools, so the denylist and the ledger reach those too — a guard that
             # covers only the tools we wrote is not a guard. Off by default: this registry is shared

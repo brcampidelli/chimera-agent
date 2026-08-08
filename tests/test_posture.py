@@ -80,6 +80,117 @@ def test_a_posture_and_an_explicit_denylist_are_unioned_not_replaced(tmp_path: A
     assert not (EXEC_TOOLS & names)  # and the posture's survived the explicit denial
 
 
+def test_the_deployment_denylist_reaches_the_app_and_unions_with_the_rest(tmp_path: Any) -> None:
+    """CHIMERA_TOOL_DENYLIST was read by `chimera run` and `chimera solve` and by nothing else.
+
+    Setting it and then using the desktop app, the API or a messaging bot restricted exactly
+    nothing — the variable read as a fence in `.env` while every request ran unfenced. That is the
+    worst shape a security control can fail in, because the failure is invisible from the place the
+    owner looks.
+    """
+    from chimera.api.code_api import CodeSeams, assemble_registry
+    from chimera.providers import LLMGateway
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"), CHIMERA_TOOL_DENYLIST="read_file")
+    seams = CodeSeams(posture=Posture(reach="workspace", approval="never"))
+    registry, _ = assemble_registry(seams, ws, settings, LLMGateway(), steps=8)
+
+    names = set(registry.names())
+    assert "read_file" not in names  # the deployment's denial is honoured
+    assert not (EXEC_TOOLS & names)  # and it did not replace the posture's
+
+
+def test_two_allowlists_intersect_so_a_request_cannot_widen_the_owners_ceiling(tmp_path: Any) -> None:
+    """The deployment list is a ceiling; the request's is one caller's ask.
+
+    Precedence in either direction is wrong here. If the request won, an owner's restriction would
+    be removable by whoever sends the request. If the deployment won, a caller could not narrow
+    itself further. Intersection is the only rule under which both statements survive — and it is
+    the fail-closed one, which is what a control that can only take capability away should be.
+    """
+    from chimera.api.code_api import CodeSeams, assemble_registry
+    from chimera.providers import LLMGateway
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    settings = Settings(
+        CHIMERA_HOME=str(tmp_path / "home"), CHIMERA_TOOL_ALLOWLIST="read_file,list_files"
+    )
+    # The request asks for one tool inside the ceiling and one outside it.
+    seams = CodeSeams(allow_tools=["read_file", "run_shell"])
+    registry, _ = assemble_registry(seams, ws, settings, LLMGateway(), steps=8)
+
+    names = set(registry.names())
+    assert names == {"read_file"}  # the intersection, not either list
+
+
+def test_a_deployment_allowlist_alone_is_an_allowlist(tmp_path: Any) -> None:
+    """With no per-request list, the environment's IS the allowlist — not a suggestion beside it."""
+    from chimera.api.code_api import CodeSeams, assemble_registry
+    from chimera.providers import LLMGateway
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"), CHIMERA_TOOL_ALLOWLIST="read_file")
+    registry, _ = assemble_registry(CodeSeams(), ws, settings, LLMGateway(), steps=8)
+
+    assert set(registry.names()) == {"read_file"}
+
+
+def test_an_unset_deployment_list_restricts_nothing(tmp_path: Any) -> None:
+    """The common path stays a no-op. An empty env var cannot mean "lock everything" — there would
+    be no way to express "no allowlist", and every existing install would wake up with no tools."""
+    from chimera.api.code_api import CodeSeams, assemble_registry
+    from chimera.providers import LLMGateway
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    registry, _ = assemble_registry(CodeSeams(), ws, settings, LLMGateway(), steps=8)
+
+    assert "run_shell" in set(registry.names())
+
+
+def test_the_explorer_cannot_walk_past_the_deployment_lists(tmp_path: Any) -> None:
+    """The one tool registered AFTER the filter — so it was the one tool no list could touch.
+
+    It is not a name the sub-agent inherits: `ExploreRepositoryTool` builds its own read-only tool
+    set internally and makes its own model calls, so letting it through an allowlist that did not
+    name it granted a capability and a bill, not just a label. `spawn_subagent` is the opposite case
+    and is why the ordering exists — it inherits the restricted registry, which is why the filter
+    has to run before it.
+    """
+    from chimera.api.code_api import CodeSeams, assemble_registry
+    from chimera.providers import LLMGateway
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    denied = Settings(
+        CHIMERA_HOME=str(tmp_path / "home"), CHIMERA_TOOL_DENYLIST="explore_repository"
+    )
+    registry, _ = assemble_registry(
+        CodeSeams(explorer=True), ws, denied, LLMGateway(), steps=8
+    )
+    assert "explore_repository" not in set(registry.names())
+
+    ceiling = Settings(CHIMERA_HOME=str(tmp_path / "home"), CHIMERA_TOOL_ALLOWLIST="read_file")
+    registry, _ = assemble_registry(
+        CodeSeams(explorer=True), ws, ceiling, LLMGateway(), steps=8
+    )
+    assert set(registry.names()) == {"read_file"}  # the owner's ceiling held
+
+    # And with no deployment list in force it is still the opt-in it always was — a request that
+    # asks for the explorer alongside its own allowlist is granting itself the tool by another
+    # field, which is a caller's business, not an owner's ceiling being raised.
+    plain = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    registry, _ = assemble_registry(
+        CodeSeams(explorer=True, allow_tools=["read_file"]), ws, plain, LLMGateway(), steps=8
+    )
+    assert set(registry.names()) == {"read_file", "explore_repository"}
+
+
 def test_no_posture_means_no_posture_not_the_default_one(tmp_path: Any) -> None:
     """A caller that never heard of postures must keep the behaviour it had. The DEFAULT posture
     denies the exec tools, so applying it silently would break every existing client in a way that

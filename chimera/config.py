@@ -397,8 +397,14 @@ class Settings(BaseSettings):
         default="http://localhost:11434", validation_alias="CHIMERA_OLLAMA_BASE_URL"
     )
 
-    # Per-session tool allowlist/denylist (names). Empty allowlist = no restriction (all
+    # Deployment-level tool allowlist/denylist (names). Empty allowlist = no restriction (all
     # tools); a non-empty allowlist grants only those. Denylist removes even if allowed.
+    #
+    # These apply on every surface: `run`/`solve` in a terminal, the coding turn, the autonomous
+    # run, the parallel batch, and the chat the messaging bots and /v1/chat/completions ride on.
+    # They used to reach only the first two, which meant an owner could write a fence in `.env` and
+    # have the app ignore it without saying so. Where a request carries its own allowlist the two
+    # INTERSECT — this list is a ceiling, and a caller must not be able to raise it.
     tool_allowlist: list[str] = Field(default_factory=list, validation_alias="CHIMERA_TOOL_ALLOWLIST")
     tool_denylist: list[str] = Field(default_factory=list, validation_alias="CHIMERA_TOOL_DENYLIST")
 

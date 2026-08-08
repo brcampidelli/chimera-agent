@@ -214,6 +214,25 @@ def build_write_region(globs: list[str] | None, ws: Path) -> Any:
     return WriteRegion(cleaned, ws) if cleaned else None
 
 
+def _intersect_allow(request: list[str] | None, deployment: list[str] | None) -> list[str] | None:
+    """Two allowlists, intersected — never replaced.
+
+    ``None`` means "no allowlist here"; an explicit list, *including an empty one*, is a real one.
+
+    Intersection rather than precedence, because the two lists are not peers. The deployment's list
+    is the owner's ceiling, set once in the environment; the request's is one caller's ask. If a
+    request could replace the ceiling, an owner's restriction would be removable by whoever sends
+    the request — the wrong direction for the one control here that can only ever take capability
+    away. The CLI keeps its own precedence rule (a typed flag beats the env) because there the
+    person typing owns both.
+    """
+    if request is None:
+        return deployment
+    if deployment is None:
+        return request
+    return sorted(set(request) & set(deployment))
+
+
 def assemble_registry(
     seams: CodeSeams,
     ws: Path,
@@ -236,18 +255,39 @@ def assemble_registry(
     would mean the run that got tainted and the run that gets asked about it are different objects,
     and the pause would never fire.
     """
+    from chimera.core import ExploreRepositoryTool
     from chimera.governance import TaintLedger, ledger_registry, restrict_registry
     from chimera.tools import default_registry
 
     registry = default_registry(ws, write_region=build_write_region(seams.write_region, ws))
-    # Union, never replace: a posture and an explicit denylist are two ways of saying "not this
-    # tool", and letting one overwrite the other means the stricter of two stated intentions loses.
-    denied = sorted({*(seams.deny_tools or ()), *resolve_posture(seams.posture).deny_tools})
-    if seams.allow_tools is not None or denied:
-        registry = restrict_registry(registry, allow=seams.allow_tools, deny=denied or None)
-    if seams.explorer:
-        from chimera.core import ExploreRepositoryTool
-
+    # Union, never replace: a posture, an explicit denylist and the deployment's own denylist are
+    # three ways of saying "not this tool", and letting one overwrite another means the strictest of
+    # several stated intentions loses.
+    #
+    # CHIMERA_TOOL_DENYLIST / _ALLOWLIST reach the app for the first time here. They were read by
+    # `chimera run` and `chimera solve` and by nothing else, so setting them and then using the
+    # desktop app or the API restricted exactly nothing. A variable named like a security control
+    # that controls nothing is worse than no variable at all: it reads as a fence in `.env` while
+    # every request runs unfenced, and it fails in the direction nobody checks.
+    denied = sorted({
+        *(seams.deny_tools or ()),
+        *resolve_posture(seams.posture).deny_tools,
+        *settings.tool_denylist,
+    })
+    allowed = _intersect_allow(seams.allow_tools, settings.tool_allowlist or None)
+    if allowed is not None or denied:
+        registry = restrict_registry(registry, allow=allowed, deny=denied or None)
+    # Checked, because this one is registered AFTER the filter ran and would otherwise be the one
+    # tool no list could touch. Against the DEPLOYMENT allowlist and the union of every denial —
+    # deliberately not against the request's own `allow_tools`: a caller that sets `explorer=True`
+    # alongside its own list is granting itself the tool by another field, which is its right, while
+    # an owner's ceiling must not be raisable by a request at all. And unlike `spawn_subagent`, this
+    # tool does not inherit the restricted registry — it builds its own read-only set internally, so
+    # letting it through was granting a capability, not just a name.
+    explorer_ok = ExploreRepositoryTool.name not in denied and (
+        not settings.tool_allowlist or ExploreRepositoryTool.name in settings.tool_allowlist
+    )
+    if seams.explorer and explorer_ok:
         # A narrow localisation question does not need the worker's model, and answering it in a
         # sub-agent keeps the finding — not the search — in the main loop's context.
         # A cheap model for the explorer is the point of the role: a narrow localisation
