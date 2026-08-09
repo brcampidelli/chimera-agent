@@ -2,13 +2,14 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Tasks } from "@/components/Tasks";
-import { getKanban, getProjects, startProject, stepProject } from "@/lib/api";
+import { getAgentRegistry, getKanban, getProjects, startProject, stepProject } from "@/lib/api";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", () => ({
   addKanbanCard: vi.fn(),
   approveProject: vi.fn(),
   denyProject: vi.fn(),
+  getAgentRegistry: vi.fn(),
   getKanban: vi.fn(),
   getProject: vi.fn(),
   getProjects: vi.fn(),
@@ -39,6 +40,7 @@ function project(over: Record<string, unknown> = {}) {
 describe("Tasks — starting a project and moving it", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getAgentRegistry).mockResolvedValue([]);
     vi.mocked(getKanban).mockResolvedValue({} as never);
     vi.mocked(getProjects).mockResolvedValue([] as never);
     vi.mocked(startProject).mockResolvedValue(project() as never);

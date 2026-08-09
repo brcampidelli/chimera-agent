@@ -1,18 +1,23 @@
 import { useId, useState } from "react";
 import { Clock } from "lucide-react";
 
+import { AgentRegistry } from "@/components/AgentRegistry";
 import { Cron } from "@/components/Cron";
 import { Tasks } from "@/components/Tasks";
 import { Tabs, TabPanel } from "@/components/ui/tabs";
 import { useT } from "@/lib/i18n";
 
-type Tab = "schedule" | "tasks";
+type Tab = "schedule" | "tasks" | "agents";
 
 /**
  * Work the agent does without being asked.
  *
  * Schedule is what it will do; Tasks is what it is doing and what needs your approval. Two views of
  * the same idea, which is why they were two rail icons that people had to learn were related.
+ *
+ * Agents is the third: the list the board dispatches against. It sat behind the CLI while the board
+ * shipped a free text box pointing at it, so the only way to learn an id was wrong was a dispatch
+ * that reported "0 worked".
  */
 export function Automation() {
   const t = useT();
@@ -22,6 +27,7 @@ export function Automation() {
   const items = [
     { value: "schedule" as const, label: t("nav.schedule") },
     { value: "tasks" as const, label: t("nav.tasks") },
+    { value: "agents" as const, label: t("nav.agentRegistry") },
   ];
 
   return (
@@ -42,6 +48,7 @@ export function Automation() {
           <TabPanel tabsId={id} value={tab}>
             {tab === "schedule" && <Cron embedded />}
             {tab === "tasks" && <Tasks embedded />}
+            {tab === "agents" && <AgentRegistry embedded />}
           </TabPanel>
         </div>
       </div>

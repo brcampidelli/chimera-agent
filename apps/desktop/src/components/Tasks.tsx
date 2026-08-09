@@ -1,19 +1,7 @@
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { KanbanSquare, Play, Plus, ShieldAlert, Square, Trash2 } from "lucide-react";
-import {
-  addKanbanCard,
-  approveProject,
-  denyProject,
-  getKanban,
-  getProject,
-  getProjects,
-  moveKanbanCard,
-  removeKanbanCard,
-  startProject,
-  stepProject,
-  streamKanbanRun,
-} from "@/lib/api";
+import { addKanbanCard, approveProject, denyProject, getAgentRegistry, getKanban, getProject, getProjects, moveKanbanCard, removeKanbanCard, startProject, stepProject, streamKanbanRun } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
 import { ErrorState } from "@/components/ui/async";
@@ -113,10 +101,20 @@ function ProjectRow({
  * to file work against (the card waits in the backlog until it does), and a dropdown would quietly
  * make "the agents you have right now" the limit of what you can plan for.
  */
-function AddCard({ onAdd }: { onAdd: (card: { title: string; lane: string }) => void }) {
+function AddCard({
+  onAdd,
+  known,
+}: {
+  onAdd: (card: { title: string; lane: string }) => void;
+  known: string[];
+}) {
   const t = useT();
+  const listId = useId();
   const [title, setTitle] = useState("");
   const [lane, setLane] = useState("solve");
+  // Suggested, not enforced. A datalist offers the agents that exist without closing the field to
+  // an agent that does not exist yet — which is the whole reason the lane is text and not a select.
+  const unknown = lane.trim() !== "" && known.length > 0 && !known.includes(lane.trim());
 
   return (
     <form
@@ -140,9 +138,20 @@ function AddCard({ onAdd }: { onAdd: (card: { title: string; lane: string }) => 
         className="field h-7 w-32 px-2 font-mono text-xs"
         placeholder="solve"
         aria-label={t("tasks.lane")}
+        list={listId}
         value={lane}
         onChange={(e) => setLane(e.target.value)}
       />
+      <datalist id={listId}>
+        {known.map((id) => (
+          <option key={id} value={id} />
+        ))}
+      </datalist>
+      {/* Said before the dispatch, not after it. The old first news that a lane had no runner was
+          "0 worked", printed once the run was already over. */}
+      {unknown && (
+        <span className="text-xs text-warn-foreground">{t("tasks.laneUnregistered")}</span>
+      )}
       <Button size="sm" type="submit" disabled={!title.trim()}>
         <Plus className="h-3.5 w-3.5" /> {t("tasks.add")}
       </Button>
@@ -327,6 +336,10 @@ export function Tasks({ embedded = false }: { embedded?: boolean } = {}) {
   const step = useMutation({ mutationFn: stepProject, onSuccess: refetchProjects });
   const dispatch = useDispatch(refetchBoard);
   const kanban = useQuery({ queryKey: ["kanban"], queryFn: getKanban });
+  // The ids the board can actually dispatch to. A failure here is not the board's problem: the
+  // suggestions simply go away and the field keeps taking whatever you type.
+  const registry = useQuery({ queryKey: ["agent-registry"], queryFn: getAgentRegistry });
+  const knownAgents = (registry.data ?? []).map((a) => a.id);
   // Which project's board to show. `null` is the global board — every card from every project,
   // which is the right default and a poor way to follow one piece of work.
   const [selected, setSelected] = useState<string | null>(null);
@@ -411,7 +424,7 @@ export function Tasks({ embedded = false }: { embedded?: boolean } = {}) {
           <>
             {/* Cards are added to the board, never to a project: a project's cards come from its
                 spec, and one typed in by hand would be work its drift check does not know about. */}
-            {!selected && <AddCard onAdd={(card) => add.mutate(card)} />}
+            {!selected && <AddCard onAdd={(card) => add.mutate(card)} known={knownAgents} />}
             <Board
               columns={(selected ? project.data?.columns : kanban.data) ?? {}}
               onMove={(id, column) => move.mutate({ id, column })}

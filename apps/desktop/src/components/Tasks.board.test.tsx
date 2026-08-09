@@ -16,6 +16,7 @@ vi.mock("@/lib/api", () => ({
   addKanbanCard: vi.fn(),
   approveProject: vi.fn(),
   denyProject: vi.fn(),
+  getAgentRegistry: vi.fn(),
   getKanban: vi.fn(),
   getProject: vi.fn(),
   getProjects: vi.fn(),
