@@ -178,7 +178,8 @@ dev = [
 chimera = "chimera.cli.main:app"
 
 [project.urls]
-Homepage = "https://github.com/brcampidelli/chimera-agent"
+Homepage = "https://chimeraagent.space"
+Documentation = "https://chimeraagent.space/en/docs/"
 Repository = "https://github.com/brcampidelli/chimera-agent"
 Issues = "https://github.com/brcampidelli/chimera-agent/issues"
 Changelog = "https://github.com/brcampidelli/chimera-agent/blob/main/CHANGELOG.md"
