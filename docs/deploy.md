@@ -147,41 +147,14 @@ has **no production mileage** yet. Start with low-stakes crons, watch `logs`, an
 governance guardrails (`--guard` on `solve`, `CHIMERA_SANDBOX=docker`) in mind for anything
 that touches real systems.
 
-## Publish the docs site (GitHub Pages)
+## Where these pages are published
 
-The site builds with `uv run --extra docs mkdocs build --strict`. To auto-deploy it on every
-docs change, enable GitHub Pages (Settings → Pages → Source: GitHub Actions) and add this
-workflow at `.github/workflows/docs.yml` (committing a workflow file needs a token with the
-`workflow` scope):
+These files are the source for the documentation on **chimeraagent.space**, which renders them
+straight from this directory at build time. Edit the markdown here and the site follows; there is
+no second copy to keep in step.
 
-```yaml
-name: docs
-on:
-  push:
-    branches: [main]
-    paths: ["docs/**", "mkdocs.yml", ".github/workflows/docs.yml"]
-  workflow_dispatch:
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-concurrency:
-  group: pages
-  cancel-in-progress: false
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-      - run: uv run --extra docs mkdocs build --strict
-      - uses: actions/upload-pages-artifact@v3
-        with: { path: site }
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment: { name: github-pages, url: "${{ steps.deployment.outputs.page_url }}" }
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
-```
+The MkDocs configuration that used to live at `mkdocs.yml` has been removed. It was complete —
+theme, navigation, ten pages — and it was never published: there was no workflow and no
+`gh-pages` branch, so the deploy instructions that used to sit in this spot described a site that
+did not exist. A configuration nobody runs is worse than no configuration, because the next person
+edits its navigation and cannot work out why nothing changes.

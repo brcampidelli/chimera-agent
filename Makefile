@@ -5,7 +5,7 @@
 .DEFAULT_GOAL := help
 UV ?= uv
 
-.PHONY: help install check lint type test fmt cov docs clean
+.PHONY: help install check lint type test fmt cov clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -33,8 +33,6 @@ fmt: ## Auto-fix lint + format
 cov: ## Test suite with a coverage report
 	$(UV) run --no-sync pytest --cov=chimera --cov-report=term-missing
 
-docs: ## Build the docs site (requires the `docs` extra)
-	$(UV) run --no-sync mkdocs build
 
 clean: ## Remove caches and build artifacts
 	rm -rf .pytest_cache .mypy_cache .ruff_cache dist build site

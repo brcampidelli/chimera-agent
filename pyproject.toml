@@ -153,10 +153,6 @@ desktop = [
     # app whose attach button fails the first time anyone presses it.
     "python-multipart>=0.0.9",
 ]
-# Build the documentation site (mkdocs-material). Only needed to render/deploy docs.
-docs = [
-    "mkdocs-material>=9.5",
-]
 # Opt-in model evolution (LoRA/SFT/DPO). Heavy + GPU-bound — never required by the
 # agent; install only to run a `chimera evolve recipe` training script.
 train = [
