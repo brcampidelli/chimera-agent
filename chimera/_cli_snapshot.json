@@ -593,7 +593,7 @@
     },
     {
       "deprecated": false,
-      "help": "Interactive multi-turn chat \u2014 your terminal right-hand. Requires a key.",
+      "help": "Interactive multi-turn chat \u2014 your terminal right-hand. Requires a key.\n\nThe conversation is saved after every turn, under ``<home>/sessions``, and picked up again on\nthe next run. It is the same store the desktop app reads, so a thread started here can be\ncontinued there and the other way round.",
       "hidden": false,
       "name": "chat",
       "params": [
@@ -657,6 +657,27 @@
           "name": "no_memory",
           "opts": [
             "--no-memory"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Resume a specific session id (see 'chimera sessions').",
+          "kind": "option",
+          "name": "session_id",
+          "opts": [
+            "--session",
+            "-s"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Start a fresh session instead of resuming.",
+          "kind": "option",
+          "name": "new",
+          "opts": [
+            "--new"
           ],
           "required": false,
           "type": "boolean"
@@ -3686,6 +3707,25 @@
         }
       ],
       "path": "serve"
+    },
+    {
+      "deprecated": false,
+      "help": "List the saved conversations \u2014 the same ones the desktop app shows.\n\nOne store, two front ends. A thread started in the terminal opens in the app, and a thread\nstarted in the app can be resumed here with ``chimera chat -s <id>``.",
+      "hidden": false,
+      "name": "sessions",
+      "params": [
+        {
+          "help": "Delete a session by id.",
+          "kind": "option",
+          "name": "delete",
+          "opts": [
+            "--delete"
+          ],
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "path": "sessions"
     },
     {
       "deprecated": false,

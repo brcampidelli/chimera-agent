@@ -803,6 +803,62 @@ def agent(
 
 
 @app.command()
+def sessions(
+    delete: str = typer.Option(None, "--delete", help="Delete a session by id."),
+) -> None:
+    """List the saved conversations — the same ones the desktop app shows.
+
+    One store, two front ends. A thread started in the terminal opens in the app, and a thread
+    started in the app can be resumed here with ``chimera chat -s <id>``.
+    """
+    from chimera.api.sessions import SessionStore
+
+    store = SessionStore(get_settings().home / "sessions")
+    if delete:
+        console.print("[dim]deleted[/dim]" if store.delete(delete) else f"[red]no session {delete}[/red]")
+        return
+
+    saved = store.list()
+    if not saved:
+        console.print("[dim]no saved conversations yet — 'chimera chat' starts one.[/dim]")
+        return
+
+    from datetime import datetime
+
+    table = Table(title=f"{len(saved)} conversation(s)")
+    table.add_column("id", style="cyan")
+    table.add_column("turns", justify="right")
+    table.add_column("last used")
+    table.add_column("title")
+    for meta in saved:
+        when = datetime.fromtimestamp(meta.updated_at).strftime("%Y-%m-%d %H:%M")
+        table.add_row(meta.id, str(meta.turns), when, meta.title)
+    console.print(table)
+    console.print("[dim]resume with: chimera chat -s <id>[/dim]")
+
+
+def _resume_or_new(manager: Any, wanted: str | None, force_new: bool) -> tuple[str, bool]:
+    """Which conversation this run continues, and whether it is a continuation.
+
+    Default is to resume the newest thread, because the defect being fixed is an assistant that
+    forgets: a right hand that starts from nothing every morning is the thing people complain
+    about. `--new` and `/new` are how you say otherwise, and the caller prints which thread it
+    opened either way — resuming without saying so is the same surprise as forgetting.
+
+    An id that does not exist yet is honoured rather than rejected: `chimera chat -s standup` is a
+    reasonable way to name a thread, and refusing it would be pedantry.
+    """
+    if wanted:
+        return wanted, bool(manager.list() and any(m.id == wanted for m in manager.list()))
+    if force_new:
+        return manager.new(), False
+    existing = manager.list()  # newest first
+    if existing:
+        return existing[0].id, True
+    return manager.new(), False
+
+
+@app.command()
 def chat(
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
     max_steps: int = typer.Option(6, "--max-steps", help="Max tool-calling steps per message."),
@@ -812,8 +868,18 @@ def chat(
         False, "--cascade", help="Tiered routing: weak -> gate -> mid -> gate -> fusion (cheap by default)."
     ),
     no_memory: bool = typer.Option(False, "--no-memory", help="Don't recall long-term memory."),
+    session_id: str = typer.Option(
+        None, "--session", "-s", help="Resume a specific session id (see 'chimera sessions')."
+    ),
+    new: bool = typer.Option(False, "--new", help="Start a fresh session instead of resuming."),
 ) -> None:
-    """Interactive multi-turn chat — your terminal right-hand. Requires a key."""
+    """Interactive multi-turn chat — your terminal right-hand. Requires a key.
+
+    The conversation is saved after every turn, under ``<home>/sessions``, and picked up again on
+    the next run. It is the same store the desktop app reads, so a thread started here can be
+    continued there and the other way round.
+    """
+    from chimera.api.sessions import SessionManager, SessionStore
     from chimera.core import Agent, AgentConfig
     from chimera.interface import ChatSession
     from chimera.providers import LLMGateway, MissingCredentialsError
@@ -834,15 +900,35 @@ def chat(
         backend = RoutedBackend(gateway, FusionEngine(gateway))
     agent = Agent(backend, default_registry(Path(workspace)), AgentConfig(model=model, max_steps=max_steps))
     mem = None if no_memory else _memory_manager()
-    session = ChatSession(
-        agent, memory=mem, graph=_recall_graph(mem), profile=_session_profile(mem)
+
+    # The conversation outlives the terminal.
+    #
+    # `chat` used to build a ChatSession in memory and drop it on exit: a right hand that forgets
+    # yesterday. The store that fixes it already existed and was already tested — `SessionManager`
+    # over `<home>/sessions` — but it was constructed in exactly one place, the desktop API. So the
+    # two products shared a data directory and had no conversation in common: nothing started in the
+    # terminal could be picked up on screen, or the reverse.
+    #
+    # This is that store, not a second one. A parallel CLI-only transcript would have been the
+    # easier change and would have made the split permanent.
+    manager = SessionManager(
+        lambda: ChatSession(agent, memory=mem, graph=_recall_graph(mem), profile=_session_profile(mem)),
+        SessionStore(settings.home / "sessions"),
     )
+    active, resumed = _resume_or_new(manager, session_id, new)
+    session = manager.get(active)
     skill_names = _learned_skill_labels(settings)
 
     console.print(
         "[bold]Chimera chat[/bold] — your terminal right-hand. "
-        "[cyan]/model <slug>[/cyan] to switch, [cyan]/reset[/cyan] to clear, [cyan]/exit[/cyan] to quit."
+        "[cyan]/model <slug>[/cyan] to switch, [cyan]/new[/cyan] for a fresh thread, "
+        "[cyan]/exit[/cyan] to quit."
     )
+    # Say which thread this is, always. Resuming silently is the same surprise as forgetting.
+    if resumed:
+        console.print(f"[dim]resuming {active} — {len(session.turns)} turn(s). /new starts over.[/dim]")
+    else:
+        console.print(f"[dim]session {active} — saved as you go, and open in the app.[/dim]")
     nudged: set[str] = set()  # preferences already suggested this session
     skill_nudged: set[str] = set()  # recurring tasks already suggested as skills
     while True:
@@ -858,9 +944,14 @@ def chat(
             console.print("[dim]bye[/dim]")
             _maybe_autoconsolidate(mem, settings)
             break
-        if message == "/reset":
-            session.reset()
-            console.print("[dim]context cleared[/dim]")
+        if message in ("/new", "/reset"):
+            # `/reset` used to clear an in-memory transcript, which cost nothing. Now that the
+            # transcript is on disk, clearing it in place would delete the conversation — a command
+            # that says "clear context" must not be the one that loses work. Both start a new thread
+            # and leave the old one where the app can still open it.
+            active = manager.new()
+            session = manager.get(active)
+            console.print(f"[dim]new thread {active} — the previous one is saved.[/dim]")
             continue
         if message.startswith("/model"):
             slug = message[len("/model") :].strip() or None
@@ -878,6 +969,9 @@ def chat(
         except Exception as exc:  # noqa: BLE001 — keep the REPL alive on transient errors
             console.print(f"[red]error: {exc}[/red]")
             continue
+        # After the turn, not at exit: Ctrl-C and a closed terminal are how a REPL usually ends,
+        # and neither runs a shutdown hook.
+        manager.persist(active)
         console.print(f"[bold magenta]chimera ›[/bold magenta] {reply}")
         if mem is not None:
             recent = [turn.user for turn in session.turns[-4:]]
