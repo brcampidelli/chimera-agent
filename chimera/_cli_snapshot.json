@@ -1,0 +1,4886 @@
+{
+  "commands": [
+    {
+      "deprecated": false,
+      "help": "Print Chimera's A2A Agent Card JSON (serve it at /.well-known/agent.json).",
+      "hidden": false,
+      "name": "a2a-card",
+      "params": [
+        {
+          "default": "'http://127.0.0.1:8765/a2a'",
+          "help": "The A2A endpoint URL to advertise.",
+          "kind": "option",
+          "name": "url",
+          "opts": [
+            "--url"
+          ],
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "path": "a2a-card"
+    },
+    {
+      "deprecated": false,
+      "help": "Run the ReAct agent loop with native tools. Requires a provider key.",
+      "hidden": false,
+      "name": "agent",
+      "params": [
+        {
+          "help": "The task for the agent to accomplish.",
+          "kind": "argument",
+          "name": "task",
+          "opts": [
+            "task"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "help": "Override the model slug.",
+          "kind": "option",
+          "name": "model",
+          "opts": [
+            "--model",
+            "-m"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "8",
+          "help": "Max tool-calling steps.",
+          "kind": "option",
+          "name": "max_steps",
+          "opts": [
+            "--max-steps"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "default": "'.'",
+          "help": "Workspace root for tools.",
+          "kind": "option",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Route deep-reasoning turns through fusion.",
+          "kind": "option",
+          "name": "fuse",
+          "opts": [
+            "--fuse"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Gate tool calls through the governance kernel.",
+          "kind": "option",
+          "name": "guard",
+          "opts": [
+            "--guard"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Per-session allowlist: only these tools (comma-separated).",
+          "kind": "option",
+          "name": "allow_tools",
+          "opts": [
+            "--allow-tools"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Per-session denylist: drop these tools (comma-separated).",
+          "kind": "option",
+          "name": "deny_tools",
+          "opts": [
+            "--deny-tools"
+          ],
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "path": "agent"
+    },
+    {
+      "commands": [
+        {
+          "deprecated": false,
+          "help": "Show the registry.",
+          "hidden": false,
+          "name": "list",
+          "params": [],
+          "path": "agents list"
+        },
+        {
+          "deprecated": false,
+          "help": "Forget an agent. Cards already filed under its lane are left exactly where they are.",
+          "hidden": false,
+          "name": "rm",
+          "params": [
+            {
+              "help": "The agent to forget.",
+              "kind": "argument",
+              "name": "agent_id",
+              "opts": [
+                "agent_id"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "agents rm"
+        },
+        {
+          "deprecated": false,
+          "help": "Add an agent, or replace the one with this id.\n\nReplace rather than merge, matching the API: a partial write that kept what you left out would\nmake clearing a pinned model impossible.",
+          "hidden": false,
+          "name": "set",
+          "params": [
+            {
+              "help": "Its handle: a lowercase slug. Also its Kanban lane.",
+              "kind": "argument",
+              "name": "agent_id",
+              "opts": [
+                "agent_id"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "default": "''",
+              "help": "What to call it on screen.",
+              "kind": "option",
+              "name": "name",
+              "opts": [
+                "--name"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "default": "''",
+              "help": "Its role, in your words.",
+              "kind": "option",
+              "name": "instructions",
+              "opts": [
+                "--instructions"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "default": "''",
+              "help": "Pin a model; empty inherits the ladder.",
+              "kind": "option",
+              "name": "model",
+              "opts": [
+                "--model"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "default": "''",
+              "help": "Comma-separated allowlist; empty means NO restriction.",
+              "kind": "option",
+              "name": "tools",
+              "opts": [
+                "--tools"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "agents set"
+        }
+      ],
+      "deprecated": false,
+      "help": "The agents you dispatch work to \u2014 as distinct from the one you converse with.",
+      "hidden": false,
+      "name": "agents",
+      "params": [],
+      "path": "agents"
+    },
+    {
+      "deprecated": false,
+      "help": "Run the Chimera Desktop app: the HTTP+SSE API + the built React UI (needs the 'desktop' extra).\n\nServes the same-origin SPA (``apps/desktop/dist``) and a streaming chat API over the real agent\nstack. Install with ``pip install 'chimera-agent[desktop]'`` and build the UI once with\n``npm --prefix apps/desktop run build``.",
+      "hidden": false,
+      "name": "app",
+      "params": [
+        {
+          "default": "'127.0.0.1'",
+          "help": "Bind host (localhost by default).",
+          "kind": "option",
+          "name": "host",
+          "opts": [
+            "--host"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "8765",
+          "help": "Bind port (0 = any free port; a busy port falls back to free).",
+          "kind": "option",
+          "name": "port",
+          "opts": [
+            "--port"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "help": "Override the model slug.",
+          "kind": "option",
+          "name": "model",
+          "opts": [
+            "--model",
+            "-m"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "6",
+          "help": "Max tool-calling steps per message.",
+          "kind": "option",
+          "name": "max_steps",
+          "opts": [
+            "--max-steps"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "help": "Workspace root for tools. Falls back to $CHIMERA_WORKSPACE, then the current directory \u2014 which is the wrong root for a packaged app, whose current directory is wherever its shortcut points.",
+          "kind": "option",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Route turns through fusion (no token streaming).",
+          "kind": "option",
+          "name": "fuse",
+          "opts": [
+            "--fuse"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Don't recall long-term memory.",
+          "kind": "option",
+          "name": "no_memory",
+          "opts": [
+            "--no-memory"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Fire scheduled jobs while the app is open (proactivity). Default: the CHIMERA_APP_CRON setting (on). --no-cron makes the app purely reactive.",
+          "kind": "option",
+          "name": "cron",
+          "opts": [
+            "--cron"
+          ],
+          "required": false,
+          "secondary_opts": [
+            "--no-cron"
+          ],
+          "type": "boolean"
+        },
+        {
+          "default": "True",
+          "help": "Open the app in your browser.",
+          "kind": "option",
+          "name": "open_browser",
+          "opts": [
+            "--open"
+          ],
+          "required": false,
+          "secondary_opts": [
+            "--no-open"
+          ],
+          "type": "boolean"
+        },
+        {
+          "help": "Write the final http://host:port URL to this file once bound (for a parent/sidecar).",
+          "kind": "option",
+          "name": "emit_port_file",
+          "opts": [
+            "--emit-port-file"
+          ],
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "path": "app"
+    },
+    {
+      "deprecated": false,
+      "help": "Your daily-driver assistant: cheap by default, escalates when it must.\n\nAssist = chat with the second-brain defaults ON: the tier cascade routes\nchit-chat to cheap models and escalates hard asks; your persistent profile\n(chimera profile) is the stable preamble; memory, nudges and end-of-session\nconsolidation are active. On exit it prints the session cost receipt \u2014\ntier distribution + measured tokens \u2014 so 'cheap by default' is a number.",
+      "hidden": false,
+      "name": "assist",
+      "params": [
+        {
+          "help": "Override the model slug.",
+          "kind": "option",
+          "name": "model",
+          "opts": [
+            "--model",
+            "-m"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "6",
+          "help": "Max tool-calling steps per message.",
+          "kind": "option",
+          "name": "max_steps",
+          "opts": [
+            "--max-steps"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "default": "'.'",
+          "help": "Workspace root for tools.",
+          "kind": "option",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Don't recall long-term memory.",
+          "kind": "option",
+          "name": "no_memory",
+          "opts": [
+            "--no-memory"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Disable tiered routing (single default model instead).",
+          "kind": "option",
+          "name": "no_cascade",
+          "opts": [
+            "--no-cascade"
+          ],
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": "assist"
+    },
+    {
+      "deprecated": false,
+      "help": "Run the continuous-evolution benchmark on a demo task set. Requires a key.",
+      "hidden": false,
+      "name": "bench",
+      "params": [
+        {
+          "default": "0",
+          "help": "Limit number of demo tasks (0 = all).",
+          "kind": "option",
+          "name": "limit",
+          "opts": [
+            "--limit"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "help": "Override the model slug.",
+          "kind": "option",
+          "name": "model",
+          "opts": [
+            "--model",
+            "-m"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Use the fusion engine as the solver.",
+          "kind": "option",
+          "name": "fuse",
+          "opts": [
+            "--fuse"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Run the stateful chained benchmark (error propagation).",
+          "kind": "option",
+          "name": "chain",
+          "opts": [
+            "--chain"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Use the hard suite (traps / propagating chain).",
+          "kind": "option",
+          "name": "hard",
+          "opts": [
+            "--hard"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "default": "1",
+          "help": "Re-run the suite N times; report stagnation + cost trend across rounds.",
+          "kind": "option",
+          "name": "rounds",
+          "opts": [
+            "--rounds"
+          ],
+          "required": false,
+          "type": "int"
+        }
+      ],
+      "path": "bench"
+    },
+    {
+      "deprecated": false,
+      "help": "Report the honest A/B delta (+95% CI) between two benchmark result files.\n\nFeed it the pass/fail from two runs on the SAME task IDs (e.g. a terminal-bench free-model\nbaseline vs the same model driven by Chimera). Prints each arm's Wilson-bounded pass rate,\nthe delta, its Newcombe CI, and whether the difference is significant. This is the number\nthat proves (or doesn't) that the scaffolding lifts a weak model.\n\nWith --paired, the two lists are treated as *aligned pairs* (each index is one task replayed\nfrom an identical forked checkpoint), and the tighter McNemar/Wilson interval is reported \u2014\nthe payoff of running both arms from the same forked state.",
+      "hidden": false,
+      "name": "bench-compare",
+      "params": [
+        {
+          "help": "JSON file of the baseline arm's per-task pass/fail (list of bools, or {task: bool}).",
+          "kind": "argument",
+          "name": "baseline",
+          "opts": [
+            "baseline"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "help": "JSON file of the treatment arm's per-task pass/fail.",
+          "kind": "argument",
+          "name": "treatment",
+          "opts": [
+            "treatment"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "default": "'baseline'",
+          "help": "Label for the baseline arm.",
+          "kind": "option",
+          "name": "baseline_name",
+          "opts": [
+            "--baseline-name"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "'chimera'",
+          "help": "Label for the treatment arm.",
+          "kind": "option",
+          "name": "treatment_name",
+          "opts": [
+            "--treatment-name"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Paired (McNemar) test: item i in both files is the SAME task replayed from an identical forked state \u2014 a tighter CI.",
+          "kind": "option",
+          "name": "paired",
+          "opts": [
+            "--paired"
+          ],
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": "bench-compare"
+    },
+    {
+      "deprecated": false,
+      "help": "Morning brief: parallel topic research through the hierarchy, one synthesized digest.\n\nThe recipe IS the decomposition (no top-model decompose call). Delegation\nreceipts land in <home>/delegations.jsonl \u2014 `chimera delegations` shows what\nthe brief cost vs the inline counterfactual, measured.",
+      "hidden": false,
+      "name": "brief",
+      "params": [
+        {
+          "default": "'examples/morning_brief/brief.yaml'",
+          "help": "Brief recipe (YAML with topics).",
+          "kind": "option",
+          "name": "recipe",
+          "opts": [
+            "--recipe"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Write the digest to this file (default: print only).",
+          "kind": "option",
+          "name": "out",
+          "opts": [
+            "--out"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "4",
+          "help": "Parallel research workers.",
+          "kind": "option",
+          "name": "max_workers",
+          "opts": [
+            "--max-workers"
+          ],
+          "required": false,
+          "type": "int"
+        }
+      ],
+      "path": "brief"
+    },
+    {
+      "deprecated": false,
+      "help": "Four-arm bench: weak-only vs mid-only vs cascade vs fusion. Calls real models.\n\nPublished criterion (stated up front): cascade >= mid-only pass rate at materially\nlower tokens-per-pass. The number reported is whatever is measured.",
+      "hidden": false,
+      "name": "cascade-bench",
+      "params": [
+        {
+          "default": "'hard'",
+          "help": "Task suite: hard | demo.",
+          "kind": "option",
+          "name": "tasks",
+          "opts": [
+            "--tasks"
+          ],
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "path": "cascade-bench"
+    },
+    {
+      "deprecated": false,
+      "help": "Interactive multi-turn chat \u2014 your terminal right-hand. Requires a key.",
+      "hidden": false,
+      "name": "chat",
+      "params": [
+        {
+          "help": "Override the model slug.",
+          "kind": "option",
+          "name": "model",
+          "opts": [
+            "--model",
+            "-m"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "6",
+          "help": "Max tool-calling steps per message.",
+          "kind": "option",
+          "name": "max_steps",
+          "opts": [
+            "--max-steps"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "default": "'.'",
+          "help": "Workspace root for tools.",
+          "kind": "option",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Route deep-reasoning turns through fusion.",
+          "kind": "option",
+          "name": "fuse",
+          "opts": [
+            "--fuse"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Tiered routing: weak -> gate -> mid -> gate -> fusion (cheap by default).",
+          "kind": "option",
+          "name": "cascade",
+          "opts": [
+            "--cascade"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Don't recall long-term memory.",
+          "kind": "option",
+          "name": "no_memory",
+          "opts": [
+            "--no-memory"
+          ],
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": "chat"
+    },
+    {
+      "deprecated": false,
+      "help": "Run a multi-agent crew on a task (Tier 3). Requires a provider key.",
+      "hidden": false,
+      "name": "crew",
+      "params": [
+        {
+          "help": "The task for the crew.",
+          "kind": "argument",
+          "name": "task",
+          "opts": [
+            "task"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "default": "'sequential'",
+          "help": "sequential | supervisor",
+          "kind": "option",
+          "name": "mode",
+          "opts": [
+            "--mode"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Override the model slug.",
+          "kind": "option",
+          "name": "model",
+          "opts": [
+            "--model",
+            "-m"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Use the fusion engine as the backend.",
+          "kind": "option",
+          "name": "fuse",
+          "opts": [
+            "--fuse"
+          ],
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": "crew"
+    },
+    {
+      "deprecated": false,
+      "help": "Tier-3: tool-using workers split ONE task, each in its own git worktree, verify-gated.\n\nDefine workers with repeated --worker 'name:instruction'. Each runs a real agent loop\n(search/read/edit) against an isolated checkout; non-conflicting edits that pass --verify\nmerge back, files two workers both changed are flagged as conflicts, and a worker whose\ncheck fails is rejected (its edits discarded). Needs a git repo to isolate.",
+      "hidden": false,
+      "name": "crew-isolated",
+      "params": [
+        {
+          "help": "The shared task the workers divide.",
+          "kind": "argument",
+          "name": "task",
+          "opts": [
+            "task"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "help": "A worker as 'name:instruction'; repeatable. Each edits in its own worktree.",
+          "kind": "option",
+          "name": "worker",
+          "opts": [
+            "--worker",
+            "-W"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "'.'",
+          "help": "Repository root (a git repo, to isolate).",
+          "kind": "option",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Override the model slug.",
+          "kind": "option",
+          "name": "model",
+          "opts": [
+            "--model",
+            "-m"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Per-worker gate: shell command run in each worktree (exit 0 to merge).",
+          "kind": "option",
+          "name": "verify",
+          "opts": [
+            "--verify"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "6",
+          "help": "Max tool-calling steps per worker.",
+          "kind": "option",
+          "name": "max_steps",
+          "opts": [
+            "--max-steps"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "default": "4",
+          "help": "Max concurrent isolated workers.",
+          "kind": "option",
+          "name": "max_workers",
+          "opts": [
+            "--max-workers"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "help": "A supervisor folds the merged results into one unified report.",
+          "kind": "option",
+          "name": "synthesize",
+          "opts": [
+            "--synthesize"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Route worker turns through fusion.",
+          "kind": "option",
+          "name": "fuse",
+          "opts": [
+            "--fuse"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Arm each worker's adaptive allowlist (dangerous-when-tainted tools require approval). The cross-agent collusion monitor runs regardless \u2014 it's always on for fan-out.",
+          "kind": "option",
+          "name": "taint",
+          "opts": [
+            "--taint"
+          ],
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": "crew-isolated"
+    },
+    {
+      "commands": [
+        {
+          "deprecated": false,
+          "help": "Add a cron, event- or webhook-triggered job.",
+          "hidden": false,
+          "name": "add",
+          "params": [
+            {
+              "help": "A human-readable name.",
+              "kind": "argument",
+              "name": "name",
+              "opts": [
+                "name"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "Cron expression, or an event/webhook name.",
+              "kind": "argument",
+              "name": "schedule",
+              "opts": [
+                "schedule"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "What to do (task description / skill).",
+              "kind": "argument",
+              "name": "action",
+              "opts": [
+                "action"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "Treat SCHEDULE as an event name.",
+              "kind": "option",
+              "name": "event",
+              "opts": [
+                "--event"
+              ],
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "help": "Fire on POST /webhook/<SCHEDULE> (needs 'chimera serve').",
+              "kind": "option",
+              "name": "webhook",
+              "opts": [
+                "--webhook"
+              ],
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "path": "cron add"
+        },
+        {
+          "deprecated": false,
+          "help": "Disable a job without deleting it.",
+          "hidden": false,
+          "name": "disable",
+          "params": [
+            {
+              "help": "The job id to disable.",
+              "kind": "argument",
+              "name": "job_id",
+              "opts": [
+                "job_id"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "cron disable"
+        },
+        {
+          "deprecated": false,
+          "help": "Enable a job (e.g. an agent-proposed one) and schedule its next run.",
+          "hidden": false,
+          "name": "enable",
+          "params": [
+            {
+              "help": "The job id to enable.",
+              "kind": "argument",
+              "name": "job_id",
+              "opts": [
+                "job_id"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "cron enable"
+        },
+        {
+          "deprecated": false,
+          "help": "Propose crons from recurring tasks and create the ones you confirm.\n\nEach proposal is shown for explicit confirmation (the human-in-the-loop approval\nthat keeps automation creation under control); confirmed jobs are validated and\ncreated enabled. ``--yes`` confirms all (use deliberately).",
+          "hidden": false,
+          "name": "learn",
+          "params": [
+            {
+              "default": "3",
+              "help": "Min repeats to propose.",
+              "kind": "option",
+              "name": "min_occurrences",
+              "opts": [
+                "--min"
+              ],
+              "required": false,
+              "type": "int"
+            },
+            {
+              "help": "Override the suggested cron schedule.",
+              "kind": "option",
+              "name": "schedule",
+              "opts": [
+                "--schedule"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Create every proposal without prompting.",
+              "kind": "option",
+              "name": "yes",
+              "opts": [
+                "--yes",
+                "-y"
+              ],
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "path": "cron learn"
+        },
+        {
+          "deprecated": false,
+          "help": "List scheduled jobs.",
+          "hidden": false,
+          "name": "list",
+          "params": [],
+          "path": "cron list"
+        },
+        {
+          "deprecated": false,
+          "help": "Remove a scheduled job by id.",
+          "hidden": false,
+          "name": "remove",
+          "params": [
+            {
+              "help": "The job id to remove.",
+              "kind": "argument",
+              "name": "job_id",
+              "opts": [
+                "job_id"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "cron remove"
+        }
+      ],
+      "deprecated": false,
+      "help": "Manage scheduled jobs (crons and event SOPs).",
+      "hidden": false,
+      "name": "cron",
+      "params": [],
+      "path": "cron"
+    },
+    {
+      "deprecated": false,
+      "help": "Measured vs counterfactual across delegations \u2014 what the hierarchy actually saved.",
+      "hidden": false,
+      "name": "delegations",
+      "params": [
+        {
+          "help": "Receipts file (default: <home>/delegations.jsonl).",
+          "kind": "option",
+          "name": "path",
+          "opts": [
+            "--path"
+          ],
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "path": "delegations"
+    },
+    {
+      "deprecated": false,
+      "help": "Deliverable Mode: produce a polished, self-contained artifact. Requires a key.",
+      "hidden": false,
+      "name": "deliver",
+      "params": [
+        {
+          "help": "What to produce (a report, plan, spec, README...).",
+          "kind": "argument",
+          "name": "request",
+          "opts": [
+            "request"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "help": "Write the deliverable to this file.",
+          "kind": "option",
+          "name": "out",
+          "opts": [
+            "--out",
+            "-o"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "'md'",
+          "help": "md | txt | html",
+          "kind": "option",
+          "name": "fmt",
+          "opts": [
+            "--format",
+            "-f"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Override the model slug.",
+          "kind": "option",
+          "name": "model",
+          "opts": [
+            "--model",
+            "-m"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Use the fusion engine for higher quality.",
+          "kind": "option",
+          "name": "fuse",
+          "opts": [
+            "--fuse"
+          ],
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": "deliver"
+    },
+    {
+      "deprecated": false,
+      "help": "Check the environment and configuration. With --fix, repair safe setup issues.",
+      "hidden": false,
+      "name": "doctor",
+      "params": [
+        {
+          "help": "Auto-repair safe setup issues (state dir, .env scaffold).",
+          "kind": "option",
+          "name": "fix",
+          "opts": [
+            "--fix"
+          ],
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": "doctor"
+    },
+    {
+      "deprecated": false,
+      "help": "Drift gate: check the workspace against a spec (Spec Growth). Exit 1 on drift.",
+      "hidden": false,
+      "name": "drift",
+      "params": [
+        {
+          "help": "Spec YAML file.",
+          "kind": "argument",
+          "name": "spec",
+          "opts": [
+            "spec"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "default": "'.'",
+          "help": "Workspace root.",
+          "kind": "option",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Check only this requirement id (project cards).",
+          "kind": "option",
+          "name": "only",
+          "opts": [
+            "--only"
+          ],
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "path": "drift"
+    },
+    {
+      "deprecated": false,
+      "help": "Stress-test continuous-evolution degradation: naive vs guarded. Requires a key.",
+      "hidden": false,
+      "name": "evoclaw",
+      "params": [
+        {
+          "default": "12",
+          "help": "Number of chained steps.",
+          "kind": "option",
+          "name": "length",
+          "opts": [
+            "--length"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "help": "Override the model slug.",
+          "kind": "option",
+          "name": "model",
+          "opts": [
+            "--model",
+            "-m"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "2",
+          "help": "Verify-or-revert retries per step (guarded).",
+          "kind": "option",
+          "name": "retries",
+          "opts": [
+            "--retries"
+          ],
+          "required": false,
+          "type": "int"
+        }
+      ],
+      "path": "evoclaw"
+    },
+    {
+      "commands": [
+        {
+          "deprecated": false,
+          "help": "Export a curated SFT or DPO dataset from trajectories.",
+          "hidden": false,
+          "name": "export",
+          "params": [
+            {
+              "help": "Output JSONL path.",
+              "kind": "option",
+              "name": "out",
+              "opts": [
+                "--out"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "default": "'sft'",
+              "help": "sft | dpo",
+              "kind": "option",
+              "name": "fmt",
+              "opts": [
+                "--format"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Trajectory JSONL (default: <home>/trajectories.jsonl).",
+              "kind": "option",
+              "name": "traj",
+              "opts": [
+                "--traj"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "default": "0.0",
+              "help": "Drop examples below this reward.",
+              "kind": "option",
+              "name": "min_reward",
+              "opts": [
+                "--min-reward"
+              ],
+              "required": false,
+              "type": "float"
+            },
+            {
+              "help": "Keep duplicate examples.",
+              "kind": "option",
+              "name": "no_dedup",
+              "opts": [
+                "--no-dedup"
+              ],
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "default": "0.0",
+              "help": "DPO: min reward margin chosen \u2212 rejected.",
+              "kind": "option",
+              "name": "min_margin",
+              "opts": [
+                "--min-margin"
+              ],
+              "required": false,
+              "type": "float"
+            },
+            {
+              "default": "0",
+              "help": "Recipe: keep only traces with >= N steps.",
+              "kind": "option",
+              "name": "min_steps",
+              "opts": [
+                "--min-steps"
+              ],
+              "required": false,
+              "type": "int"
+            },
+            {
+              "help": "Recipe: at most one SFT example per task.",
+              "kind": "option",
+              "name": "diverse",
+              "opts": [
+                "--diverse"
+              ],
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "help": "Keep only traces whose step-following score >= this (SkillCoach).",
+              "kind": "option",
+              "name": "min_process",
+              "opts": [
+                "--min-process"
+              ],
+              "required": false,
+              "type": "float"
+            }
+          ],
+          "path": "evolve export"
+        },
+        {
+          "deprecated": false,
+          "help": "Watch evolution health; retract the most recent skill on a SIGNIFICANT regression (M19-A6).",
+          "hidden": false,
+          "name": "guard",
+          "params": [
+            {
+              "default": "0",
+              "help": "Limit demo tasks (0 = all).",
+              "kind": "option",
+              "name": "limit",
+              "opts": [
+                "--limit"
+              ],
+              "required": false,
+              "type": "int"
+            },
+            {
+              "help": "Override the model slug.",
+              "kind": "option",
+              "name": "model",
+              "opts": [
+                "--model",
+                "-m"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Also roll back if second-half mean cost exceeds first by more than this.",
+              "kind": "option",
+              "name": "cost_drift_tol",
+              "opts": [
+                "--cost-drift-tol"
+              ],
+              "required": false,
+              "type": "float"
+            },
+            {
+              "help": "Retire the most recent skill IF a SIGNIFICANT regression is measured.",
+              "kind": "option",
+              "name": "apply",
+              "opts": [
+                "--apply"
+              ],
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "path": "evolve guard"
+        },
+        {
+          "deprecated": false,
+          "help": "Emit a runnable LoRA training recipe (train.py + README + requirements).",
+          "hidden": false,
+          "name": "recipe",
+          "params": [
+            {
+              "help": "Directory for the training recipe.",
+              "kind": "option",
+              "name": "out",
+              "opts": [
+                "--out"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "default": "'sft'",
+              "help": "sft | dpo",
+              "kind": "option",
+              "name": "fmt",
+              "opts": [
+                "--format"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "default": "'meta-llama/Llama-3.1-8B-Instruct'",
+              "kind": "option",
+              "name": "base_model",
+              "opts": [
+                "--base-model"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "default": "'dataset.jsonl'",
+              "help": "Dataset filename the script reads.",
+              "kind": "option",
+              "name": "dataset",
+              "opts": [
+                "--dataset"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "evolve recipe"
+        },
+        {
+          "deprecated": false,
+          "help": "GEPA-refine a skill from verified trajectories, gated on non-regressing transfer (M19-A5).",
+          "hidden": false,
+          "name": "refine",
+          "params": [
+            {
+              "help": "Name of the learned skill to refine.",
+              "kind": "argument",
+              "name": "skill_name",
+              "opts": [
+                "skill_name"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "Trajectory JSONL (default: <home>/trajectories.jsonl).",
+              "kind": "option",
+              "name": "traj",
+              "opts": [
+                "--traj"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Override the model.",
+              "kind": "option",
+              "name": "model",
+              "opts": [
+                "--model",
+                "-m"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "default": "20",
+              "help": "GEPA rollout budget.",
+              "kind": "option",
+              "name": "budget",
+              "opts": [
+                "--budget"
+              ],
+              "required": false,
+              "type": "int"
+            },
+            {
+              "default": "1.0",
+              "help": "Only mine trajectories at/above this reward (1.0 = verified).",
+              "kind": "option",
+              "name": "min_reward",
+              "opts": [
+                "--min-reward"
+              ],
+              "required": false,
+              "type": "float"
+            },
+            {
+              "help": "Persist the refined skill IF it passes the transfer gate.",
+              "kind": "option",
+              "name": "apply",
+              "opts": [
+                "--apply"
+              ],
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "path": "evolve refine"
+        },
+        {
+          "deprecated": false,
+          "help": "One rejection-sampling fine-tuning round, gated by an honest A/B on two bench result files.\n\nRejection-samples the collected trajectories (successes at/above the reward bar), then promotes\nthe round ONLY if the candidate beats the baseline with a confidence interval that excludes zero\n\u2014 no lift, no promotion, no training on noise. Artifacts are withheld for an unpromoted round\nunless ``--force``. Feed ``--baseline``/``--candidate`` the pass/fail lists two bench runs produce.",
+          "hidden": false,
+          "name": "rft",
+          "params": [
+            {
+              "help": "JSON list of baseline bench pass/fail.",
+              "kind": "option",
+              "name": "baseline",
+              "opts": [
+                "--baseline"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "JSON list of candidate bench pass/fail.",
+              "kind": "option",
+              "name": "candidate",
+              "opts": [
+                "--candidate"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "Trajectory JSONL (default: <home>/trajectories.jsonl).",
+              "kind": "option",
+              "name": "traj",
+              "opts": [
+                "--traj"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "default": "0.5",
+              "help": "Rejection-sampling reward bar.",
+              "kind": "option",
+              "name": "min_reward",
+              "opts": [
+                "--min-reward"
+              ],
+              "required": false,
+              "type": "float"
+            },
+            {
+              "default": "30",
+              "help": "Accepted examples needed to gate.",
+              "kind": "option",
+              "name": "min_examples",
+              "opts": [
+                "--min-examples"
+              ],
+              "required": false,
+              "type": "int"
+            },
+            {
+              "default": "0",
+              "help": "Keep at most this many accepted per prompt (0 = all).",
+              "kind": "option",
+              "name": "top_k",
+              "opts": [
+                "--top-k"
+              ],
+              "required": false,
+              "type": "int"
+            },
+            {
+              "help": "If promoted, write dataset + recipe here.",
+              "kind": "option",
+              "name": "out",
+              "opts": [
+                "--out"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Export even if the round is not promoted.",
+              "kind": "option",
+              "name": "force",
+              "opts": [
+                "--force"
+              ],
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "path": "evolve rft"
+        },
+        {
+          "deprecated": false,
+          "help": "Show how much training signal the collected trajectories hold.",
+          "hidden": false,
+          "name": "status",
+          "params": [
+            {
+              "help": "Trajectory JSONL (default: <home>/trajectories.jsonl).",
+              "kind": "option",
+              "name": "traj",
+              "opts": [
+                "--traj"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "default": "0.0",
+              "help": "Drop examples below this reward.",
+              "kind": "option",
+              "name": "min_reward",
+              "opts": [
+                "--min-reward"
+              ],
+              "required": false,
+              "type": "float"
+            },
+            {
+              "default": "30",
+              "help": "Examples needed before training is worth it.",
+              "kind": "option",
+              "name": "min_examples",
+              "opts": [
+                "--min-examples"
+              ],
+              "required": false,
+              "type": "int"
+            }
+          ],
+          "path": "evolve status"
+        },
+        {
+          "deprecated": false,
+          "help": "Self-optimize the agent spec (OpenJarvis meta-search) against the daily scenarios.\n\nEach round a model proposes a coordinated edit to the spec; the candidate is scored on\nthe daily scenarios and kept only on non-regression. Uses real model calls.",
+          "hidden": false,
+          "name": "tune",
+          "params": [
+            {
+              "default": "2",
+              "help": "Meta-search rounds.",
+              "kind": "option",
+              "name": "rounds",
+              "opts": [
+                "--rounds"
+              ],
+              "required": false,
+              "type": "int"
+            },
+            {
+              "help": "Base model for the spec.",
+              "kind": "option",
+              "name": "model",
+              "opts": [
+                "--model"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "default": "8",
+              "help": "Initial runtime step budget.",
+              "kind": "option",
+              "name": "max_steps",
+              "opts": [
+                "--max-steps"
+              ],
+              "required": false,
+              "type": "int"
+            }
+          ],
+          "path": "evolve tune"
+        }
+      ],
+      "deprecated": false,
+      "help": "Opt-in model evolution (curate trajectories -> LoRA/DPO recipe).",
+      "hidden": false,
+      "name": "evolve",
+      "params": [],
+      "path": "evolve"
+    },
+    {
+      "deprecated": false,
+      "help": "Locate relevant code via the isolated Context Explorer subagent (FastContext-style).\n\nReturns only a compact file:line evidence block \u2014 the exploration turns never touch your\ncontext. A cheap model is usually the right call here; localization is a narrow task.",
+      "hidden": false,
+      "name": "explore",
+      "params": [
+        {
+          "help": "What to locate in the repository.",
+          "kind": "argument",
+          "name": "query",
+          "opts": [
+            "query"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "default": "'.'",
+          "help": "Repository root to explore.",
+          "kind": "option",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Model for the explorer (a cheap one is fine).",
+          "kind": "option",
+          "name": "model",
+          "opts": [
+            "--model",
+            "-m"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "8",
+          "help": "Max exploration turns.",
+          "kind": "option",
+          "name": "max_turns",
+          "opts": [
+            "--max-turns"
+          ],
+          "required": false,
+          "type": "int"
+        }
+      ],
+      "path": "explore"
+    },
+    {
+      "deprecated": false,
+      "help": "Show optional capabilities and what each needs (a key or a dependency).",
+      "hidden": false,
+      "name": "features",
+      "params": [],
+      "path": "features"
+    },
+    {
+      "deprecated": false,
+      "help": "Run a prompt through the LLM-Fusion engine (panel -> judge -> synthesizer).",
+      "hidden": false,
+      "name": "fuse",
+      "params": [
+        {
+          "help": "The prompt to run through the fusion engine.",
+          "kind": "argument",
+          "name": "prompt",
+          "opts": [
+            "prompt"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "help": "Show panel answers + judge analysis.",
+          "kind": "option",
+          "name": "show_panel",
+          "opts": [
+            "--show-panel"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Override selective fusion (default: from settings).",
+          "kind": "option",
+          "name": "selective",
+          "opts": [
+            "--selective"
+          ],
+          "required": false,
+          "secondary_opts": [
+            "--full"
+          ],
+          "type": "boolean"
+        },
+        {
+          "default": "1",
+          "help": "Cheap fusion: sample ONE model N times and take the consensus (self-consistency), instead of a multi-model panel.",
+          "kind": "option",
+          "name": "best_of",
+          "opts": [
+            "--best-of"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "help": "With --best-of: pick the best sample by a verifier score instead of majority vote (Weaver-lite).",
+          "kind": "option",
+          "name": "verify_select",
+          "opts": [
+            "--verify-select"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Model for --best-of self-consistency.",
+          "kind": "option",
+          "name": "model",
+          "opts": [
+            "--model",
+            "-m"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Print the itemized receipt: per-advisor cost at each model's rate.",
+          "kind": "option",
+          "name": "show_cost",
+          "opts": [
+            "--show-cost"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Append the run's cost receipt to this JSONL (for cost\u00d7quality analysis).",
+          "kind": "option",
+          "name": "receipt",
+          "opts": [
+            "--receipt"
+          ],
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "path": "fuse"
+    },
+    {
+      "deprecated": false,
+      "help": "A/B the fusion engine: full vs selective (tokens + accuracy). Calls real models.",
+      "hidden": false,
+      "name": "fusion-bench",
+      "params": [
+        {
+          "default": "'hard'",
+          "help": "Task suite: hard | demo.",
+          "kind": "option",
+          "name": "tasks",
+          "opts": [
+            "--tasks"
+          ],
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "path": "fusion-bench"
+    },
+    {
+      "deprecated": false,
+      "help": "Summarize persisted fusion receipts into an honest cost\u00d7quality curve.",
+      "hidden": false,
+      "name": "fusion-receipts",
+      "params": [
+        {
+          "help": "JSONL of receipts written by `fuse --receipt`.",
+          "kind": "argument",
+          "name": "path",
+          "opts": [
+            "path"
+          ],
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "path": "fusion-receipts"
+    },
+    {
+      "deprecated": false,
+      "help": "Show the governance verdict (allow/warn/review/block) for an action.",
+      "hidden": false,
+      "name": "guard",
+      "params": [
+        {
+          "help": "The action/command to evaluate.",
+          "kind": "argument",
+          "name": "action",
+          "opts": [
+            "action"
+          ],
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "path": "guard"
+    },
+    {
+      "deprecated": false,
+      "help": "Paired A/B: single-agent (all docs inline) vs the hierarchy (one worker per doc). Calls real models.\n\nBoth arms run on the SAME model so the comparison isolates the ORCHESTRATION (minimal-context\nscoping + budgets + contracts), not model strength. Quality = paired McNemar/Wilson (the only place\n\"significant\" appears); tokens = measured totals per arm, with no significance claim on cost.\n\n`--multistep` switches to the companion suite where the token crossover lives: a single agent\nre-sends every document on every turn (cost grows with turns), while scoped workers pay each doc\n~once \u2014 and prices the measured cache reduction via the caching model.",
+      "hidden": false,
+      "name": "hierarchy-bench",
+      "params": [
+        {
+          "help": "Mid/worker model \u2014 BOTH arms use it, to isolate orchestration. Defaults to the tier ladder's mid.",
+          "kind": "option",
+          "name": "model",
+          "opts": [
+            "--model",
+            "-m"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Top model for synthesis. Defaults to --model (same family keeps the isolation).",
+          "kind": "option",
+          "name": "top_model",
+          "opts": [
+            "--top-model"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "''",
+          "help": "Comma-separated task ids to filter (default: all 10 synthetic tasks).",
+          "kind": "option",
+          "name": "tasks",
+          "opts": [
+            "--tasks"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "4",
+          "help": "Max concurrent workers in the hierarchy arm.",
+          "kind": "option",
+          "name": "max_workers",
+          "opts": [
+            "--max-workers"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "help": "Write the JSON summary to this path.",
+          "kind": "option",
+          "name": "out",
+          "opts": [
+            "--out"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Run the MULTI-STEP suite instead (single growing context vs per-step scoped workers, over large docs) \u2014 the regime where the hierarchy actually saves tokens. Also reports a caching-aware dollar reduction.",
+          "kind": "option",
+          "name": "multistep",
+          "opts": [
+            "--multistep"
+          ],
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": "hierarchy-bench"
+    },
+    {
+      "deprecated": false,
+      "help": "First-run setup: create .env, set a provider key, and point you at a real example.",
+      "hidden": false,
+      "name": "init",
+      "params": [
+        {
+          "help": "Your OpenRouter API key (sk-or-...); one key = 100+ models.",
+          "kind": "option",
+          "name": "openrouter_key",
+          "opts": [
+            "--openrouter-key"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Default model slug to set (optional).",
+          "kind": "option",
+          "name": "model",
+          "opts": [
+            "--model"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Non-interactive: never prompt.",
+          "kind": "option",
+          "name": "yes",
+          "opts": [
+            "--yes",
+            "-y"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Project dir for the .env (default: cwd).",
+          "kind": "option",
+          "name": "home",
+          "opts": [
+            "--home"
+          ],
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "path": "init"
+    },
+    {
+      "commands": [
+        {
+          "deprecated": false,
+          "help": "Add a card to the backlog.",
+          "hidden": false,
+          "name": "add",
+          "params": [
+            {
+              "help": "Short card title.",
+              "kind": "argument",
+              "name": "title",
+              "opts": [
+                "title"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "Task text to run (defaults to title).",
+              "kind": "option",
+              "name": "action",
+              "opts": [
+                "--action",
+                "-a"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "default": "'solve'",
+              "help": "Who works it: solve | crew | the id of one of your agents (`chimera agents`).",
+              "kind": "option",
+              "name": "lane",
+              "opts": [
+                "--lane",
+                "-l"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Verify command for the solve lane (exit 0).",
+              "kind": "option",
+              "name": "verify",
+              "opts": [
+                "--verify"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "kanban add"
+        },
+        {
+          "deprecated": false,
+          "help": "Show the board, column by column.",
+          "hidden": false,
+          "name": "board",
+          "params": [],
+          "path": "kanban board"
+        },
+        {
+          "deprecated": false,
+          "help": "Turn recurring tasks (from the experience buffer) into backlog cards.\n\nUses the cron-learner's recurrence detector; each card is confirmed (or --yes), and\na task already on the board is skipped \u2014 so re-running is safe.",
+          "hidden": false,
+          "name": "learn",
+          "params": [
+            {
+              "default": "3",
+              "help": "Min repeats to turn into a card.",
+              "kind": "option",
+              "name": "min_occurrences",
+              "opts": [
+                "--min"
+              ],
+              "required": false,
+              "type": "int"
+            },
+            {
+              "default": "'solve'",
+              "help": "Lane for the created cards.",
+              "kind": "option",
+              "name": "lane",
+              "opts": [
+                "--lane",
+                "-l"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Add every card without prompting.",
+              "kind": "option",
+              "name": "yes",
+              "opts": [
+                "--yes",
+                "-y"
+              ],
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "path": "kanban learn"
+        },
+        {
+          "deprecated": false,
+          "help": "Move a card to another column.",
+          "hidden": false,
+          "name": "move",
+          "params": [
+            {
+              "help": "Card id.",
+              "kind": "argument",
+              "name": "card_id",
+              "opts": [
+                "card_id"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "backlog | doing | review | done.",
+              "kind": "argument",
+              "name": "column",
+              "opts": [
+                "column"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "kanban move"
+        },
+        {
+          "deprecated": false,
+          "help": "Remove a card.",
+          "hidden": false,
+          "name": "rm",
+          "params": [
+            {
+              "help": "Card id.",
+              "kind": "argument",
+              "name": "card_id",
+              "opts": [
+                "card_id"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "kanban rm"
+        },
+        {
+          "deprecated": false,
+          "help": "Dispatch backlog cards through their lanes (solve/crew). Requires a key.",
+          "hidden": false,
+          "name": "run",
+          "params": [
+            {
+              "help": "Max backlog cards to dispatch.",
+              "kind": "option",
+              "name": "limit",
+              "opts": [
+                "--limit",
+                "-n"
+              ],
+              "required": false,
+              "type": "int"
+            },
+            {
+              "default": "'.'",
+              "help": "Workspace for the solve lane.",
+              "kind": "option",
+              "name": "workspace",
+              "opts": [
+                "--workspace",
+                "-w"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Override the model slug.",
+              "kind": "option",
+              "name": "model",
+              "opts": [
+                "--model",
+                "-m"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "kanban run"
+        }
+      ],
+      "deprecated": false,
+      "help": "Task board with worker lanes (backlog/doing/review/done).",
+      "hidden": false,
+      "name": "kanban",
+      "params": [],
+      "path": "kanban"
+    },
+    {
+      "deprecated": false,
+      "help": "SDLC crew: plan -> build -> test -> review with verify-or-revert. Requires a key.",
+      "hidden": false,
+      "name": "lifecycle",
+      "params": [
+        {
+          "help": "The feature/task to take through the SDLC.",
+          "kind": "argument",
+          "name": "task",
+          "opts": [
+            "task"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "help": "Test command for the test stage (exit 0).",
+          "kind": "option",
+          "name": "verify",
+          "opts": [
+            "--verify"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "'.'",
+          "help": "Workspace root.",
+          "kind": "option",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Override the model slug.",
+          "kind": "option",
+          "name": "model",
+          "opts": [
+            "--model",
+            "-m"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "2",
+          "help": "Build/test verify-or-revert budget.",
+          "kind": "option",
+          "name": "max_attempts",
+          "opts": [
+            "--max-attempts"
+          ],
+          "required": false,
+          "type": "int"
+        }
+      ],
+      "path": "lifecycle"
+    },
+    {
+      "deprecated": false,
+      "help": "Render the maturity scorecard: surfaces \u00d7 coverage-IDs proven by real tests.",
+      "hidden": false,
+      "name": "maturity",
+      "params": [
+        {
+          "default": "'tests'",
+          "help": "Path to the tests directory (the evidence base).",
+          "kind": "option",
+          "name": "tests_dir",
+          "opts": [
+            "--tests"
+          ],
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "path": "maturity"
+    },
+    {
+      "commands": [
+        {
+          "deprecated": false,
+          "help": "Add (or replace-by-name) an MCP server. Persists to .chimera/mcp.json \u2014 no connect.",
+          "hidden": false,
+          "name": "add",
+          "params": [
+            {
+              "help": "A unique name for the server (namespaces its tools).",
+              "kind": "argument",
+              "name": "name",
+              "opts": [
+                "name"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "The launch command (e.g. npx, uvx, python).",
+              "kind": "option",
+              "name": "command",
+              "opts": [
+                "--command",
+                "-c"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "A command argument (repeatable).",
+              "kind": "option",
+              "name": "arg",
+              "opts": [
+                "--arg",
+                "-a"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "An env var as K=V (repeatable).",
+              "kind": "option",
+              "name": "env",
+              "opts": [
+                "--env",
+                "-e"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "mcp add"
+        },
+        {
+          "deprecated": false,
+          "help": "List configured MCP servers (name, command + args, env key names). No connect.",
+          "hidden": false,
+          "name": "list",
+          "params": [],
+          "path": "mcp list"
+        },
+        {
+          "deprecated": false,
+          "help": "Remove a configured MCP server by name.",
+          "hidden": false,
+          "name": "remove",
+          "params": [
+            {
+              "help": "The server name to remove.",
+              "kind": "argument",
+              "name": "name",
+              "opts": [
+                "name"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "mcp remove"
+        },
+        {
+          "deprecated": false,
+          "help": "Live-connect a configured server and print the tools it exposes (or a clear error).\n\nThis is the ONLY MCP subcommand that connects (spawns the server + runs the async handshake). It\nis the sole honest proof a server is reachable. Needs the 'mcp' extra and the server's own runtime\n(e.g. Node for an npx server).",
+          "hidden": false,
+          "name": "test",
+          "params": [
+            {
+              "help": "The configured server to live-test.",
+              "kind": "argument",
+              "name": "name",
+              "opts": [
+                "name"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "default": "12.0",
+              "help": "Connect timeout in seconds.",
+              "kind": "option",
+              "name": "timeout",
+              "opts": [
+                "--timeout"
+              ],
+              "required": false,
+              "type": "float"
+            }
+          ],
+          "path": "mcp test"
+        }
+      ],
+      "deprecated": false,
+      "help": "Configure MCP servers (persisted to .chimera/mcp.json). Terminal-first source of truth.",
+      "hidden": false,
+      "name": "mcp",
+      "params": [],
+      "path": "mcp"
+    },
+    {
+      "commands": [
+        {
+          "deprecated": false,
+          "help": "Remember a fact (ADD / UPDATE / NOOP, deduped).",
+          "hidden": false,
+          "name": "add",
+          "params": [
+            {
+              "help": "The fact to remember.",
+              "kind": "argument",
+              "name": "content",
+              "opts": [
+                "content"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "Optional dedup key.",
+              "kind": "option",
+              "name": "key",
+              "opts": [
+                "--key"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Store as a persona fact (part of the cross-session profile).",
+              "kind": "option",
+              "name": "persona",
+              "opts": [
+                "--persona"
+              ],
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "path": "memory add"
+        },
+        {
+          "deprecated": false,
+          "help": "Merge clusters of similar memories into one LLM-summarised fact (opt-in write).",
+          "hidden": false,
+          "name": "consolidate",
+          "params": [
+            {
+              "default": "0.5",
+              "help": "Similarity (Jaccard) to cluster facts; lower = merges more.",
+              "kind": "option",
+              "name": "threshold",
+              "opts": [
+                "--threshold"
+              ],
+              "required": false,
+              "type": "float"
+            }
+          ],
+          "path": "memory consolidate"
+        },
+        {
+          "deprecated": false,
+          "help": "Build an entity-relation graph from long-term memory and show it.",
+          "hidden": false,
+          "name": "graph",
+          "params": [
+            {
+              "help": "Show relations for one entity.",
+              "kind": "option",
+              "name": "entity",
+              "opts": [
+                "--entity",
+                "-e"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "memory graph"
+        },
+        {
+          "deprecated": false,
+          "help": "List all memory items.",
+          "hidden": false,
+          "name": "list",
+          "params": [],
+          "path": "memory list"
+        },
+        {
+          "deprecated": false,
+          "help": "Show the consolidated cross-session user profile (persona facts).",
+          "hidden": false,
+          "name": "profile",
+          "params": [],
+          "path": "memory profile"
+        },
+        {
+          "deprecated": false,
+          "help": "Prune low-value memory under a budget. Dry-run by default; persona/profile facts are never pruned.",
+          "hidden": false,
+          "name": "prune",
+          "params": [
+            {
+              "default": "50",
+              "help": "Keep the N highest-value memories.",
+              "kind": "option",
+              "name": "max_items",
+              "opts": [
+                "--max"
+              ],
+              "required": false,
+              "type": "int"
+            },
+            {
+              "help": "Actually delete. Default is a dry-run preview (no data lost).",
+              "kind": "option",
+              "name": "apply",
+              "opts": [
+                "--apply"
+              ],
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "path": "memory prune"
+        },
+        {
+          "deprecated": false,
+          "help": "Search memory (keyword).",
+          "hidden": false,
+          "name": "search",
+          "params": [
+            {
+              "help": "Search query.",
+              "kind": "argument",
+              "name": "query",
+              "opts": [
+                "query"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "default": "5",
+              "help": "Max results.",
+              "kind": "option",
+              "name": "k",
+              "opts": [
+                "--k"
+              ],
+              "required": false,
+              "type": "int"
+            }
+          ],
+          "path": "memory search"
+        }
+      ],
+      "deprecated": false,
+      "help": "Curated long-term memory.",
+      "hidden": false,
+      "name": "memory",
+      "params": [],
+      "path": "memory"
+    },
+    {
+      "deprecated": false,
+      "help": "Measure recall@k as memory grows \u2014 lexical vs paraphrase.\n\nDefault (keyword search, no key needed) surfaces the honest ceiling: exact-token recall\nholds at scale, but paraphrase recall collapses. Pass ``--semantic`` to re-run with the\nembedding recall path and watch the paraphrase column lift \u2014 that delta is the whole\npoint of M11b.",
+      "hidden": false,
+      "name": "memory-bench",
+      "params": [
+        {
+          "default": "'50,200,1000'",
+          "help": "Comma-separated memory sizes to sweep.",
+          "kind": "option",
+          "name": "sizes",
+          "opts": [
+            "--sizes"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Use embedding recall (needs an embeddings key) to measure the lift.",
+          "kind": "option",
+          "name": "semantic",
+          "opts": [
+            "--semantic"
+          ],
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": "memory-bench"
+    },
+    {
+      "deprecated": false,
+      "help": "Meta-agent: design a specialized agent blueprint for a task. Requires a key.",
+      "hidden": false,
+      "name": "meta",
+      "params": [
+        {
+          "help": "The task to design a specialized agent for.",
+          "kind": "argument",
+          "name": "task",
+          "opts": [
+            "task"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "help": "Override the model slug.",
+          "kind": "option",
+          "name": "model",
+          "opts": [
+            "--model",
+            "-m"
+          ],
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "path": "meta"
+    },
+    {
+      "deprecated": false,
+      "help": "Import config + skills from another agent; --apply also merges long-term memory.",
+      "hidden": false,
+      "name": "migrate",
+      "params": [
+        {
+          "help": "Source agent: hermes | openclaw.",
+          "kind": "argument",
+          "name": "source",
+          "opts": [
+            "source"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "help": "Path to the source agent's home directory.",
+          "kind": "argument",
+          "name": "path",
+          "opts": [
+            "path"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "help": "Write artifacts (default: dry-run preview).",
+          "kind": "option",
+          "name": "apply",
+          "opts": [
+            "--apply"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Target Chimera home (default: from config).",
+          "kind": "option",
+          "name": "home",
+          "opts": [
+            "--home"
+          ],
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "path": "migrate"
+    },
+    {
+      "commands": [
+        {
+          "deprecated": false,
+          "help": "Browse the curated multi-vendor catalog (suggestions \u2014 any slug works).",
+          "hidden": false,
+          "name": "catalog",
+          "params": [
+            {
+              "help": "Filter: weak, mid, or top.",
+              "kind": "option",
+              "name": "tier",
+              "opts": [
+                "--tier"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Filter by vendor substring.",
+              "kind": "option",
+              "name": "vendor",
+              "opts": [
+                "--vendor"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "models catalog"
+        },
+        {
+          "deprecated": false,
+          "help": "Pin a tier to a model (or set the cost mode). Explicit pins always beat the mode.",
+          "hidden": false,
+          "name": "set",
+          "params": [
+            {
+              "help": "weak | mid | top (alias: orchestrator) | mode",
+              "kind": "argument",
+              "name": "role",
+              "opts": [
+                "role"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "A model slug (any vendor), 'auto' to unpin, or a cost mode for 'mode'.",
+              "kind": "argument",
+              "name": "value",
+              "opts": [
+                "value"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "models set"
+        }
+      ],
+      "deprecated": false,
+      "help": "Model assignment: tier ladder (weak/mid/top), cost mode, and the multi-vendor catalog.",
+      "hidden": false,
+      "name": "models",
+      "params": [],
+      "path": "models"
+    },
+    {
+      "deprecated": false,
+      "help": "Hierarchical run: top model decomposes/synthesizes, budgeted mid workers execute.\n\nWrite-shaped and trivial tasks FALL BACK to the single-agent path by design\n(the evidence says multi-agent loses there); the fallback is logged with its\ncounterfactual so `chimera delegations` shows the decision.",
+      "hidden": false,
+      "name": "orchestrate",
+      "params": [
+        {
+          "help": "The task (read-heavy multi-part tasks benefit most).",
+          "kind": "argument",
+          "name": "task",
+          "opts": [
+            "task"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "default": "4",
+          "help": "Parallel worker cap.",
+          "kind": "option",
+          "name": "max_workers",
+          "opts": [
+            "--max-workers"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "help": "Token budget per delegation (default: settings).",
+          "kind": "option",
+          "name": "budget",
+          "opts": [
+            "--budget"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "help": "Show classification + decomposition + estimate; zero worker spend.",
+          "kind": "option",
+          "name": "dry_run",
+          "opts": [
+            "--dry-run"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Model slug for the spot-check auditor (a DISTINCT/cross-provider model that grades a worker's summary against its raw output). Default: the weak tier.",
+          "kind": "option",
+          "name": "verify_model",
+          "opts": [
+            "--verify-model"
+          ],
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "path": "orchestrate"
+    },
+    {
+      "commands": [
+        {
+          "deprecated": false,
+          "help": "Feed it (raises fullness).",
+          "hidden": false,
+          "name": "feed",
+          "params": [],
+          "path": "pet feed"
+        },
+        {
+          "deprecated": false,
+          "help": "Adopt a fresh companion (resets stats).",
+          "hidden": false,
+          "name": "new",
+          "params": [
+            {
+              "default": "'Chimi'",
+              "help": "Companion name.",
+              "kind": "option",
+              "name": "name",
+              "opts": [
+                "--name"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "default": "'chimera'",
+              "help": "Companion species.",
+              "kind": "option",
+              "name": "species",
+              "opts": [
+                "--species"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "pet new"
+        },
+        {
+          "deprecated": false,
+          "help": "Play with it (raises happiness; costs energy + a little fullness).",
+          "hidden": false,
+          "name": "play",
+          "params": [],
+          "path": "pet play"
+        },
+        {
+          "deprecated": false,
+          "help": "Let it rest (restores energy).",
+          "hidden": false,
+          "name": "rest",
+          "params": [],
+          "path": "pet rest"
+        },
+        {
+          "deprecated": false,
+          "help": "Check on your companion (stats drift while you're away).",
+          "hidden": false,
+          "name": "status",
+          "params": [],
+          "path": "pet status"
+        }
+      ],
+      "deprecated": false,
+      "help": "Your virtual companion \u2014 a chimera that needs care.",
+      "hidden": false,
+      "name": "pet",
+      "params": [],
+      "path": "pet"
+    },
+    {
+      "commands": [
+        {
+          "deprecated": false,
+          "help": "Manually add a bullet (a near-duplicate reinforces the existing one).",
+          "hidden": false,
+          "name": "add",
+          "params": [
+            {
+              "help": "The strategy/pitfall bullet to add.",
+              "kind": "argument",
+              "name": "content",
+              "opts": [
+                "content"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "default": "'strategy'",
+              "help": "strategy | pitfall | check.",
+              "kind": "option",
+              "name": "section",
+              "opts": [
+                "--section"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "playbook add"
+        },
+        {
+          "deprecated": false,
+          "help": "Reflect on a run outcome and apply incremental deltas (add/reinforce/deprecate).",
+          "hidden": false,
+          "name": "curate",
+          "params": [
+            {
+              "help": "The task the outcome is for.",
+              "kind": "option",
+              "name": "task",
+              "opts": [
+                "--task"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "What happened (success/failure + details).",
+              "kind": "option",
+              "name": "outcome",
+              "opts": [
+                "--outcome"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "Model slug for the reflect+curate call.",
+              "kind": "option",
+              "name": "model",
+              "opts": [
+                "--model"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "playbook curate"
+        },
+        {
+          "deprecated": false,
+          "help": "Grow-and-refine: merge duplicate bullets and cap the size (deprecates the weakest).",
+          "hidden": false,
+          "name": "refine",
+          "params": [],
+          "path": "playbook refine"
+        },
+        {
+          "deprecated": false,
+          "help": "Print the current active playbook (top strategies by score).",
+          "hidden": false,
+          "name": "show",
+          "params": [],
+          "path": "playbook show"
+        }
+      ],
+      "deprecated": false,
+      "help": "ACE strategy playbook \u2014 incremental, delta-curated guidance for the agent.",
+      "hidden": false,
+      "name": "playbook",
+      "params": [],
+      "path": "playbook"
+    },
+    {
+      "deprecated": false,
+      "help": "PROBE best-arm identification with a cheap-proxy control variate (M18-5).\n\n\"Which model/config is best?\" where each expensive reward (a real grade) is paired with a cheap\nproxy (a weak judge) of unknown correlation. PROBE uses the proxy as a control variate so the\nestimate needs FEWER expensive draws the better the proxy correlates \u2014 and stays unbiased when the\nproxy is useless. Prints each arm's adjusted mean \u00b1 interval, the winner, and \u2014 if not yet\nconfident \u2014 the arm to sample next. Feed it recorded (proxy, reward) observations from a bench.",
+      "hidden": false,
+      "name": "probe-select",
+      "params": [
+        {
+          "help": "JSON: {\"arm\": [[proxy, reward-or-null], ...], ...}. Omit when using --from-log.",
+          "kind": "argument",
+          "name": "data",
+          "opts": [
+            "data"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Read observations from a ProbeLog JSONL (e.g. <home>/probe.jsonl written by `solve --probe-log`).",
+          "kind": "option",
+          "name": "from_log",
+          "opts": [
+            "--from-log"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "0.1",
+          "help": "Confidence level (smaller = stricter).",
+          "kind": "option",
+          "name": "delta",
+          "opts": [
+            "--delta"
+          ],
+          "required": false,
+          "type": "float"
+        },
+        {
+          "default": "2",
+          "help": "Expensive rewards required per arm before deciding.",
+          "kind": "option",
+          "name": "min_reward",
+          "opts": [
+            "--min-reward"
+          ],
+          "required": false,
+          "type": "int"
+        }
+      ],
+      "path": "probe-select"
+    },
+    {
+      "commands": [
+        {
+          "deprecated": false,
+          "help": "Remove a stored fact.",
+          "hidden": false,
+          "name": "forget",
+          "params": [
+            {
+              "help": "The exact fact to remove (or 'name' to clear the name).",
+              "kind": "argument",
+              "name": "value",
+              "opts": [
+                "value"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "profile forget"
+        },
+        {
+          "deprecated": false,
+          "help": "Add a profile fact (name replaces; the list kinds append with dedup).",
+          "hidden": false,
+          "name": "set",
+          "params": [
+            {
+              "help": "name | preference | project | context",
+              "kind": "argument",
+              "name": "kind",
+              "opts": [
+                "kind"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "The fact to store.",
+              "kind": "argument",
+              "name": "value",
+              "opts": [
+                "value"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "profile set"
+        },
+        {
+          "deprecated": false,
+          "help": "Show the stored profile and the exact preamble sessions will receive.",
+          "hidden": false,
+          "name": "show",
+          "params": [],
+          "path": "profile show"
+        }
+      ],
+      "deprecated": false,
+      "help": "Persistent user profile \u2014 the assistant's stable, cacheable preamble.",
+      "hidden": false,
+      "name": "profile",
+      "params": [],
+      "path": "profile"
+    },
+    {
+      "commands": [
+        {
+          "deprecated": false,
+          "help": "Approve the initial plan (default) or a paused high-risk card, then continue.",
+          "hidden": false,
+          "name": "approve",
+          "params": [
+            {
+              "help": "Project id.",
+              "kind": "argument",
+              "name": "project_id",
+              "opts": [
+                "project_id"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "Approve a specific high-risk card instead of the plan.",
+              "kind": "option",
+              "name": "card",
+              "opts": [
+                "--card"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Override the solve model.",
+              "kind": "option",
+              "name": "model",
+              "opts": [
+                "--model",
+                "-m"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "project approve"
+        },
+        {
+          "deprecated": false,
+          "help": "Reject a paused high-risk card (parks it for review, escalates to a human).",
+          "hidden": false,
+          "name": "deny",
+          "params": [
+            {
+              "help": "Project id.",
+              "kind": "argument",
+              "name": "project_id",
+              "opts": [
+                "project_id"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "The high-risk card to reject.",
+              "kind": "option",
+              "name": "card",
+              "opts": [
+                "--card"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "project deny"
+        },
+        {
+          "deprecated": false,
+          "help": "Continue running a paused/escalated project (re-attempts a soft rail-stop).",
+          "hidden": false,
+          "name": "run",
+          "params": [
+            {
+              "help": "Project id.",
+              "kind": "argument",
+              "name": "project_id",
+              "opts": [
+                "project_id"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "Override the solve model.",
+              "kind": "option",
+              "name": "model",
+              "opts": [
+                "--model",
+                "-m"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "project run"
+        },
+        {
+          "deprecated": false,
+          "help": "Create a project from a spec and run it until it aligns or a rail stops it.",
+          "hidden": false,
+          "name": "start",
+          "params": [
+            {
+              "help": "Spec YAML (the acceptance authority).",
+              "kind": "argument",
+              "name": "spec",
+              "opts": [
+                "spec"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "default": "'.'",
+              "help": "Project workspace root.",
+              "kind": "option",
+              "name": "workspace",
+              "opts": [
+                "--workspace",
+                "-w"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Override the solve model.",
+              "kind": "option",
+              "name": "model",
+              "opts": [
+                "--model",
+                "-m"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "default": "20",
+              "help": "Hard rail on card runs.",
+              "kind": "option",
+              "name": "max_iterations",
+              "opts": [
+                "--max-iterations"
+              ],
+              "required": false,
+              "type": "int"
+            },
+            {
+              "help": "Skip the initial plan-approval pause (auto-approve).",
+              "kind": "option",
+              "name": "yes",
+              "opts": [
+                "--yes",
+                "-y"
+              ],
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "path": "project start"
+        },
+        {
+          "deprecated": false,
+          "help": "Show a project's status and its board.",
+          "hidden": false,
+          "name": "status",
+          "params": [
+            {
+              "help": "Project id.",
+              "kind": "argument",
+              "name": "project_id",
+              "opts": [
+                "project_id"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "project status"
+        },
+        {
+          "deprecated": false,
+          "help": "Run exactly one iteration (cron-able).",
+          "hidden": false,
+          "name": "step",
+          "params": [
+            {
+              "help": "Project id.",
+              "kind": "argument",
+              "name": "project_id",
+              "opts": [
+                "project_id"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "Override the solve model.",
+              "kind": "option",
+              "name": "model",
+              "opts": [
+                "--model",
+                "-m"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "project step"
+        }
+      ],
+      "deprecated": false,
+      "help": "Run a project start-to-finish against a Spec (drift = acceptance authority).",
+      "hidden": false,
+      "name": "project",
+      "params": [],
+      "path": "project"
+    },
+    {
+      "deprecated": false,
+      "help": "Red-team the injection defenses: attack success rate with vs without them.\n\nNo key needed \u2014 measures whether the governance layer blocks a harmful tool call\nonce a run is tainted (defense-in-depth coverage), not model susceptibility.",
+      "hidden": false,
+      "name": "redteam",
+      "params": [],
+      "path": "redteam"
+    },
+    {
+      "deprecated": false,
+      "help": "Grade an answer against an authorable rubric \u2014 weighted criteria with a required-criterion veto.\n\nProduces a per-criterion breakdown, a single weighted score, and a pass/fail verdict. A required\ncriterion that falls below the gate vetoes the outcome regardless of the weighted score.",
+      "hidden": false,
+      "name": "rubric-grade",
+      "params": [
+        {
+          "help": "JSON rubric: {criteria:[{text,weight,required}], pass_threshold, required_gate}.",
+          "kind": "option",
+          "name": "rubric_file",
+          "opts": [
+            "--rubric"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "help": "The task the answer is for.",
+          "kind": "option",
+          "name": "task",
+          "opts": [
+            "--task"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "help": "The answer text (or use --answer-file).",
+          "kind": "option",
+          "name": "answer",
+          "opts": [
+            "--answer"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Read the answer from this file.",
+          "kind": "option",
+          "name": "answer_file",
+          "opts": [
+            "--answer-file"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Model slug for the grader.",
+          "kind": "option",
+          "name": "model",
+          "opts": [
+            "--model"
+          ],
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "path": "rubric-grade"
+    },
+    {
+      "deprecated": false,
+      "help": "Run a single-shot Tier-1 completion (no fusion). Requires a provider key.",
+      "hidden": false,
+      "name": "run",
+      "params": [
+        {
+          "help": "The prompt to send.",
+          "kind": "argument",
+          "name": "prompt",
+          "opts": [
+            "prompt"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "help": "Override the model slug.",
+          "kind": "option",
+          "name": "model",
+          "opts": [
+            "--model",
+            "-m"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Optional system prompt.",
+          "kind": "option",
+          "name": "system",
+          "opts": [
+            "--system",
+            "-s"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Attach an image (path or URL); repeatable. Needs a vision model.",
+          "kind": "option",
+          "name": "image",
+          "opts": [
+            "--image"
+          ],
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "path": "run"
+    },
+    {
+      "deprecated": false,
+      "help": "State-based bench: grade the final workspace state + count harmful side effects.\n\nUnlike the text benches, this measures what the agent DID (files it changed), and flags\nmutations outside each task's allowed set. Uses real models + file tools.",
+      "hidden": false,
+      "name": "sandbox-bench",
+      "params": [
+        {
+          "default": "'.sandbox-bench'",
+          "help": "Dir to run sandboxed tasks in.",
+          "kind": "option",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Override the model slug.",
+          "kind": "option",
+          "name": "model",
+          "opts": [
+            "--model",
+            "-m"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "8",
+          "help": "Max tool-calling steps per task.",
+          "kind": "option",
+          "name": "max_steps",
+          "opts": [
+            "--max-steps"
+          ],
+          "required": false,
+          "type": "int"
+        }
+      ],
+      "path": "sandbox-bench"
+    },
+    {
+      "deprecated": false,
+      "help": "Run the daily right-hand scenario suite (live). Requires a key.",
+      "hidden": false,
+      "name": "scenarios",
+      "params": [
+        {
+          "help": "Override the model slug.",
+          "kind": "option",
+          "name": "model",
+          "opts": [
+            "--model",
+            "-m"
+          ],
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "path": "scenarios"
+    },
+    {
+      "deprecated": false,
+      "help": "Measure tool-schema token cost, full vs compacted (advertise-time). No model calls.",
+      "hidden": false,
+      "name": "schema-bench",
+      "params": [
+        {
+          "help": "Path or URL to an OpenAPI spec to include (its tools are verbose).",
+          "kind": "option",
+          "name": "openapi",
+          "opts": [
+            "--openapi"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Include a couple of synthetic verbose tools to show the effect.",
+          "kind": "option",
+          "name": "demo",
+          "opts": [
+            "--demo"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Tokenizer model (default: your default).",
+          "kind": "option",
+          "name": "model",
+          "opts": [
+            "--model",
+            "-m"
+          ],
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "path": "schema-bench"
+    },
+    {
+      "deprecated": false,
+      "help": "Run the messaging gateway on HTTP, Discord, Telegram, Slack or Signal. Requires a key.\n\nAdd ``--cron`` to also fire scheduled jobs on a real clock \u2014 turning the reactive gateway\ninto an agent that acts on time (the daemon that makes proactivity real). Pass ``--mcp`` to\ninstead expose Chimera *as* an MCP server on stdio, so any MCP client (Claude Desktop, an\nIDE, another agent) can call ``chimera_solve`` / ``chimera_fuse`` / ``chimera_memory_search``.",
+      "hidden": false,
+      "name": "serve",
+      "params": [
+        {
+          "default": "'127.0.0.1'",
+          "help": "Bind host.",
+          "kind": "option",
+          "name": "host",
+          "opts": [
+            "--host"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "8765",
+          "help": "Bind port.",
+          "kind": "option",
+          "name": "port",
+          "opts": [
+            "--port"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "help": "Override the model slug.",
+          "kind": "option",
+          "name": "model",
+          "opts": [
+            "--model",
+            "-m"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "6",
+          "help": "Max tool-calling steps per message.",
+          "kind": "option",
+          "name": "max_steps",
+          "opts": [
+            "--max-steps"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "default": "'.'",
+          "help": "Workspace root for tools.",
+          "kind": "option",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Route deep-reasoning turns through fusion.",
+          "kind": "option",
+          "name": "fuse",
+          "opts": [
+            "--fuse"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Don't recall long-term memory.",
+          "kind": "option",
+          "name": "no_memory",
+          "opts": [
+            "--no-memory"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Serve on Discord (needs CHIMERA_DISCORD_BOT_TOKEN + the 'messaging' extra).",
+          "kind": "option",
+          "name": "discord",
+          "opts": [
+            "--discord"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Serve on Telegram (needs CHIMERA_TELEGRAM_BOT_TOKEN).",
+          "kind": "option",
+          "name": "telegram",
+          "opts": [
+            "--telegram"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Serve on Slack (needs CHIMERA_SLACK_BOT_TOKEN + CHIMERA_SLACK_APP_TOKEN + the 'messaging' extra).",
+          "kind": "option",
+          "name": "slack",
+          "opts": [
+            "--slack"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Serve on Signal via a signal-cli-rest-api bridge (CHIMERA_SIGNAL_API_URL + CHIMERA_SIGNAL_NUMBER).",
+          "kind": "option",
+          "name": "signal",
+          "opts": [
+            "--signal"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Also run the cron daemon: fire scheduled jobs on the real clock (proactivity).",
+          "kind": "option",
+          "name": "cron",
+          "opts": [
+            "--cron"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "default": "30",
+          "help": "Seconds between cron scheduler ticks.",
+          "kind": "option",
+          "name": "cron_tick",
+          "opts": [
+            "--cron-tick"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "help": "Serve Chimera AS an MCP server over stdio (solve/fuse/memory as tools).",
+          "kind": "option",
+          "name": "mcp",
+          "opts": [
+            "--mcp"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Also expose an A2A endpoint on HTTP (agent card + task lifecycle).",
+          "kind": "option",
+          "name": "a2a",
+          "opts": [
+            "--a2a"
+          ],
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": "serve"
+    },
+    {
+      "deprecated": false,
+      "help": "A/B reasoning with vs without injected TRS skill cards. Calls real models.",
+      "hidden": false,
+      "name": "skillcard-bench",
+      "params": [
+        {
+          "default": "'hard'",
+          "help": "Task suite: hard | big | demo. 'big' = 24 traps for a tighter paired CI.",
+          "kind": "option",
+          "name": "tasks",
+          "opts": [
+            "--tasks"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "1",
+          "help": "How many cards to retrieve per task.",
+          "kind": "option",
+          "name": "k",
+          "opts": [
+            "--k"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "default": "2",
+          "help": "Relevance gate: inject a card only on >= N shared query terms (0=off).",
+          "kind": "option",
+          "name": "min_overlap",
+          "opts": [
+            "--min-overlap"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "default": "3",
+          "help": "Render budget: max lines per injected card.",
+          "kind": "option",
+          "name": "max_lines",
+          "opts": [
+            "--max-lines"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "help": "Bench your own learned cards (skills.json) instead of the demo set.",
+          "kind": "option",
+          "name": "use_store",
+          "opts": [
+            "--use-store"
+          ],
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": "skillcard-bench"
+    },
+    {
+      "deprecated": false,
+      "help": "List the built-in skills.",
+      "hidden": false,
+      "name": "skills",
+      "params": [],
+      "path": "skills"
+    },
+    {
+      "deprecated": false,
+      "help": "Approve/reactivate a learned skill after review (activates retrieval).\n\nWorks for both a pending skill (held from a tainted run) and a retired one (un-retire).",
+      "hidden": false,
+      "name": "skills-approve",
+      "params": [
+        {
+          "help": "Name of the pending or retired skill to activate.",
+          "kind": "argument",
+          "name": "name",
+          "opts": [
+            "name"
+          ],
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "path": "skills-approve"
+    },
+    {
+      "deprecated": false,
+      "help": "Reflectively evolve a skill's prompt template against graded instances (GEPA).\n\nEach instance is a `{input, expect}` pair; the (simple, honest) scorer gives 1.0 when the\nproduced output contains the `expect` substring, else 0.0. GEPA reflects on a failing case to\nrewrite the template and keeps a Pareto frontier of candidates. Dry-run by default: the\nimproved skill is only written back to the store with ``--apply``, and only if it beats the seed.",
+      "hidden": false,
+      "name": "skills-evolve",
+      "params": [
+        {
+          "help": "Name of the learned skill whose prompt to GEPA-evolve.",
+          "kind": "argument",
+          "name": "name",
+          "opts": [
+            "name"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "help": "JSON file: a list of {\"input\": {...}, \"expect\": \"substring\"}.",
+          "kind": "option",
+          "name": "instances",
+          "opts": [
+            "--instances"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "default": "20",
+          "help": "Rollout budget (evaluations across the search).",
+          "kind": "option",
+          "name": "budget",
+          "opts": [
+            "--budget"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "help": "Model slug for the executor + reflector.",
+          "kind": "option",
+          "name": "model",
+          "opts": [
+            "--model"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Save the improved skill (default: dry-run).",
+          "kind": "option",
+          "name": "apply",
+          "opts": [
+            "--apply"
+          ],
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": "skills-evolve"
+    },
+    {
+      "deprecated": false,
+      "help": "Export a learned skill to the open SKILL.md format (portable to the agent-skills ecosystem).",
+      "hidden": false,
+      "name": "skills-export",
+      "params": [
+        {
+          "help": "Name of the learned skill to export.",
+          "kind": "argument",
+          "name": "name",
+          "opts": [
+            "name"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "help": "Write to this path (default: <name>/SKILL.md).",
+          "kind": "option",
+          "name": "out",
+          "opts": [
+            "--out",
+            "-o"
+          ],
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "path": "skills-export"
+    },
+    {
+      "deprecated": false,
+      "help": "Import a SKILL.md into the store. A tainted-provenance skill is held pending for review.",
+      "hidden": false,
+      "name": "skills-import",
+      "params": [
+        {
+          "help": "Path to a SKILL.md (or a skill directory containing one).",
+          "kind": "argument",
+          "name": "path",
+          "opts": [
+            "path"
+          ],
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "path": "skills-import"
+    },
+    {
+      "deprecated": false,
+      "help": "Run the measured skill-lifecycle loop (M18-4): promote proven provisionals, demote regressions.\n\nDecisions come from the store's MEASURED usage stats (never a model's self-report): a provisional\nskill that earns a high win rate over enough uses is promoted to active; a provisional that fails\nprobation or an active skill whose win rate regresses is retired (kept for review). Dry-run by\ndefault; ``--apply`` closes the loop \u2014 cron it for a hands-off promote/demote cycle.",
+      "hidden": false,
+      "name": "skills-lifecycle",
+      "params": [
+        {
+          "help": "Actually promote/demote (default: dry-run preview).",
+          "kind": "option",
+          "name": "apply",
+          "opts": [
+            "--apply"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "default": "5",
+          "help": "Provisional probation length.",
+          "kind": "option",
+          "name": "promote_min_uses",
+          "opts": [
+            "--promote-min-uses"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "default": "0.7",
+          "help": "Win rate to promote a provisional skill.",
+          "kind": "option",
+          "name": "promote_min_rate",
+          "opts": [
+            "--promote-min-rate"
+          ],
+          "required": false,
+          "type": "float"
+        },
+        {
+          "default": "5",
+          "help": "Uses before a skill can be demoted.",
+          "kind": "option",
+          "name": "demote_min_uses",
+          "opts": [
+            "--demote-min-uses"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "default": "0.3333333333333333",
+          "help": "Win rate at/below which a skill is demoted.",
+          "kind": "option",
+          "name": "demote_max_rate",
+          "opts": [
+            "--demote-max-rate"
+          ],
+          "required": false,
+          "type": "float"
+        }
+      ],
+      "path": "skills-lifecycle"
+    },
+    {
+      "deprecated": false,
+      "help": "List learned skills held for review (e.g. distilled during a tainted run).",
+      "hidden": false,
+      "name": "skills-pending",
+      "params": [],
+      "path": "skills-pending"
+    },
+    {
+      "deprecated": false,
+      "help": "Propose retiring under-performing skills \u2014 review-gated, never a delete.\n\nRetiring only flips status to 'retired' (excluded from retrieval, still inspectable and\nreactivatable with ``skills-approve``). With no name, acts on the ``retirement_candidates``\nsignal (used often, low win rate). Dry-run by default; pass ``--apply`` to commit.",
+      "hidden": false,
+      "name": "skills-retire",
+      "params": [
+        {
+          "help": "Skill to retire; omit to act on all candidates.",
+          "kind": "argument",
+          "name": "name",
+          "opts": [
+            "name"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Actually retire (default: dry-run preview).",
+          "kind": "option",
+          "name": "apply",
+          "opts": [
+            "--apply"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "default": "5",
+          "help": "Only propose skills used at least this often.",
+          "kind": "option",
+          "name": "min_uses",
+          "opts": [
+            "--min-uses"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "default": "0.3333333333333333",
+          "help": "Only propose skills whose win rate is at or below this.",
+          "kind": "option",
+          "name": "max_rate",
+          "opts": [
+            "--max-rate"
+          ],
+          "required": false,
+          "type": "float"
+        }
+      ],
+      "path": "skills-retire"
+    },
+    {
+      "deprecated": false,
+      "help": "Per-skill usage stats (uses, successes, win rate) + retirement candidates.",
+      "hidden": false,
+      "name": "skills-stats",
+      "params": [],
+      "path": "skills-stats"
+    },
+    {
+      "deprecated": false,
+      "help": "Tier-2: autonomously solve a task with plan + verify-or-revert. Requires a key.",
+      "hidden": false,
+      "name": "solve",
+      "params": [
+        {
+          "help": "The task to solve autonomously (omit with --approve/--deny).",
+          "kind": "argument",
+          "name": "task",
+          "opts": [
+            "task"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Verification command (exit 0 == success).",
+          "kind": "option",
+          "name": "verify",
+          "opts": [
+            "--verify"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "'.'",
+          "help": "Workspace root.",
+          "kind": "option",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Override the model slug.",
+          "kind": "option",
+          "name": "model",
+          "opts": [
+            "--model",
+            "-m"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "3",
+          "help": "Max verify-or-revert attempts.",
+          "kind": "option",
+          "name": "max_attempts",
+          "opts": [
+            "--max-attempts"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "default": "8",
+          "help": "Max tool-calling steps per attempt.",
+          "kind": "option",
+          "name": "max_steps",
+          "opts": [
+            "--max-steps"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "help": "Skip the planning step.",
+          "kind": "option",
+          "name": "no_plan",
+          "opts": [
+            "--no-plan"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Skip Manager review.",
+          "kind": "option",
+          "name": "no_manager",
+          "opts": [
+            "--no-manager"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Manager reviews via the cascade rubric.",
+          "kind": "option",
+          "name": "rubric",
+          "opts": [
+            "--rubric"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Route deep-reasoning turns through fusion.",
+          "kind": "option",
+          "name": "fuse",
+          "opts": [
+            "--fuse"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Tiered routing: weak -> gate -> mid -> gate -> fusion (cheap by default).",
+          "kind": "option",
+          "name": "cascade",
+          "opts": [
+            "--cascade"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Gate tool calls through the governance kernel.",
+          "kind": "option",
+          "name": "guard",
+          "opts": [
+            "--guard"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Per-session allowlist: only these tools (comma-separated).",
+          "kind": "option",
+          "name": "allow_tools",
+          "opts": [
+            "--allow-tools"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Per-session denylist: drop these tools (comma-separated).",
+          "kind": "option",
+          "name": "deny_tools",
+          "opts": [
+            "--deny-tools"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Track a capability ledger + review execution of tainted input.",
+          "kind": "option",
+          "name": "taint",
+          "opts": [
+            "--taint"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "default": "True",
+          "help": "Record trajectories for opt-in model evolution.",
+          "kind": "option",
+          "name": "collect",
+          "opts": [
+            "--collect"
+          ],
+          "required": false,
+          "secondary_opts": [
+            "--no-collect"
+          ],
+          "type": "boolean"
+        },
+        {
+          "help": "Don't auto-write a long-term memory fact on success.",
+          "kind": "option",
+          "name": "no_remember",
+          "opts": [
+            "--no-remember"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Don't auto-propose a learned skill when a task recurs.",
+          "kind": "option",
+          "name": "no_evolve_skills",
+          "opts": [
+            "--no-evolve-skills"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Run in an isolated git worktree; changes copied back only on success.",
+          "kind": "option",
+          "name": "isolate",
+          "opts": [
+            "--isolate"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Give the agent an isolated Context Explorer for repo search (FastContext-style).",
+          "kind": "option",
+          "name": "explorer",
+          "opts": [
+            "--explorer"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Give the agent spawn_subagent to delegate subtasks to isolated subagents.",
+          "kind": "option",
+          "name": "subagents",
+          "opts": [
+            "--subagents"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Prepend a structural map of the workspace (files + top-level symbols) to the agent's context.",
+          "kind": "option",
+          "name": "repo_map",
+          "opts": [
+            "--repo-map"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "After a failed attempt, run a structured self-check that steers the retry (helps weak models).",
+          "kind": "option",
+          "name": "progress_ledger",
+          "opts": [
+            "--progress-ledger"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Extract the task's atomic requirements and grade each attempt's coverage (catches dropped constraints).",
+          "kind": "option",
+          "name": "checklist",
+          "opts": [
+            "--checklist"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "With no --verify: generate executable pytest grounded in the task's requirements and use it as the gate (catches wrong code the coverage grade rubber-stamps).",
+          "kind": "option",
+          "name": "gen_tests",
+          "opts": [
+            "--gen-tests"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Model-role profile: economy | balanced | max. Puts a different model on each role (explore/plan/edit/review) drawn from the tier ladder. Routing is NOT yet shown to improve outcomes \u2014 see bench/role_routing/PREREGISTRATION.md.",
+          "kind": "option",
+          "name": "profile",
+          "opts": [
+            "--profile"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Per-role model overrides: 'edit=vendor/slug,plan=vendor/other'. Roles: explore, plan, edit, review. Merges over --profile; a role left unset keeps --model. `verify` is not a role here \u2014 it runs a command and has no model to choose.",
+          "kind": "option",
+          "name": "role_models",
+          "opts": [
+            "--role-models"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Comma-separated globs the file-writers may touch (e.g. 'src/**,*.py'). A write outside is refused \u2014 blocks an injected instruction from rewriting an unrelated file.",
+          "kind": "option",
+          "name": "write_region",
+          "opts": [
+            "--write-region"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Log (arm, proxy=manager-judgment, reward=verified) per attempt to <home>/probe.jsonl for PROBE best-arm selection (see `chimera probe-select --from-log`). Needs --verify + a manager.",
+          "kind": "option",
+          "name": "probe_log",
+          "opts": [
+            "--probe-log"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Reshape a long, rambling bug-report task into a salient-facts-first form (location/repro/expected-vs-actual/fix-hint) before planning. No-op on non-bug or short tasks.",
+          "kind": "option",
+          "name": "normalize_task",
+          "opts": [
+            "--normalize-task"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Inject the stored ACE strategy playbook into context, then curate it from this run's outcome (closed loop).",
+          "kind": "option",
+          "name": "playbook",
+          "opts": [
+            "--playbook"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Read learned skill cards back into context (the learn->use loop). Default follows settings.skill_cards; this overrides it per run.",
+          "kind": "option",
+          "name": "skill_cards",
+          "opts": [
+            "--skill-cards"
+          ],
+          "required": false,
+          "secondary_opts": [
+            "--no-skill-cards"
+          ],
+          "type": "boolean"
+        },
+        {
+          "default": "1",
+          "help": "With --fuse: sample K cheap answers per turn; escalate to fusion when they disagree (free confidence signal).",
+          "kind": "option",
+          "name": "agreement",
+          "opts": [
+            "--agreement"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "help": "Model slug of a stronger, independent judge that grades hard-turn (retried) results before accepting them.",
+          "kind": "option",
+          "name": "strong_verify",
+          "opts": [
+            "--strong-verify"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "On a stall, rebuild the plan from accumulated failure causes (dual-ledger) instead of just nudging.",
+          "kind": "option",
+          "name": "replan",
+          "opts": [
+            "--replan"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Show a failed attempt its own reverted diff, as a path not to retake.",
+          "kind": "option",
+          "name": "diff_feedback",
+          "opts": [
+            "--diff-feedback"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "On failure, leave the last attempt's edits on disk for an external grader (don't revert).",
+          "kind": "option",
+          "name": "keep_workspace",
+          "opts": [
+            "--keep-workspace"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Fail an attempt that changed no file \u2014 for code tasks, an explanation is not a fix.",
+          "kind": "option",
+          "name": "require_diff",
+          "opts": [
+            "--require-diff"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Match repeated-failure signatures approximately, not byte-identically.",
+          "kind": "option",
+          "name": "stagnation_fuzzy",
+          "opts": [
+            "--stagnation-fuzzy"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Machine-checkable success clauses, comma-separated: file_exists:PATH | file_contains:PATH:REGEX | answer_matches:REGEX.",
+          "kind": "option",
+          "name": "contract",
+          "opts": [
+            "--contract"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Print live progress events (attempt/result/status) as the run proceeds.",
+          "kind": "option",
+          "name": "stream",
+          "opts": [
+            "--stream"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Checkpoint this run under a thread id; re-run with the same id to resume after a crash.",
+          "kind": "option",
+          "name": "thread",
+          "opts": [
+            "--thread"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Pause for human approval before finalizing a run that consumed untrusted content (needs --thread).",
+          "kind": "option",
+          "name": "pause_on_taint",
+          "opts": [
+            "--pause-on-taint"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "HITL accept: finalize a paused run as-is, by thread id (no task needed).",
+          "kind": "option",
+          "name": "approve",
+          "opts": [
+            "--approve"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "HITL ignore: discard a paused run by thread id (no task needed).",
+          "kind": "option",
+          "name": "deny",
+          "opts": [
+            "--deny"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "HITL respond: resume a paused run by thread id with --feedback guidance.",
+          "kind": "option",
+          "name": "respond",
+          "opts": [
+            "--respond"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Guidance for --respond (fed back so the run tries again).",
+          "kind": "option",
+          "name": "feedback_text",
+          "opts": [
+            "--feedback"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "HITL edit: finalize a paused run with the corrected --answer, by thread id.",
+          "kind": "option",
+          "name": "edit",
+          "opts": [
+            "--edit"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "The human-corrected answer for --edit.",
+          "kind": "option",
+          "name": "answer_text",
+          "opts": [
+            "--answer"
+          ],
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "path": "solve"
+    },
+    {
+      "deprecated": false,
+      "help": "Solve several tasks concurrently, each in its own git worktree (Tier-3 isolation).\n\nEvery task runs against an isolated checkout, so parallel edits never collide. On\nmerge-back, a file two tasks both changed is reported as a conflict and left for you\nto resolve rather than silently overwritten. Needs a git repo to isolate.",
+      "hidden": false,
+      "name": "solve-batch",
+      "params": [
+        {
+          "help": "Tasks to solve in parallel, each isolated.",
+          "kind": "argument",
+          "name": "tasks",
+          "opts": [
+            "tasks"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "default": "'.'",
+          "help": "Workspace root (a git repo, to isolate).",
+          "kind": "option",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Override the model slug.",
+          "kind": "option",
+          "name": "model",
+          "opts": [
+            "--model",
+            "-m"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "6",
+          "help": "Max tool-calling steps per task.",
+          "kind": "option",
+          "name": "max_steps",
+          "opts": [
+            "--max-steps"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "default": "2",
+          "help": "Max verify-or-revert attempts per task.",
+          "kind": "option",
+          "name": "max_attempts",
+          "opts": [
+            "--max-attempts"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "default": "4",
+          "help": "Max concurrent isolated workers.",
+          "kind": "option",
+          "name": "max_workers",
+          "opts": [
+            "--max-workers"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "help": "Route deep-reasoning turns through fusion.",
+          "kind": "option",
+          "name": "fuse",
+          "opts": [
+            "--fuse"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Arm each worker's adaptive allowlist (dangerous-when-tainted tools require approval). The cross-agent collusion monitor runs regardless \u2014 it's always on for fan-out.",
+          "kind": "option",
+          "name": "taint",
+          "opts": [
+            "--taint"
+          ],
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": "solve-batch"
+    },
+    {
+      "deprecated": false,
+      "help": "Honest A/B over two SWE-bench Verified-Mini reports on the SAME instance ids.\n\nReads the official evaluation reports (``resolved_ids`` or a per-instance map) for a free model\nalone vs the same model driven by Chimera, projects both onto the shared instance list (a missing\nid counts as unresolved), and prints the delta + 95% CI. This is the second standard scoreboard\nfor the weak-model-lift thesis; the pass/fail comes from SWE-bench's tests, never self-reported.",
+      "hidden": false,
+      "name": "swe-bench-compare",
+      "params": [
+        {
+          "help": "SWE-bench evaluation report JSON for the model-only arm.",
+          "kind": "argument",
+          "name": "baseline",
+          "opts": [
+            "baseline"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "help": "SWE-bench evaluation report JSON for the model+Chimera arm.",
+          "kind": "argument",
+          "name": "treatment",
+          "opts": [
+            "treatment"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "help": "JSONL of the instances both arms ran (fixes the id set).",
+          "kind": "option",
+          "name": "instances",
+          "opts": [
+            "--instances"
+          ],
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "path": "swe-bench-compare"
+    },
+    {
+      "deprecated": false,
+      "help": "List the built-in native tools.",
+      "hidden": false,
+      "name": "tools",
+      "params": [
+        {
+          "default": "'.'",
+          "kind": "option",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "path": "tools"
+    },
+    {
+      "deprecated": false,
+      "help": "Promote a learned change only if it helps its tuned slice AND doesn't regress a holdout.\n\nGuards against *negative transfer* \u2014 a GEPA prompt / ACE delta / distilled skill that raises the pass\nrate on the tasks it was tuned against but REGRESSES on other tasks sharing the capability. Feed the\ntuned slice's paired pass/fail (baseline vs candidate) and, ideally, a disjoint same-capability\nholdout's; the verdict is PROMOTE / BLOCK with the paired evidence (exit 1 on BLOCK, for CI).\nWithout a holdout it promotes on the tuned gain alone but flags that transfer was NOT measured.",
+      "hidden": false,
+      "name": "transfer-gate",
+      "params": [
+        {
+          "help": "JSON pass/fail of the baseline on the TUNED slice (list of bools, or {task: bool}).",
+          "kind": "argument",
+          "name": "tuned_baseline",
+          "opts": [
+            "tuned_baseline"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "help": "JSON pass/fail of the candidate on the TUNED slice (aligned, same order).",
+          "kind": "argument",
+          "name": "tuned_treatment",
+          "opts": [
+            "tuned_treatment"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "help": "JSON pass/fail of the baseline on a DISJOINT same-capability holdout.",
+          "kind": "option",
+          "name": "holdout_baseline",
+          "opts": [
+            "--holdout-baseline"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "JSON pass/fail of the candidate on the holdout (aligned).",
+          "kind": "option",
+          "name": "holdout_treatment",
+          "opts": [
+            "--holdout-treatment"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Require the tuned gain's paired CI to exclude 0, not just \u0394>0.",
+          "kind": "option",
+          "name": "require_significant",
+          "opts": [
+            "--require-significant"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "default": "0.0",
+          "help": "Max tolerated pass-rate drop on the holdout before promotion is blocked.",
+          "kind": "option",
+          "name": "tol",
+          "opts": [
+            "--tol"
+          ],
+          "required": false,
+          "type": "float"
+        }
+      ],
+      "path": "transfer-gate"
+    },
+    {
+      "deprecated": false,
+      "help": "Launch the full-screen TUI \u2014 your right-hand. Requires a key.",
+      "hidden": false,
+      "name": "tui",
+      "params": [
+        {
+          "help": "Override the model slug.",
+          "kind": "option",
+          "name": "model",
+          "opts": [
+            "--model",
+            "-m"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "6",
+          "help": "Max tool-calling steps per message.",
+          "kind": "option",
+          "name": "max_steps",
+          "opts": [
+            "--max-steps"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "default": "'.'",
+          "help": "Workspace root for tools.",
+          "kind": "option",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Route deep-reasoning turns through fusion.",
+          "kind": "option",
+          "name": "fuse",
+          "opts": [
+            "--fuse"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Don't recall long-term memory.",
+          "kind": "option",
+          "name": "no_memory",
+          "opts": [
+            "--no-memory"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "default": "True",
+          "help": "Live token streaming (single-model path only).",
+          "kind": "option",
+          "name": "stream",
+          "opts": [
+            "--stream"
+          ],
+          "required": false,
+          "secondary_opts": [
+            "--no-stream"
+          ],
+          "type": "boolean"
+        }
+      ],
+      "path": "tui"
+    },
+    {
+      "deprecated": false,
+      "help": "Show the Chimera version.",
+      "hidden": false,
+      "name": "version",
+      "params": [],
+      "path": "version"
+    },
+    {
+      "deprecated": false,
+      "help": "Run a declarative workflow \u2014 a designed loop \u2014 from a YAML file. Requires a key.",
+      "hidden": false,
+      "name": "workflow",
+      "params": [
+        {
+          "help": "Workflow YAML file (declarative loop).",
+          "kind": "argument",
+          "name": "file",
+          "opts": [
+            "file"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "default": "'.'",
+          "help": "Workspace root.",
+          "kind": "option",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Override the model slug.",
+          "kind": "option",
+          "name": "model",
+          "opts": [
+            "--model",
+            "-m"
+          ],
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "path": "workflow"
+    }
+  ],
+  "generated_for": "0.41.0",
+  "help": "Self-evolving AI agent with an LLM-Fusion reasoning core.",
+  "name": "chimera"
+}

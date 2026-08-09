@@ -160,6 +160,21 @@ jobs:
           uv run python -m chimera.api.schema_dump > apps/desktop/openapi.json
           npm --prefix apps/desktop run gen:api
 
+      # The same idea one layer out: the documentation site renders the command reference from
+      # this dump, so a new command with no help text, or a renamed flag, must not reach a
+      # published page describing the CLI as it was last release.
+      - name: Regenerate the CLI snapshot
+        run: uv run python -m chimera.cli.schema_dump > chimera/_cli_snapshot.json
+
+      - name: Fail if the CLI snapshot is stale
+        run: |
+          if ! git diff --quiet -- chimera/_cli_snapshot.json; then
+            echo "::error::The CLI reference is out of date. Run this and commit the result:"
+            echo "  python -m chimera.cli.schema_dump > chimera/_cli_snapshot.json"
+            git --no-pager diff --stat -- chimera/_cli_snapshot.json
+            exit 1
+          fi
+
       # The drift gate: if the committed schema/types differ from a fresh regeneration, someone changed
       # a backend response model without running `gen:api`. Fail loudly with the fix.
       - name: Fail if the generated API types are stale
