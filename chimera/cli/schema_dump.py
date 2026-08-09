@@ -35,8 +35,20 @@ from chimera import __version__
 from chimera.cli.main import app as cli_app
 
 
-def _has_subcommands(command: Any) -> bool:
-    return isinstance(getattr(command, "commands", None), dict)
+def _subcommands(command: Any) -> dict[str, Any] | None:
+    """The children of a group, or ``None`` for a leaf command.
+
+    Typer vendors its own copy of Click, so ``isinstance(x, click.Group)`` is ``False`` for a
+    ``TyperGroup`` and every group would be dumped as a leaf — which is how the first version of
+    this file lost 53 subcommands without failing. Duck-typing on the mapping is what actually
+    distinguishes the two.
+
+    It returns the mapping rather than a boolean because the caller needs the mapping, and a
+    boolean would leave the type checker to take ``.commands`` on faith from a ``click.Command``
+    that does not declare it.
+    """
+    commands = getattr(command, "commands", None)
+    return commands if isinstance(commands, dict) else None
 
 
 def _param_json(param: Any) -> dict[str, Any]:
@@ -85,24 +97,25 @@ def _command_json(name: str, command: Any, path: list[str]) -> dict[str, Any]:
         "deprecated": bool(getattr(command, "deprecated", False)),
         "params": [_param_json(p) for p in getattr(command, "params", [])],
     }
-    if _has_subcommands(command):
+    children = _subcommands(command)
+    if children is not None:
         entry["commands"] = [
-            _command_json(child_name, child, full)
-            for child_name, child in sorted(command.commands.items())
+            _command_json(child_name, child, full) for child_name, child in sorted(children.items())
         ]
     return entry
 
 
 def build() -> dict[str, Any]:
     root = typer.main.get_command(cli_app)
-    if not _has_subcommands(root):  # pragma: no cover - the CLI is always a group
+    commands = _subcommands(root)
+    if commands is None:  # pragma: no cover - the CLI is always a group
         raise TypeError("the Chimera CLI is expected to expose subcommands")
     return {
         "generated_for": __version__,
         "name": getattr(root, "name", None) or "chimera",
         "help": (getattr(root, "help", None) or "").strip(),
         "commands": [
-            _command_json(name, command, []) for name, command in sorted(root.commands.items())
+            _command_json(name, command, []) for name, command in sorted(commands.items())
         ],
     }
 
