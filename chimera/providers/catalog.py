@@ -149,22 +149,36 @@ class ProviderInfo:
 #: starting point the user can overwrite, never a constraint — a key for any of LiteLLM's other
 #: hundred-odd vendors works too (see :mod:`chimera.providers.discovery`), it simply arrives without
 #: a suggestion, which is honest rather than unsupported.
+#:
+#: **Checked against each vendor's own model list on 2026-08-09.** Worth repeating whenever these are
+#: touched, because the failure is silent in a specific way: a superseded model still answers, still
+#: bills, and nothing in a passing test suite can tell you that a new install is being pointed at
+#: last year's generation. Every entry below is the vendor's own "start here if you are unsure",
+#: which is exactly the question a first run is asking.
 PROVIDERS: tuple[ProviderInfo, ...] = (
+    # Left on 5.5 deliberately: this must MATCH ``Settings.default_model``, because for OpenRouter
+    # the wizard shows the suggestion without writing it. Showing 5.6 here while 5.5 is what runs
+    # would put a number on screen that is not the one in use. Refreshing the product default is a
+    # separate decision, and it moves the presets and the fusion panel with it.
     ProviderInfo(
         "OPENROUTER_API_KEY", "OpenRouter", "openrouter/openai/gpt-5.5", "https://openrouter.ai/keys"
     ),
+    # gpt-5.6-sol, via its documented alias; same $5/$30 as the 5.5 it replaces.
     ProviderInfo(
-        "OPENAI_API_KEY", "OpenAI", "openai/gpt-5.5", "https://platform.openai.com/api-keys"
+        "OPENAI_API_KEY", "OpenAI", "openai/gpt-5.6", "https://platform.openai.com/api-keys"
     ),
+    # A canonical dateless ID, not a convenience alias — Anthropic pins these to one snapshot.
     ProviderInfo(
         "ANTHROPIC_API_KEY",
         "Anthropic",
-        "anthropic/claude-opus-4-8",
+        "anthropic/claude-opus-5",
         "https://console.anthropic.com/settings/keys",
     ),
+    # The current stable Flash; `gemini-flash-latest` is the hot-swapping alias, so not that one.
     ProviderInfo(
-        "GEMINI_API_KEY", "Gemini", "gemini/gemini-2.5-flash", "https://aistudio.google.com/apikey"
+        "GEMINI_API_KEY", "Gemini", "gemini/gemini-3.6-flash", "https://aistudio.google.com/apikey"
     ),
+    # DeepSeek's long-lived alias for its chat model; unchanged.
     ProviderInfo(
         "DEEPSEEK_API_KEY",
         "DeepSeek",
