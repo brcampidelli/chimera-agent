@@ -335,6 +335,40 @@ export interface paths {
         patch: operations["patch_config_endpoint_api_config_patch"];
         trace?: never;
     };
+    "/api/config/pool/{provider}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pool Add Endpoint */
+        post: operations["pool_add_endpoint_api_config_pool__provider__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/config/pool/{provider}/{index}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Pool Remove Endpoint */
+        delete: operations["pool_remove_endpoint_api_config_pool__provider___index__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/config/test": {
         parameters: {
             query?: never;
@@ -1930,6 +1964,8 @@ export interface components {
             mcp: components["schemas"]["McpCfgOut"];
             memory: components["schemas"]["MemoryCfgOut"];
             models: components["schemas"]["ModelsCfgOut"];
+            /** Pools */
+            pools?: components["schemas"]["PoolOut"][];
             /** Providers */
             providers: components["schemas"]["ProviderOut"][];
             sandbox: components["schemas"]["SandboxCfgOut"];
@@ -2451,6 +2487,11 @@ export interface components {
             auto_consolidate: boolean;
             /** Backend */
             backend: string;
+            /**
+             * Embed Model
+             * @default
+             */
+            embed_model: string;
             /** Remember From Chat */
             remember_from_chat: boolean;
             /** Semantic */
@@ -2540,6 +2581,11 @@ export interface components {
             fallback_models: string[];
             /** Mid */
             mid: string;
+            /**
+             * Ollama Base Url
+             * @default
+             */
+            ollama_base_url: string;
             /** Orchestrator */
             orchestrator: string;
             tiers: components["schemas"]["TiersOut"];
@@ -2578,6 +2624,43 @@ export interface components {
             task: string;
             /** Workspace */
             workspace?: string | null;
+        };
+        /** PoolAddIn */
+        PoolAddIn: {
+            /** Key */
+            key: string;
+        };
+        /**
+         * PoolKeyOut
+         * @description One key in a rotation pool, as much of it as anyone is ever shown.
+         */
+        PoolKeyOut: {
+            /** Hint */
+            hint: string;
+            /** Index */
+            index: number;
+        };
+        /**
+         * PoolOut
+         * @description A provider's rotation pool. Present for every provider that has one, empty list when it does not.
+         */
+        PoolOut: {
+            /** Env */
+            env: string;
+            /** Keys */
+            keys: components["schemas"]["PoolKeyOut"][];
+            /** Provider */
+            provider: string;
+        };
+        /**
+         * PoolWriteOut
+         * @description What a pool looks like afterwards — the count, never the contents.
+         */
+        PoolWriteOut: {
+            /** Count */
+            count: number;
+            /** Provider */
+            provider: string;
         };
         /**
          * Posture
@@ -2737,14 +2820,32 @@ export interface components {
             /** Status */
             status: string;
         };
-        /** ProviderOut */
+        /**
+         * ProviderOut
+         * @description One credential slot, as the screen that offers it needs to understand it.
+         */
         ProviderOut: {
             /** Env */
             env: string;
             /** Hint */
             hint: string;
+            /**
+             * Keys Url
+             * @default
+             */
+            keys_url: string;
             /** Label */
             label: string;
+            /**
+             * Llm
+             * @default true
+             */
+            llm: boolean;
+            /**
+             * Model
+             * @default
+             */
+            model: string;
             /** Set */
             set: boolean;
         };
@@ -3716,6 +3817,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UpdatedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pool_add_endpoint_api_config_pool__provider__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PoolAddIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PoolWriteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pool_remove_endpoint_api_config_pool__provider___index__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+                index: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PoolWriteOut"];
                 };
             };
             /** @description Validation Error */

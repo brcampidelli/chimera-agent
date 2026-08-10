@@ -19,21 +19,23 @@ from pathlib import Path
 from typing import Any
 
 from chimera.config import Settings, get_settings
+from chimera.providers.catalog import PROVIDERS
 
 # Credential env-vars (secret) and the non-secret settings the UI may edit. Anything outside this set
 # is rejected by patch_config, so the endpoint can't be used to write arbitrary .env lines.
-_PROVIDER_LABELS = {
-    "OPENROUTER_API_KEY": "OpenRouter",
-    "OPENAI_API_KEY": "OpenAI",
-    "ANTHROPIC_API_KEY": "Anthropic",
-    "GEMINI_API_KEY": "Gemini",
-    "DEEPSEEK_API_KEY": "DeepSeek",
+#: Credentials that buy a capability rather than a model — search, speech, images. Listed on the
+#: settings screen beside the providers, and deliberately NOT offered by the first-run wizard: none
+#: of them makes ``has_any_key`` true, so choosing one there would be a dead end that confirms.
+_TOOL_CREDENTIALS = {
     "TAVILY_API_KEY": "Tavily (web search)",
     "BRAVE_API_KEY": "Brave (web search)",
     "SERPAPI_API_KEY": "SerpAPI",
     "ELEVENLABS_API_KEY": "ElevenLabs (TTS)",
     "STABILITY_API_KEY": "Stability (images)",
 }
+# The model providers come from the catalog, which owns their slugs and their labels. Keeping a
+# second list here is how the CLI and the app end up disagreeing about what a provider is called.
+_PROVIDER_LABELS = {p.env: p.label for p in PROVIDERS} | _TOOL_CREDENTIALS
 # Messaging bot tokens — secret (masked on read), settable so the UI can configure a channel the
 # agent reaches you on without editing .env by hand.
 _MESSAGING_SECRETS = {"CHIMERA_DISCORD_BOT_TOKEN", "CHIMERA_TELEGRAM_BOT_TOKEN"}
@@ -47,6 +49,13 @@ _EDITABLE_SETTINGS = {
     "CHIMERA_CASCADE",
     "CHIMERA_API_BASE",
     "CHIMERA_FALLBACK_MODELS",
+    # Only reachable by hand-editing .env until now. `api_base` is next to it on the screen and is
+    # NOT a substitute: that one is sent on every call, this one only points the Ollama provider.
+    "CHIMERA_OLLAMA_BASE_URL",
+    # The model behind the semantic-memory toggle three rows below. Offering the switch and hiding
+    # its dependency is how a control ends up confirming a change it did not make: recall degrades
+    # to lexical on any embedder failure, without a word on this screen.
+    "CHIMERA_EMBED_MODEL",
     "CHIMERA_CACHE",
     "CHIMERA_PROMPT_CACHE",
     "CHIMERA_MEMORY_BACKEND",
@@ -71,6 +80,20 @@ _EDITABLE_SETTINGS = {
     "CHIMERA_TOOL_DENYLIST",
 }
 ALLOWED_KEYS = _SECRET_KEYS | _EDITABLE_SETTINGS
+
+
+def is_editable(key: str) -> bool:
+    """Whether ``patch_config`` will write this env var.
+
+    The fixed allowlist above, plus any ``<PROVIDER>_API_KEY`` the credential gate now accepts. The
+    two have to agree: once :mod:`chimera.providers.discovery` lets a Groq key start the agent, a
+    screen that cannot save one is a screen that tells the user their key is unsupported. The
+    discovery helper is also what keeps the search and speech credentials out — they match the same
+    name pattern and are not providers of models.
+    """
+    from chimera.providers.discovery import provider_from_env_var
+
+    return key in ALLOWED_KEYS or provider_from_env_var(key) is not None
 
 #: When a saved setting actually starts applying, for the ones where the answer is not "now".
 #:
@@ -105,18 +128,117 @@ def _hint(value: str | None) -> str:
     return f"…{value[-4:]}"
 
 
+def _pool_env(provider: str) -> str:
+    """``"openrouter"`` -> ``CHIMERA_OPENROUTER_KEYS``, or ``ValueError`` for anything else.
+
+    Only the five with a settings field have a pool: rotation and cooldown are per-provider state
+    the gateway keeps, not something a name alone can conjure. A discovered provider gets its single
+    key from the environment and is none the worse for it.
+    """
+    from chimera.providers.catalog import PROVIDERS_BY_NAME, provider_names
+
+    if provider not in PROVIDERS_BY_NAME:
+        raise ValueError(f"unknown provider: {provider} (known: {', '.join(provider_names())})")
+    return f"CHIMERA_{provider.upper()}_KEYS"
+
+
+def read_pools(settings: Settings) -> list[dict[str, Any]]:
+    """Every provider's rotation pool, masked — position and last four characters, nothing else."""
+    from chimera.providers.catalog import PROVIDERS_BY_NAME
+
+    return [
+        {
+            "provider": name,
+            "env": _pool_env(name),
+            "keys": [
+                {"index": i, "hint": _hint(key)}
+                for i, key in enumerate(settings.credential_pool(name))
+            ],
+        }
+        for name in PROVIDERS_BY_NAME
+    ]
+
+
+def _write_pool(provider: str, keys: list[str], env_path: Path | None) -> dict[str, Any]:
+    env = _pool_env(provider)
+    value = ",".join(keys)
+    _write_env_var(env_path or Path(".env"), env, value)
+    os.environ[env] = value
+    get_settings.cache_clear()
+    return {"provider": provider, "count": len(keys)}
+
+
+def pool_add(provider: str, key: str, *, env_path: Path | None = None) -> dict[str, Any]:
+    """Append one key to a provider's pool.
+
+    The client sends a key and never a list, which is what makes the read-modify-write safe: the
+    server holds the only copy of the other keys, so a stale or masked client view cannot destroy
+    them. Rejects a comma (it is the pool separator, so one key would silently become two) and
+    anything shaped like the mask this API hands out.
+    """
+    candidate = (key or "").strip()
+    if not candidate:
+        raise ValueError("key may not be empty")
+    if "," in candidate:
+        raise ValueError("key may not contain a comma — that is the separator between pool entries")
+    if any(c in candidate for c in "\r\n"):
+        raise ValueError("key may not contain a newline")
+    if candidate.startswith("…") or set(candidate) <= {"*", "•", "·"}:
+        # A client echoing back what it displayed. Cheap to check, and it fails loudly here instead
+        # of quietly replacing a working pool with its own mask.
+        raise ValueError("that looks like a masked hint, not a key")
+    existing = list(get_settings().credential_pool(provider)) if provider else []
+    if candidate in existing:
+        raise ValueError("that key is already in the pool")
+    return _write_pool(provider, [*existing, candidate], env_path)
+
+
+def pool_remove(provider: str, index: int, *, env_path: Path | None = None) -> dict[str, Any]:
+    """Drop the key at ``index``. An index, never a value — the client has never seen one."""
+    existing = list(get_settings().credential_pool(provider)) if provider else []
+    _pool_env(provider)  # validates the provider even when the pool is empty
+    if not 0 <= index < len(existing):
+        raise ValueError(f"no key at index {index} (pool has {len(existing)})")
+    return _write_pool(provider, existing[:index] + existing[index + 1 :], env_path)
+
+
 def read_config(settings: Settings) -> dict[str, Any]:
     """The settings snapshot for the UI. Secrets are masked to ``{set, hint}`` — never cleartext."""
     creds = settings.credentials()
+    known = {p.env: p for p in PROVIDERS}
     providers = [
         {
             "env": env,
             "label": _PROVIDER_LABELS[env],
             "set": bool(creds.get(env)),
             "hint": _hint(creds.get(env)),
+            "llm": env in known,
+            "model": known[env].default_model if env in known else "",
+            "keys_url": known[env].keys_url if env in known else "",
         }
         for env in _PROVIDER_LABELS
     ]
+    # Providers Chimera was never told about. A key for any of LiteLLM's other ~100 vendors now opens
+    # the gate, so the screen listing credentials has to be able to show one — otherwise the app
+    # reports "no key" about a key it is currently using. They arrive without a suggested model or a
+    # sign-up page, which is the honest answer: we discovered the credential, we did not ship support
+    # for the vendor. The value is masked by the same `_hint`.
+    from chimera.providers.discovery import generic_providers
+
+    for name in generic_providers():
+        env = f"{name.upper()}_API_KEY"
+        value = os.environ.get(env)
+        providers.append(
+            {
+                "env": env,
+                "label": name.title(),
+                "set": bool(value),
+                "hint": _hint(value),
+                "llm": True,
+                "model": "",
+                "keys_url": "",
+            }
+        )
     ladder = settings.tier_ladder()
     return {
         "models": {
@@ -129,6 +251,7 @@ def read_config(settings: Settings) -> dict[str, Any]:
             "api_base": settings.api_base,
             "fallback_models": list(settings.fallback_models),
             "tiers": {"weak": ladder.weak, "mid": ladder.mid, "top": ladder.top},
+            "ollama_base_url": settings.ollama_base_url,
         },
         "memory": {
             "backend": settings.memory_backend,
@@ -136,6 +259,7 @@ def read_config(settings: Settings) -> dict[str, Any]:
             "auto_consolidate": settings.auto_consolidate,
             "remember_from_chat": settings.remember_from_chat,
             "skill_cards": settings.skill_cards,
+            "embed_model": settings.embed_model,
         },
         "cache": {"completion": settings.cache, "prompt": settings.prompt_cache},
         "sandbox": {"mode": settings.sandbox, "image": settings.sandbox_image},
@@ -152,6 +276,7 @@ def read_config(settings: Settings) -> dict[str, Any]:
         "mcp": {"autoload": settings.mcp_autoload},
         "automation": {"cron": settings.app_cron},
         "providers": providers,
+        "pools": read_pools(settings),
         # Keys absent here apply to the next call; see APPLIES_WHEN.
         "applies": dict(APPLIES_WHEN),
     }
@@ -193,7 +318,7 @@ def patch_config(updates: dict[str, str], *, env_path: Path | None = None) -> di
     can 400 it). Clears the ``get_settings`` cache so the next read sees the new values. Values are
     written verbatim and never logged.
     """
-    rejected = [k for k in updates if k not in ALLOWED_KEYS]
+    rejected = [k for k in updates if not is_editable(k)]
     if rejected:
         raise ValueError(f"not editable: {', '.join(sorted(rejected))}")
     # Allowlisting the KEY isn't enough: a newline in the VALUE would split into extra .env lines and

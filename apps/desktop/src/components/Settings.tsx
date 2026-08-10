@@ -1,13 +1,15 @@
 import { createContext, useContext, useId, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, KeyRound, Loader2 } from "lucide-react";
+import { Check, KeyRound, Loader2, Trash2 } from "lucide-react";
 import {
+  addPoolKey,
   getConfig,
   getDoctor,
   getInstructions,
   getMessaging,
   patchConfig,
   putInstructions,
+  removePoolKey,
   startMessaging,
   stopMessaging,
 } from "@/lib/api";
@@ -19,7 +21,7 @@ import { Connections } from "@/components/Connections";
 import { Governance } from "@/components/Governance";
 import { Usage } from "@/components/Usage";
 import { LANGS, useI18n, useT } from "@/lib/i18n";
-import type { AgentIdentity, AppConfig, DoctorInfo, ProviderCfg } from "@/lib/types";
+import type { AgentIdentity, AppConfig, DoctorInfo, PoolCfg, ProviderCfg } from "@/lib/types";
 
 function Card({ title, children }: { title: string; children: ReactNode }) {
   // Named region rather than a bare section: this screen stacks eleven of them, and unnamed they
@@ -383,6 +385,76 @@ function SecretField({ provider, onSave }: { provider: ProviderCfg; onSave: (v: 
 }
 
 /**
+ * A provider's rotation pool: the keys it spreads load across and fails over between.
+ *
+ * Deliberately NOT a text field holding the comma-separated list, which is the shape the setting has
+ * in `.env` and the obvious thing to render. A text field has to show its current value to be
+ * editable; the value is secret, so it would show the mask; and the first person to click into it
+ * and press Save writes `…abcd` over a working rotation. Here the existing keys are output only —
+ * there is no control whose value is a key — and the two things you can do are add one and delete
+ * one by position. The client never holds a key it did not just type.
+ */
+function PoolField({ pool, onChanged }: { pool: PoolCfg; onChanged: () => void }) {
+  const t = useT();
+  const [v, setV] = useState("");
+  const [error, setError] = useState("");
+  const add = useMutation({
+    mutationFn: () => addPoolKey(pool.provider, v.trim()),
+    onSuccess: () => {
+      setV("");
+      setError("");
+      onChanged();
+    },
+    onError: () => setError(t("settings.pool.rejected")),
+  });
+  const drop = useMutation({
+    mutationFn: (index: number) => removePoolKey(pool.provider, index),
+    onSuccess: onChanged,
+  });
+
+  return (
+    <div className="space-y-2">
+      {pool.keys.length === 0 ? (
+        <p className="text-xs text-muted-foreground">{t("settings.pool.empty")}</p>
+      ) : (
+        <ul className="space-y-1">
+          {pool.keys.map((k) => (
+            <li key={k.index} className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Check className="h-3.5 w-3.5 shrink-0 text-ok" />
+              <span className="font-mono">{k.hint}</span>
+              <button
+                className="ml-auto text-muted-foreground hover:text-bad"
+                aria-label={t("settings.pool.remove", { hint: k.hint })}
+                disabled={drop.isPending}
+                onClick={() => drop.mutate(k.index)}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex items-center gap-2">
+        <input
+          className={inputCls}
+          type="password"
+          placeholder={t("settings.pasteKey")}
+          value={v}
+          onChange={(e) => {
+            setV(e.target.value);
+            setError("");
+          }}
+        />
+        <Button size="sm" disabled={!v.trim() || add.isPending} onClick={() => add.mutate()}>
+          {t("settings.pool.add")}
+        </Button>
+      </div>
+      {error ? <p className="text-xs text-bad">{error}</p> : null}
+    </div>
+  );
+}
+
+/**
  * One messaging platform.
  *
  * Was hardcoded to Discord — the platform name appeared in four places and the status was read as
@@ -620,6 +692,17 @@ export function Settings() {
               onSave={(v) => save({ CHIMERA_API_BASE: v })}
             />
           </Row>
+          {/* Not the same field as the one above, and the difference matters: `api_base` is sent on
+              EVERY call, so pointing it at Ollama redirects the cloud providers too. This one only
+              tells LiteLLM's Ollama provider where the server is, which is what someone running
+              Ollama on another machine actually wants. */}
+          <Row label={t("settings.row.ollamaUrl")} hint={t("settings.hint.ollamaUrl")}>
+            <TextField
+              value={c.models.ollama_base_url}
+              placeholder="http://localhost:11434"
+              onSave={(v) => save({ CHIMERA_OLLAMA_BASE_URL: v })}
+            />
+          </Row>
           <Row label={t("settings.row.fallbackModels")} hint={t("settings.hint.fallbackModels")}>
             <TextField
               value={c.models.fallback_models.join(", ")}
@@ -644,6 +727,22 @@ export function Settings() {
           ))}
         </Card>
 
+        {/* Existed, worked, rotated round-robin with a cooldown per key — and no interface could
+            reach it, so the whole feature was a paragraph in .env.example. */}
+        <Card title={t("settings.card.pools")}>
+          <Row label={t("settings.row.poolsIntro")} hint={t("settings.hint.pools")}>
+            <span />
+          </Row>
+          {(c.pools ?? []).map((p) => (
+            <Row key={p.provider} label={p.provider} hint={p.env}>
+              <PoolField
+                pool={p}
+                onChanged={() => void qc.invalidateQueries({ queryKey: ["config"] })}
+              />
+            </Row>
+          ))}
+        </Card>
+
         <Card title={t("settings.card.memory")}>
           <Row label={t("settings.row.backend")}>
             <Select
@@ -656,6 +755,16 @@ export function Settings() {
             <Toggle
               on={c.memory.semantic}
               onChange={(v) => save({ CHIMERA_SEMANTIC_MEMORY: String(v) })}
+            />
+          </Row>
+          {/* Directly under the switch that depends on it. Semantic recall falls back to lexical on
+              ANY embedder failure, silently — so an embed model the user's key cannot serve made the
+              toggle above confirm a change it did not make. */}
+          <Row label={t("settings.row.embedModel")} hint={t("settings.hint.embedModel")}>
+            <TextField
+              value={c.memory.embed_model}
+              placeholder="openrouter/openai/text-embedding-3-small"
+              onSave={(v) => save({ CHIMERA_EMBED_MODEL: v })}
             />
           </Row>
           <Row label={t("settings.row.autoConsolidate")} hint={t("settings.hint.autoConsolidate")}>
@@ -757,7 +866,18 @@ export function Settings() {
         <Card title={t("settings.card.server")}>
           <Row label={t("settings.row.bearer")} hint={t("settings.hint.bearer")}>
             <SecretField
-              provider={{ env: "CHIMERA_SERVER_TOKEN", label: "token", set: c.server.token_set, hint: "" }}
+              // Not a provider — SecretField's masked-write behaviour is what is being reused. The
+              // model/keys_url fields are empty because there is nothing on the other end of this
+              // token to suggest a model for or to send anyone to sign up at.
+              provider={{
+                env: "CHIMERA_SERVER_TOKEN",
+                label: "token",
+                set: c.server.token_set,
+                hint: "",
+                llm: false,
+                model: "",
+                keys_url: "",
+              }}
               onSave={(v) => save({ CHIMERA_SERVER_TOKEN: v })}
             />
           </Row>

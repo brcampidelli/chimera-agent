@@ -24,6 +24,7 @@ import type {
   MemoryLayers,
   MemoryProfile,
   PlanResult,
+  PoolWrite,
   ProjectState,
   RunReceipt,
   SessionMeta,
@@ -46,6 +47,18 @@ function authHeaders(extra?: HeadersInit): HeadersInit {
   const base: Record<string, string> = { "Content-Type": "application/json" };
   if (SERVER_TOKEN) base.Authorization = `Bearer ${SERVER_TOKEN}`;
   return { ...base, ...(extra ?? {}) };
+}
+
+/** Auth WITHOUT a `Content-Type` — the header a `FormData` body must not be given.
+ *
+ *  Only the browser knows the multipart boundary it just generated, and it writes the header for you
+ *  precisely when you have not written one yourself. Sending `Content-Type: application/json` next to
+ *  a FormData body — which is what `authHeaders()` does — does not change the body: the bytes are
+ *  still multipart, they just arrive labelled as JSON with no boundary to parse them by. The server
+ *  then answers `422 field required` about a file that was in the request all along, which reads to
+ *  the user as "the upload is broken" and to a developer as "the endpoint is wrong". */
+function authHeadersNoContentType(): HeadersInit {
+  return SERVER_TOKEN ? { Authorization: `Bearer ${SERVER_TOKEN}` } : {};
 }
 
 async function json<T>(path: string, init?: RequestInit): Promise<T> {
@@ -141,6 +154,21 @@ export const getMaturity = () => json<Maturity>("/api/maturity");
 export const getBenchmarks = () => json<Benchmarks>("/api/benchmarks");
 export const patchConfig = (updates: Record<string, string>) =>
   json<{ updated: string[] }>("/api/config", { method: "PATCH", body: JSON.stringify(updates) });
+
+/** Add one key to a provider's rotation pool. ONE key, never the list.
+ *
+ *  The list stays on the server, which is what makes a masked display safe: this client has only
+ *  ever seen `…abcd` for the other entries, and there is no request it could make that would send
+ *  them back. A "save the whole pool" endpoint would have needed the real values here. */
+export const addPoolKey = (provider: string, key: string) =>
+  json<PoolWrite>(`/api/config/pool/${provider}`, {
+    method: "POST",
+    body: JSON.stringify({ key }),
+  });
+
+/** Remove the key at `index`. A position, never a value — see {@link addPoolKey}. */
+export const removePoolKey = (provider: string, index: number) =>
+  json<PoolWrite>(`/api/config/pool/${provider}/${index}`, { method: "DELETE" });
 // Returns the STORED identity, not the submitted one: the free text is capped server-side, so the
 // screen must show what the agent will actually be told rather than what was typed into it.
 export const putInstructions = (identity: AgentIdentity) =>
@@ -635,7 +663,11 @@ export interface Attachment {
 export async function uploadAttachment(file: File): Promise<Attachment> {
   const body = new FormData();
   body.append("file", file);
-  const res = await fetch("/api/attachments", { method: "POST", headers: authHeaders(), body });
+  const res = await fetch("/api/attachments", {
+    method: "POST",
+    headers: authHeadersNoContentType(),
+    body,
+  });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return (await res.json()) as Attachment;
 }
@@ -674,7 +706,11 @@ export interface Transcript {
 export async function transcribe(audio: Blob): Promise<Transcript> {
   const body = new FormData();
   body.append("file", audio, "speech.webm");
-  const res = await fetch("/api/transcribe", { method: "POST", headers: authHeaders(), body });
+  const res = await fetch("/api/transcribe", {
+    method: "POST",
+    headers: authHeadersNoContentType(),
+    body,
+  });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return (await res.json()) as Transcript;
 }

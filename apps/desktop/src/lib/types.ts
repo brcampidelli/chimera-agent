@@ -20,6 +20,9 @@ export type CronJob = Schemas["CronJobOut"];
 export type TaskCard = Schemas["TaskCardOut"];
 export type ProjectState = Schemas["ProjectStateOut"];
 export type ProviderCfg = Schemas["ProviderOut"];
+/** A provider's rotation pool. Carries hints and positions — never a key. */
+export type PoolCfg = Schemas["PoolOut"];
+export type PoolWrite = Schemas["PoolWriteOut"];
 export type AppConfig = Schemas["ConfigOut"];
 export type AgentIdentity = Schemas["AgentIdentityOut"];
 /** An agent you dispatch work to, as opposed to the one you converse with. */

@@ -79,6 +79,29 @@ impl FirstAddr for str {
     }
 }
 
+/// The port this install used last time, or 0 to let the OS choose.
+///
+/// Asking for the same port again is not an optimisation — it is what makes the app's own storage
+/// survive a restart. The window loads an `http://127.0.0.1:<port>` origin, and browsers partition
+/// `localStorage` by scheme+host+**port**, so an OS-assigned port every launch means a new origin
+/// every launch: theme, chosen workspace, project list and language are all written to a store the
+/// next launch cannot see. The code that saves them says they are "remembered across launches", and
+/// with a rotating port that sentence is false.
+///
+/// Anything below 1024 is ignored: a memo claiming a privileged port cannot have come from us.
+fn remembered_port(memo: &Path) -> u16 {
+    std::fs::read_to_string(memo)
+        .ok()
+        .and_then(|s| s.trim().parse::<u16>().ok())
+        .filter(|p| *p >= 1024)
+        .unwrap_or(0)
+}
+
+/// The port out of `http://host:port`, if it parses.
+fn port_of(url: &str) -> Option<u16> {
+    url.trim_end_matches('/').rsplit(':').next()?.parse().ok()
+}
+
 /// Launch the sidecar and return the running child plus the URL it reported.
 fn start_sidecar(app: &tauri::App) -> Result<(Child, String), String> {
     let exe = sidecar_path(app)?;
@@ -99,8 +122,16 @@ fn start_sidecar(app: &tauri::App) -> Result<(Child, String), String> {
     let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&data_dir).map_err(|e| format!("cannot create {data_dir:?}: {e}"))?;
 
+    // Ask for the port we used last time so the window keeps its origin — see `remembered_port`.
+    // Asking is all this does: the backend falls back to an OS-assigned free port when the requested
+    // one is taken, so a port claimed by something else (or by a second copy of this app) costs a
+    // fresh origin once, never a failure to start.
+    let memo = data_dir.join("last-port.txt");
+    let wanted = remembered_port(&memo);
+    let wanted_arg = wanted.to_string();
+
     let child = Command::new(&exe)
-        .args(["--no-open", "--port", "0", "--emit-port-file"])
+        .args(["--no-open", "--port", &wanted_arg, "--emit-port-file"])
         .arg(&port_file)
         .env("CHIMERA_HOME", data_dir.join("data"))
         .spawn()
@@ -110,7 +141,49 @@ fn start_sidecar(app: &tauri::App) -> Result<(Child, String), String> {
     let url = wait_for_url(&port_file, Duration::from_secs(45))?;
     wait_for_listening(&url, Duration::from_secs(30))?;
     let _ = std::fs::remove_file(&port_file);
+
+    // Remember what we actually got, which is not always what we asked for. Best-effort on purpose:
+    // an unwritable memo means the next launch picks a fresh port, which is the behaviour we had
+    // before — worth degrading to, never worth refusing to start over.
+    if let Some(actual) = port_of(&url) {
+        if actual != wanted {
+            let _ = std::fs::write(&memo, actual.to_string());
+        }
+    }
     Ok((child, url))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{port_of, remembered_port};
+
+    #[test]
+    fn a_url_yields_its_port() {
+        assert_eq!(port_of("http://127.0.0.1:51234"), Some(51234));
+        assert_eq!(port_of("http://127.0.0.1:51234/"), Some(51234));
+        assert_eq!(port_of("http://127.0.0.1"), None);
+    }
+
+    #[test]
+    fn a_missing_or_nonsense_memo_means_let_the_os_choose() {
+        let dir = std::env::temp_dir().join("chimera-port-memo-test");
+        std::fs::create_dir_all(&dir).unwrap();
+        let memo = dir.join("last-port.txt");
+
+        let _ = std::fs::remove_file(&memo);
+        assert_eq!(remembered_port(&memo), 0);
+
+        std::fs::write(&memo, "not a port").unwrap();
+        assert_eq!(remembered_port(&memo), 0);
+
+        // A privileged port cannot have come from an OS-assigned bind, so it is not ours to reuse.
+        std::fs::write(&memo, "80").unwrap();
+        assert_eq!(remembered_port(&memo), 0);
+
+        std::fs::write(&memo, "51234\n").unwrap();
+        assert_eq!(remembered_port(&memo), 51234);
+        let _ = std::fs::remove_file(&memo);
+    }
 }
 
 fn kill_sidecar(app: &tauri::AppHandle) {

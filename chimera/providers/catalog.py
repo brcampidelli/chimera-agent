@@ -122,6 +122,84 @@ CATALOG: tuple[CatalogEntry, ...] = (
 )
 
 
+@dataclass(frozen=True)
+class ProviderInfo:
+    """A credential slot that serves models: what to call it, and what to do once it has a key."""
+
+    env: str
+    label: str
+    default_model: str
+    """A slug that works the moment this key is saved — the answer to "and now which model?".
+
+    It exists because a key alone is not a working setup. Every preset in ``_PRESETS`` is an
+    OpenRouter slug, so someone who saves an Anthropic key and changes nothing gets a weak/mid/top
+    ladder pointing at a vendor they have no key for, and the first call fails with a 401 that names
+    the wrong provider. Pinning one concrete model at setup time is what makes the ladder collapse
+    onto something reachable (``fallback_single_model``) instead of onto nothing.
+    """
+
+    keys_url: str
+    """Where a human goes to get one. Kept here rather than in a screen so the CLI and the desktop
+    wizard cannot drift into pointing at different pages for the same provider."""
+
+
+#: The providers with a settings field, a rotating key pool and a labelled slot in the UI.
+#:
+#: DATA, with the same warning the catalog carries about itself: slugs go stale. Anything here is a
+#: starting point the user can overwrite, never a constraint — a key for any of LiteLLM's other
+#: hundred-odd vendors works too (see :mod:`chimera.providers.discovery`), it simply arrives without
+#: a suggestion, which is honest rather than unsupported.
+#:
+#: **Checked against each vendor's own model list on 2026-08-09.** Worth repeating whenever these are
+#: touched, because the failure is silent in a specific way: a superseded model still answers, still
+#: bills, and nothing in a passing test suite can tell you that a new install is being pointed at
+#: last year's generation. Every entry below is the vendor's own "start here if you are unsure",
+#: which is exactly the question a first run is asking.
+PROVIDERS: tuple[ProviderInfo, ...] = (
+    # Left on 5.5 deliberately: this must MATCH ``Settings.default_model``, because for OpenRouter
+    # the wizard shows the suggestion without writing it. Showing 5.6 here while 5.5 is what runs
+    # would put a number on screen that is not the one in use. Refreshing the product default is a
+    # separate decision, and it moves the presets and the fusion panel with it.
+    ProviderInfo(
+        "OPENROUTER_API_KEY", "OpenRouter", "openrouter/openai/gpt-5.5", "https://openrouter.ai/keys"
+    ),
+    # gpt-5.6-sol, via its documented alias; same $5/$30 as the 5.5 it replaces.
+    ProviderInfo(
+        "OPENAI_API_KEY", "OpenAI", "openai/gpt-5.6", "https://platform.openai.com/api-keys"
+    ),
+    # A canonical dateless ID, not a convenience alias — Anthropic pins these to one snapshot.
+    ProviderInfo(
+        "ANTHROPIC_API_KEY",
+        "Anthropic",
+        "anthropic/claude-opus-5",
+        "https://console.anthropic.com/settings/keys",
+    ),
+    # The current stable Flash; `gemini-flash-latest` is the hot-swapping alias, so not that one.
+    ProviderInfo(
+        "GEMINI_API_KEY", "Gemini", "gemini/gemini-3.6-flash", "https://aistudio.google.com/apikey"
+    ),
+    # DeepSeek's long-lived alias for its chat model; unchanged.
+    ProviderInfo(
+        "DEEPSEEK_API_KEY",
+        "DeepSeek",
+        "deepseek/deepseek-chat",
+        "https://platform.deepseek.com/api_keys",
+    ),
+)
+
+#: ``"anthropic"`` -> its slot. The name is the env var without the suffix, lowercased — the same
+#: shape :func:`chimera.providers.discovery.provider_from_env_var` produces, so a first-class name
+#: and a discovered one are spelled identically everywhere they meet.
+PROVIDERS_BY_NAME: dict[str, ProviderInfo] = {
+    p.env.removesuffix("_API_KEY").lower(): p for p in PROVIDERS
+}
+
+
+def provider_names() -> list[str]:
+    """The accepted ``--provider`` values, in the order they are offered."""
+    return list(PROVIDERS_BY_NAME)
+
+
 def entries(tier: Tier | None = None, vendor: str | None = None) -> list[CatalogEntry]:
     """Catalog entries, optionally filtered by tier and/or vendor substring."""
     found = list(CATALOG)

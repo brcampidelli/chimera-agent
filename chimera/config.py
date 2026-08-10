@@ -7,6 +7,7 @@ the providers it actually calls (see :mod:`chimera.providers.gateway`).
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
@@ -477,9 +478,22 @@ class Settings(BaseSettings):
         return [single] if single else []
 
     def configured_providers(self) -> list[str]:
-        """Names of providers that currently have a key (single or pool)."""
+        """Providers that currently have a key: the five first-class ones, then whatever else the
+        environment reveals.
+
+        The five come first, and both groups are ordered deterministically, because this list is not
+        only displayed — ``catalog._reachable`` compares the first segment of a model slug against
+        it, so an unstable order would make tier resolution unstable with it.
+
+        The second group is what stops the product refusing to work for someone holding a valid
+        Groq or Mistral key; see :mod:`chimera.providers.discovery` for why the test is a name
+        pattern rather than a lookup in LiteLLM's provider list.
+        """
+        from chimera.providers.discovery import generic_providers
+
         names = ("openrouter", "openai", "anthropic", "gemini", "deepseek")
-        return [name for name in names if self.key_pool(name)]
+        first = [name for name in names if self.key_pool(name)]
+        return first + [name for name in generic_providers() if name not in first]
 
     def has_any_key(self) -> bool:
         return bool(self.configured_providers())
@@ -503,7 +517,26 @@ class Settings(BaseSettings):
         }
 
 
+def _export_env_file_credentials() -> None:
+    """Put provider keys that live only in the ``.env`` into the process environment.
+
+    ``Settings`` is declared ``extra="ignore"``, so a key it has no field for — ``GROQ_API_KEY``, say
+    — is read from the file and silently dropped: it becomes neither an attribute nor an environment
+    variable, and LiteLLM, which reads the environment, never sees it. Since ``chimera init`` writes
+    a ``.env`` and the docs point people at it, that gap would leave someone who followed our own
+    instructions with a working key and a product that will not start.
+
+    ``setdefault``, not assignment: a value already in the process environment wins over the file,
+    which is the precedence pydantic-settings applies to every field it does know about.
+    """
+    from chimera.providers.discovery import env_file_credentials
+
+    for name, value in env_file_credentials(Settings.model_config.get("env_file")).items():
+        os.environ.setdefault(name, value)
+
+
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     """Return the cached process-wide settings instance."""
+    _export_env_file_credentials()
     return Settings()
