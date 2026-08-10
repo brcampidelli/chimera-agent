@@ -47,9 +47,18 @@ _KEY_ENV_VARS = {
     "deepseek_api_key": "DEEPSEEK_API_KEY",
 }
 
-# LiteLLM prefixes that route to a local, keyless runtime (Ollama). A model named with one of these
-# runs on the user's machine and needs no API key — the credential gate must let it through.
-_LOCAL_MODEL_PREFIXES = ("ollama/", "ollama_chat/")
+# LiteLLM prefixes that route to a local, keyless runtime. A model named with one of these runs on
+# the user's machine and needs no API key — the credential gate must let it through. Ollama is the
+# common case; LM Studio, vLLM and llamafile are the same situation and were being refused for a key
+# none of them wants.
+_LOCAL_MODEL_PREFIXES = (
+    "ollama/",
+    "ollama_chat/",
+    "lm_studio/",
+    "hosted_vllm/",
+    "vllm/",
+    "llamafile/",
+)
 
 
 def _is_local_model(model: str) -> bool:
@@ -298,15 +307,26 @@ class LLMGateway:
 
         A local model like ``ollama/llama3`` runs on your machine with no API key, so the credential
         gate must not block it. This is what makes a fully-local, zero-key setup first-class.
+
+        The message names the variable for the provider actually being called rather than reciting
+        the five Chimera happens to have fields for. Listing five when a hundred would work is how
+        the old message taught people that their Groq key was unsupported when it was merely
+        unlisted; see :mod:`chimera.providers.discovery`.
         """
         if _is_local_model(resolved):
             return
-        if not self.settings.has_any_key():
-            raise MissingCredentialsError(
-                "No provider key configured. Set one of "
-                f"{list(_KEY_ENV_VARS.values())} in your environment or .env "
-                "(or use a local model, e.g. CHIMERA_MODEL=ollama/llama3, which needs no key)."
-            )
+        if self.settings.has_any_key():
+            return
+        head, sep, _ = (resolved or "").partition("/")
+        named = sep and head.replace("_", "").replace("-", "").isalnum()
+        wanted = f"{head.upper().replace('-', '_')}_API_KEY" if named else ""
+        raise MissingCredentialsError(
+            "No provider key configured"
+            + (f" for '{head}'. Set {wanted}" if wanted else ". Set a provider key")
+            + " in your environment or .env — any provider LiteLLM supports works, "
+            f"not only {list(_KEY_ENV_VARS.values())} "
+            "(or use a local model, e.g. CHIMERA_MODEL=ollama/llama3, which needs no key)."
+        )
 
     def _provider_kwargs(self) -> dict[str, Any]:
         """Extra litellm kwargs — a custom endpoint, plus the per-request deadline.

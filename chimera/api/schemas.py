@@ -176,6 +176,11 @@ class ModelsCfgOut(BaseModel):
     api_base: str | None
     fallback_models: list[str]
     tiers: TiersOut
+    ollama_base_url: str = ""
+    """Where the local Ollama server lives.
+
+    Distinct from ``api_base``, which applies to EVERY call: this one only points LiteLLM's Ollama
+    provider somewhere, so a remote Ollama box stops being a reason to hand-edit ``.env``."""
 
 
 class MemoryCfgOut(BaseModel):
@@ -189,6 +194,14 @@ class MemoryCfgOut(BaseModel):
     Off by default, and that default is the gap between what this project says it does and what an
     install does: the agent extracts skills from successful runs either way, and without this it
     never reads one of them again."""
+
+    embed_model: str = ""
+    """The model that turns memories into vectors — what makes ``semantic`` mean anything.
+
+    Exposed because the screen already offers the switch that depends on it. Semantic recall falls
+    back to lexical on ANY embedder failure, silently and by design, so a default the user's key
+    cannot serve produced a toggle that turned on, confirmed, and changed nothing — the exact failure
+    the ``applies`` field exists to prevent elsewhere."""
 
 
 class CacheCfgOut(BaseModel):
@@ -225,10 +238,49 @@ class McpCfgOut(BaseModel):
 
 
 class ProviderOut(BaseModel):
+    """One credential slot, as the screen that offers it needs to understand it."""
+
     env: str
     label: str
     set: bool
     hint: str
+    llm: bool = True
+    """Whether this credential serves MODELS, as opposed to search, speech or images.
+
+    The screen listing keys shows all of them; the first-run wizard must offer only these. Saving a
+    web-search key does not make ``has_any_key`` true, so a wizard that let you pick one would take
+    the key, confirm it, and then stay on screen forever waiting for a provider."""
+
+    model: str = ""
+    """A model slug that works the moment this key is saved; empty when we have no suggestion.
+
+    Answers here rather than in the client because the client is the one place it cannot be checked:
+    a list of slugs maintained in the frontend goes stale silently, and this one is already known to
+    be perishable. See ``chimera.providers.catalog.ProviderInfo``."""
+
+    keys_url: str = ""
+    """Where to get a key. Empty for a provider we discovered rather than one we ship."""
+
+
+class PoolKeyOut(BaseModel):
+    """One key in a rotation pool, as much of it as anyone is ever shown."""
+
+    index: int
+    """Its position, which is how the client asks for it to be removed.
+
+    An index rather than the value, and that is the whole design: there is no request shape that can
+    carry a key back to the server, so a client that renders the mask and re-submits the field — the
+    obvious bug, and the one that would overwrite a working pool with `…abcd` — cannot be written."""
+
+    hint: str
+
+
+class PoolOut(BaseModel):
+    """A provider's rotation pool. Present for every provider that has one, empty list when it does not."""
+
+    provider: str
+    env: str
+    keys: list[PoolKeyOut]
 
 
 class AutomationCfgOut(BaseModel):
@@ -266,6 +318,9 @@ class ConfigOut(BaseModel):
     automation: AutomationCfgOut
     guard: GuardCfgOut
     providers: list[ProviderOut]
+    pools: list[PoolOut] = Field(default_factory=list)
+    """Multi-key rotation, per provider. Never the keys — see :class:`PoolKeyOut`."""
+
     applies: dict[str, str] = Field(default_factory=dict)
     """Env-var name -> when a saved change starts applying, for the ones where it is not "now".
 
@@ -307,6 +362,17 @@ class AgentDefOut(BaseModel):
 
 class UpdatedOut(BaseModel):
     updated: list[str]
+
+
+class PoolAddIn(BaseModel):
+    key: str
+
+
+class PoolWriteOut(BaseModel):
+    """What a pool looks like afterwards — the count, never the contents."""
+
+    provider: str
+    count: int
 
 
 class DoctorOut(BaseModel):

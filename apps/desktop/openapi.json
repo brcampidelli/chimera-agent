@@ -1275,6 +1275,13 @@
           "models": {
             "$ref": "#/components/schemas/ModelsCfgOut"
           },
+          "pools": {
+            "items": {
+              "$ref": "#/components/schemas/PoolOut"
+            },
+            "title": "Pools",
+            "type": "array"
+          },
           "providers": {
             "items": {
               "$ref": "#/components/schemas/ProviderOut"
@@ -2654,6 +2661,11 @@
             "title": "Backend",
             "type": "string"
           },
+          "embed_model": {
+            "default": "",
+            "title": "Embed Model",
+            "type": "string"
+          },
           "remember_from_chat": {
             "title": "Remember From Chat",
             "type": "boolean"
@@ -2887,6 +2899,11 @@
             "title": "Mid",
             "type": "string"
           },
+          "ollama_base_url": {
+            "default": "",
+            "title": "Ollama Base Url",
+            "type": "string"
+          },
           "orchestrator": {
             "title": "Orchestrator",
             "type": "string"
@@ -2998,6 +3015,84 @@
           "task"
         ],
         "title": "PlanRequest",
+        "type": "object"
+      },
+      "PoolAddIn": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "title": "PoolAddIn",
+        "type": "object"
+      },
+      "PoolKeyOut": {
+        "description": "One key in a rotation pool, as much of it as anyone is ever shown.",
+        "properties": {
+          "hint": {
+            "title": "Hint",
+            "type": "string"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "index",
+          "hint"
+        ],
+        "title": "PoolKeyOut",
+        "type": "object"
+      },
+      "PoolOut": {
+        "description": "A provider's rotation pool. Present for every provider that has one, empty list when it does not.",
+        "properties": {
+          "env": {
+            "title": "Env",
+            "type": "string"
+          },
+          "keys": {
+            "items": {
+              "$ref": "#/components/schemas/PoolKeyOut"
+            },
+            "title": "Keys",
+            "type": "array"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "env",
+          "keys"
+        ],
+        "title": "PoolOut",
+        "type": "object"
+      },
+      "PoolWriteOut": {
+        "description": "What a pool looks like afterwards \u2014 the count, never the contents.",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "count"
+        ],
+        "title": "PoolWriteOut",
         "type": "object"
       },
       "Posture": {
@@ -3307,6 +3402,7 @@
         "type": "object"
       },
       "ProviderOut": {
+        "description": "One credential slot, as the screen that offers it needs to understand it.",
         "properties": {
           "env": {
             "title": "Env",
@@ -3316,8 +3412,23 @@
             "title": "Hint",
             "type": "string"
           },
+          "keys_url": {
+            "default": "",
+            "title": "Keys Url",
+            "type": "string"
+          },
           "label": {
             "title": "Label",
+            "type": "string"
+          },
+          "llm": {
+            "default": true,
+            "title": "Llm",
+            "type": "boolean"
+          },
+          "model": {
+            "default": "",
+            "title": "Model",
             "type": "string"
           },
           "set": {
@@ -5084,6 +5195,103 @@
           }
         },
         "summary": "Patch Config Endpoint"
+      }
+    },
+    "/api/config/pool/{provider}": {
+      "post": {
+        "operationId": "pool_add_endpoint_api_config_pool__provider__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "title": "Provider",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PoolAddIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoolWriteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pool Add Endpoint"
+      }
+    },
+    "/api/config/pool/{provider}/{index}": {
+      "delete": {
+        "operationId": "pool_remove_endpoint_api_config_pool__provider___index__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "title": "Provider",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "index",
+            "required": true,
+            "schema": {
+              "title": "Index",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoolWriteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pool Remove Endpoint"
       }
     },
     "/api/config/test": {

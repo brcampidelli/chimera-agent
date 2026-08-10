@@ -24,6 +24,7 @@ import type {
   MemoryLayers,
   MemoryProfile,
   PlanResult,
+  PoolWrite,
   ProjectState,
   RunReceipt,
   SessionMeta,
@@ -153,6 +154,21 @@ export const getMaturity = () => json<Maturity>("/api/maturity");
 export const getBenchmarks = () => json<Benchmarks>("/api/benchmarks");
 export const patchConfig = (updates: Record<string, string>) =>
   json<{ updated: string[] }>("/api/config", { method: "PATCH", body: JSON.stringify(updates) });
+
+/** Add one key to a provider's rotation pool. ONE key, never the list.
+ *
+ *  The list stays on the server, which is what makes a masked display safe: this client has only
+ *  ever seen `…abcd` for the other entries, and there is no request it could make that would send
+ *  them back. A "save the whole pool" endpoint would have needed the real values here. */
+export const addPoolKey = (provider: string, key: string) =>
+  json<PoolWrite>(`/api/config/pool/${provider}`, {
+    method: "POST",
+    body: JSON.stringify({ key }),
+  });
+
+/** Remove the key at `index`. A position, never a value — see {@link addPoolKey}. */
+export const removePoolKey = (provider: string, index: number) =>
+  json<PoolWrite>(`/api/config/pool/${provider}/${index}`, { method: "DELETE" });
 // Returns the STORED identity, not the submitted one: the free text is capped server-side, so the
 // screen must show what the agent will actually be told rather than what was typed into it.
 export const putInstructions = (identity: AgentIdentity) =>

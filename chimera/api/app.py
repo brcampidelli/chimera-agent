@@ -75,6 +75,8 @@ from chimera.api.schemas import (
     NewSessionOut,
     PausedRunOut,
     PlanOut,
+    PoolAddIn,
+    PoolWriteOut,
     RunReceiptOut,
     SessionDetailOut,
     SessionMetaOut,
@@ -364,6 +366,31 @@ def build_api_app(
 
         try:
             return patch_config(updates)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    # Pools are edited by OPERATION, not by value. `PATCH /api/config` writes a string, and a string
+    # is exactly what a pool must not be edited as: the client would have to know every key to change
+    # one, so rendering the mask and re-submitting the field — the natural implementation — silently
+    # replaces a working rotation with `…abcd`. Add takes one key and never the list; remove takes a
+    # position and never a value. Neither request can carry a key backwards.
+    @app.post("/api/config/pool/{provider}", dependencies=[guard], response_model=PoolWriteOut)
+    def pool_add_endpoint(provider: str, body: PoolAddIn) -> dict[str, Any]:
+        from chimera.api.config_api import pool_add
+
+        try:
+            return pool_add(provider, body.key)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.delete(
+        "/api/config/pool/{provider}/{index}", dependencies=[guard], response_model=PoolWriteOut
+    )
+    def pool_remove_endpoint(provider: str, index: int) -> dict[str, Any]:
+        from chimera.api.config_api import pool_remove
+
+        try:
+            return pool_remove(provider, index)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 

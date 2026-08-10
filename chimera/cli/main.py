@@ -231,8 +231,12 @@ def version() -> None:
 
 @app.command()
 def init(
+    provider: str = typer.Option(
+        "openrouter", "--provider", help="Which provider the key is for (openrouter, openai, ...)."
+    ),
+    key: str = typer.Option(None, "--key", help="API key for --provider."),
     openrouter_key: str = typer.Option(
-        None, "--openrouter-key", help="Your OpenRouter API key (sk-or-...); one key = 100+ models."
+        None, "--openrouter-key", help="Your OpenRouter API key (same as --provider openrouter --key)."
     ),
     model: str = typer.Option(None, "--model", help="Default model slug to set (optional)."),
     yes: bool = typer.Option(False, "--yes", "-y", help="Non-interactive: never prompt."),
@@ -240,6 +244,16 @@ def init(
 ) -> None:
     """First-run setup: create .env, set a provider key, and point you at a real example."""
     import os
+
+    from chimera.providers.catalog import PROVIDERS_BY_NAME, provider_names
+
+    chosen = PROVIDERS_BY_NAME.get(provider.strip().lower())
+    if chosen is None:
+        console.print(
+            f"[red]Unknown provider[/red] '{provider}'. Known: {', '.join(provider_names())}.\n"
+            "Any other provider LiteLLM supports also works — set <NAME>_API_KEY in .env directly."
+        )
+        raise typer.Exit(code=2)
 
     root = Path(home) if home else Path.cwd()
     env_path = root / ".env"
@@ -256,20 +270,28 @@ def init(
         console.print(f"[green]Created[/green] {env_path}")
 
     # 2. Provider key (flag wins; prompt only when interactive).
-    key = (openrouter_key or "").strip()
-    if not key and not yes:
-        console.print("Get a key at [bold]https://openrouter.ai/keys[/bold] (a free tier exists).")
-        key = typer.prompt(
-            "Paste your OpenRouter API key (leave blank to skip)", default="", show_default=False
+    secret = (key or openrouter_key or "").strip()
+    if not secret and not yes:
+        console.print(f"Get a key at [bold]{chosen.keys_url}[/bold].")
+        secret = typer.prompt(
+            f"Paste your {chosen.label} API key (leave blank to skip)", default="", show_default=False
         ).strip()
-    if key:
-        _set_env_var(env_path, "OPENROUTER_API_KEY", key)
-        os.environ["OPENROUTER_API_KEY"] = key  # so the check below sees it immediately
-        console.print("[green]Set[/green] OPENROUTER_API_KEY in .env")
+    if secret:
+        _set_env_var(env_path, chosen.env, secret)
+        os.environ[chosen.env] = secret  # so the check below sees it immediately
+        console.print(f"[green]Set[/green] {chosen.env} in .env")
     if model:
         _set_env_var(env_path, "CHIMERA_DEFAULT_MODEL", model)
         os.environ["CHIMERA_DEFAULT_MODEL"] = model
         console.print(f"[green]Set[/green] CHIMERA_DEFAULT_MODEL={model}")
+    elif secret and chosen.env != "OPENROUTER_API_KEY":
+        # Without this the tier presets stay on OpenRouter slugs and the ladder points at a vendor
+        # this key cannot reach — the first call then fails with a 401 naming the wrong provider.
+        # OpenRouter is skipped because the built-in default already matches: writing it would freeze
+        # THIS release's default into the user's .env and stop them inheriting the next one.
+        _set_env_var(env_path, "CHIMERA_DEFAULT_MODEL", chosen.default_model)
+        os.environ["CHIMERA_DEFAULT_MODEL"] = chosen.default_model
+        console.print(f"[green]Set[/green] CHIMERA_DEFAULT_MODEL={chosen.default_model}")
 
     # 2b. Cost mode: how the weak/mid/top tier ladder is filled unless the user pins
     # models per role (`chimera models set ...`). Vendor-agnostic — any slug, any role.
@@ -312,7 +334,7 @@ def init(
         console.print(
             Panel.fit(
                 f"No provider key yet. Add one to [bold]{env_path}[/bold] "
-                "(OPENROUTER_API_KEY=...) and run [bold]chimera doctor[/bold].",
+                f"({chosen.env}=...) and run [bold]chimera doctor[/bold].",
                 title="[yellow]One more step[/yellow]",
             )
         )
@@ -353,6 +375,21 @@ def doctor(
         settings = get_settings()
 
     providers = settings.configured_providers()
+    # The gate accepts a credential on the strength of its NAME, which is fast and permissive: a
+    # typo'd GROK_API_KEY is indistinguishable from a provider. Diagnostics is the one command where
+    # paying LiteLLM's import to check is worth it — and where an unavailable LiteLLM has to degrade
+    # to saying nothing, never to a warning that might be wrong. The five with settings fields are
+    # never questioned; only what was discovered from the environment.
+    from chimera.providers.discovery import generic_providers, litellm_known
+
+    discovered = generic_providers()
+    known = litellm_known(discovered)
+    shown = [
+        f"{p} [yellow](unknown to LiteLLM)[/yellow]"
+        if p in discovered and not known.get(p, True)
+        else p
+        for p in providers
+    ]
 
     table = Table(title="Chimera doctor", show_header=False, title_style="bold")
     table.add_row("Chimera version", __version__)
@@ -362,7 +399,7 @@ def doctor(
     table.add_row("Default model", settings.default_model)
     table.add_row(
         "Configured providers",
-        ", ".join(providers) if providers else "[yellow]none[/yellow]",
+        ", ".join(shown) if shown else "[yellow]none[/yellow]",
     )
     console.print(table)
 

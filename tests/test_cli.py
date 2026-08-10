@@ -288,6 +288,58 @@ def test_init_writes_key_and_reports_ready(tmp_path: Path, monkeypatch: pytest.M
     get_settings.cache_clear()
 
 
+def test_init_sets_up_a_provider_that_is_not_openrouter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`--provider` also pins a model, because a key alone is not a working setup.
+
+    Every cost preset is an OpenRouter slug, so an Anthropic key with the built-in default left
+    alone leaves the tier ladder pointing at a vendor this key cannot reach — and the first call
+    fails with a 401 naming the wrong provider.
+    """
+    (tmp_path / ".env.example").write_text("OPENROUTER_API_KEY=\n", encoding="utf-8")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    get_settings.cache_clear()
+    result = runner.invoke(
+        app,
+        ["init", "--yes", "--home", str(tmp_path), "--provider", "anthropic", "--key", "sk-ant-x"],
+    )
+    assert result.exit_code == 0
+    env = (tmp_path / ".env").read_text(encoding="utf-8")
+    assert "ANTHROPIC_API_KEY=sk-ant-x" in env
+    assert "CHIMERA_DEFAULT_MODEL=anthropic/" in env
+    assert "OPENROUTER_API_KEY=sk-ant-x" not in env
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("CHIMERA_DEFAULT_MODEL", raising=False)
+    get_settings.cache_clear()
+
+
+def test_init_leaves_the_built_in_default_alone_for_openrouter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Writing it would freeze this release's default into the user's .env and stop them inheriting
+    # the next one — and unlike the other providers, there is nothing to correct here.
+    (tmp_path / ".env.example").write_text("OPENROUTER_API_KEY=\n", encoding="utf-8")
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    get_settings.cache_clear()
+    result = runner.invoke(
+        app, ["init", "--yes", "--home", str(tmp_path), "--key", "sk-or-x"]
+    )
+    assert result.exit_code == 0
+    assert "CHIMERA_DEFAULT_MODEL=" not in (tmp_path / ".env").read_text(encoding="utf-8")
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    get_settings.cache_clear()
+
+
+def test_init_refuses_an_unknown_provider_and_says_what_it_knows(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app, ["init", "--yes", "--home", str(tmp_path), "--provider", "nope", "--key", "x"]
+    )
+    assert result.exit_code == 2
+    assert "openrouter" in result.stdout  # names the accepted values rather than just refusing
+    assert not (tmp_path / ".env").exists()  # refused before touching anything
+
+
 def test_init_creates_env_from_example(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     (tmp_path / ".env.example").write_text("OPENROUTER_API_KEY=\nOPENAI_API_KEY=\n", encoding="utf-8")
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)

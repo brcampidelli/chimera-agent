@@ -16,7 +16,7 @@ pytest.importorskip("sse_starlette")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from chimera.config import Settings  # noqa: E402
+from chimera.config import Settings, get_settings  # noqa: E402
 from chimera.core.agent import AgentResult, ToolActivity  # noqa: E402
 from chimera.interface import ChatSession  # noqa: E402
 
@@ -1017,7 +1017,80 @@ def test_config_endpoint_shape(tmp_path: Any) -> None:
     cfg = _client(tmp_path).get("/api/config").json()
     assert {"models", "memory", "cache", "sandbox", "server", "providers"} <= set(cfg)
     # no provider entry ever carries a raw key field
-    assert all(set(p) == {"env", "label", "set", "hint"} for p in cfg["providers"])
+    fields = {"env", "label", "set", "hint", "llm", "model", "keys_url"}
+    assert all(set(p) == fields for p in cfg["providers"])
+
+
+def test_pool_endpoints_add_and_remove_without_ever_carrying_a_key_back(
+    tmp_path: Any, monkeypatch: Any
+) -> None:
+    monkeypatch.setenv("CHIMERA_OPENROUTER_KEYS", "")
+    monkeypatch.chdir(tmp_path)  # patch_config/_write_env_var resolve .env against the cwd
+    get_settings.cache_clear()
+    client = _client(tmp_path)
+
+    assert client.post("/api/config/pool/openrouter", json={"key": "sk-or-first1111"}).json() == {
+        "provider": "openrouter",
+        "count": 1,
+    }
+    client.post("/api/config/pool/openrouter", json={"key": "sk-or-second2222"})
+
+    pools = {p["provider"]: p for p in client.get("/api/config").json()["pools"]}
+    assert pools["openrouter"]["keys"] == [
+        {"index": 0, "hint": "…1111"},
+        {"index": 1, "hint": "…2222"},
+    ]
+
+    assert client.delete("/api/config/pool/openrouter/0").json()["count"] == 1
+    assert client.get("/api/config").json()
+    remaining = {p["provider"]: p for p in client.get("/api/config").json()["pools"]}
+    assert remaining["openrouter"]["keys"] == [{"index": 0, "hint": "…2222"}]
+
+
+def test_pool_endpoint_400s_instead_of_writing_a_mask(tmp_path: Any, monkeypatch: Any) -> None:
+    monkeypatch.setenv("CHIMERA_OPENROUTER_KEYS", "sk-or-real1111")
+    monkeypatch.chdir(tmp_path)
+    get_settings.cache_clear()
+    client = _client(tmp_path)
+
+    assert client.post("/api/config/pool/openrouter", json={"key": "…1111"}).status_code == 400
+    assert client.post("/api/config/pool/nope", json={"key": "x"}).status_code == 400
+    assert client.delete("/api/config/pool/openrouter/9").status_code == 400
+    # and the pool the client tried to overwrite is untouched
+    pools = {p["provider"]: p for p in client.get("/api/config").json()["pools"]}
+    assert pools["openrouter"]["keys"] == [{"index": 0, "hint": "…1111"}]
+
+
+def test_the_settings_that_only_the_env_file_could_reach(tmp_path: Any) -> None:
+    """Two values the interface used to hide, one of them under a switch that depends on it.
+
+    `semantic` degrades to lexical recall on ANY embedder failure, without a word — so an embed
+    model the user's key cannot serve made that toggle confirm a change it had not made. And the
+    Ollama URL is not covered by `api_base`: that one is sent on every call, this one only points
+    the Ollama provider, which is what someone running it on another machine needs.
+    """
+    from chimera.api.config_api import is_editable
+
+    cfg = _client(tmp_path).get("/api/config").json()
+    assert cfg["memory"]["embed_model"]
+    assert cfg["models"]["ollama_base_url"]
+    assert is_editable("CHIMERA_EMBED_MODEL") and is_editable("CHIMERA_OLLAMA_BASE_URL")
+
+
+def test_config_says_which_credentials_serve_models(tmp_path: Any) -> None:
+    """The first-run wizard filters on this, and getting it wrong is a dead end that confirms.
+
+    A search or speech key does not make ``has_any_key`` true, so a wizard that offered one would
+    take the key, report it saved, and then stay on screen forever waiting for a provider.
+    """
+    providers = {p["env"]: p for p in _client(tmp_path).get("/api/config").json()["providers"]}
+
+    assert providers["ANTHROPIC_API_KEY"]["llm"] is True
+    assert providers["ANTHROPIC_API_KEY"]["model"]  # a slug to start on, not just a key slot
+    assert providers["ANTHROPIC_API_KEY"]["keys_url"].startswith("https://")
+    for env in ("TAVILY_API_KEY", "ELEVENLABS_API_KEY", "STABILITY_API_KEY"):
+        assert providers[env]["llm"] is False
+        assert providers[env]["model"] == ""
 
 
 def test_cron_list_enable_disable_delete(monkeypatch: Any, tmp_path: Any) -> None:

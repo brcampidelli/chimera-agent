@@ -1963,7 +1963,28 @@
       "name": "init",
       "params": [
         {
-          "help": "Your OpenRouter API key (sk-or-...); one key = 100+ models.",
+          "default": "'openrouter'",
+          "help": "Which provider the key is for (openrouter, openai, ...).",
+          "kind": "option",
+          "name": "provider",
+          "opts": [
+            "--provider"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "API key for --provider.",
+          "kind": "option",
+          "name": "key",
+          "opts": [
+            "--key"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Your OpenRouter API key (same as --provider openrouter --key).",
           "kind": "option",
           "name": "openrouter_key",
           "opts": [
