@@ -101,16 +101,19 @@ class TestForma:
 
 
 class TestMontagemDoLink:
-    def test_marcador_vira_link_da_fonte_verificada(self) -> None:
+    def test_marcador_vira_numero_ligado_a_fonte_verificada(self) -> None:
+        # Numerado porque a manchete inteira dentro da frase era ilegível: treze palavras em
+        # inglês no meio de um período em português, oito vezes por texto. As manchetes ficam na
+        # lista do fim, que é de onde a página as renderiza de qualquer jeito.
         saida = writer.link_sources(CORPO, FONTES)
-        assert "[Meta returns to open models](https://the-decoder.com/meta-open-models)" in saida
+        assert "[[1]](https://the-decoder.com/meta-open-models)" in saida
+        assert "[[2]](https://techcrunch.com/openai-cyber)" in saida
         assert "[S1]" not in saida and "[S2]" not in saida
 
-    def test_a_manchete_nao_e_traduzida(self) -> None:
-        # O texto do link é a manchete no idioma do veículo, nas nove versões. Traduzi-la entrega
-        # ao leitor um título que não existe na página para onde ele vai.
-        corpo_pt = "Conforme [S1], o cenário muda."
-        assert "Meta returns to open models" in writer.link_sources(corpo_pt, FONTES)
+    def test_o_texto_de_release_usa_a_manchete(self) -> None:
+        # Ali não há bloco de fontes embaixo: um `[1]` apontaria para uma lista que não existe.
+        saida = writer.link_sources("As notas [S1].", FONTES[:1], numbered=False)
+        assert "[Meta returns to open models](https://the-decoder.com/meta-open-models)" in saida
 
 
 # --------------------------------------------------------------------------- a redação

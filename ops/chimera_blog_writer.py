@@ -817,16 +817,24 @@ def translate(art: dict, lang: str, n_sources: int) -> dict | None:
     return None
 
 
-def link_sources(body: str, items: list[dict]) -> str:
-    """Troca cada marcador pelo link da fonte, com a manchete como texto do link.
+def link_sources(body: str, items: list[dict], numbered: bool = True) -> str:
+    """Troca cada marcador pelo link da fonte.
 
-    A manchete fica na língua do veículo, de propósito, nas nove versões: é o texto que a pessoa
-    vai encontrar quando clicar. Traduzir o texto de um link é entregar ao leitor um título que não
-    existe na página para onde ele vai.
+    Numerado, e não com a manchete como texto do link. A primeira versão inseria a manchete inteira,
+    porque ela é o título que a pessoa vai encontrar ao clicar — e traduzi-la seria entregar um
+    título que não existe na página de destino. O raciocínio continua certo; o efeito era ilegível:
+    uma manchete inglesa de treze palavras no meio de uma frase em português, oito vezes por texto.
+    Uma coluna cita por número e põe as manchetes na lista do fim, que é de onde a página as
+    renderiza de qualquer jeito, na língua do veículo.
+
+    `numbered=False` para o texto de release, que não tem bloco de fontes embaixo: ali um `[1]`
+    apontaria para uma lista que a página não mostra.
     """
     def troca(m: re.Match) -> str:
-        item = items[int(m.group(1)) - 1]
-        return f"[{item['headline']}]({item['url']})"
+        i = int(m.group(1))
+        item = items[i - 1]
+        texto = f"[{i}]" if numbered else item["headline"]
+        return f"[{texto}]({item['url']})"
 
     return MARKER.sub(troca, body)
 
@@ -874,7 +882,7 @@ def render(art: dict, day: str, category: str, items: list[dict], dropped: str, 
             ]
     if dropped:
         lines.append(f"dropped: {yaml_str(dropped)}")
-    lines += ["---", "", link_sources(art["body"].strip(), items), ""]
+    lines += ["---", "", link_sources(art["body"].strip(), items, numbered=category == "analysis"), ""]
     return "\n".join(lines)
 
 
