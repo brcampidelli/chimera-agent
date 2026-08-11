@@ -408,43 +408,79 @@ def outlet_of(host: str) -> str:
 
 # --------------------------------------------------------------------------- comentário
 
-PROMPT = """Você escreve uma linha de comentário para um boletim de notícias de IA do projeto
-Chimera Agent — um framework open-source de agentes com governança e benchmarks honestos.
+# Os nove idiomas do site. A ordem é a do seletor de idioma, e `en` vem primeiro porque é a única
+# língua em que o modelo escreve sem ajuda: as outras oito saem melhor quando ele já formou a ideia.
+LANGS = ("en", "pt", "es", "fr", "de", "it", "pl", "zh", "ja")
+LANG_NAMES = {
+    "en": "English",
+    "pt": "português do Brasil",
+    "es": "español",
+    "fr": "français",
+    "de": "Deutsch",
+    "it": "italiano",
+    "pl": "polski",
+    "zh": "简体中文",
+    "ja": "日本語",
+}
 
-Recebe a MANCHETE e a DESCRIÇÃO de uma matéria. Escreva UMA a DUAS frases dizendo o que aquilo muda
-para quem constrói agentes de IA. Em {lang}.
+# Frases inteiras que modelos deixam escapar quando "pensam alto" na saída final. Uma delas está no
+# ar agora, num boletim em inglês: "(Alternatively, if shorter is preferred: …)". O modelo estava
+# oferecendo uma escolha ao operador, e o operador era um script.
+ARTIFACTS = re.compile(
+    # A oferta ao operador, no fim: "(Alternatively, if shorter is preferred: …)"
+    r"\s*\((?:alternatively|alternativamente|or,? if|se preferir|caso prefira)[^)]*\)\s*$"
+    # A cortesia de abertura: "Here's the comment:", "Aqui está o comentário:", "Comentário:".
+    # O dois-pontos tem de vir em até 40 caracteres depois do marcador, senão isto comeria uma
+    # frase legítima que só por acaso começa com "Claro" e tem um dois-pontos lá adiante.
+    r"|^\s*(?:aqui est[áa]|segue|here(?:'s| is)|sure|claro|coment[áa]rio|comment)\b[^:\n]{0,40}:\s*",
+    re.I,
+)
+
+PROMPT = """Você escreve o comentário de um boletim de notícias de IA do projeto Chimera Agent —
+um framework open-source de agentes com governança e benchmarks honestos.
+
+Recebe a MANCHETE de uma matéria e, quando existe, uma DESCRIÇÃO curta. Escreva UMA a DUAS frases
+dizendo o que aquilo muda para quem constrói agentes de IA — e escreva a MESMA ideia em cada um dos
+nove idiomas pedidos.
 
 REGRAS INVIOLÁVEIS:
-- NÃO afirme nenhum fato que não esteja na manchete ou na descrição. Nada de números, nomes,
-  datas ou citações que não estejam ali.
-- É comentário, não reportagem. Opinião e implicação, não recontagem da notícia.
-- No máximo {cap} caracteres. Sem markdown, sem aspas ao redor, sem prefixo.
-- PULAR é só para matéria que não trata de IA, de LLM ou de agentes. Se trata, há o que dizer:
-  toda notícia da área muda alguma coisa para quem constrói — custo, risco, expectativa, mercado.
+- NÃO afirme nenhum fato que não esteja na manchete ou na descrição. Nada de números, nomes, datas
+  ou citações que não estejam ali. O que você acrescenta é implicação, nunca informação.
+- Uma descrição curta, ou ausente, NÃO é motivo para pular. A manchete já basta para dizer o que
+  aquilo muda — implicação não depende de detalhe, depende do assunto.
+- É comentário, não reportagem. Não reconte a notícia: diga o que ela significa para quem constrói.
+- Os nove idiomas dizem a MESMA coisa. São traduções de um comentário, não nove opiniões diferentes.
+- No máximo {cap} caracteres por idioma. Sem markdown, sem aspas ao redor, sem prefixo, sem oferecer
+  versões alternativas — quem lê a sua resposta é um script, não uma pessoa que possa escolher.
+- PULAR é só para matéria que não trata de IA, de LLM ou de agentes.
+
+Responda APENAS com um objeto JSON, sem cercas de código, exatamente nesta forma:
+{{"en": "...", "pt": "...", "es": "...", "fr": "...", "de": "...", "it": "...", "pl": "...", "zh": "...", "ja": "..."}}
+
+Para pular, responda apenas: {{"skip": true}}
 
 MANCHETE: {headline}
 DESCRIÇÃO: {description}"""
 
 
-def comment_for(item: dict, lang: str) -> str:
+def _clean(text: str) -> str:
+    """Uma linha, sem aspas de embrulho e sem os restos que o modelo dirige ao operador."""
+    text = " ".join(str(text).replace("\n", " ").split())
+    text = ARTIFACTS.sub("", text).strip()
+    return text.strip('"').strip("'").strip()
+
+
+def _ask(prompt: str, max_tokens: int) -> dict | None:
+    """Uma chamada ao modelo que devolve JSON, ou None. Nunca levanta."""
     key = env("OPENROUTER_API_KEY")
     if not key:
-        return ""
+        return None
     body = {
         "model": env("CHIMERA_DIGEST_MODEL") or "deepseek/deepseek-chat",
-        "messages": [
-            {
-                "role": "user",
-                "content": PROMPT.format(
-                    lang="português do Brasil" if lang == "pt" else "English",
-                    cap=COMMENT_MAX - 40,
-                    headline=item["headline"],
-                    description=item["description"] or "(sem descrição)",
-                ),
-            }
-        ],
-        "max_tokens": 260,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
         "temperature": 0.3,
+        "response_format": {"type": "json_object"},
     }
     req = urllib.request.Request(
         "https://openrouter.ai/api/v1/chat/completions",
@@ -458,17 +494,53 @@ def comment_for(item: dict, lang: str) -> str:
         },
     )
     try:
-        with urllib.request.urlopen(req, timeout=90) as resp:
+        with urllib.request.urlopen(req, timeout=120) as resp:
             data = json.load(resp)
-        text = data["choices"][0]["message"]["content"].strip()
+        raw = data["choices"][0]["message"]["content"].strip()
     except Exception as exc:  # noqa: BLE001
-        log(f"comentário {lang}: {type(exc).__name__} {str(exc)[:70]}")
-        return ""
+        log(f"modelo: {type(exc).__name__} {str(exc)[:70]}")
+        return None
+    # Alguns modelos ignoram response_format e devolvem a cerca de código mesmo assim.
+    raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw).strip()
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        log(f"modelo: resposta não é JSON ({raw[:70]})")
+        return None
+    return parsed if isinstance(parsed, dict) else None
 
-    text = " ".join(text.replace("\n", " ").split()).strip('"').strip()
-    if text.upper().startswith("PULAR") or not text:
-        return ""
-    return fit(text, lang)
+
+def comments_for(item: dict) -> dict[str, str]:
+    """Os nove comentários de um item, numa chamada só.
+
+    Uma chamada por idioma custaria nove vezes mais e produziria nove opiniões diferentes sobre a
+    mesma matéria — o leitor alemão leria outra coisa que o brasileiro. Pedir os nove de uma vez é
+    mais barato E é o que torna o boletim o mesmo boletim em toda língua.
+
+    Devolve {} quando o modelo pula, quando falha, ou quando algum idioma não veio: um boletim com
+    buraco em quatro línguas é pior que um item a menos.
+    """
+    parsed = _ask(
+        PROMPT.format(
+            cap=COMMENT_MAX - 40,
+            headline=item["headline"],
+            description=item["description"] or "(sem descrição — use a manchete)",
+        ),
+        max_tokens=1400,
+    )
+    if parsed is None or parsed.get("skip"):
+        return {}
+
+    out: dict[str, str] = {}
+    for lang in LANGS:
+        text = _clean(parsed.get(lang, ""))
+        if not text or text.upper().startswith("PULAR"):
+            log(f"comentário: idioma {lang} veio vazio — item descartado")
+            return {}
+        out[lang] = fit(text, lang)
+        if not out[lang]:
+            return {}
+    return out
 
 
 def fit(text: str, lang: str) -> str:
@@ -507,16 +579,67 @@ def slugify(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
 
 
-def render(lang: str, day: str, slot: str, items: list[dict], dropped: str) -> str:
-    label = {
-        "pt": {"meio-dia": "meio-dia", "fim-do-dia": "fim do dia"},
-        "en": {"meio-dia": "midday", "fim-do-dia": "evening"},
-    }[lang][slot]
-    title = f"Boletim — {day}, {label}" if lang == "pt" else f"Digest — {day}, {label}"
-    # Todos os itens, não só o primeiro: o resumo é o que aparece no índice do blog e no card
-    # social, e um resumo que nomeia uma das três notícias descreve o post errado.
+SUMMARY_PROMPT = """Você escreve a linha de resumo de um boletim de notícias de IA do projeto
+Chimera Agent. Ela aparece no índice do blog e no card compartilhado — é o que decide se alguém abre.
+
+Recebe as manchetes do boletim de hoje. Escreva UMA frase dizendo do que trata este boletim como um
+todo, em cada um dos nove idiomas pedidos.
+
+REGRAS INVIOLÁVEIS:
+- NÃO afirme nenhum fato que não esteja nas manchetes. Nada de números, nomes ou datas novos.
+- Uma frase que descreve o CONJUNTO. Não é lugar de nomear uma das notícias e ignorar as outras.
+- Os nove idiomas dizem a MESMA coisa.
+- No máximo 200 caracteres por idioma. Sem markdown, sem aspas ao redor, sem prefixo.
+
+Responda APENAS com um objeto JSON:
+{{"en": "...", "pt": "...", "es": "...", "fr": "...", "de": "...", "it": "...", "pl": "...", "zh": "...", "ja": "..."}}
+
+MANCHETES:
+{headlines}"""
+
+# O título do post, por idioma, e o rótulo do horário. Sai daqui e não de um if de duas línguas.
+TITLE_WORD = {
+    "en": "Digest", "pt": "Boletim", "es": "Boletín", "fr": "Bulletin", "de": "Bulletin",
+    "it": "Bollettino", "pl": "Biuletyn", "zh": "简报", "ja": "ダイジェスト",
+}
+SLOT_LABEL = {
+    "meio-dia": {
+        "en": "midday", "pt": "meio-dia", "es": "mediodía", "fr": "midi", "de": "Mittag",
+        "it": "mezzogiorno", "pl": "południe", "zh": "午间", "ja": "昼",
+    },
+    "fim-do-dia": {
+        "en": "evening", "pt": "fim do dia", "es": "final del día", "fr": "fin de journée",
+        "de": "Tagesende", "it": "fine giornata", "pl": "koniec dnia", "zh": "日终", "ja": "夕方",
+    },
+}
+
+
+def summaries_for(items: list[dict]) -> dict[str, str]:
+    """A linha de resumo nos nove idiomas, ou {} — e aí o chamador usa as manchetes.
+
+    Era a concatenação das manchetes, que vêm no idioma do veículo. Um boletim em inglês abria com
+    uma frase em português porque a primeira fonte do dia era brasileira, e o card compartilhado
+    saía bilíngue sem que ninguém tivesse decidido isso.
+    """
+    parsed = _ask(
+        SUMMARY_PROMPT.format(headlines="\n".join(f"- {i['headline']}" for i in items)),
+        max_tokens=900,
+    )
+    if parsed is None:
+        return {}
+    out = {lang: _clean(parsed.get(lang, ""))[:280] for lang in LANGS}
+    return out if all(out.values()) else {}
+
+
+def render(
+    lang: str, day: str, slot: str, items: list[dict], dropped: str, summaries: dict[str, str]
+) -> str:
+    title = f"{TITLE_WORD[lang]} — {day}, {SLOT_LABEL[slot][lang]}"
+    # Nosso texto quando o modelo o escreveu; as manchetes como reserva, para o post nunca sair sem
+    # resumo. A reserva é a versão antiga, com a mistura de idiomas que ela sempre teve — visível,
+    # e só quando a chamada falhou.
     heads = " · ".join(i["headline"] for i in items)
-    summary = (heads[:277] + "…") if len(heads) > 280 else heads
+    summary = summaries.get(lang) or ((heads[:277] + "…") if len(heads) > 280 else heads)
     lines = [
         "---",
         f"title: {yaml_str(title)}",
@@ -777,15 +900,16 @@ def main() -> int:
     for item in ordered:
         if len(accepted) >= args.max_items:
             break
-        item["comment_pt"] = comment_for(item, "pt")
-        item["comment_en"] = comment_for(item, "en")
-        if not item["comment_pt"] or not item["comment_en"]:
+        comments = comments_for(item)
+        if not comments:
             reasons.append("sem comentário utilizável")
             log(
-                f"  sem comentário ({'pt' if not item['comment_pt'] else 'en'}): "
-                f"{item['headline'][:70]} | descrição {len(item['description'])} car."
+                f"  sem comentário: {item['headline'][:70]} "
+                f"| descrição {len(item['description'])} car."
             )
             continue
+        for lang, text in comments.items():
+            item[f"comment_{lang}"] = text
         accepted.append(item)
 
     tally: dict[str, int] = {}
@@ -817,9 +941,12 @@ def main() -> int:
 
     day = datetime.now(UTC).strftime("%Y-%m-%d")
     slug = f"boletim-{day}-{args.slot}"
+    summaries = summaries_for(accepted)
+    if not summaries:
+        log("resumo: o modelo não devolveu as nove linhas — usando as manchetes como reserva")
     files = {
-        f"content/blog/pt/{slug}.md": render("pt", day, args.slot, accepted, dropped),
-        f"content/blog/en/{slug}.md": render("en", day, args.slot, accepted, dropped),
+        f"content/blog/{lang}/{slug}.md": render(lang, day, args.slot, accepted, dropped, summaries)
+        for lang in LANGS
     }
 
     if args.dry_run:
