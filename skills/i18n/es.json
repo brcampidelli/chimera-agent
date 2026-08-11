@@ -1,0 +1,45 @@
+{
+  "_why": "Translated card descriptions, and only the descriptions.\n\nThe body of a card is not prose about the product: it is the payload the agent reads at runtime, the bytes the published SHA-256 attests to, and the text the CLI imports by path. Translating it would break all three at once — the page would show a hash that does not match what the reader is reading, and the translation would never reach the agent anyway, because the CLI only ever imports skills/.\n\nSo the description travels here instead, in a sidecar that leaves SKILL.md byte-identical. Each entry declares source_sha256 of the English description it was made from; when the English changes, the site falls back to it rather than showing a translation of a sentence that no longer exists.",
+  "descriptions": {
+    "assert-what-the-generator-found": {
+      "text": "Un generador que se cae te dice que falló; uno que emite salida plausible no te dice nada. Prueba lo que encontró, nunca que se ejecutó.",
+      "source_sha256": "059b66d7e09a1aa6ce2b31647672f3c724dbafb4d8b75c1b599d79c0762823f2"
+    },
+    "build-the-gate-before-the-content": {
+      "text": "Una comprobación añadida después de lo que protege es una comprobación que alguien apaga para poder entregar. Déjala cerrada mientras no hay nada que bloquear.",
+      "source_sha256": "3458f7683941585bbca67d834bcd4f33f2d5eea3124c194cb08ed6acb9a238b9"
+    },
+    "declare-when-a-setting-takes-effect": {
+      "text": "Un control que guarda correctamente y no cambia nada hasta reiniciar es peor que uno que falla. Di cuándo se aplica, y deriva eso de dónde se lee el valor.",
+      "source_sha256": "db548604dbe6cfe82f690d90ddfdcf107ff6a76abcfb7f3b73a60616d343453a"
+    },
+    "derive-instead-of-transcribing": {
+      "text": "Todo lo copiado a mano desde otro archivo es correcto exactamente una vez. Si se puede generar, genéralo, y haz fallar la compilación cuando la copia quede desactualizada.",
+      "source_sha256": "ba0e688ec255689f4e441a5f14e2377b0e044b64c1679e303612f0a4dc4439ee"
+    },
+    "do-not-ship-an-empty-surface": {
+      "text": "Una pantalla, pestaña o categoría vacía es una promesa que el producto no está cumpliendo. Ocúltala hasta que tenga contenido, o no la construyas todavía.",
+      "source_sha256": "4b4defbce9c566af11eab06a9ce9d33b65edd59a556ca4555c0b80de3409dd42"
+    },
+    "keep-the-caveat-with-the-number": {
+      "text": "Una cifra y su matiz deben ser un único artefacto. Dos párrafos se separan; un componente no puede.",
+      "source_sha256": "9560e76d7c148785f634f7d8b71e7bee1525972db4b530af7ec42d67e9588eb6"
+    },
+    "pin-the-case-that-narrowed-the-rule": {
+      "text": "Cuando una comprobación salta sobre el objetivo equivocado, el arreglo la debilita. Captura el falso positivo como prueba en el mismo commit, o la regla se erosiona en silencio.",
+      "source_sha256": "2ec4320899defc512245ee7d45eab69f3911c207a0f9e576341490f76b836a52"
+    },
+    "publish-the-run-that-did-not-work": {
+      "text": "Publica el experimento que falló, conserva sin cambios el que quedó superado, y nunca repitas la tirada buscando significancia. El sesgo está en la selección, no en el número.",
+      "source_sha256": "9e96faac615281ebefeacbac915cdab98215ecf8da14b68048eba557eb0e8064"
+    },
+    "verify-before-claiming": {
+      "text": "Antes de informar que una tarea está hecha, ejecuta la comprobación que fallaría si no lo estuviera: una explicación no es un arreglo.",
+      "source_sha256": "1d5f5e274b524ce6980b2d980a5504a3350563858b5160b99303962a0b232120"
+    },
+    "warn-before-the-thing-you-are-warning-about": {
+      "text": "Una advertencia colocada después de la acción a la que se refiere llega cuando el lector ya decidió. Ponla arriba y, cuando importa, haz que no se pueda descartar.",
+      "source_sha256": "e1f0c23a799b631b2081b73d1f2941094c34150f6663ea486c6315b63f141fea"
+    }
+  }
+}
