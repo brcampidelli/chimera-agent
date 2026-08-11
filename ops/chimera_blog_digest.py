@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """chimera_blog_digest.py — o boletim de IA do chimeraagent.space, duas vezes por dia.
 
 Roda no sidecar (uid 10000, sem git, sem dependências fora da stdlib). Publica pela API de
@@ -37,7 +36,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 REPO = "brcampidelli/chimera-site"
 SITE = "https://chimeraagent.space"
@@ -115,7 +114,7 @@ FETCH_TIMEOUT = 25
 # --------------------------------------------------------------------------- infraestrutura
 
 def log(msg: str) -> None:
-    line = f"{datetime.now(timezone.utc):%Y-%m-%d %H:%M:%S} {msg}"
+    line = f"{datetime.now(UTC):%Y-%m-%d %H:%M:%S} {msg}"
     print(line, flush=True)
     try:
         os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
@@ -130,10 +129,11 @@ def env(key: str) -> str | None:
     if val:
         return val
     try:
-        for line in open("/opt/data/.env", encoding="utf-8"):
-            m = re.match(r"\s*(?:export\s+)?" + re.escape(key) + r"\s*=\s*(.*)", line.strip())
-            if m:
-                return m.group(1).strip().strip('"').strip("'")
+        with open("/opt/data/.env", encoding="utf-8") as handle:
+            for line in handle:
+                m = re.match(r"\s*(?:export\s+)?" + re.escape(key) + r"\s*=\s*(.*)", line.strip())
+                if m:
+                    return m.group(1).strip().strip('"').strip("'")
     except OSError:
         pass
     return None
@@ -318,7 +318,7 @@ def verify(cand: dict) -> tuple[dict | None, str]:
     if not published:
         return None, f"data ilegível ({raw[:24]})"
 
-    age = datetime.now(timezone.utc) - published
+    age = datetime.now(UTC) - published
     if age > timedelta(hours=MAX_AGE_HOURS):
         return None, f"publicado há {int(age.total_seconds() // 3600)}h"
     if age < timedelta(hours=-6):
@@ -367,20 +367,20 @@ def parse_date(value: str) -> datetime | None:
     try:
         dt = parsedate_to_datetime(value)
         if dt:
-            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+            return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
     except (TypeError, ValueError):
         pass
 
     for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S.%f%z", "%Y-%m-%d"):
         try:
             dt = datetime.strptime(value.replace("Z", "+0000"), fmt)
-            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+            return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
         except ValueError:
             continue
 
     try:
         dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+        return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
     except ValueError:
         return None
 
@@ -574,6 +574,57 @@ def gh(method: str, path: str, payload: dict | None = None) -> tuple[int, dict]:
         return exc.code, body_of(exc)
 
 
+CHECKS_TIMEOUT_S = int(os.environ.get("CHIMERA_DIGEST_CHECKS_TIMEOUT_S", "900"))
+CHECKS_POLL_S = 20
+
+
+def checks_pass(number: int, sha: str, timeout_s: int = CHECKS_TIMEOUT_S) -> bool:
+    """Espera o CI do site concluir para este commit. Só devolve True se ele aprovou.
+
+    A regra que não pode ser afrouxada: **ausência de check não é aprovação**. Logo depois de um PR
+    nascer, a API responde `total_count: 0` porque o workflow ainda não registrou — tratar isso como
+    "nada reprovou, então pode" é exatamente o furo que este trecho existe para fechar, e é um erro
+    fácil de cometer, porque num merge manual ele se parece com pressa em vez de defeito.
+
+    Estouro de prazo também não é aprovação. O PR fica aberto: um boletim malformado vira um PR
+    esperando alguém, que é barato, em vez de uma página no ar, que não é.
+    """
+    limite = time.time() + timeout_s
+    visto = False
+    while time.time() < limite:
+        st, res = gh("GET", f"/repos/{REPO}/commits/{sha}/check-runs")
+        if st != 200:
+            log(f"github: não consegui ler os checks de #{number} ({st})")
+            time.sleep(CHECKS_POLL_S)
+            continue
+
+        runs = res.get("check_runs") or []
+        if not runs:
+            # Ainda não registrou. Continua esperando — ver o docstring.
+            time.sleep(CHECKS_POLL_S)
+            continue
+
+        visto = True
+        pendentes = [r for r in runs if r.get("status") != "completed"]
+        if pendentes:
+            time.sleep(CHECKS_POLL_S)
+            continue
+
+        ruins = [
+            f"{r.get('name')}={r.get('conclusion')}"
+            for r in runs
+            if r.get("conclusion") not in ("success", "neutral", "skipped")
+        ]
+        if ruins:
+            log(f"github: CI reprovou #{number}: {', '.join(ruins)}")
+            return False
+        log(f"github: CI aprovou #{number} ({len(runs)} check(s))")
+        return True
+
+    log(f"github: CI de #{number} não concluiu em {timeout_s}s (viu algum check: {visto})")
+    return False
+
+
 def publish(files: dict[str, str], slug: str, day: str) -> bool:
     """Branch, dois arquivos, PR, merge. Nunca commit direto na main: o rastro do PR é o que torna
     auditável um post que ninguém leu antes de publicar."""
@@ -622,6 +673,19 @@ def publish(files: dict[str, str], slug: str, day: str) -> bool:
         return False
 
     number = pr["number"]
+
+    # O portão. O site já sabe reprovar um boletim malformado — `postProblems()` e
+    # `digestProblems()` são testados no vitest dele —, mas até aqui o merge saía no mesmo segundo
+    # em que o PR nascia, antes de qualquer check ter o que dizer. A validação existia e nunca
+    # chegava a rodar onde importava.
+    #
+    # A alternativa seria reescrever essas regras em Python, aqui. Seria uma segunda cópia da regra,
+    # correta exatamente uma vez: no dia em que o schema do site mudasse, este script continuaria
+    # aprovando o que o site passou a recusar. Esperar o CI reusa a fonte única.
+    if not checks_pass(number, pr["head"]["sha"]):
+        log(f"github: PR #{number} fica ABERTO — o CI do site não aprovou")
+        return False
+
     # O merge é o passo autônomo que o Bruno autorizou. A trava é o escopo: este job só escreve
     # sob content/blog/, então só isso pode chegar à main por aqui.
     st, res = gh("PUT", f"/repos/{REPO}/pulls/{number}/merge", {"merge_method": "squash"})
@@ -683,7 +747,7 @@ def main() -> int:
     # os itens mais velhos, que são justamente os que não entrariam.
     ordem = sorted(
         by_url.values(),
-        key=lambda c: parse_date(c.get("feed_date") or "") or datetime.min.replace(tzinfo=timezone.utc),
+        key=lambda c: parse_date(c.get("feed_date") or "") or datetime.min.replace(tzinfo=UTC),
         reverse=True,
     )
     alvo = max(args.max_items * 3, 6)
@@ -751,7 +815,7 @@ def main() -> int:
         + ", ".join(f"{why} ({n})" for why, n in sorted(tally.items(), key=lambda kv: -kv[1])[:6])
     ) if tally else base
 
-    day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    day = datetime.now(UTC).strftime("%Y-%m-%d")
     slug = f"boletim-{day}-{args.slot}"
     files = {
         f"content/blog/pt/{slug}.md": render("pt", day, args.slot, accepted, dropped),
