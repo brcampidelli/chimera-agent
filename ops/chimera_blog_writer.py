@@ -1,27 +1,43 @@
 #!/usr/bin/env python3
-"""chimera_blog_digest.py — o boletim de IA do chimeraagent.space, duas vezes por dia.
+"""chimera_blog_writer.py — o redator do blog do chimeraagent.space.
 
 Roda no sidecar (uid 10000, sem git, sem dependências fora da stdlib). Publica pela API de
 conteúdo do GitHub: nada é clonado, o que também respeita o disco da VPS, que está em 78%.
 
-O DESENHO, EM UMA FRASE
-    O post não pode afirmar mais do que a fonte diz, porque a manchete, o veículo, a data e o link
-    vão para o frontmatter e a página os renderiza de lá. Sobra ao modelo exatamente um campo por
-    item — `comment` —, marcado como nosso e limitado a 400 caracteres pelo portão do site.
+O QUE MUDOU, E POR QUE IMPORTA
+    Isto era um boletim: manchete dos outros, link e um comentário nosso de duas frases. A defesa
+    contra invenção era estrutural e forte — o modelo escrevia UM campo, limitado a 400 caracteres,
+    e todo o resto da página vinha de dados verificados.
+
+    Agora o texto é nosso, inteiro. Isso é o que o Bruno pediu e é uma coisa melhor de se ler, mas
+    remove aquela defesa por completo: um artigo é exatamente onde um modelo fluente inventa número,
+    data e citação sem que nada trave. Então a defesa foi refeita, e é isto:
+
+    1. O modelo NÃO ESCREVE URL. Nenhuma. Para citar uma matéria ele usa `[S1]`, `[S2]`, e o link é
+       montado aqui, a partir da lista já verificada. Fonte inventada não é detectada — ela é
+       INEXPRIMÍVEL, porque não existe campo onde ela caberia.
+    2. As fontes continuam em dados, no frontmatter, e a página as renderiza de lá. O corpo é
+       nosso; o que dá para conferir não é.
+    3. Citação longa entre aspas é reprovada pelo portão do site. Pôr frase na boca de alguém que
+       existe é a única invenção que faz estrago fora deste projeto.
+    4. Nove idiomas ou nenhum. Uma rodada que escreve cinco e perde quatro deixa um site que parece
+       deliberado, e o leitor não tem como saber que houve falha.
+    5. Nada vai para a main sem o CI do site aprovar. As regras de formato vivem no `blog.ts` de
+       lá, testadas no vitest de lá; aqui não há cópia delas — cópia de regra fica correta
+       exatamente uma vez.
 
 O QUE ESTE SCRIPT RECUSA A FAZER
     * Confiar na data relativa da listagem. "Há 20 horas" não é uma data; a data sai do
-      `datePublished` no JSON-LD do próprio artigo. Foi montando o boletim de estreia à mão que
-      isso apareceu, e é o campo cuja honestidade sustenta o resto.
+      `datePublished` no JSON-LD do próprio artigo, e é o campo cuja honestidade sustenta o resto.
     * Publicar a manchete que veio da busca. A manchete é a que o artigo declara em `og:title` ou
       `<title>` — um resumo de buscador é texto de terceiro sobre o texto do veículo.
-    * Reproduzir corpo de matéria. O que sai daqui é manchete (título, citação padrão), link e
-      comentário próprio. A `description` do artigo entra como insumo do modelo e nunca é publicada.
-    * Inventar volume. Se nenhum candidato passa, nada é publicado — um boletim vazio é uma página
-      com data e mais nada, e o portão do site o reprovaria de qualquer jeito.
+    * Reproduzir corpo de matéria. A `description` entra como insumo do modelo e nunca é publicada.
+    * Inventar volume. Se nada passa, nada sai. Uma página vazia com data é pior que silêncio.
 
 Uso:
-    chimera_blog_digest.py [--slot meio-dia|fim-do-dia] [--dry-run] [--max-items 3]
+    chimera_blog_writer.py [--sources 3] [--dry-run]        um artigo a partir do noticiário
+    chimera_blog_writer.py --release 0.42.0 [--dry-run]     um artigo sobre um release nosso
+    chimera_blog_writer.py --release latest
 """
 from __future__ import annotations
 
@@ -39,11 +55,14 @@ import xml.etree.ElementTree as ET
 from datetime import UTC, datetime, timedelta
 
 REPO = "brcampidelli/chimera-site"
+PRODUCT_REPO = "brcampidelli/chimera-agent"
 SITE = "https://chimeraagent.space"
+# O mesmo caminho de estado do boletim: o que já foi lido continua lido, e a troca de formato não
+# ressuscita quarenta matérias de três dias atrás na primeira rodada.
 SEEN_PATH = "/opt/data/state/blog_digest_seen.json"
-LOG_PATH = "/opt/data/logs/blog-digest.log"
+LOG_PATH = "/opt/data/logs/blog-writer.log"
 
-UA = {"User-Agent": f"Mozilla/5.0 (compatible; ChimeraDigest/1.0; +{SITE})"}
+UA = {"User-Agent": f"Mozilla/5.0 (compatible; ChimeraWriter/1.0; +{SITE})"}
 
 # As seis do Bruno, mais nove em inglês.
 #
@@ -107,7 +126,6 @@ TOPIC = re.compile(
 # que passasse no filtro de assunto — só a Exame publica IA todo dia. A janela é o que decide se o
 # boletim sai; a data de cada item aparece no card, então quem lê julga a idade por conta própria.
 MAX_AGE_HOURS = int(os.environ.get("CHIMERA_DIGEST_MAX_AGE_H", "72"))
-COMMENT_MAX = 400  # o mesmo teto que o portão do site aplica
 FETCH_TIMEOUT = 25
 
 
@@ -436,31 +454,94 @@ ARTIFACTS = re.compile(
     re.I,
 )
 
-PROMPT = """Você escreve o comentário de um boletim de notícias de IA do projeto Chimera Agent —
-um framework open-source de agentes com governança e benchmarks honestos.
+WRITE_PROMPT = """Você é o redator do blog do Chimera Agent — um framework open-source de agentes
+de IA, com governança, avaliação honesta e fusão de modelos. Quem lê constrói agentes: gente que
+programa, não gente que compra.
 
-Recebe a MANCHETE de uma matéria e, quando existe, uma DESCRIÇÃO curta. Escreva UMA a DUAS frases
-dizendo o que aquilo muda para quem constrói agentes de IA — e escreva a MESMA ideia em cada um dos
-nove idiomas pedidos.
+Recebe as MATÉRIAS que a redação leu hoje: manchete, veículo e uma descrição curta de cada uma.
+Escreva UM artigo nosso a partir delas. Não é resumo das matérias, não é boletim, não é lista.
+É um texto com uma TESE — o que aquilo muda para quem constrói agentes — e a tese é sua.
 
-REGRAS INVIOLÁVEIS:
-- NÃO afirme nenhum fato que não esteja na manchete ou na descrição. Nada de números, nomes, datas
-  ou citações que não estejam ali. O que você acrescenta é implicação, nunca informação.
-- Uma descrição curta, ou ausente, NÃO é motivo para pular. A manchete já basta para dizer o que
-  aquilo muda — implicação não depende de detalhe, depende do assunto.
-- É comentário, não reportagem. Não reconte a notícia: diga o que ela significa para quem constrói.
-- Os nove idiomas dizem a MESMA coisa. São traduções de um comentário, não nove opiniões diferentes.
-- No máximo {cap} caracteres por idioma. Sem markdown, sem aspas ao redor, sem prefixo, sem oferecer
-  versões alternativas — quem lê a sua resposta é um script, não uma pessoa que possa escolher.
-- PULAR é só para matéria que não trata de IA, de LLM ou de agentes.
+**ESCREVA O ARTIGO EM INGLÊS.** Estas instruções estão em português, o texto que você produz não
+está: o inglês é a língua-fonte do site, e é dele que saem as outras oito traduções e o endereço
+da página. Título, resumo e corpo, todos em inglês.
 
-Responda APENAS com um objeto JSON, sem cercas de código, exatamente nesta forma:
-{{"en": "...", "pt": "...", "es": "...", "fr": "...", "de": "...", "it": "...", "pl": "...", "zh": "...", "ja": "..."}}
+FORMA:
+- Entre 450 e 700 palavras. Markdown. Dois ou três subtítulos `##`. Sem título `#` no corpo (o
+  título vem no campo `title`).
+- Comece pela ideia, não pela notícia. A primeira frase não é "a OpenAI anunciou": é o que isso
+  significa. A notícia entra quando for necessária para sustentar o argumento.
+- Frases diretas. Sem adjetivo de folheto ("revolucionário", "poderoso", "game-changer"), sem
+  pergunta retórica de abertura, sem "no mundo acelerado da IA".
+- Termine com o que fica de prático para quem constrói. Concreto, não exortação.
 
-Para pular, responda apenas: {{"skip": true}}
+REGRAS INVIOLÁVEIS — o texto sai no ar sem ninguém ler antes:
+- NÃO afirme nenhum fato que não esteja nas matérias. Nada de números, datas, nomes de produto,
+  preços, percentuais ou resultados de benchmark que não estejam ali. O que você acrescenta é
+  raciocínio, nunca informação.
+- NÃO invente citação. Nenhuma frase entre aspas atribuída a alguém. Nem uma.
+- NÃO escreva URL nenhuma. Para citar uma matéria, use o marcador {marcadores} exatamente assim,
+  entre colchetes, no meio da frase. O link é montado depois, por um script.
+- Se as matérias não sustentam uma tese honesta, responda {{"skip": true}}. Um texto vazio publicado
+  é pior que uma rodada sem publicação.
 
-MANCHETE: {headline}
-DESCRIÇÃO: {description}"""
+Responda APENAS com um objeto JSON, sem cercas de código:
+{{"title": "...", "summary": "...", "body": "..."}}
+
+- `title`: o título do artigo. Até 70 caracteres, específico, sem dois-pontos decorativo.
+- `summary`: uma frase, até 200 caracteres, dizendo a tese. É o que aparece no índice do blog.
+- `body`: o artigo em markdown, com os marcadores de fonte.
+
+MATÉRIAS:
+{material}"""
+
+TRANSLATE_PROMPT = """Traduza para {idioma} o artigo abaixo, do blog do Chimera Agent — um
+framework open-source de agentes de IA. Quem lê programa.
+
+REGRAS:
+- Traduza o SENTIDO, não as palavras. Escreva como um engenheiro escreveria esse mesmo argumento
+  na sua língua. Não é para soar traduzido.
+- Preserve a estrutura exata: mesma quantidade de parágrafos, mesmos subtítulos `##` na mesma
+  ordem, mesma ênfase.
+- Os marcadores de fonte — {marcadores} — ficam IDÊNTICOS, entre colchetes, na posição que a
+  frase da sua língua exigir. Eles viram links depois; um marcador perdido é uma fonte perdida.
+- Não traduza: Chimera, nomes de empresa e de produto, termos de código entre crases.
+- Não resuma, não corte, não acrescente. O texto na sua língua diz o mesmo que o original.
+
+Responda APENAS com um objeto JSON, sem cercas de código:
+{{"title": "...", "summary": "...", "body": "..."}}
+
+ARTIGO:
+{artigo}"""
+
+UPDATE_PROMPT = """Você é o redator do blog do Chimera Agent — um framework open-source de agentes
+de IA. Saiu a versão {version}, e você escreve o texto que a anuncia. Quem lê constrói agentes.
+
+Recebe as NOTAS DE RELEASE, escritas por quem programou. Escreva UM artigo nosso sobre elas.
+
+**ESCREVA O ARTIGO EM INGLÊS**, pelo mesmo motivo: o inglês é a língua-fonte do site.
+
+FORMA:
+- Entre 350 e 600 palavras. Markdown. Dois ou três subtítulos `##`. Sem título `#` no corpo.
+- Não repita a lista. As notas já existem e estão linkadas. Escolha o que MUDA para quem usa e
+  explique por que aquilo estava errado antes.
+- Frases diretas. Sem adjetivo de folheto. Sem "estamos empolgados em anunciar".
+- Termine com o que a pessoa faz agora: o comando, o passo, a página.
+
+REGRAS INVIOLÁVEIS — o texto sai no ar sem ninguém ler antes:
+- NÃO afirme nada que não esteja nas notas. Nada de números de desempenho, datas, planos futuros
+  ou capacidades que não estejam ali. Se as notas não dizem, nós não dizemos.
+- NÃO invente citação.
+- NÃO escreva URL nenhuma, exceto o marcador {marcador} — que vira o link das notas de release.
+
+Responda APENAS com um objeto JSON, sem cercas de código:
+{{"title": "...", "summary": "...", "body": "..."}}
+
+- `title`: até 70 caracteres. Pode nomear a versão.
+- `summary`: uma frase, até 200 caracteres, dizendo o que mudou.
+
+NOTAS DE RELEASE DA VERSÃO {version}:
+{notas}"""
 
 
 def _clean(text: str) -> str:
@@ -476,7 +557,7 @@ def _ask(prompt: str, max_tokens: int) -> dict | None:
     if not key:
         return None
     body = {
-        "model": env("CHIMERA_DIGEST_MODEL") or "deepseek/deepseek-chat",
+        "model": env("CHIMERA_WRITER_MODEL") or "deepseek/deepseek-chat",
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": max_tokens,
         "temperature": 0.3,
@@ -490,15 +571,34 @@ def _ask(prompt: str, max_tokens: int) -> dict | None:
             "Content-Type": "application/json",
             "Authorization": f"Bearer {key}",
             "HTTP-Referer": SITE,
-            "X-Title": "Chimera digest",
+            "X-Title": "Chimera writer",
         },
     )
-    try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            data = json.load(resp)
-        raw = data["choices"][0]["message"]["content"].strip()
-    except Exception as exc:  # noqa: BLE001
-        log(f"modelo: {type(exc).__name__} {str(exc)[:70]}")
+    # Espera crescente no 429, e só no 429.
+    #
+    # A rodada faz nove chamadas seguidas — uma para escrever e oito para traduzir — e o limite de
+    # taxa aparece lá pela sétima. Foi assim que uma execução real morreu no chinês depois de sete
+    # idiomas prontos: a retentativa disparou um segundo depois, que é exatamente o intervalo em
+    # que um 429 continua sendo 429. Repetir sem esperar não é uma tentativa, é a mesma chamada.
+    for espera in (0, 20, 45, 90):
+        if espera:
+            log(f"modelo: limite de taxa, esperando {espera}s")
+            time.sleep(espera)
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                data = json.load(resp)
+            raw = data["choices"][0]["message"]["content"].strip()
+            break
+        except urllib.error.HTTPError as exc:
+            if exc.code == 429:
+                continue
+            log(f"modelo: HTTP {exc.code}")
+            return None
+        except Exception as exc:  # noqa: BLE001
+            log(f"modelo: {type(exc).__name__} {str(exc)[:70]}")
+            return None
+    else:
+        log("modelo: limite de taxa persistiu depois de três esperas")
         return None
     # Alguns modelos ignoram response_format e devolvem a cerca de código mesmo assim.
     raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw).strip()
@@ -510,60 +610,225 @@ def _ask(prompt: str, max_tokens: int) -> dict | None:
     return parsed if isinstance(parsed, dict) else None
 
 
-def comments_for(item: dict) -> dict[str, str]:
-    """Os nove comentários de um item, numa chamada só.
+MARKER = re.compile(r"\[S(\d+)\]")
+BARE_URL = re.compile(r"https?://")
 
-    Uma chamada por idioma custaria nove vezes mais e produziria nove opiniões diferentes sobre a
-    mesma matéria — o leitor alemão leria outra coisa que o brasileiro. Pedir os nove de uma vez é
-    mais barato E é o que torna o boletim o mesmo boletim em toda língua.
 
-    Devolve {} quando o modelo pula, quando falha, ou quando algum idioma não veio: um boletim com
-    buraco em quatro línguas é pior que um item a menos.
+def markers_for(n: int) -> str:
+    return ", ".join(f"[S{i + 1}]" for i in range(n))
+
+
+def shape_problems(art: dict, n_sources: int, title_max: int = 90) -> list[str]:
+    """O que está errado com o que o modelo devolveu, antes de virar arquivo.
+
+    Isto NÃO é uma segunda cópia das regras do site. As regras do site são sobre o formato de um
+    post e vivem no `blog.ts`, testadas no vitest dele; duplicá-las aqui produziria uma cópia
+    correta exatamente uma vez, até o dia em que o schema mudasse. O que se checa aqui é outra
+    coisa: se a RODADA devolveu o que se pediu. Campo faltando, marcador para uma fonte que não
+    existe, URL escrita à mão onde o combinado era um marcador.
+
+    A URL crua é a que importa. O modelo não escreve link nenhum — quem monta o link é
+    `link_sources`, a partir da lista verificada. Uma fonte inventada não é detectada aqui: ela é
+    inexprimível, porque o campo onde ela caberia não existe. Este teste só pega a rodada que
+    ignorou a instrução.
     """
-    parsed = _ask(
-        PROMPT.format(
-            cap=COMMENT_MAX - 40,
-            headline=item["headline"],
-            description=item["description"] or "(sem descrição — use a manchete)",
-        ),
-        max_tokens=1400,
+    problems = []
+    for field in ("title", "summary", "body"):
+        if not str(art.get(field, "")).strip():
+            problems.append(f"campo {field} vazio")
+    if problems:
+        return problems
+
+    if BARE_URL.search(art["body"]):
+        problems.append("o corpo traz URL escrita pelo modelo — o combinado é marcador")
+    usados = {int(m) for m in MARKER.findall(art["body"])}
+    fora = sorted(i for i in usados if not 1 <= i <= n_sources)
+    if fora:
+        problems.append(f"marcadores fora da lista de fontes: {fora}")
+    if n_sources and not usados:
+        problems.append("o corpo não cita nenhuma fonte")
+    if len(art["title"]) > title_max:
+        problems.append(f"título com {len(art['title'])} caracteres, teto {title_max}")
+    if len(art["summary"]) > 240:
+        problems.append(f"resumo com {len(art['summary'])} caracteres")
+    return problems
+
+
+# Palavras funcionais que aparecem em qualquer parágrafo de português ou espanhol e praticamente
+# nunca em prosa inglesa. Não é detecção de idioma: é a pergunta "isto está em inglês?", que é a
+# única que interessa aqui.
+NAO_INGLES = re.compile(
+    r"\b(não|nao|são|sao|está|esta[oó]|para|com|uma|dos|das|pelo|pela|mais|também|"
+    r"que|porque|quando|sobre|entre|muito|tem|foi|ser)\b",
+    re.I,
+)
+
+DIGITOS = re.compile(r"\d[\d.,]*")
+
+
+def looks_english(text: str) -> bool:
+    """Se o texto está em inglês. Instrução no prompt não é trava: esta é a trava.
+
+    O prompt está em português e a primeira execução real devolveu o artigo inteiro em português —
+    título, resumo e corpo — para o arquivo `blog/en/`, com o endereço da página em português e as
+    oito traduções saindo de um "original" que não era o idioma-fonte. Nada quebrou; ficou só
+    errado, que é o modo de falha caro.
+    """
+    achadas = {m.group(0).lower() for m in NAO_INGLES.finditer(text)}
+    return len(achadas) < 3
+
+
+def invented_numbers(body: str, material: str) -> list[str]:
+    """Números do corpo que não aparecem no material.
+
+    Um número é a afirmação factual mais densa que um texto carrega e a mais fácil de conferir. O
+    resto do que um modelo inventa — um nome, uma ênfase — não dá para checar assim, e não se
+    finge que dá: isto pega uma classe de invenção, não a invenção.
+
+    Compara sem separador, porque `3.6` vira `3,6` e `1,500` vira `1.500` conforme quem escreve.
+    """
+    limpo = lambda s: s.replace(".", "").replace(",", "").rstrip("0") or "0"  # noqa: E731
+    no_material = {limpo(m.group(0)) for m in DIGITOS.finditer(material)}
+    fora = []
+    for m in DIGITOS.finditer(body):
+        bruto = m.group(0).rstrip(".,")
+        if len(bruto.strip(".,")) >= 2 and limpo(bruto) not in no_material:
+            fora.append(bruto)
+    return fora
+
+
+def write_article(items: list[dict]) -> dict | None:
+    """O artigo em inglês, de uma chamada, a partir das matérias verificadas.
+
+    Inglês primeiro e traduções depois, e não os nove numa tacada como fazia o boletim: dois
+    parágrafos cabiam numa resposta só, um artigo de seiscentas palavras vezes nove não cabe — o
+    modelo trunca e o truncamento não avisa. E há um ganho junto: quem traduz vê o argumento
+    pronto, então as nove versões dizem a mesma coisa em vez de serem nove opiniões paralelas.
+    """
+    material = "\n\n".join(
+        f"[S{i + 1}] {it['headline']}\n     veículo: {it['outlet']}  ·  data: {it['published']}\n"
+        f"     descrição: {it['description'] or '(sem descrição)'}"
+        for i, it in enumerate(items)
     )
-    if parsed is None or parsed.get("skip"):
-        return {}
+    for _ in (1, 2):
+        art = _ask(
+            WRITE_PROMPT.format(marcadores=markers_for(len(items)), material=material),
+            max_tokens=3000,
+        )
+        if art is None:
+            continue
+        if art.get("skip"):
+            log("redação: o modelo não viu tese sustentável nas matérias de hoje")
+            return None
+        problems = shape_problems(art, len(items))
+        if not looks_english(f"{art.get('title', '')} {art.get('body', '')}"):
+            problems.append("o artigo-fonte não saiu em inglês")
+        fora = invented_numbers(str(art.get("body", "")), material)
+        if fora:
+            problems.append(f"números que não estão no material: {fora[:5]}")
+        if problems:
+            log("redação: " + "; ".join(problems))
+            continue
+        return {k: art[k] for k in ("title", "summary", "body")}
+    return None
 
-    out: dict[str, str] = {}
-    for lang in LANGS:
-        text = _clean(parsed.get(lang, ""))
-        if not text or text.upper().startswith("PULAR"):
-            log(f"comentário: idioma {lang} veio vazio — item descartado")
-            return {}
-        out[lang] = fit(text, lang)
-        if not out[lang]:
-            return {}
-    return out
 
+def write_update(version: str, notes: str) -> dict | None:
+    """O artigo sobre um release nosso. Uma fonte só: as notas, que são nossas.
 
-def fit(text: str, lang: str) -> str:
-    """Cabe no teto mantendo frases inteiras.
-
-    Cortar no meio de uma frase muda o que ela diz, então isso nunca acontece aqui. Mas descartar
-    o comentário inteiro porque a terceira frase não coube é jogar fora as duas que couberam — e
-    na primeira rodada isso zerou o boletim: quatro itens verificados, quatro comentários longos,
-    nenhuma notícia publicada. Descartar a cauda é diferente de cortar a frase.
+    As mesmas travas do artigo de fora valem aqui. As notas serem nossas reduz o risco de inventar
+    sobre terceiros, não o de inventar: um número de desempenho que ninguém mediu é pior vindo de
+    nós, porque quem lê tem motivo para acreditar.
     """
-    if len(text) <= COMMENT_MAX:
-        return text
-    kept = ""
-    for sentence in re.split(r"(?<=[.!?])\s+", text):
-        nxt = (kept + " " + sentence).strip()
-        if len(nxt) > COMMENT_MAX:
-            break
-        kept = nxt
-    if kept:
-        log(f"comentário {lang}: {len(text)} caracteres, mantidas as frases que cabem ({len(kept)})")
-        return kept
-    log(f"comentário {lang}: nem a primeira frase cabe em {COMMENT_MAX} — descartado")
-    return ""
+    material = notes[:12000]
+    for _ in (1, 2):
+        art = _ask(
+            UPDATE_PROMPT.format(marcador="[S1]", version=version, notas=material),
+            max_tokens=2600,
+        )
+        if art is None:
+            continue
+        if art.get("skip"):
+            log("redação: o modelo não escreveu o texto do release")
+            return None
+        problems = shape_problems(art, 1)
+        if not looks_english(f"{art.get('title', '')} {art.get('body', '')}"):
+            problems.append("o artigo-fonte não saiu em inglês")
+        fora = invented_numbers(str(art.get("body", "")), f"{material} {version}")
+        if fora:
+            problems.append(f"números que não estão nas notas: {fora[:5]}")
+        if problems:
+            log("redação: " + "; ".join(problems))
+            continue
+        return {k: art[k] for k in ("title", "summary", "body")}
+    return None
+
+
+def _translate_once(art: dict, lang: str, n_sources: int) -> dict | None:
+    origem = json.dumps(art, ensure_ascii=False, indent=2)
+    out = _ask(
+        TRANSLATE_PROMPT.format(
+            idioma=LANG_NAMES[lang], marcadores=markers_for(n_sources), artigo=origem
+        ),
+        max_tokens=5000,
+    )
+    if out is None:
+        return None
+    # O teto de título de uma TRADUÇÃO é relativo ao original, não absoluto.
+    #
+    # O teto fixo de 90 reprovou o alemão com 92, e o alemão estava certo: a mesma frase corre uns
+    # 30% mais longa. Uma regra calibrada no inglês que reprova o alemão por ser alemão é a terceira
+    # desta leva — junto com um regex que via "arnês" dentro de "harness" e um "veio igual ao
+    # inglês" que acusava cognatos. O que se quer barrar aqui é título que virou parágrafo, e isso
+    # se mede contra o original.
+    problems = shape_problems(out, n_sources, title_max=max(90, int(len(art["title"]) * 1.8)))
+    if problems:
+        log(f"tradução {lang}: " + "; ".join(problems))
+        return None
+    # Os marcadores que sobreviveram têm de ser os mesmos. Um perdido é uma fonte que some do
+    # texto naquele idioma — e some em silêncio, porque a página continua bonita sem ela.
+    if set(MARKER.findall(out["body"])) != set(MARKER.findall(art["body"])):
+        log(f"tradução {lang}: os marcadores de fonte não bateram com o original")
+        return None
+    if out["body"].strip() == art["body"].strip():
+        # Com prévia: sem ela, a única forma de diagnosticar isto é reproduzir a rodada inteira à
+        # mão, que foi o que custou uma hora na primeira vez.
+        log(f"tradução {lang}: veio o texto em inglês de volta — {out['body'][:90]!r}")
+        return None
+    return {k: out[k] for k in ("title", "summary", "body")}
+
+
+def translate(art: dict, lang: str, n_sources: int) -> dict | None:
+    """O artigo num idioma, ou None. Uma chamada por idioma, com uma segunda tentativa.
+
+    A retentativa não é otimismo: como a rodada é nove-ou-nenhum, uma única chamada instável custa
+    o texto do dia inteiro, nos nove idiomas. Foi o que aconteceu na primeira execução real — o
+    modelo devolveu o inglês para o português e a rodada morreu ali; a mesma chamada, repetida,
+    traduziu sem problema. Uma tentativa a mais é barata, e "nove ou nenhum" continua de pé.
+    """
+    if lang == "en":
+        return art
+    for attempt in (1, 2):
+        out = _translate_once(art, lang, n_sources)
+        if out is not None:
+            if attempt == 2:
+                log(f"tradução {lang}: saiu na segunda tentativa")
+            return out
+    return None
+
+
+def link_sources(body: str, items: list[dict]) -> str:
+    """Troca cada marcador pelo link da fonte, com a manchete como texto do link.
+
+    A manchete fica na língua do veículo, de propósito, nas nove versões: é o texto que a pessoa
+    vai encontrar quando clicar. Traduzir o texto de um link é entregar ao leitor um título que não
+    existe na página para onde ele vai.
+    """
+    def troca(m: re.Match) -> str:
+        item = items[int(m.group(1)) - 1]
+        return f"[{item['headline']}]({item['url']})"
+
+    return MARKER.sub(troca, body)
 
 
 # --------------------------------------------------------------------------- escrita
@@ -579,87 +844,55 @@ def slugify(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
 
 
-SUMMARY_PROMPT = """Você escreve a linha de resumo de um boletim de notícias de IA do projeto
-Chimera Agent. Ela aparece no índice do blog e no card compartilhado — é o que decide se alguém abre.
+def render(art: dict, day: str, category: str, items: list[dict], dropped: str, version: str) -> str:
+    """Um arquivo markdown, com o frontmatter que o portão do site sabe reprovar.
 
-Recebe as manchetes do boletim de hoje. Escreva UMA frase dizendo do que trata este boletim como um
-todo, em cada um dos nove idiomas pedidos.
-
-REGRAS INVIOLÁVEIS:
-- NÃO afirme nenhum fato que não esteja nas manchetes. Nada de números, nomes ou datas novos.
-- Uma frase que descreve o CONJUNTO. Não é lugar de nomear uma das notícias e ignorar as outras.
-- Os nove idiomas dizem a MESMA coisa.
-- No máximo 200 caracteres por idioma. Sem markdown, sem aspas ao redor, sem prefixo.
-
-Responda APENAS com um objeto JSON:
-{{"en": "...", "pt": "...", "es": "...", "fr": "...", "de": "...", "it": "...", "pl": "...", "zh": "...", "ja": "..."}}
-
-MANCHETES:
-{headlines}"""
-
-# O título do post, por idioma, e o rótulo do horário. Sai daqui e não de um if de duas línguas.
-TITLE_WORD = {
-    "en": "Digest", "pt": "Boletim", "es": "Boletín", "fr": "Bulletin", "de": "Bulletin",
-    "it": "Bollettino", "pl": "Biuletyn", "zh": "简报", "ja": "ダイジェスト",
-}
-SLOT_LABEL = {
-    "meio-dia": {
-        "en": "midday", "pt": "meio-dia", "es": "mediodía", "fr": "midi", "de": "Mittag",
-        "it": "mezzogiorno", "pl": "południe", "zh": "午间", "ja": "昼",
-    },
-    "fim-do-dia": {
-        "en": "evening", "pt": "fim do dia", "es": "final del día", "fr": "fin de journée",
-        "de": "Tagesende", "it": "fine giornata", "pl": "koniec dnia", "zh": "日终", "ja": "夕方",
-    },
-}
-
-
-def summaries_for(items: list[dict]) -> dict[str, str]:
-    """A linha de resumo nos nove idiomas, ou {} — e aí o chamador usa as manchetes.
-
-    Era a concatenação das manchetes, que vêm no idioma do veículo. Um boletim em inglês abria com
-    uma frase em português porque a primeira fonte do dia era brasileira, e o card compartilhado
-    saía bilíngue sem que ninguém tivesse decidido isso.
+    As fontes vão para o frontmatter e a página as renderiza de lá — a única parte do formato de
+    boletim que valia a pena manter. O corpo é nosso, e é aí que mora o risco novo; a defesa dele
+    está no `blog.ts` do site, e o merge só acontece depois que o CI de lá aprova.
     """
-    parsed = _ask(
-        SUMMARY_PROMPT.format(headlines="\n".join(f"- {i['headline']}" for i in items)),
-        max_tokens=900,
-    )
-    if parsed is None:
-        return {}
-    out = {lang: _clean(parsed.get(lang, ""))[:280] for lang in LANGS}
-    return out if all(out.values()) else {}
-
-
-def render(
-    lang: str, day: str, slot: str, items: list[dict], dropped: str, summaries: dict[str, str]
-) -> str:
-    title = f"{TITLE_WORD[lang]} — {day}, {SLOT_LABEL[slot][lang]}"
-    # Nosso texto quando o modelo o escreveu; as manchetes como reserva, para o post nunca sair sem
-    # resumo. A reserva é a versão antiga, com a mistura de idiomas que ela sempre teve — visível,
-    # e só quando a chamada falhou.
-    heads = " · ".join(i["headline"] for i in items)
-    summary = summaries.get(lang) or ((heads[:277] + "…") if len(heads) > 280 else heads)
     lines = [
         "---",
-        f"title: {yaml_str(title)}",
+        f"title: {yaml_str(art['title'])}",
         f"date: {day}",
-        "category: digest",
-        f"summary: {yaml_str(summary)}",
-        "items:",
+        f"category: {category}",
+        f"summary: {yaml_str(art['summary'])}",
     ]
-    for item in items:
-        lines += [
-            f"  - headline: {yaml_str(item['headline'])}",
-            f"    url: {item['url']}",
-            f"    outlet: {yaml_str(item['outlet'])}",
-            f"    published: {item['published']}",
-            f"    comment: {yaml_str(item[f'comment_{lang}'])}",
-        ]
+    if category == "update":
+        lines.append(f"version: {yaml_str(version)}")
+    # Só o texto sobre os outros carrega bloco de fontes. Num texto sobre um release nosso, a
+    # "fonte" é a nossa própria nota — ela vira o link no corpo e não vira uma lista que finge
+    # apuração externa.
+    if category == "analysis" and items:
+        lines.append("sources:")
+        for item in items:
+            lines += [
+                f"  - headline: {yaml_str(item['headline'])}",
+                f"    url: {item['url']}",
+                f"    outlet: {yaml_str(item['outlet'])}",
+                f"    published: {item['published']}",
+            ]
     if dropped:
         lines.append(f"dropped: {yaml_str(dropped)}")
-    lines += ["---", ""]
+    lines += ["---", "", link_sources(art["body"].strip(), items), ""]
     return "\n".join(lines)
+
+
+def compose(art_en: dict, items: list[dict], day: str, slug: str, category: str, dropped: str, version: str) -> dict[str, str] | None:
+    """Os nove arquivos, ou None.
+
+    Nove ou nenhum, e o portão do site também exige isso. Uma rodada que escreve cinco idiomas e
+    perde quatro deixa um site que parece deliberado: quatro línguas cujo blog simplesmente tem
+    menos coisa. O leitor não tem como saber que houve uma falha, então quem sabe é este `return`.
+    """
+    files: dict[str, str] = {}
+    for lang in LANGS:
+        art = translate(art_en, lang, len(items)) if lang != "en" else art_en
+        if art is None:
+            log(f"composição: {lang} não saiu — nada será publicado nesta rodada")
+            return None
+        files[f"content/blog/{lang}/{slug}.md"] = render(art, day, category, items, dropped, version)
+    return files
 
 
 # --------------------------------------------------------------------------- publicação
@@ -748,8 +981,8 @@ def checks_pass(number: int, sha: str, timeout_s: int = CHECKS_TIMEOUT_S) -> boo
     return False
 
 
-def publish(files: dict[str, str], slug: str, day: str) -> bool:
-    """Branch, dois arquivos, PR, merge. Nunca commit direto na main: o rastro do PR é o que torna
+def publish(files: dict[str, str], slug: str, day: str, category: str) -> bool:
+    """Branch, nove arquivos, PR, merge. Nunca commit direto na main: o rastro do PR é o que torna
     auditável um post que ninguém leu antes de publicar."""
     import base64
 
@@ -757,12 +990,12 @@ def publish(files: dict[str, str], slug: str, day: str) -> bool:
     if status != 200:
         log(f"github: não consegui ler a main ({status})")
         return False
-    branch = f"blog/digest-{slug}"
+    branch = f"blog/{category}-{slug}"
     gh("POST", f"/repos/{REPO}/git/refs", {"ref": f"refs/heads/{branch}", "sha": main["object"]["sha"]})
 
     for path, content in files.items():
         payload = {
-            "message": f"content(blog): boletim {day}",
+            "message": f"content(blog): {category} {slug}",
             "content": base64.b64encode(content.encode()).decode(),
             "branch": branch,
         }
@@ -781,12 +1014,15 @@ def publish(files: dict[str, str], slug: str, day: str) -> bool:
         "POST",
         f"/repos/{REPO}/pulls",
         {
-            "title": f"boletim {day}",
+            "title": f"blog: {slug}",
             "head": branch,
             "base": "main",
             "body": (
-                "Boletim automático. Manchete, veículo, data e link vêm do próprio artigo; o "
-                "comentário é do agente e está limitado pelo portão do site.\n\n"
+                "Texto nosso, escrito por agente, nos nove idiomas.\n\n"
+                "O modelo não escreve URL nenhuma: cita as fontes por marcador e os links são "
+                "montados a partir da lista verificada, então uma fonte inventada não é detectada "
+                "— ela é inexprimível. O resto das defesas está no portão deste repositório, e o "
+                "merge só sai se o CI aprovar.\n\n"
                 f"Arquivos: {', '.join(files)}"
             ),
         },
@@ -838,12 +1074,98 @@ def save_seen(urls: list[str]) -> None:
 
 # --------------------------------------------------------------------------- principal
 
+def release_notes(version: str) -> tuple[str, str] | None:
+    """(versão, notas) do release do produto, ou None. `latest` resolve para a última publicada."""
+    path = (
+        f"/repos/{PRODUCT_REPO}/releases/latest"
+        if version == "latest"
+        else f"/repos/{PRODUCT_REPO}/releases/tags/v{version}"
+    )
+    st, res = gh("GET", path)
+    if st != 200 or not isinstance(res, dict):
+        log(f"github: não achei o release {version} ({st})")
+        return None
+    tag = str(res.get("tag_name") or "").lstrip("v")
+    body = str(res.get("body") or "").strip()
+    if not re.fullmatch(r"\d+\.\d+\.\d+", tag):
+        log(f"github: tag {tag!r} não é uma versão que o portão do site aceite")
+        return None
+    if len(body) < 80:
+        log(f"github: as notas de {tag} têm {len(body)} caracteres — não dá para escrever sobre isso")
+        return None
+    return tag, body
+
+
+def free_slug(base: str) -> str:
+    """Um slug que ainda não existe na main.
+
+    Sem data no nome, que é como os posts escritos à mão são nomeados aqui. O preço é a colisão —
+    dois textos sobre o mesmo assunto na mesma semana —, e o preço é pago aqui em vez de virar um
+    arquivo sobrescrito, que é a forma silenciosa de perder um post publicado.
+    """
+    slug = base[:70].strip("-")
+    for suffix in ("", "-2", "-3", "-4"):
+        candidate = f"{slug}{suffix}"
+        st, _ = gh("GET", f"/repos/{REPO}/contents/content/blog/en/{candidate}.md")
+        if st == 404:
+            return candidate
+    return f"{slug}-{datetime.now(UTC):%Y-%m-%d}"
+
+
+def run_update(args) -> int:
+    found = release_notes(args.release)
+    if not found:
+        return 1
+    version, notes = found
+    art = write_update(version, notes)
+    if not art:
+        return 1
+
+    tag_url = f"https://github.com/{PRODUCT_REPO}/releases/tag/v{version}"
+    # Uma "fonte" que é nossa: as próprias notas. Serve para o marcador [S1] virar link; não vai
+    # para o frontmatter, porque a página só mostra bloco de fontes num texto sobre os outros.
+    notes_item = {
+        "headline": f"Chimera Agent v{version}",
+        "url": tag_url,
+        "outlet": "GitHub",
+        "published": datetime.now(UTC).strftime("%Y-%m-%d"),
+    }
+    day = datetime.now(UTC).strftime("%Y-%m-%d")
+    slug = slugify(art["title"]) or f"chimera-{version.replace('.', '-')}"
+
+    if args.dry_run:
+        files = compose(art, [notes_item], day, slug, "update", "", version)
+        return dump(files, "")
+
+    slug = free_slug(slug)
+    files = compose(art, [notes_item], day, slug, "update", "", version)
+    if not files:
+        return 1
+    if not publish(files, slug, f"v{version}", "update"):
+        return 1
+    log(f"release v{version}: publicado como {slug}")
+    return 0
+
+
+def dump(files: dict[str, str] | None, dropped: str) -> int:
+    if not files:
+        print("(dry-run: a rodada não produziu os nove arquivos)")
+        return 1
+    for path, content in files.items():
+        print(f"\n===== {path} =====\n{content}")
+    print(f"\n(dry-run: nada publicado)  descartes: {dropped}")
+    return 0
+
+
 def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--slot", default="fim-do-dia", choices=["meio-dia", "fim-do-dia"])
-    ap.add_argument("--max-items", type=int, default=3)
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--sources", type=int, default=3, help="quantas matérias alimentam o artigo")
+    ap.add_argument("--release", help="escreve sobre um release do produto: 0.42.0 ou 'latest'")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
+
+    if args.release:
+        return run_update(args)
 
     seen = load_seen()
     seen_set = set(seen)
@@ -855,29 +1177,21 @@ def main() -> int:
             by_url.setdefault(cand["url"], cand)
     log(f"colheita: {len(candidates)} candidatos, {len(by_url)} inéditos")
 
-    accepted: list[dict] = []
     reasons: list[str] = []
-    used_outlets: set[str] = set()
 
-    # Verificar primeiro, escolher depois. Na primeira versão a diversidade de veículo era uma
-    # regra e rejeitou três itens da Exame numa rodada que publicou UM — preferir variedade não
-    # pode custar o boletim. Agora ela ordena os aprovados; não elimina nenhum.
-    # Mais recente primeiro, e verifica sob demanda.
-    #
-    # Com cinco feeds brasileiros a colheita dava ~30 candidatos e verificar todos era barato. Com
-    # treze feeds passa de setenta, cada um uma requisição de até 25s — verificar tudo para depois
-    # escolher três estoura o teto de 900s do job. A ordem por data faz a parada antecipada custar
-    # os itens mais velhos, que são justamente os que não entrariam.
+    # Verificar em ordem de data e parar assim que houver material suficiente. Com treze feeds a
+    # colheita passa de setecentos itens; verificar todos para depois escolher três estoura o teto
+    # de tempo do job, e os que ficam de fora são justamente os mais velhos.
     ordem = sorted(
         by_url.values(),
         key=lambda c: parse_date(c.get("feed_date") or "") or datetime.min.replace(tzinfo=UTC),
         reverse=True,
     )
-    alvo = max(args.max_items * 3, 6)
+    alvo = max(args.sources * 3, 6)
     verified: list[dict] = []
     for cand in ordem:
         if len(verified) >= alvo:
-            log(f"parada antecipada: {len(verified)} verificados bastam para escolher {args.max_items}")
+            log(f"parada antecipada: {len(verified)} verificados bastam para escolher {args.sources}")
             break
         item, why = verify(cand)
         if not item:
@@ -887,6 +1201,7 @@ def main() -> int:
         verified.append(item)
 
     verified.sort(key=lambda i: i["published_at"], reverse=True)
+    used_outlets: set[str] = set()
     ordered: list[dict] = []
     for pass_no in (1, 2):  # a primeira passada pega um por veículo; a segunda completa
         for item in verified:
@@ -896,70 +1211,51 @@ def main() -> int:
                 continue
             ordered.append(item)
             used_outlets.add(item["outlet"])
-
-    for item in ordered:
-        if len(accepted) >= args.max_items:
-            break
-        comments = comments_for(item)
-        if not comments:
-            reasons.append("sem comentário utilizável")
-            log(
-                f"  sem comentário: {item['headline'][:70]} "
-                f"| descrição {len(item['description'])} car."
-            )
-            continue
-        for lang, text in comments.items():
-            item[f"comment_{lang}"] = text
-        accepted.append(item)
+    items = ordered[: args.sources]
 
     tally: dict[str, int] = {}
     for why in reasons:
         tally[why] = tally.get(why, 0) + 1
-    # Sempre, e antes da saída antecipada. Uma rodada que não publicou nada e não disse por quê é
-    # indistinguível de uma rodada que não rodou.
+    # Sempre, e antes de qualquer saída antecipada. Uma rodada que não publicou nada e não disse
+    # por quê é indistinguível de uma rodada que não rodou.
     if tally:
         log("motivos: " + ", ".join(f"{why} ({n})" for why, n in sorted(tally.items(), key=lambda kv: -kv[1])))
 
-    if not accepted:
-        log("nada passou nas checagens — nenhum boletim publicado neste horário")
+    if not items:
+        log("nenhuma matéria passou nas checagens — nada escrito hoje")
         return 0
-    # Contar o que foi EXAMINADO, não o que foi reunido.
-    #
-    # Com treze feeds a colheita passa de mil itens e a rodada para de verificar assim que tem o
-    # bastante. Dizer "1448 candidatos, 3 publicados" faz o leitor entender que 1445 foram
-    # avaliados e reprovados — foram nove. Um número honesto sobre descartes não pode ser o
-    # tamanho da pilha de onde ninguém tirou nada.
+
+    # Contar o que foi EXAMINADO, não o que foi reunido. Dizer "1448 candidatos, 1 publicado" faz
+    # o leitor entender que 1447 foram avaliados e reprovados; foram nove.
     examinados = len(verified) + len(reasons)
-    base = (
-        f"{examinados} candidatos examinados de {len(by_url)} reunidos, {len(accepted)} publicados."
-    )
-    dropped = (
-        base
-        + " Descartados: "
-        + ", ".join(f"{why} ({n})" for why, n in sorted(tally.items(), key=lambda kv: -kv[1])[:6])
-    ) if tally else base
+    dropped = f"{examinados} matérias examinadas de {len(by_url)} reunidas, {len(items)} lidas para este texto."
+    if tally:
+        dropped += " Descartadas: " + ", ".join(
+            f"{why} ({n})" for why, n in sorted(tally.items(), key=lambda kv: -kv[1])[:6]
+        )
+
+    art = write_article(items)
+    if not art:
+        return 0
 
     day = datetime.now(UTC).strftime("%Y-%m-%d")
-    slug = f"boletim-{day}-{args.slot}"
-    summaries = summaries_for(accepted)
-    if not summaries:
-        log("resumo: o modelo não devolveu as nove linhas — usando as manchetes como reserva")
-    files = {
-        f"content/blog/{lang}/{slug}.md": render(lang, day, args.slot, accepted, dropped, summaries)
-        for lang in LANGS
-    }
-
-    if args.dry_run:
-        for path, content in files.items():
-            print(f"\n===== {path} =====\n{content}")
-        print(f"\n(dry-run: nada publicado)  descartes: {dropped}")
-        return 0
-
-    if not publish(files, f"{day}-{args.slot}", day):
+    slug = slugify(art["title"])
+    if not slug:
+        log("redação: o título não produziu slug utilizável")
         return 1
 
-    save_seen(seen + [i["url"] for i in accepted])
-    log(f"boletim {slug}: {len(accepted)} itens")
+    if args.dry_run:
+        return dump(compose(art, items, day, slug, "analysis", dropped, ""), dropped)
+
+    slug = free_slug(slug)
+    files = compose(art, items, day, slug, "analysis", dropped, "")
+    if not files:
+        return 1
+    if not publish(files, slug, day, "analysis"):
+        return 1
+
+    save_seen(seen + [i["url"] for i in items])
+    log(f"artigo {slug}: escrito a partir de {len(items)} matérias, nos {len(LANGS)} idiomas")
     return 0
 
 
