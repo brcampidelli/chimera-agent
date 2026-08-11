@@ -46,8 +46,11 @@ FONTES = [
     },
 ]
 
-CORPO = "Uma tese.\n\n## Primeiro\n\nO que muda, segundo [S1] e também [S2].\n\n## Depois\n\nFim."
-ARTIGO = {"title": "O que muda", "summary": "A tese em uma frase.", "body": CORPO}
+# O artigo-fonte é em INGLÊS, como o de verdade: é dele que saem as oito traduções e o endereço da
+# página. A primeira versão deste arquivo usava um corpo em português aqui, e a trava de idioma —
+# escrita depois, por causa de uma execução real que produziu justamente isso — reprovou o fixture.
+CORPO = "A claim.\n\n## First\n\nWhat shifts, per [S1] and also [S2].\n\n## Then\n\nEnd of it."
+ARTIGO = {"title": "What shifts", "summary": "The thesis in one line.", "body": CORPO}
 
 
 def _modelo(monkeypatch: pytest.MonkeyPatch, resposta: Any) -> None:
@@ -83,6 +86,18 @@ class TestForma:
 
     def test_pega_campo_vazio(self) -> None:
         assert "campo title vazio" in " ".join(writer.shape_problems({**ARTIGO, "title": "  "}, 2))
+
+    def test_o_teto_de_titulo_e_relativo_na_traducao(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # O teto fixo de 90 reprovou um título alemão de 92 caracteres, e o alemão estava certo:
+        # a mesma frase corre uns 30% mais longa. O que se barra é título que virou parágrafo.
+        en = {**ARTIGO, "title": "A" * 68}
+        alemao = {**ARTIGO, "title": "B" * 92, "body": CORPO + "\nZeile"}
+        _modelo(monkeypatch, alemao)
+        assert writer.translate(en, "de", 2) == alemao
+
+        paragrafo = {**ARTIGO, "title": "C" * 400, "body": CORPO + "\nZeile"}
+        _modelo(monkeypatch, paragrafo)
+        assert writer.translate(en, "de", 2) is None
 
 
 class TestMontagemDoLink:
@@ -123,12 +138,47 @@ class TestRedacao:
         assert writer.write_article(FONTES) is None
 
 
+class TestIdiomaFonteENumeros:
+    """As duas travas que a primeira execução real pediu."""
+
+    def test_pega_o_artigo_fonte_escrito_em_portugues(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Aconteceu: o prompt está em português e o modelo devolveu o artigo inteiro em português
+        # para o arquivo `blog/en/`, com o endereço da página em português e as oito traduções
+        # saindo de um "original" que não era o idioma-fonte. Nada quebrou; ficou só errado.
+        pt = (
+            "A indústria de IA está em um ponto onde tamanho não significa desempenho, e para quem "
+            "constrói agentes com modelos menores isso muda mais do que parece. Segundo [S1]."
+        )
+        _modelo(monkeypatch, {**ARTIGO, "body": pt})
+        assert writer.write_article(FONTES) is None
+
+    def test_deixa_passar_o_ingles(self) -> None:
+        assert writer.looks_english("What a security model changes for people who build agents")
+
+    def test_pega_numero_que_nao_esta_no_material(self) -> None:
+        material = "Nemotron 3.5 Lightning, 3.6 billion active parameters, 670 tokens per second."
+        corpo = "It runs 3.6 billion parameters and is 40 percent cheaper."
+        assert writer.invented_numbers(corpo, material) == ["40"]
+
+    def test_o_texto_de_release_tem_as_mesmas_travas(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # As notas serem nossas reduz o risco de inventar sobre terceiros, não o de inventar. Um
+        # número de desempenho que ninguém mediu é pior vindo de nós: quem lê tem motivo para crer.
+        art = {**ARTIGO, "body": "It ships [S1] and runs 40 percent faster than before."}
+        _modelo(monkeypatch, art)
+        assert writer.write_update("0.42.0", "Fixes seven settings that would not apply.") is None
+
+    def test_nao_reclama_de_separador_diferente(self) -> None:
+        # `3.6` vira `3,6` conforme quem escreve, e uma regra que confunde vírgula com invenção é
+        # uma regra que reprova o texto certo.
+        assert writer.invented_numbers("são 3,6 bilhões", "3.6 billion active parameters") == []
+
+
 class TestTraducao:
     def test_ingles_passa_direto(self) -> None:
         assert writer.translate(ARTIGO, "en", 2) is ARTIGO
 
     def test_traduz(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        pt = {**ARTIGO, "body": CORPO.replace("Uma tese.", "Uma tese em português.")}
+        pt = {**ARTIGO, "body": CORPO.replace("A claim.", "Uma tese em português.")}
         _modelo(monkeypatch, pt)
         assert writer.translate(ARTIGO, "pt", 2) == pt
 
@@ -141,6 +191,67 @@ class TestTraducao:
     def test_pega_o_ingles_devolvido_como_traducao(self, monkeypatch: pytest.MonkeyPatch) -> None:
         _modelo(monkeypatch, dict(ARTIGO))
         assert writer.translate(ARTIGO, "ja", 2) is None
+
+    def test_uma_chamada_instavel_nao_custa_o_dia(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Aconteceu na primeira execução real: o modelo devolveu o inglês para o português e a
+        # rodada morreu ali, levando junto os nove idiomas. A mesma chamada, repetida, traduziu.
+        boa = {**ARTIGO, "body": CORPO.replace("A claim.", "Una tesis.")}
+        respostas = [dict(ARTIGO), boa]
+        monkeypatch.setattr(writer, "_ask", lambda *_a, **_k: respostas.pop(0))
+        assert writer.translate(ARTIGO, "es", 2) == boa
+
+    def test_mas_duas_falhas_seguidas_cancelam(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # A retentativa é para instabilidade, não para insistir até o modelo acertar por acaso.
+        chamadas = []
+        monkeypatch.setattr(writer, "_ask", lambda *a, **k: chamadas.append(1) or dict(ARTIGO))
+        assert writer.translate(ARTIGO, "fr", 2) is None
+        assert len(chamadas) == 2
+
+
+class TestLimiteDeTaxa:
+    """Nove chamadas seguidas encontram o limite de taxa lá pela sétima."""
+
+    def _http(self, monkeypatch: pytest.MonkeyPatch, codigos: list[int]) -> list[float]:
+        esperas: list[float] = []
+        monkeypatch.setattr(writer.time, "sleep", lambda s: esperas.append(s))
+        monkeypatch.setattr(writer, "env", lambda k: "chave" if "KEY" in k else None)
+
+        def urlopen(*_a: Any, **_k: Any) -> Any:
+            codigo = codigos.pop(0)
+            if codigo != 200:
+                raise writer.urllib.error.HTTPError("u", codigo, "x", {}, None)  # type: ignore[arg-type]
+
+            class Resp:
+                def __enter__(self) -> Any:
+                    return self
+
+                def __exit__(self, *_e: Any) -> None:
+                    return None
+
+                def read(self) -> bytes:
+                    return b'{"choices":[{"message":{"content":"{\\"ok\\":1}"}}]}'
+
+            return Resp()
+
+        monkeypatch.setattr(writer.json, "load", lambda r: writer.json.loads(r.read()))
+        monkeypatch.setattr(writer.urllib.request, "urlopen", urlopen)
+        return esperas
+
+    def test_espera_e_cresce_no_429(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        esperas = self._http(monkeypatch, [429, 429, 200])
+        assert writer._ask("p", 100) == {"ok": 1}
+        assert esperas == [20, 45]  # repetir sem esperar não é uma tentativa
+
+    def test_desiste_depois_de_tres_esperas(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._http(monkeypatch, [429, 429, 429, 429])
+        assert writer._ask("p", 100) is None
+
+    def test_outro_erro_http_nao_vira_espera(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Um 401 repetido quatro vezes com pausas é uma rodada de três minutos para descobrir que
+        # a chave está errada.
+        esperas = self._http(monkeypatch, [401])
+        assert writer._ask("p", 100) is None
+        assert esperas == []
 
 
 class TestComposicao:

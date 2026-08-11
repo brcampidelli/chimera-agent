@@ -462,6 +462,10 @@ Recebe as MATÉRIAS que a redação leu hoje: manchete, veículo e uma descriç�
 Escreva UM artigo nosso a partir delas. Não é resumo das matérias, não é boletim, não é lista.
 É um texto com uma TESE — o que aquilo muda para quem constrói agentes — e a tese é sua.
 
+**ESCREVA O ARTIGO EM INGLÊS.** Estas instruções estão em português, o texto que você produz não
+está: o inglês é a língua-fonte do site, e é dele que saem as outras oito traduções e o endereço
+da página. Título, resumo e corpo, todos em inglês.
+
 FORMA:
 - Entre 450 e 700 palavras. Markdown. Dois ou três subtítulos `##`. Sem título `#` no corpo (o
   título vem no campo `title`).
@@ -514,6 +518,8 @@ UPDATE_PROMPT = """Você é o redator do blog do Chimera Agent — um framework 
 de IA. Saiu a versão {version}, e você escreve o texto que a anuncia. Quem lê constrói agentes.
 
 Recebe as NOTAS DE RELEASE, escritas por quem programou. Escreva UM artigo nosso sobre elas.
+
+**ESCREVA O ARTIGO EM INGLÊS**, pelo mesmo motivo: o inglês é a língua-fonte do site.
 
 FORMA:
 - Entre 350 e 600 palavras. Markdown. Dois ou três subtítulos `##`. Sem título `#` no corpo.
@@ -568,12 +574,31 @@ def _ask(prompt: str, max_tokens: int) -> dict | None:
             "X-Title": "Chimera writer",
         },
     )
-    try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            data = json.load(resp)
-        raw = data["choices"][0]["message"]["content"].strip()
-    except Exception as exc:  # noqa: BLE001
-        log(f"modelo: {type(exc).__name__} {str(exc)[:70]}")
+    # Espera crescente no 429, e só no 429.
+    #
+    # A rodada faz nove chamadas seguidas — uma para escrever e oito para traduzir — e o limite de
+    # taxa aparece lá pela sétima. Foi assim que uma execução real morreu no chinês depois de sete
+    # idiomas prontos: a retentativa disparou um segundo depois, que é exatamente o intervalo em
+    # que um 429 continua sendo 429. Repetir sem esperar não é uma tentativa, é a mesma chamada.
+    for espera in (0, 20, 45, 90):
+        if espera:
+            log(f"modelo: limite de taxa, esperando {espera}s")
+            time.sleep(espera)
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                data = json.load(resp)
+            raw = data["choices"][0]["message"]["content"].strip()
+            break
+        except urllib.error.HTTPError as exc:
+            if exc.code == 429:
+                continue
+            log(f"modelo: HTTP {exc.code}")
+            return None
+        except Exception as exc:  # noqa: BLE001
+            log(f"modelo: {type(exc).__name__} {str(exc)[:70]}")
+            return None
+    else:
+        log("modelo: limite de taxa persistiu depois de três esperas")
         return None
     # Alguns modelos ignoram response_format e devolvem a cerca de código mesmo assim.
     raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw).strip()
@@ -593,7 +618,7 @@ def markers_for(n: int) -> str:
     return ", ".join(f"[S{i + 1}]" for i in range(n))
 
 
-def shape_problems(art: dict, n_sources: int) -> list[str]:
+def shape_problems(art: dict, n_sources: int, title_max: int = 90) -> list[str]:
     """O que está errado com o que o modelo devolveu, antes de virar arquivo.
 
     Isto NÃO é uma segunda cópia das regras do site. As regras do site são sobre o formato de um
@@ -622,11 +647,54 @@ def shape_problems(art: dict, n_sources: int) -> list[str]:
         problems.append(f"marcadores fora da lista de fontes: {fora}")
     if n_sources and not usados:
         problems.append("o corpo não cita nenhuma fonte")
-    if len(art["title"]) > 90:
-        problems.append(f"título com {len(art['title'])} caracteres")
+    if len(art["title"]) > title_max:
+        problems.append(f"título com {len(art['title'])} caracteres, teto {title_max}")
     if len(art["summary"]) > 240:
         problems.append(f"resumo com {len(art['summary'])} caracteres")
     return problems
+
+
+# Palavras funcionais que aparecem em qualquer parágrafo de português ou espanhol e praticamente
+# nunca em prosa inglesa. Não é detecção de idioma: é a pergunta "isto está em inglês?", que é a
+# única que interessa aqui.
+NAO_INGLES = re.compile(
+    r"\b(não|nao|são|sao|está|esta[oó]|para|com|uma|dos|das|pelo|pela|mais|também|"
+    r"que|porque|quando|sobre|entre|muito|tem|foi|ser)\b",
+    re.I,
+)
+
+DIGITOS = re.compile(r"\d[\d.,]*")
+
+
+def looks_english(text: str) -> bool:
+    """Se o texto está em inglês. Instrução no prompt não é trava: esta é a trava.
+
+    O prompt está em português e a primeira execução real devolveu o artigo inteiro em português —
+    título, resumo e corpo — para o arquivo `blog/en/`, com o endereço da página em português e as
+    oito traduções saindo de um "original" que não era o idioma-fonte. Nada quebrou; ficou só
+    errado, que é o modo de falha caro.
+    """
+    achadas = {m.group(0).lower() for m in NAO_INGLES.finditer(text)}
+    return len(achadas) < 3
+
+
+def invented_numbers(body: str, material: str) -> list[str]:
+    """Números do corpo que não aparecem no material.
+
+    Um número é a afirmação factual mais densa que um texto carrega e a mais fácil de conferir. O
+    resto do que um modelo inventa — um nome, uma ênfase — não dá para checar assim, e não se
+    finge que dá: isto pega uma classe de invenção, não a invenção.
+
+    Compara sem separador, porque `3.6` vira `3,6` e `1,500` vira `1.500` conforme quem escreve.
+    """
+    limpo = lambda s: s.replace(".", "").replace(",", "").rstrip("0") or "0"  # noqa: E731
+    no_material = {limpo(m.group(0)) for m in DIGITOS.finditer(material)}
+    fora = []
+    for m in DIGITOS.finditer(body):
+        bruto = m.group(0).rstrip(".,")
+        if len(bruto.strip(".,")) >= 2 and limpo(bruto) not in no_material:
+            fora.append(bruto)
+    return fora
 
 
 def write_article(items: list[dict]) -> dict | None:
@@ -642,50 +710,78 @@ def write_article(items: list[dict]) -> dict | None:
         f"     descrição: {it['description'] or '(sem descrição)'}"
         for i, it in enumerate(items)
     )
-    art = _ask(
-        WRITE_PROMPT.format(marcadores=markers_for(len(items)), material=material),
-        max_tokens=3000,
-    )
-    if art is None or art.get("skip"):
-        log("redação: o modelo não viu tese sustentável nas matérias de hoje")
-        return None
-    problems = shape_problems(art, len(items))
-    if problems:
-        log("redação: " + "; ".join(problems))
-        return None
-    return {k: art[k] for k in ("title", "summary", "body")}
+    for _ in (1, 2):
+        art = _ask(
+            WRITE_PROMPT.format(marcadores=markers_for(len(items)), material=material),
+            max_tokens=3000,
+        )
+        if art is None:
+            continue
+        if art.get("skip"):
+            log("redação: o modelo não viu tese sustentável nas matérias de hoje")
+            return None
+        problems = shape_problems(art, len(items))
+        if not looks_english(f"{art.get('title', '')} {art.get('body', '')}"):
+            problems.append("o artigo-fonte não saiu em inglês")
+        fora = invented_numbers(str(art.get("body", "")), material)
+        if fora:
+            problems.append(f"números que não estão no material: {fora[:5]}")
+        if problems:
+            log("redação: " + "; ".join(problems))
+            continue
+        return {k: art[k] for k in ("title", "summary", "body")}
+    return None
 
 
 def write_update(version: str, notes: str) -> dict | None:
-    """O artigo sobre um release nosso. Uma fonte só: as notas, que são nossas."""
-    art = _ask(
-        UPDATE_PROMPT.format(marcador="[S1]", version=version, notas=notes[:12000]),
-        max_tokens=2600,
-    )
-    if art is None or art.get("skip"):
-        log("redação: o modelo não escreveu o texto do release")
-        return None
-    problems = shape_problems(art, 1)
-    if problems:
-        log("redação: " + "; ".join(problems))
-        return None
-    return {k: art[k] for k in ("title", "summary", "body")}
+    """O artigo sobre um release nosso. Uma fonte só: as notas, que são nossas.
+
+    As mesmas travas do artigo de fora valem aqui. As notas serem nossas reduz o risco de inventar
+    sobre terceiros, não o de inventar: um número de desempenho que ninguém mediu é pior vindo de
+    nós, porque quem lê tem motivo para acreditar.
+    """
+    material = notes[:12000]
+    for _ in (1, 2):
+        art = _ask(
+            UPDATE_PROMPT.format(marcador="[S1]", version=version, notas=material),
+            max_tokens=2600,
+        )
+        if art is None:
+            continue
+        if art.get("skip"):
+            log("redação: o modelo não escreveu o texto do release")
+            return None
+        problems = shape_problems(art, 1)
+        if not looks_english(f"{art.get('title', '')} {art.get('body', '')}"):
+            problems.append("o artigo-fonte não saiu em inglês")
+        fora = invented_numbers(str(art.get("body", "")), f"{material} {version}")
+        if fora:
+            problems.append(f"números que não estão nas notas: {fora[:5]}")
+        if problems:
+            log("redação: " + "; ".join(problems))
+            continue
+        return {k: art[k] for k in ("title", "summary", "body")}
+    return None
 
 
-def translate(art: dict, lang: str, n_sources: int) -> dict | None:
-    """O artigo num idioma, ou None. Uma chamada por idioma."""
-    if lang == "en":
-        return art
+def _translate_once(art: dict, lang: str, n_sources: int) -> dict | None:
     origem = json.dumps(art, ensure_ascii=False, indent=2)
     out = _ask(
         TRANSLATE_PROMPT.format(
             idioma=LANG_NAMES[lang], marcadores=markers_for(n_sources), artigo=origem
         ),
-        max_tokens=3400,
+        max_tokens=5000,
     )
     if out is None:
         return None
-    problems = shape_problems(out, n_sources)
+    # O teto de título de uma TRADUÇÃO é relativo ao original, não absoluto.
+    #
+    # O teto fixo de 90 reprovou o alemão com 92, e o alemão estava certo: a mesma frase corre uns
+    # 30% mais longa. Uma regra calibrada no inglês que reprova o alemão por ser alemão é a terceira
+    # desta leva — junto com um regex que via "arnês" dentro de "harness" e um "veio igual ao
+    # inglês" que acusava cognatos. O que se quer barrar aqui é título que virou parágrafo, e isso
+    # se mede contra o original.
+    problems = shape_problems(out, n_sources, title_max=max(90, int(len(art["title"]) * 1.8)))
     if problems:
         log(f"tradução {lang}: " + "; ".join(problems))
         return None
@@ -695,9 +791,30 @@ def translate(art: dict, lang: str, n_sources: int) -> dict | None:
         log(f"tradução {lang}: os marcadores de fonte não bateram com o original")
         return None
     if out["body"].strip() == art["body"].strip():
-        log(f"tradução {lang}: veio o texto em inglês de volta")
+        # Com prévia: sem ela, a única forma de diagnosticar isto é reproduzir a rodada inteira à
+        # mão, que foi o que custou uma hora na primeira vez.
+        log(f"tradução {lang}: veio o texto em inglês de volta — {out['body'][:90]!r}")
         return None
     return {k: out[k] for k in ("title", "summary", "body")}
+
+
+def translate(art: dict, lang: str, n_sources: int) -> dict | None:
+    """O artigo num idioma, ou None. Uma chamada por idioma, com uma segunda tentativa.
+
+    A retentativa não é otimismo: como a rodada é nove-ou-nenhum, uma única chamada instável custa
+    o texto do dia inteiro, nos nove idiomas. Foi o que aconteceu na primeira execução real — o
+    modelo devolveu o inglês para o português e a rodada morreu ali; a mesma chamada, repetida,
+    traduziu sem problema. Uma tentativa a mais é barata, e "nove ou nenhum" continua de pé.
+    """
+    if lang == "en":
+        return art
+    for attempt in (1, 2):
+        out = _translate_once(art, lang, n_sources)
+        if out is not None:
+            if attempt == 2:
+                log(f"tradução {lang}: saiu na segunda tentativa")
+            return out
+    return None
 
 
 def link_sources(body: str, items: list[dict]) -> str:
