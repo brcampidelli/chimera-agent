@@ -1,0 +1,45 @@
+{
+  "_why": "Translated card descriptions, and only the descriptions.\n\nThe body of a card is not prose about the product: it is the payload the agent reads at runtime, the bytes the published SHA-256 attests to, and the text the CLI imports by path. Translating it would break all three at once — the page would show a hash that does not match what the reader is reading, and the translation would never reach the agent anyway, because the CLI only ever imports skills/.\n\nSo the description travels here instead, in a sidecar that leaves SKILL.md byte-identical. Each entry declares source_sha256 of the English description it was made from; when the English changes, the site falls back to it rather than showing a translation of a sentence that no longer exists.",
+  "descriptions": {
+    "assert-what-the-generator-found": {
+      "text": "Ein Generator, der abstürzt, sagt dir, dass er gescheitert ist; einer, der plausible Ausgabe liefert, sagt dir nichts. Prüfe, was er gefunden hat, nie dass er gelaufen ist.",
+      "source_sha256": "059b66d7e09a1aa6ce2b31647672f3c724dbafb4d8b75c1b599d79c0762823f2"
+    },
+    "build-the-gate-before-the-content": {
+      "text": "Eine Prüfung, die nach dem eingeführt wird, was sie schützt, ist eine Prüfung, die jemand zum Ausliefern abschaltet. Schließe sie, solange es nichts zu blockieren gibt.",
+      "source_sha256": "3458f7683941585bbca67d834bcd4f33f2d5eea3124c194cb08ed6acb9a238b9"
+    },
+    "declare-when-a-setting-takes-effect": {
+      "text": "Eine Einstellung, die erfolgreich speichert und bis zum Neustart nichts ändert, ist schlimmer als eine, die fehlschlägt. Sag, wann sie greift, und leite das davon ab, wo sie gelesen wird.",
+      "source_sha256": "db548604dbe6cfe82f690d90ddfdcf107ff6a76abcfb7f3b73a60616d343453a"
+    },
+    "derive-instead-of-transcribing": {
+      "text": "Alles, was von Hand aus einer anderen Datei kopiert wurde, ist genau einmal richtig. Wenn es generierbar ist, generiere es — und lass den Build scheitern, sobald die Kopie veraltet.",
+      "source_sha256": "ba0e688ec255689f4e441a5f14e2377b0e044b64c1679e303612f0a4dc4439ee"
+    },
+    "do-not-ship-an-empty-surface": {
+      "text": "Ein leerer Screen, Tab oder eine leere Kategorie ist ein Versprechen, das das Produkt nicht hält. Blende sie aus, bis sie Inhalt hat, oder baue sie noch nicht.",
+      "source_sha256": "4b4defbce9c566af11eab06a9ce9d33b65edd59a556ca4555c0b80de3409dd42"
+    },
+    "keep-the-caveat-with-the-number": {
+      "text": "Eine Zahl und ihr Vorbehalt müssen ein Artefakt sein. Zwei Absätze driften auseinander; eine Komponente kann das nicht.",
+      "source_sha256": "9560e76d7c148785f634f7d8b71e7bee1525972db4b530af7ec42d67e9588eb6"
+    },
+    "pin-the-case-that-narrowed-the-rule": {
+      "text": "Wenn eine Prüfung beim falschen Ziel anschlägt, macht der Fix sie schwächer. Halte den Fehlalarm im selben Commit als Test fest, sonst erodiert die Regel still.",
+      "source_sha256": "2ec4320899defc512245ee7d45eab69f3911c207a0f9e576341490f76b836a52"
+    },
+    "publish-the-run-that-did-not-work": {
+      "text": "Veröffentliche das Experiment, das gescheitert ist, bewahre das überholte unverändert auf und würfle nie neu, um Signifikanz zu erreichen. Die Verzerrung liegt in der Auswahl, nicht in der Zahl.",
+      "source_sha256": "9e96faac615281ebefeacbac915cdab98215ecf8da14b68048eba557eb0e8064"
+    },
+    "verify-before-claiming": {
+      "text": "Bevor du eine Aufgabe als erledigt meldest, führe die Prüfung aus, die fehlschlagen würde, wenn sie es nicht wäre — eine Erklärung ist keine Behebung.",
+      "source_sha256": "1d5f5e274b524ce6980b2d980a5504a3350563858b5160b99303962a0b232120"
+    },
+    "warn-before-the-thing-you-are-warning-about": {
+      "text": "Ein Warnhinweis nach der Handlung, die er betrifft, kommt an, wenn die lesende Person längst entschieden hat. Setze ihn darüber und mache ihn unabweisbar, wenn es darauf ankommt.",
+      "source_sha256": "e1f0c23a799b631b2081b73d1f2941094c34150f6663ea486c6315b63f141fea"
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "_why": "Translated card descriptions, and only the descriptions.\n\nThe body of a card is not prose about the product: it is the payload the agent reads at runtime, the bytes the published SHA-256 attests to, and the text the CLI imports by path. Translating it would break all three at once — the page would show a hash that does not match what the reader is reading, and the translation would never reach the agent anyway, because the CLI only ever imports skills/.\n\nSo the description travels here instead, in a sidecar that leaves SKILL.md byte-identical. Each entry declares source_sha256 of the English description it was made from; when the English changes, the site falls back to it rather than showing a translation of a sentence that no longer exists.",
+  "descriptions": {
+    "assert-what-the-generator-found": {
+      "text": "クラッシュするジェネレーターは失敗したと教えてくれますが、もっともらしい出力を返すものは何も教えてくれません。実行されたことではなく、何を見つけたかをテストしてください。",
+      "source_sha256": "059b66d7e09a1aa6ce2b31647672f3c724dbafb4d8b75c1b599d79c0762823f2"
+    },
+    "build-the-gate-before-the-content": {
+      "text": "守る対象より後から追加したチェックは、リリースのために誰かが切るチェックです。まだ止めるものが何もないうちに閉じておいてください。",
+      "source_sha256": "3458f7683941585bbca67d834bcd4f33f2d5eea3124c194cb08ed6acb9a238b9"
+    },
+    "declare-when-a-setting-takes-effect": {
+      "text": "保存には成功するのに再起動まで何も変わらない設定は、失敗する設定より悪いものです。いつ効くのかを明示し、それを読み取り箇所から導いてください。",
+      "source_sha256": "db548604dbe6cfe82f690d90ddfdcf107ff6a76abcfb7f3b73a60616d343453a"
+    },
+    "derive-instead-of-transcribing": {
+      "text": "他のファイルから手で写したものは、ちょうど一度だけ正しいものです。生成できるなら生成し、写しが古くなったらビルドを失敗させてください。",
+      "source_sha256": "ba0e688ec255689f4e441a5f14e2377b0e044b64c1679e303612f0a4dc4439ee"
+    },
+    "do-not-ship-an-empty-surface": {
+      "text": "空の画面・タブ・カテゴリは、製品が守っていない約束です。中身が入るまで隠すか、まだ作らないでください。",
+      "source_sha256": "4b4defbce9c566af11eab06a9ce9d33b65edd59a556ca4555c0b80de3409dd42"
+    },
+    "keep-the-caveat-with-the-number": {
+      "text": "数値とその但し書きは、ひとつの成果物でなければなりません。段落がふたつあれば離れていきますが、コンポーネントひとつなら離れようがありません。",
+      "source_sha256": "9560e76d7c148785f634f7d8b71e7bee1525972db4b530af7ec42d67e9588eb6"
+    },
+    "pin-the-case-that-narrowed-the-rule": {
+      "text": "チェックが誤った対象で発火したとき、その修正はチェックを弱めます。同じコミットで誤検知をテストとして固定してください。さもないとルールは静かに擦り減ります。",
+      "source_sha256": "2ec4320899defc512245ee7d45eab69f3911c207a0f9e576341490f76b836a52"
+    },
+    "publish-the-run-that-did-not-work": {
+      "text": "失敗した実験も公表し、置き換えられた結果は手を加えずに残し、有意性を求めて振り直さないでください。バイアスは数値ではなく、選択にあります。",
+      "source_sha256": "9e96faac615281ebefeacbac915cdab98215ecf8da14b68048eba557eb0e8064"
+    },
+    "verify-before-claiming": {
+      "text": "タスクを完了と報告する前に、完了していなければ失敗するはずの検査を実行してください。説明は修正ではありません。",
+      "source_sha256": "1d5f5e274b524ce6980b2d980a5504a3350563858b5160b99303962a0b232120"
+    },
+    "warn-before-the-thing-you-are-warning-about": {
+      "text": "対象となる操作の後に置かれた注意書きは、読み手がすでに決めた後に届きます。上に置き、重要な場面では消せないようにしてください。",
+      "source_sha256": "e1f0c23a799b631b2081b73d1f2941094c34150f6663ea486c6315b63f141fea"
+    }
+  }
+}

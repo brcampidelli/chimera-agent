@@ -1,0 +1,45 @@
+{
+  "_why": "Translated card descriptions, and only the descriptions.\n\nThe body of a card is not prose about the product: it is the payload the agent reads at runtime, the bytes the published SHA-256 attests to, and the text the CLI imports by path. Translating it would break all three at once — the page would show a hash that does not match what the reader is reading, and the translation would never reach the agent anyway, because the CLI only ever imports skills/.\n\nSo the description travels here instead, in a sidecar that leaves SKILL.md byte-identical. Each entry declares source_sha256 of the English description it was made from; when the English changes, the site falls back to it rather than showing a translation of a sentence that no longer exists.",
+  "descriptions": {
+    "assert-what-the-generator-found": {
+      "text": "会崩溃的生成器告诉你它失败了；输出看似合理的生成器什么也没告诉你。测试它找到了什么，而不是它跑过了。",
+      "source_sha256": "059b66d7e09a1aa6ce2b31647672f3c724dbafb4d8b75c1b599d79c0762823f2"
+    },
+    "build-the-gate-before-the-content": {
+      "text": "在被守护的东西之后才加的检查，是有人为了发布而关掉的检查。趁还没有东西要拦，就把它接死。",
+      "source_sha256": "3458f7683941585bbca67d834bcd4f33f2d5eea3124c194cb08ed6acb9a238b9"
+    },
+    "declare-when-a-setting-takes-effect": {
+      "text": "保存成功却要重启才生效的设置，比保存失败还糟。说明它何时生效，并从读取它的地方推导出来。",
+      "source_sha256": "db548604dbe6cfe82f690d90ddfdcf107ff6a76abcfb7f3b73a60616d343453a"
+    },
+    "derive-instead-of-transcribing": {
+      "text": "任何从别处手抄过来的东西，只正确一次。能生成就生成，并在副本过期时让构建失败。",
+      "source_sha256": "ba0e688ec255689f4e441a5f14e2377b0e044b64c1679e303612f0a4dc4439ee"
+    },
+    "do-not-ship-an-empty-surface": {
+      "text": "空的界面、标签页或分类，是产品没有兑现的承诺。有内容之前先藏起来，或者干脆先别做。",
+      "source_sha256": "4b4defbce9c566af11eab06a9ce9d33b65edd59a556ca4555c0b80de3409dd42"
+    },
+    "keep-the-caveat-with-the-number": {
+      "text": "数字和它的限定条件必须是同一个产物。两个段落会各走各的；一个组件做不到。",
+      "source_sha256": "9560e76d7c148785f634f7d8b71e7bee1525972db4b530af7ec42d67e9588eb6"
+    },
+    "pin-the-case-that-narrowed-the-rule": {
+      "text": "当一项检查打在错误的目标上，修复会让它变弱。在同一个提交里把这个误报固定成测试，否则规则会悄悄被磨掉。",
+      "source_sha256": "2ec4320899defc512245ee7d45eab69f3911c207a0f9e576341490f76b836a52"
+    },
+    "publish-the-run-that-did-not-work": {
+      "text": "把失败的实验也发出来，把被取代的那次原样保留，绝不为了显著性重跑。偏差在于挑选，不在于那个数字。",
+      "source_sha256": "9e96faac615281ebefeacbac915cdab98215ecf8da14b68048eba557eb0e8064"
+    },
+    "verify-before-claiming": {
+      "text": "在报告任务完成之前，先跑那个「若未完成就会失败」的检查——解释不是修复。",
+      "source_sha256": "1d5f5e274b524ce6980b2d980a5504a3350563858b5160b99303962a0b232120"
+    },
+    "warn-before-the-thing-you-are-warning-about": {
+      "text": "放在所涉动作之后的提醒，到达时读者已经做了决定。把它放在前面；重要的时候，别让它能被关掉。",
+      "source_sha256": "e1f0c23a799b631b2081b73d1f2941094c34150f6663ea486c6315b63f141fea"
+    }
+  }
+}
