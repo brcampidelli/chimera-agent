@@ -1620,7 +1620,26 @@ def _mount_spa(app: FastAPI, static_dir: Path) -> None:
         if full_path.startswith("api/"):
             raise HTTPException(status_code=404, detail="not found")
         # Any other path that isn't a real asset falls back to the SPA entrypoint (client routing).
-        candidate = (static_dir / full_path).resolve()
-        if candidate.is_file() and static_dir.resolve() in candidate.parents:
-            return FileResponse(candidate)
+        #
+        # Inside the guard because asking the filesystem about a path is not a safe question. A
+        # request path can carry bytes no filesystem accepts: `%00` decodes to a NUL and `stat`
+        # raises **ValueError**, which "is this a file" does not catch — so a request for a page
+        # that does not exist became a 500, reading as the server being broken rather than the URL
+        # being wrong. Reproduced, and the two `%00` cases in the tests fail without this.
+        #
+        # `OSError` is caught beside it for the platform shapes that raise instead of returning
+        # False — some Windows paths are documented to. That branch is defensive: on the CPython
+        # and Windows build measured here, `:` and `|` came back as a plain miss, so it is guarding
+        # a case I did not manage to reproduce rather than one I watched happen.
+        #
+        # The traversal guard is the line below and it is doing its job — `..` and an absolute path
+        # both resolve outside `static_dir` and are refused. This is robustness, not a hole: what
+        # was missing is that a malformed path should reach the same answer as any other unknown
+        # path, which is the app.
+        try:
+            candidate = (static_dir / full_path).resolve()
+            if candidate.is_file() and static_dir.resolve() in candidate.parents:
+                return FileResponse(candidate)
+        except (OSError, ValueError):
+            pass
         return _index_html(index, request)
