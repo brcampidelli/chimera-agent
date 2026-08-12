@@ -17,7 +17,7 @@
 [![Discord](https://img.shields.io/badge/Discord-join-5865F2.svg?logo=discord&logoColor=white)](https://discord.gg/ACvBbrmguV)
 [![Reddit](https://img.shields.io/badge/Reddit-r%2FChimeraAgent-FF4500.svg?logo=reddit&logoColor=white)](https://www.reddit.com/r/ChimeraAgent/)
 ![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)
-[![Donate](https://img.shields.io/badge/Donate-Stripe-635BFF.svg?logo=stripe&logoColor=white)](https://donate.stripe.com/9B63cofM491m4SBfe177O00)
+[![Donate](https://img.shields.io/badge/Donate-Stripe-635BFF.svg?logo=stripe&logoColor=white)](https://buy.stripe.com/9B6aEQ57q91m1Gp7Lz77O01)
 
 <sub><a href="README.md">English</a> · <a href="README.pt-BR.md">Português</a> · <a href="README.es.md">Español</a> · <a href="README.de.md">Deutsch</a> · <a href="README.fr.md">Français</a> · <a href="README.it.md">Italiano</a> · <a href="README.pl.md">Polski</a> · <b>中文</b> · <a href="README.ja.md">日本語</a></sub>
 
@@ -434,7 +434,7 @@ uv run pytest -q         # 测试套件
 Chimera 完全免费、开源，公开开发。如果它对你有帮助，欢迎通过一次性捐赠来资助
 它的开发 —— 每一份支持都很重要，我们万分感激。💜
 
-**[💜 通过 Stripe 捐赠](https://donate.stripe.com/9B63cofM491m4SBfe177O00)**
+**[💜 通过 Stripe 捐赠](https://buy.stripe.com/9B6aEQ57q91m1Gp7Lz77O01)**
 
 ## 许可证
 

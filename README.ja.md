@@ -17,7 +17,7 @@
 [![Discord](https://img.shields.io/badge/Discord-join-5865F2.svg?logo=discord&logoColor=white)](https://discord.gg/ACvBbrmguV)
 [![Reddit](https://img.shields.io/badge/Reddit-r%2FChimeraAgent-FF4500.svg?logo=reddit&logoColor=white)](https://www.reddit.com/r/ChimeraAgent/)
 ![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)
-[![Donate](https://img.shields.io/badge/Donate-Stripe-635BFF.svg?logo=stripe&logoColor=white)](https://donate.stripe.com/9B63cofM491m4SBfe177O00)
+[![Donate](https://img.shields.io/badge/Donate-Stripe-635BFF.svg?logo=stripe&logoColor=white)](https://buy.stripe.com/9B6aEQ57q91m1Gp7Lz77O01)
 
 <sub><a href="README.md">English</a> · <a href="README.pt-BR.md">Português</a> · <a href="README.es.md">Español</a> · <a href="README.de.md">Deutsch</a> · <a href="README.fr.md">Français</a> · <a href="README.it.md">Italiano</a> · <a href="README.pl.md">Polski</a> · <a href="README.zh-CN.md">中文</a> · <b>日本語</b></sub>
 
@@ -453,7 +453,7 @@ Reddit 派ですか？ アップデートやディスカッションは **[r/Chi
 
 Chimera は無料のオープンソースで、オープンに開発されています。もし役に立ったら、一度きりの寄付で開発を応援していただけます —— どんな支援もとても励みになり、心から感謝します。💜
 
-**[💜 Stripe で寄付する](https://donate.stripe.com/9B63cofM491m4SBfe177O00)**
+**[💜 Stripe で寄付する](https://buy.stripe.com/9B6aEQ57q91m1Gp7Lz77O01)**
 
 ## ライセンス
 

@@ -17,7 +17,7 @@
 [![Discord](https://img.shields.io/badge/Discord-join-5865F2.svg?logo=discord&logoColor=white)](https://discord.gg/ACvBbrmguV)
 [![Reddit](https://img.shields.io/badge/Reddit-r%2FChimeraAgent-FF4500.svg?logo=reddit&logoColor=white)](https://www.reddit.com/r/ChimeraAgent/)
 ![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)
-[![Donate](https://img.shields.io/badge/Donate-Stripe-635BFF.svg?logo=stripe&logoColor=white)](https://donate.stripe.com/9B63cofM491m4SBfe177O00)
+[![Donate](https://img.shields.io/badge/Donate-Stripe-635BFF.svg?logo=stripe&logoColor=white)](https://buy.stripe.com/9B6aEQ57q91m1Gp7Lz77O01)
 
 <sub><a href="README.md">English</a> · <a href="README.pt-BR.md">Português</a> · <a href="README.es.md">Español</a> · <a href="README.de.md">Deutsch</a> · <a href="README.fr.md">Français</a> · <b>Italiano</b> · <a href="README.pl.md">Polski</a> · <a href="README.zh-CN.md">中文</a> · <a href="README.ja.md">日本語</a></sub>
 
@@ -480,7 +480,7 @@ Preferisci Reddit? Segui **[r/ChimeraAgent](https://www.reddit.com/r/ChimeraAgen
 Chimera è gratuito e open-source, costruito allo scoperto. Se ti è utile, puoi aiutare a finanziarne
 lo sviluppo con una donazione una tantum — ogni contributo aiuta ed è enormemente apprezzato. 💜
 
-**[💜 Dona con Stripe](https://donate.stripe.com/9B63cofM491m4SBfe177O00)**
+**[💜 Dona con Stripe](https://buy.stripe.com/9B6aEQ57q91m1Gp7Lz77O01)**
 
 ## Licenza
 
