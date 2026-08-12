@@ -6,6 +6,7 @@ first: create it, or advance it. The HITL gate was on the screen; the loop it ga
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -14,15 +15,30 @@ from fastapi.testclient import TestClient
 
 from chimera.config import Settings
 
-SPEC = """
+
+def _spec(code: str) -> str:
+    """A one-requirement spec whose check runs `code` in this interpreter.
+
+    Not `true`/`false`. Those are Unix binaries, and on Windows `cmd.exe` has neither — so the
+    "already satisfied" spec was never satisfied there and both tests below sat at `running`
+    forever. The rest of the suite already reaches for `sys.executable` for exactly this reason
+    (`tests/test_verify.py:23`); this file had not caught up.
+
+    Single-quoted in YAML so a Windows path keeps its backslashes and the inner double quotes
+    survive.
+    """
+    return f"""
 name: demo
 requirements:
   - id: r1
     text: the check passes
     check: command
-    target: "true"
+    target: '"{sys.executable}" -c "{code}"'
     required: true
 """
+
+
+SPEC = _spec("pass")
 
 
 @pytest.fixture
@@ -54,7 +70,7 @@ def spec(tmp_path: Path) -> Path:
 def unaligned(tmp_path: Path) -> Path:
     """A spec with work to do: its check exits 1, so the project has a requirement to satisfy."""
     path = tmp_path / "unaligned.yaml"
-    path.write_text(SPEC.replace('target: "true"', 'target: "false"'), encoding="utf-8")
+    path.write_text(_spec("raise SystemExit(1)"), encoding="utf-8")
     return path
 
 

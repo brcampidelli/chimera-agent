@@ -7,6 +7,9 @@ runs a command (tests, a build, a linter) and treats exit code 0 as success — 
 
 from __future__ import annotations
 
+import os
+import shlex
+import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,6 +25,59 @@ _MAX_OUTPUT_CHARS = 20_000
 #:       tests live outside the inferred path would otherwise have every change reverted by a
 #:       verifier that ran nothing.
 _NO_VERDICT = frozenset({5, 127})
+
+#: `cmd.exe` builtins, which have no executable on disk.
+#:
+#: `shutil.which` cannot find them, so without this list a builtin that exits non-zero would be
+#: mistaken for a command that does not exist — and the verifier would abstain on a real failure,
+#: which is the more dangerous direction of this bug.
+_CMD_BUILTINS = frozenset(
+    {
+        "assoc", "break", "call", "cd", "chdir", "cls", "color", "copy", "date", "del",
+        "dir", "echo", "endlocal", "erase", "exit", "for", "ftype", "goto", "if", "md",
+        "mkdir", "mklink", "move", "path", "pause", "popd", "prompt", "pushd", "rd",
+        "rem", "ren", "rename", "rmdir", "set", "setlocal", "shift", "start", "time",
+        "title", "type", "ver", "verify", "vol",
+    }
+)
+
+
+def program_missing(command: str) -> bool:
+    """True when the first token of ``command`` names a program that is nowhere to be found.
+
+    This exists because **Windows has no exit code for "command not found"**. `cmd.exe` answers 1 —
+    the same code every test runner uses for "your tests failed" — so the 127 convention below is
+    Unix-only, and on Windows a missing verify command was reported as a FAILED verification. That
+    reverts the attempt and writes a test failure into the receipt that never happened, which is
+    precisely the outcome the 127 handling was added to prevent.
+
+    Matching the shell's error message is not an option: `cmd.exe` localises it. On the machine
+    where this was found it read "não é reconhecido como um comando interno ou externo", so an
+    English pattern would have been a defence that works everywhere except where you are.
+
+    Asking whether the program exists is the only signal that is neither exit-code nor locale
+    dependent. Only the first token is examined: in a pipeline or an `&&` chain it is the one the
+    shell reports as missing, and it is the one the caller typed.
+    """
+    try:
+        # posix=False keeps Windows path quoting (`"C:\\Program Files\\..."`) in one piece; the
+        # posix lexer would eat the backslashes.
+        tokens = shlex.split(command, posix=False)
+    except ValueError:
+        # Unbalanced quotes. Not our question to answer — let the shell's own verdict stand.
+        return False
+    if not tokens:
+        return False
+
+    program = tokens[0].strip('"').strip("'")
+    if not program:
+        return False
+    if program.lower() in _CMD_BUILTINS:
+        return False
+    if os.sep in program or (os.altsep and os.altsep in program):
+        # An explicit path: existence is a direct question, and `which` does not answer it.
+        return not Path(program).exists()
+    return shutil.which(program) is None
 
 
 @dataclass
@@ -82,6 +138,11 @@ class CommandVerifier:
             # autonomous loop already demotes an abstention to the no-verifier path, so `evidence`
             # correctly stops being "verifier". We could not check it; we do not claim we did, and we
             # do not punish the work for our own inability.
+            return VerificationResult(True, output, abstained=True)
+        if proc.returncode != 0 and os.name == "nt" and program_missing(self.command):
+            # The Windows half of the same abstention. Checked only after a non-zero exit, so a
+            # command that exists and genuinely fails is never reinterpreted, and `which` is not
+            # paid on the happy path.
             return VerificationResult(True, output, abstained=True)
         return VerificationResult(proc.returncode == 0, output)
 
