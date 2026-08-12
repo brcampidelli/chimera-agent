@@ -116,6 +116,39 @@ docker compose exec chimera chimera cron add "morning-brief" "0 8 * * *" "..."
 The daemon ticks every `--cron-tick` seconds (default 30) and dispatches each job's action
 through the agent when it's due. A failing job is logged and never stops the daemon.
 
+### Asking what the schedule is not telling you
+
+```bash
+chimera cron doctor
+```
+
+A schedule can go quiet in two ways, and until you ask, both look the same — like a schedule with
+nothing due:
+
+- **Nothing ran.** The daemon died, the container was never restarted, the host slept. No
+  exception, no log line, no verdict. Every other honesty mechanism here sits *downstream of a run
+  having happened*, so none of them gets a turn.
+- **Everything ran and lost.** The daemon is alive, `last_run` is a minute ago, the schedule is
+  advancing — and every dispatch has failed for a month. This one reads as *healthier* than the
+  first, because the field that looks like health is recording the attempt, not the outcome.
+
+`cron doctor` asks both questions and gives different advice, because the fixes have nothing in
+common: overdue is about the daemon, failing is about the job. `chimera cron list` prints a line
+when anything is failing, so you do not have to know the command exists to find out.
+
+**What it is not.** It is a question, not a watcher: nothing here notices while the process is
+down, for the same reason a crashed process cannot log its own crash. It answers honestly the
+moment anything asks — a shell, the app, the next start. A real watchdog needs its own clock and
+its own liveness, which is a separate decision and is
+[tracked as issue #26](https://github.com/brcampidelli/chimera-agent/issues/26). If you want an
+alert rather than an answer, run it from the host's own cron:
+
+```cron
+*/30 * * * * cd /opt/chimera && .venv/bin/chimera cron doctor | mail -s "chimera" you@example.com
+```
+
+That works because it is supervised by something other than Chimera — which is the whole point.
+
 ---
 
 ## 4. Health, backups, security

@@ -3868,6 +3868,78 @@ def cron_list() -> None:
         )
     console.print(table)
 
+    # A line, not a column. This table was already at its width budget with six columns; a seventh
+    # truncated the name, which is the column people read — and a truncated warning is a warning
+    # somebody scrolls past. What this has to fix is that `enabled` and `schedule` together read as
+    # health while saying nothing about whether the last dispatch won.
+    falhando = [job for job in store.list() if job.enabled and job.consecutive_failures]
+    if falhando:
+        pior = max(job.consecutive_failures for job in falhando)
+        console.print(
+            f"[red]{len(falhando)} enabled job(s) failing[/red] "
+            f"[dim](worst: {pior} in a row) — `chimera cron doctor`[/dim]"
+        )
+
+
+@cron_app.command("doctor")
+def cron_doctor(
+    grace_minutes: float = typer.Option(
+        10.0, "--grace", help="How late a job may be before it counts as missed."
+    ),
+) -> None:
+    """Ask the schedule what it is not telling you: what never ran, and what ran and lost.
+
+    Every other honesty mechanism here sits downstream of a run having happened. This is the one
+    question about the run that did not — and about the one that happens on time, forever, and
+    fails every time, which looks healthier than the first from any field that existed before.
+
+    It is a question, not a watcher: nothing notices while this process is down, for the same
+    reason a crashed process cannot log its own crash. What it gives you is an honest answer the
+    moment you ask.
+    """
+    import time
+
+    from chimera.scheduler.engine import Scheduler
+
+    sched = Scheduler(_cron_store())
+    now = time.time()
+
+    atrasados = sched.overdue(now, grace=grace_minutes * 60)
+    falhando = sched.failing(at_least=1)
+
+    if atrasados:
+        console.print(f"[yellow]{len(atrasados)} job(s) due and never dispatched:[/yellow]")
+        for job, behind in atrasados:
+            console.print(f"  [cyan]{job.id}[/cyan] {job.name} — [yellow]{_ago(behind)} late[/yellow]")
+        console.print(
+            "[dim]Nothing ran. That is about the daemon, not the jobs: check that `chimera serve "
+            "--cron` is up and has been.[/dim]"
+        )
+
+    if falhando:
+        console.print(f"[red]{len(falhando)} job(s) dispatched on time and failing:[/red]")
+        for job in falhando:
+            console.print(
+                f"  [cyan]{job.id}[/cyan] {job.name} — [red]{job.last_status} "
+                f"x{job.consecutive_failures}[/red]: {job.last_error or ''}"
+            )
+        console.print("[dim]These ran. That is about the jobs, not the daemon.[/dim]")
+
+    if not atrasados and not falhando:
+        console.print("[green]every enabled job is on schedule and its last dispatch won[/green]")
+        console.print(
+            "[dim]Said about what this can see: a job that has never been due yet has nothing to "
+            "report, and nothing here watches while this process is not running.[/dim]"
+        )
+
+
+def _ago(seconds: float) -> str:
+    if seconds < 3600:
+        return f"{seconds / 60:.0f}m"
+    if seconds < 86400:
+        return f"{seconds / 3600:.1f}h"
+    return f"{seconds / 86400:.1f}d"
+
 
 @cron_app.command("add")
 def cron_add(

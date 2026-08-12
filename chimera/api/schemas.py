@@ -450,6 +450,12 @@ class CronJobOut(BaseModel):
     enabled: bool
     next_run: float | None
     last_run: float | None
+    """When a dispatch was last ATTEMPTED — not whether it worked. See the three fields below."""
+    last_status: str | None = None
+    """`ok`, `error` or `timeout`. None on a job that has never been dispatched."""
+    last_error: str | None = None
+    consecutive_failures: int = 0
+    """Since the last success. One failure is weather; forty is a broken job."""
     created_by: str
 
 

@@ -2001,14 +2001,23 @@ export interface components {
         CronJobOut: {
             /** Action */
             action: string;
+            /**
+             * Consecutive Failures
+             * @default 0
+             */
+            consecutive_failures: number;
             /** Created By */
             created_by: string;
             /** Enabled */
             enabled: boolean;
             /** Id */
             id: string;
+            /** Last Error */
+            last_error?: string | null;
             /** Last Run */
             last_run: number | null;
+            /** Last Status */
+            last_status?: string | null;
             /** Name */
             name: string;
             /** Next Run */
