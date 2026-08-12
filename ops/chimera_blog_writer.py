@@ -426,9 +426,14 @@ def outlet_of(host: str) -> str:
 
 # --------------------------------------------------------------------------- comentário
 
-# Os nove idiomas do site. A ordem é a do seletor de idioma, e `en` vem primeiro porque é a única
-# língua em que o modelo escreve sem ajuda: as outras oito saem melhor quando ele já formou a ideia.
-LANGS = ("en", "pt", "es", "fr", "de", "it", "pl", "zh", "ja")
+# Os idiomas do site. A ordem é a do seletor de idioma, e `en` vem primeiro porque é a única língua
+# em que o modelo escreve sem ajuda: as outras saem melhor quando ele já formou a ideia.
+#
+# Esta tupla decide o futuro, não o passado. Traduzir os posts existentes é trabalho de uma vez;
+# esquecer daqui é dívida que recomeça no post de amanhã — e o teste que a pega
+# (`blog.test.ts`, "publishes an agent-written piece in every language or in none") mora no
+# repositório do site, que não vê este arquivo.
+LANGS = ("en", "pt", "es", "fr", "de", "it", "pl", "zh", "ja", "ru")
 LANG_NAMES = {
     "en": "English",
     "pt": "português do Brasil",
@@ -439,6 +444,7 @@ LANG_NAMES = {
     "pl": "polski",
     "zh": "简体中文",
     "ja": "日本語",
+    "ru": "русский",
 }
 
 # Frases inteiras que modelos deixam escapar quando "pensam alto" na saída final. Uma delas está no
@@ -463,7 +469,7 @@ Escreva UM artigo nosso a partir delas. Não é resumo das matérias, não é bo
 É um texto com uma TESE — o que aquilo muda para quem constrói agentes — e a tese é sua.
 
 **ESCREVA O ARTIGO EM INGLÊS.** Estas instruções estão em português, o texto que você produz não
-está: o inglês é a língua-fonte do site, e é dele que saem as outras oito traduções e o endereço
+está: o inglês é a língua-fonte do site, e é dele que saem todas as outras traduções e o endereço
 da página. Título, resumo e corpo, todos em inglês.
 
 FORMA:
@@ -576,10 +582,11 @@ def _ask(prompt: str, max_tokens: int) -> dict | None:
     )
     # Espera crescente no 429, e só no 429.
     #
-    # A rodada faz nove chamadas seguidas — uma para escrever e oito para traduzir — e o limite de
-    # taxa aparece lá pela sétima. Foi assim que uma execução real morreu no chinês depois de sete
-    # idiomas prontos: a retentativa disparou um segundo depois, que é exatamente o intervalo em
-    # que um 429 continua sendo 429. Repetir sem esperar não é uma tentativa, é a mesma chamada.
+    # A rodada faz uma chamada por idioma, seguidas — uma para escrever e as outras para traduzir —,
+    # e o limite de taxa aparece lá pela sétima. Foi assim que uma execução real morreu no chinês
+    # depois de sete idiomas prontos: a retentativa disparou um segundo depois, que é exatamente o
+    # intervalo em que um 429 continua sendo 429. Repetir sem esperar não é uma tentativa, é a mesma
+    # chamada. Cada idioma novo empurra a rodada mais fundo nessa faixa, e não afrouxa a espera.
     for espera in (0, 20, 45, 90):
         if espera:
             log(f"modelo: limite de taxa, esperando {espera}s")
@@ -671,7 +678,7 @@ def looks_english(text: str) -> bool:
 
     O prompt está em português e a primeira execução real devolveu o artigo inteiro em português —
     título, resumo e corpo — para o arquivo `blog/en/`, com o endereço da página em português e as
-    oito traduções saindo de um "original" que não era o idioma-fonte. Nada quebrou; ficou só
+    demais traduções saindo de um "original" que não era o idioma-fonte. Nada quebrou; ficou só
     errado, que é o modo de falha caro.
     """
     achadas = {m.group(0).lower() for m in NAO_INGLES.finditer(text)}
@@ -801,10 +808,10 @@ def _translate_once(art: dict, lang: str, n_sources: int) -> dict | None:
 def translate(art: dict, lang: str, n_sources: int) -> dict | None:
     """O artigo num idioma, ou None. Uma chamada por idioma, com uma segunda tentativa.
 
-    A retentativa não é otimismo: como a rodada é nove-ou-nenhum, uma única chamada instável custa
-    o texto do dia inteiro, nos nove idiomas. Foi o que aconteceu na primeira execução real — o
+    A retentativa não é otimismo: como a rodada é todos-ou-nenhum, uma única chamada instável custa
+    o texto do dia inteiro, em todos os idiomas. Foi o que aconteceu na primeira execução real — o
     modelo devolveu o inglês para o português e a rodada morreu ali; a mesma chamada, repetida,
-    traduziu sem problema. Uma tentativa a mais é barata, e "nove ou nenhum" continua de pé.
+    traduziu sem problema. Uma tentativa a mais é barata, e "todos ou nenhum" continua de pé.
     """
     if lang == "en":
         return art
@@ -823,7 +830,7 @@ def link_sources(body: str, items: list[dict], numbered: bool = True) -> str:
     Numerado, e não com a manchete como texto do link. A primeira versão inseria a manchete inteira,
     porque ela é o título que a pessoa vai encontrar ao clicar — e traduzi-la seria entregar um
     título que não existe na página de destino. O raciocínio continua certo; o efeito era ilegível:
-    uma manchete inglesa de treze palavras no meio de uma frase em português, oito vezes por texto.
+    uma manchete inglesa de treze palavras no meio de uma frase em português, a cada tradução.
     Uma coluna cita por número e põe as manchetes na lista do fim, que é de onde a página as
     renderiza de qualquer jeito, na língua do veículo.
 
@@ -1026,7 +1033,7 @@ def publish(files: dict[str, str], slug: str, day: str, category: str) -> bool:
             "head": branch,
             "base": "main",
             "body": (
-                "Texto nosso, escrito por agente, nos nove idiomas.\n\n"
+                "Texto nosso, escrito por agente, em todos os idiomas do site.\n\n"
                 "O modelo não escreve URL nenhuma: cita as fontes por marcador e os links são "
                 "montados a partir da lista verificada, então uma fonte inventada não é detectada "
                 "— ela é inexprimível. O resto das defesas está no portão deste repositório, e o "
