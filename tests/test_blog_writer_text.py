@@ -258,16 +258,21 @@ class TestLimiteDeTaxa:
 
 
 class TestComposicao:
-    def test_nove_idiomas(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_um_arquivo_por_idioma(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # A garantia é "um arquivo por idioma", não "nove arquivos". Este teste cravava o 9 e
+        # reprovou ao entrar o russo — dizendo que o número mudou, que é a única coisa que um
+        # número escrito à mão sabe dizer. A igualdade de conjuntos abaixo é a checagem de verdade;
+        # o piso em LANGS existe só para isto não passar por vacuidade se a tupla esvaziar.
         traduzido = {**ARTIGO, "body": CORPO + "\n\nlinha extra"}
         _modelo(monkeypatch, traduzido)
         files = writer.compose(ARTIGO, FONTES, "2026-08-12", "o-que-muda", "analysis", "", "")
         assert files is not None
-        assert len(files) == len(writer.LANGS) == 9
+        assert len(writer.LANGS) > 1
+        assert len(files) == len(writer.LANGS)
         assert set(files) == {f"content/blog/{lang}/o-que-muda.md" for lang in writer.LANGS}
 
     def test_um_idioma_que_falha_cancela_a_rodada(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        # Nove ou nenhum. Cinco idiomas publicados e quatro perdidos deixam um site que parece
+        # Todos ou nenhum. Cinco idiomas publicados e o resto perdido deixam um site que parece
         # deliberado, e quem lê não tem como saber que houve falha.
         _modelo(monkeypatch, None)
         assert writer.compose(ARTIGO, FONTES, "2026-08-12", "x", "analysis", "", "") is None
