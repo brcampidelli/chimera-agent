@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 from croniter import croniter
 
 from chimera.concurrency import call_with_deadline
-from chimera.scheduler.models import CreatedBy, CronJob
+from chimera.scheduler.models import CreatedBy, CronJob, DispatchStatus
 from chimera.scheduler.store import CronStore
 from chimera.telemetry import get_logger
 
@@ -146,6 +146,50 @@ class Scheduler:
             and job.next_run <= now
         ]
 
+    def overdue(self, now: float, *, grace: float = 0.0) -> list[tuple[CronJob, float]]:
+        """Enabled cron jobs whose time passed more than ``grace`` ago, and by how much.
+
+        This is the silence nothing else in the project can see. Every honesty mechanism here sits
+        downstream of a run having happened — the verifier judges a result, the diff gate measures a
+        change, the receipt names who approved it. None of them gets a turn when the run never
+        occurred, and a schedule that produces no receipt reads as a schedule with nothing due.
+
+        The expectation was already on disk: ``next_run`` is computed from the cron expression and
+        only moves when the job fires. What was missing was somebody asking.
+
+        **What this cannot do, stated because the alternative is implying otherwise.** It is a
+        question, not a watcher. Nothing here notices while the process is down, for the same reason
+        a crashed process cannot log its own crash — a check that lives in the daemon is dead when
+        the daemon is. What it gives you is an honest answer the moment anything asks: the CLI, the
+        app, the next start. A real watcher needs its own clock and its own liveness, and that is a
+        separate decision (issue #26) rather than something to fake here.
+
+        ``grace`` exists because "due a second ago" is a tick in progress, not a miss. Pass the
+        deployment's tick interval, or a multiple of it.
+        """
+        late: list[tuple[CronJob, float]] = []
+        for job in self.store.list():
+            if not job.enabled or job.trigger != "cron" or job.next_run is None:
+                continue
+            behind = now - job.next_run
+            if behind > grace:
+                late.append((job, behind))
+        return sorted(late, key=lambda pair: pair[1], reverse=True)
+
+    def failing(self, *, at_least: int = 1) -> list[CronJob]:
+        """Enabled jobs that have failed ``at_least`` times in a row since their last success.
+
+        The second silence, and the one that looks healthiest: these jobs ARE running. ``last_run``
+        is recent, the daemon is alive, the schedule is advancing — and every dispatch has lost.
+        Told apart from :meth:`overdue` because the responses have nothing in common: one says look
+        at the daemon, the other says look at the job.
+        """
+        return [
+            job
+            for job in self.store.list()
+            if job.enabled and job.consecutive_failures >= at_least
+        ]
+
     def jobs_for_event(self, event: str) -> list[CronJob]:
         """Enabled event jobs registered for ``event``."""
         return [
@@ -193,18 +237,32 @@ class Scheduler:
         ran: list[CronJob] = []
         for job in self.due(now):
             _log.debug("dispatching cron job %s (%s)", job.name, job.id)
+            # The outcome is recorded HERE, inside the guard, and `mark_ran` still runs outside it.
+            # Those are two different facts and folding them into one field is what made a job that
+            # has failed on every tick for a month look healthy: `last_run` is a minute ago, because
+            # the attempt happened, and nothing anywhere said the attempt lost.
             try:
                 _dispatch_bounded(job, dispatch, job_timeout)
+                self._record(job, "ok", None)
             except TimeoutError:
                 _log.warning(
                     "cron job %s (%s) exceeded %ss and was abandoned; the schedule continues",
                     job.name, job.id, job_timeout,
                 )
+                self._record(job, "timeout", f"exceeded {job_timeout}s and was abandoned")
             except Exception as exc:  # a failing job must not break the scheduler
                 _log.warning("cron job %s failed: %s", job.id, exc)
+                self._record(job, "error", f"{type(exc).__name__}: {exc}")
             self.mark_ran(job, now)
             ran.append(job)
         return ran
+
+    @staticmethod
+    def _record(job: CronJob, status: DispatchStatus, error: str | None) -> None:
+        """Set the outcome on the job. `mark_ran` persists it a moment later, in the same tick."""
+        job.last_status = status
+        job.last_error = (error or "")[:300] or None
+        job.consecutive_failures = 0 if status == "ok" else job.consecutive_failures + 1
 
     def fire_event(self, event: str, now: float, dispatch: Callable[[CronJob], None]) -> list[CronJob]:
         """Dispatch every job registered for ``event``. Returns those run."""

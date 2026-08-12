@@ -933,6 +933,26 @@
         },
         {
           "deprecated": false,
+          "help": "Ask the schedule what it is not telling you: what never ran, and what ran and lost.\n\nEvery other honesty mechanism here sits downstream of a run having happened. This is the one\nquestion about the run that did not \u2014 and about the one that happens on time, forever, and\nfails every time, which looks healthier than the first from any field that existed before.\n\nIt is a question, not a watcher: nothing notices while this process is down, for the same\nreason a crashed process cannot log its own crash. What it gives you is an honest answer the\nmoment you ask.",
+          "hidden": false,
+          "name": "doctor",
+          "params": [
+            {
+              "default": "10.0",
+              "help": "How late a job may be before it counts as missed.",
+              "kind": "option",
+              "name": "grace_minutes",
+              "opts": [
+                "--grace"
+              ],
+              "required": false,
+              "type": "float"
+            }
+          ],
+          "path": "cron doctor"
+        },
+        {
+          "deprecated": false,
           "help": "Enable a job (e.g. an agent-proposed one) and schedule its next run.",
           "hidden": false,
           "name": "enable",

@@ -65,6 +65,11 @@ def _job_dict(job: Any) -> dict[str, Any]:
         "enabled": job.enabled,
         "next_run": job.next_run,
         "last_run": job.last_run,
+        # The attempt and the outcome, side by side. `last_run` alone made a job that has failed on
+        # every tick for a month read as one that just worked a minute ago.
+        "last_status": job.last_status,
+        "last_error": job.last_error,
+        "consecutive_failures": job.consecutive_failures,
         "created_by": job.created_by,
     }
 

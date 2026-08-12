@@ -1388,6 +1388,11 @@
             "title": "Action",
             "type": "string"
           },
+          "consecutive_failures": {
+            "default": 0,
+            "title": "Consecutive Failures",
+            "type": "integer"
+          },
           "created_by": {
             "title": "Created By",
             "type": "string"
@@ -1400,6 +1405,17 @@
             "title": "Id",
             "type": "string"
           },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
           "last_run": {
             "anyOf": [
               {
@@ -1410,6 +1426,17 @@
               }
             ],
             "title": "Last Run"
+          },
+          "last_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Status"
           },
           "name": {
             "title": "Name",
