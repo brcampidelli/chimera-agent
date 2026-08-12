@@ -129,6 +129,7 @@ through the agent when it's due. A failing job is logged and never stops the dae
   desktop API (the desktop UI is handed the token automatically only for loopback clients, so a
   remotely-exposed instance stays behind your own auth). Auth is opt-in and empty by default, so
   without that variable there is none — restrict the port, or expose only the webhook path.
+  To reach this instance from the desktop app, see [§5](#5-reaching-this-instance-from-the-desktop-app).
 - **Sandboxing:** set `CHIMERA_SANDBOX=docker` to run the shell/code tools in a throwaway
   container instead of the host.
 - **Unattended host execution:** since 2026-07-20 a headless run **refuses** host commands under the
@@ -140,7 +141,82 @@ through the agent when it's due. A failing job is logged and never stops the dae
 
 ---
 
-## 5. Honest status
+## 5. Reaching this instance from the desktop app
+
+The desktop app talks to the Chimera it starts on your own machine by default. From v0.44 it can
+also point at one you run yourself — this VPS — so the app becomes a window onto the agent that is
+already up all night doing your cron jobs.
+
+**Read this part before opening a port.** What you are exposing is not a dashboard. Every screen in
+that app is a command surface: it runs shell, edits files, dispatches a board of autonomous tasks
+and changes settings. An instance reachable from the internet without a token is not "a Chimera
+someone could look at" — it is a machine anybody who finds the address can run commands on, with
+your provider keys paying for it.
+
+Three things have to be true, and the app refuses to connect unless the first two are:
+
+**1 — TLS.** Put it behind a reverse proxy with a real certificate (Caddy gets one for you):
+
+```caddyfile
+chimera.seudominio.com {
+    reverse_proxy 127.0.0.1:8765
+}
+```
+
+The app refuses a non-`https` address outside your own machine, because the token travels in an
+`Authorization` header on **every** request — over plain http that is a credential handed to every
+hop between you and the server, and nothing on screen would look wrong while it happened.
+
+**2 — A token.** Auth is opt-in and empty by default:
+
+```bash
+CHIMERA_SERVER_TOKEN=$(openssl rand -hex 32)
+```
+
+Put it in the `.env`, restart, and paste the same value into the app. The app refuses a remote
+address with no token for the reason above: an instance without one is open to whoever finds it.
+
+Note what the server deliberately does **not** do: when a remote client asks for the UI, it serves
+the page *without* the token. The token is never handed out over the network — you copy it to your
+own client, once, out of band. That is why the app has a field for it.
+
+**3 — Your app's origin.** The app is served by its own local sidecar, so its requests to this
+instance are cross-origin and a browser discards the responses unless this instance names that
+origin:
+
+```bash
+CHIMERA_ALLOWED_ORIGINS=http://127.0.0.1:45813
+```
+
+The app shows you the exact value when a connection fails — it is on the error message, ready to
+copy. The port is stable per install (it is remembered between launches since v0.43), so you set
+this once per machine you connect from. Several are comma-separated.
+
+**This setting is not a security boundary and must not be read as one.** CORS decides which *page*
+may read a response; it decides nothing about who may *call*. The token is the gate. Naming an
+origin without setting a token does not protect anything — it just makes an unprotected instance
+reachable from a browser as well as from `curl`.
+
+Empty by default, so an instance nobody configured behaves exactly as it did before.
+
+### What the app tells you when it fails
+
+- **"The token was refused"** — the address and the origin are right; the value is wrong.
+- **"Could not reach it"** — either the address is wrong or the origin is not allowed. The browser
+  refuses to say which, on purpose, so the app names both rather than guessing and hands you the
+  origin to allow.
+- **A version warning** — the app compares its own backend's version against this one and says both
+  numbers. It does not refuse: a server one release behind usually works, and refusing would strand
+  you on the screen you would need to fix it. Some endpoints may not exist on the older side.
+
+### Safer still
+
+Skip the public port entirely: reach the VPS over WireGuard or a Tailscale tailnet and point the
+app at the private address. The token still matters — a tailnet is a smaller room, not an empty one.
+
+---
+
+## 6. Honest status
 
 Chimera is **alpha**. This deploys and runs, and the cron daemon makes it proactive — but it
 has **no production mileage** yet. Start with low-stakes crons, watch `logs`, and keep the

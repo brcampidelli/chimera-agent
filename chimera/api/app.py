@@ -350,6 +350,31 @@ def build_api_app(
 
     app = FastAPI(title="Chimera Desktop API", version="1", docs_url="/api/docs", openapi_url="/api/openapi.json")
 
+    # Cross-origin, only for the origins the operator named, and only when they named some.
+    #
+    # The desktop app pointed at THIS instance from another machine is served by its own loopback
+    # sidecar, so its requests here are cross-origin and the browser discards the responses unless
+    # this instance names that origin. Serving the bundled SPA is same-origin and needs none of
+    # this, which is why an instance nobody configured behaves exactly as it did before.
+    #
+    # `allow_credentials` stays False on purpose. The app authenticates with a bearer header, not a
+    # cookie, so it does not need credentialed CORS — and turning it on would let a browser attach
+    # this instance's cookies to a request some other page made.
+    #
+    # Read once, here, rather than per request: middleware is installed at construction, and a
+    # setting that pretended to be live would be a promise this layer cannot keep.
+    origins = [o.strip() for o in (settings.allowed_origins or "").split(",") if o.strip()]
+    if origins:
+        from fastapi.middleware.cors import CORSMiddleware
+
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=origins,
+            allow_credentials=False,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
     @app.get("/api/health", response_model=HealthOut)
     def health() -> dict[str, Any]:
         return {"status": "ok", "sessions": len(store.list())}
