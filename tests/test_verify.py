@@ -15,7 +15,12 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from chimera.core.verify import CommandVerifier, NullVerifier, VerificationResult
+from chimera.core.verify import (
+    CommandVerifier,
+    NullVerifier,
+    VerificationResult,
+    program_missing,
+)
 
 
 def _py(code: str) -> str:
@@ -123,11 +128,59 @@ def test_a_command_that_does_not_exist_abstains_rather_than_failing(tmp_path: Pa
     reverted the attempt and wrote a test failure into the receipt that never happened — survivable
     while a human typed the command and could see the typo, and not survivable once the command is
     inferred from the project.
+
+    This test passed on Linux and failed on Windows for as long as it existed, because nobody ran
+    the suite on Windows. `cmd.exe` answers 1, not 127 — see `program_missing`.
     """
     result = CommandVerifier("definitely-not-a-real-command-xyz", tmp_path).verify()
 
     assert result.abstained is True
     assert result.passed is True  # abstention is not a failure either — it is silence
+
+
+# --- "does this program exist" (the Windows half of the abstention) ------------------------
+#
+# `program_missing` is tested directly rather than only through `CommandVerifier`, because the
+# branch that uses it runs on Windows alone. Testing the predicate keeps the reasoning under test
+# on Linux and macOS too, where it would otherwise be dead code nobody exercises until it breaks.
+
+
+def test_a_name_that_resolves_to_nothing_is_missing() -> None:
+    assert program_missing("definitely-not-a-real-command-xyz --flag") is True
+
+
+def test_a_program_that_exists_is_not_missing() -> None:
+    # sys.executable is the one program guaranteed present wherever these tests run.
+    assert program_missing(_py("pass")) is False
+
+
+def test_only_the_first_token_is_judged() -> None:
+    """A pipeline's later stages are not the question. The shell reports the FIRST missing program,
+    and the first token is what the caller typed."""
+    assert program_missing(f"{_py('pass')} | definitely-not-a-real-command-xyz") is False
+
+
+def test_a_shell_builtin_is_not_missing() -> None:
+    """`echo` and `cd` have no executable on Windows; `which` cannot find them.
+
+    Without this, a builtin that exits non-zero would be read as "command not found" and the
+    verifier would abstain on a REAL failure — the dangerous direction, because abstention keeps
+    the work instead of reverting it.
+    """
+    assert program_missing("echo hello") is False
+    assert program_missing("CD nowhere") is False  # case-insensitive, like cmd.exe
+
+
+def test_an_explicit_path_that_does_not_exist_is_missing(tmp_path: Path) -> None:
+    """`which` only searches PATH, so a spelled-out path needs a different question."""
+    assert program_missing(f'"{tmp_path / "nope.exe"}" --version') is True
+
+
+def test_unbalanced_quotes_are_not_our_verdict_to_give() -> None:
+    """An unparseable command is the shell's complaint, not ours. Returning False leaves its own
+    exit code to speak — guessing "missing" here would abstain on a syntax error and keep work that
+    was never checked."""
+    assert program_missing('python -c "unterminated') is False
 
 
 def test_pytest_collecting_nothing_abstains(tmp_path: Path) -> None:
