@@ -36,6 +36,17 @@ class SolveLane:
         self.model = model
         self.max_attempts = max_attempts
 
+    def for_workspace(self, workspace: Path) -> SolveLane:
+        """The same lane bound to another directory — how a card gets run in isolation.
+
+        Parallel dispatch gives each card its own git worktree, and a lane that writes files has to
+        be told about it or every card would edit the one real workspace at once: two autonomous
+        loops running plan / execute / verify-or-revert over the same files, each reverting work the
+        other had just done. Rebinding is a new instance, not a mutation, because the caller keeps
+        using the original for the next batch.
+        """
+        return SolveLane(workspace=workspace, model=self.model, max_attempts=self.max_attempts)
+
     def run(self, card: KanbanCard) -> LaneResult:
         from chimera.config import get_settings
         from chimera.core import (
@@ -111,6 +122,12 @@ class AgentLane:
         # model on an agent said something more specific than the flag that dispatched the board.
         self.model = agent.model or model
         self.max_attempts = max_attempts
+
+    def for_workspace(self, workspace: Path) -> AgentLane:
+        """The same agent bound to another directory. See ``SolveLane.for_workspace``."""
+        return AgentLane(
+            self.agent, workspace=workspace, model=self.model, max_attempts=self.max_attempts
+        )
 
     def run(self, card: KanbanCard) -> LaneResult:
         from chimera.config import get_settings

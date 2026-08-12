@@ -2360,6 +2360,11 @@ export interface components {
             limit?: number | null;
             /** Model */
             model?: string | null;
+            /**
+             * Workers
+             * @default 1
+             */
+            workers: number;
             /** Workspace */
             workspace?: string | null;
         };

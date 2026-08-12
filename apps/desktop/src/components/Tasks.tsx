@@ -259,6 +259,8 @@ function StartProject({ onStart }: { onStart: (spec: string) => void }) {
   );
 }
 
+const WORKERS_KEY = "chimera.kanban.workers";
+
 /** The board's live dispatch: start it, stop it, and say what it is doing while it runs.
  *
  * A dispatch calls models for as long as the backlog has cards, so the button has to be a Stop as
@@ -269,7 +271,19 @@ function useDispatch(onCard: () => void) {
   const t = useT();
   const [running, setRunning] = useState(false);
   const [line, setLine] = useState("");
+  const [conflicts, setConflicts] = useState<string[]>([]);
+  // Remembered, because the answer is a property of this board and this machine, not of one press.
+  const [workers, setWorkers] = useState(() => Number(localStorage.getItem(WORKERS_KEY) ?? 1) || 1);
   const abort = useRef<AbortController | null>(null);
+
+  const changeWorkers = (n: number) => {
+    setWorkers(n);
+    try {
+      localStorage.setItem(WORKERS_KEY, String(n));
+    } catch {
+      /* private mode — the choice just does not survive the launch */
+    }
+  };
 
   const toggle = () => {
     if (running) {
@@ -283,13 +297,17 @@ function useDispatch(onCard: () => void) {
     abort.current = controller;
     setRunning(true);
     setLine(t("tasks.dispatching"));
+    setConflicts([]);
     void streamKanbanRun(
-      {},
+      { workers },
       {
         onCard: (outcome) => {
           setLine(`${outcome.card_id} → ${outcome.moved_to}`);
           onCard();
         },
+        // Kept on screen after the run: those cards succeeded and not all of their edits survived
+        // the merge, which is the one thing a green board would otherwise hide.
+        onConflict: setConflicts,
         onDone: (summary) => {
           setRunning(false);
           // The count of cards actually WORKED, which is not the count that was queued: a card
@@ -307,7 +325,7 @@ function useDispatch(onCard: () => void) {
     );
   };
 
-  return { running, line, toggle };
+  return { running, line, toggle, workers, changeWorkers, conflicts };
 }
 
 export function Tasks({ embedded = false }: { embedded?: boolean } = {}) {
@@ -401,6 +419,24 @@ export function Tasks({ embedded = false }: { embedded?: boolean } = {}) {
                   {dispatch.line}
                 </span>
               )}
+              {/* How many cards at once. Hidden while running, because changing it mid-dispatch
+                  would set a number for the next run and read as if it applied to this one. */}
+              {!dispatch.running && (
+                <label className="flex items-center gap-1 text-xs text-muted-foreground">
+                  {t("tasks.workers")}
+                  <select
+                    className="rounded-chip border border-hairline bg-transparent px-1.5 py-0.5"
+                    value={dispatch.workers}
+                    onChange={(e) => dispatch.changeWorkers(Number(e.target.value))}
+                  >
+                    {[1, 2, 3, 4, 6, 8].map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <Button size="sm" variant={dispatch.running ? "outline" : "ghost"} onClick={dispatch.toggle}>
                 {dispatch.running ? (
                   <>
@@ -424,6 +460,12 @@ export function Tasks({ embedded = false }: { embedded?: boolean } = {}) {
           <>
             {/* Cards are added to the board, never to a project: a project's cards come from its
                 spec, and one typed in by hand would be work its drift check does not know about. */}
+            {dispatch.conflicts.length > 0 && (
+              <p className="mb-3 rounded-chip border border-warn/30 bg-warn/10 px-3 py-2 text-xs text-warn-foreground">
+                {t("tasks.conflicts", { n: dispatch.conflicts.length })}{" "}
+                <span className="font-mono">{dispatch.conflicts.slice(0, 4).join(", ")}</span>
+              </p>
+            )}
             {!selected && <AddCard onAdd={(card) => add.mutate(card)} known={knownAgents} />}
             <Board
               columns={(selected ? project.data?.columns : kanban.data) ?? {}}

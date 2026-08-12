@@ -277,9 +277,17 @@ export interface DispatchOutcome {
  * and a refactor that arrives with a feature is a refactor nobody can review separately from it.
  */
 export async function streamKanbanRun(
-  req: { limit?: number | null; workspace?: string | null; model?: string | null },
+  req: {
+    limit?: number | null;
+    workspace?: string | null;
+    model?: string | null;
+    /** Cards worked at once. Above 1 each gets its own git worktree; see the backend's dispatch. */
+    workers?: number;
+  },
   handlers: {
     onCard?: (outcome: DispatchOutcome) => void;
+    /** Files two successful cards both changed. Only one version came back. */
+    onConflict?: (paths: string[]) => void;
     onDone?: (summary: { worked: number; error?: string }) => void;
     onError?: (message: string) => void;
   },
@@ -322,6 +330,7 @@ export async function streamKanbanRun(
       try {
         const data = JSON.parse(payload);
         if (event === "card") handlers.onCard?.(data as DispatchOutcome);
+        else if (event === "conflict") handlers.onConflict?.((data as { paths: string[] }).paths);
         else if (event === "done") handlers.onDone?.(data as { worked: number; error?: string });
       } catch {
         // A frame we cannot parse is one frame lost, not a broken dispatch: the board is the

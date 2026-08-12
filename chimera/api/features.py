@@ -333,6 +333,14 @@ def register_features(
         queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
         loop = asyncio.get_running_loop()
 
+        def emit_conflict(paths: list[str]) -> None:
+            # A file two successful cards both changed. Only one version can come back, so the run
+            # says which files that happened to instead of picking one and reporting two successes.
+            loop.call_soon_threadsafe(
+                queue.put_nowait,
+                {"event": "conflict", "data": json.dumps({"paths": paths})},
+            )
+
         def emit(outcome: Any) -> None:
             loop.call_soon_threadsafe(
                 queue.put_nowait,
@@ -352,7 +360,15 @@ def register_features(
         def work() -> None:
             done: dict[str, Any]
             try:
-                outcomes = dispatch(board, runners, limit=req.limit, on_outcome=emit)
+                outcomes = dispatch(
+                    board,
+                    runners,
+                    limit=req.limit,
+                    on_outcome=emit,
+                    workers=req.workers,
+                    workspace=ws,
+                    on_conflict=emit_conflict,
+                )
                 done = {"worked": len(outcomes)}
             except Exception as exc:  # noqa: BLE001 — a dispatch failure is a frame, not a 500
                 done = {"worked": 0, "error": str(exc)}
