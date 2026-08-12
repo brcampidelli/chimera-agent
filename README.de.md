@@ -19,7 +19,7 @@
 ![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)
 [![Donate](https://img.shields.io/badge/Donate-Stripe-635BFF.svg?logo=stripe&logoColor=white)](https://buy.stripe.com/9B6aEQ57q91m1Gp7Lz77O01)
 
-<sub><a href="README.md">English</a> · <a href="README.pt-BR.md">Português</a> · <a href="README.es.md">Español</a> · <b>Deutsch</b> · <a href="README.fr.md">Français</a> · <a href="README.it.md">Italiano</a> · <a href="README.pl.md">Polski</a> · <a href="README.zh-CN.md">中文</a> · <a href="README.ja.md">日本語</a></sub>
+<sub><a href="README.md">English</a> · <a href="README.pt-BR.md">Português</a> · <a href="README.es.md">Español</a> · <b>Deutsch</b> · <a href="README.fr.md">Français</a> · <a href="README.it.md">Italiano</a> · <a href="README.pl.md">Polski</a> · <a href="README.zh-CN.md">中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.ru.md">Русский</a></sub>
 
 </div>
 
@@ -227,7 +227,7 @@ eigene:
 - **Server-Deployment mit einem Befehl** — betreibe es mit Docker (oder auf Bare-Metal), sodass es läuft und beim Neustart wieder hochfährt. Siehe **[docs/deploy.md](docs/deploy.md)**.
 - **Sicherheitskern** — eine Prüfung bei jeder Aktion (erlauben / warnen / blockieren / nachfragen), ein **optionaler** netzwerkisolierter Container für nicht vertrauenswürdigen Code (`CHIMERA_SANDBOX=docker`; der Standard-Runner *local* ist *nicht* isoliert) und ein vollständiges Audit-Protokoll dessen, was es getan hat.
 - **Halte an, bevor es etwas festschreibt, das es aus unsicherer Quelle gelesen hat** (`--pause-on-taint`) — ein Lauf, der nicht vertrauenswürdige Inhalte verarbeitet hat, parkt sich selbst, statt abzuschließen, und wartet auf dich. Du kannst das Ergebnis annehmen, eine von dir bearbeitete Fassung annehmen, Hinweise schicken und es erneut versuchen lassen, oder es ganz ablehnen — vom Terminal *oder* aus der Desktop-App. Nichts wird gespeichert und nichts gelernt, bis du entscheidest, und eine Pause wird nie als Fehlschlag gemeldet: Sie hat kein Urteil erreicht, sie wartet auf einen Menschen.
-- **Eine Desktop-App, die einen Lauf steuert und ihn nicht nur startet** — fünf Ziele statt eines Menüs aus fünfzehn, in neun Sprachen. Starte einen Lauf und geh weg: Der Fortschritt ist noch da, wenn du zurückkommst, die Statusleiste benennt von jedem Bildschirm aus, was der Agent tut, und Stopp funktioniert überall. Native Installer für Windows / macOS / Linux unter [Releases](https://github.com/brcampidelli/chimera-agent/releases).
+- **Eine Desktop-App, die einen Lauf steuert und ihn nicht nur startet** — fünf Ziele statt eines Menüs aus fünfzehn, in zehn Sprachen. Starte einen Lauf und geh weg: Der Fortschritt ist noch da, wenn du zurückkommst, die Statusleiste benennt von jedem Bildschirm aus, was der Agent tut, und Stopp funktioniert überall. Native Installer für Windows / macOS / Linux unter [Releases](https://github.com/brcampidelli/chimera-agent/releases).
 
 ## Schnellstart
 
@@ -304,7 +304,7 @@ Spalte „Braucht"). **Docker? Das offizielle Image enthält bereits alles unten
 | **Chat, der sich an dich erinnert** | — | `chimera chat` |
 | **Eine Frage stellen** | — | `chimera run "erkläre X in 3 Punkten"` |
 | **Vollbild-Terminal-App** | — | `chimera tui` |
-| **Desktop-App** (Chat · Arbeit · Code · Wissen · Automatisierung, in 9 Sprachen) | `[desktop]` oder ein Download | `chimera app`, oder einen nativen Installer (`.exe`/`.dmg`/`.AppImage`/`.deb`) von [Releases](https://github.com/brcampidelli/chimera-agent/releases) holen |
+| **Desktop-App** (Chat · Arbeit · Code · Wissen · Automatisierung, in 10 Sprachen) | `[desktop]` oder ein Download | `chimera app`, oder einen nativen Installer (`.exe`/`.dmg`/`.AppImage`/`.deb`) von [Releases](https://github.com/brcampidelli/chimera-agent/releases) holen |
 | **Eine Aufgabe erledigen, nur behalten wenn ein Test besteht** | — | `chimera solve "füge hello() zu app.py + einen Test hinzu" --verify "pytest -q"` |
 | **Frag mich, bevor etwas aus dem Web Gelesenes festgeschrieben wird** | — | `--pause-on-taint` an `chimera solve` anhängen |
 | **Sehen, was ein Lauf wirklich gekostet hat, Schritt für Schritt** | — | wird für dich geschrieben: `.chimera/traces.jsonl` (oder `$CHIMERA_HOME`) |

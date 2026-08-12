@@ -19,7 +19,7 @@
 ![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)
 [![Donate](https://img.shields.io/badge/Donate-Stripe-635BFF.svg?logo=stripe&logoColor=white)](https://buy.stripe.com/9B6aEQ57q91m1Gp7Lz77O01)
 
-<sub><a href="README.md">English</a> · <a href="README.pt-BR.md">Português</a> · <a href="README.es.md">Español</a> · <a href="README.de.md">Deutsch</a> · <a href="README.fr.md">Français</a> · <a href="README.it.md">Italiano</a> · <b>Polski</b> · <a href="README.zh-CN.md">中文</a> · <a href="README.ja.md">日本語</a></sub>
+<sub><a href="README.md">English</a> · <a href="README.pt-BR.md">Português</a> · <a href="README.es.md">Español</a> · <a href="README.de.md">Deutsch</a> · <a href="README.fr.md">Français</a> · <a href="README.it.md">Italiano</a> · <b>Polski</b> · <a href="README.zh-CN.md">中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.ru.md">Русский</a></sub>
 
 </div>
 
@@ -220,7 +220,7 @@ pozostaje użyteczny, a większość z niej jest niewidoczna, dopóki nie zawied
 - **Wdrożenie na serwer jedną komendą** — uruchom z Dockerem (albo bez), żeby działała bez przerwy i wstawała po restarcie. Zobacz **[docs/deploy.md](docs/deploy.md)**.
 - **Jądro bezpieczeństwa** — kontrola przy każdym działaniu (pozwól / ostrzeż / zablokuj / zapytaj), **opcjonalny** kontener z odciętą siecią dla niezaufanego kodu (`CHIMERA_SANDBOX=docker`; domyślny lokalny runner *nie* jest odizolowany) i pełny dziennik audytu tego, co zrobiła.
 - **Zatrzymaj ją, zanim coś zatwierdzi, gdy przeczytała coś, czemu nie należy ufać** (`--pause-on-taint`) — przebieg, który wchłonął niezaufaną treść, sam się parkuje zamiast finalizować i czeka na ciebie. Możesz zaakceptować wynik, zaakceptować wersję, którą sam poprawiłeś, wysłać wskazówki i pozwolić spróbować ponownie albo odrzucić w całości — z terminala *lub* z aplikacji desktopowej. Nic nie jest zapisywane i nic nie jest uczone, dopóki nie zdecydujesz, a pauza nigdy nie jest raportowana jako porażka: nie doszła do werdyktu, czeka na człowieka.
-- **Aplikacja desktopowa, która pilotuje przebieg, a nie tylko go uruchamia** — pięć miejsc docelowych zamiast menu z piętnastoma, w dziewięciu językach. Uruchom przebieg i odejdź: postęp nadal tam jest, gdy wrócisz, pasek stanu z każdego ekranu nazywa to, co robi agent, a Stop działa ze wszystkich. Natywne instalatory dla Windows / macOS / Linux w [Releases](https://github.com/brcampidelli/chimera-agent/releases).
+- **Aplikacja desktopowa, która pilotuje przebieg, a nie tylko go uruchamia** — pięć miejsc docelowych zamiast menu z piętnastoma, w dziesięciu językach. Uruchom przebieg i odejdź: postęp nadal tam jest, gdy wrócisz, pasek stanu z każdego ekranu nazywa to, co robi agent, a Stop działa ze wszystkich. Natywne instalatory dla Windows / macOS / Linux w [Releases](https://github.com/brcampidelli/chimera-agent/releases).
 
 ## Szybki start
 
@@ -297,7 +297,7 @@ chcesz (zobacz kolumnę „Wymaga"). **Używasz Dockera? Oficjalny obraz ma już
 | **Czat, który cię pamięta** | — | `chimera chat` |
 | **Zadaj jedno pytanie** | — | `chimera run "wyjaśnij X w 3 punktach"` |
 | **Pełnoekranowa aplikacja terminalowa** | — | `chimera tui` |
-| **Aplikacja desktopowa** (czat · praca · kod · wiedza · automatyzacja, w 9 językach) | `[desktop]` albo pobranie | `chimera app`, albo weź natywny instalator (`.exe`/`.dmg`/`.AppImage`/`.deb`) z [Releases](https://github.com/brcampidelli/chimera-agent/releases) |
+| **Aplikacja desktopowa** (czat · praca · kod · wiedza · automatyzacja, w 10 językach) | `[desktop]` albo pobranie | `chimera app`, albo weź natywny instalator (`.exe`/`.dmg`/`.AppImage`/`.deb`) z [Releases](https://github.com/brcampidelli/chimera-agent/releases) |
 | **Wykonaj zadanie i zachowaj je tylko, gdy kontrola przejdzie** | — | `chimera solve "dodaj hello() do app.py + test" --verify "pytest -q"` |
 | **Zapytaj mnie, zanim zatwierdzisz coś przeczytanego z sieci** | — | dodaj `--pause-on-taint` do `chimera solve` |
 | **Zobacz, ile przebieg naprawdę kosztował, krok po kroku** | — | zapisywane za ciebie w `.chimera/traces.jsonl` (albo `$CHIMERA_HOME`) |

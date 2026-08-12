@@ -19,7 +19,7 @@
 ![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)
 [![Donate](https://img.shields.io/badge/Donate-Stripe-635BFF.svg?logo=stripe&logoColor=white)](https://buy.stripe.com/9B6aEQ57q91m1Gp7Lz77O01)
 
-<sub><a href="README.md">English</a> · <a href="README.pt-BR.md">Português</a> · <a href="README.es.md">Español</a> · <a href="README.de.md">Deutsch</a> · <b>Français</b> · <a href="README.it.md">Italiano</a> · <a href="README.pl.md">Polski</a> · <a href="README.zh-CN.md">中文</a> · <a href="README.ja.md">日本語</a></sub>
+<sub><a href="README.md">English</a> · <a href="README.pt-BR.md">Português</a> · <a href="README.es.md">Español</a> · <a href="README.de.md">Deutsch</a> · <b>Français</b> · <a href="README.it.md">Italiano</a> · <a href="README.pl.md">Polski</a> · <a href="README.zh-CN.md">中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.ru.md">Русский</a></sub>
 
 </div>
 
@@ -227,7 +227,7 @@ sienne :
 - **Déploiement serveur en une commande** — faites-le tourner avec Docker (ou en bare-metal) pour qu'il reste actif et redémarre au reboot. Voir **[docs/deploy.md](docs/deploy.md)**.
 - **Noyau de sécurité** — une vérification sur chaque action (autoriser / avertir / bloquer / demander), un conteneur à réseau isolé **optionnel** pour le code non fiable (`CHIMERA_SANDBOX=docker` ; le runner *local* par défaut n'est *pas* isolé), et un journal d'audit complet de ce qu'il a fait.
 - **Arrêtez-le avant qu'il ne valide quelque chose lu d'une source douteuse** (`--pause-on-taint`) — une exécution qui a consommé du contenu non fiable se met en attente au lieu de finaliser, et vous attend. Vous pouvez accepter le résultat, accepter une version que vous avez modifiée, envoyer des consignes et le laisser réessayer, ou le rejeter — depuis le terminal *ou* depuis l'application de bureau. Rien n'est enregistré et rien n'est appris tant que vous n'avez pas décidé, et une pause n'est jamais rapportée comme un échec : elle n'a pas atteint de verdict, elle attend une personne.
-- **Une application de bureau qui pilote une exécution, pas seulement qui la lance** — cinq destinations au lieu d'un menu de quinze, en neuf langues. Lancez une exécution et partez : la progression est toujours là à votre retour, la barre d'état nomme ce que fait l'agent depuis n'importe quel écran, et Arrêter fonctionne partout. Installateurs natifs pour Windows / macOS / Linux sur [Releases](https://github.com/brcampidelli/chimera-agent/releases).
+- **Une application de bureau qui pilote une exécution, pas seulement qui la lance** — cinq destinations au lieu d'un menu de quinze, en dix langues. Lancez une exécution et partez : la progression est toujours là à votre retour, la barre d'état nomme ce que fait l'agent depuis n'importe quel écran, et Arrêter fonctionne partout. Installateurs natifs pour Windows / macOS / Linux sur [Releases](https://github.com/brcampidelli/chimera-agent/releases).
 
 ## Démarrage rapide
 
@@ -304,7 +304,7 @@ extras voulus (voir la colonne « Requiert »). **Docker ? L'image officielle co
 | **Chat qui se souvient de vous** | — | `chimera chat` |
 | **Poser une question** | — | `chimera run "explique X en 3 points"` |
 | **Application terminal plein écran** | — | `chimera tui` |
-| **Application de bureau** (chat · travail · code · connaissances · automatisation, en 9 langues) | `[desktop]` ou un téléchargement | `chimera app`, ou récupérez un installateur natif (`.exe`/`.dmg`/`.AppImage`/`.deb`) depuis [Releases](https://github.com/brcampidelli/chimera-agent/releases) |
+| **Application de bureau** (chat · travail · code · connaissances · automatisation, en 10 langues) | `[desktop]` ou un téléchargement | `chimera app`, ou récupérez un installateur natif (`.exe`/`.dmg`/`.AppImage`/`.deb`) depuis [Releases](https://github.com/brcampidelli/chimera-agent/releases) |
 | **Faire une tâche, la garder seulement si un test passe** | — | `chimera solve "ajoute hello() à app.py + un test" --verify "pytest -q"` |
 | **Me demander avant de valider ce qu'il a lu sur le web** | — | ajoutez `--pause-on-taint` à `chimera solve` |
 | **Voir ce qu'une exécution a réellement coûté, étape par étape** | — | écrit pour vous dans `.chimera/traces.jsonl` (ou `$CHIMERA_HOME`) |

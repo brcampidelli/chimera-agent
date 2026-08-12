@@ -3155,7 +3155,7 @@
         "type": "object"
       },
       "PostureFacts": {
-        "description": "What is true right now, for the UI to render as one sentence.\n\nStructured rather than prose because the sentence has to exist in nine languages, and a server\nthat returned English would quietly make this the one untranslated line on the screen.",
+        "description": "What is true right now, for the UI to render as one sentence.\n\nStructured rather than prose because the sentence has to exist in every language the app ships,\nand a server that returned English would quietly make this the one untranslated line on the\nscreen.",
         "properties": {
           "fell_back_to_host": {
             "default": false,

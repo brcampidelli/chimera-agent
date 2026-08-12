@@ -2698,8 +2698,9 @@ export interface components {
          * PostureFacts
          * @description What is true right now, for the UI to render as one sentence.
          *
-         *     Structured rather than prose because the sentence has to exist in nine languages, and a server
-         *     that returned English would quietly make this the one untranslated line on the screen.
+         *     Structured rather than prose because the sentence has to exist in every language the app ships,
+         *     and a server that returned English would quietly make this the one untranslated line on the
+         *     screen.
          */
         PostureFacts: {
             /**

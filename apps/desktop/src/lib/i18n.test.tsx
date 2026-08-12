@@ -12,8 +12,8 @@ import { DICTS, LANGS, type Lang } from "@/lib/i18n";
  * is a claim; these are the assertions that keep the claim true.
  *
  * **Why there is an escape hatch.** Demanding total parity made the claim true and the app closed:
- * adding one English string turned eight locales red, so any contributor who was not fluent in nine
- * languages simply could not touch the desktop app. That is a real cost and it bought less than it
+ * adding one English string turned every other locale red, so any contributor who was not fluent in
+ * all of them simply could not touch the desktop app. That is a real cost and it bought less than it
  * looked like, because the runtime fallback means a missing key was never a crash — only a silently
  * English sentence. So the guarantee moved from *"everything is translated"* to *"nothing
  * untranslated is invisible"*: a key may be listed in `i18n-pending.json` and CI stays green, and
@@ -83,6 +83,7 @@ describe("the language picker", () => {
       pl: "Polski",
       zh: "中文",
       ja: "日本語",
+      ru: "Русский",
     });
   });
 });

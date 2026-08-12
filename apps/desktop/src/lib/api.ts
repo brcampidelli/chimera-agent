@@ -807,7 +807,7 @@ export type Reach = "read_only" | "workspace" | "workspace_shell";
 export type Approval = "always" | "suspicious" | "never";
 
 /** What the chosen posture means on THIS machine, right now. Structured rather than prose so the
- *  sentence can be rendered in nine languages — a server that returned English would make this the
+ *  sentence can be rendered in every language — a server that returned English would make this the
  *  one untranslated line on the screen. */
 export interface PostureFacts {
   writes: "nothing" | "workspace";
