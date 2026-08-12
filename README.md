@@ -19,7 +19,7 @@
 ![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)
 [![Donate](https://img.shields.io/badge/Donate-Stripe-635BFF.svg?logo=stripe&logoColor=white)](https://buy.stripe.com/9B6aEQ57q91m1Gp7Lz77O01)
 
-<sub><b>English</b> · <a href="README.pt-BR.md">Português</a> · <a href="README.es.md">Español</a> · <a href="README.de.md">Deutsch</a> · <a href="README.fr.md">Français</a> · <a href="README.it.md">Italiano</a> · <a href="README.pl.md">Polski</a> · <a href="README.zh-CN.md">中文</a> · <a href="README.ja.md">日本語</a></sub>
+<sub><b>English</b> · <a href="README.pt-BR.md">Português</a> · <a href="README.es.md">Español</a> · <a href="README.de.md">Deutsch</a> · <a href="README.fr.md">Français</a> · <a href="README.it.md">Italiano</a> · <a href="README.pl.md">Polski</a> · <a href="README.zh-CN.md">中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.ru.md">Русский</a></sub>
 
 </div>
 
@@ -209,7 +209,7 @@ a long run stays useful, and most of it is invisible until it fails. Chimera mea
 - **One-command server deploy** — run it with Docker (or bare-metal) so it stays up and restarts on reboot. See **[docs/deploy.md](docs/deploy.md)**.
 - **Safety kernel** — a check on every action (allow / warn / block / ask), an **opt-in** network-isolated container for untrusted code (`CHIMERA_SANDBOX=docker`; the default local runner is *not* isolated), and a full audit log of what it did.
 - **Stop before it commits, when it read something it shouldn't trust** (`--pause-on-taint`) — a run that consumed untrusted content parks itself instead of finalising, and waits for you. You can accept the result, accept a version you edited, send guidance and let it try again, or reject it outright — from the terminal *or* the desktop app. Nothing is saved and nothing is learned until you decide, and a pause is never reported as a failure: it hasn't reached a verdict, it's waiting on a person.
-- **A desktop app that pilots a run, not just launches one** — five destinations instead of a menu of fifteen, in nine languages. Start a run and walk away: the progress is still there when you come back, the status bar names what the agent is doing from every screen, and Stop works from all of them. Native installers for Windows / macOS / Linux on [Releases](https://github.com/brcampidelli/chimera-agent/releases).
+- **A desktop app that pilots a run, not just launches one** — five destinations instead of a menu of fifteen, in ten languages. Start a run and walk away: the progress is still there when you come back, the status bar names what the agent is doing from every screen, and Stop works from all of them. Native installers for Windows / macOS / Linux on [Releases](https://github.com/brcampidelli/chimera-agent/releases).
 
 ## Quickstart
 
@@ -285,7 +285,7 @@ Prefer a lean install? Keep `pip install chimera-agent` and add only the extras 
 | **Chat that remembers you** | — | `chimera chat` |
 | **Ask one question** | — | `chimera run "explain X in 3 bullets"` |
 | **Full-screen terminal app** | — | `chimera tui` |
-| **Desktop app** (chat · work · code · knowledge · automation, in 9 languages) | `[desktop]` or a download | `chimera app`, or grab a native installer (`.exe`/`.dmg`/`.AppImage`/`.deb`) from [Releases](https://github.com/brcampidelli/chimera-agent/releases) |
+| **Desktop app** (chat · work · code · knowledge · automation, in 10 languages) | `[desktop]` or a download | `chimera app`, or grab a native installer (`.exe`/`.dmg`/`.AppImage`/`.deb`) from [Releases](https://github.com/brcampidelli/chimera-agent/releases) |
 | **Do a task, keep it only if a check passes** | — | `chimera solve "add hello() to app.py + a test" --verify "pytest -q"` |
 | **Ask me before finalising anything it read off the web** | — | add `--pause-on-taint` to `chimera solve` |
 | **See what a run actually cost, step by step** | — | written for you at `.chimera/traces.jsonl` (or `$CHIMERA_HOME`) |

@@ -19,7 +19,7 @@
 ![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)
 [![Donate](https://img.shields.io/badge/Donate-Stripe-635BFF.svg?logo=stripe&logoColor=white)](https://buy.stripe.com/9B6aEQ57q91m1Gp7Lz77O01)
 
-<sub><a href="README.md">English</a> · <a href="README.pt-BR.md">Português</a> · <a href="README.es.md">Español</a> · <a href="README.de.md">Deutsch</a> · <a href="README.fr.md">Français</a> · <b>Italiano</b> · <a href="README.pl.md">Polski</a> · <a href="README.zh-CN.md">中文</a> · <a href="README.ja.md">日本語</a></sub>
+<sub><a href="README.md">English</a> · <a href="README.pt-BR.md">Português</a> · <a href="README.es.md">Español</a> · <a href="README.de.md">Deutsch</a> · <a href="README.fr.md">Français</a> · <b>Italiano</b> · <a href="README.pl.md">Polski</a> · <a href="README.zh-CN.md">中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.ru.md">Русский</a></sub>
 
 </div>
 
@@ -224,7 +224,7 @@ propria:
 - **Deploy su server con un comando** — eseguilo con Docker (o bare-metal) così resta su e riparte al riavvio. Vedi **[docs/deploy.md](docs/deploy.md)**.
 - **Kernel di sicurezza** — un controllo su ogni azione (permetti / avvisa / blocca / chiedi), un container con rete isolata **opt-in** per il codice non fidato (`CHIMERA_SANDBOX=docker`; il runner locale predefinito *non* è isolato) e un registro di audit completo di ciò che ha fatto.
 - **Fermalo prima che finalizzi, quando ha letto qualcosa di cui non fidarsi** (`--pause-on-taint`) — un'esecuzione che ha consumato contenuti non fidati si mette da parte invece di finalizzare, e ti aspetta. Puoi accettare il risultato, accettare una versione che hai modificato tu, inviare indicazioni e lasciargli riprovare, o rifiutarlo del tutto — dal terminale *o* dall'app desktop. Nulla viene salvato e nulla viene appreso finché non decidi, e una pausa non viene mai riportata come fallimento: non ha raggiunto un verdetto, sta aspettando una persona.
-- **Un'app desktop che pilota un'esecuzione, non che la lancia soltanto** — cinque destinazioni invece di un menù da quindici, in nove lingue. Avvia un'esecuzione e allontanati: il progresso è ancora lì quando torni, la barra di stato dice cosa sta facendo l'agente da qualsiasi schermata, e Stop funziona da tutte. Installer nativi per Windows / macOS / Linux su [Releases](https://github.com/brcampidelli/chimera-agent/releases).
+- **Un'app desktop che pilota un'esecuzione, non che la lancia soltanto** — cinque destinazioni invece di un menù da quindici, in dieci lingue. Avvia un'esecuzione e allontanati: il progresso è ancora lì quando torni, la barra di stato dice cosa sta facendo l'agente da qualsiasi schermata, e Stop funziona da tutte. Installer nativi per Windows / macOS / Linux su [Releases](https://github.com/brcampidelli/chimera-agent/releases).
 
 ## Avvio rapido
 
@@ -302,7 +302,7 @@ vuoi (vedi la colonna "Richiede"). **Usi Docker? L'immagine ufficiale ha già tu
 | **Chat che si ricorda di te** | — | `chimera chat` |
 | **Fai una domanda** | — | `chimera run "spiega X in 3 punti"` |
 | **App da terminale a tutto schermo** | — | `chimera tui` |
-| **App desktop** (chat · lavoro · codice · conoscenza · automazione, in 9 lingue) | `[desktop]` o un download | `chimera app`, oppure prendi un installer nativo (`.exe`/`.dmg`/`.AppImage`/`.deb`) da [Releases](https://github.com/brcampidelli/chimera-agent/releases) |
+| **App desktop** (chat · lavoro · codice · conoscenza · automazione, in 10 lingue) | `[desktop]` o un download | `chimera app`, oppure prendi un installer nativo (`.exe`/`.dmg`/`.AppImage`/`.deb`) da [Releases](https://github.com/brcampidelli/chimera-agent/releases) |
 | **Fai un compito, e tienilo solo se un controllo passa** | — | `chimera solve "aggiungi hello() ad app.py + un test" --verify "pytest -q"` |
 | **Chiedimi prima di finalizzare qualcosa letto dal web** | — | aggiungi `--pause-on-taint` a `chimera solve` |
 | **Vedi quanto è costata davvero un'esecuzione, passo per passo** | — | viene scritto per te in `.chimera/traces.jsonl` (o `$CHIMERA_HOME`) |

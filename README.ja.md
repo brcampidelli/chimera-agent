@@ -19,7 +19,7 @@
 ![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)
 [![Donate](https://img.shields.io/badge/Donate-Stripe-635BFF.svg?logo=stripe&logoColor=white)](https://buy.stripe.com/9B6aEQ57q91m1Gp7Lz77O01)
 
-<sub><a href="README.md">English</a> · <a href="README.pt-BR.md">Português</a> · <a href="README.es.md">Español</a> · <a href="README.de.md">Deutsch</a> · <a href="README.fr.md">Français</a> · <a href="README.it.md">Italiano</a> · <a href="README.pl.md">Polski</a> · <a href="README.zh-CN.md">中文</a> · <b>日本語</b></sub>
+<sub><a href="README.md">English</a> · <a href="README.pt-BR.md">Português</a> · <a href="README.es.md">Español</a> · <a href="README.de.md">Deutsch</a> · <a href="README.fr.md">Français</a> · <a href="README.it.md">Italiano</a> · <a href="README.pl.md">Polski</a> · <a href="README.zh-CN.md">中文</a> · <b>日本語</b> · <a href="README.ru.md">Русский</a></sub>
 
 </div>
 
@@ -210,7 +210,7 @@ nanobot、CrewAI、LangGraph）を実際にリバースエンジニアリング�
 - **1 コマンドでサーバーにデプロイ** —— Docker（またはベアメタル）で動かせば、起動したままで再起動後も自動で立ち上がります。**[docs/deploy.md](docs/deploy.md)** を参照。
 - **セーフティ・カーネル** —— すべての操作へのチェック（許可 / 警告 / ブロック / 確認）、信頼できないコードのための**オプトインの**ネットワーク分離コンテナ（`CHIMERA_SANDBOX=docker`。デフォルトの local ランナーは分離**されません**）、そして何をしたかの完全な監査ログ。
 - **信頼すべきでないものを読んだときは、確定させる前に止める**（`--pause-on-taint`）—— 信頼できない内容を取り込んだ実行は、確定せずに自分を待機状態に置き、あなたを待ちます。結果をそのまま受け入れる、あなたが編集した版を受け入れる、指示を送ってもう一度試させる、あるいはきっぱり却下する —— ターミナル*でも*デスクトップアプリ*でも*できます。あなたが決めるまで何も保存されず、何も学習されません。そして一時停止が失敗として報告されることはありません：結論に至っていないだけで、人を待っているのです。
-- **実行を「起動する」だけでなく「操縦する」デスクトップアプリ** —— 15 項目のメニューではなく 5 つの行き先、9 言語対応。実行を開始してその場を離れても、戻ってくれば進捗はそのまま残っており、ステータスバーはどの画面からでもエージェントが何をしているかを示し、停止はどこからでも効きます。Windows / macOS / Linux 向けのネイティブインストーラーは [Releases](https://github.com/brcampidelli/chimera-agent/releases) にあります。
+- **実行を「起動する」だけでなく「操縦する」デスクトップアプリ** —— 15 項目のメニューではなく 5 つの行き先、10 言語対応。実行を開始してその場を離れても、戻ってくれば進捗はそのまま残っており、ステータスバーはどの画面からでもエージェントが何をしているかを示し、停止はどこからでも効きます。Windows / macOS / Linux 向けのネイティブインストーラーは [Releases](https://github.com/brcampidelli/chimera-agent/releases) にあります。
 
 ## クイックスタート
 
@@ -285,7 +285,7 @@ pip install 'chimera-agent[full]'     # 下記の非 GPU 機能すべてを 1 �
 | **あなたを覚えるチャット** | — | `chimera chat` |
 | **質問を 1 つする** | — | `chimera run "X を 3 点で説明して"` |
 | **フルスクリーンのターミナルアプリ** | — | `chimera tui` |
-| **デスクトップアプリ**（チャット · 作業 · コード · 知識 · 自動化、9 言語） | `[desktop]` またはダウンロード | `chimera app`、または [Releases](https://github.com/brcampidelli/chimera-agent/releases) からネイティブインストーラー（`.exe`/`.dmg`/`.AppImage`/`.deb`）を入手 |
+| **デスクトップアプリ**（チャット · 作業 · コード · 知識 · 自動化、10 言語） | `[desktop]` またはダウンロード | `chimera app`、または [Releases](https://github.com/brcampidelli/chimera-agent/releases) からネイティブインストーラー（`.exe`/`.dmg`/`.AppImage`/`.deb`）を入手 |
 | **タスクを実行し、チェックに通った時だけ残す** | — | `chimera solve "app.py に hello() とテストを追加" --verify "pytest -q"` |
 | **ウェブから読んだ内容を確定する前に確認してほしい** | — | `chimera solve` に `--pause-on-taint` を付ける |
 | **1 回の実行が実際にいくらかかったかを、ステップ単位で見る** | — | 自動的に書かれます：`.chimera/traces.jsonl`（または `$CHIMERA_HOME`） |

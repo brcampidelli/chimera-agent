@@ -19,7 +19,7 @@
 ![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)
 [![Donate](https://img.shields.io/badge/Donate-Stripe-635BFF.svg?logo=stripe&logoColor=white)](https://buy.stripe.com/9B6aEQ57q91m1Gp7Lz77O01)
 
-<sub><a href="README.md">English</a> · <a href="README.pt-BR.md">Português</a> · <a href="README.es.md">Español</a> · <a href="README.de.md">Deutsch</a> · <a href="README.fr.md">Français</a> · <a href="README.it.md">Italiano</a> · <a href="README.pl.md">Polski</a> · <b>中文</b> · <a href="README.ja.md">日本語</a></sub>
+<sub><a href="README.md">English</a> · <a href="README.pt-BR.md">Português</a> · <a href="README.es.md">Español</a> · <a href="README.de.md">Deutsch</a> · <a href="README.fr.md">Français</a> · <a href="README.it.md">Italiano</a> · <a href="README.pl.md">Polski</a> · <b>中文</b> · <a href="README.ja.md">日本語</a> · <a href="README.ru.md">Русский</a></sub>
 
 </div>
 
@@ -198,7 +198,7 @@ Chimera 并不打算在*渠道数量*上去和那些巨型智能体项目一较�
 - **一条命令部署到服务器** —— 用 Docker（或裸机）运行它，让它持续在线并在重启后自动恢复。详见 **[docs/deploy.md](docs/deploy.md)**。
 - **安全内核** —— 对每个操作进行一道检查（允许 / 警告 / 拦截 / 询问）、一个**需手动开启的**、网络隔离的容器用于运行不受信任代码（`CHIMERA_SANDBOX=docker`；默认的 local 运行器**并不**隔离），以及一份完整的行为审计日志。
 - **当它读到了不该信任的内容时，在落定之前先停下**（`--pause-on-taint`）—— 一次消费了不可信内容的运行会把自己停放起来而不是收尾，并等你决定。你可以接受这个结果、接受你自己改过的版本、给出指引让它再试一次，或者直接拒绝——在终端*或*桌面应用里都行。在你做出决定之前，什么都不会保存、什么都不会被学习；而暂停从不被报告为失败：它还没得出结论，它在等一个人。
-- **一个能驾驶运行、而不只是启动运行的桌面应用** —— 五个去处，而不是十五项的菜单，支持九种语言。启动一次运行然后走开：回来时进度还在，状态栏在任何界面都会说明智能体正在做什么，停止按钮在每个界面都有效。Windows / macOS / Linux 的原生安装包见 [Releases](https://github.com/brcampidelli/chimera-agent/releases)。
+- **一个能驾驶运行、而不只是启动运行的桌面应用** —— 五个去处，而不是十五项的菜单，支持十种语言。启动一次运行然后走开：回来时进度还在，状态栏在任何界面都会说明智能体正在做什么，停止按钮在每个界面都有效。Windows / macOS / Linux 的原生安装包见 [Releases](https://github.com/brcampidelli/chimera-agent/releases)。
 
 ## 快速开始
 
@@ -272,7 +272,7 @@ pip install 'chimera-agent[full]'     # 下面所有非 GPU 功能，一条命�
 | **记住你的聊天** | — | `chimera chat` |
 | **问一个问题** | — | `chimera run "用 3 点解释 X"` |
 | **全屏终端应用** | — | `chimera tui` |
-| **桌面应用**（聊天 · 工作 · 代码 · 知识 · 自动化，九种语言） | `[desktop]` 或直接下载 | `chimera app`，或从 [Releases](https://github.com/brcampidelli/chimera-agent/releases) 下载原生安装包（`.exe`/`.dmg`/`.AppImage`/`.deb`） |
+| **桌面应用**（聊天 · 工作 · 代码 · 知识 · 自动化，十种语言） | `[desktop]` 或直接下载 | `chimera app`，或从 [Releases](https://github.com/brcampidelli/chimera-agent/releases) 下载原生安装包（`.exe`/`.dmg`/`.AppImage`/`.deb`） |
 | **做一个任务，只有通过检查才保留** | — | `chimera solve "给 app.py 加 hello() 和一个测试" --verify "pytest -q"` |
 | **在落定任何从网上读到的内容前先问我** | — | 给 `chimera solve` 加上 `--pause-on-taint` |
 | **逐步查看一次运行到底花了多少** | — | 已自动写好：`.chimera/traces.jsonl`（或 `$CHIMERA_HOME`） |

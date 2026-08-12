@@ -21,9 +21,9 @@ Chimera is a Python agent framework (`chimera/`) with a Tauri + React desktop ap
 
 ## Hard rules
 
-**Never rename or delete an i18n key.** `apps/desktop/src/lib/i18n.tsx` carries nine languages, and
-the component tests assert on rendered English strings. A rename breaks them silently across all
-nine. Adding keys is free; renaming is not.
+**Never rename or delete an i18n key.** `apps/desktop/src/lib/i18n.tsx` carries every language the
+app offers, and the component tests assert on rendered English strings. A rename breaks them
+silently in all of them at once. Adding keys is free; renaming is not.
 
 **A route change and its generated types ship in the same commit.** If you touch a FastAPI route in
 `chimera/api/`, regenerate both or CI fails on drift:

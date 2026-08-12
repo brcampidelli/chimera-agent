@@ -37,7 +37,7 @@ Only if they apply:
 - [ ] Touched `apps/desktop/` → `npm --prefix apps/desktop run test` **and** `run build` pass
 - [ ] Touched a route in `chimera/api/` → regenerated `openapi.json` + `api-schema.ts` **in this commit**
 - [ ] Touched `i18n.tsx` → added keys only; renamed or deleted none
-- [ ] Added a UI string → either translated all nine languages, or listed the key in `i18n-pending.json`
+- [ ] Added a UI string → either translated every language, or listed the key in `i18n-pending.json`
 - [ ] Touched `bench/` → the prediction was registered *before* the run, and nothing was loosened after
 - [ ] Added a tool → its capability is classified in `chimera/governance/ledger.py`
 - [ ] Docs/README updated if behaviour a user relies on changed
