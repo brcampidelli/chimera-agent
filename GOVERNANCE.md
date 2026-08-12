@@ -10,7 +10,7 @@ this repo — and this document exists to make it addressable rather than merely
 | Maintainers with commit rights | **1** (@brcampidelli) |
 | Maintainers who can publish a release | **1** |
 | Bus factor | **1** |
-| Funding | donations only ([Stripe](https://donate.stripe.com/9B63cofM491m4SBfe177O00)) |
+| Funding | donations only ([Stripe](https://buy.stripe.com/9B6aEQ57q91m1Gp7Lz77O01)) |
 | Governance model | BDFL, by default rather than by design |
 
 If the maintainer stops, the project stops: no one else can merge a security fix, cut a release, or
