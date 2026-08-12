@@ -539,6 +539,14 @@ class KanbanRunIn(BaseModel):
     model: str | None = None
     """A model for the lanes that have none pinned. An agent's own pin still wins over it."""
 
+    workers: int = 1
+    """How many cards to work at once. 1 is the sequential board this endpoint has always been.
+
+    Above 1 each card gets its own git worktree and the edits are merged back afterwards, because
+    two of the lanes run the autonomous verify-or-revert loop against the workspace and would
+    otherwise undo each other's files. A file two cards both changed arrives as a `conflict` frame
+    rather than being silently resolved to one of them."""
+
 
 class ProjectStateOut(BaseModel):
     id: str

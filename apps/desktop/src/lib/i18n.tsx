@@ -676,6 +676,8 @@ const en: Dict = {
   "server.errUnreachable": "Could not reach it. Either the address is wrong, or that instance has not been told to allow this app — the browser cannot tell those apart. Set CHIMERA_ALLOWED_ORIGINS={origin} there.",
   "server.errUnauthorized": "The token was refused.",
   "server.errNotChimera": "Something answered, but it is not a Chimera.",
+  "tasks.workers": "at once",
+  "tasks.conflicts": "{n} file(s) were changed by more than one card, so only one version came back:",
 };
 
 const pt: Dict = {
@@ -1327,6 +1329,8 @@ const pt: Dict = {
   "server.errUnreachable": "Não consegui alcançar. Ou o endereço está errado, ou aquela instância não foi avisada para permitir este app — o navegador não distingue os dois casos. Defina lá CHIMERA_ALLOWED_ORIGINS={origin}.",
   "server.errUnauthorized": "O token foi recusado.",
   "server.errNotChimera": "Alguma coisa respondeu, mas não é um Chimera.",
+  "tasks.workers": "de cada vez",
+  "tasks.conflicts": "{n} arquivo(s) foram alterados por mais de um cartão, então só uma versão voltou:",
 };
 
 const es: Dict = {
@@ -1978,6 +1982,8 @@ const es: Dict = {
   "server.errUnreachable": "No pude alcanzarlo. O la dirección es incorrecta, o esa instancia no ha sido configurada para permitir esta app — el navegador no distingue ambos casos. Define allí CHIMERA_ALLOWED_ORIGINS={origin}.",
   "server.errUnauthorized": "El token fue rechazado.",
   "server.errNotChimera": "Algo respondió, pero no es un Chimera.",
+  "tasks.workers": "a la vez",
+  "tasks.conflicts": "{n} archivo(s) fueron modificados por más de una tarjeta, así que solo volvió una versión:",
 };
 
 const fr: Dict = {
@@ -2629,6 +2635,8 @@ const fr: Dict = {
   "server.errUnreachable": "Impossible de l'atteindre. Soit l'adresse est fausse, soit cette instance n'autorise pas cette application — le navigateur ne distingue pas les deux. Définissez-y CHIMERA_ALLOWED_ORIGINS={origin}.",
   "server.errUnauthorized": "Le jeton a été refusé.",
   "server.errNotChimera": "Quelque chose a répondu, mais ce n'est pas un Chimera.",
+  "tasks.workers": "à la fois",
+  "tasks.conflicts": "{n} fichier(s) ont été modifiés par plus d'une carte ; une seule version est revenue :",
 };
 
 const de: Dict = {
@@ -3280,6 +3288,8 @@ const de: Dict = {
   "server.errUnreachable": "Nicht erreichbar. Entweder ist die Adresse falsch, oder diese Instanz erlaubt diese App nicht — der Browser kann beides nicht unterscheiden. Setzen Sie dort CHIMERA_ALLOWED_ORIGINS={origin}.",
   "server.errUnauthorized": "Das Token wurde abgelehnt.",
   "server.errNotChimera": "Etwas hat geantwortet, aber es ist kein Chimera.",
+  "tasks.workers": "gleichzeitig",
+  "tasks.conflicts": "{n} Datei(en) wurden von mehr als einer Karte geändert, also kam nur eine Fassung zurück:",
 };
 
 const zh: Dict = {
@@ -3928,6 +3938,8 @@ const zh: Dict = {
   "server.errUnreachable": "无法连接。可能是地址不对，也可能是那个实例没有被允许接受本应用——浏览器无法区分这两种情况。请在那边设置 CHIMERA_ALLOWED_ORIGINS={origin}。",
   "server.errUnauthorized": "令牌被拒绝。",
   "server.errNotChimera": "有东西响应了，但它不是 Chimera。",
+  "tasks.workers": "并行",
+  "tasks.conflicts": "有 {n} 个文件被多张卡片修改，因此只有一个版本被合并回来：",
 };
 
 const ja: Dict = {
@@ -4577,6 +4589,8 @@ const ja: Dict = {
   "server.errUnreachable": "到達できませんでした。アドレスが違うか、そのインスタンスがこのアプリを許可していないかです —— ブラウザはこの二つを区別できません。向こう側で CHIMERA_ALLOWED_ORIGINS={origin} を設定してください。",
   "server.errUnauthorized": "トークンが拒否されました。",
   "server.errNotChimera": "何かが応答しましたが、Chimera ではありません。",
+  "tasks.workers": "同時に",
+  "tasks.conflicts": "{n} 個のファイルが複数のカードから変更されたため、戻ったのは一方だけです:",
 };
 
 const it: Dict = {
@@ -5203,6 +5217,8 @@ const it: Dict = {
   "server.errUnreachable": "Non sono riuscito a raggiungerlo. O l'indirizzo è sbagliato, o quell'istanza non è stata configurata per consentire questa app — il browser non distingue i due casi. Imposta lì CHIMERA_ALLOWED_ORIGINS={origin}.",
   "server.errUnauthorized": "Il token è stato rifiutato.",
   "server.errNotChimera": "Qualcosa ha risposto, ma non è un Chimera.",
+  "tasks.workers": "alla volta",
+  "tasks.conflicts": "{n} file sono stati modificati da più di una scheda, quindi è tornata una sola versione:",
 };
 
 const pl: Dict = {
@@ -5829,6 +5845,8 @@ const pl: Dict = {
   "server.errUnreachable": "Nie udało się połączyć. Albo adres jest błędny, albo tamta instancja nie zezwala tej aplikacji — przeglądarka nie odróżnia tych przypadków. Ustaw tam CHIMERA_ALLOWED_ORIGINS={origin}.",
   "server.errUnauthorized": "Token został odrzucony.",
   "server.errNotChimera": "Coś odpowiedziało, ale to nie jest Chimera.",
+  "tasks.workers": "naraz",
+  "tasks.conflicts": "{n} plik(ów) zmieniła więcej niż jedna karta, więc wróciła tylko jedna wersja:",
 };
 
 export const DICTS: Record<Lang, Dict> = { en, pt, es, fr, de, it, pl, zh, ja };

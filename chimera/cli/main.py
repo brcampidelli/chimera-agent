@@ -4154,6 +4154,9 @@ def kanban_run(
     limit: int = typer.Option(None, "--limit", "-n", help="Max backlog cards to dispatch."),
     workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace for the solve lane."),
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
+    workers: int = typer.Option(
+        1, "--workers", "-j", help="Work this many cards at once, each in its own git worktree."
+    ),
 ) -> None:
     """Dispatch backlog cards through their lanes (solve/crew). Requires a key."""
     from chimera.core.registry import load as load_agents
@@ -4173,7 +4176,21 @@ def kanban_run(
         "solve": SolveLane(workspace=Path(workspace), model=model),
         "crew": CrewLane(model=model),
     }
-    outcomes = dispatch(board, runners, limit=limit)
+    def conflitos(paths: list[str]) -> None:
+        # Said before the per-card lines, because it changes how they should be read: those cards
+        # succeeded, and not all of their edits survived the merge.
+        console.print(f"[yellow]{len(paths)} file(s) changed by more than one card:[/yellow]")
+        for path in paths[:10]:
+            console.print(f"  [dim]{path}[/dim]")
+
+    outcomes = dispatch(
+        board,
+        runners,
+        limit=limit,
+        workers=workers,
+        workspace=Path(workspace),
+        on_conflict=conflitos,
+    )
     if not outcomes:
         console.print("[dim]nothing in backlog to run[/dim]")
         return

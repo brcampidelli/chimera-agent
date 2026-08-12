@@ -2302,6 +2302,11 @@
             ],
             "title": "Model"
           },
+          "workers": {
+            "default": 1,
+            "title": "Workers",
+            "type": "integer"
+          },
           "workspace": {
             "anyOf": [
               {

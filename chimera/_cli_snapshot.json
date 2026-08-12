@@ -2219,6 +2219,18 @@
               ],
               "required": false,
               "type": "str"
+            },
+            {
+              "default": "1",
+              "help": "Work this many cards at once, each in its own git worktree.",
+              "kind": "option",
+              "name": "workers",
+              "opts": [
+                "--workers",
+                "-j"
+              ],
+              "required": false,
+              "type": "int"
             }
           ],
           "path": "kanban run"
