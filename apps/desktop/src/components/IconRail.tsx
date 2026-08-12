@@ -15,13 +15,24 @@ import { focusRing } from "@/components/ui/focus";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useT } from "@/lib/i18n";
 
-export type View =
-  | "knowledge"
-  | "automation"
-  | "work"
-  | "code"
-  | "maturity"
-  | "settings";
+/**
+ * Every destination, as data.
+ *
+ * The type used to be a bare union, which the router cannot check a URL against — a hash arrives as
+ * a string and something has to say whether it names a real screen. Deriving the type FROM the list
+ * keeps one source of truth: adding a screen to the array is what makes it a valid `View`, and a
+ * second hand-maintained list cannot drift out of step with the first.
+ */
+export const VIEWS = [
+  "knowledge",
+  "automation",
+  "work",
+  "code",
+  "maturity",
+  "settings",
+] as const;
+
+export type View = (typeof VIEWS)[number];
 
 /** Maturity reports the Chimera project's OWN test coverage, so it needs a source checkout — in
  *  an installed build it renders an empty state. Shipping a permanently blank screen is a trust
