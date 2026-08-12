@@ -6,6 +6,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.43.0] - 2026-08-11
+
+The release where a key for any provider LiteLLM reaches starts working, three things that existed
+only in `.env` got a control, and two features that were built but unreachable finally have a
+surface: attaching a file, and the registry the board dispatches to.
+
+### Added
+
+- **Any provider LiteLLM understands.** LiteLLM is a hard dependency that reaches a hundred-odd
+  vendors and Chimera recognised five. Someone holding a valid Groq or Mistral key was told "No
+  provider key configured" and never reached LiteLLM at all — a refusal that, from outside, is
+  indistinguishable from a broken product. The gate now accepts any `<PROVIDER>_API_KEY`.
+  - Minus a denylist of our own credentials that are not sources of models. That list is mandatory
+    rather than tidy: `ELEVENLABS` and `STABILITY` are real entries in LiteLLM's provider enum, so
+    without it someone whose only credential is text-to-speech would pass the gate and `doctor`
+    would name them as a provider of models.
+  - A key that lived only in the `.env` was read and silently dropped, because `Settings` is
+    `extra="ignore"` — it became neither an attribute nor an environment variable, and LiteLLM never
+    saw it. Since `chimera init` writes a `.env` and the docs point people at it, opening the gate
+    alone would have traded one error for another.
+  - `doctor` flags a discovered name LiteLLM does not recognise, because a typo looks exactly like a
+    provider. That check pays LiteLLM's import, which is why it lives in the diagnostic command and
+    not in the gate.
+- **The first-run wizard picks a provider, and pins a model that works with it.** Every cost preset
+  is an OpenRouter slug, so an Anthropic key with the built-in default untouched left the tier
+  ladder pointing at a vendor that key cannot reach — and the Test button then blamed the brand-new
+  key for OpenRouter's 401. The suggestion is shown in an editable field rather than applied
+  invisibly, because these slugs perish and a wrong one should be something you see before Save.
+- **The agent registry gets a screen**, as Automation's third tab: list, create, edit, delete. The
+  registry existed, was persisted and was dispatched against, and was reachable only from the CLI or
+  a hand-written `curl` — so the board's lane box was a free text field guessing at a list the app
+  never showed, and the first news that an id was wrong arrived as "0 worked", after the run.
+  - The lane stays free text: filing work against an agent you have not created yet is reasonable,
+    and the card waits in the backlog until it exists. The board now offers the registered ids as a
+    datalist and says "no agent with this id yet" while you type.
+- **Three settings no interface could reach.** The embed model, now directly under the
+  semantic-memory switch that depends on it — recall degrades to lexical on any embedder failure,
+  silently and by design, so a default the user's key could not serve made that toggle confirm a
+  change it had not made. The Ollama base URL, which `api_base` does not cover because that one is
+  sent on every call and redirects the cloud providers too. And key pools, which rotated round-robin
+  with a per-key cooldown and had no control anywhere.
+  - Pools are edited by **operation**, never by value: add takes one key, remove takes a position. A
+    text field holding the CSV would have to display its value to be editable, the value is secret
+    so it would display the mask, and one Save would write `…abcd` over a working rotation. There is
+    no request shape here that carries a key back to the server, which makes that failure
+    inexpressible rather than merely unlikely.
+
+### Fixed
+
+- **Attaching a document and dictating a message both answered 422 in the shipped app.** Both send a
+  `FormData` body through `authHeaders()`, which always sets `Content-Type: application/json` — and
+  a Content-Type you write yourself is one the browser will not write for you, so the multipart
+  boundary was missing. The bytes were still multipart; they just arrived labelled as something the
+  server could not split, and FastAPI reported the file field as *missing*, which sends you looking
+  at the form instead of at the header.
+  - Cover was in the wrong place, which is why nothing noticed: every component test mocks
+    `@/lib/api` wholesale, so the upload client was a stub and the real `fetch` never ran.
+- **The app lost your theme, workspace, project list and language on every launch.** The shell
+  started the backend with `--port 0` and let the OS pick, so the window loaded a different
+  `http://127.0.0.1:<port>` origin each time — and browsers partition `localStorage` by
+  scheme+host+**port**. The port is remembered now and asked for again; asking is all it does, since
+  the backend already falls back to a free port when the requested one is taken.
+- **Three of the five suggested model slugs were a generation behind**, because they came from a
+  catalogue that speaks OpenRouter's aliases rather than each vendor's native IDs. Checked against
+  the vendors' own model lists.
+
 ## [0.42.0] - 2026-08-08
 
 The release where the Settings screen stopped lying, two security controls that existed only in
