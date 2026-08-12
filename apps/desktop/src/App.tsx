@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { IconRail, type View } from "@/components/IconRail";
+import { useRoute } from "@/lib/router";
 import { Settings } from "@/components/Settings";
 import { Knowledge } from "@/components/Knowledge";
 import { Automation } from "@/components/Automation";
@@ -61,7 +62,10 @@ export default function App() {
   // never sees it). Session-local "skip" lets a GUI-first user jump to Settings without a key yet.
   const doctor = useQuery({ queryKey: ["doctor"], queryFn: getDoctor });
   const [skipOnboarding, setSkipOnboarding] = useState(false);
-  const [view, setView] = useState<View>("code");
+  // The screen lives in the URL now. It was a `useState`, which is enough until something outside
+  // this switch needs to point at a place — "open this file at line 42" from a diagnostic or a
+  // search hit — and until open editor tabs need to survive a reload and answer the back button.
+  const { view, navigate } = useRoute();
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   // Every destination, plus every session by title. This is the long tail the rail no longer
@@ -72,21 +76,21 @@ export default function App() {
       id: `go-${v}`,
       label: t(`nav.${v}`),
       group: t("palette.group.go"),
-      run: () => setView(v),
+      run: () => navigate(v),
     }));
-  }, [t]);
+  }, [t, navigate]);
 
   useHotkeys({
     onPalette: () => setPaletteOpen((o) => !o),
-    onSettings: () => setView("settings"),
+    onSettings: () => navigate("settings"),
     // The conversation owns its own "new" now — it lives beside the list of past ones, which is
     // where someone looks for it. A global shortcut that jumps you to a screen AND clears it is two
     // actions wearing one key.
-    onNewChat: () => setView("code"),
+    onNewChat: () => navigate("code"),
     onNavigate: (i) => {
       const order: View[] = ["code", "work", "knowledge", "automation"];
       const target = order[i - 1];
-      if (target) setView(target);
+      if (target) navigate(target);
     },
   });
 
@@ -110,7 +114,7 @@ export default function App() {
       <Onboarding
         onSkip={() => {
           setSkipOnboarding(true);
-          setView("settings");
+          navigate("settings");
         }}
       />
     );
@@ -131,11 +135,11 @@ export default function App() {
         viewKey={view}
         viewLabel={t(`nav.${view}`)}
         // Usage lives in Settings now; the cost chip still takes you straight there.
-        onOpenUsage={() => setView("settings")}
+        onOpenUsage={() => navigate("settings")}
         rail={
           <IconRail
             view={view}
-            onSelect={setView}
+            onSelect={navigate}
             dark={dark}
             onToggleTheme={toggle}
             ignite={ignite}
