@@ -50,6 +50,17 @@ class GrepTool(_WorkspaceTool):
         "required": ["pattern"],
     }
 
+    def __init__(self, workspace: Path | None = None, *, trust_workspace: bool = True) -> None:
+        super().__init__(workspace)
+        # Same reasoning as ReadFileTool, and the same bypass if it is missing. A red-team pass on
+        # 2026-07-18 found that reading an attacker-controlled file returned its bytes and never
+        # tainted the run, so the whole taint machinery silently no-op'd for that entry point while
+        # the identical payload was blocked when it arrived through a fetch. `read_file` was fixed;
+        # this tool returns content from the same files and was not, so the bypass simply moved one
+        # tool over. Default still trusts the workspace — your own repo must not trip `--taint` on
+        # every search.
+        self.untrusted_output = not trust_workspace
+
     def run(self, **kwargs: Any) -> str:
         try:
             regex = re.compile(str(kwargs["pattern"]))

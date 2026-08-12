@@ -81,7 +81,7 @@ def default_registry(
     registry.register(EditFileTool(workspace, write_region=write_region))
     registry.register(ApplyPatchTool(workspace, write_region=write_region))
     registry.register(ListDirTool(workspace))
-    registry.register(GrepTool(workspace))
+    registry.register(GrepTool(workspace, trust_workspace=trust_workspace))
     registry.register(GlobTool(workspace))
     registry.register(RunShellTool(workspace, get_sandbox(), confirm=confirm))
     registry.register(HttpGetTool())
