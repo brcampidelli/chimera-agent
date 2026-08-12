@@ -1,6 +1,7 @@
 import { Square } from "lucide-react";
 
 import { BrandMark } from "@/components/BrandMark";
+import { ServerBadge } from "@/components/ServerBadge";
 import { VersionBadge } from "@/components/VersionBadge";
 import { focusRing } from "@/components/ui/focus";
 import { useAgent } from "@/lib/agent-context";
@@ -112,6 +113,7 @@ export function AgentStatusBar({ onOpenUsage }: { onOpenUsage?: () => void }) {
         </button>
       )}
 
+      <ServerBadge />
       <VersionBadge />
     </footer>
   );

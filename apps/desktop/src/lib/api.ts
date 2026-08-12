@@ -36,16 +36,19 @@ import type {
   UsageSummary,
   VersionInfo,
 } from "@/lib/types";
+import { apiUrl, token } from "@/lib/server";
 
-// The backend injects the bearer token into the page (as a meta tag) only for a loopback client, when
-// CHIMERA_SERVER_TOKEN is set. We forward it so the guarded endpoints work; when no token is set the
-// meta is absent and nothing is sent (the localhost default is unauthenticated).
-const SERVER_TOKEN =
-  (document.querySelector('meta[name="chimera-token"]') as HTMLMetaElement | null)?.content ?? "";
-
+// Where the request goes and which token it carries both come from `server.ts`: the local sidecar
+// keeps the shipped behaviour exactly (relative path, token from the meta tag the backend injects
+// for a loopback client), and a remote server supplies its own base URL and its own token, because
+// a remotely-served page is never given one.
+//
+// Read per call, never captured at module load: the active server can change while the window is
+// open, and a constant here would keep sending to the previous one until relaunch.
 function authHeaders(extra?: HeadersInit): HeadersInit {
   const base: Record<string, string> = { "Content-Type": "application/json" };
-  if (SERVER_TOKEN) base.Authorization = `Bearer ${SERVER_TOKEN}`;
+  const bearer = token();
+  if (bearer) base.Authorization = `Bearer ${bearer}`;
   return { ...base, ...(extra ?? {}) };
 }
 
@@ -58,11 +61,12 @@ function authHeaders(extra?: HeadersInit): HeadersInit {
  *  then answers `422 field required` about a file that was in the request all along, which reads to
  *  the user as "the upload is broken" and to a developer as "the endpoint is wrong". */
 function authHeadersNoContentType(): HeadersInit {
-  return SERVER_TOKEN ? { Authorization: `Bearer ${SERVER_TOKEN}` } : {};
+  const bearer = token();
+  return bearer ? { Authorization: `Bearer ${bearer}` } : {};
 }
 
 async function json<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, { ...init, headers: authHeaders(init?.headers) });
+  const res = await fetch(apiUrl(path), { ...init, headers: authHeaders(init?.headers) });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return (await res.json()) as T;
 }
@@ -283,7 +287,7 @@ export async function streamKanbanRun(
 ): Promise<void> {
   let res: Response;
   try {
-    res = await fetch("/api/kanban/run", {
+    res = await fetch(apiUrl("/api/kanban/run"), {
       method: "POST",
       headers: authHeaders(),
       body: JSON.stringify(req),
@@ -366,7 +370,7 @@ export async function streamChat(
 ): Promise<void> {
   let res: Response;
   try {
-    res = await fetch("/api/chat/stream", {
+    res = await fetch(apiUrl("/api/chat/stream"), {
       method: "POST",
       headers: authHeaders(),
       body: JSON.stringify({ message, session_id: sessionId, stream: true, fuse }),
@@ -506,7 +510,7 @@ export async function streamRun(
 ): Promise<void> {
   let res: Response;
   try {
-    res = await fetch("/api/runs", {
+    res = await fetch(apiUrl("/api/runs"), {
       method: "POST",
       headers: authHeaders(),
       body: JSON.stringify(req),
@@ -663,7 +667,7 @@ export interface Attachment {
 export async function uploadAttachment(file: File): Promise<Attachment> {
   const body = new FormData();
   body.append("file", file);
-  const res = await fetch("/api/attachments", {
+  const res = await fetch(apiUrl("/api/attachments"), {
     method: "POST",
     headers: authHeadersNoContentType(),
     body,
@@ -706,7 +710,7 @@ export interface Transcript {
 export async function transcribe(audio: Blob): Promise<Transcript> {
   const body = new FormData();
   body.append("file", audio, "speech.webm");
-  const res = await fetch("/api/transcribe", {
+  const res = await fetch(apiUrl("/api/transcribe"), {
     method: "POST",
     headers: authHeadersNoContentType(),
     body,
@@ -733,7 +737,7 @@ export async function streamCodeTurn(
 ): Promise<void> {
   let res: Response;
   try {
-    res = await fetch("/api/code/turn", {
+    res = await fetch(apiUrl("/api/code/turn"), {
       method: "POST",
       headers: authHeaders(),
       body: JSON.stringify(req),
@@ -1032,7 +1036,7 @@ export async function streamAgents(
 ): Promise<void> {
   let res: Response;
   try {
-    res = await fetch("/api/agents", {
+    res = await fetch(apiUrl("/api/agents"), {
       method: "POST",
       headers: authHeaders(),
       body: JSON.stringify(req),
@@ -1117,7 +1121,7 @@ export async function streamExec(
 ): Promise<void> {
   let res: Response;
   try {
-    res = await fetch("/api/fs/exec", {
+    res = await fetch(apiUrl("/api/fs/exec"), {
       method: "POST",
       headers: authHeaders(),
       body: JSON.stringify(req),

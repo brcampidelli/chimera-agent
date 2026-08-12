@@ -293,6 +293,18 @@ class Settings(BaseSettings):
     # Optional bearer token guarding the state-changing HTTP endpoints (/a2a, /chat, /webhook/*).
     # Unset = no auth (fine for localhost); set it before exposing the server to a network.
     server_token: str | None = Field(default=None, validation_alias="CHIMERA_SERVER_TOKEN")
+    # Origins allowed to call this instance from a browser — comma-separated, empty by default.
+    #
+    # Only the desktop app pointed at a REMOTE Chimera needs this: it is served from its own
+    # loopback sidecar, so every call to another host is cross-origin and the browser drops the
+    # response unless the server names that origin. Serving the bundled SPA is same-origin and
+    # needs nothing, which is why the default stays closed.
+    #
+    # This is not the authorization boundary and must not be read as one. CORS decides which page
+    # may *read* a response; it decides nothing about who may call. `server_token` is the gate —
+    # naming an origin here without setting a token does not protect the instance, it just makes an
+    # unprotected instance reachable from a browser as well as from curl.
+    allowed_origins: str = Field(default="", validation_alias="CHIMERA_ALLOWED_ORIGINS")
     signal_api_url: str | None = Field(default=None, validation_alias="CHIMERA_SIGNAL_API_URL")
     signal_number: str | None = Field(default=None, validation_alias="CHIMERA_SIGNAL_NUMBER")
 
