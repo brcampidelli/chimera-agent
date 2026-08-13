@@ -93,6 +93,16 @@ const chrome = EditorView.theme({
   ".cm-diagnostic-warning": { borderLeftColor: "hsl(var(--warn))" },
   ".cm-diagnostic-info, .cm-diagnostic-hint": { borderLeftColor: "hsl(var(--muted-foreground))" },
   ".cm-diagnosticSource": { color: "hsl(var(--muted-foreground))" },
+
+  // The inline suggestion. `--code-comment` on purpose: it is the one colour in the palette the eye
+  // already reads as "not the program", which is exactly what a proposal is. Italic would have been
+  // the obvious second signal and is wrong here — the text is code, and slanting it makes the
+  // indentation of a multi-line suggestion impossible to compare with the lines around it.
+  ".cm-ghostText": {
+    color: "hsl(var(--code-comment))",
+    whiteSpace: "pre-wrap",
+    opacity: "0.85",
+  },
 });
 
 /**

@@ -15,7 +15,9 @@ import type {
   GitStatus,
   RouteMeta,
   Resources,
+  CompletionAcceptance,
   DiagnosticsResult,
+  InlineCompletion,
   SearchResult,
   Benchmarks,
   GovernanceAudit,
@@ -158,6 +160,33 @@ export const getDiagnostics = (
     method: "POST",
     body: JSON.stringify({ path, text, workspace: workspace || null }),
   });
+
+// --- Inline completion ---
+// `signal` is not optional decoration. Every keystroke starts a request, and a request nobody
+// aborted keeps a local GPU busy producing text for a cursor that has moved — which looks exactly
+// like a slow model from the outside. The server has its own single-flight for the same reason;
+// these are two halves of one guarantee, not a belt and braces.
+export const getInlineCompletion = (
+  prefix: string,
+  suffix: string,
+  key: string,
+  signal?: AbortSignal,
+) =>
+  json<InlineCompletion>("/api/complete/inline", {
+    method: "POST",
+    body: JSON.stringify({ prefix, suffix, key }),
+    signal,
+  });
+
+// Tab or Escape. Fire-and-forget: an unrecorded outcome costs a sample, and blocking the editor on
+// a statistic would be the wrong trade.
+export const postCompletionOutcome = (id: string, accepted: boolean) =>
+  json<CompletionAcceptance>("/api/complete/outcome", {
+    method: "POST",
+    body: JSON.stringify({ id, accepted }),
+  });
+
+export const getCompletionStats = () => json<CompletionAcceptance>("/api/complete/stats");
 
 // --- What this machine is spending ---
 // Every field is nullable and that is the contract, not an oversight: a measurement that could not

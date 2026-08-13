@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 
 import { Editor } from "@/components/editor/Editor";
 import { diagnosticsExtension } from "@/components/editor/diagnostics";
+import { inlineCompletion } from "@/components/editor/inline";
 import { getFsFile, saveFile } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { focusRing } from "@/components/ui/focus";
@@ -192,10 +193,16 @@ export function Edit({
    * reporting a clean bill of health that nobody checked, so "nothing looked" gets its own line.
    */
   const [lspNote, setLspNote] = useState("");
+  const [completionNote, setCompletionNote] = useState("");
   const pathRef = useRef(path);
   pathRef.current = path;
-  const lint = useMemo(
-    () => diagnosticsExtension(workspace, () => pathRef.current ?? "", setLspNote),
+  const extra = useMemo(
+    () => [
+      diagnosticsExtension(workspace, () => pathRef.current ?? "", setLspNote),
+      // The single-flight key is the file, so switching tabs mid-request abandons the old one
+      // rather than letting two files compete for the same local model.
+      inlineCompletion(() => pathRef.current ?? "default", setCompletionNote),
+    ],
     [workspace],
   );
 
@@ -287,12 +294,20 @@ export function Edit({
               {t("edit.lsp.unavailable", { note: lspNote })}
             </p>
           )}
+          {/* Only a STANDING problem reaches here — no model server, model not pulled. An empty
+              suggestion and a superseded request are silent, because unlike a missing diagnostic a
+              missing suggestion makes no claim about the file. */}
+          {completionNote && (
+            <p className="shrink-0 border-b border-hairline px-3 py-1.5 text-xs text-muted-foreground">
+              {t("edit.complete.unavailable", { note: completionNote })}
+            </p>
+          )}
           <div className="min-h-0 flex-1">
             <Editor
               path={path}
               doc={drafts[path] ?? disk ?? ""}
               readOnly={readOnly}
-              extra={lint}
+              extra={extra}
               onChange={draft}
               onSave={() => saveRef.current()}
             />

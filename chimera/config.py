@@ -422,6 +422,19 @@ class Settings(BaseSettings):
         default="http://localhost:11434", validation_alias="CHIMERA_OLLAMA_BASE_URL"
     )
 
+    # Inline completion in the editor: the model asked what comes after the cursor, and the hard
+    # cut on how long it may take.
+    #
+    # A **base** tag, not an instruct one, and that is not a preference. Fill-in-the-middle needs
+    # the template that consumes `suffix`; an instruct model ignores it and answers in prose, so
+    # the grey text becomes "Sure! Here is a function that...". The default names a small base
+    # model; if it is not pulled the editor says so and names the pull command, because a feature
+    # that is silently off is indistinguishable from one that is broken.
+    complete_model: str = Field(
+        default="qwen2.5-coder:1.5b-base", validation_alias="CHIMERA_COMPLETE_MODEL"
+    )
+    complete_budget_ms: int = Field(default=600, validation_alias="CHIMERA_COMPLETE_BUDGET_MS")
+
     # Deployment-level tool allowlist/denylist (names). Empty allowlist = no restriction (all
     # tools); a non-empty allowlist grants only those. Denylist removes even if allowed.
     #

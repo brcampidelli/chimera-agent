@@ -404,6 +404,38 @@ class DiagnosticsOut(BaseModel):
     note: str
 
 
+class CompletionOut(BaseModel):
+    """One inline suggestion, or an account of why there is none."""
+
+    text: str
+    #: An id to refer back to when the suggestion is accepted or dismissed. Empty when nothing was
+    #: shown, which is what keeps the acceptance rate's denominator honest.
+    id: str
+    #: False ONLY for a standing problem — no model server, model not pulled, a runtime error. A
+    #: superseded request and an empty answer are `True`: unlike a diagnostic, a missing suggestion
+    #: asserts nothing about the file, so a banner for the ordinary cases would bury the real ones.
+    available: bool
+    note: str
+    #: Round trip in milliseconds, which is the number that decides whether this feature is usable.
+    ms: int
+    model: str
+
+
+class AcceptanceOut(BaseModel):
+    """How often the suggestions are taken, on this machine.
+
+    `rate` is null until something has been accepted or dismissed. Zero would be a claim ("nobody
+    wants these") where the truth is that nobody has answered yet.
+    """
+
+    shown: int
+    accepted: int
+    dismissed: int
+    rate: float | None
+    mean_ms: int | None
+    note: str
+
+
 class GpuOut(BaseModel):
     """One GPU, as its own driver reports it. Every number is nullable on purpose."""
 

@@ -44,12 +44,14 @@ from chimera.api.maturity_api import maturity_report
 from chimera.api.roles import fusion_for_role, review_model_for
 from chimera.api.runs import load_runs
 from chimera.api.schemas import (
+    AcceptanceOut,
     AgentDefOut,
     AgentIdentityOut,
     AgentsBatchOut,
     BatchCancelOut,
     BenchmarksOut,
     CancelOut,
+    CompletionOut,
     ConfigOut,
     ConfigTestOut,
     DeletedOut,
@@ -149,6 +151,30 @@ class DiagnosticsRequest(BaseModel):
     path: str
     text: str
     workspace: str | None = None
+
+
+class CompletionRequest(BaseModel):
+    """Ask what comes after the cursor.
+
+    The text is split by the CLIENT rather than sent whole with an offset, because the editor is the
+    only party that knows where the caret is at the moment the request leaves — and a stale offset
+    against a fresher document is an off-by-one that produces a plausible suggestion in the wrong
+    place, which is the hardest kind to notice.
+
+    `key` is the single-flight bucket: one per editor tab. Requests sharing a key supersede one
+    another, so a burst of keystrokes leaves exactly one generation running.
+    """
+
+    prefix: str
+    suffix: str = ""
+    key: str = "default"
+
+
+class CompletionOutcomeRequest(BaseModel):
+    """What became of a suggestion. `id` is the one the completion came back with."""
+
+    id: str
+    accepted: bool
 
 
 class SearchRequest(BaseModel):
@@ -1067,6 +1093,57 @@ def build_api_app(
 
         ws = _resolve_fs_workspace(req.workspace)
         return diagnostics_for_buffer(ws, req.path, req.text)
+
+    @app.post("/api/complete/inline", dependencies=[guard], response_model=CompletionOut)
+    async def complete_inline_endpoint(req: CompletionRequest) -> dict[str, Any]:
+        """A fill-in-the-middle suggestion from the local model.
+
+        Async, unlike its neighbours, and for one reason: cancellation. A keystroke supersedes the
+        request before it, and the superseded one must stop OCCUPYING THE GPU — not merely have its
+        answer discarded. A thread-pool handler could not close the upstream connection early, and
+        the leak reads as "the model is slow", which sends you tuning the wrong thing.
+        """
+        from chimera.complete.inline import complete_inline
+        from chimera.complete.outcomes import record_shown
+
+        found = await complete_inline(
+            req.prefix,
+            req.suffix,
+            base_url=settings.ollama_base_url,
+            model=settings.complete_model,
+            key=req.key,
+            budget_ms=settings.complete_budget_ms,
+        )
+        ident = ""
+        if found.text:
+            ident = record_shown(
+                Path(settings.home), ms=found.ms, chars=len(found.text), model=found.model
+            )
+        return {
+            "text": found.text,
+            "id": ident,
+            "available": found.available,
+            "note": found.note,
+            "ms": found.ms,
+            "model": found.model,
+        }
+
+    @app.post("/api/complete/outcome", dependencies=[guard], response_model=AcceptanceOut)
+    def complete_outcome_endpoint(req: CompletionOutcomeRequest) -> dict[str, Any]:
+        """Record a Tab or an Escape, and answer with the rate so far."""
+        from chimera.complete.outcomes import acceptance, record_outcome
+
+        home = Path(settings.home)
+        record_outcome(home, ident=req.id, accepted=req.accepted)
+        return acceptance(home)
+
+    @app.get("/api/complete/stats", dependencies=[guard], response_model=AcceptanceOut)
+    def complete_stats_endpoint() -> dict[str, Any]:
+        """The acceptance rate measured on THIS machine — the only evidence that would justify a
+        claim about how good these suggestions are. Until it has samples, `rate` is null."""
+        from chimera.complete.outcomes import acceptance
+
+        return acceptance(Path(settings.home))
 
     @app.get("/api/resources", dependencies=[guard], response_model=ResourcesOut)
     def resources_endpoint() -> dict[str, Any]:
