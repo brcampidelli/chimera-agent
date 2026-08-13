@@ -53,6 +53,7 @@ from chimera.api.schemas import (
     ConfigOut,
     ConfigTestOut,
     DeletedOut,
+    DiagnosticsOut,
     DoctorOut,
     FsBrowseOut,
     FsFileOut,
@@ -134,6 +135,20 @@ class FsFileWriteRequest(BaseModel):
     """The workspace root the write is scoped to. None = the app's launch workspace."""
     path: str
     content: str
+
+
+class DiagnosticsRequest(BaseModel):
+    """Ask the language server what is wrong with one file.
+
+    The TEXT travels, not just the path, and that is the whole design. The editor's buffer is what
+    the person is looking at; the file on disk is what they last saved. Diagnosing the saved copy
+    means every squiggle is one save behind, which is worse than none — it points at problems the
+    user already fixed.
+    """
+
+    path: str
+    text: str
+    workspace: str | None = None
 
 
 class SearchRequest(BaseModel):
@@ -1032,6 +1047,26 @@ def build_api_app(
             "elapsed_ms": result.elapsed_ms,
             "error": result.error,
         }
+
+    @app.post("/api/lsp/diagnostics", dependencies=[guard], response_model=DiagnosticsOut)
+    def lsp_diagnostics(req: DiagnosticsRequest) -> dict[str, Any]:
+        """What `ruff server` says about this buffer.
+
+        POST, and the request carries the text — see :class:`DiagnosticsRequest`. Not a WebSocket:
+        this app has never served one, `uvicorn` here is installed without `[standard]` so there is
+        no `wsproto`, a browser WebSocket cannot send an `Authorization` header, and WS does not go
+        through CORS. A new unauthenticated channel on a memorable localhost port, in a product
+        whose pitch is governance, is the worst trade available.
+
+        Synchronous rather than streamed. Diagnostics arrive as a server NOTIFICATION, so a stream
+        would be honest — but it would also be a second long-lived connection per open file, and the
+        wait here is the tens of milliseconds ruff takes on one buffer. A stream can replace this
+        without the caller changing, which is the reason the response is a list rather than an event.
+        """
+        from chimera.api.lsp_api import diagnostics_for_buffer
+
+        ws = _resolve_fs_workspace(req.workspace)
+        return diagnostics_for_buffer(ws, req.path, req.text)
 
     @app.get("/api/resources", dependencies=[guard], response_model=ResourcesOut)
     def resources_endpoint() -> dict[str, Any]:

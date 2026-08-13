@@ -817,6 +817,37 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/lsp/diagnostics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lsp Diagnostics
+         * @description What `ruff server` says about this buffer.
+         *
+         *     POST, and the request carries the text — see :class:`DiagnosticsRequest`. Not a WebSocket:
+         *     this app has never served one, `uvicorn` here is installed without `[standard]` so there is
+         *     no `wsproto`, a browser WebSocket cannot send an `Authorization` header, and WS does not go
+         *     through CORS. A new unauthenticated channel on a memorable localhost port, in a product
+         *     whose pitch is governance, is the worst trade available.
+         *
+         *     Synchronous rather than streamed. Diagnostics arrive as a server NOTIFICATION, so a stream
+         *     would be honest — but it would also be a second long-lived connection per open file, and the
+         *     wait here is the tens of milliseconds ruff takes on one buffer. A stream can replace this
+         *     without the caller changing, which is the reason the response is a list rather than an event.
+         */
+        post: operations["lsp_diagnostics_api_lsp_diagnostics_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/maturity": {
         parameters: {
             query?: never;
@@ -2091,6 +2122,57 @@ export interface components {
         DeletedOut: {
             /** Deleted */
             deleted: boolean;
+        };
+        /**
+         * DiagnosticOut
+         * @description One problem the language server found, in the editor's own coordinates.
+         */
+        DiagnosticOut: {
+            /** Code */
+            code: string;
+            /** Column */
+            column: number;
+            /** End Column */
+            end_column: number;
+            /** End Line */
+            end_line: number;
+            /** Line */
+            line: number;
+            /** Message */
+            message: string;
+            /** Path */
+            path: string;
+            /** Severity */
+            severity: string;
+        };
+        /**
+         * DiagnosticsOut
+         * @description What the language server says about one file, and whether it was able to say anything.
+         */
+        DiagnosticsOut: {
+            /** Available */
+            available: boolean;
+            /** Diagnostics */
+            diagnostics: components["schemas"]["DiagnosticOut"][];
+            /** Note */
+            note: string;
+        };
+        /**
+         * DiagnosticsRequest
+         * @description Ask the language server what is wrong with one file.
+         *
+         *     The TEXT travels, not just the path, and that is the whole design. The editor's buffer is what
+         *     the person is looking at; the file on disk is what they last saved. Diagnosing the saved copy
+         *     means every squiggle is one save behind, which is worse than none — it points at problems the
+         *     user already fixed.
+         */
+        DiagnosticsRequest: {
+            /** Path */
+            path: string;
+            /** Text */
+            text: string;
+            /** Workspace */
+            workspace?: string | null;
         };
         /**
          * DictationOut
@@ -4909,6 +4991,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lsp_diagnostics_api_lsp_diagnostics_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiagnosticsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiagnosticsOut"];
                 };
             };
             /** @description Validation Error */

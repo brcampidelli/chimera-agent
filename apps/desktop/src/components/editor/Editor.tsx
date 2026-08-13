@@ -100,9 +100,25 @@ export interface EditorProps {
    * a contenteditable, which jsdom does not implement faithfully.
    */
   onReady?: (view: EditorView) => void;
+  /**
+   * Extra CodeMirror extensions — the diagnostics linter, today.
+   *
+   * Read when a document's state is BUILT, which is once per file. That is deliberate: a linter
+   * rebuilt on every render would restart its debounce on every keystroke and never fire. The
+   * closure inside it reads the current path, so one instance serves every tab.
+   */
+  extra?: Extension;
 }
 
-export function Editor({ path, doc, onChange, onSave, onReady, readOnly = false }: EditorProps) {
+export function Editor({
+  path,
+  doc,
+  onChange,
+  onSave,
+  onReady,
+  extra,
+  readOnly = false,
+}: EditorProps) {
   const host = useRef<HTMLDivElement | null>(null);
   const view = useRef<EditorView | null>(null);
   // Per-path editor state, so switching tabs keeps the cursor and the undo history.
@@ -151,6 +167,7 @@ export function Editor({ path, doc, onChange, onSave, onReady, readOnly = false 
           doc,
           extensions: [
             base,
+            ...(extra ? [extra] : []),
             languageConf.of(languageFor(path)),
             readOnlyConf.of(readOnlyOf(readOnly)),
             EditorView.updateListener.of((u) => {
