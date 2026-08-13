@@ -295,6 +295,16 @@ class Agent:
         # silently.
         if self.config.instructions:
             system_prompt = f"{system_prompt}\n\n{self.config.instructions}"
+        # Remembered here so a compaction can put it back. The task arrives as the last user message
+        # and, after enough turns, falls out of the tail that compaction keeps — leaving the agent
+        # executing a plan whose purpose was deleted. Set at the loop rather than by each caller
+        # because the caller that compacts most (the conversational coding turn) set only the open
+        # file, and the fix has to reach the callers nobody remembered.
+        #
+        # Not overwritten: `/api/runs` fills `current_state` with a richer framing before calling in,
+        # and a later turn of a conversation should not relabel the run as its own latest message.
+        if not self.run_state.task:
+            self.run_state.task = task
         # The system message is rebuilt every turn rather than carried in ``history``: skills are
         # retrieved for THIS task and the project instructions follow the file now in focus, so a
         # stale system message would pin both to whatever the first turn happened to be about.
