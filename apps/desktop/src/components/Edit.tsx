@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 
 import { Editor } from "@/components/editor/Editor";
+import { diagnosticsExtension } from "@/components/editor/diagnostics";
 import { getFsFile, saveFile } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { focusRing } from "@/components/ui/focus";
@@ -180,6 +181,24 @@ export function Edit({
   const saveRef = useRef(save.mutate);
   saveRef.current = save.mutate;
 
+  /**
+   * Diagnostics, from `ruff server` — the same rules the CI job enforces.
+   *
+   * Built ONCE per workspace and shared by every tab, because a linter rebuilt on each render
+   * restarts its own debounce on each keystroke and therefore never fires. It reads the current file
+   * through a ref for the same reason.
+   *
+   * `lspNote` is the honest half. An editor with no squiggles on a machine without ruff would be
+   * reporting a clean bill of health that nobody checked, so "nothing looked" gets its own line.
+   */
+  const [lspNote, setLspNote] = useState("");
+  const pathRef = useRef(path);
+  pathRef.current = path;
+  const lint = useMemo(
+    () => diagnosticsExtension(workspace, () => pathRef.current ?? "", setLspNote),
+    [workspace],
+  );
+
   const close = useCallback(
     (target: string) => {
       // Computed OUTSIDE the state updater. Navigating from inside one calls the parent's setState
@@ -263,11 +282,17 @@ export function Edit({
               </button>
             </div>
           )}
+          {lspNote && (
+            <p className="shrink-0 border-b border-hairline px-3 py-1.5 text-xs text-muted-foreground">
+              {t("edit.lsp.unavailable", { note: lspNote })}
+            </p>
+          )}
           <div className="min-h-0 flex-1">
             <Editor
               path={path}
               doc={drafts[path] ?? disk ?? ""}
               readOnly={readOnly}
+              extra={lint}
               onChange={draft}
               onSave={() => saveRef.current()}
             />

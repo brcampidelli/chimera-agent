@@ -45,7 +45,7 @@ _MAX_LINE = 4_000_000
 #: Everything started through this module and not yet reaped. Weak references would be wrong here:
 #: the whole point is that an abandoned process still gets killed, so the registry must be what
 #: keeps it reachable.
-_LIVE: list[StdioProcess] = []
+_LIVE: list[Any] = []
 _LIVE_LOCK = threading.Lock()
 
 #: The cmd.exe metacharacters that turn an argument into a command. A double quote is deliberately
@@ -139,6 +139,25 @@ def kill_tree(proc: subprocess.Popen[Any]) -> None:
         proc.kill()
 
 
+def track(child: Any) -> None:
+    """Register anything with a ``close(timeout)`` for the exit-time reaper.
+
+    Exists so there is exactly ONE reaper. A language server frames its messages with
+    `Content-Length` in BYTES, which needs a binary stream, while an ACP agent sends one JSON object
+    per line, which needs a text one — so the two cannot share a reader. They can and must share the
+    thing that guarantees neither survives the app: a second registry is a second list somebody
+    forgets to add to.
+    """
+    with _LIVE_LOCK:
+        _LIVE.append(child)
+
+
+def untrack(child: Any) -> None:
+    """Forget a child that closed itself. Idempotent."""
+    with _LIVE_LOCK, suppress(ValueError):
+        _LIVE.remove(child)
+
+
 def reap_all() -> None:
     """Kill everything still running. Registered with :mod:`atexit`, and callable directly.
 
@@ -218,8 +237,7 @@ class StdioProcess:
             bufsize=1,
             **_spawn_flags(),
         )
-        with _LIVE_LOCK:
-            _LIVE.append(self)
+        track(self)
         threading.Thread(target=self._read_stdout, name=f"{self.name}-out", daemon=True).start()
         threading.Thread(target=self._read_stderr, name=f"{self.name}-err", daemon=True).start()
         return self
@@ -244,8 +262,7 @@ class StdioProcess:
         proc = self._proc
         if proc is None:
             return
-        with _LIVE_LOCK, suppress(ValueError):
-            _LIVE.remove(self)
+        untrack(self)
         with suppress(Exception), self._write_lock:
             if proc.stdin and not proc.stdin.closed:
                 proc.stdin.close()

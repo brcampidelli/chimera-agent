@@ -1533,6 +1533,112 @@
         "title": "DeletedOut",
         "type": "object"
       },
+      "DiagnosticOut": {
+        "description": "One problem the language server found, in the editor's own coordinates.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "column": {
+            "title": "Column",
+            "type": "integer"
+          },
+          "end_column": {
+            "title": "End Column",
+            "type": "integer"
+          },
+          "end_line": {
+            "title": "End Line",
+            "type": "integer"
+          },
+          "line": {
+            "title": "Line",
+            "type": "integer"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "line",
+          "column",
+          "end_line",
+          "end_column",
+          "severity",
+          "code",
+          "message"
+        ],
+        "title": "DiagnosticOut",
+        "type": "object"
+      },
+      "DiagnosticsOut": {
+        "description": "What the language server says about one file, and whether it was able to say anything.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "diagnostics": {
+            "items": {
+              "$ref": "#/components/schemas/DiagnosticOut"
+            },
+            "title": "Diagnostics",
+            "type": "array"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "diagnostics",
+          "available",
+          "note"
+        ],
+        "title": "DiagnosticsOut",
+        "type": "object"
+      },
+      "DiagnosticsRequest": {
+        "description": "Ask the language server what is wrong with one file.\n\nThe TEXT travels, not just the path, and that is the whole design. The editor's buffer is what\nthe person is looking at; the file on disk is what they last saved. Diagnosing the saved copy\nmeans every squiggle is one save behind, which is worse than none \u2014 it points at problems the\nuser already fixed.",
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          }
+        },
+        "required": [
+          "path",
+          "text"
+        ],
+        "title": "DiagnosticsRequest",
+        "type": "object"
+      },
       "DictationOut": {
         "description": "Whether speech can become text here, and by which route.\n\nReported before recording. The alternative \u2014 record, upload, fail \u2014 tells someone their audio\ncould not be transcribed, which reads as \"the recording was bad\" rather than \"nothing was ever\ngoing to transcribe it\".",
         "properties": {
@@ -6735,6 +6841,45 @@
           }
         },
         "summary": "Run Kanban"
+      }
+    },
+    "/api/lsp/diagnostics": {
+      "post": {
+        "description": "What `ruff server` says about this buffer.\n\nPOST, and the request carries the text \u2014 see :class:`DiagnosticsRequest`. Not a WebSocket:\nthis app has never served one, `uvicorn` here is installed without `[standard]` so there is\nno `wsproto`, a browser WebSocket cannot send an `Authorization` header, and WS does not go\nthrough CORS. A new unauthenticated channel on a memorable localhost port, in a product\nwhose pitch is governance, is the worst trade available.\n\nSynchronous rather than streamed. Diagnostics arrive as a server NOTIFICATION, so a stream\nwould be honest \u2014 but it would also be a second long-lived connection per open file, and the\nwait here is the tens of milliseconds ruff takes on one buffer. A stream can replace this\nwithout the caller changing, which is the reason the response is a list rather than an event.",
+        "operationId": "lsp_diagnostics_api_lsp_diagnostics_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiagnosticsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiagnosticsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Lsp Diagnostics"
       }
     },
     "/api/maturity": {

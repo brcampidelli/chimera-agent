@@ -15,7 +15,9 @@ from chimera.proc.stdio import (
     kill_tree,
     reap_all,
     resolve_program,
+    track,
     unsafe_windows_argument,
+    untrack,
 )
 
 __all__ = [
@@ -23,5 +25,7 @@ __all__ = [
     "kill_tree",
     "reap_all",
     "resolve_program",
+    "track",
     "unsafe_windows_argument",
+    "untrack",
 ]

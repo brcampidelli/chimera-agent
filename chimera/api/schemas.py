@@ -375,6 +375,35 @@ class PoolWriteOut(BaseModel):
     count: int
 
 
+class DiagnosticOut(BaseModel):
+    """One problem the language server found, in the editor's own coordinates."""
+
+    path: str
+    line: int  # 0-based, as the protocol sends it
+    #: UTF-16 code units, as the protocol sends them — NOT a Python or JavaScript string index.
+    #: JavaScript strings are UTF-16, so a browser can use this directly; anything server-side has
+    #: to convert (see `chimera.lsp.positions`), and the two disagree only in files with an emoji
+    #: or CJK before the problem, which is what makes the mistake invisible until it is reported.
+    column: int
+    end_line: int
+    end_column: int
+    severity: str  # "error" | "warning" | "information" | "hint"
+    code: str  # the rule that fired, e.g. "F401"
+    message: str
+
+
+class DiagnosticsOut(BaseModel):
+    """What the language server says about one file, and whether it was able to say anything."""
+
+    diagnostics: list[DiagnosticOut]
+    #: False when no language server could be started here. The list is then empty for a reason
+    #: that is not "the file is clean", and a screen showing no squiggles either way would be
+    #: reporting a clean bill of health nobody checked.
+    available: bool
+    #: What to do about `available: false`, in the words of an install line. Empty when running.
+    note: str
+
+
 class GpuOut(BaseModel):
     """One GPU, as its own driver reports it. Every number is nullable on purpose."""
 

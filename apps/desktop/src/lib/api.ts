@@ -15,6 +15,7 @@ import type {
   GitStatus,
   RouteMeta,
   Resources,
+  DiagnosticsResult,
   SearchResult,
   Benchmarks,
   GovernanceAudit,
@@ -142,6 +143,20 @@ export const searchFiles = (
       case_sensitive: options.caseSensitive ?? false,
       glob: options.glob ?? "",
     }),
+  });
+
+// --- Diagnostics from a language server ---
+// The BUFFER travels, not just the path: the editor's text is what the person is looking at, and
+// diagnosing the saved copy would put every squiggle one save behind — pointing at problems they
+// already fixed. `available: false` is not an empty list of problems; it means nothing looked.
+export const getDiagnostics = (
+  workspace: string | null | undefined,
+  path: string,
+  text: string,
+) =>
+  json<DiagnosticsResult>("/api/lsp/diagnostics", {
+    method: "POST",
+    body: JSON.stringify({ path, text, workspace: workspace || null }),
   });
 
 // --- What this machine is spending ---

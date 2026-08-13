@@ -70,6 +70,29 @@ const chrome = EditorView.theme({
     borderRadius: "6px",
     padding: "2px 6px",
   },
+
+  // Diagnostics. `@codemirror/lint` marks a range with a wavy underline drawn as an inline SVG
+  // data URI, whose colour is baked into the image and therefore cannot follow a variable. Setting
+  // `backgroundImage: none` and using `text-decoration: underline wavy` swaps a picture of a
+  // squiggle for a real one — which is what lets the light and dark themes disagree about the shade
+  // of red without shipping two images.
+  ".cm-lintRange": { backgroundImage: "none", textDecorationSkipInk: "none" },
+  ".cm-lintRange-error": { textDecoration: "underline wavy hsl(var(--bad))" },
+  ".cm-lintRange-warning": { textDecoration: "underline wavy hsl(var(--warn))" },
+  ".cm-lintRange-info, .cm-lintRange-hint": {
+    textDecoration: "underline wavy hsl(var(--muted-foreground))",
+  },
+  ".cm-tooltip.cm-tooltip-lint": {
+    backgroundColor: "hsl(var(--surface-2))",
+    border: "1px solid hsl(var(--border))",
+    borderRadius: "6px",
+    color: "hsl(var(--foreground))",
+  },
+  ".cm-diagnostic": { padding: "4px 8px", borderLeftWidth: "3px", borderLeftStyle: "solid" },
+  ".cm-diagnostic-error": { borderLeftColor: "hsl(var(--bad))" },
+  ".cm-diagnostic-warning": { borderLeftColor: "hsl(var(--warn))" },
+  ".cm-diagnostic-info, .cm-diagnostic-hint": { borderLeftColor: "hsl(var(--muted-foreground))" },
+  ".cm-diagnosticSource": { color: "hsl(var(--muted-foreground))" },
 });
 
 /**

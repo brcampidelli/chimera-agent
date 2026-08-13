@@ -8,6 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Diagnostics in the editor, from `ruff server`.** `POST /api/lsp/diagnostics` speaks LSP to a
+  language server held warm per workspace, and the editor underlines what it reports. `ruff` and not
+  a general server because it already gates every commit here: a squiggle in the editor is something
+  the build will also complain about, and a warning CI does not care about teaches people to stop
+  reading warnings.
+  - The buffer travels with the request, so the file you are looking at is the file being checked —
+    diagnosing the saved copy would put every squiggle one save behind, pointing at problems already
+    fixed.
+  - **Positions are converted, not assumed.** The protocol counts columns in UTF-16 code units and
+    Python counts code points; the two agree on every ASCII file and disagree by one per emoji or
+    other astral character. `chimera/lsp/positions.py` converts both directions, a property test
+    sweeps every character boundary of a mixed string, and a measured case pins the real off-by-one
+    (a `ruff` diagnostic that lands on `s` instead of `os` without it). The browser half does *not*
+    convert, because JavaScript strings are already UTF-16 — converting twice would break exactly
+    the files the conversion exists for.
+  - **"No problems" and "nothing looked" are different answers.** A machine without `ruff`, a
+    non-Python file, a server that failed to start — each returns `available: false` with a reason
+    rather than an empty list, because an editor showing no squiggles either way would be reporting
+    a clean bill of health nobody checked.
 - **Local retrieval over a repository** (`chimera/rag/`): symbol-level chunking over Python's AST,
   one SQLite file with an FTS5 index and optional vectors, and RRF fusion of the two rankings. The
   embedder is injected, so a machine without one gets keyword retrieval rather than an error, and
