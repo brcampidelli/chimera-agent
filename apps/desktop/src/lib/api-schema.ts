@@ -317,6 +317,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/complete/inline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Complete Inline Endpoint
+         * @description A fill-in-the-middle suggestion from the local model.
+         *
+         *     Async, unlike its neighbours, and for one reason: cancellation. A keystroke supersedes the
+         *     request before it, and the superseded one must stop OCCUPYING THE GPU — not merely have its
+         *     answer discarded. A thread-pool handler could not close the upstream connection early, and
+         *     the leak reads as "the model is slow", which sends you tuning the wrong thing.
+         */
+        post: operations["complete_inline_endpoint_api_complete_inline_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/complete/outcome": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Complete Outcome Endpoint
+         * @description Record a Tab or an Escape, and answer with the rate so far.
+         */
+        post: operations["complete_outcome_endpoint_api_complete_outcome_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/complete/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Complete Stats Endpoint
+         * @description The acceptance rate measured on THIS machine — the only evidence that would justify a
+         *     claim about how good these suggestions are. Until it has samples, `rate` is null.
+         */
+        get: operations["complete_stats_endpoint_api_complete_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/config": {
         parameters: {
             query?: never;
@@ -1482,6 +1548,27 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * AcceptanceOut
+         * @description How often the suggestions are taken, on this machine.
+         *
+         *     `rate` is null until something has been accepted or dismissed. Zero would be a claim ("nobody
+         *     wants these") where the truth is that nobody has answered yet.
+         */
+        AcceptanceOut: {
+            /** Accepted */
+            accepted: number;
+            /** Dismissed */
+            dismissed: number;
+            /** Mean Ms */
+            mean_ms: number | null;
+            /** Note */
+            note: string;
+            /** Rate */
+            rate: number | null;
+            /** Shown */
+            shown: number;
+        };
+        /**
          * AgentDefOut
          * @description One agent you can send work to — as distinct from the one you converse with.
          *
@@ -2041,6 +2128,60 @@ export interface components {
             workspace?: string | null;
             /** Write Region */
             write_region?: string[] | null;
+        };
+        /**
+         * CompletionOut
+         * @description One inline suggestion, or an account of why there is none.
+         */
+        CompletionOut: {
+            /** Available */
+            available: boolean;
+            /** Id */
+            id: string;
+            /** Model */
+            model: string;
+            /** Ms */
+            ms: number;
+            /** Note */
+            note: string;
+            /** Text */
+            text: string;
+        };
+        /**
+         * CompletionOutcomeRequest
+         * @description What became of a suggestion. `id` is the one the completion came back with.
+         */
+        CompletionOutcomeRequest: {
+            /** Accepted */
+            accepted: boolean;
+            /** Id */
+            id: string;
+        };
+        /**
+         * CompletionRequest
+         * @description Ask what comes after the cursor.
+         *
+         *     The text is split by the CLIENT rather than sent whole with an offset, because the editor is the
+         *     only party that knows where the caret is at the moment the request leaves — and a stale offset
+         *     against a fresher document is an off-by-one that produces a plausible suggestion in the wrong
+         *     place, which is the hardest kind to notice.
+         *
+         *     `key` is the single-flight bucket: one per editor tab. Requests sharing a key supersede one
+         *     another, so a burst of keystrokes leaves exactly one generation running.
+         */
+        CompletionRequest: {
+            /**
+             * Key
+             * @default default
+             */
+            key: string;
+            /** Prefix */
+            prefix: string;
+            /**
+             * Suffix
+             * @default
+             */
+            suffix: string;
         };
         /** ConfigOut */
         ConfigOut: {
@@ -4068,6 +4209,92 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    complete_inline_endpoint_api_complete_inline_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompletionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompletionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    complete_outcome_endpoint_api_complete_outcome_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompletionOutcomeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptanceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    complete_stats_endpoint_api_complete_stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptanceOut"];
                 };
             };
         };

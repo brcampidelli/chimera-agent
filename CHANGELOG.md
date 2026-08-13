@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Inline completion in the editor, from a local model.** Grey text ahead of the cursor; Tab takes
+  it, Escape refuses it. Fill-in-the-middle through Ollama's `/api/generate`, so the model sees the
+  text on **both** sides of the caret — without the suffix it writes the closing brace you already
+  have. The model name is a setting whose default is a *base* tag, because an instruct tag ignores
+  `suffix` and answers in prose.
+  - **Cancellation is the engineering, not the model.** Every keystroke supersedes the request
+    before it, and a superseded request that keeps generating occupies a local GPU with text nobody
+    will read while the next one queues behind it. The symptom would be "the model is slow", which
+    sends you tuning the wrong thing. So the upstream call is streamed and abandoned between chunks,
+    which closes the connection — the tests prove it against a server that records exactly when the
+    client hung up, on a machine with no GPU in it.
+  - **No claim about how good the suggestions are.** Every suggestion shown is counted, and Tab and
+    Escape are counted against it (`GET /api/complete/stats`). The rate is `null` until something
+    has been answered — zero would be a claim where the truth is that nobody has replied yet. The
+    ledger holds no code: an acceptance rate does not need to know what you were writing.
+  - Without a local model the editor says so once and **stops asking**, rather than retrying a dead
+    port on every keystroke.
 - **Diagnostics in the editor, from `ruff server`.** `POST /api/lsp/diagnostics` speaks LSP to a
   language server held warm per workspace, and the editor underlines what it reports. `ruff` and not
   a general server because it already gates every commit here: a squiggle in the editor is something

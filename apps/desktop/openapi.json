@@ -1,6 +1,59 @@
 {
   "components": {
     "schemas": {
+      "AcceptanceOut": {
+        "description": "How often the suggestions are taken, on this machine.\n\n`rate` is null until something has been accepted or dismissed. Zero would be a claim (\"nobody\nwants these\") where the truth is that nobody has answered yet.",
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "integer"
+          },
+          "dismissed": {
+            "title": "Dismissed",
+            "type": "integer"
+          },
+          "mean_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Ms"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate"
+          },
+          "shown": {
+            "title": "Shown",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "shown",
+          "accepted",
+          "dismissed",
+          "rate",
+          "mean_ms",
+          "note"
+        ],
+        "title": "AcceptanceOut",
+        "type": "object"
+      },
       "AgentDefOut": {
         "description": "One agent you can send work to \u2014 as distinct from the one you converse with.\n\nShares its field names with ``AgentIdentityOut`` on purpose: an agent is an agent, and the two\nshould be copyable between each other without a translation layer. What it adds is an ``id``\n(its handle, and the Kanban lane it answers on) and a tool allowlist.",
         "properties": {
@@ -1287,6 +1340,88 @@
           "message"
         ],
         "title": "CodeTurnRequest",
+        "type": "object"
+      },
+      "CompletionOut": {
+        "description": "One inline suggestion, or an account of why there is none.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "ms": {
+            "title": "Ms",
+            "type": "integer"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "id",
+          "available",
+          "note",
+          "ms",
+          "model"
+        ],
+        "title": "CompletionOut",
+        "type": "object"
+      },
+      "CompletionOutcomeRequest": {
+        "description": "What became of a suggestion. `id` is the one the completion came back with.",
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "accepted"
+        ],
+        "title": "CompletionOutcomeRequest",
+        "type": "object"
+      },
+      "CompletionRequest": {
+        "description": "Ask what comes after the cursor.\n\nThe text is split by the CLIENT rather than sent whole with an offset, because the editor is the\nonly party that knows where the caret is at the moment the request leaves \u2014 and a stale offset\nagainst a fresher document is an off-by-one that produces a plausible suggestion in the wrong\nplace, which is the hardest kind to notice.\n\n`key` is the single-flight bucket: one per editor tab. Requests sharing a key supersede one\nanother, so a burst of keystrokes leaves exactly one generation running.",
+        "properties": {
+          "key": {
+            "default": "default",
+            "title": "Key",
+            "type": "string"
+          },
+          "prefix": {
+            "title": "Prefix",
+            "type": "string"
+          },
+          "suffix": {
+            "default": "",
+            "title": "Suffix",
+            "type": "string"
+          }
+        },
+        "required": [
+          "prefix"
+        ],
+        "title": "CompletionRequest",
         "type": "object"
       },
       "ConfigOut": {
@@ -5684,6 +5819,103 @@
           }
         },
         "summary": "Code Worth"
+      }
+    },
+    "/api/complete/inline": {
+      "post": {
+        "description": "A fill-in-the-middle suggestion from the local model.\n\nAsync, unlike its neighbours, and for one reason: cancellation. A keystroke supersedes the\nrequest before it, and the superseded one must stop OCCUPYING THE GPU \u2014 not merely have its\nanswer discarded. A thread-pool handler could not close the upstream connection early, and\nthe leak reads as \"the model is slow\", which sends you tuning the wrong thing.",
+        "operationId": "complete_inline_endpoint_api_complete_inline_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompletionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompletionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Complete Inline Endpoint"
+      }
+    },
+    "/api/complete/outcome": {
+      "post": {
+        "description": "Record a Tab or an Escape, and answer with the rate so far.",
+        "operationId": "complete_outcome_endpoint_api_complete_outcome_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompletionOutcomeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptanceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Complete Outcome Endpoint"
+      }
+    },
+    "/api/complete/stats": {
+      "get": {
+        "description": "The acceptance rate measured on THIS machine \u2014 the only evidence that would justify a\nclaim about how good these suggestions are. Until it has samples, `rate` is null.",
+        "operationId": "complete_stats_endpoint_api_complete_stats_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptanceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Complete Stats Endpoint"
       }
     },
     "/api/config": {
