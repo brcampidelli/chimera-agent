@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "chimera-api",
-      "runtimeExecutable": "chimera",
-      "runtimeArgs": ["app", "--port", "8765"],
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "chimera", "app", "--port", "8765"],
       "port": 8765
     },
     {
@@ -12,6 +12,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "apps/desktop", "run", "dev"],
       "port": 5173
+    },
+    {
+      "name": "site",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "../chimera-site", "run", "dev"],
+      "port": 3000
     }
   ]
 }
