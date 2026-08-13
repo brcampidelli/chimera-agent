@@ -55,6 +55,27 @@
   /* The dim behind a modal. Heavier on dark, where the page is already low-contrast. */
   --scrim: 222 47% 4% / 0.6;
 
+  /* Syntax. The editor's highlighting is design, not decoration, so it lives here with every other
+     colour rather than inside a theme object the design gate cannot see — and it follows light/dark
+     for free. `--code-plain` is deliberately `--foreground`: unclassified text should read as text.
+     Hues are picked off the existing accents (blue keyword, cyan type) so a highlighted file looks
+     like it belongs to this app rather than to whichever editor theme was copied in. */
+  --code-plain: 210 22% 91%;
+  --code-comment: 214 14% 52%;
+  --code-keyword: 217 91% 72%;
+  --code-string: 152 48% 62%;
+  --code-number: 28 90% 68%;
+  --code-function: 189 84% 66%;
+  --code-type: 189 70% 74%;
+  --code-variable: 210 22% 86%;
+  --code-punctuation: 214 14% 62%;
+  --code-invalid: 0 72% 62%;
+  /* The editor's own furniture: the line you are on, the matched selection, the gutter's numbers. */
+  --code-active-line: 222 40% 100% / 0.04;
+  --code-selection: 217 91% 62% / 0.28;
+  --code-match: 38 92% 50% / 0.3;
+  --code-gutter: 214 14% 45%;
+
   --elev: 0 12px 30px -12px rgba(0, 0, 0, 0.72), 0 2px 6px -2px rgba(0, 0, 0, 0.5),
     inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 0 0 1px rgba(255, 255, 255, 0.02);
   --elev-lg: 0 30px 70px -18px rgba(0, 0, 0, 0.78), inset 0 1px 0 rgba(255, 255, 255, 0.07);
@@ -100,6 +121,24 @@
   --surface-2: 214 34% 97%;
   --surface-hover: 214 30% 93%;
   --scrim: 222 30% 20% / 0.35;
+
+  /* The light half of the syntax palette. Every token above has a counterpart here — a missing one
+     would be invisible rather than merely wrong, because the dark value is chosen to sit on a dark
+     page. Darkened and desaturated: the same hues at dark-theme lightness are unreadable on white. */
+  --code-plain: 222 47% 14%;
+  --code-comment: 222 12% 48%;
+  --code-keyword: 217 82% 42%;
+  --code-string: 152 52% 30%;
+  --code-number: 24 78% 38%;
+  --code-function: 199 84% 34%;
+  --code-type: 189 72% 30%;
+  --code-variable: 222 30% 26%;
+  --code-punctuation: 222 12% 40%;
+  --code-invalid: 0 72% 46%;
+  --code-active-line: 222 40% 20% / 0.05;
+  --code-selection: 217 91% 52% / 0.2;
+  --code-match: 32 95% 44% / 0.28;
+  --code-gutter: 222 12% 52%;
 
   --elev: 0 10px 26px -12px rgba(30, 50, 90, 0.2), 0 1px 3px rgba(30, 50, 90, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.8);
