@@ -2362,6 +2362,11 @@ export interface components {
             /** Default Model */
             default_model: string;
             /**
+             * Editor
+             * @default []
+             */
+            editor: components["schemas"]["EditorCapabilityOut"][];
+            /**
              * External Agents
              * @default []
              */
@@ -2373,6 +2378,27 @@ export interface components {
             /** Sandbox */
             sandbox: string;
             tiers: components["schemas"]["TiersOut"];
+        };
+        /**
+         * EditorCapabilityOut
+         * @description One editor capability, measured on this machine.
+         */
+        EditorCapabilityOut: {
+            /** Available */
+            available: boolean;
+            /** Detail */
+            detail: string;
+            /** Hint */
+            hint: string;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Probed
+             * @default true
+             */
+            probed: boolean;
         };
         /**
          * ExecCancelOut
@@ -2958,6 +2984,11 @@ export interface components {
             api_base: string | null;
             /** Cascade */
             cascade: boolean;
+            /**
+             * Complete Model
+             * @default
+             */
+            complete_model: string;
             /** Cost Mode */
             cost_mode: string;
             /** Default */

@@ -703,6 +703,15 @@ export function Settings() {
               onSave={(v) => save({ CHIMERA_OLLAMA_BASE_URL: v })}
             />
           </Row>
+          {/* Directly under the Ollama URL, because it is useless without it and the pair is one
+              decision. The hint carries the part nobody guesses: it must be a BASE tag. */}
+          <Row label={t("settings.row.completeModel")} hint={t("settings.hint.completeModel")}>
+            <TextField
+              value={c.models.complete_model}
+              placeholder="qwen2.5-coder:1.5b-base"
+              onSave={(v) => save({ CHIMERA_COMPLETE_MODEL: v })}
+            />
+          </Row>
           <Row label={t("settings.row.fallbackModels")} hint={t("settings.hint.fallbackModels")}>
             <TextField
               value={c.models.fallback_models.join(", ")}

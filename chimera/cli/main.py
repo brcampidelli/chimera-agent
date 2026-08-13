@@ -403,6 +403,36 @@ def doctor(
     )
     console.print(table)
 
+    # Capability by capability, measured HERE. The app ships as an installer, so this is the one
+    # place someone can find out whether the editor's diagnostics, its completion model and the
+    # external agents actually work on their machine — and, when they do not, the command that
+    # changes that. "Unavailable" without a remedy is a shrug.
+    from chimera.acp.agents import available_agents
+    from chimera.api.config_api import editor_capabilities
+
+    caps = Table(title="Capabilities", show_header=True, header_style="bold")
+    caps.add_column("Capability")
+    caps.add_column("Status")
+    caps.add_column("How to get it")
+    for row in [*editor_capabilities(settings), *available_agents()]:
+        ready = bool(row.get("available"))
+        # "configured" and "available" are different claims and get different words. A completion
+        # model nobody has reached is not available; saying so here would be a promise the editor
+        # then fails to keep, and the user would go looking for the fault in the wrong place.
+        probed = bool(row.get("probed", True))
+        status = (
+            ("[green]available[/green]" if probed else "[green]configured[/green]")
+            if ready
+            else "[yellow]not here[/yellow]"
+        )
+        caps.add_row(
+            str(row.get("label") or row.get("key")),
+            status,
+            str(row.get("detail") or "") if ready and not probed
+            else ("" if ready else str(row.get("hint") or row.get("install_hint") or "")),
+        )
+    console.print(caps)
+
     if providers:
         console.print("[green]Ready[/green] — at least one provider key is configured.")
     else:

@@ -177,6 +177,7 @@ class ModelsCfgOut(BaseModel):
     fallback_models: list[str]
     tiers: TiersOut
     ollama_base_url: str = ""
+    complete_model: str = ""
     """Where the local Ollama server lives.
 
     Distinct from ``api_base``, which applies to EVERY call: this one only points LiteLLM's Ollama
@@ -488,6 +489,21 @@ class ExternalAgentOut(BaseModel):
     notes: str
 
 
+class EditorCapabilityOut(BaseModel):
+    """One editor capability, measured on this machine."""
+
+    key: str
+    label: str
+    available: bool
+    #: Whether `available` was MEASURED or merely read from the configuration. Diagnostics resolve a
+    #: program, so True; completion only knows that a model and a URL were set, so False — and the
+    #: caller must not render the two with the same word.
+    probed: bool = True
+    detail: str
+    #: The command that turns `available: false` into true. "Unavailable" without one is a shrug.
+    hint: str
+
+
 class DoctorOut(BaseModel):
     has_any_key: bool
     configured_providers: list[str]
@@ -497,6 +513,7 @@ class DoctorOut(BaseModel):
     cache: bool
     sandbox: str
     external_agents: list[ExternalAgentOut] = []
+    editor: list[EditorCapabilityOut] = []
 
 
 class ConfigTestOut(BaseModel):
