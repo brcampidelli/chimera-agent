@@ -5,6 +5,7 @@ import {
   ListChecks,
   FileCode2,
   Gauge,
+  PencilRuler,
   Settings as SettingsIcon,
   Moon,
   Sun,
@@ -28,6 +29,7 @@ export const VIEWS = [
   "automation",
   "work",
   "code",
+  "edit",
   "maturity",
   "settings",
 ] as const;
@@ -43,6 +45,9 @@ const NAV: { view: View; labelKey: string; icon: ComponentType<{ className?: str
   // Código first: it is where the work starts. Trabalho is where you go to look at what a run DID,
   // which is a second step by definition — and the rail's order is the app's opinion about that.
   { view: "code", labelKey: "nav.code", icon: FileCode2 },
+  // Second, next to the conversation and not inside it: asking and editing are different postures,
+  // and the screen that begins with "what do you want done" cannot also begin with a file tree.
+  { view: "edit", labelKey: "nav.edit", icon: PencilRuler },
   { view: "work", labelKey: "nav.work", icon: ListChecks },
   { view: "knowledge", labelKey: "nav.knowledge", icon: Brain },
   { view: "automation", labelKey: "nav.automation", icon: Clock },

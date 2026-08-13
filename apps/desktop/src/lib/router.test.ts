@@ -46,6 +46,15 @@ describe("parseHash", () => {
     expect([...parseHash("#/work").params.keys()]).toEqual([]);
   });
 
+  it("addresses a file in the editor", () => {
+    // The whole point of putting the screen in the URL: "open this file" becomes a link that a
+    // diagnostic, a search hit or a tool event can produce, instead of a callback threaded through
+    // the shell. Round-tripped because a Windows path is full of characters a URL must encode.
+    const route = parseHash(formatHash("edit", { file: "src\\lib\\api.ts" }));
+    expect(route.view).toBe("edit");
+    expect(route.params.get("file")).toBe("src\\lib\\api.ts");
+  });
+
   it("refuses a dev-only screen in a shipped build", () => {
     // Maturity needs a source checkout. Parsing it in a release would land on a blank screen, which
     // reads as a broken app rather than a link that no longer applies.

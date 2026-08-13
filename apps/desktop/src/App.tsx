@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { IconRail, type View } from "@/components/IconRail";
 import { useRoute } from "@/lib/router";
@@ -20,7 +20,41 @@ import { ErrorState } from "@/components/ui/async";
 import { getDoctor } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { applyTheme, readTheme, resolveTheme, type Theme } from "@/lib/theme";
+import { readWorkspace, writeWorkspace } from "@/lib/workspace";
 import { useIgnition } from "@/lib/useIgnition";
+
+/**
+ * The editor arrives on demand.
+ *
+ * CodeMirror and its six grammars weigh 609 kB (215 kB gzipped) — measured by building both ways —
+ * on a screen most sessions never open. Eager, they grew the bundle by 30%; deferred, the main
+ * bundle moves by under 10 kB. Everything else here is loaded up front because it is small and
+ * because a split you cannot justify is just a loading state you invented; this one pays for
+ * itself, and it is the pattern the language server and the completion model will need next.
+ *
+ * Splitting is possible at all because the screen has an ADDRESS. Deciding what to load by looking
+ * at the route is the first thing the router bought that a `useState` could not.
+ */
+const Edit = lazy(() => import("@/components/Edit").then((m) => ({ default: m.Edit })));
+const EditSidebar = lazy(() =>
+  import("@/components/editor/EditSidebar").then((m) => ({ default: m.EditSidebar })),
+);
+
+/** A chunk that is still arriving. Centred and quiet — this is a fraction of a second on local
+ *  disk, and a heavy skeleton would be more noticeable than the wait it covers. */
+function Loading({ children }: { children: ReactNode }) {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-full items-center justify-center">
+          <Spinner />
+        </div>
+      }
+    >
+      {children}
+    </Suspense>
+  );
+}
 
 /**
  * The theme preference, persisted.
@@ -65,13 +99,22 @@ export default function App() {
   // The screen lives in the URL now. It was a `useState`, which is enough until something outside
   // this switch needs to point at a place — "open this file at line 42" from a diagnostic or a
   // search hit — and until open editor tabs need to survive a reload and answer the back button.
-  const { view, navigate } = useRoute();
+  const { route, view, navigate, setParams } = useRoute();
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // The editor's folder. It lives here rather than inside the screen because the sidebar and the
+  // editor are two different AppShell slots, so their common state has to sit above both. Same
+  // stored value the chat screen uses — one app, one current project.
+  const [editWorkspace, setEditWorkspace] = useState(readWorkspace);
+  const editPath = route.params.get("file");
+  const openInEditor = (file: string | null) =>
+    view === "edit" && file !== null
+      ? setParams({ file })
+      : navigate("edit", file ? { file } : undefined);
 
   // Every destination, plus every session by title. This is the long tail the rail no longer
   // carries — and the reason collapsing the rail cost nothing in reach.
   const commands: Command[] = useMemo(() => {
-    const views: View[] = ["code", "work", "knowledge", "automation", "settings"];
+    const views: View[] = ["code", "edit", "work", "knowledge", "automation", "settings"];
     return views.map((v) => ({
       id: `go-${v}`,
       label: t(`nav.${v}`),
@@ -88,7 +131,8 @@ export default function App() {
     // actions wearing one key.
     onNewChat: () => navigate("code"),
     onNavigate: (i) => {
-      const order: View[] = ["code", "work", "knowledge", "automation"];
+      // The same order as the rail, which is the only reason a number key is guessable at all.
+      const order: View[] = ["code", "edit", "work", "knowledge", "automation"];
       const target = order[i - 1];
       if (target) navigate(target);
     },
@@ -149,11 +193,33 @@ export default function App() {
         // inside itself (grouped by project, which the flat chat list could not do), so the left
         // slot stays empty rather than holding a second list of the same thing.
         inspector={view === "code" ? <Activity /> : undefined}
+        // Left = what exists. On the editor screen that is the folder you are working in — the one
+        // place in the app where finding the file IS the task rather than a detour from it.
+        context={
+          view === "edit" ? (
+            <Loading>
+              <EditSidebar
+                workspace={editWorkspace}
+                onWorkspace={(w) => {
+                  setEditWorkspace(w);
+                  writeWorkspace(w);
+                }}
+                activePath={editPath}
+                onOpen={openInEditor}
+              />
+            </Loading>
+          ) : undefined
+        }
       >
         {view === "knowledge" && <Knowledge />}
         {view === "automation" && <Automation />}
         {view === "work" && <Work />}
         {view === "code" && <Code />}
+        {view === "edit" && (
+          <Loading>
+            <Edit workspace={editWorkspace || null} path={editPath} onOpen={openInEditor} />
+          </Loading>
+        )}
         {/* Dev-only, matching the rail: in a shipped build this screen has no data. */}
         {view === "maturity" && import.meta.env.DEV && <Maturity />}
         {view === "settings" && <Settings />}

@@ -70,6 +70,17 @@ if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = () => {};
 }
 
+// CodeMirror measures text to place the cursor and the selection. jsdom's Range has no
+// `getClientRects`, so every editor test printed a stack trace per measure pass — hundreds of lines
+// of noise around a green run, which is how a REAL error goes unread. Same reasoning as the Radix
+// stubs above: jsdom does no layout, so these coordinates are untestable here either way, and the
+// editor tests assert document state rather than geometry.
+if (!Range.prototype.getClientRects) {
+  Range.prototype.getClientRects = () =>
+    Object.assign([] as DOMRect[], { item: () => null }) as unknown as DOMRectList;
+  Range.prototype.getBoundingClientRect = () => new DOMRect();
+}
+
 // Unmount anything a test rendered and drop any persisted UI state, so tests can't leak into each
 // other (VersionBadge, for one, reads localStorage on mount).
 afterEach(() => {

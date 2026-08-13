@@ -16,15 +16,27 @@ function renderRail(view: View = "code") {
 }
 
 describe("IconRail", () => {
-  it("carries four destinations, not fifteen", () => {
+  it("carries a handful of destinations, not fifteen", () => {
     renderRail();
     // Fifteen icons stopped being words and became positions to memorise. The regrouping cut them
     // to five, and merging the chat into the conversation cut one more — there was never a reason
     // for two doors to the same agent, and the one without the guard was the more permissive door.
-    // If this number creeps back up, so has the problem. (Maturity adds one in development only.)
+    // If this number creeps back up, so has the problem.
+    //
+    // The editor took the fifth slot. It earns a door rather than a corner of the conversation
+    // because `189e3c7` established that the conversation does not open with a file tree; a screen
+    // whose first act is choosing a file is a different screen, and a different screen needs an
+    // address. The ceiling is now spent: a sixth destination should replace one, not join them.
+    //
+    // Counted WITHOUT the dev-only Maturity button. That entry is absent from every shipped build,
+    // and letting it consume the budget would mean the rule protects a rail no user ever sees.
     const nav = screen.getByRole("navigation");
-    const destinations = nav.querySelectorAll("button");
-    expect(destinations.length).toBeLessThanOrEqual(5);
+    const destinations = nav.querySelectorAll("button").length;
+    // Subtracting a count rather than matching a label: the label is translated, so a locale where
+    // "Maturity" is spelled otherwise would have made this rule fail for a reason that has nothing
+    // to do with the rail.
+    const devOnly = import.meta.env.DEV ? 1 : 0;
+    expect(destinations - devOnly).toBeLessThanOrEqual(5);
   });
 
   it("names every icon-only button", () => {
