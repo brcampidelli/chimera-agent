@@ -207,3 +207,44 @@ def test_loop_compacts_once_the_prompt_crosses_the_trigger() -> None:
     # starts contradicting its earlier self.
     assert any(s.compacted for s in result.steplog.steps)
     assert result.answer == "done"
+
+
+# --- the task survives compaction (arXiv 2608.11242 / 2608.11392) --------------------------------
+
+
+def test_the_task_is_restored_after_compaction() -> None:
+    """The first thing a naive compactor drops and the last thing an agent can do without.
+
+    The task arrives as a user message at the end of the initial prompt. After enough turns it falls
+    out of the tail compaction keeps, and `_structural_note` deliberately does not summarise content
+    — so without this the agent is left executing a plan whose purpose was deleted, holding a note
+    that says N messages were removed. A file it can re-read; an instruction it cannot.
+    """
+    state = RunState(task="Make the failing test in tests/test_auth.py pass")
+    messages: list[Any] = [{"role": "system", "content": "SYS"}]
+    messages += [{"role": "user", "content": f"turn {i}"} for i in range(20)]
+
+    compacted, changed = compact(messages, keep_recent=4, state=state)
+
+    assert changed is True
+    restored = "\n".join(str(m.get("content", "")) for m in compacted)
+    assert "Make the failing test in tests/test_auth.py pass" in restored
+
+
+def test_the_task_leads_the_restored_message() -> None:
+    # A restored plan under a forgotten task is an agent carrying out steps it can no longer justify.
+    message = RunState(task="ship the release", plan="1. bump 2. tag").as_message()
+
+    assert message is not None
+    content = str(message["content"])
+    assert content.index("ship the release") < content.index("1. bump 2. tag")
+
+
+def test_a_state_with_only_a_task_still_restores() -> None:
+    # The conversational coding turn sets nothing else, so this is the shape that actually ships.
+    assert RunState(task="rename the module").as_message() is not None
+
+
+def test_an_empty_state_restores_nothing() -> None:
+    # Unchanged: a compaction with nothing to say must not append an empty ceremonial message.
+    assert RunState().as_message() is None

@@ -95,6 +95,23 @@ class RunState:
     implicitly on every step, and that a naive summary silently drops.
     """
 
+    #: What the run was ASKED to do, verbatim.
+    #:
+    #: The first thing a naive compactor drops and the last thing an agent can do without. The task
+    #: arrives as a user message at the end of the initial prompt; after enough turns it falls out
+    #: of the kept tail, and `_structural_note` deliberately does not summarise content — so the
+    #: agent is left executing a plan whose purpose was deleted, with a note saying N messages were
+    #: removed. A file it can re-read; an instruction it cannot.
+    #:
+    #: Set by :meth:`Agent.run` itself rather than by each caller, because the callers that most
+    #: need it are the ones nobody remembered to update: `/api/runs` populates plan and tasks, and
+    #: the conversational coding turn — the screen that compacts most — set only ``open_file``.
+    #:
+    #: Two independent papers measure this failure class (arXiv 2608.11242: compactors retain 17%
+    #: of injected session constraints; 2608.11392: rule-form items survive a compaction far better
+    #: than facts). Our system message already survives verbatim, which is the half those papers
+    #: find missing; this is the other half.
+    task: str = ""
     #: Path of the file currently being worked on, and its content — re-read, not remembered.
     open_file: tuple[str, str] | None = None
     #: The plan the run is executing.
@@ -107,6 +124,10 @@ class RunState:
     def as_message(self) -> MessageLike | None:
         """Render as a single user message, or None when there is nothing to restore."""
         parts: list[str] = []
+        # First, because it is what everything else is in service of. A restored plan under a
+        # forgotten task is an agent carrying out steps it can no longer justify.
+        if self.task:
+            parts.append(f"The task you were given:\n{self.task}")
         if self.current_state:
             parts.append(f"Current state:\n{self.current_state}")
         if self.plan:
