@@ -288,6 +288,28 @@
             ],
             "title": "Profile"
           },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "provider_command": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Command"
+          },
           "repo_map": {
             "default": false,
             "title": "Repo Map",
@@ -1182,6 +1204,28 @@
             ],
             "title": "Profile"
           },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "provider_command": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Command"
+          },
           "repo_map": {
             "default": false,
             "title": "Repo Map",
@@ -1525,6 +1569,14 @@
             "title": "Default Model",
             "type": "string"
           },
+          "external_agents": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ExternalAgentOut"
+            },
+            "title": "External Agents",
+            "type": "array"
+          },
           "has_any_key": {
             "title": "Has Any Key",
             "type": "boolean"
@@ -1585,6 +1637,50 @@
           "command"
         ],
         "title": "ExecRequest",
+        "type": "object"
+      },
+      "ExternalAgentOut": {
+        "description": "One ACP agent Chimera knows how to launch, and whether it is here.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "command": {
+            "title": "Command",
+            "type": "string"
+          },
+          "install_hint": {
+            "title": "Install Hint",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string"
+          },
+          "writes_directly": {
+            "title": "Writes Directly",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "available",
+          "command",
+          "install_hint",
+          "writes_directly",
+          "notes"
+        ],
+        "title": "ExternalAgentOut",
         "type": "object"
       },
       "FileDiffOut": {
@@ -3157,6 +3253,11 @@
       "PostureFacts": {
         "description": "What is true right now, for the UI to render as one sentence.\n\nStructured rather than prose because the sentence has to exist in every language the app ships,\nand a server that returned English would quietly make this the one untranslated line on the\nscreen.",
         "properties": {
+          "external_agent": {
+            "default": "",
+            "title": "External Agent",
+            "type": "string"
+          },
           "fell_back_to_host": {
             "default": false,
             "title": "Fell Back To Host",
@@ -3221,6 +3322,17 @@
             ],
             "title": "Approval",
             "type": "string"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
           },
           "reach": {
             "default": "workspace",
@@ -3763,6 +3875,28 @@
             "default": "user",
             "title": "Profile Source",
             "type": "string"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "provider_command": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Command"
           },
           "repo_map": {
             "default": false,

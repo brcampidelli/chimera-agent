@@ -596,6 +596,14 @@ export interface CodeTurnInput {
   /** Route this turn through the fusion panel. It will not be able to use tools — see
    *  {@link CodeTurnDone.fused}, which is how the answer says so. */
   fuse?: boolean;
+  /** Hand this turn to an EXTERNAL coding agent over ACP — "claude", "gemini" or "custom".
+   *
+   *  Omit for Chimera's own loop. The events are identical either way, deliberately: the checkpoint,
+   *  the verifier and the revert are what this screen is, and they apply to any worker. What does
+   *  NOT apply is prevention — see {@link PostureFacts.external_agent}. */
+  provider?: string | null;
+  /** The command for `provider: "custom"`. Split shell-style and run WITHOUT a shell. */
+  provider_command?: string | null;
 }
 
 /** One tool call, as it happens. `arguments` and `observation` arrive already clipped server-side
@@ -610,7 +618,9 @@ export interface CodeToolEvent {
 /** The terminal `done` payload of a coding turn — what it did, what it cost, how close to the wall. */
 export interface CodeTurnDone {
   answer: string;
-  steps: number;
+  // Null for an external turn: the steps happened inside somebody else's loop and it did not say
+  // how many. Zero would read as "it did nothing".
+  steps: number | null;
   stopped_reason: string;
   tool_names: string[];
   model: string;
@@ -619,7 +629,7 @@ export interface CodeTurnDone {
   usd: number | null;
   // The largest prompt this turn built. The number that says whether raising max_steps is safe —
   // shown rather than hidden, because a ceiling raised without seeing its cost is a trap.
-  context_peak_tokens: number;
+  context_peak_tokens: number | null;
   // Typed as the real shape rather than an opaque bag: the fusion panel renders it, and an opaque
   // record forced every consumer to cast — which is how a field silently stops being rendered.
   route_meta: RouteMeta | null;
@@ -634,6 +644,19 @@ export interface CodeTurnDone {
    *  the prompt alone. Zero tool calls is the same number a turn that needed none reports, so
    *  without this flag the two are indistinguishable. */
   fused?: boolean;
+  /** The external agent that did this turn, or absent for Chimera's own loop.
+   *
+   *  Present because the two are not interchangeable on the receipt: `steps` and
+   *  `context_peak_tokens` arrive as null for an external turn — those numbers exist inside somebody
+   *  else's loop and it did not report them — and zero would read as "it did nothing". */
+  external?: string;
+  /** Permission prompts answered on your behalf. Recorded rather than hidden: we grant them because
+   *  gating a prompt the agent did not have to ask is theatre, and the honest half of that bargain
+   *  is that every grant is on the receipt. */
+  auto_approved?: string[];
+  /** Writes the agent asked us to make and the write region refused. A refusal nobody sees is
+   *  indistinguishable from a write that silently did not happen. */
+  refused_writes?: string[];
 }
 
 /** The verdict on what a turn WROTE, emitted only when the turn edited something.
@@ -821,6 +844,14 @@ export interface PostureFacts {
   // untrusted content, so the tools that would otherwise start refusing keep working. The default
   // for a chat, deliberately — and therefore something the sentence has to admit.
   unguarded: boolean;
+  // The external agent doing the work, or "" for Chimera's own loop.
+  //
+  // When set, every field above changes meaning. An ACP agent has file and shell tools of its own:
+  // it MAY route a write through our handler, where the write region applies exactly as it does
+  // natively — and it may not, in which case the region applies to nothing. So `writes` and `shell`
+  // stop being boundaries and become descriptions of the calls we happened to see. What survives is
+  // the checkpoint, and the sentence has to promise that instead.
+  external_agent: string;
 }
 
 /** Ask what a posture would mean, without committing to it.
@@ -832,10 +863,20 @@ export const getPostureFacts = (
   approval: Approval,
   workspace?: string | null,
   surface: "run" | "turn" | "chat" = "turn",
+  // Which external agent this posture applies to, if any. Sent because it changes what every other
+  // field MEANS: an ACP agent has file tools of its own, so the write region describes the calls we
+  // see rather than the ones that happen.
+  provider?: string | null,
 ) =>
   json<PostureFacts>("/api/code/posture", {
     method: "POST",
-    body: JSON.stringify({ reach, approval, workspace: workspace || null, surface }),
+    body: JSON.stringify({
+      reach,
+      approval,
+      workspace: workspace || null,
+      surface,
+      provider: provider || null,
+    }),
   });
 
 // --- Roles (which model does which job) ---

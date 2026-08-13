@@ -55,6 +55,12 @@ function Choice<T extends string>({
  *  Every clause is a translated fragment rather than a server-side sentence, so the one line that
  *  most needs to be understood is not the one line left in English. */
 function sentence(facts: NonNullable<ReturnType<typeof useFacts>["data"]>, t: TFunc): string {
+  // An external agent changes what the other clauses MEAN, so it replaces them rather than sitting
+  // beside them. "Writes inside /project" is a boundary when we own the tools and a description of
+  // what we happened to see when we do not — and the same sentence cannot be both.
+  if (facts.external_agent) {
+    return t("code.posture.saysExternal", { path: facts.workspace });
+  }
   const parts = [
     facts.writes === "nothing"
       ? t("code.posture.saysNoWrites")
@@ -65,10 +71,10 @@ function sentence(facts: NonNullable<ReturnType<typeof useFacts>["data"]>, t: TF
   return parts.join(" ");
 }
 
-function useFacts(reach: Reach, approval: Approval, workspace: string) {
+function useFacts(reach: Reach, approval: Approval, workspace: string, provider: string) {
   return useQuery({
-    queryKey: ["posture", reach, approval, workspace],
-    queryFn: () => getPostureFacts(reach, approval, workspace || null),
+    queryKey: ["posture", reach, approval, workspace, provider],
+    queryFn: () => getPostureFacts(reach, approval, workspace || null, "turn", provider || null),
     // Never cached across time: the answer depends on whether a Docker daemon is answering RIGHT
     // NOW, and a stale "runs in a container" is the single most misleading thing this can say.
     staleTime: 0,
@@ -91,6 +97,7 @@ export function PostureBar({
   onApproval,
   disabled,
   compact,
+  provider = "",
 }: {
   workspace: string;
   reach: Reach;
@@ -100,9 +107,11 @@ export function PostureBar({
   disabled?: boolean;
   /** Render as one row for the composer strip instead of a titled block. */
   compact?: boolean;
+  /** The external agent that will do the work, or "" for Chimera's own loop. */
+  provider?: string;
 }) {
   const t = useT();
-  const facts = useFacts(reach, approval, workspace);
+  const facts = useFacts(reach, approval, workspace, provider);
 
   // Compact: one row beside the composer instead of a 167px block above it.
   //
@@ -142,6 +151,12 @@ export function PostureBar({
             {t("code.posture.fellBack")}
           </p>
         ) : null}
+        {facts.data?.external_agent ? (
+          <p className="flex items-start gap-1.5 text-xs text-warn-foreground">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            {t("code.posture.externalNote")}
+          </p>
+        ) : null}
         {facts.isError ? <p className="text-xs text-bad">{t("code.posture.unknown")}</p> : null}
       </div>
     );
@@ -176,6 +191,12 @@ export function PostureBar({
             <p className="flex items-start gap-1.5 text-xs text-bad">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               {t("code.posture.fellBack")}
+            </p>
+          ) : null}
+          {facts.data.external_agent ? (
+            <p className="flex items-start gap-1.5 text-xs text-warn-foreground">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              {t("code.posture.externalNote")}
             </p>
           ) : null}
         </>

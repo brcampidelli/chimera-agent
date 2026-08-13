@@ -284,6 +284,8 @@ def read_config(settings: Settings) -> dict[str, Any]:
 
 def doctor(settings: Settings) -> dict[str, Any]:
     """A config-health snapshot (no live provider pings): which providers have keys, the model ladder."""
+    from chimera.acp.agents import available_agents
+
     ladder = settings.tier_ladder()
     return {
         "has_any_key": settings.has_any_key(),
@@ -293,6 +295,10 @@ def doctor(settings: Settings) -> dict[str, Any]:
         "memory_backend": settings.memory_backend,
         "cache": settings.cache,
         "sandbox": settings.sandbox,
+        # Capability by capability, measured on THIS machine. A frozen sidecar is built by CI on a
+        # machine nobody looked at, so "the adapter should be there" stops being evidence at exactly
+        # the point a user needs the answer — and `npx` missing reads identically to a bug in us.
+        "external_agents": available_agents(),
     }
 
 

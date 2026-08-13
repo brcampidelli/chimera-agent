@@ -1543,6 +1543,10 @@ export interface components {
             posture?: components["schemas"]["Posture"] | null;
             /** Profile */
             profile?: ("economy" | "balanced" | "max") | null;
+            /** Provider */
+            provider?: string | null;
+            /** Provider Command */
+            provider_command?: string | null;
             /**
              * Repo Map
              * @default false
@@ -1933,6 +1937,10 @@ export interface components {
             posture?: components["schemas"]["Posture"] | null;
             /** Profile */
             profile?: ("economy" | "balanced" | "max") | null;
+            /** Provider */
+            provider?: string | null;
+            /** Provider Command */
+            provider_command?: string | null;
             /**
              * Repo Map
              * @default false
@@ -2054,6 +2062,11 @@ export interface components {
             configured_providers: string[];
             /** Default Model */
             default_model: string;
+            /**
+             * External Agents
+             * @default []
+             */
+            external_agents: components["schemas"]["ExternalAgentOut"][];
             /** Has Any Key */
             has_any_key: boolean;
             /** Memory Backend */
@@ -2078,6 +2091,26 @@ export interface components {
             timeout: number;
             /** Workspace */
             workspace?: string | null;
+        };
+        /**
+         * ExternalAgentOut
+         * @description One ACP agent Chimera knows how to launch, and whether it is here.
+         */
+        ExternalAgentOut: {
+            /** Available */
+            available: boolean;
+            /** Command */
+            command: string;
+            /** Install Hint */
+            install_hint: string;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Notes */
+            notes: string;
+            /** Writes Directly */
+            writes_directly: boolean;
         };
         /** FileDiffOut */
         FileDiffOut: {
@@ -2704,6 +2737,11 @@ export interface components {
          */
         PostureFacts: {
             /**
+             * External Agent
+             * @default
+             */
+            external_agent: string;
+            /**
              * Fell Back To Host
              * @default false
              */
@@ -2742,6 +2780,8 @@ export interface components {
              * @enum {string}
              */
             approval: "always" | "suspicious" | "never";
+            /** Provider */
+            provider?: string | null;
             /**
              * Reach
              * @default workspace
@@ -2987,6 +3027,10 @@ export interface components {
              * @default user
              */
             profile_source: string;
+            /** Provider */
+            provider?: string | null;
+            /** Provider Command */
+            provider_command?: string | null;
             /**
              * Repo Map
              * @default false

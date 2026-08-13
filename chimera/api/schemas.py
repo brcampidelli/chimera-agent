@@ -375,6 +375,18 @@ class PoolWriteOut(BaseModel):
     count: int
 
 
+class ExternalAgentOut(BaseModel):
+    """One ACP agent Chimera knows how to launch, and whether it is here."""
+
+    key: str
+    label: str
+    available: bool  # resolved on THIS machine, right now — never inferred from configuration
+    command: str
+    install_hint: str  # what to DO about `available: false`; "not found" helps nobody
+    writes_directly: bool  # it has file tools of its own, so our write region is an offer it may decline
+    notes: str
+
+
 class DoctorOut(BaseModel):
     has_any_key: bool
     configured_providers: list[str]
@@ -383,6 +395,7 @@ class DoctorOut(BaseModel):
     memory_backend: str
     cache: bool
     sandbox: str
+    external_agents: list[ExternalAgentOut] = []
 
 
 class ConfigTestOut(BaseModel):

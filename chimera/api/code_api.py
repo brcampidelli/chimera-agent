@@ -152,6 +152,26 @@ class CodeSeams(BaseModel):
     deciding for the user. What is NOT optional is that the turn says so, which ``done.fused`` does.
     """
 
+    provider: str | None = None
+    """Run this turn through an EXTERNAL coding agent instead of Chimera's own loop.
+
+    ``None`` (default) is the native loop and nothing changes. A key from
+    :mod:`chimera.acp.agents` — ``claude``, ``gemini``, ``custom`` — launches that agent over ACP
+    and reports its work through this endpoint's existing events, so the transcript, the verifier,
+    the checkpoint and the revert all still apply.
+
+    What does NOT still apply is prevention. These agents have file and shell tools of their own,
+    so ``write_region`` and ``deny_tools`` govern only the calls they choose to route through us.
+    The checkpoint is what covers the rest, and :mod:`chimera.api.posture` has to say so — a
+    posture sentence that claims a boundary this turn does not have is the one lie the product
+    cannot afford."""
+
+    provider_command: str | None = None
+    """The command for ``provider="custom"``, as a shell-style string. Ignored otherwise.
+
+    Split with :func:`shlex.split` and run WITHOUT a shell. A user pointing this at their own
+    adapter is the same trust level as the verify command they already configure."""
+
     posture: Posture | None = None
     """How far the agent may reach, and when it stops to ask (see :mod:`chimera.api.posture`).
 
@@ -338,6 +358,14 @@ class PostureQuery(BaseModel):
     which means nothing marks it after it reads untrusted content and the tools that would start
     refusing keep working. Defaulting to ``"run"`` keeps every existing caller reading exactly what
     it read before."""
+
+    provider: str | None = None
+    """The external agent this posture would apply to, if any.
+
+    Asked here rather than inferred, because it changes what every other field MEANS. A turn driven
+    through Claude Code can write with its own tools, so the write region describes the calls we see
+    rather than the ones that happen — and the sentence the user reads has to say the smaller,
+    truer thing."""
 
     reach: Reach = DEFAULT_REACH
     approval: Approval = DEFAULT_APPROVAL
@@ -542,6 +570,39 @@ def register_code_api(
                 guard = WorkspaceGuard(ws)
                 before = guard.snapshot()
 
+                def _verify_and_finish(payload: dict[str, Any]) -> None:
+                    """Judge what the turn wrote and close the stream.
+
+                    Shared by both branches on purpose. The verifier, the revert offer and the
+                    receipt are what this endpoint IS; an external worker that skipped them would be
+                    a second, weaker product wearing the same screen.
+                    """
+                    if edited:
+                        from chimera.api.app import resolve_verify
+                        from chimera.core.verify import CommandVerifier
+
+                        command, source = resolve_verify(None, ws)
+                        if command is None:
+                            emit("verified", {"command": None, "source": source, "state": "none"})
+                        else:
+                            outcome = CommandVerifier(command, ws).verify()
+                            state = (
+                                "abstained" if outcome.abstained
+                                else "passed" if outcome.passed
+                                else "failed"
+                            )
+                            token = ""
+                            if state == "failed":
+                                token = uuid.uuid4().hex
+                                _pending_reverts[token] = (guard, before)
+                                while len(_pending_reverts) > _MAX_PENDING_REVERTS:
+                                    _pending_reverts.pop(next(iter(_pending_reverts)))
+                            emit("verified", {
+                                "command": command, "source": source, "state": state,
+                                "output": outcome.output[:4000], "revert_token": token,
+                            })
+                    emit("done", payload)
+
                 # Same swap the chat turn uses, under the same per-session lock: hand the agent the
                 # fusion engine for this call and restore it in `finally`. Fusion ignores tools, so
                 # this turn will not touch a file — reported as `fused` rather than left to look like
@@ -550,6 +611,40 @@ def register_code_api(
                 original_backend = getattr(agent, "backend", None) if fused else None
                 if fused:
                     agent.backend = fuse_backend  # type: ignore[assignment]
+
+                external = (req.provider or "").strip().lower()
+                if external:
+                    # Somebody else's agent does the work; everything around it is unchanged. The
+                    # snapshot above was already taken, the verifier below still runs, and the
+                    # revert offer still applies — which is the entire reason this is a branch
+                    # inside the existing turn rather than a second endpoint.
+                    from chimera.api.code_acp import done_payload, run_external_turn
+
+                    with lock_for(session_id):
+                        acp_result = run_external_turn(
+                            provider=external,
+                            command=req.provider_command,
+                            message=message,
+                            workspace=ws,
+                            session_id=session_id,
+                            images=images or None,
+                            write_region=build_write_region(req.write_region, ws),
+                            on_token=on_token if req.stream else None,
+                            on_tool=lambda name, args, ok, obs: emit(
+                                "tool", tool_event(name, args, ok, obs).data
+                            ),
+                            on_edit=on_edit,
+                        )
+                        # The conversation is the agent's, but the RECORD is ours: without this the
+                        # sidebar would show an untitled, empty session for work that really happened.
+                        session.messages.append({"role": "user", "content": message})
+                        session.messages.append({"role": "assistant", "content": acp_result.answer})
+                        store.save(session)
+                    _verify_and_finish(
+                        done_payload(acp_result, provider=external, tainted=bool(ledger.run_tainted()))
+                    )
+                    return
+
                 with lock_for(session_id):
                     result = session.send(
                         message,
@@ -563,39 +658,7 @@ def register_code_api(
                     if fused:
                         agent.backend = original_backend  # type: ignore[assignment]
                     store.save(session)
-                # Judge what the turn wrote, if it wrote anything and the project says how.
-                if edited:
-                    from chimera.api.app import resolve_verify
-                    from chimera.core.verify import CommandVerifier
-
-                    command, source = resolve_verify(None, ws)
-                    if command is None:
-                        # Said out loud rather than left as an absence: an editing turn that nothing
-                        # checked is exactly the case a user would otherwise assume was checked,
-                        # because the other button on this screen does check.
-                        emit("verified", {"command": None, "source": source, "state": "none"})
-                    else:
-                        outcome = CommandVerifier(command, ws).verify()
-                        state = (
-                            "abstained" if outcome.abstained
-                            else "passed" if outcome.passed
-                            else "failed"
-                        )
-                        token = ""
-                        if state == "failed":
-                            # OFFERED, not applied. A run reverts itself because the user asked for a
-                            # verdict; a conversation is a conversation, and silently undoing what
-                            # someone watched being typed is a worse surprise than a failing test.
-                            token = uuid.uuid4().hex
-                            _pending_reverts[token] = (guard, before)
-                            while len(_pending_reverts) > _MAX_PENDING_REVERTS:
-                                _pending_reverts.pop(next(iter(_pending_reverts)))
-                        emit("verified", {
-                            "command": command, "source": source, "state": state,
-                            "output": outcome.output[:4000], "revert_token": token,
-                        })
-                emit(
-                    "done",
+                _verify_and_finish(
                     {
                         "answer": result.answer,
                         "steps": result.steps,
@@ -624,7 +687,19 @@ def register_code_api(
 
             except Exception as exc:  # noqa: BLE001 — surfaced to the client as an error event
                 _log.warning("code turn failed: %s", exc)
-                emit("error", {"message": "the coding turn failed"})
+                # An external agent's own words when we have them. "the coding turn failed" is right
+                # for the native branch, where the failure is ours to debug — but an adapter that is
+                # not installed, or that could not authenticate, has already said something more
+                # useful than anything this line could invent, and hiding it behind a generic
+                # sentence turns a two-minute fix into a support thread.
+                from chimera.api.code_acp import failure_message
+
+                message_out = (
+                    failure_message(exc)
+                    if (req.provider or "").strip()
+                    else "the coding turn failed"
+                )
+                emit("error", {"message": message_out})
             finally:
                 loop.call_soon_threadsafe(queue.put_nowait, None)  # sentinel: end of stream
 
@@ -661,6 +736,7 @@ def register_code_api(
             # it — and when they have not, the sentence has to say so, because the whole product
             # rests on stating what is true on this machine rather than what reads better.
             guarded=req.surface != "chat" or live().guard_chat,
+            external_agent=(req.provider or "").strip().lower(),
         )
 
     @app.post("/api/code/roles", dependencies=[guard], response_model=RoleModels)

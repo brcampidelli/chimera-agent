@@ -55,6 +55,19 @@ export function makeCodeApiMock() {
     // throw "Query data cannot be undefined" in a dozen suites that have nothing to do with
     // sessions. A default of "no past conversations" is also the honest starting state.
     listCodeSessions: vi.fn(async () => []),
+    // The provider picker reads the live catalogue of external agents from here. Resolved by
+    // default with an EMPTY list, which is the state of a machine with no adapters installed — so
+    // every suite that is not about external agents sees the screen it saw before they existed.
+    getDoctor: vi.fn(async () => ({
+      has_any_key: true,
+      configured_providers: ["openrouter"],
+      default_model: "test/model",
+      tiers: { weak: "w", mid: "m", top: "t" },
+      memory_backend: "sqlite",
+      cache: true,
+      sandbox: "local",
+      external_agents: [],
+    })),
     getPausedRuns: vi.fn(),
     respondToRun: vi.fn(),
     streamAgents: vi.fn(),
@@ -70,6 +83,7 @@ export function postureFacts(over: Partial<PostureFacts> = {}): PostureFacts {
     shell: "none",
     pauses: "tainted",
     fell_back_to_host: false,
+    external_agent: "",
     // The coding turn is always assembled with the ledger, so the fixture's default is the guarded
     // case. A test that wants the unguarded chat has to ask for it — which is the right way round:
     // the warning should never appear in a suite that is not about the warning.
