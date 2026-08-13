@@ -86,6 +86,10 @@ repo can tell you, since the desktop is only ever built in CI.
 uv pip install -e . --no-deps
 uv run --no-sync python -m chimera.eval.maturity_snapshot
 uv run --no-sync python -m chimera.eval.benchmark_snapshot
+#    THREE snapshots, not two — the CLI one embeds the version too, and CI checks it. Cutting
+#    v0.44.0 with only the first two left `test_the_committed_snapshot_is_current` red, which the
+#    full suite caught and this list would not have.
+uv run --no-sync python -m chimera.cli.schema_dump > chimera/_cli_snapshot.json
 # 3. CHANGELOG: rename [Unreleased] -> [X.Y.Z] - <date>   (STABLE ONLY — an rc previews the
 #    [Unreleased] section and leaves it alone; the stable is what names and dates it)
 # 4. commit, push, then:
