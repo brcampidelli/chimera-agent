@@ -56,6 +56,10 @@ _EDITABLE_SETTINGS = {
     # its dependency is how a control ends up confirming a change it did not make: recall degrades
     # to lexical on any embedder failure, without a word on this screen.
     "CHIMERA_EMBED_MODEL",
+    # The model behind the editor's inline completion. It needs a BASE tag (an instruct model
+    # ignores the suffix and answers in prose), which is a thing nobody guesses — so the field has
+    # to be on the screen, not in a file the user has to be told about.
+    "CHIMERA_COMPLETE_MODEL",
     "CHIMERA_CACHE",
     "CHIMERA_PROMPT_CACHE",
     "CHIMERA_MEMORY_BACKEND",
@@ -252,6 +256,7 @@ def read_config(settings: Settings) -> dict[str, Any]:
             "fallback_models": list(settings.fallback_models),
             "tiers": {"weak": ladder.weak, "mid": ladder.mid, "top": ladder.top},
             "ollama_base_url": settings.ollama_base_url,
+            "complete_model": settings.complete_model,
         },
         "memory": {
             "backend": settings.memory_backend,
@@ -299,7 +304,41 @@ def doctor(settings: Settings) -> dict[str, Any]:
         # machine nobody looked at, so "the adapter should be there" stops being evidence at exactly
         # the point a user needs the answer — and `npx` missing reads identically to a bug in us.
         "external_agents": available_agents(),
+        # The editor's own capabilities, measured on THIS machine. Same reason as the agents above:
+        # a downloaded app is the exact place where "it should be installed" stops being evidence,
+        # and the answer a new user needs is "what do I install", not "something is unavailable".
+        "editor": editor_capabilities(settings),
     }
+
+
+def editor_capabilities(settings: Settings) -> list[dict[str, object]]:
+    """Diagnostics and inline completion: present or absent, with the command that fixes absent.
+
+    Neither is pinged. `ruff` is a program, so resolution answers it; the completion model lives
+    behind a server that may be on another machine, and starting a request to find out would make
+    `doctor` slow and occasionally wrong about a machine that is merely asleep. What is reported is
+    what is CONFIGURED plus whether the program is there — and the field names say which.
+    """
+    from chimera.api.lsp_api import ruff_available
+
+    return [
+        {
+            "key": "diagnostics",
+            "label": "Editor diagnostics (ruff)",
+            "available": ruff_available(),
+            "detail": "ruff server",
+            "hint": "pip install ruff (or install Chimera's 'dev' extra)",
+        },
+        {
+            "key": "completion",
+            # `available` here means CONFIGURED, and the detail says where to look — the editor
+            # itself reports the live answer, because it is the only surface that has just asked.
+            "label": "Inline completion (local model)",
+            "available": bool(settings.complete_model and settings.ollama_base_url),
+            "detail": f"{settings.complete_model or '(unset)'} at {settings.ollama_base_url or '(unset)'}",
+            "hint": f"ollama pull {settings.complete_model}" if settings.complete_model else "set CHIMERA_COMPLETE_MODEL",
+        },
+    ]
 
 
 def _write_env_var(path: Path, key: str, value: str) -> None:

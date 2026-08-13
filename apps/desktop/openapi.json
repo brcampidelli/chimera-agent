@@ -1810,6 +1810,14 @@
             "title": "Default Model",
             "type": "string"
           },
+          "editor": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/EditorCapabilityOut"
+            },
+            "title": "Editor",
+            "type": "array"
+          },
           "external_agents": {
             "default": [],
             "items": {
@@ -1844,6 +1852,40 @@
           "sandbox"
         ],
         "title": "DoctorOut",
+        "type": "object"
+      },
+      "EditorCapabilityOut": {
+        "description": "One editor capability, measured on this machine.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "hint": {
+            "title": "Hint",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "available",
+          "detail",
+          "hint"
+        ],
+        "title": "EditorCapabilityOut",
         "type": "object"
       },
       "ExecCancelOut": {
@@ -3370,6 +3412,11 @@
           "cascade": {
             "title": "Cascade",
             "type": "boolean"
+          },
+          "complete_model": {
+            "default": "",
+            "title": "Complete Model",
+            "type": "string"
           },
           "cost_mode": {
             "title": "Cost Mode",
