@@ -436,6 +436,14 @@ class AcceptanceOut(BaseModel):
     note: str
 
 
+class ExecCancelOut(BaseModel):
+    """Whether a command was actually stopped."""
+
+    #: False when there was nothing to stop: the command already finished, or it is running inside a
+    #: non-local sandbox where no host process exists to signal.
+    cancelled: bool
+
+
 class GpuOut(BaseModel):
     """One GPU, as its own driver reports it. Every number is nullable on purpose."""
 

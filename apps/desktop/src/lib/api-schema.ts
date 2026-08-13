@@ -603,6 +603,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/fs/exec/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fs Exec Cancel
+         * @description Stop a running command and everything it started.
+         *
+         *     `cancelled: false` when there was nothing to stop — a command that already finished, or one
+         *     running inside a non-local sandbox, where there is no host process to signal. Answering true
+         *     regardless would put a button on screen that does nothing and reports success.
+         */
+        post: operations["fs_exec_cancel_api_fs_exec_cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/fs/file": {
         parameters: {
             query?: never;
@@ -2349,6 +2373,22 @@ export interface components {
             /** Sandbox */
             sandbox: string;
             tiers: components["schemas"]["TiersOut"];
+        };
+        /**
+         * ExecCancelOut
+         * @description Whether a command was actually stopped.
+         */
+        ExecCancelOut: {
+            /** Cancelled */
+            cancelled: boolean;
+        };
+        /**
+         * ExecCancelRequest
+         * @description Stop the run whose id came back on the `started` event.
+         */
+        ExecCancelRequest: {
+            /** Id */
+            id: string;
         };
         /** ExecRequest */
         ExecRequest: {
@@ -4691,6 +4731,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fs_exec_cancel_api_fs_exec_cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExecCancelRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExecCancelOut"];
                 };
             };
             /** @description Validation Error */

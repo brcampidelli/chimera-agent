@@ -1846,6 +1846,34 @@
         "title": "DoctorOut",
         "type": "object"
       },
+      "ExecCancelOut": {
+        "description": "Whether a command was actually stopped.",
+        "properties": {
+          "cancelled": {
+            "title": "Cancelled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "cancelled"
+        ],
+        "title": "ExecCancelOut",
+        "type": "object"
+      },
+      "ExecCancelRequest": {
+        "description": "Stop the run whose id came back on the `started` event.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "ExecCancelRequest",
+        "type": "object"
+      },
       "ExecRequest": {
         "properties": {
           "command": {
@@ -6399,6 +6427,45 @@
           }
         },
         "summary": "Fs Exec Stream"
+      }
+    },
+    "/api/fs/exec/cancel": {
+      "post": {
+        "description": "Stop a running command and everything it started.\n\n`cancelled: false` when there was nothing to stop \u2014 a command that already finished, or one\nrunning inside a non-local sandbox, where there is no host process to signal. Answering true\nregardless would put a button on screen that does nothing and reports success.",
+        "operationId": "fs_exec_cancel_api_fs_exec_cancel_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecCancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecCancelOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Fs Exec Cancel"
       }
     },
     "/api/fs/file": {
