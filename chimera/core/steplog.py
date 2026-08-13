@@ -72,6 +72,13 @@ class StepRecord:
     #: Whether the context was compacted right after this step. Marks where history was dropped,
     #: which is the first thing to check when an agent starts contradicting its earlier self.
     compacted: bool = False
+    #: Wall-clock milliseconds spent in the model call for this step. 0 when nobody measured it.
+    #:
+    #: MEASURED, not derived. Every other number here comes from the provider's usage report, and
+    #: this one cannot: a rate needs a duration, and no provider sends one. Deriving it from the
+    #: run's total time would divide by the tool calls, the verifier and the user's thinking time —
+    #: producing a number that moves when the network is slow and calling it the model's speed.
+    elapsed_ms: int = 0
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -79,6 +86,7 @@ class StepRecord:
             "prompt_tokens": self.prompt_tokens,
             "completion_tokens": self.completion_tokens,
             "cached_tokens": self.cached_tokens,
+            "elapsed_ms": self.elapsed_ms,
             "model": self.model,
             "content": self.content,
             "compacted": self.compacted,
@@ -111,6 +119,39 @@ class StepLog:
     def compactions(self) -> int:
         """How many times history was dropped during the run."""
         return sum(1 for s in self.steps if s.compacted)
+
+    @property
+    def generation_ms(self) -> int:
+        """Wall-clock time spent waiting on the model, across the run.
+
+        Not the run's duration. The difference between the two is the tools, the verifier and the
+        time a paused run spent waiting for a person — and attributing any of that to the model is
+        how a fast model on a slow machine gets blamed for the machine.
+        """
+        return sum(s.elapsed_ms for s in self.steps)
+
+    @property
+    def tokens_per_second(self) -> float | None:
+        """Output tokens per second of time spent inside model calls.
+
+        None rather than zero when nothing was measured, and the distinction is the whole point:
+        a provider that reports no completion tokens, or a caller that never timed its steps, has
+        told us nothing about speed. Zero would say the model produced nothing, which is a claim.
+
+        Counts only steps that reported BOTH a duration and a token count, because a step missing
+        either would otherwise drag the rate toward a number no component actually produced.
+
+        What it measures is deliberately the honest, slightly pessimistic thing: wall time from
+        request to last token, so the network and the time-to-first-token are in it. That is the
+        rate a person waiting at the screen experiences, which is the one worth reporting.
+        """
+        counted = [s for s in self.steps if s.elapsed_ms > 0 and s.completion_tokens > 0]
+        if not counted:
+            return None
+        seconds = sum(s.elapsed_ms for s in counted) / 1000
+        if seconds <= 0:
+            return None
+        return sum(s.completion_tokens for s in counted) / seconds
 
     @property
     def cache_hit_rate(self) -> float | None:

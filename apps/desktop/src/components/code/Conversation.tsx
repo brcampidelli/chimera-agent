@@ -154,6 +154,12 @@ function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
       {done.context_peak_tokens !== null && done.context_peak_tokens > 0 ? (
         <Badge>{t("code.chat.peak", { n: done.context_peak_tokens.toLocaleString() })}</Badge>
       ) : null}
+      {/* Measured inside the model calls, not divided out of the turn's duration — the tools and
+          the verifier are not the model, and folding them in reports a shell command as slow
+          generation. Absent (never 0) when nothing was timed. */}
+      {done.tokens_per_second != null ? (
+        <Badge>{t("code.chat.speed", { n: Math.round(done.tokens_per_second) })}</Badge>
+      ) : null}
       {/* Every permission we answered on the user's behalf, and every write the region refused.
           Both are the receipt's half of the bargain the posture note describes. */}
       {done.auto_approved?.length ? (

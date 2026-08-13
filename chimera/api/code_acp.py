@@ -91,6 +91,9 @@ def done_payload(result: AcpTurnResult, *, provider: str, tainted: bool) -> dict
         "completion_tokens": result.completion_tokens,
         "usd": result.usd,
         "context_peak_tokens": None,
+        # Same reasoning as `steps`: the generation happened inside somebody else's loop, which
+        # timed its own calls and did not tell us.
+        "tokens_per_second": None,
         "route_meta": {"provider": provider, "external": True},
         "tainted": tainted,
         "memory_facts_used": 0,

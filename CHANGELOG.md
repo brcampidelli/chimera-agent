@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Search across the workspace.** `POST /api/fs/search` and a panel beside the file tree: hits
+  grouped by file, the matched span highlighted from offsets the server measured, and a click that
+  opens the file. ripgrep where it exists, a bounded Python walk where it does not — and the answer
+  names which one produced it, because the two are not equivalent and a silent swap would return
+  different results on different machines.
+- **What the machine is spending.** `GET /api/resources` and a panel under the activity inspector:
+  CPU, memory, and NVIDIA VRAM. Every field is nullable and an absent one renders as "unavailable",
+  never as 0% — zero VRAM reads as "the GPU is idle", and on an AMD or Apple machine that is a claim
+  about hardware we cannot see. psutil joins the `desktop` extra; without it the panel says so and
+  names the extra.
+- **Generation speed, measured.** The step log now records the wall time of each model call, so a
+  turn reports output tokens per second of time spent *inside* the model. Derived from the run's
+  duration it would have folded in the tools, the verifier and the user's own thinking.
+
 - **Drive somebody else's coding agent.** A coding turn can now be handed to Claude Code or Gemini
   CLI over the Agent Client Protocol, and it comes back through the same events as a native turn —
   same transcript, same verifier, same snapshot, same revert. Chimera's claim was never that its

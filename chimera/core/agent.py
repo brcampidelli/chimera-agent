@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import difflib
 import json
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -324,7 +325,12 @@ class Agent:
         drift_reported = False
 
         for step in range(1, self.config.max_steps + 1):
+            # Timed here and nowhere else: this call is the only thing in the loop that is the
+            # model. Measuring around the whole iteration would fold the tool calls into the rate
+            # and report a shell command as slow generation.
+            call_started = time.monotonic()
             result = self._step(messages, tools=tool_schema, on_token=on_token, usage=usage)
+            call_ms = int((time.monotonic() - call_started) * 1000)
             # `result.prompt_tokens` is the provider's own count for the prompt we just sent — which
             # is exactly the live size of the context. Keeping it per step (instead of only summing
             # it) is the whole cost of knowing how much room is left.
@@ -337,6 +343,7 @@ class Agent:
                 cached_tokens=result.cache_read_tokens,
                 model=result.model,
                 content=clip(result.content or "", 400),
+                elapsed_ms=call_ms,
             )
             steplog.add(record)
             # Compaction is decided AFTER the call, on the provider's real count for the prompt we

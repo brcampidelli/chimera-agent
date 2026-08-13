@@ -555,6 +555,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/fs/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fs Search
+         * @description Find a string across the workspace, as structured hits.
+         *
+         *     A POST because the query is user text — a `q=` in a URL is logged by every proxy between
+         *     here and nowhere, and someone searching their own repository for a token they are trying to
+         *     remove should not have it written to an access log on the way.
+         *
+         *     Read-only and scoped to the workspace, like the tree and the file reader beside it. The
+         *     answer names the engine that produced it: ripgrep where it exists, a bounded Python walk
+         *     where it does not, and never a silent swap between the two.
+         */
+        post: operations["fs_search_api_fs_search_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/fs/tree": {
         parameters: {
             query?: never;
@@ -1094,6 +1122,30 @@ export interface paths {
          *     every other request for as long as a card takes.
          */
         post: operations["step_project_api_projects__project_id__step_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/resources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Resources Endpoint
+         * @description What this machine is spending, right now.
+         *
+         *     Every field is nullable and that is the contract: a measurement that could not be taken is
+         *     absent, never zero. A panel showing 0% VRAM on an AMD card would be believed, and it would
+         *     be wrong about hardware the user is looking at.
+         */
+        get: operations["resources_endpoint_api_resources_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2264,6 +2316,20 @@ export interface components {
             populated: boolean;
         };
         /**
+         * GpuOut
+         * @description One GPU, as its own driver reports it. Every number is nullable on purpose.
+         */
+        GpuOut: {
+            /** Name */
+            name: string;
+            /** Utilisation */
+            utilisation: number | null;
+            /** Vram Total Mb */
+            vram_total_mb: number | null;
+            /** Vram Used Mb */
+            vram_used_mb: number | null;
+        };
+        /**
          * GuardCfgOut
          * @description Whether the CHAT agent is assembled with the coding turn's protections.
          *
@@ -2588,6 +2654,15 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** MemoryOut */
+        MemoryOut: {
+            /** Percent */
+            percent: number | null;
+            /** Total Mb */
+            total_mb: number | null;
+            /** Used Mb */
+            used_mb: number | null;
+        };
         /** MemoryProfileOut */
         MemoryProfileOut: {
             /** Persona */
@@ -2904,6 +2979,28 @@ export interface components {
             /** Set */
             set: boolean;
         };
+        /**
+         * ResourcesOut
+         * @description What this machine is spending, with every gap left as a gap.
+         *
+         *     Nullable throughout, and that is the contract: a measurement that could not be taken is absent,
+         *     never zero. Zero VRAM reads as "the GPU is idle" and zero CPU reads as "nothing is running" —
+         *     both are claims about a machine, and on a laptop whose GPU we cannot see, neither is ours to
+         *     make. `notes` says which tool was missing, in the words of what to install.
+         */
+        ResourcesOut: {
+            /** Cpu Count */
+            cpu_count: number | null;
+            /** Cpu Percent */
+            cpu_percent: number | null;
+            /** Gpus */
+            gpus: components["schemas"]["GpuOut"][];
+            memory: components["schemas"]["MemoryOut"];
+            /** Notes */
+            notes: string[];
+            /** Process Mb */
+            process_mb: number | null;
+        };
         /** RetiredOut */
         RetiredOut: {
             /** Retired */
@@ -3054,6 +3151,65 @@ export interface components {
             image: string;
             /** Mode */
             mode: string;
+        };
+        /**
+         * SearchHitOut
+         * @description One matching line.
+         */
+        SearchHitOut: {
+            /** End */
+            end: number;
+            /** Line */
+            line: number;
+            /** Path */
+            path: string;
+            /** Start */
+            start: number;
+            /** Text */
+            text: string;
+        };
+        /**
+         * SearchOut
+         * @description What a search found, and how honestly it found it.
+         */
+        SearchOut: {
+            /** Capped */
+            capped: boolean;
+            /** Elapsed Ms */
+            elapsed_ms: number;
+            /** Engine */
+            engine: string;
+            /** Error */
+            error: string;
+            /** Hits */
+            hits: components["schemas"]["SearchHitOut"][];
+            /** Timed Out */
+            timed_out: boolean;
+        };
+        /**
+         * SearchRequest
+         * @description Find a string across the workspace.
+         */
+        SearchRequest: {
+            /**
+             * Case Sensitive
+             * @default false
+             */
+            case_sensitive: boolean;
+            /**
+             * Glob
+             * @default
+             */
+            glob: string;
+            /** Query */
+            query: string;
+            /**
+             * Regex
+             * @default false
+             */
+            regex: boolean;
+            /** Workspace */
+            workspace?: string | null;
         };
         /** ServerCfgOut */
         ServerCfgOut: {
@@ -4304,6 +4460,39 @@ export interface operations {
             };
         };
     };
+    fs_search_api_fs_search_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SearchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     fs_tree_endpoint_api_fs_tree_get: {
         parameters: {
             query?: {
@@ -5306,6 +5495,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resources_endpoint_api_resources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResourcesOut"];
                 };
             };
         };
