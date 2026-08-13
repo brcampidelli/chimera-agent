@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Local retrieval over a repository** (`chimera/rag/`): symbol-level chunking over Python's AST,
+  one SQLite file with an FTS5 index and optional vectors, and RRF fusion of the two rankings. The
+  embedder is injected, so a machine without one gets keyword retrieval rather than an error, and
+  the repository map's PageRank is a **tiebreak only** — a central file is not evidence that it
+  answers this question.
+- **A pre-registered A/B for it** (`chimera/eval/rag_bench.py`, baseline in `bench/rag/`). Probes
+  are derived mechanically from docstrings with the symbol's own name removed, and the docstrings
+  are stripped from what gets indexed. Measured on this repository: keyword-only recall@10 of
+  **0.4925** over 400 probes on 2,691 chunks — so the ceiling a semantic layer could add is 50.75
+  points. The baseline was taken before any embedder was wired, which is what makes it a
+  pre-registration rather than a number chosen after the fact.
+
 - **Search across the workspace.** `POST /api/fs/search` and a panel beside the file tree: hits
   grouped by file, the matched span highlighted from offsets the server measured, and a click that
   opens the file. ripgrep where it exists, a bounded Python walk where it does not — and the answer

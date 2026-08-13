@@ -1,0 +1,15 @@
+{
+  "probes": 400,
+  "chunks": 2691,
+  "k": 10,
+  "keyword_recall": 0.4925,
+  "vector_recall": null,
+  "hybrid_recall": null,
+  "headroom": 0.5075,
+  "notes": [
+    "no embedder supplied \u2014 the ceiling below is what one could add at most"
+  ],
+  "corpus": "chimera/ (this repository)",
+  "date": "2026-08-13",
+  "preregistered": "Baseline taken BEFORE any embedder was wired, so the semantic number cannot be chosen after seeing what would look good. headroom is the ceiling: the most a semantic layer could add."
+}
