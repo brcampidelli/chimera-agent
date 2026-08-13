@@ -57,6 +57,7 @@ from chimera.api.schemas import (
     DeletedOut,
     DiagnosticsOut,
     DoctorOut,
+    ExecCancelOut,
     FsBrowseOut,
     FsFileOut,
     FsFileWrittenOut,
@@ -199,6 +200,12 @@ class ExecRequest(BaseModel):
     """Working directory, relative to the workspace (default: workspace root). Does NOT persist —
     each command is a fresh subprocess."""
     timeout: float = 60
+
+
+class ExecCancelRequest(BaseModel):
+    """Stop the run whose id came back on the `started` event."""
+
+    id: str
 
 
 class GitCommitRequest(BaseModel):
@@ -1164,6 +1171,7 @@ def build_api_app(
         # sandbox; honors CHIMERA_SANDBOX (non-local runs one-shot inside the sandbox, isolated). Same
         # side-effecting power as `run_shell` / a terminal in the workspace, gated the same way (bearer
         # + localhost bind). The child env scrubs provider secrets (reused from LocalSandbox).
+        from chimera.api.exec_stream import cancel as cancel_exec
         from chimera.api.exec_stream import resolve_exec_cwd, run_streamed
 
         ws = _resolve_fs_workspace(req.workspace)
@@ -1172,6 +1180,7 @@ def build_api_app(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail="invalid cwd") from exc
         timeout = max(1.0, min(float(req.timeout), 3600.0))  # clamp to the shell tool's 1..3600 cap
+        run_id = uuid.uuid4().hex
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
 
@@ -1187,6 +1196,7 @@ def build_api_app(
                     timeout=timeout,
                     on_line=lambda text: push({"kind": "line", "text": text}),
                     settings=settings,
+                    run_id=run_id,
                 )
                 push({"kind": "exit", "code": code})
             except Exception as exc:  # noqa: BLE001 — surfaced to the client as a non-zero exit
@@ -1198,13 +1208,34 @@ def build_api_app(
         threading.Thread(target=work, daemon=True).start()
 
         async def events() -> AsyncIterator[dict[str, str]]:
-            while True:
-                item = await queue.get()
-                if item is None:
-                    break
-                yield {"event": item["kind"], "data": json.dumps(item)}
+            # The id first, so a Stop button exists before there is any output to stop.
+            yield {"event": "started", "data": json.dumps({"kind": "started", "id": run_id})}
+            try:
+                while True:
+                    item = await queue.get()
+                    if item is None:
+                        break
+                    yield {"event": item["kind"], "data": json.dumps(item)}
+            finally:
+                # Closing the panel, navigating away, or losing the window ends the stream — and
+                # must end the command with it. Without this, a `npm run dev` started here holds
+                # its port until the timeout, which for a long command is an hour, and by then
+                # nobody remembers starting it. Killing an already-finished run is a no-op.
+                cancel_exec(run_id)
 
         return EventSourceResponse(events())
+
+    @app.post("/api/fs/exec/cancel", dependencies=[guard], response_model=ExecCancelOut)
+    def fs_exec_cancel(req: ExecCancelRequest) -> dict[str, Any]:
+        """Stop a running command and everything it started.
+
+        `cancelled: false` when there was nothing to stop — a command that already finished, or one
+        running inside a non-local sandbox, where there is no host process to signal. Answering true
+        regardless would put a button on screen that does nothing and reports success.
+        """
+        from chimera.api.exec_stream import cancel as cancel_exec
+
+        return {"cancelled": cancel_exec(req.id)}
 
     @app.get("/api/git/status", dependencies=[guard], response_model=GitStatusOut)
     def git_status_endpoint(workspace: str | None = None) -> dict[str, Any]:

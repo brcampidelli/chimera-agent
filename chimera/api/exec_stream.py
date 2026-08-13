@@ -12,20 +12,55 @@ note, so ``CHIMERA_SANDBOX=docker`` stays isolated. Line-by-line streaming is th
 
 The child env reuses :func:`~chimera.sandbox.local._child_env`, so provider secrets are scrubbed and the
 non-interactive overrides + ``stdin=DEVNULL`` apply — the same posture as ``RunShellTool``.
+
+**A run can be stopped, and stopping it means the whole tree.** Without that, closing the panel on a
+``npm run dev`` leaves a dev server holding a port until the timeout — which for a long command is an
+hour, and by then nobody remembers starting it. `Popen.kill()` alone is not enough either: a shell
+command is usually a launcher, so killing the one process we hold orphans the ones doing the work.
+The registry below is what a Stop button and a closed stream both reach for.
 """
 
 from __future__ import annotations
 
 import os
-import signal
 import subprocess
 import threading
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+
+from chimera.proc.stdio import kill_tree
 
 if TYPE_CHECKING:
     from chimera.config import Settings
+
+#: Commands running right now, by run id. A dict and not a single slot: the editor can start one
+#: while another is still going, and a Stop button that killed "the current command" would kill the
+#: wrong one exactly when two are running — which is the only time it matters.
+_running: dict[str, subprocess.Popen[Any]] = {}
+_running_lock = threading.Lock()
+
+
+def cancel(run_id: str) -> bool:
+    """Stop a running command and everything it started. False when there is nothing to stop.
+
+    False is also the honest answer for a non-local sandbox: that path runs one-shot inside the
+    sandbox and there is no host process here to signal. Reporting True would put a Stop button on
+    screen that does nothing and says it worked.
+    """
+    with _running_lock:
+        proc = _running.get(run_id)
+    if proc is None or proc.poll() is not None:
+        return False
+    kill_tree(proc)
+    return True
+
+
+def running_count() -> int:
+    """How many commands are live. For tests, and for a shutdown that wants to know."""
+    with _running_lock:
+        return sum(1 for proc in _running.values() if proc.poll() is None)
+
 
 # Total streamed output cap: past this we emit "[output truncated]" once and stop emitting (still
 # draining the pipe so the child never blocks on a full pipe), then return its real exit code.
@@ -55,6 +90,7 @@ def run_streamed(
     timeout: float = 60,
     on_line: Callable[[str], None],
     settings: Settings | None = None,
+    run_id: str = "",
 ) -> int:
     """Run ``command`` as a fresh subprocess in the workspace, streaming output via ``on_line``.
 
@@ -102,17 +138,15 @@ def run_streamed(
         start_new_session=posix,
     )
 
+    if run_id:
+        with _running_lock:
+            _running[run_id] = proc
+
     timed_out = threading.Event()
 
     def _kill() -> None:
         timed_out.set()
-        if posix:
-            try:
-                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)  # type: ignore[attr-defined]
-            except (ProcessLookupError, PermissionError, OSError):
-                proc.kill()
-        else:
-            proc.kill()
+        kill_tree(proc)
 
     watchdog = threading.Timer(timeout, _kill)
     watchdog.daemon = True
@@ -134,6 +168,9 @@ def run_streamed(
     finally:
         proc.wait()
         watchdog.cancel()
+        if run_id:
+            with _running_lock:
+                _running.pop(run_id, None)
 
     if timed_out.is_set():
         on_line(f"[timed out after {timeout:g}s]")

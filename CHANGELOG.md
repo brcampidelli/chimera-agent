@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **A command runner beside the file you are editing.** Run one command in the workspace, watch its
+  combined output, keep the history — per project, across reloads, on the arrow keys.
+  - **It says it is not a terminal.** There is no PTY: each command is a fresh subprocess, so `cd`
+    and `export` do not carry over and anything interactive gets no input. That limitation is
+    printed in the empty panel rather than discovered an hour later; a real PTY was cut from the
+    plan on purpose, because half a terminal that looks like a whole one is worse than an honest
+    runner.
+  - **Stop now stops.** `POST /api/fs/exec/cancel` kills the process **tree**, and ending the stream
+    — closing the panel, leaving the screen — does the same. Before this, a `npm run dev` started
+    here held its port until the run's timeout, which for a long command is an hour, and killing
+    only the shell we hold would have left the port busy while the panel claimed the command ended.
+    `cancelled: false` when there was nothing to stop, including inside a non-local sandbox where
+    there is no host process to signal.
 - **Inline completion in the editor, from a local model.** Grey text ahead of the cursor; Tab takes
   it, Escape refuses it. Fill-in-the-middle through Ollama's `/api/generate`, so the model sees the
   text on **both** sides of the caret — without the suffix it writes the closing brace you already

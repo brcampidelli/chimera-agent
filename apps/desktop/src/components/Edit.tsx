@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { X } from "lucide-react";
+import { TerminalSquare, X } from "lucide-react";
 
 import { Editor } from "@/components/editor/Editor";
 import { diagnosticsExtension } from "@/components/editor/diagnostics";
 import { inlineCompletion } from "@/components/editor/inline";
+import { Runner } from "@/components/editor/Runner";
 import { getFsFile, saveFile } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { focusRing } from "@/components/ui/focus";
@@ -193,6 +194,9 @@ export function Edit({
    * reporting a clean bill of health that nobody checked, so "nothing looked" gets its own line.
    */
   const [lspNote, setLspNote] = useState("");
+  // The runner is off until asked for. It is a side panel on a screen whose subject is a file, and
+  // opening one by default would spend a third of the height on a thing most sessions never use.
+  const [runner, setRunner] = useState(false);
   const [completionNote, setCompletionNote] = useState("");
   const pathRef = useRef(path);
   pathRef.current = path;
@@ -312,11 +316,29 @@ export function Edit({
               onSave={() => saveRef.current()}
             />
           </div>
+          {runner && (
+            <div className="h-56 shrink-0">
+              <Runner workspace={workspace} />
+            </div>
+          )}
           <div className="flex shrink-0 items-center justify-between border-t border-hairline px-3 py-1 text-xs text-muted-foreground">
             <span className="truncate" title={path}>
               {path}
             </span>
             <span className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setRunner((on) => !on)}
+                aria-pressed={runner}
+                className={cn(
+                  "flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-surface-hover hover:text-foreground",
+                  runner && "text-foreground",
+                  focusRing,
+                )}
+              >
+                <TerminalSquare className="h-3 w-3" />
+                {t("runner.title")}
+              </button>
               {readOnly && <span>{t("edit.readOnly")}</span>}
               {save.isError && <span className="text-bad">{t("edit.saveFailed")}</span>}
               {save.isPending ? (

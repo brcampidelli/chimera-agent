@@ -1232,6 +1232,8 @@ export interface ExecRequestInput {
 }
 
 export interface ExecStreamHandlers {
+  /** The run's id, first thing on the wire — so a Stop button exists before there is any output. */
+  onStarted?: (id: string) => void;
   onLine?: (text: string) => void;
   onExit?: (code: number) => void;
   onError?: (msg: string) => void;
@@ -1277,6 +1279,18 @@ export async function streamExec(
   if (buffer.trim()) dispatchExec(buffer, handlers);
 }
 
+/** Stop a running command AND everything it started.
+ *
+ * Aborting the fetch alone would only stop us listening — the server kills the tree when the stream
+ * ends, but a browser that has gone away is not a reliable signal, and a Stop button whose effect
+ * depends on the network noticing is a Stop button you cannot trust. This asks explicitly, and
+ * `cancelled: false` means there was nothing left to stop. */
+export const cancelExec = (id: string) =>
+  json<{ cancelled: boolean }>("/api/fs/exec/cancel", {
+    method: "POST",
+    body: JSON.stringify({ id }),
+  });
+
 function dispatchExec(frame: string, h: ExecStreamHandlers): void {
   let event = "message";
   let data = "";
@@ -1291,7 +1305,8 @@ function dispatchExec(frame: string, h: ExecStreamHandlers): void {
   } catch {
     return;
   }
-  if (event === "line") h.onLine?.(payload.text as string);
+  if (event === "started") h.onStarted?.(payload.id as string);
+  else if (event === "line") h.onLine?.(payload.text as string);
   else if (event === "exit") h.onExit?.(payload.code as number);
   else if (event === "error") h.onError?.(payload.message as string);
 }
