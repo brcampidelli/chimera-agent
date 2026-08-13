@@ -2394,6 +2394,11 @@ export interface components {
             key: string;
             /** Label */
             label: string;
+            /**
+             * Probed
+             * @default true
+             */
+            probed: boolean;
         };
         /**
          * ExecCancelOut

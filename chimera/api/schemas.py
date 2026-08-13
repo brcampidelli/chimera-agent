@@ -494,9 +494,11 @@ class EditorCapabilityOut(BaseModel):
 
     key: str
     label: str
-    #: For diagnostics: the program resolves. For completion: a model and a server are configured —
-    #: whether that server answers is what the editor itself reports, having just asked.
     available: bool
+    #: Whether `available` was MEASURED or merely read from the configuration. Diagnostics resolve a
+    #: program, so True; completion only knows that a model and a URL were set, so False — and the
+    #: caller must not render the two with the same word.
+    probed: bool = True
     detail: str
     #: The command that turns `available: false` into true. "Unavailable" without one is a shrug.
     hint: str

@@ -314,10 +314,13 @@ def doctor(settings: Settings) -> dict[str, Any]:
 def editor_capabilities(settings: Settings) -> list[dict[str, object]]:
     """Diagnostics and inline completion: present or absent, with the command that fixes absent.
 
-    Neither is pinged. `ruff` is a program, so resolution answers it; the completion model lives
-    behind a server that may be on another machine, and starting a request to find out would make
-    `doctor` slow and occasionally wrong about a machine that is merely asleep. What is reported is
-    what is CONFIGURED plus whether the program is there — and the field names say which.
+    The two are known to DIFFERENT degrees, and `probed` is what says so. `ruff` is a program, so
+    resolving it is a real answer. The completion model lives behind a server that may be on another
+    machine; pinging it would make `doctor` slow and occasionally wrong about a machine that is
+    merely asleep, so all that is known there is that a model and a URL were configured.
+
+    Collapsing the two into one word would be the lie this whole surface exists to avoid: "available"
+    for a completion model nobody has reached is a promise the editor then quietly fails to keep.
     """
     from chimera.api.lsp_api import ruff_available
 
@@ -326,15 +329,17 @@ def editor_capabilities(settings: Settings) -> list[dict[str, object]]:
             "key": "diagnostics",
             "label": "Editor diagnostics (ruff)",
             "available": ruff_available(),
+            "probed": True,  # the program either resolves on this machine or it does not
             "detail": "ruff server",
             "hint": "pip install ruff (or install Chimera's 'dev' extra)",
         },
         {
             "key": "completion",
-            # `available` here means CONFIGURED, and the detail says where to look — the editor
-            # itself reports the live answer, because it is the only surface that has just asked.
             "label": "Inline completion (local model)",
+            # CONFIGURED, not reached. The editor reports the live answer, because it is the only
+            # surface that has just asked one.
             "available": bool(settings.complete_model and settings.ollama_base_url),
+            "probed": False,
             "detail": f"{settings.complete_model or '(unset)'} at {settings.ollama_base_url or '(unset)'}",
             "hint": f"ollama pull {settings.complete_model}" if settings.complete_model else "set CHIMERA_COMPLETE_MODEL",
         },

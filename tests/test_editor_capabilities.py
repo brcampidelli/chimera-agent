@@ -51,6 +51,19 @@ def test_a_configured_completion_hints_the_pull_for_that_exact_model(tmp_path: P
     assert found["completion"]["hint"] == "ollama pull qwen2.5-coder:1.5b-base"
 
 
+def test_configured_and_available_are_not_the_same_claim(tmp_path: Path) -> None:
+    """`probed` is what keeps the CLI from printing "available" for a server nobody reached.
+
+    Diagnostics resolve a program, so that answer is measured. The completion model may live on
+    another machine that is merely asleep; calling it available would be a promise the editor then
+    fails to keep, and the user would go looking for the fault in the wrong place.
+    """
+    found = {row["key"]: row for row in editor_capabilities(_settings(tmp_path))}
+
+    assert found["diagnostics"]["probed"] is True
+    assert found["completion"]["probed"] is False
+
+
 def test_doctor_reports_the_editor_alongside_the_external_agents(tmp_path: Path) -> None:
     # One place to answer "what works on this machine", not two.
     report = doctor(_settings(tmp_path))

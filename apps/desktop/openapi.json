@@ -1876,6 +1876,11 @@
           "label": {
             "title": "Label",
             "type": "string"
+          },
+          "probed": {
+            "default": true,
+            "title": "Probed",
+            "type": "boolean"
           }
         },
         "required": [
