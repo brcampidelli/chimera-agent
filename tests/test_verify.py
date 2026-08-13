@@ -12,6 +12,7 @@ metacharacters and use single quotes only.
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -174,6 +175,66 @@ def test_a_shell_builtin_is_not_missing() -> None:
 def test_an_explicit_path_that_does_not_exist_is_missing(tmp_path: Path) -> None:
     """`which` only searches PATH, so a spelled-out path needs a different question."""
     assert program_missing(f'"{tmp_path / "nope.exe"}" --version') is True
+
+
+def _runner(directory: Path, stem: str) -> str:
+    """A file THIS platform's shell could actually start, and the name you would type for it.
+
+    Platform-specific because the question is: a `.sh` is not a program on Windows, so calling it
+    missing there is the right answer — a test that demanded otherwise would be demanding a bug.
+    """
+    name = f"{stem}.cmd" if os.name == "nt" else f"{stem}.sh"
+    path = directory / name
+    path.write_text(
+        "@echo off\r\nexit /b 1\r\n" if os.name == "nt" else "#!/bin/sh\nexit 1\n",
+        encoding="utf-8",
+    )
+    if os.name != "nt":
+        path.chmod(0o755)
+    return name
+
+
+def test_a_relative_command_is_looked_for_where_it_will_RUN(tmp_path: Path) -> None:
+    """The dangerous direction, and the reason this predicate takes a workspace.
+
+    The verifier runs the command with ``cwd=workspace``. This function used to resolve a relative
+    path against the SERVER's cwd instead — for a packaged desktop build, wherever the launcher
+    points. So a project whose verify command is `scripts/test.sh` had a program the shell finds and
+    this function called missing, and a real test failure became an abstention.
+
+    Abstention KEEPS the work. So the bug's output was: tests failed, change kept, receipt saying
+    the verification could not run.
+    """
+    (tmp_path / "scripts").mkdir()
+    name = _runner(tmp_path / "scripts", "test")
+
+    # Asked from the directory it runs in: present.
+    assert program_missing(f"scripts/{name} --fast", tmp_path) is False
+    # Asked from somewhere else: missing — the correct answer to a different question, and the
+    # reason passing the workspace is not optional.
+    assert program_missing(f"scripts/{name} --fast", tmp_path / "scripts") is True
+
+
+def test_a_bare_name_sitting_in_the_workspace_is_not_missing(tmp_path: Path) -> None:
+    """`cmd.exe` searches its current directory, so a runner dropped in the project root is
+    runnable. Calling it missing would abstain on whatever verdict it actually reached."""
+    name = _runner(tmp_path, "run_tests")
+    assert program_missing(name, tmp_path) is False
+
+
+def test_a_command_written_without_its_windows_extension_is_still_there(tmp_path: Path) -> None:
+    """On Windows `check` and `check.cmd` are the same command, so the short form must not read as
+    absent. Elsewhere there is no such equivalence and the honest answer is the opposite."""
+    _runner(tmp_path, "check")
+    assert program_missing("./check", tmp_path) is (os.name != "nt")
+
+
+def test_the_verifier_asks_about_its_own_workspace(tmp_path: Path) -> None:
+    """End to end, without depending on the shell being able to execute anything: a command whose
+    program lives in the workspace must never be reported as an abstention for being absent."""
+    name = _runner(tmp_path, "check_here")
+    verifier = CommandVerifier(name, tmp_path)
+    assert program_missing(verifier.command, verifier.workspace) is False
 
 
 def test_unbalanced_quotes_are_not_our_verdict_to_give() -> None:

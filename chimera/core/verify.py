@@ -42,8 +42,34 @@ _CMD_BUILTINS = frozenset(
 )
 
 
-def program_missing(command: str) -> bool:
+def _exists_with_pathext(candidate: Path) -> bool:
+    """Whether ``candidate`` names a file the shell could start, extension included or implied.
+
+    On Windows `check` and `check.cmd` are the same command, so a verify command written without
+    the extension must not be read as absent — that reading abstains, and abstention keeps work
+    that nothing verified.
+    """
+    if candidate.exists():
+        return True
+    if os.name != "nt":
+        return False
+    for ext in os.environ.get("PATHEXT", ".COM;.EXE;.BAT;.CMD").split(os.pathsep):
+        if ext and candidate.with_name(candidate.name + ext).exists():
+            return True
+    return False
+
+
+def program_missing(command: str, workspace: Path | str | None = None) -> bool:
     """True when the first token of ``command`` names a program that is nowhere to be found.
+
+    ``workspace`` is the directory the command will RUN in, and leaving it out was a real defect in
+    the first version of this function. The verifier runs with ``cwd=workspace``; this predicate
+    resolved relative paths against the *server process's* cwd — which for a packaged desktop build
+    is wherever the launcher points, typically `C:\\Program Files\\Chimera`. So a project whose
+    verify command is `scripts\\test.cmd` had a program that cmd.exe finds and this function calls
+    missing, and a REAL test failure was recorded as an abstention. Abstention keeps the work, so
+    that is the dangerous direction — a change nothing verified, kept, with a receipt saying the
+    verification could not run.
 
     This exists because **Windows has no exit code for "command not found"**. `cmd.exe` answers 1 —
     the same code every test runner uses for "your tests failed" — so the 127 convention below is
@@ -74,10 +100,25 @@ def program_missing(command: str) -> bool:
         return False
     if program.lower() in _CMD_BUILTINS:
         return False
+
+    root = Path(workspace) if workspace is not None else Path.cwd()
     if os.sep in program or (os.altsep and os.altsep in program):
-        # An explicit path: existence is a direct question, and `which` does not answer it.
-        return not Path(program).exists()
-    return shutil.which(program) is None
+        # An explicit path: existence is a direct question, asked from the directory the command
+        # will actually run in.
+        #
+        # Spelled out rather than delegated to `shutil.which`, whose handling of a path WITH a
+        # directory differs between Python versions on Windows — 3.11 checks the exact name and
+        # never tries PATHEXT. Depending on that would make this gate's verdict a function of the
+        # interpreter, which is not a property a safety check should have.
+        candidate = Path(program)
+        if not candidate.is_absolute():
+            candidate = root / candidate
+        return not _exists_with_pathext(candidate)
+    # A bare name: PATH, and then the workspace itself, because `cmd.exe` searches its current
+    # directory too (unless `NoDefaultCurrentDirectoryInExePath` is set). If the file is sitting
+    # right there, the shell can run it and we must not claim otherwise.
+    return shutil.which(program) is None and shutil.which(program, path=str(root)) is None
+
 
 
 @dataclass
@@ -139,7 +180,7 @@ class CommandVerifier:
             # correctly stops being "verifier". We could not check it; we do not claim we did, and we
             # do not punish the work for our own inability.
             return VerificationResult(True, output, abstained=True)
-        if proc.returncode != 0 and os.name == "nt" and program_missing(self.command):
+        if proc.returncode != 0 and os.name == "nt" and program_missing(self.command, self.workspace):
             # The Windows half of the same abstention. Checked only after a non-zero exit, so a
             # command that exists and genuinely fails is never reinterpreted, and `which` is not
             # paid on the happy path.
