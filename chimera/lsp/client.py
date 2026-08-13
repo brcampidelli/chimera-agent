@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import itertools
 import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -99,6 +100,14 @@ class RuffClient:
         #: Version per open document, incremented on every change. The protocol requires it to be
         #: monotonic; a server that sees a version go backwards is entitled to ignore the edit.
         self._versions: dict[str, int] = {}
+        #: The last text we sent per URI, so an unchanged buffer costs nothing.
+        self._texts: dict[str, str] = {}
+        #: How many times the server has published for a URI. A COUNT and not a flag, because the
+        #: question a caller has is never "are there diagnostics" but "have they been recomputed
+        #: since I handed over this text" — and for a file that is now clean the answer is an empty
+        #: list, which a flag on emptiness could not distinguish from silence.
+        self._publishes: dict[str, int] = {}
+        self._published = threading.Condition()
 
     # --- lifetime ---------------------------------------------------------------------------
 
@@ -144,13 +153,63 @@ class RuffClient:
 
     def diagnostics_for(self, path: Path) -> list[Diagnostic]:
         """The latest diagnostics for a file, or [] when none have arrived."""
-        return list(self.diagnostics.get(path_to_uri(path), []))
+        with self._published:
+            return list(self.diagnostics.get(path_to_uri(path), []))
 
     # --- documents --------------------------------------------------------------------------
+
+    def sync_document(self, path: Path, text: str) -> bool:
+        """Hand the server this buffer. Returns whether anything was actually sent.
+
+        A second `didOpen` for a document the server already has is outside the protocol, and it
+        resets the version to 1 — a server that sees a version go backwards is entitled to ignore
+        the edit. `ruff` in fact tolerates it and re-publishes anyway (measured, by reverting this
+        line and watching the tests still pass), but that is undefined behaviour we would be
+        depending on, and the next server we add is not obliged to be as forgiving.
+
+        The bug this pairs with was elsewhere and is worth naming, because I got its cause wrong at
+        first: the caller used to poll its own diagnostics cache and stop as soon as it was
+        non-empty, so a second request returned the FIRST request's answer before the server had
+        said anything about the new text. Delete the unused import and the squiggle stayed —
+        precisely the failure this feature exists to prevent. `wait_for_publish` is the fix; this
+        method is protocol hygiene alongside it.
+        """
+        uri = path_to_uri(path)
+        if self._texts.get(uri) == text:
+            return False
+        self._texts[uri] = text
+        if uri in self._versions:
+            self.change_document(path, text)
+        else:
+            self.open_document(path, text)
+        return True
+
+    def publish_count(self, path: Path) -> int:
+        """How many results the server has published for this file so far."""
+        with self._published:
+            return self._publishes.get(path_to_uri(path), 0)
+
+    def wait_for_publish(self, path: Path, since: int, timeout: float) -> list[Diagnostic]:
+        """Block until the server publishes again for this file, then report.
+
+        `since` must be read BEFORE the text is sent. Reading it after leaves a window in which the
+        answer arrives, the count moves, and the wait then blocks for a result that has already
+        been delivered — a two-second stall on every keystroke of a fast server.
+        """
+        uri = path_to_uri(path)
+        deadline = time.monotonic() + timeout
+        with self._published:
+            while self._publishes.get(uri, 0) <= since:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                self._published.wait(remaining)
+            return list(self.diagnostics.get(uri, []))
 
     def open_document(self, path: Path, text: str) -> None:
         uri = path_to_uri(path)
         self._versions[uri] = 1
+        self._texts[uri] = text
         self._notify(
             "textDocument/didOpen",
             {
@@ -168,6 +227,7 @@ class RuffClient:
         uri = path_to_uri(path)
         version = self._versions.get(uri, 0) + 1
         self._versions[uri] = version
+        self._texts[uri] = text
         self._notify(
             "textDocument/didChange",
             {
@@ -179,7 +239,10 @@ class RuffClient:
     def close_document(self, path: Path) -> None:
         uri = path_to_uri(path)
         self._versions.pop(uri, None)
-        self.diagnostics.pop(uri, None)
+        self._texts.pop(uri, None)
+        with self._published:
+            self.diagnostics.pop(uri, None)
+            self._publishes.pop(uri, None)
         self._notify("textDocument/didClose", {"textDocument": {"uri": uri}})
 
     # --- protocol ---------------------------------------------------------------------------
@@ -226,7 +289,10 @@ class RuffClient:
             params = message.get("params") or {}
             uri = str(params.get("uri") or "")
             found = [_diagnostic(uri, d) for d in (params.get("diagnostics") or [])]
-            self.diagnostics[uri] = found
+            with self._published:
+                self.diagnostics[uri] = found
+                self._publishes[uri] = self._publishes.get(uri, 0) + 1
+                self._published.notify_all()
             if self._on_diagnostics is not None:
                 self._on_diagnostics(uri, found)
             return

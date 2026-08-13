@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from chimera.lsp.client import Diagnostic, RuffClient
+from chimera.lsp.client import RuffClient
 from chimera.proc.stdio import resolve_program
 from chimera.telemetry import get_logger
 from chimera.tools.workspace import PathEscapesWorkspaceError, resolve_in_workspace
@@ -30,8 +30,10 @@ MAX_SERVERS = 4
 #: Seconds a server may sit unused before it is closed.
 IDLE_SECONDS = 900.0
 
-#: How long to wait for diagnostics after handing over a buffer. Ruff answers a single file in
-#: milliseconds; this is the ceiling before reporting what we have rather than blocking a request.
+#: How long to wait for the server to publish after handing over a buffer. Ruff answers a single
+#: file in milliseconds; this is the ceiling before reporting what we have rather than blocking a
+#: request. Hitting it means reporting the PREVIOUS result, which is the one honest option left:
+#: an empty list would claim a clean file nobody finished checking.
 SETTLE_SECONDS = 2.0
 
 _servers: dict[str, tuple[RuffClient, float]] = {}
@@ -124,8 +126,14 @@ def diagnostics_for_buffer(workspace: Path, path: str, text: str) -> dict[str, A
         return {"diagnostics": [], "available": False, "note": "the language server did not start"}
 
     try:
-        client.open_document(target, text)
-        found = _settle(client, target)
+        # The count is read BEFORE the text goes out, so a server that answers between the two
+        # cannot leave us waiting for a result already delivered.
+        before = client.publish_count(target)
+        found = (
+            client.wait_for_publish(target, before, SETTLE_SECONDS)
+            if client.sync_document(target, text)
+            else client.diagnostics_for(target)  # identical buffer: nothing to recompute
+        )
     except Exception as exc:  # noqa: BLE001
         _log.warning("diagnostics failed: %s", exc)
         return {"diagnostics": [], "available": False, "note": "the language server stopped"}
@@ -147,20 +155,3 @@ def diagnostics_for_buffer(workspace: Path, path: str, text: str) -> dict[str, A
         "available": True,
         "note": "",
     }
-
-
-def _settle(client: RuffClient, target: Path) -> list[Diagnostic]:
-    """Wait briefly for the notification, then report whatever arrived.
-
-    An empty result after the wait is ambiguous — a clean file and a slow server look identical —
-    and the ambiguity is accepted here rather than papered over: reporting a fabricated "still
-    checking" state would be a third value the editor has to render for a case that lasts
-    milliseconds.
-    """
-    deadline = time.monotonic() + SETTLE_SECONDS
-    while time.monotonic() < deadline:
-        found = client.diagnostics_for(target)
-        if found:
-            return found
-        time.sleep(0.02)
-    return client.diagnostics_for(target)

@@ -66,6 +66,38 @@ def test_it_diagnoses_the_buffer_not_the_file_on_disk(client) -> None:
 
 
 @pytest.mark.skipif(not HAS_RUFF, reason="ruff not on PATH")
+def test_a_corrected_buffer_stops_reporting_the_problem_it_had(client) -> None:
+    """The second request for the SAME file must diagnose the second text.
+
+    This shipped broken and the whole suite was green, because every test asked once — the one that
+    asked twice used two different paths. The endpoint polled its own diagnostics cache and stopped
+    as soon as it was non-empty, which after the first request is immediately, so the second answer
+    was the first answer. Symptom: you delete the unused import, the squiggle stays, and the editor
+    is lying about the file in front of you — the one failure this feature exists to prevent.
+    """
+    api, _ = client
+
+    first = api.post("/api/lsp/diagnostics", json={"path": "a.py", "text": "import os\n"}).json()
+    assert [d["code"] for d in first["diagnostics"]] == ["F401"]
+
+    fixed = api.post("/api/lsp/diagnostics", json={"path": "a.py", "text": "x = 1\n"}).json()
+
+    assert fixed["available"] is True
+    assert fixed["diagnostics"] == [], "the editor kept the diagnostics of a buffer that is gone"
+
+
+@pytest.mark.skipif(not HAS_RUFF, reason="ruff not on PATH")
+def test_a_new_problem_in_the_same_file_is_reported(client) -> None:
+    # The other direction of the same bug: going clean → broken must also arrive.
+    api, _ = client
+    api.post("/api/lsp/diagnostics", json={"path": "b.py", "text": "x = 1\n"})
+
+    body = api.post("/api/lsp/diagnostics", json={"path": "b.py", "text": "import sys\n"}).json()
+
+    assert [d["code"] for d in body["diagnostics"]] == ["F401"]
+
+
+@pytest.mark.skipif(not HAS_RUFF, reason="ruff not on PATH")
 def test_a_clean_buffer_is_available_and_empty(client) -> None:
     # The pair that must never collapse into one: nothing wrong, and something looked.
     api, _ = client
