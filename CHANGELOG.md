@@ -6,6 +6,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Drive somebody else's coding agent.** A coding turn can now be handed to Claude Code or Gemini
+  CLI over the Agent Client Protocol, and it comes back through the same events as a native turn —
+  same transcript, same verifier, same snapshot, same revert. Chimera's claim was never that its
+  loop is the only good loop; it is the governance around a loop, and that applies to any worker.
+  Set `provider` on `POST /api/code/turn`, or pick one in the app's **Worker** row.
+- **`chimera doctor` reports external agents.** Each one with `available: true/false`, resolved on
+  the machine the sidecar is running on, and the install line when it is false. A packaged build is
+  assembled by CI on a machine nobody looked at, so "it should be there" stops being evidence
+  exactly where a user needs an answer.
+- **An editor screen** (`#/edit`): CodeMirror 6, tabs, a file tree, and the open file in the URL.
+
+### Changed
+
+- **The posture line tells a smaller truth for an external turn.** It stops saying "edits inside
+  `/project`, runs no commands" — that describes tools Chimera owns — and says a snapshot was taken
+  and the turn can be undone. These agents have file and shell tools of their own, so a write region
+  governs only the calls they route through us. The guarantee is the checkpoint, not prevention, and
+  claiming otherwise would be the one lie this product cannot afford.
+- **Permission prompts from an external agent are granted and recorded**, not gated. A gate the
+  agent can walk around is not a gate; every grant appears on the receipt instead.
+- `steps` and `context_peak_tokens` are `null` for an external turn rather than `0` — those numbers
+  happened inside somebody else's loop, and zero would read as "it did nothing".
+
+### Fixed
+
+- **Child processes no longer outlive the app.** Long-running children are started in their own
+  process group and killed as a tree (`taskkill /T` on Windows, `killpg` on POSIX), with an
+  `atexit` reaper for a crash or a mid-turn quit. A coding agent is a launcher: killing the process
+  we hold left its workers running and the workspace locked by something invisible.
+- **`Popen(["npx", …])` on Windows.** `CreateProcess` does not consult `PATHEXT`, so `npx.CMD` was
+  invisible under the name everyone types and the failure read as "the adapter is not installed".
+- **The verify-or-revert gate no longer fails a change because a command is missing on Windows.**
+  `cmd.exe` answers 1 rather than 127, so "I could not run it" was recorded as "the work is bad".
+
 ## [0.43.0] - 2026-08-11
 
 The release where a key for any provider LiteLLM reaches starts working, three things that existed

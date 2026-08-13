@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/panel";
 import { Agents } from "@/components/Agents";
 import { Conversation } from "@/components/code/Conversation";
 import { PostureNote } from "@/components/code/PostureNote";
+import { ProviderPicker } from "@/components/code/ProviderPicker";
 import { SessionSidebar } from "@/components/code/SessionSidebar";
 import { ProjectPicker } from "@/components/code/ProjectPicker";
 import { useRunSession } from "@/lib/run-session";
@@ -246,6 +247,10 @@ export function Code() {
   const reach = (cfg.data?.autonomy.reach || "workspace") as Reach;
   const approval = (cfg.data?.autonomy.approval || "suspicious") as Approval;
   const posture = useMemo(() => ({ reach, approval }), [reach, approval]);
+  // Who does the work. Session-local rather than persisted: handing your workspace to another
+  // company's agent is a decision per piece of work, not a setting that quietly stays on from the
+  // last time — and a persisted default here would be the app choosing on the user's behalf.
+  const [provider, setProvider] = useState("");
   // Same: a default the system applies, and the receipt records `profile_source: "system"` so the
   // cost panel never counts it beside a profile somebody deliberately picked.
   const profile: Profile = "balanced";
@@ -374,12 +379,26 @@ export function Code() {
             onEdited={refreshOpenFile}
             busyElsewhere={runBusy}
             posture={posture}
+            provider={provider}
             profile={profile}
             /* No selectors. What they expressed is now a server default the app SENDS (never omits
                — an absent posture means no tool denials and no pause at all, which is more permissive
                than any corner of the grid a user could have chosen) and a line of evidence in the
                transcript once it becomes relevant. */
-            controls={<PostureNote workspace={workspace} reach={reach} approval={approval} />}
+            controls={
+              <div className="flex flex-col gap-1.5">
+                {/* The picker sits ABOVE the sentence, because the sentence is about the choice.
+                    Reversed, someone reads what the agent may do to their files and then changes
+                    who the agent is — which is the order in which a promise stops being true. */}
+                <ProviderPicker value={provider} onChange={setProvider} disabled={runBusy} />
+                <PostureNote
+                  workspace={workspace}
+                  reach={reach}
+                  approval={approval}
+                  provider={provider}
+                />
+              </div>
+            }
           />
           {/* Several agents at once, once someone said yes to running several agents at once. This
               was a destination — a tab you picked before knowing whether the work was parallel, with

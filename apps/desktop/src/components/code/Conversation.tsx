@@ -145,10 +145,22 @@ function ToolRow({ tool, onOpenFile }: { tool: CodeToolEvent; onOpenFile?: (p: s
 function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <Badge>{t("code.chat.steps", { n: done.steps })}</Badge>
-      {done.model ? <Badge>{done.model}</Badge> : null}
-      {done.context_peak_tokens > 0 ? (
+      {/* Who did the work, first — it is the fact that reframes every badge after it. */}
+      {done.external ? <Badge tone="warn">{t("code.chat.external", { agent: done.external })}</Badge> : null}
+      {/* Null, not zero: an external turn's steps happened inside somebody else's loop and it did
+          not report them. Rendering "0 steps" would say it did nothing. */}
+      {done.steps !== null ? <Badge>{t("code.chat.steps", { n: done.steps })}</Badge> : null}
+      {done.model && !done.external ? <Badge>{done.model}</Badge> : null}
+      {done.context_peak_tokens !== null && done.context_peak_tokens > 0 ? (
         <Badge>{t("code.chat.peak", { n: done.context_peak_tokens.toLocaleString() })}</Badge>
+      ) : null}
+      {/* Every permission we answered on the user's behalf, and every write the region refused.
+          Both are the receipt's half of the bargain the posture note describes. */}
+      {done.auto_approved?.length ? (
+        <Badge tone="warn">{t("code.chat.autoApproved", { n: done.auto_approved.length })}</Badge>
+      ) : null}
+      {done.refused_writes?.length ? (
+        <Badge tone="warn">{t("code.chat.refusedWrites", { n: done.refused_writes.length })}</Badge>
       ) : null}
       <Badge tone={done.usd === null ? "warn" : undefined}>
         {done.usd === null ? t("code.chat.unknownCost") : `$${done.usd.toFixed(4)}`}
@@ -179,6 +191,7 @@ export function Conversation({
   onEdited,
   busyElsewhere,
   posture,
+  provider = "",
   profile,
   controls,
   onOpenFile,
@@ -189,6 +202,8 @@ export function Conversation({
   /** The same reach/approval the verified run uses — pressing one button rather than the other must
    *  not change what the agent is allowed to do. */
   posture: { reach: Reach; approval: Approval };
+  /** Who does the work: "" for Chimera's own loop, or an external agent key. */
+  provider?: string;
   /** Which tier each role draws from — the same profile the verified run uses. */
   profile: Profile;
   /** Start a verified run with this text, in the panel that owns the run machinery. */
@@ -295,6 +310,10 @@ export function Conversation({
         posture,
         profile,
         fuse,
+        // "" means Chimera's own loop, and the field is omitted rather than sent empty — an empty
+        // string is a value the server would have to special-case, and a caller that never heard of
+        // providers must send exactly what it sent before.
+        ...(provider ? { provider } : {}),
         attachments: attached.map((a) => a.id),
       },
       {

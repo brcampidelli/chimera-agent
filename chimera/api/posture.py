@@ -164,6 +164,19 @@ class PostureFacts(BaseModel):
     #: says nothing is the one version of that choice which cannot be defended. The coding turn is
     #: always guarded; a chat is guarded only if the user turned it on.
     unguarded: bool = False
+    #: The external agent doing the work, or "" for Chimera's own loop.
+    #:
+    #: When set, everything above changes meaning and the interface has to say so. An ACP agent has
+    #: file and shell tools of its own: it MAY route a write through our handler, where the write
+    #: region and the workspace jail apply exactly as they do natively — and it may not, in which
+    #: case they apply to nothing. So `writes` and `shell` stop being boundaries and become
+    #: descriptions of the calls we happen to see.
+    #:
+    #: What survives intact is the checkpoint: the workspace is snapshotted before the turn and can
+    #: be put back afterwards, whatever the agent used to change it. That is a real guarantee and a
+    #: smaller one, and stating the smaller one is the whole reason this field exists. A posture
+    #: sentence that claimed prevention here would be the one lie this product cannot afford.
+    external_agent: str = ""
 
 
 def describe(
@@ -173,6 +186,7 @@ def describe(
     *,
     can_pause: bool = True,
     guarded: bool = True,
+    external_agent: str = "",
 ) -> PostureFacts:
     """Report what this posture means on THIS machine, right now.
 
@@ -219,6 +233,7 @@ def describe(
         ),
         fell_back_to_host=fell_back,
         unguarded=not guarded,
+        external_agent=external_agent,
     )
 
 

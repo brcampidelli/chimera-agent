@@ -20,6 +20,10 @@ This site is task-oriented: pick what you want to do.
   Plug in any MCP server (GitHub, filesystem, …).
   [MCP servers →](mcp.md)
 
+- **:material-account-switch: Drive another agent**
+  Hand a turn to Claude Code or Gemini CLI over ACP — and read what that does to the guarantees.
+  [External agents →](external-agents.md)
+
 - **:material-server: Operate it**
   Run 24/7 on a small server; schedule jobs; deliver to chat.
   [Deploy →](deploy.md)

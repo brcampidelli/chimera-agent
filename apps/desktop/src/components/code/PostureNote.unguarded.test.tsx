@@ -41,7 +41,16 @@ describe("PostureNote — the guard that is not there", () => {
     );
 
     await vi.waitFor(() =>
-      expect(getPostureFacts).toHaveBeenCalledWith("workspace", "suspicious", "/repo", "chat"),
+      // The provider is part of the question now, and not a decoration on the answer: an external
+      // agent changes what every other fact MEANS, so asking without it would get a sentence about
+      // a boundary this turn does not have. `null` is "Chimera's own loop".
+      expect(getPostureFacts).toHaveBeenCalledWith(
+        "workspace",
+        "suspicious",
+        "/repo",
+        "chat",
+        null,
+      ),
     );
   });
 });

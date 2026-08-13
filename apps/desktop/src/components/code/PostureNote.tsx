@@ -22,6 +22,11 @@ import { useT, type TFunc } from "@/lib/i18n";
  * and a fresh call here): a Docker daemon that died since the last answer must change the answer.
  */
 function sentence(facts: NonNullable<ReturnType<typeof useFacts>["data"]>, t: TFunc): string {
+  // An external agent REPLACES the clauses rather than joining them. "Edits inside /project" is a
+  // boundary when we own the file tools and a description of the calls we happened to see when we do
+  // not — and one sentence cannot be both. What is still true is the checkpoint, so that is what
+  // this promises instead.
+  if (facts.external_agent) return t("code.posture.saysExternal", { path: facts.workspace });
   const parts = [
     facts.writes === "nothing"
       ? t("code.posture.saysNoWrites")
@@ -32,10 +37,16 @@ function sentence(facts: NonNullable<ReturnType<typeof useFacts>["data"]>, t: TF
   return parts.join(" ");
 }
 
-function useFacts(reach: Reach, approval: Approval, workspace: string, surface: Surface) {
+function useFacts(
+  reach: Reach,
+  approval: Approval,
+  workspace: string,
+  surface: Surface,
+  provider: string,
+) {
   return useQuery({
-    queryKey: ["posture", reach, approval, workspace, surface],
-    queryFn: () => getPostureFacts(reach, approval, workspace || null, surface),
+    queryKey: ["posture", reach, approval, workspace, surface, provider],
+    queryFn: () => getPostureFacts(reach, approval, workspace || null, surface, provider || null),
     // No project, no question. This probes the live sandbox on every call by design (a Docker daemon
     // that died has to change the answer), so asking it when there is nothing to say is a round-trip
     // spent on an answer that will not be rendered.
@@ -52,6 +63,7 @@ export function PostureNote({
   reach,
   approval,
   surface = "turn",
+  provider = "",
 }: {
   workspace: string;
   reach: Reach;
@@ -59,9 +71,12 @@ export function PostureNote({
   /** Which surface is asking. A chat is assembled WITHOUT the taint ledger unless the user armed it,
    *  and that changes what is true — so it changes the sentence. */
   surface?: Surface;
+  /** The external agent that would do the work, or "" for Chimera's own loop. It changes what every
+   *  other fact MEANS, so it is part of the question and not a decoration on the answer. */
+  provider?: string;
 }) {
   const t = useT();
-  const facts = useFacts(reach, approval, workspace, surface);
+  const facts = useFacts(reach, approval, workspace, surface, provider);
 
   // No project chosen, nothing to say. The sentence names a directory the agent may edit, and with
   // no project it named the app's own launch directory — which on a fresh install is wherever the
@@ -89,6 +104,16 @@ export function PostureNote({
         <p className="flex items-start gap-1.5 text-xs text-warn">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           {t("code.posture.unguarded")}
+        </p>
+      ) : null}
+      {facts.data?.external_agent ? (
+        // The sentence this whole feature has to be able to stand behind. These agents have file and
+        // shell tools of their own, so the write region governs only the calls they route through
+        // us. Claiming prevention here would be the one lie the product cannot afford; what is real
+        // is the snapshot taken before the turn and the revert offered after it.
+        <p className="flex items-start gap-1.5 text-xs text-warn">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          {t("code.posture.externalNote")}
         </p>
       ) : null}
       {facts.data?.fell_back_to_host ? (
