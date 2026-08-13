@@ -514,6 +514,7 @@ data = [
 ]
 desktop = [
     { name = "fastapi" },
+    { name = "psutil" },
     { name = "python-multipart" },
     { name = "sse-starlette" },
     { name = "uvicorn" },
@@ -613,6 +614,7 @@ requires-dist = [
     { name = "peft", marker = "extra == 'train'", specifier = ">=0.11" },
     { name = "playwright", specifier = ">=1.40" },
     { name = "plotly", marker = "extra == 'viz'", specifier = ">=5.18" },
+    { name = "psutil", marker = "extra == 'desktop'", specifier = ">=5.9" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pydantic-settings", specifier = ">=2.3" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },

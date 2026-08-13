@@ -671,6 +671,11 @@ def register_code_api(
                         # The number that says whether raising max_steps is safe. Reported because
                         # a ceiling the user can raise without seeing its cost is a trap.
                         "context_peak_tokens": result.steplog.context_peak_tokens,
+                        # Output tokens per second of time spent INSIDE model calls — measured per
+                        # step, not divided out of the run's duration, which would fold the tools
+                        # and the verifier into the model's speed. None when nothing was measured;
+                        # zero would say the model produced nothing.
+                        "tokens_per_second": result.steplog.tokens_per_second,
                         "route_meta": result.route_meta,
                         # Did this turn read anything untrusted? A turn steered by a planted
                         # instruction used to be indistinguishable from one that was not.

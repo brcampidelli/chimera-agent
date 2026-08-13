@@ -2115,6 +2115,56 @@
         "title": "GovernanceAuditOut",
         "type": "object"
       },
+      "GpuOut": {
+        "description": "One GPU, as its own driver reports it. Every number is nullable on purpose.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "utilisation": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utilisation"
+          },
+          "vram_total_mb": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vram Total Mb"
+          },
+          "vram_used_mb": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vram Used Mb"
+          }
+        },
+        "required": [
+          "name",
+          "vram_total_mb",
+          "vram_used_mb",
+          "utilisation"
+        ],
+        "title": "GpuOut",
+        "type": "object"
+      },
       "GuardCfgOut": {
         "description": "Whether the CHAT agent is assembled with the coding turn's protections.\n\nOff by default, and that default is a real exposure rather than an oversight: this agent is\nshared with the messaging gateway and the OpenAI-compatible endpoint, so arming it silently would\ntake shell away from bots someone already runs. Readable here because the posture line names this\nswitch when it reports a conversation as unguarded \u2014 a warning that cannot point at its own\nremedy is half a warning.",
         "properties": {
@@ -2922,6 +2972,50 @@
         "title": "MemoryLayersOut",
         "type": "object"
       },
+      "MemoryOut": {
+        "properties": {
+          "percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percent"
+          },
+          "total_mb": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Mb"
+          },
+          "used_mb": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Used Mb"
+          }
+        },
+        "required": [
+          "total_mb",
+          "used_mb",
+          "percent"
+        ],
+        "title": "MemoryOut",
+        "type": "object"
+      },
       "MemoryProfileOut": {
         "properties": {
           "persona": {
@@ -3589,6 +3683,71 @@
         "title": "ProviderOut",
         "type": "object"
       },
+      "ResourcesOut": {
+        "description": "What this machine is spending, with every gap left as a gap.\n\nNullable throughout, and that is the contract: a measurement that could not be taken is absent,\nnever zero. Zero VRAM reads as \"the GPU is idle\" and zero CPU reads as \"nothing is running\" \u2014\nboth are claims about a machine, and on a laptop whose GPU we cannot see, neither is ours to\nmake. `notes` says which tool was missing, in the words of what to install.",
+        "properties": {
+          "cpu_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Count"
+          },
+          "cpu_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Percent"
+          },
+          "gpus": {
+            "items": {
+              "$ref": "#/components/schemas/GpuOut"
+            },
+            "title": "Gpus",
+            "type": "array"
+          },
+          "memory": {
+            "$ref": "#/components/schemas/MemoryOut"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "process_mb": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Process Mb"
+          }
+        },
+        "required": [
+          "cpu_percent",
+          "cpu_count",
+          "memory",
+          "process_mb",
+          "gpus",
+          "notes"
+        ],
+        "title": "ResourcesOut",
+        "type": "object"
+      },
       "RetiredOut": {
         "properties": {
           "retired": {
@@ -3987,6 +4146,122 @@
           "image"
         ],
         "title": "SandboxCfgOut",
+        "type": "object"
+      },
+      "SearchHitOut": {
+        "description": "One matching line.",
+        "properties": {
+          "end": {
+            "title": "End",
+            "type": "integer"
+          },
+          "line": {
+            "title": "Line",
+            "type": "integer"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "start": {
+            "title": "Start",
+            "type": "integer"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "line",
+          "text",
+          "start",
+          "end"
+        ],
+        "title": "SearchHitOut",
+        "type": "object"
+      },
+      "SearchOut": {
+        "description": "What a search found, and how honestly it found it.",
+        "properties": {
+          "capped": {
+            "title": "Capped",
+            "type": "boolean"
+          },
+          "elapsed_ms": {
+            "title": "Elapsed Ms",
+            "type": "integer"
+          },
+          "engine": {
+            "title": "Engine",
+            "type": "string"
+          },
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
+          "hits": {
+            "items": {
+              "$ref": "#/components/schemas/SearchHitOut"
+            },
+            "title": "Hits",
+            "type": "array"
+          },
+          "timed_out": {
+            "title": "Timed Out",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "hits",
+          "engine",
+          "capped",
+          "timed_out",
+          "elapsed_ms",
+          "error"
+        ],
+        "title": "SearchOut",
+        "type": "object"
+      },
+      "SearchRequest": {
+        "description": "Find a string across the workspace.",
+        "properties": {
+          "case_sensitive": {
+            "default": false,
+            "title": "Case Sensitive",
+            "type": "boolean"
+          },
+          "glob": {
+            "default": "",
+            "title": "Glob",
+            "type": "string"
+          },
+          "query": {
+            "title": "Query",
+            "type": "string"
+          },
+          "regex": {
+            "default": false,
+            "title": "Regex",
+            "type": "boolean"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "SearchRequest",
         "type": "object"
       },
       "ServerCfgOut": {
@@ -5879,6 +6154,45 @@
         "summary": "Fs File Write Endpoint"
       }
     },
+    "/api/fs/search": {
+      "post": {
+        "description": "Find a string across the workspace, as structured hits.\n\nA POST because the query is user text \u2014 a `q=` in a URL is logged by every proxy between\nhere and nowhere, and someone searching their own repository for a token they are trying to\nremove should not have it written to an access log on the way.\n\nRead-only and scoped to the workspace, like the tree and the file reader beside it. The\nanswer names the engine that produced it: ripgrep where it exists, a bounded Python walk\nwhere it does not, and never a silent swap between the two.",
+        "operationId": "fs_search_api_fs_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Fs Search"
+      }
+    },
     "/api/fs/tree": {
       "get": {
         "operationId": "fs_tree_endpoint_api_fs_tree_get",
@@ -7118,6 +7432,25 @@
           }
         },
         "summary": "Step Project"
+      }
+    },
+    "/api/resources": {
+      "get": {
+        "description": "What this machine is spending, right now.\n\nEvery field is nullable and that is the contract: a measurement that could not be taken is\nabsent, never zero. A panel showing 0% VRAM on an AMD card would be believed, and it would\nbe wrong about hardware the user is looking at.",
+        "operationId": "resources_endpoint_api_resources_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResourcesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Resources Endpoint"
       }
     },
     "/api/runs": {

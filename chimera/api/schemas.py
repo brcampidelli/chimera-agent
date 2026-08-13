@@ -375,6 +375,38 @@ class PoolWriteOut(BaseModel):
     count: int
 
 
+class GpuOut(BaseModel):
+    """One GPU, as its own driver reports it. Every number is nullable on purpose."""
+
+    name: str
+    vram_total_mb: int | None
+    vram_used_mb: int | None
+    utilisation: float | None
+
+
+class MemoryOut(BaseModel):
+    total_mb: int | None
+    used_mb: int | None
+    percent: float | None
+
+
+class ResourcesOut(BaseModel):
+    """What this machine is spending, with every gap left as a gap.
+
+    Nullable throughout, and that is the contract: a measurement that could not be taken is absent,
+    never zero. Zero VRAM reads as "the GPU is idle" and zero CPU reads as "nothing is running" —
+    both are claims about a machine, and on a laptop whose GPU we cannot see, neither is ours to
+    make. `notes` says which tool was missing, in the words of what to install.
+    """
+
+    cpu_percent: float | None
+    cpu_count: int | None
+    memory: MemoryOut
+    process_mb: int | None  # this process, not the machine: two different sentences
+    gpus: list[GpuOut]
+    notes: list[str]
+
+
 class ExternalAgentOut(BaseModel):
     """One ACP agent Chimera knows how to launch, and whether it is here."""
 
@@ -761,6 +793,30 @@ class FsTreeOut(BaseModel):
     path: str  # the (relative) directory listed
     entries: list[FsNodeOut]  # immediate children only (dirs first, then files, alphabetical)
     capped: bool  # the listing hit the max-entries cap (some children are omitted)
+
+
+class SearchHitOut(BaseModel):
+    """One matching line."""
+
+    path: str  # workspace-relative, forward slashes — the shape the tree and the editor already use
+    line: int  # 1-based
+    text: str  # the matching line, clipped
+    start: int  # where the match begins in `text`, so the UI highlights rather than re-searches
+    end: int
+
+
+class SearchOut(BaseModel):
+    """What a search found, and how honestly it found it."""
+
+    hits: list[SearchHitOut]
+    #: "ripgrep" or "python". Reported because they are not equivalent — the fallback is slower and
+    #: ignores `.gitignore`. A silent fallback would be useful and dishonest; naming it is what lets
+    #: the screen say the search was the simpler one.
+    engine: str
+    capped: bool  # the hit cap stopped it early — a capped result that looks complete is a lie
+    timed_out: bool  # ran out of time, which is NOT the same as "too many answers"
+    elapsed_ms: int
+    error: str  # empty on success; never a traceback
 
 
 class FsFileOut(BaseModel):

@@ -14,6 +14,8 @@ import type {
   GitRevertResult,
   GitStatus,
   RouteMeta,
+  Resources,
+  SearchResult,
   Benchmarks,
   GovernanceAudit,
   InjectionReport,
@@ -122,6 +124,32 @@ export const saveFile = (workspace: string | null | undefined, path: string, con
     method: "PUT",
     body: JSON.stringify({ workspace: workspace || null, path, content }),
   });
+// --- Cross-file search ---
+// A POST, not a GET with `?q=`: the query is the user's own text, and a URL is written to every
+// access log between here and nowhere. Someone searching their repository for a token they are
+// removing should not have it logged on the way. Scoped to `workspace` like the tree beside it.
+export const searchFiles = (
+  workspace: string | null | undefined,
+  query: string,
+  options: { regex?: boolean; caseSensitive?: boolean; glob?: string } = {},
+) =>
+  json<SearchResult>("/api/fs/search", {
+    method: "POST",
+    body: JSON.stringify({
+      query,
+      workspace: workspace || null,
+      regex: options.regex ?? false,
+      case_sensitive: options.caseSensitive ?? false,
+      glob: options.glob ?? "",
+    }),
+  });
+
+// --- What this machine is spending ---
+// Every field is nullable and that is the contract, not an oversight: a measurement that could not
+// be taken is absent, never zero. 0% VRAM on an AMD card would be believed, and would be wrong
+// about hardware the user is looking at.
+export const getResources = () => json<Resources>("/api/resources");
+
 // --- Git (status / diff / commit / scoped revert for the Code screen's git panel) ---
 // All gate on `is_git_repo` server-side: a non-repo (or git-missing) folder returns the honest
 // {is_repo: false} empty-state, never a 500. Commit stages EXPLICIT paths (never `add -A`); revert is
@@ -630,6 +658,10 @@ export interface CodeTurnDone {
   // The largest prompt this turn built. The number that says whether raising max_steps is safe —
   // shown rather than hidden, because a ceiling raised without seeing its cost is a trap.
   context_peak_tokens: number | null;
+  /** Output tokens per second of time spent INSIDE the model calls — measured per step, not divided
+   *  out of the turn's duration, which would fold the tools and the verifier into the model's speed.
+   *  Null when nothing was measured; zero would say the model produced nothing. */
+  tokens_per_second?: number | null;
   // Typed as the real shape rather than an opaque bag: the fusion panel renders it, and an opaque
   // record forced every consumer to cast — which is how a field silently stops being rendered.
   route_meta: RouteMeta | null;

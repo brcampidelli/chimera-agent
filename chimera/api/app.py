@@ -77,7 +77,9 @@ from chimera.api.schemas import (
     PlanOut,
     PoolAddIn,
     PoolWriteOut,
+    ResourcesOut,
     RunReceiptOut,
+    SearchOut,
     SessionDetailOut,
     SessionMetaOut,
     ToolsOut,
@@ -132,6 +134,20 @@ class FsFileWriteRequest(BaseModel):
     """The workspace root the write is scoped to. None = the app's launch workspace."""
     path: str
     content: str
+
+
+class SearchRequest(BaseModel):
+    """Find a string across the workspace."""
+
+    query: str
+    workspace: str | None = None
+    #: False (the default) searches for the text EXACTLY as typed. `connect()` is what someone means
+    #: when they type `connect()`; read as a pattern it means "connect with an empty group" and
+    #: sweeps in every bare `connect` — MORE results than the literal search, which reads as working.
+    regex: bool = False
+    case_sensitive: bool = False
+    #: A ripgrep-style glob narrowing which files are searched (`*.ts`). Empty searches all of them.
+    glob: str = ""
 
 
 class ExecRequest(BaseModel):
@@ -982,6 +998,52 @@ def build_api_app(
             raise HTTPException(status_code=400, detail="invalid path") from exc
         except ValueError as exc:  # content over the byte cap
             raise HTTPException(status_code=400, detail="content too large") from exc
+
+    @app.post("/api/fs/search", dependencies=[guard], response_model=SearchOut)
+    def fs_search(req: SearchRequest) -> dict[str, Any]:
+        """Find a string across the workspace, as structured hits.
+
+        A POST because the query is user text — a `q=` in a URL is logged by every proxy between
+        here and nowhere, and someone searching their own repository for a token they are trying to
+        remove should not have it written to an access log on the way.
+
+        Read-only and scoped to the workspace, like the tree and the file reader beside it. The
+        answer names the engine that produced it: ripgrep where it exists, a bounded Python walk
+        where it does not, and never a silent swap between the two.
+        """
+        from chimera.core.search import search as run_search
+
+        ws = _resolve_fs_workspace(req.workspace)
+        result = run_search(
+            req.query,
+            ws,
+            regex=req.regex,
+            case_sensitive=req.case_sensitive,
+            glob=req.glob,
+        )
+        return {
+            "hits": [
+                {"path": h.path, "line": h.line, "text": h.text, "start": h.start, "end": h.end}
+                for h in result.hits
+            ],
+            "engine": result.engine,
+            "capped": result.capped,
+            "timed_out": result.timed_out,
+            "elapsed_ms": result.elapsed_ms,
+            "error": result.error,
+        }
+
+    @app.get("/api/resources", dependencies=[guard], response_model=ResourcesOut)
+    def resources_endpoint() -> dict[str, Any]:
+        """What this machine is spending, right now.
+
+        Every field is nullable and that is the contract: a measurement that could not be taken is
+        absent, never zero. A panel showing 0% VRAM on an AMD card would be believed, and it would
+        be wrong about hardware the user is looking at.
+        """
+        from chimera.core.resources import snapshot
+
+        return snapshot().as_dict()
 
     @app.post("/api/fs/exec", dependencies=[guard])
     async def fs_exec_stream(req: ExecRequest) -> EventSourceResponse:
