@@ -444,6 +444,19 @@ class Settings(BaseSettings):
     # position guardian silenced at 2 p.m. until midnight costs more than it saves.
     daily_usd_cap: float | None = Field(default=None, validation_alias="CHIMERA_DAILY_USD_CAP")
 
+    # Who says yes when governance escalates an action to review: `ask` | `deny` | `allow`.
+    #
+    # Both governance layers have taken an approver since they were written and never been given
+    # one, which measured out as 100% of dangerous-class calls refused on any run that read
+    # something external (bench/injection/PREREGISTRATION.md). The gate was never too strict —
+    # there was nothing on the other side of it.
+    #
+    # `ask` degrades to `deny` with no terminal attached, which is what a cron job has. Degrading
+    # the other way would make an unattended deployment the most permissive configuration in the
+    # product, which is backwards. `allow` exists for a workspace whose contents the owner already
+    # trusts, and every grant is recorded so the choice does not become invisible.
+    approval_mode: str = Field(default="ask", validation_alias="CHIMERA_APPROVAL")
+
     # Deployment-level tool allowlist/denylist (names). Empty allowlist = no restriction (all
     # tools); a non-empty allowlist grants only those. Denylist removes even if allowed.
     #
