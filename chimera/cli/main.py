@@ -35,6 +35,7 @@ from rich.table import Table
 
 from chimera import __version__
 from chimera.config import get_settings
+from chimera.governance import governed_profile
 
 if TYPE_CHECKING:
     from chimera.config import Settings
@@ -1371,7 +1372,12 @@ def serve(
     http_send_tool = SendMessageTool(push_senders) if push_senders.platforms() else None
 
     def factory() -> ChatSession:
-        registry = default_registry(workspace_path)
+        registry, _ = governed_profile(
+            default_registry(workspace_path),
+            settings=settings,
+            home=settings.home,
+            surface="serve",
+        )
         if http_send_tool is not None:
             registry.register(http_send_tool)
         runner = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
@@ -1719,9 +1725,18 @@ def _start_cron_daemon(
             if spent >= cap:
                 raise BudgetExceeded(f"daily cap reached: ${spent:.4f} of ${cap:.4f}")
 
+        # Governance on the path that runs unattended. In `observe` this refuses nothing and
+        # records what enforcement would have cost; the count is reported below, per job, which is
+        # the whole point of having a middle state.
+        job_registry, job_approvals = governed_profile(
+            default_registry(workspace),
+            settings=settings,
+            home=settings.home,
+            surface=f"cron:{job.name}",
+        )
         agent = Agent(
             backend,
-            default_registry(workspace),
+            job_registry,
             AgentConfig(
                 model=model,
                 max_steps=max_steps,
@@ -1746,10 +1761,30 @@ def _start_cron_daemon(
                 usd=result.usd,
             ),
         )
+        # Said out loud, on the job, every time. A governance decision that only exists inside an
+        # observation string is one nobody counts — and on this path "nobody counted" reads as a
+        # green tick over work that never happened.
+        if job_approvals.granted or job_approvals.refused:
+            touched = len(job_approvals.granted) + len(job_approvals.refused)
+            detail = job_approvals.summary() or (
+                f"{len(job_approvals.granted)} would be refused under enforce"
+            )
+            console.print(
+                f"[yellow]cron '{job.name}': governance touched {touched} action(s) — "
+                f"{detail}[/yellow]"
+            )
         return result.answer
 
     def run_task(task: str) -> str:
-        agent = Agent(backend, default_registry(workspace), AgentConfig(model=model, max_steps=max_steps))
+        """The job-less fallback. Governed too — it is reachable, and "reachable but forgotten" is
+        the exact shape of the hole this whole change closes."""
+        registry, _ = governed_profile(
+            default_registry(workspace),
+            settings=settings,
+            home=settings.home,
+            surface="cron:task",
+        )
+        agent = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
         return agent.run(task).answer
 
     results_path = get_settings().home / "scheduler" / "cron_results.jsonl"
@@ -1844,7 +1879,17 @@ def _serve_mcp(
     from chimera.tools import default_registry
 
     def _solve(task: str) -> str:
-        registry = default_registry(workspace_path)
+        registry, _ = governed_profile(
+
+            default_registry(workspace_path),
+
+            settings=get_settings(),
+
+            home=get_settings().home,
+
+            surface="mcp",
+
+        )
         worker = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
         auto = AutonomousAgent(
             worker,
@@ -1887,7 +1932,17 @@ def _build_a2a(
     from chimera.tools import default_registry
 
     def _solve(task: str) -> str:
-        registry = default_registry(workspace_path)
+        registry, _ = governed_profile(
+
+            default_registry(workspace_path),
+
+            settings=get_settings(),
+
+            home=get_settings().home,
+
+            surface="a2a",
+
+        )
         worker = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
         auto = AutonomousAgent(
             worker, config=AutonomousConfig(max_attempts=2, use_planner=False, use_manager=False)
@@ -1931,7 +1986,17 @@ def _serve_platform(
     send_tool = SendMessageTool(senders)
 
     def factory() -> ChatSession:
-        registry = default_registry(workspace_path)
+        registry, _ = governed_profile(
+
+            default_registry(workspace_path),
+
+            settings=get_settings(),
+
+            home=get_settings().home,
+
+            surface="platform",
+
+        )
         registry.register(send_tool)
         runner = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
         return ChatSession(runner, memory=memory, graph=graph)
