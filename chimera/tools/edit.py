@@ -20,7 +20,7 @@ from typing import Any
 
 from chimera.tools.base import Tool
 from chimera.tools.workspace import atomic_write_text, read_text_for_edit, resolve_in_workspace
-from chimera.tools.write_region import WriteRegion
+from chimera.tools.write_region import WriteRegion, refuse_write
 
 # Conflict-marker hunk format, familiar to models from git and Aider:
 #   <<<<<<< SEARCH
@@ -61,7 +61,7 @@ class EditFileTool(_WorkspaceTool):
 
     def run(self, **kwargs: Any) -> str:
         path = resolve_in_workspace(self.workspace, str(kwargs["path"]))
-        if self.write_region is not None and (err := self.write_region.check(path)):
+        if err := refuse_write(self.workspace, path, self.write_region):
             return err
         old = str(kwargs["old"])
         new = str(kwargs["new"])
@@ -137,7 +137,7 @@ class ApplyPatchTool(_WorkspaceTool):
 
     def run(self, **kwargs: Any) -> str:
         path = resolve_in_workspace(self.workspace, str(kwargs["path"]))
-        if self.write_region is not None and (err := self.write_region.check(path)):
+        if err := refuse_write(self.workspace, path, self.write_region):
             return err
         rel = kwargs["path"]
         if not path.is_file():

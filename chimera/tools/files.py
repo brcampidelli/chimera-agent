@@ -7,7 +7,7 @@ from typing import Any
 
 from chimera.tools.base import Tool
 from chimera.tools.workspace import atomic_write_text, resolve_in_workspace
-from chimera.tools.write_region import WriteRegion
+from chimera.tools.write_region import WriteRegion, refuse_write
 
 _MAX_READ_CHARS = 20_000
 
@@ -68,7 +68,7 @@ class WriteFileTool(_WorkspaceTool):
 
     def run(self, **kwargs: Any) -> str:
         path = resolve_in_workspace(self.workspace, str(kwargs["path"]))
-        if self.write_region is not None and (err := self.write_region.check(path)):
+        if err := refuse_write(self.workspace, path, self.write_region):
             return err
         content = str(kwargs.get("content", ""))
         path.parent.mkdir(parents=True, exist_ok=True)

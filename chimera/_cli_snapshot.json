@@ -4001,7 +4001,7 @@
     },
     {
       "deprecated": false,
-      "help": "Import a SKILL.md into the store. A tainted-provenance skill is held pending for review.",
+      "help": "Import a SKILL.md into the store. A tainted-provenance skill is held pending for review.\n\nValidated on the way in. This is the only path by which a skill written by somebody else enters\nthe store, and it was the only one that skipped the validator the agent's own proposals must\npass \u2014 the gate was applied to the code we wrote and not to the code we were handed, which is\nbackwards. A skill card ends up in the system prompt, so an unvalidated one is an instruction\nfrom a stranger with the standing of an instruction from the owner.",
       "hidden": false,
       "name": "skills-import",
       "params": [

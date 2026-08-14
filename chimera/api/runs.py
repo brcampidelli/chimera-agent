@@ -52,7 +52,9 @@ class AttemptReceipt(BaseModel):
     diff_summary: str = ""  # the workspace diff this attempt made, as audited before any revert
     feedback: str = ""  # the retry feedback this attempt produced, truncated in the builder
     diffs: list[FileDiffReceipt] = []  # real per-file unified diffs (what the attempt changed/attempted)
-    #: On whose authority this attempt was decided: "verifier" | "diff+manager" | "manager" | "none".
+    #: On whose authority this attempt was decided: "verifier" | "diff+manager" | "diff" | "manager"
+    #: | "none". "diff" is a measured workspace change with no manager configured — what used to be
+    #: mislabelled "manager", naming a reviewer that never ran.
     #: This crossed from ``Attempt`` late: the field existed in memory for a release while the
     #: persisted receipt carried only the booleans, so a reader of runs.jsonl could not tell a
     #: command-verified pass from an LLM approving prose. Nobody chose that — it just never crossed
