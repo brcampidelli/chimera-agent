@@ -27,8 +27,14 @@ def make_agent_dispatch(
     on_result: Callable[[CronJob, str], None] | None = None,
     *,
     delivery_retries: int = 2,
+    run_job: Callable[[CronJob], str] | None = None,
 ) -> Dispatch:
     """Build a dispatch that runs a job's ``action`` through ``run_task`` (task -> answer).
+
+    ``run_job`` is the job-aware form and wins when given: a caller that has to honour the job's own
+    settings — its spend cap, whether it is exempt from the daily one — needs the job, not just the
+    action string. ``run_task`` stays for every caller that does not, which is most of them, and is
+    what the tests drive.
 
     ``on_result`` (optional) receives ``(job, answer)`` — e.g. to deliver the result to a
     chat platform or a durable sink. Delivery is *confirmed*: it is retried up to
@@ -38,7 +44,7 @@ def make_agent_dispatch(
     """
 
     def dispatch(job: CronJob) -> None:
-        answer = run_task(job.action)
+        answer = run_job(job) if run_job is not None else run_task(job.action)
         _log.info("cron '%s' ran -> %s", job.name, (answer or "").replace("\n", " ")[:200])
         if on_result is None:
             return

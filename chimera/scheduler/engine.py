@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from croniter import croniter
 
 from chimera.concurrency import call_with_deadline
+from chimera.orchestration.budget import BudgetExceeded
 from chimera.scheduler.models import CreatedBy, CronJob, DispatchStatus
 from chimera.scheduler.store import CronStore
 from chimera.telemetry import get_logger
@@ -250,6 +251,12 @@ class Scheduler:
                     job.name, job.id, job_timeout,
                 )
                 self._record(job, "timeout", f"exceeded {job_timeout}s and was abandoned")
+            except BudgetExceeded as exc:
+                # Not a failure: the job was refused because the money said no. Loud on purpose —
+                # a refusal that only showed up as "nothing happened" is indistinguishable from a
+                # stopped daemon, and this path runs jobs that watch real positions.
+                _log.warning("cron job %s refused on budget: %s", job.name, exc)
+                self._record(job, "budget", str(exc))
             except Exception as exc:  # a failing job must not break the scheduler
                 _log.warning("cron job %s failed: %s", job.id, exc)
                 self._record(job, "error", f"{type(exc).__name__}: {exc}")
@@ -262,7 +269,13 @@ class Scheduler:
         """Set the outcome on the job. `mark_ran` persists it a moment later, in the same tick."""
         job.last_status = status
         job.last_error = (error or "")[:300] or None
-        job.consecutive_failures = 0 if status == "ok" else job.consecutive_failures + 1
+        # A budget refusal does not count as a failure: the job never ran, so nothing about it
+        # failed, and letting it climb this counter would make a spending decision look like forty
+        # broken dispatches to anyone reading `failing()`.
+        if status in ("ok", "budget"):
+            job.consecutive_failures = 0
+        else:
+            job.consecutive_failures += 1
 
     def fire_event(self, event: str, now: float, dispatch: Callable[[CronJob], None]) -> list[CronJob]:
         """Dispatch every job registered for ``event``. Returns those run."""

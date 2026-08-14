@@ -1622,12 +1622,57 @@ def _start_cron_daemon(
     """Start the cron daemon in a background thread; return its stop event."""
     import json
     import time
+    from datetime import UTC, datetime
 
+    from chimera.api.usage import UsageRecord, append_usage, spent_today
     from chimera.core import Agent, AgentConfig
+    from chimera.orchestration.budget import BudgetExceeded
     from chimera.scheduler import CronDaemon, CronJob, Scheduler, make_agent_dispatch
     from chimera.tools import default_registry
 
     scheduler = Scheduler(_cron_store())
+    settings = get_settings()
+    usage_path = settings.home / "usage.jsonl"
+
+    def run_job(job: CronJob) -> str:
+        """One dispatch, inside whatever the money allows.
+
+        Three things happen here that did not before. The DAILY cap is checked before the job is
+        allowed to spend anything; the job's own cap is handed to the loop; and what the job spent
+        is written to the usage log — which is what makes the daily figure include cron at all. It
+        did not: the log was written only by the chat turn, so a daily cap read from it would have
+        been blind to exactly the spend it exists to bound.
+        """
+        cap = settings.daily_usd_cap
+        if cap and not job.critical:
+            today = datetime.now(UTC).strftime("%Y-%m-%d")
+            spent, unpriced = spent_today(usage_path, today=today)
+            if unpriced:
+                raise BudgetExceeded(
+                    f"today's spend cannot be known (an unpriced model ran); {job.name} refused. "
+                    "Price the model, or mark this job critical if it must run regardless"
+                )
+            if spent >= cap:
+                raise BudgetExceeded(f"daily cap reached: ${spent:.4f} of ${cap:.4f}")
+
+        agent = Agent(
+            backend,
+            default_registry(workspace),
+            AgentConfig(model=model, max_steps=max_steps, max_usd=job.max_usd),
+        )
+        result = agent.run(job.action)
+        append_usage(
+            usage_path,
+            UsageRecord(
+                ts=datetime.now(UTC).isoformat(),
+                session_id=f"cron:{job.id}",
+                model=result.model,
+                prompt_tokens=result.prompt_tokens,
+                completion_tokens=result.completion_tokens,
+                usd=result.usd,
+            ),
+        )
+        return result.answer
 
     def run_task(task: str) -> str:
         agent = Agent(backend, default_registry(workspace), AgentConfig(model=model, max_steps=max_steps))
@@ -1649,7 +1694,9 @@ def _start_cron_daemon(
         with results_path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(record, ensure_ascii=False) + "\n")
 
-    daemon = CronDaemon(scheduler, make_agent_dispatch(run_task, deliver), tick_seconds=tick)
+    daemon = CronDaemon(
+        scheduler, make_agent_dispatch(run_task, deliver, run_job=run_job), tick_seconds=tick
+    )
     _thread, stop = daemon.start()
     jobs = len(scheduler.store.list())
     console.print(f"[dim]cron daemon on (tick {tick}s, {jobs} job(s) scheduled)[/dim]")
