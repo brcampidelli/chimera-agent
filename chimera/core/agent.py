@@ -194,6 +194,10 @@ class AgentResult:
     cache_read_tokens: int = 0
     cache_write_tokens: int = 0
     usd: float | None = None
+    #: The id this run was written to the trace under, or "" when no trace was written. It is what
+    #: lets a receipt, a usage record and a trace line be joined back into one run — the join that
+    #: was impossible while the trace was keyed by a truncated task.
+    run_id: str = ""
     tool_names: list[str] = field(default_factory=list)  # names of the tools actually called, in order
     model: str = ""  # the model slug that actually answered (for a per-model usage breakdown)
     #: Per-step record: context size at each step, and what each tool was asked and answered.
@@ -537,11 +541,12 @@ class Agent:
         from chimera.orchestration.receipts import price_delegation
 
         log = steplog if steplog is not None else StepLog()
+        run_id = ""
         if self.config.trace_path is not None and log.steps:
             # Best-effort: a trace that cannot be written must never take the run down with it. The
             # answer is the product; the trace is evidence about how it was reached.
             try:
-                log.write(self.config.trace_path, task=task, stopped_reason=stopped_reason)
+                run_id = log.write(self.config.trace_path, task=task, stopped_reason=stopped_reason)
             except OSError as exc:  # pragma: no cover - disk-shaped failure
                 _log.debug("could not write trace to %s: %s", self.config.trace_path, exc)
 
@@ -560,6 +565,7 @@ class Agent:
             cache_read_tokens=usage.cache_read,
             cache_write_tokens=usage.cache_write,
             usd=usd,
+            run_id=run_id,
             tool_names=tool_names,
             model=model,
             route_meta=route_meta,
