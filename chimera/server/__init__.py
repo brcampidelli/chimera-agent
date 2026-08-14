@@ -4,6 +4,7 @@ The gateway routes per-chat messages into ChatSessions; adapters (local + Discor
 are its transports.
 """
 
+from chimera.server.bind import InsecureBindError, check_bind, is_loopback
 from chimera.server.discord_adapter import DiscordAdapter
 from chimera.server.gateway import (
     Adapter,
@@ -22,6 +23,9 @@ from chimera.server.telegram_adapter import TelegramAdapter
 from chimera.server.whatsapp import WhatsAppSender, WhatsAppWebhook
 
 __all__ = [
+    "InsecureBindError",
+    "check_bind",
+    "is_loopback",
     "InboundMessage",
     "MessageGateway",
     "MessagingManager",

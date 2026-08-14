@@ -12,7 +12,11 @@ services:
     restart: unless-stopped
     env_file: .env
     ports:
-      - "8765:8765"          # HTTP gateway: POST /chat, POST /webhook/<hook>, GET /health
+      # LOOPBACK by default. `8765:8765` publishes on every interface, and with an empty
+      # CHIMERA_SERVER_TOKEN the gateway authenticates nobody — one `docker compose up` and an
+      # agent with tools is answering the internet. Put a proxy that authenticates in front, or
+      # set a token and change this line deliberately.
+      - "127.0.0.1:8765:8765" # HTTP gateway: POST /chat, POST /webhook/<hook>, GET /health
     volumes:
       - chimera-data:/data   # CHIMERA_HOME — agent state survives restarts
     # Default command runs the HTTP gateway + cron daemon. To also serve a chat platform,
