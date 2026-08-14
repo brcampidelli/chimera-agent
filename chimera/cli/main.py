@@ -5281,6 +5281,33 @@ def redteam() -> None:
             "— named honestly; the general data-vs-instructions problem (#5) stays open."
         )
 
+    # The other half, and it is not optional. A defense scored on attacks alone has a trivial
+    # maximum — refuse everything — so the block rate above is unreadable without this number
+    # beside it. See `bench/injection/PREREGISTRATION.md` for the gate both must pass.
+    from chimera.eval.injection import run_posture
+
+    posture = run_posture(defended=True)
+    benign = posture.benign.summary()
+    cost = Table(title="What the defense costs in legitimate work", header_style="bold")
+    cost.add_column("Legitimate task set")
+    cost.add_column("Refused", justify="right")
+    cost.add_row(
+        "reads its own repo first (control — must stay 0%)",
+        f"{benign.get('over_block_workspace', 0.0):.0%}",
+    )
+    cost.add_row(
+        "reads something external first (docs, issue, release notes)",
+        f"{benign.get('over_block_fetch', 0.0):.0%}",
+    )
+    cost.add_row("[bold]all legitimate work[/bold]", f"[bold]{benign['over_block_rate']:.0%}[/bold]")
+    console.print(cost)
+    passed, why = posture.gate()
+    console.print(f"[{'green' if passed else 'red'}]gate: {'pass' if passed else 'FAIL'}[/] — {why}")
+    if posture.benign.refusals():
+        console.print(
+            f"[yellow]Legitimate work refused:[/yellow] {', '.join(posture.benign.refusals())}"
+        )
+
 
 @app.command("probe-select")
 def probe_select(
