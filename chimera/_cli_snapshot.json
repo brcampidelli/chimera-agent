@@ -22,6 +22,48 @@
     },
     {
       "deprecated": false,
+      "help": "Serve Chimera to an editor over the Agent Client Protocol (stdio).\n\nThe mirror of what `chimera code --provider claude` does: there we drive somebody else's agent,\nhere somebody else's editor drives ours. Point Zed, JetBrains or Neovim at `chimera acp` and the\nloop, the verifier and the receipt are available without installing a second tool.\n\nNothing on this path may write to stdout \u2014 it IS the protocol. A stray print corrupts the frame\nthe editor is parsing, and the symptom is an editor that hangs rather than output in the wrong\nplace. The banner goes to stderr for the same reason the MCP server's does.",
+      "hidden": false,
+      "name": "acp",
+      "params": [
+        {
+          "default": "'.'",
+          "help": "Directory the agent works in.",
+          "kind": "option",
+          "name": "workspace",
+          "opts": [
+            "--workspace",
+            "-w"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Override the model for this session.",
+          "kind": "option",
+          "name": "model",
+          "opts": [
+            "--model"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "30",
+          "help": "Tool-calling steps per turn.",
+          "kind": "option",
+          "name": "max_steps",
+          "opts": [
+            "--max-steps"
+          ],
+          "required": false,
+          "type": "int"
+        }
+      ],
+      "path": "acp"
+    },
+    {
+      "deprecated": false,
       "help": "Run the ReAct agent loop with native tools. Requires a provider key.",
       "hidden": false,
       "name": "agent",
