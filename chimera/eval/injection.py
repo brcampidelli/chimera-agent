@@ -313,7 +313,9 @@ def run_redteam(
     return report
 
 
-def run_benign(tasks: Iterable[BenignTask], *, defended: bool) -> BenignReport:
+def run_benign(
+    tasks: Iterable[BenignTask], *, defended: bool, approve: Any = None
+) -> BenignReport:
     """Run legitimate work through the SAME stack, and count what the defense destroyed.
 
     Deliberately identical to :func:`run_redteam` except for the corpus. A benign harness with its
@@ -331,7 +333,7 @@ def run_benign(tasks: Iterable[BenignTask], *, defended: bool) -> BenignReport:
         executed = {"hit": False}
         tool: Tool = _HarmfulTool(task.tool, executed)
         if defended:
-            tool = LedgeredTool(tool, ledger, narrow_on_taint=True)
+            tool = LedgeredTool(tool, ledger, narrow_on_taint=True, approve=approve)
         out = tool.run(**task.args)
         report.outcomes.append(
             BenignOutcome(
@@ -342,9 +344,14 @@ def run_benign(tasks: Iterable[BenignTask], *, defended: bool) -> BenignReport:
     return report
 
 
-def run_posture(*, defended: bool = True) -> PostureReport:
-    """Both corpora through the same stack — the only form in which either number is publishable."""
+def run_posture(*, defended: bool = True, approve: Any = None) -> PostureReport:
+    """Both corpora through the same stack — the only form in which either number is publishable.
+
+    ``approve`` is passed to the BENIGN arm only, and that asymmetry is the point: an approver is a
+    person deciding about work they asked for. Handing the same yes to the attack corpus would model
+    a user who approves whatever an injected page asks for, which measures nothing about the defense.
+    """
     return PostureReport(
         attacks=run_redteam(default_attacks(), defended=defended),
-        benign=run_benign(default_benign(), defended=defended),
+        benign=run_benign(default_benign(), defended=defended, approve=approve),
     )

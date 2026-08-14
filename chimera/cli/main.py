@@ -2986,6 +2986,13 @@ def solve(
 
     meter = MeteredBackend(gateway, label="overhead")
 
+    # Built OUTSIDE `_run_solve` on purpose: the worktree path calls that function again on retry,
+    # and a ledger created inside it would be discarded along with the evidence of what the run was
+    # not allowed to do — which is the one fact this whole mechanism exists to keep.
+    from chimera.governance import ApprovalLedger, approver_for
+
+    approvals = ApprovalLedger()
+
     def _run_solve(ws: Path) -> AutonomousResult:
         from chimera.tools.write_region import WriteRegion
 
@@ -3020,11 +3027,19 @@ def solve(
             registry.register(
                 SubAgentTool(gateway, lambda: registry, model=model, max_turns=max_steps)
             )
+        # Someone on the other side of the gate. Both layers have accepted an approver since they
+        # were written and neither was ever given one, which measured out as 100% of dangerous-class
+        # calls refused on any run that read something external — the gate was never too strict,
+        # there was nothing behind it. `ask` degrades to `deny` without a terminal, and every
+        # decision is recorded so a refused run can be told apart from an idle one.
+        approve = approver_for(settings.approval_mode, approvals)
         if guard:
             from chimera.governance import TrustKernel, govern_registry
 
             registry = govern_registry(
-                registry, TrustKernel(audit=AuditLog(settings.home / "audit.jsonl"))
+                registry,
+                TrustKernel(audit=AuditLog(settings.home / "audit.jsonl")),
+                approve=approve,
             )
         ledger = None
         if taint:
@@ -3036,7 +3051,7 @@ def solve(
             # narrow_on_taint: once the run consumes untrusted content, dangerous tools
             # (shell/write/exec/email) require approval for the rest of the run (M9b).
             registry = ledger_registry(
-                registry, ledger, audit=allow_audit, narrow_on_taint=True
+                registry, ledger, audit=allow_audit, narrow_on_taint=True, approve=approve
             )
         # insist_on_action: solve is autonomous task completion, so a described-but-unexecuted plan
         # is pushed back to actually run — the fix for the worker narrating instead of acting.
@@ -3191,6 +3206,18 @@ def solve(
     console.print(result.answer)
     status = "[green]success[/green]" if result.success else "[red]failed[/red]"
     console.print(f"[dim]{status} after {len(result.attempts)} attempt(s)[/dim]")
+
+    # The loud half, and the reason the approver exists at all. A refused call comes back as an
+    # ordinary observation string, so the agent reads it like any tool result and carries on — the
+    # run ends in prose and the receipt says success. That is how a guardian reports green having
+    # guarded nothing. Saying it here costs one line and removes the whole failure mode.
+    if approvals.blocked:
+        console.print(f"[yellow]governance: {approvals.summary()}[/yellow]")
+        if result.success:
+            console.print(
+                "[yellow]…and this run was reported successful anyway — check that the work it "
+                "was asked to do actually happened.[/yellow]"
+            )
 
     # Close the ACE loop: reflect on this run's outcome (success or failure) and curate the
     # playbook with incremental deltas, so the next run starts from the improved guidance.

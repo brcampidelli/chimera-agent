@@ -61,6 +61,25 @@ This is the same configuration the roadmap proposes turning on for the 24/7 cron
 why that step is gated behind an observer mode: the refusal is returned as an ordinary observation
 string, so the job would finish "successfully" having done nothing.
 
+## Second measurement (2026-08-14, with an approver wired)
+
+The action the first measurement pointed at was "wire a real approver" — the `approve=` parameter
+existed at both layers and had no production caller. Done, and re-measured:
+
+| configuration | attacks blocked | over-block (all) | over-block (fetch) | gate |
+|---|---|---|---|---|
+| no approver (the shipped state) | 85.7% | 50% | 100% | **FAIL** |
+| approver that approves | **85.7%** | **0%** | **0%** | **pass** |
+
+The attack block rate does not move. That is the point of the change and the reason the approver is
+offered only to the benign arm: handing the same yes to the attack corpus would model a user who
+approves whatever an injected page asks for, which measures nothing about the defense.
+
+What this does **not** show is that approving is the right policy — only that the gate was empty
+rather than strict. `deny` remains the unattended default, and it is now a *recorded* deny: the run
+can say what it was not allowed to do, which is what makes a refusal distinguishable from a job that
+simply had nothing to do.
+
 ## What this does NOT license
 
 The obvious response is to loosen the narrowing until the gate goes green. That would be tuning to

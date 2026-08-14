@@ -70,6 +70,9 @@ if TYPE_CHECKING:
 
 # Exported name -> (submodule, attribute). No renames here, but the shape matches chimera.eval's.
 _LAZY: dict[str, tuple[str, str]] = {
+    "ApprovalLedger": ("approval", "ApprovalLedger"),
+    "Approver": ("approval", "Approver"),
+    "approver_for": ("approval", "approver_for"),
     "ActorResult": ("actors", "ActorResult"),
     "ChangeProposal": ("actors", "ChangeProposal"),
     "FourActorGovernance": ("actors", "FourActorGovernance"),
@@ -158,6 +161,9 @@ __all__ = [
     "QuarantinedReader",
     "QuarantineResult",
     "fields_schema",
+    "ApprovalLedger",
+    "Approver",
+    "approver_for",
     "SkillValidator",
     "ScheduleValidator",
     "ValidationResult",
