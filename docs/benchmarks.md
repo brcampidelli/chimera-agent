@@ -18,8 +18,19 @@ harness.
 - **Honesty guards:** pin the task-ID subset (publish it), run ≥3 seeds, publish all transcripts,
   and add a frontier-model row only as a *ceiling reference* — never as the comparison.
 
-The one number that proves the thesis: **free model alone = X%, free model + Chimera = Y%, same
-tasks, Y ≫ X.**
+### The result — and it went against us
+
+This page used to end the section by naming the number that *would* prove the thesis: "free model
+alone = X%, free model + Chimera = Y%, Y ≫ X". The experiment has since been run, and Y came out
+**below** X. On a pre-registered N=40 slice with the same model in both arms
+(`deepseek-chat-v3.1`): **7.5% → 2.5%**, paired **Δ −5.0pp, 95% CI [−5.0%, +1.6%] — not
+significant**. The scaffold did not lift an already-competent model; both arms sit at a
+variance-dominated floor. Full write-up, including the pre-registration written before the run:
+[`bench/terminal_bench/RESULTS.md`](../bench/terminal_bench/RESULTS.md).
+
+The sentence promising `Y ≫ X` outlived the run that refuted it, on this page and in nine
+translations. It is recorded here rather than quietly deleted, because a project whose only real
+asset is honest measurement cannot afford a page that predicts the opposite of its own result.
 
 ## Running it
 
@@ -33,7 +44,7 @@ Chimera plugs in as the treatment agent via `chimera/eval/terminal_bench.py`
 scaffolding flags). Point Harbor at a pinned subset and a free model for each arm; see the
 [Harbor docs](https://www.tbench.ai/) for the exact `harbor run` invocation and `--agent-import-path`.
 
-## SWE-bench Verified (the second scoreboard) — **run, twice**
+## SWE-bench Verified (the second scoreboard) — **run four times**
 
 Terminal-Bench proves the thesis on CLI tasks; SWE-bench proves it on real GitHub bug-fixes — given
 a repo at a base commit and an issue, the agent must produce a patch that makes the instance's
@@ -42,24 +53,38 @@ subset.
 
 ### Results
 
-Two pre-registered runs on the same frozen 19-instance `django/django` slice (easiest difficulty
-stratum), `deepseek-chat-v3.1`, pass@1, graded **only** by the official `swebench` 4.1.0 harness in
-Docker. Full write-up: [`bench/swe_bench/RESULTS.md`](../bench/swe_bench/RESULTS.md).
+Four pre-registered runs on `django/django` slices, `deepseek-chat-v3.1`, pass@1, graded **only** by
+the official `swebench` 4.1.0 harness in Docker. Full write-up:
+[`bench/swe_bench/RESULTS.md`](../bench/swe_bench/RESULTS.md).
 
-| run | baseline | + Chimera | paired Δ | 95% CI | |
-|---|---|---|---|---|---|
-| 1 (`max_steps=8`) | 36.8% (7/19) | 36.8% (7/19) | +0.0% | [−8.5%, +8.5%] | not significant |
-| 2 (`max_steps=30`) | 42.1% (8/19) | **57.9% (11/19)** | **+15.8%** | [−1.9%, +15.8%] | not significant |
+| run | slice | baseline | + Chimera | paired Δ | 95% CI | |
+|---|---|---|---|---|---|---|
+| 1 (`max_steps=8`) | 19 | 36.8% (7/19) | 36.8% (7/19) | +0.0% | [−8.5%, +8.5%] | not significant |
+| 2 (`max_steps=30`) | same 19 | 42.1% (8/19) | 57.9% (11/19) | +15.8% | [−1.9%, +15.8%] | not significant |
+| **3 (replication)** | **41 unseen** | 34.1% (14/41) | **43.9% (18/41)** | **+9.8%** | [−3.5%, +16.7%] | not significant |
+| **pooled (secondary)** | **60** | 36.7% (22/60) | 48.3% (29/60) | **+11.7%** | **[+0.8%, +16.4%]** | **significant** |
+| 4 (attribution) | run 3's 41 | 34.1% | *scaffold only* 39.0% | +4.9% | [−7.6%, +14.2%] | not significant |
 
 Run 1 is an **exact zero** and is published unchanged. Run 2 fixed two faults that were *ours* — the
 scaffold ran without its strongest mechanism, and 8 tool-calling steps is not enough to navigate a
-250 MB repository — and came out **3 instances won, 0 lost**. The pair is the finding: the scaffold is
-worth *nothing* when the agent is starved of steps and *three instances* when it is not, and it wins
-by editing **better** (69% vs 57% precision when it edits), not by editing more.
+250 MB repository — and came out **3 instances won, 0 lost**.
 
-> ⚠️ **57.9% is not a SWE-bench Verified score.** The slice is deliberately easy and single-repo,
-> chosen so a paired A/B has room to measure; a real Verified score needs the full 500. And the delta
-> is **not significant** — with 8 both-fail pairs, n=19 leaves only three informative pairs.
+That 3–0 sweep on three informative pairs is exactly the shape a lucky sample produces, and the
+pre-registration gave it a **one-in-three chance of being just that**. So run 3 repeated it on **41
+instances whose outcomes we had never seen**, changing nothing else: same arms, same model, same step
+budget, same timeout. The effect **reappeared** — +9.8%, inside the registered +5-to-+20 band, on a
+slice that turned out *harder* than run 2's (baseline 34.1% vs 42.1%). Run 4 then split the scaffold
+from the diff-gate on the same 41: **+4.9% each**, and the mechanism is precision, which climbs
+50% → 59% → 67% while the patch rate never moves.
+
+> ⚠️ **None of these is a SWE-bench Verified score.** The slices are deliberately easy and
+> single-repo, chosen so a paired A/B has room to measure; a real Verified score needs the full 500.
+> No individual run is significant. The pooled n=60 is — and it was pre-registered as **secondary**
+> precisely because it mixes seen with unseen data, so it supports the effect rather than sizing it.
+
+Two of our own predictions were retracted along the way, as prominently as they were made: the
+mechanism we had traced for run 1's empty patches (the fix was the step budget, not the diff-gate we
+blamed), and a run-2 reading that run 4 contradicted.
 
 Run 2 also ships a **retraction**: the mechanism we had traced for run 1's empty patches was wrong
 (the fix was the step budget, not the diff-gate we blamed), corrected as prominently as it was claimed.

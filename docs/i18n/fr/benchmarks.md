@@ -25,8 +25,21 @@ tests de vérification, notée pass/fail par ces tests, pilotée par le harness 
   ≥3 seeds, publier toutes les transcriptions, et n'ajouter une ligne modèle-frontière que comme
   *référence plafond* — jamais comme comparaison.
 
-Le chiffre unique qui prouve la thèse : **modèle gratuit seul = X %, modèle gratuit + Chimera =
-Y %, mêmes tâches, Y ≫ X.**
+### Le résultat — et il nous a contredits
+
+Cette page terminait la section en nommant le nombre qui *prouverait* la thèse : « modèle gratuit
+seul = X %, modèle gratuit + Chimera = Y %, Y ≫ X ». L'expérience a depuis été menée, et Y est
+ressorti **en dessous** de X. Sur un sous-ensemble pré-enregistré de N=40 avec le même modèle dans
+les deux bras (`deepseek-chat-v3.1`) : **7,5 % → 2,5 %**, **Δ appariée −5,0 pp, IC 95 % [−5,0 %,
++1,6 %] — non significatif**. L'échafaudage n'a pas fait progresser un modèle déjà compétent ; les
+deux bras se situent sur un plancher dominé par la variance. Rapport complet, y compris le
+pré-enregistrement rédigé avant l'exécution :
+[`bench/terminal_bench/RESULTS.md`](../../../bench/terminal_bench/RESULTS.md).
+
+La phrase promettant `Y ≫ X` a survécu à l'exécution qui l'a réfutée, sur cette page et dans neuf
+traductions. Elle est consignée ici plutôt que supprimée en silence, car un projet dont le seul
+actif réel est la mesure honnête ne peut pas se permettre une page qui prédit le contraire de son
+propre résultat.
 
 ## L'exécuter
 
@@ -41,7 +54,7 @@ les flags de scaffolding). Pointez Harbor vers un sous-ensemble fixé et un mod�
 chaque bras ; voir la [documentation Harbor](https://www.tbench.ai/) pour l'invocation exacte de
 `harbor run` et `--agent-import-path`.
 
-## SWE-bench Verified (le second tableau de bord) — **exécuté, deux fois**
+## SWE-bench Verified (le second tableau de bord) — **exécuté quatre fois**
 
 Terminal-Bench prouve la thèse sur des tâches CLI ; SWE-bench la prouve sur de vraies
 corrections de bugs GitHub — étant donné un dépôt à un commit de base et une issue, l'agent doit
@@ -50,7 +63,7 @@ produire un patch qui fait passer les tests `FAIL_TO_PASS` de l'instance tout en
 
 ### Résultats
 
-Deux runs pré-enregistrés sur la même tranche gelée de 19 instances `django/django` (strate de
+Quatre runs pré-enregistrés sur des tranches `django/django` (strate de
 difficulté la plus facile), `deepseek-chat-v3.1`, pass@1, notés **uniquement** par le harness
 officiel `swebench` 4.1.0 dans Docker. Compte-rendu complet :
 [`bench/swe_bench/RESULTS.md`](../bench/swe_bench/RESULTS.md).
@@ -59,6 +72,9 @@ officiel `swebench` 4.1.0 dans Docker. Compte-rendu complet :
 |---|---|---|---|---|---|
 | 1 (`max_steps=8`) | 36,8 % (7/19) | 36,8 % (7/19) | +0,0 % | [−8,5 %, +8,5 %] | non significatif |
 | 2 (`max_steps=30`) | 42,1 % (8/19) | **57,9 % (11/19)** | **+15,8 %** | [−1,9 %, +15,8 %] | non significatif |
+| **3 (réplication)** | 34,1 % (14/41) | **43,9 % (18/41)** | **+9,8 %** | [−3,5 %, +16,7 %] | non significatif |
+| **groupé (secondaire)** | 36,7 % (22/60) | 48,3 % (29/60) | **+11,7 %** | **[+0,8 %, +16,4 %]** | **significatif** |
+| 4 (attribution) | 34,1 % | *échafaudage seul* 39,0 % | +4,9 % | [−7,6 %, +14,2 %] | non significatif |
 
 Le run 1 est un **zéro exact** et est publié sans modification. Le run 2 a corrigé deux défauts
 qui étaient les *nôtres* — le scaffold tournait sans son mécanisme le plus fort, et 8 étapes
@@ -67,7 +83,7 @@ d'appel d'outils ne suffisent pas pour naviguer dans un dépôt de 250 Mo — et
 l'agent est privé d'étapes et *trois instances* quand il ne l'est pas, et il gagne en éditant
 **mieux** (69 % contre 57 % de précision quand il édite), pas en éditant plus.
 
-> ⚠️ **57,9 % n'est pas un score SWE-bench Verified.** La tranche est délibérément facile et
+> ⚠️ **Aucun de ces chiffres n'est un score SWE-bench Verified.** La tranche est délibérément facile et
 > mono-dépôt, choisie pour qu'un A/B apparié ait de la marge pour mesurer ; un vrai score
 > Verified nécessite les 500 complets. Et le delta n'est **pas significatif** — avec 8 paires
 > échec-échec, n=19 ne laisse que trois paires informatives.
@@ -75,6 +91,16 @@ l'agent est privé d'étapes et *trois instances* quand il ne l'est pas, et il g
 Le run 2 livre aussi une **rétractation** : le mécanisme que nous avions retracé pour les
 patchs vides du run 1 était erroné (le correctif était le budget d'étapes, pas la porte de diff
 que nous avions blâmée), corrigé aussi ostensiblement qu'il avait été affirmé.
+
+Ce 3–0 sur trois paires informatives est exactement la forme que produit un échantillon chanceux, et
+le pré-enregistrement lui donnait **une chance sur trois de n'être que cela**. Le run 3 l'a donc
+répété sur **41 instances dont nous n'avions jamais vu les résultats**, sans rien changer d'autre.
+L'effet **a réapparu** : +9,8 %, dans la fourchette enregistrée de +5 à +20, sur une tranche qui
+s'est révélée *plus difficile* que celle du run 2 (référence 34,1 % contre 42,1 %). Le run 4 a
+ensuite séparé l'échafaudage du diff-gate sur les mêmes 41 : **+4,9 % chacun**, et le mécanisme est
+la précision, qui monte de 50 % à 59 % puis 67 % alors que le taux de patch ne bouge pas. Aucun run
+isolé n'est significatif ; le groupé n=60 l'est — et il a été pré-enregistré comme **secondaire**
+précisément parce qu'il mélange données vues et non vues.
 
 ### L'adaptateur
 
