@@ -435,6 +435,15 @@ class Settings(BaseSettings):
     )
     complete_budget_ms: int = Field(default=600, validation_alias="CHIMERA_COMPLETE_BUDGET_MS")
 
+    # Aggregate dollar ceiling for ONE day, across everything that writes to the usage log. Unset
+    # (the default) means no daily cap and therefore no new way for a scheduled job to be refused.
+    #
+    # Read from the log rather than a counter so it survives a restart, and refused LOUDLY: the job
+    # gets `last_status="budget"` with the numbers, because a refusal that only looked like "nothing
+    # happened" is indistinguishable from a dead daemon. A job marked `critical` is exempt — a
+    # position guardian silenced at 2 p.m. until midnight costs more than it saves.
+    daily_usd_cap: float | None = Field(default=None, validation_alias="CHIMERA_DAILY_USD_CAP")
+
     # Deployment-level tool allowlist/denylist (names). Empty allowlist = no restriction (all
     # tools); a non-empty allowlist grants only those. Denylist removes even if allowed.
     #

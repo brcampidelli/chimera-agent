@@ -58,6 +58,30 @@ def load_usage(path: Path) -> list[UsageRecord]:
     return out
 
 
+def spent_today(path: Path, *, today: str) -> tuple[float, bool]:
+    """What has been spent on ``today`` (an ISO ``YYYY-MM-DD``), and whether any of it is unknown.
+
+    Returns ``(usd, has_unpriced)``. The second value is not a detail: a day containing one unpriced
+    turn has an unknown total, and a cap compared against the known part alone would be comparing
+    against a number that is confidently too low. The caller decides what to do with that — the
+    scheduler refuses, which is the same rule the per-run cap follows.
+
+    Reads the log rather than keeping a counter, so the answer survives a restart. The daemon runs
+    for weeks; a total held in memory would reset to zero every deploy, which is the one moment a
+    spend cap most needs to remember.
+    """
+    total = 0.0
+    unpriced = False
+    for record in load_usage(path):
+        if not record.ts.startswith(today):
+            continue
+        if record.usd is None:
+            unpriced = True
+        else:
+            total += record.usd
+    return round(total, 6), unpriced
+
+
 def summarize_usage(records: list[UsageRecord]) -> dict[str, Any]:
     """Aggregate usage records into the dashboard summary.
 
