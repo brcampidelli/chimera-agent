@@ -231,6 +231,13 @@ class Attempt:
     completion_tokens: int = 0
     #: The model slug that actually answered this attempt (the EDITOR's model under role routing).
     model: str = ""
+    #: The id this attempt's trace line was written under, or "" when no trace was written.
+    #:
+    #: One attempt IS one agent run, which is one trace line — so this is the exact key that joins a
+    #: verified outcome to the context it was carrying. Without it the two files can only be joined
+    #: on a truncated task, which collides precisely where the join matters: a bench repeats one
+    #: task, and a run with three attempts writes three indistinguishable lines.
+    run_id: str = ""
     #: Names of out-of-checkout side-effect tools this attempt actually called (send_email,
     #: http_post, …), read off the step log. Recorded, never acted on: an empty diff means
     #: something very different once a run has already sent mail, and a reader of the receipt
@@ -721,6 +728,10 @@ class AutonomousAgent:
             attempt.diffs = diffs
             attempt.diff_productive = diff_productive
             attempt.side_effects = _side_effects(steplog)
+            # The key that joins this outcome to the trace line the same run just wrote. Read off
+            # the worker's result, like  above and for the same reason: it is the worker that
+            # knows, and re-deriving it here would be a second place for the two to disagree.
+            attempt.run_id = str(getattr(agent_result, 'run_id', '') or '')
             # What this attempt charged. Read off the worker's own result rather than recomputed:
             # `usd` is None there whenever the model's price is unknown, and that None has to
             # survive all the way to the receipt for the "was it worth it?" view to stay honest.
