@@ -34,6 +34,15 @@ class CardABRow:
     card_ok: bool
     card_tokens: int | None
     hit: bool  # a card was retrieved for this task
+    #: The placebo arm: the same NUMBER of cards, of the same rough size, retrieved for a DIFFERENT
+    #: task. None when the arm was not run (it costs a third model call per task).
+    #:
+    #: Without it "cards beat no-cards" cannot distinguish "this card was relevant" from "a block of
+    #: plausible prose before the question helps" — and the second is a well-documented effect that
+    #: has nothing to do with the skill library this project is built around. A flip gate that
+    #: cannot tell them apart will happily promote a library of noise.
+    placebo_ok: bool | None = None
+    placebo_tokens: int | None = None
 
 
 @dataclass
@@ -54,6 +63,24 @@ class CardABReport:
         c = sum(1 for r in self.rows if not r.base_ok and r.card_ok)  # cards won
         d = sum(1 for r in self.rows if not r.base_ok and not r.card_ok)  # both fail
         return PairedResult("no-cards", "cards", both_pass=a, baseline_only=b, treatment_only=c, both_fail=d)
+
+    def paired_vs_placebo(self) -> PairedResult | None:
+        """Cards against the PLACEBO, which is the comparison that means something.
+
+        `paired()` above answers "does adding a block of text help?". This answers "does adding the
+        RIGHT text help?" — and only the second is a claim about the skill library. None when the
+        placebo arm was not run.
+        """
+        from chimera.eval.paired import PairedResult
+
+        rows = [r for r in self.rows if r.placebo_ok is not None]
+        if not rows:
+            return None
+        a = sum(1 for r in rows if r.placebo_ok and r.card_ok)
+        b = sum(1 for r in rows if r.placebo_ok and not r.card_ok)
+        c = sum(1 for r in rows if not r.placebo_ok and r.card_ok)
+        d = sum(1 for r in rows if not r.placebo_ok and not r.card_ok)
+        return PairedResult("placebo", "cards", both_pass=a, baseline_only=b, treatment_only=c, both_fail=d)
 
     def summary(self) -> dict[str, float]:
         n = len(self.rows)
@@ -102,6 +129,7 @@ def run_skillcard_ab(
     min_overlap: int = 0,
     max_lines: int = 4,
     model: str | None = None,
+    placebo: bool = False,
 ) -> CardABReport:
     """Run each task with and without injected skill cards against ``backend``.
 
@@ -122,6 +150,20 @@ def run_skillcard_ab(
             card_out, card_tok = _solve_once(backend, card_prompt, model)
         except Exception:
             card_out, card_tok = "", None
+        placebo_ok: bool | None = None
+        placebo_tok: int | None = None
+        if placebo and retrieved:
+            # Same count, same shape, wrong task. Drawn from the cards this task did NOT retrieve,
+            # so the block is real library prose rather than lorem ipsum — the question is whether
+            # RELEVANCE did the work, and a placebo of obvious nonsense would not ask it.
+            decoys = _decoys(index, cards, task.prompt, len(retrieved), k=k, min_overlap=min_overlap)
+            decoy_block = cards_context_block(decoys, max_lines_per_card=max_lines)
+            decoy_prompt = f"{decoy_block}\n\n{task.prompt}" if decoy_block else task.prompt
+            try:
+                decoy_out, placebo_tok = _solve_once(backend, decoy_prompt, model)
+            except Exception:
+                decoy_out, placebo_tok = "", None
+            placebo_ok = bool(task.check(decoy_out))
         report.rows.append(
             CardABRow(
                 task_id=task.id,
@@ -130,9 +172,25 @@ def run_skillcard_ab(
                 card_ok=bool(task.check(card_out)),
                 card_tokens=card_tok,
                 hit=bool(retrieved),
+                placebo_ok=placebo_ok,
+                placebo_tokens=placebo_tok,
             )
         )
     return report
+
+
+def _decoys(
+    index: CardIndex, cards: list[LearnedSkill], prompt: str, count: int, *, k: int, min_overlap: int
+) -> list[LearnedSkill]:
+    """`count` cards this prompt did NOT retrieve — the placebo block.
+
+    Falls back to the least-relevant cards in the library when everything matched, and returns fewer
+    than asked rather than repeating one: a placebo that duplicates a card is a different treatment,
+    not a control.
+    """
+    retrieved = {c.name for c in index.search(prompt, k=k, min_overlap=min_overlap)}
+    others = [c for c in cards if c.name not in retrieved]
+    return others[:count]
 
 
 def demo_cards() -> list[LearnedSkill]:
