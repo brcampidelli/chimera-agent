@@ -4,6 +4,102 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.45.0] - 2026-08-14
+
+The release after the editor, and it is about the other half of the product: the agent that runs
+with nobody watching. Everything here came out of a multi-agent study of the field — 31 arXiv papers,
+five surveys of competitors, forums and security literature, and an audit of our own code — whose
+first finding was that **the defences this project sells existed and were switched off on exactly the
+path that runs unattended**. Most of what follows is wiring, measuring, and saying out loud what was
+not measured.
+
+### Security
+
+- **The shipped deployment no longer serves an unauthenticated agent to the internet.** Three
+  defaults composed into it: `docker-compose.yml` published `8765:8765` on every interface,
+  `.env.example` left `CHIMERA_SERVER_TOKEN=` empty, and auth is opt-in. Follow the README's
+  one-command deployment and you got an agent gateway, with tools, answering anyone who found the
+  port. **`serve` now refuses to bind a non-loopback address without a token**, with the three
+  remedies in the message; the compose publishes to `127.0.0.1`; and `--allow-insecure-bind` exists
+  because `0.0.0.0` behind an authenticating proxy is a real deployment and a guard people must work
+  around is one they learn to disable everywhere.
+  - The check is on the **bind**, not the request. A gateway that starts and then 401s has already
+    told the internet there is a Chimera here — and it depends on every future transport branch
+    remembering to ask, which is how the A2A streaming path once served an unauthenticated agent by
+    short-circuiting ahead of the auth call.
+- **Four guards that existed and did not cover the default path.** None was a missing feature; each
+  was already tested on its own and reachable by every path but one. The subagent kept a reference to
+  the *raw* registry and so ran outside the kernel and the taint ledger — the one path that can spawn
+  work escaped every guard its parent was under. `.git`, `.chimera` and `.env` were writable, and the
+  write region could not have stopped it, because the writers only consulted a region when one was
+  declared. `skills-import` was the only third-party entry point and the only one that skipped the
+  validator. And `evidence` could name a manager that never ran.
+
+### Added
+
+- **A dollar ceiling, in three places.** Per run (`AgentConfig.max_usd`), per scheduled job
+  (`CronJob.max_usd`), and a daily aggregate (`CHIMERA_DAILY_USD_CAP`) that stops the cron from
+  firing. Until now the only limits were step counters, and a job in a retry loop spent until the
+  provider's balance ran out — the one failure with no floor under it.
+  - **An unpriced call stops the run.** A ceiling that skips what it cannot price shows green while
+    the spend climbs, and it climbs fastest on the models nobody bothered to price. The unknown is
+    sticky. A **local** model is priced at zero rather than unknown, or the cap would refuse the one
+    configuration that cannot overspend.
+  - The cron now writes to the usage log, which is what makes the daily figure include it at all —
+    that log had exactly one writer, the chat turn. A budget refusal is its own dispatch status and
+    does not climb the failure counter, and a job can be marked `critical` to escape the daily cap
+    (never its own): a position guardian silenced at 2 p.m. costs more than it saves.
+- **One governed profile, and an `observe` state before it.** `serve`, the cron dispatch, the MCP
+  server, the A2A endpoint and the messaging adapters each built a bare registry;
+  `CHIMERA_TOOL_ALLOWLIST` had three call sites and none of them were these, so the config's claim
+  that the lists "apply on every surface" was false for the five surfaces that run with nobody
+  watching. `CHIMERA_GOVERNANCE=observe` runs the whole stack, refuses nothing, and records every
+  action enforcement *would* have refused — so the price of `enforce` is a number you measure over a
+  window instead of a risk you take in production. Default `off`; governance arriving through an
+  upgrade is not a thing an upgrade may decide.
+- **An approver, at last.** Both layers have accepted an `approve=` callable since they were written
+  and neither was ever given one — measured at **100%** of dangerous-class calls refused on any run
+  that read something external. `CHIMERA_APPROVAL=ask|deny|allow`, where `ask` degrades to `deny`
+  with no terminal attached. Every decision is recorded, because a refusal that arrives as an
+  ordinary observation string is one the agent reads and moves past: the run ends in prose and
+  reports success.
+- **Chimera as somebody else's agent.** `chimera acp` speaks the Agent Client Protocol from the
+  agent side, so Zed, JetBrains or Neovim drive the loop, the verifier and the receipt without
+  installing a second tool. Distribution rather than capability.
+- **`chimera context-curve`** — success against context size, from our own logs, with Wilson
+  intervals and pre-registered floors.
+
+### Changed
+
+- **The trace can name a run.** Every line carries a `run_id` and a timestamp, and the receipt
+  carries the same id, so a receipt, a usage row and a trace line join. It was keyed by a truncated
+  task plus a stop reason, which collides exactly where the file is used. The trace is now redacted
+  and size-capped in the same commit, because the cron path collects text that came back from a
+  broker, a database and a payment processor.
+- **Two benches gained the axis that was missing.** The injection suite counted attacks blocked and
+  nothing else — a defence scored on attacks alone has a trivial maximum, refuse everything. It now
+  publishes over-block on legitimate work beside it, and the gate fails on either. The skill-card A/B
+  gained an opt-in placebo arm: same number of cards, same size, retrieved for a *different* task,
+  so "a block of plausible prose helps" is distinguishable from "this card was relevant".
+
+### Honest notes
+
+- **The context curve has no data.** Its first output is **0 joined attempts out of 706 real ones**,
+  and it says so rather than drawing a line through nothing. The step log had been written at 3 of
+  ~15 construction sites, none of them unattended. A null result would license leaving compaction
+  unbuilt; an absence of data licenses nothing, and the tool distinguishes them.
+- **The first version of the over-block measurement was wrong**, reported 100%, and is recorded
+  rather than quietly fixed: it tainted every benign row through a call that in production has one
+  caller. A number that absurd is supposed to trigger an audit of the apparatus before a conclusion.
+- **Published numbers caught up with the runs that produced them.** `docs/benchmarks.md` still
+  promised, in the future tense and in nine translations, the Terminal-Bench result that had already
+  come out **against** us (7.5% → 2.5%); the SWE-bench table stopped two runs short of the
+  replication and the decomposition; and the README claimed fusion cost "no loss of accuracy" where
+  the source says accuracy moved 0 to −8.3pp.
+- Governance A/B, AgentDojo and a weak-model SWE-bench run remain **unbuilt on purpose**: each needs
+  paid model calls this phase has no budget for, and a runner nobody can execute is code that ages
+  without ever being exercised.
+
 ## [0.44.0] - 2026-08-13
 
 ### Added
