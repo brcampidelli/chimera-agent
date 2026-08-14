@@ -1857,6 +1857,71 @@ def _sender_registry(settings: Settings, primary: Any = None) -> Any:
     return registry
 
 
+@app.command("acp")
+def acp_server(
+    workspace: str = typer.Option(".", "--workspace", "-w", help="Directory the agent works in."),
+    model: str | None = typer.Option(None, "--model", help="Override the model for this session."),
+    max_steps: int = typer.Option(30, "--max-steps", help="Tool-calling steps per turn."),
+) -> None:
+    """Serve Chimera to an editor over the Agent Client Protocol (stdio).
+
+    The mirror of what `chimera code --provider claude` does: there we drive somebody else's agent,
+    here somebody else's editor drives ours. Point Zed, JetBrains or Neovim at `chimera acp` and the
+    loop, the verifier and the receipt are available without installing a second tool.
+
+    Nothing on this path may write to stdout — it IS the protocol. A stray print corrupts the frame
+    the editor is parsing, and the symptom is an editor that hangs rather than output in the wrong
+    place. The banner goes to stderr for the same reason the MCP server's does.
+    """
+    import sys
+
+    from chimera.acp.server import AcpServer
+    from chimera.core import Agent, AgentConfig
+    from chimera.governance import governed_profile
+    from chimera.providers import LLMGateway
+    from chimera.tools import default_registry
+
+    settings = get_settings()
+    if not settings.has_any_key():
+        # stderr, not the console: stdout is the wire, and an editor parsing a Rich panel as a
+        # JSON-RPC frame reports a hang rather than a missing key.
+        print("No provider key configured. Run 'chimera doctor'.", file=sys.stderr)
+        raise typer.Exit(code=1)
+    workspace_path = Path(workspace).resolve()
+    backend = LLMGateway()
+    registry, approvals = governed_profile(
+        default_registry(workspace_path),
+        settings=settings,
+        home=settings.home,
+        surface="acp",
+    )
+    agent = Agent(
+        backend,
+        registry,
+        AgentConfig(
+            model=model or settings.default_model,
+            max_steps=max_steps,
+            project_root=workspace_path,
+            trace_path=settings.home / "traces.jsonl",
+        ),
+    )
+
+    def run_turn(prompt: str, on_token: Any) -> str:
+        result = agent.run(prompt, on_token=on_token)
+        if approvals.blocked:
+            # Surfaced in the answer, because an editor shows the answer and nothing else. A
+            # governance refusal that lived only in a log would leave a person reading a confident
+            # reply about work that was not allowed to happen.
+            return f"{result.answer}\n\n[governance] {approvals.summary()}"
+        return result.answer
+
+    print(
+        f"Chimera ACP agent on stdio (workspace {workspace_path}). Ctrl+C to stop.",
+        file=sys.stderr,
+    )
+    AcpServer(run_turn, workspace=str(workspace_path)).serve_forever()
+
+
 def _serve_mcp(
     backend: SupportsComplete,
     gateway: Any,  # LLMGateway (for the fusion engine)
@@ -1882,13 +1947,9 @@ def _serve_mcp(
         registry, _ = governed_profile(
 
             default_registry(workspace_path),
-
             settings=get_settings(),
-
             home=get_settings().home,
-
             surface="mcp",
-
         )
         worker = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
         auto = AutonomousAgent(
@@ -1935,13 +1996,9 @@ def _build_a2a(
         registry, _ = governed_profile(
 
             default_registry(workspace_path),
-
             settings=get_settings(),
-
             home=get_settings().home,
-
             surface="a2a",
-
         )
         worker = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
         auto = AutonomousAgent(
@@ -1989,13 +2046,9 @@ def _serve_platform(
         registry, _ = governed_profile(
 
             default_registry(workspace_path),
-
             settings=get_settings(),
-
             home=get_settings().home,
-
             surface="platform",
-
         )
         registry.register(send_tool)
         runner = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))

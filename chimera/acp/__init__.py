@@ -9,6 +9,10 @@ governance around a loop — the taint ledger, the write region, the checkpoint,
 receipt. Those apply to any worker, and refusing to drive a worker somebody already trusts would be
 insisting on the least interesting half of the product.
 
+**And the mirror.** :mod:`chimera.acp.server` is the same protocol from the other side: `chimera acp`
+speaks it on stdio so an editor that did not write Chimera can drive it. Distribution rather than
+capability — nothing there makes the agent better, it changes who can reach one.
+
 **What this cannot promise, and says so.** An ACP agent declares which client capabilities it will
 use, and we declare which we offer — but the agents worth driving have file and shell tools of their
 own. Claude Code writes through the Claude Agent SDK, not necessarily through our `fs/write_text_file`
@@ -20,12 +24,14 @@ smaller thing.
 
 from chimera.acp.agents import AcpAgentSpec, available_agents, spec_for
 from chimera.acp.client import AcpConnection, AcpError
+from chimera.acp.server import AcpServer
 from chimera.acp.turn import AcpTurn, AcpTurnResult
 
 __all__ = [
     "AcpAgentSpec",
     "AcpConnection",
     "AcpError",
+    "AcpServer",
     "AcpTurn",
     "AcpTurnResult",
     "available_agents",
