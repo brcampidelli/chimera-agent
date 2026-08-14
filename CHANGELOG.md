@@ -4,6 +4,26 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.45.1] - 2026-08-14
+
+### Fixed
+
+- **The published Docker image crash-looped.** `Dockerfile` installs `.[full]`, which does not
+  include `desktop`, so the container that runs the 24/7 gateway has no FastAPI — and v0.45.0 put
+  `from chimera.api.usage import ...` on the cron path. Importing a leaf executes the package
+  `__init__`, which eagerly re-exported `build_api_app`, so a JSONL reader dragged in the whole web
+  stack: `ModuleNotFoundError: No module named 'fastapi'`, on boot, in a restart loop.
+  - Found by a deployment, not by us. The dev environment has FastAPI, so the import succeeds and
+    the bug is invisible to every test that was running.
+  - Fixed at the cause rather than the symptom. Adding `desktop` to the image would have worked,
+    made it heavier, contradicted the extra's own documented reason for existing — and left the trap
+    for the next leaf import. `chimera/api/__init__.py` now resolves its re-exports lazily, so
+    `chimera.api.usage`, `.roles`, `.sessions`, `.posture` and `.config_api` cost what they should.
+    `chimera app` still needs the extra and still fails loudly without it.
+  - The regression test runs in a subprocess with `fastapi` made unimportable, and starts by
+    asserting the block works — without that, every assertion after it would pass in an environment
+    that has FastAPI installed, which is exactly how this shipped.
+
 ## [0.45.0] - 2026-08-14
 
 The release after the editor, and it is about the other half of the product: the agent that runs
