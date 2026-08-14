@@ -1,6 +1,6 @@
 # SWE-bench Verified — the Chimera scaffold on real django bugs
 
-Three pre-registered runs, all graded **only** by the official `swebench` 4.1.0 harness in Docker —
+Four pre-registered runs, all graded **only** by the official `swebench` 4.1.0 harness in Docker —
 never self-reported. Design, slice, arms and predictions were fixed in
 [`PREREGISTRATION.md`](PREREGISTRATION.md) **before any model call** of each run.
 

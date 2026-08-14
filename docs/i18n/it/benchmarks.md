@@ -26,8 +26,20 @@ verifica, valutati pass/fail da quei test, guidati dall'harness agnostico rispet
   pubblicare tutti i transcript, e aggiungere una riga di modello di frontiera solo come
   *riferimento di soffitto* — mai come confronto.
 
-Il numero unico che dimostra la tesi: **modello gratuito da solo = X%, modello gratuito +
-Chimera = Y%, stessi task, Y ≫ X.**
+### Il risultato — ed è andato contro di noi
+
+Questa pagina chiudeva la sezione nominando il numero che *avrebbe provato* la tesi: "modello
+gratuito da solo = X%, modello gratuito + Chimera = Y%, Y ≫ X". L'esperimento è stato poi eseguito, e
+Y è uscito **sotto** X. Su una fetta pre-registrata di N=40 con lo stesso modello in entrambi i
+bracci (`deepseek-chat-v3.1`): **7,5% → 2,5%**, **Δ appaiata −5,0pp, IC 95% [−5,0%, +1,6%] — non
+significativo**. L'impalcatura non ha sollevato un modello già competente; entrambi i bracci stanno
+su un pavimento dominato dalla varianza. Resoconto completo, inclusa la pre-registrazione scritta
+prima dell'esecuzione: [`bench/terminal_bench/RESULTS.md`](../../../bench/terminal_bench/RESULTS.md).
+
+La frase che prometteva `Y ≫ X` è sopravvissuta all'esecuzione che l'ha smentita, su questa pagina e
+in nove traduzioni. Resta registrata qui invece di essere cancellata in silenzio, perché un progetto
+il cui unico vero patrimonio è la misurazione onesta non può permettersi una pagina che prevede il
+contrario del proprio risultato.
 
 ## Eseguirlo
 
@@ -42,7 +54,7 @@ con i flag di scaffolding). Punta Harbor verso un sottoinsieme fissato e un mode
 ogni braccio; vedi la [documentazione di Harbor](https://www.tbench.ai/) per l'invocazione esatta
 di `harbor run` e `--agent-import-path`.
 
-## SWE-bench Verified (il secondo tabellone) — **eseguito, due volte**
+## SWE-bench Verified (il secondo tabellone) — **eseguito quattro volte**
 
 Terminal-Bench dimostra la tesi su task CLI; SWE-bench la dimostra su correzioni di bug reali di
 GitHub — dato un repository a un commit base e una issue, l'agente deve produrre una patch che
@@ -51,7 +63,7 @@ il sottoinsieme validato da esseri umani.
 
 ### Risultati
 
-Due esecuzioni pre-registrate sulla stessa fetta congelata di 19 istanze di `django/django`
+Quattro esecuzioni pre-registrate su fette di `django/django`
 (strato di difficoltà più facile), `deepseek-chat-v3.1`, pass@1, valutate **solo** dall'harness
 ufficiale `swebench` 4.1.0 in Docker. Resoconto completo:
 [`bench/swe_bench/RESULTS.md`](../bench/swe_bench/RESULTS.md).
@@ -60,6 +72,9 @@ ufficiale `swebench` 4.1.0 in Docker. Resoconto completo:
 |---|---|---|---|---|---|
 | 1 (`max_steps=8`) | 36.8% (7/19) | 36.8% (7/19) | +0.0% | [−8.5%, +8.5%] | non significativo |
 | 2 (`max_steps=30`) | 42.1% (8/19) | **57.9% (11/19)** | **+15.8%** | [−1.9%, +15.8%] | non significativo |
+| **3 (replicazione)** | 34.1% (14/41) | **43.9% (18/41)** | **+9.8%** | [−3.5%, +16.7%] | non significativo |
+| **aggregato (secondario)** | 36.7% (22/60) | 48.3% (29/60) | **+11.7%** | **[+0.8%, +16.4%]** | **significativo** |
+| 4 (attribuzione) | 34.1% | *solo impalcatura* 39.0% | +4.9% | [−7.6%, +14.2%] | non significativo |
 
 La run 1 è uno **zero esatto** ed è pubblicata invariata. La run 2 ha corretto due difetti che
 erano **nostri** — lo scaffold girava senza il suo meccanismo più forte, e 8 passi di
@@ -68,7 +83,7 @@ vinte, 0 perse**. La coppia è il risultato: lo scaffold non vale *nulla* quando
 privato di passi, e *tre istanze* quando non lo è, e vince editando **meglio** (69% contro 57% di
 precisione quando edita), non editando di più.
 
-> ⚠️ **57,9% non è uno score SWE-bench Verified.** La fetta è deliberatamente facile e a
+> ⚠️ **Nessuno di questi è uno score SWE-bench Verified.** La fetta è deliberatamente facile e a
 > singolo repository, scelta perché un A/B appaiato abbia margine di misurazione; uno score
 > Verified vero richiede i 500 completi. E il delta **non è significativo** — con 8 coppie in cui
 > entrambi falliscono, n=19 lascia solo tre coppie informative.
@@ -76,6 +91,16 @@ precisione quando edita), non editando di più.
 La run 2 porta anche una **ritrattazione**: il meccanismo che avevamo tracciato per le patch
 vuote della run 1 era sbagliato (la correzione era il budget di passi, non il diff-gate che
 avevamo incolpato), corretto con lo stesso risalto con cui era stato affermato.
+
+Quel 3–0 su tre coppie informative è esattamente la forma che produce un campione fortunato, e la
+pre-registrazione gli dava **una possibilità su tre di essere solo quello**. Così l'esecuzione 3 lo
+ha ripetuto su **41 istanze i cui esiti non avevamo mai visto**, senza cambiare nient'altro.
+L'effetto **è riapparso**: +9,8%, dentro la banda registrata da +5 a +20, su una fetta risultata
+*più difficile* di quella dell'esecuzione 2 (baseline 34,1% contro 42,1%). L'esecuzione 4 ha poi
+separato l'impalcatura dal diff-gate sulle stesse 41: **+4,9% ciascuno**, e il meccanismo è la
+precisione, che sale 50% → 59% → 67% mentre il tasso di patch non si muove. Nessuna esecuzione
+singola è significativa; l'aggregato n=60 lo è — ed è stato pre-registrato come **secondario**
+proprio perché mescola dati visti e non visti.
 
 ### L'adattatore
 

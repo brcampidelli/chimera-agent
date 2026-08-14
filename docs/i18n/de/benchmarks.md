@@ -26,8 +26,21 @@ Verifikationstests, bewertet pass/fail durch diese Tests, gesteuert vom agentena
   laufen lassen, alle Transkripte veröffentlichen und eine Frontier-Modell-Zeile nur als
   *Obergrenzen-Referenz* hinzufügen — nie als Vergleich.
 
-Die eine Zahl, die die These beweist: **freies Modell allein = X %, freies Modell + Chimera = Y %,
-dieselben Aufgaben, Y ≫ X.**
+### Das Ergebnis — und es fiel gegen uns aus
+
+Diese Seite schloss den Abschnitt mit der Zahl ab, die die These *beweisen würde*: „freies Modell
+allein = X %, freies Modell + Chimera = Y %, Y ≫ X". Das Experiment wurde inzwischen durchgeführt,
+und Y lag **unter** X. Auf einem vorab registrierten Ausschnitt von N=40 mit demselben Modell in
+beiden Armen (`deepseek-chat-v3.1`): **7,5 % → 2,5 %**, **gepaartes Δ −5,0 Prozentpunkte, 95 %-KI
+[−5,0 %, +1,6 %] — nicht signifikant**. Das Gerüst hat ein bereits kompetentes Modell nicht
+angehoben; beide Arme liegen auf einem varianzdominierten Boden. Vollständiger Bericht,
+einschließlich der vor dem Lauf verfassten Vorabregistrierung:
+[`bench/terminal_bench/RESULTS.md`](../../../bench/terminal_bench/RESULTS.md).
+
+Der Satz, der `Y ≫ X` versprach, überlebte den Lauf, der ihn widerlegte — auf dieser Seite und in
+neun Übersetzungen. Er wird hier festgehalten statt still gelöscht, denn ein Projekt, dessen
+einziges echtes Kapital ehrliche Messung ist, kann sich keine Seite leisten, die das Gegenteil des
+eigenen Ergebnisses vorhersagt.
 
 ## Ausführen
 
@@ -42,7 +55,7 @@ Scaffolding-Flags ausführt). Harbor auf eine festgepinnte Teilmenge und ein fre
 jeden Arm richten; den genauen `harbor run`-Aufruf und `--agent-import-path` siehe die
 [Harbor-Dokumentation](https://www.tbench.ai/).
 
-## SWE-bench Verified (das zweite Scoreboard) — **zweimal ausgeführt**
+## SWE-bench Verified (das zweite Scoreboard) — **viermal ausgeführt**
 
 Terminal-Bench beweist die These bei CLI-Aufgaben; SWE-bench beweist sie bei echten
 GitHub-Bugfixes — gegeben ein Repo bei einem Basis-Commit und ein Issue, muss der Agent einen
@@ -51,7 +64,7 @@ grün bleibt. "Verified" ist die menschlich validierte Teilmenge.
 
 ### Ergebnisse
 
-Zwei vorregistrierte Läufe auf demselben eingefrorenen 19-Instanzen-`django/django`-Slice
+Vier vorregistrierte Läufe auf `django/django`-Slices
 (leichteste Schwierigkeitsstufe), `deepseek-chat-v3.1`, pass@1, bewertet **ausschließlich** vom
 offiziellen `swebench`-4.1.0-Harness in Docker. Vollständiger Bericht:
 [`bench/swe_bench/RESULTS.md`](../bench/swe_bench/RESULTS.md).
@@ -60,6 +73,9 @@ offiziellen `swebench`-4.1.0-Harness in Docker. Vollständiger Bericht:
 |---|---|---|---|---|---|
 | 1 (`max_steps=8`) | 36,8 % (7/19) | 36,8 % (7/19) | +0,0 % | [−8,5 %, +8,5 %] | nicht signifikant |
 | 2 (`max_steps=30`) | 42,1 % (8/19) | **57,9 % (11/19)** | **+15,8 %** | [−1,9 %, +15,8 %] | nicht signifikant |
+| **3 (Replikation)** | 34,1 % (14/41) | **43,9 % (18/41)** | **+9,8 %** | [−3,5 %, +16,7 %] | nicht signifikant |
+| **gepoolt (sekundär)** | 36,7 % (22/60) | 48,3 % (29/60) | **+11,7 %** | **[+0,8 %, +16,4 %]** | **signifikant** |
+| 4 (Attribution) | 34,1 % | *nur Gerüst* 39,0 % | +4,9 % | [−7,6 %, +14,2 %] | nicht signifikant |
 
 Lauf 1 ist eine **exakte Null** und wird unverändert veröffentlicht. Lauf 2 behob zwei Fehler, die
 *unsere eigenen* waren — das Scaffold lief ohne seinen stärksten Mechanismus, und 8
@@ -69,7 +85,7 @@ wert, wenn der Agent an Schritten hungert, und *drei Instanzen* wert, wenn nicht
 durch **besseres** Editieren (69 % vs. 57 % Präzision, wenn editiert wird), nicht durch mehr
 Editieren.
 
-> ⚠️ **57,9 % ist kein SWE-bench-Verified-Score.** Der Slice ist absichtlich leicht und
+> ⚠️ **Keiner dieser Werte ist ein SWE-bench-Verified-Score.** Der Slice ist absichtlich leicht und
 > Single-Repo, gewählt, damit ein gepaartes A/B Spielraum zum Messen hat; ein echter
 > Verified-Score braucht die vollen 500. Und das Delta ist **nicht signifikant** — bei 8 Paaren,
 > in denen beide scheitern, bleiben bei n=19 nur drei informative Paare übrig.
@@ -77,6 +93,16 @@ Editieren.
 Lauf 2 bringt auch eine **Widerrufung** mit: Der Mechanismus, den wir für Laufs 1 leere Patches
 verantwortlich gemacht hatten, war falsch (der Fix war das Schrittbudget, nicht das Diff-Gate,
 dem wir die Schuld gegeben hatten), korrigiert ebenso prominent, wie es behauptet wurde.
+
+Dieses 3–0 auf drei informativen Paaren ist genau die Form, die eine glückliche Stichprobe erzeugt,
+und die Vorabregistrierung gab ihr **eine Chance von eins zu drei, genau das zu sein**. Lauf 3
+wiederholte es daher auf **41 Instanzen, deren Ergebnisse wir nie gesehen hatten**, ohne sonst etwas
+zu ändern. Der Effekt **trat erneut auf**: +9,8 %, innerhalb des registrierten Bandes von +5 bis
++20, auf einem Slice, der sich als *schwerer* erwies als der von Lauf 2 (Baseline 34,1 % gegenüber
+42,1 %). Lauf 4 trennte dann Gerüst und Diff-Gate auf denselben 41: **je +4,9 %**, und der
+Mechanismus ist die Präzision, die von 50 % über 59 % auf 67 % steigt, während die Patch-Rate sich
+nicht bewegt. Kein einzelner Lauf ist signifikant; der gepoolte n=60 ist es — und er wurde als
+**sekundär** vorregistriert, gerade weil er Gesehenes mit Ungesehenem mischt.
 
 ### Der Adapter
 
