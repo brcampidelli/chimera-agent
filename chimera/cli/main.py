@@ -1298,6 +1298,12 @@ def tui(
 def serve(
     host: str = typer.Option("127.0.0.1", "--host", help="Bind host."),
     port: int = typer.Option(8765, "--port", help="Bind port."),
+    allow_insecure_bind: bool = typer.Option(
+        False,
+        "--allow-insecure-bind",
+        envvar="CHIMERA_ALLOW_INSECURE_BIND",
+        help="Serve on a reachable address with no token. Only behind a network you already trust.",
+    ),
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
     max_steps: int = typer.Option(6, "--max-steps", help="Max tool-calling steps per message."),
     workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root for tools."),
@@ -1376,6 +1382,16 @@ def serve(
             profile=shared_profile,
             remember_from_chat=settings.remember_from_chat,
         )
+
+    # Before anything binds. A gateway that starts and then 401s has already told the internet
+    # there is a Chimera here, and still depends on every future transport remembering to ask.
+    from chimera.server import InsecureBindError, check_bind
+
+    try:
+        check_bind(host, token=settings.server_token, allow_insecure=allow_insecure_bind)
+    except InsecureBindError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
 
     message_gateway = MessageGateway(factory)
     a2a_pair = _build_a2a(backend, model, max_steps, workspace_path, host, port) if a2a else None

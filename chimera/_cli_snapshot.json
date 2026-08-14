@@ -3663,6 +3663,16 @@
           "type": "int"
         },
         {
+          "help": "Serve on a reachable address with no token. Only behind a network you already trust.",
+          "kind": "option",
+          "name": "allow_insecure_bind",
+          "opts": [
+            "--allow-insecure-bind"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
           "help": "Override the model slug.",
           "kind": "option",
           "name": "model",
