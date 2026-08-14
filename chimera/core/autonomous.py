@@ -717,10 +717,14 @@ class AutonomousAgent:
             if verifier_active:
                 evidence = "verifier"
             elif diff_productive:
-                evidence = "diff+manager"
-            elif ok:
+                # "diff+manager" claims two authorities. With no manager configured the only real
+                # one is the diff, and saying so is the difference between a receipt and a label.
+                evidence = "diff+manager" if self._manager_ran() else "diff"
+            elif ok and self._manager_ran():
                 evidence = "manager"
             else:
+                # Includes the case that used to read "manager": approved by nobody, because nobody
+                # was asked. `none` is what that is.
                 evidence = "none"
             attempt = Attempt(index, answer, approved, verified, False, ok, fb, vout,
                               evidence=evidence)
@@ -1123,10 +1127,24 @@ class AutonomousAgent:
         )
 
     def _review(self, task: str, answer: str, context: str) -> tuple[bool, str]:
-        if self.manager is None or not self.config.use_manager:
+        """Approval and feedback. Approves vacuously when there is no manager — see
+        :meth:`_manager_ran`, which is what stops that vacuum being labelled as a review."""
+        if not self._manager_ran():
             return True, ""
+        assert self.manager is not None
         review = self.manager.review(task, answer, context=context)
         return review.approved, review.feedback
+
+    def _manager_ran(self) -> bool:
+        """Whether a manager actually looked at this attempt.
+
+        The vacuous `True` above is correct — with no reviewer configured, nothing should veto the
+        work. What was wrong is that the caller could not tell the two apart, so an attempt with no
+        manager at all came out labelled ``evidence="manager"``: a receipt naming an authority that
+        never existed. The receipt's whole job is to say who approved, and it was the one field that
+        could be fabricated by omission.
+        """
+        return self.manager is not None and bool(self.config.use_manager)
 
     def _verify(self) -> tuple[bool, str, bool]:
         """Returns (passed, output, abstained). ``abstained`` = the verifier had nothing runnable to

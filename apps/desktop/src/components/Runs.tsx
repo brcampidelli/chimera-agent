@@ -32,7 +32,11 @@ function StatusBadge({ run, t }: { run: RunReceipt; t: TFunc }) {
  *  the one surface a human actually looks at. Tone carries the strength: only executable evidence
  *  is `ok`, an LLM approving prose with nothing else checked is `warn`, not a muted footnote. */
 function EvidenceBadge({ evidence, t }: { evidence: string; t: TFunc }) {
-  const tone = evidence === "verifier" ? "ok" : evidence === "diff+manager" ? "accent" : "warn";
+  // "diff" sits with "diff+manager": both rest on a measured workspace change. It is the label an
+  // attempt gets when files really changed and NO manager was configured — which used to be
+  // reported as "manager", naming a reviewer that never ran.
+  const machineBacked = evidence === "diff+manager" || evidence === "diff";
+  const tone = evidence === "verifier" ? "ok" : machineBacked ? "accent" : "warn";
   return <Badge tone={tone}>{t(`runs.evidence.${evidence}`)}</Badge>;
 }
 

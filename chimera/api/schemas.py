@@ -779,7 +779,7 @@ class AttemptReceiptOut(BaseModel):
     diff_summary: str  # what this attempt actually changed in the workspace, audited before any revert
     feedback: str  # the retry feedback this attempt produced, truncated
     diffs: list[FileDiffOut]  # real per-file unified diffs (on a reverted attempt: what it ATTEMPTED)
-    evidence: str  # who approved: "verifier" | "diff+manager" | "manager" | "none"
+    evidence: str  # who approved: "verifier" | "diff+manager" | "diff" | "manager" | "none"
     # null = could not be measured, which is NOT false ("measured, nothing changed"). The UI must
     # render the unknown as its own state; deriving it by absence is how the third state decays.
     diff_productive: bool | None

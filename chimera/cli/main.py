@@ -3012,8 +3012,14 @@ def solve(
         if subagents:
             from chimera.core import SubAgentTool
 
-            # The subagent draws from the tools registered so far (minus spawn itself).
-            registry.register(SubAgentTool(gateway, registry, model=model, max_turns=max_steps))
+            # The subagent draws from the tools registered so far (minus spawn itself) — resolved
+            # LATE, and that is the whole point. `registry` is rebound below by `govern_registry`
+            # and `ledger_registry`; passing the object here handed the subagent the RAW tools,
+            # so the one path that can spawn work escaped every guard its parent was under. The
+            # lambda closes over the NAME, so it resolves to whatever the final wrapper is.
+            registry.register(
+                SubAgentTool(gateway, lambda: registry, model=model, max_turns=max_steps)
+            )
         if guard:
             from chimera.governance import TrustKernel, govern_registry
 
@@ -3592,8 +3598,16 @@ def skills_export(
 def skills_import(
     path: str = typer.Argument(..., help="Path to a SKILL.md (or a skill directory containing one)."),
 ) -> None:
-    """Import a SKILL.md into the store. A tainted-provenance skill is held pending for review."""
+    """Import a SKILL.md into the store. A tainted-provenance skill is held pending for review.
+
+    Validated on the way in. This is the only path by which a skill written by somebody else enters
+    the store, and it was the only one that skipped the validator the agent's own proposals must
+    pass — the gate was applied to the code we wrote and not to the code we were handed, which is
+    backwards. A skill card ends up in the system prompt, so an unvalidated one is an instruction
+    from a stranger with the standing of an instruction from the owner.
+    """
     from chimera.evolution import SkillStore
+    from chimera.governance import SkillValidator
     from chimera.skills.skill_md import parse_skill_md, to_learned
 
     src = Path(path)
@@ -3603,6 +3617,10 @@ def skills_import(
         console.print(f"[red]No SKILL.md at {src}.[/red]")
         raise typer.Exit(code=1)
     skill = to_learned(parse_skill_md(src.read_text(encoding="utf-8")))
+    verdict = SkillValidator().validate(skill.to_dict())
+    if not verdict.accepted:
+        console.print(f"[red]Refused[/red] {skill.name}: {'; '.join(verdict.reasons)}")
+        raise typer.Exit(code=1)
     store = SkillStore(get_settings().home / "skills.json")
     store.add(skill)
     note = " [yellow](held pending — tainted provenance)[/yellow]" if skill.status == "pending" else ""
