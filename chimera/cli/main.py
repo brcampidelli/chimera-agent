@@ -361,6 +361,54 @@ def _doctor_fixes(settings: Any, *, cwd: Path | None = None) -> list[str]:
     return done
 
 
+@app.command("context-curve")
+def context_curve_cmd(
+    traces: str = typer.Option(None, "--traces", help="Path to traces.jsonl (default: CHIMERA_HOME)."),
+    runs: str = typer.Option(None, "--runs", help="Path to runs.jsonl (default: CHIMERA_HOME)."),
+    json_out: bool = typer.Option(False, "--json", help="Print the raw result instead of a table."),
+) -> None:
+    """Did runs carrying more context do worse? Measured on THIS machine's own logs.
+
+    Answers with "not enough data" until the pre-registered floors are met — see
+    `bench/context_curve/PREREGISTRATION.md`, which fixed those floors before any data existed.
+    """
+    import json as _json
+
+    from chimera.eval.context_curve import context_curve
+
+    settings = get_settings()
+    result = context_curve(
+        Path(traces) if traces else settings.home / "traces.jsonl",
+        Path(runs) if runs else settings.home / "runs.jsonl",
+    )
+    if json_out:
+        console.print_json(_json.dumps(result.as_dict()))
+        return
+
+    table = Table(title="Success vs peak context", header_style="bold")
+    for col in ("context (prompt tokens)", "attempts", "success", "rate", "95% CI"):
+        table.add_column(col, justify="right")
+    for bucket in result.as_dict()["buckets"]:
+        rate = bucket["rate"]
+        ci = bucket["ci95"]
+        table.add_row(
+            str(bucket["context_tokens"]),
+            str(bucket["runs"]),
+            str(bucket["successes"]),
+            "—" if rate is None else f"{rate:.1%}",
+            "—" if ci is None else f"[{ci[0]:.1%}, {ci[1]:.1%}]",
+        )
+    console.print(table)
+    console.print(f"[bold]{result.verdict()}[/bold]")
+    if result.unjoinable_attempts or result.unjoinable_traces:
+        # Said out loud rather than swallowed: a silently dropped half of the data is how a real
+        # effect gets measured away.
+        console.print(
+            f"[dim]{result.unjoinable_attempts} attempt(s) and {result.unjoinable_traces} trace(s) "
+            "could not be joined — they predate the run id, or ran without tracing.[/dim]"
+        )
+
+
 @app.command()
 def doctor(
     fix: bool = typer.Option(False, "--fix", help="Auto-repair safe setup issues (state dir, .env scaffold)."),

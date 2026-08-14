@@ -687,6 +687,45 @@
     },
     {
       "deprecated": false,
+      "help": "Did runs carrying more context do worse? Measured on THIS machine's own logs.\n\nAnswers with \"not enough data\" until the pre-registered floors are met \u2014 see\n`bench/context_curve/PREREGISTRATION.md`, which fixed those floors before any data existed.",
+      "hidden": false,
+      "name": "context-curve",
+      "params": [
+        {
+          "help": "Path to traces.jsonl (default: CHIMERA_HOME).",
+          "kind": "option",
+          "name": "traces",
+          "opts": [
+            "--traces"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Path to runs.jsonl (default: CHIMERA_HOME).",
+          "kind": "option",
+          "name": "runs",
+          "opts": [
+            "--runs"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Print the raw result instead of a table.",
+          "kind": "option",
+          "name": "json_out",
+          "opts": [
+            "--json"
+          ],
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": "context-curve"
+    },
+    {
+      "deprecated": false,
       "help": "Run a multi-agent crew on a task (Tier 3). Requires a provider key.",
       "hidden": false,
       "name": "crew",

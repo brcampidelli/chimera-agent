@@ -74,6 +74,11 @@ class AttemptReceipt(BaseModel):
     prompt_tokens: int = 0
     completion_tokens: int = 0
     model: str = ""  # the model that actually answered (the EDITOR's, under role routing)
+    #: The trace line this attempt wrote, by id. The join key between what a run ACHIEVED (here) and
+    #: what it was CARRYING (the step log) — the pair nobody could compute while the trace was keyed
+    #: by a truncated task. Empty for an attempt that ran without tracing, and for every receipt
+    #: written before this field existed.
+    run_id: str = ""
     #: Out-of-checkout side effects this attempt actually performed (send_email, http_post, …).
     #: An empty diff means one thing for a run that only touched files and something else entirely
     #: for a run that already sent mail — the receipt should not force that inference.
@@ -172,6 +177,7 @@ def build_receipt(
             # accepts by design — an older Attempt without these fields reads as "unknown" rather
             # than raising, which is the honest answer for a record that predates them.
             evidence=getattr(a, "evidence", "none") or "none",
+            run_id=getattr(a, "run_id", "") or "",
             diff_productive=getattr(a, "diff_productive", None),
             side_effects=list(getattr(a, "side_effects", None) or []),
             usd=getattr(a, "usd", None),
