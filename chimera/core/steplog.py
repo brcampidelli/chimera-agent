@@ -19,9 +19,13 @@ produce will be turned off, and a trace that is turned off explains nothing.
 from __future__ import annotations
 
 import json
+import uuid
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+from chimera.core.redact import redact
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from chimera.core.context_drift import DriftReport
@@ -30,6 +34,28 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 # 20k-char file dump. Diffs and verifier output already have their own richer receipts.
 _ARG_CHARS = 400
 _OBS_CHARS = 800
+
+
+#: A trace that grows without bound on a machine that runs for weeks stops being a diagnostic and
+#: becomes a disk problem — and the first symptom is a daemon that cannot write anything at all.
+#: One previous generation is kept: enough to span a rotation while investigating an incident,
+#: bounded enough that the cap means what it says.
+MAX_TRACE_BYTES = 32 * 1024 * 1024
+
+
+def _rotate_if_large(path: Path) -> None:
+    """Move the trace aside once it passes the cap, keeping exactly one previous generation.
+
+    Rename rather than trim: rewriting the file to drop old lines would have to read all of it, and
+    a crash mid-rewrite loses the whole history instead of the oldest part of it.
+    """
+    try:
+        if path.exists() and path.stat().st_size >= MAX_TRACE_BYTES:
+            path.replace(path.with_suffix(path.suffix + ".1"))
+    except OSError:  # pragma: no cover - disk-shaped failure
+        # A rotation that fails must not take the run down: the answer is the product, the trace is
+        # evidence about it.
+        pass
 
 
 def clip(text: str, limit: int) -> str:
@@ -213,16 +239,37 @@ class StepLog:
             "steps": [s.as_dict() for s in self.steps],
         }
 
-    def write(self, path: Path, *, task: str, stopped_reason: str) -> None:
-        """Append this run's trace as one JSONL line.
+    def write(self, path: Path, *, task: str, stopped_reason: str, run_id: str = "") -> str:
+        """Append this run's trace as one JSONL line. Returns the id it was written under.
 
         One line per run rather than per step: a run is the unit anyone reads back, and a partial
         run interleaved with others is worse than no trace at all.
+
+        **`run_id` and `ts` are what make the line joinable.** The record used to be keyed by a
+        truncated task plus a stop reason, which collides exactly where it matters: a bench runs the
+        same task dozens of times, and one run with three attempts writes three lines that are
+        indistinguishable. Nothing downstream — a success×context curve, a cron replay, failure
+        attribution — can be built on a key that cannot tell two runs apart.
+
+        The body is **redacted** and the file is **capped**, in the same place, because both are
+        properties of writing a trace to disk rather than of producing one. On the 24/7 path this
+        text came from a broker and a payment processor; see :mod:`chimera.core.redact` for exactly
+        what that promises and what it does not.
         """
-        record = {"task": clip(task, _ARG_CHARS), "stopped_reason": stopped_reason, **self.as_dict()}
+        run_id = run_id or uuid.uuid4().hex
+        record = {
+            "run_id": run_id,
+            "ts": datetime.now(UTC).isoformat(),
+            "task": clip(task, _ARG_CHARS),
+            "stopped_reason": stopped_reason,
+            **self.as_dict(),
+        }
+        line = redact(json.dumps(record, ensure_ascii=False))
         path.parent.mkdir(parents=True, exist_ok=True)
+        _rotate_if_large(path)
         with path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+            fh.write(line + "\n")
+        return run_id
 
 
 def tool_record(name: str, arguments: dict[str, Any], observation: str) -> ToolRecord:

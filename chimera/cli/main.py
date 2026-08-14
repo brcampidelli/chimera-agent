@@ -1658,14 +1658,24 @@ def _start_cron_daemon(
         agent = Agent(
             backend,
             default_registry(workspace),
-            AgentConfig(model=model, max_steps=max_steps, max_usd=job.max_usd),
+            AgentConfig(
+                model=model,
+                max_steps=max_steps,
+                max_usd=job.max_usd,
+                # The path that runs the most was the one with no step-level record at all. Without
+                # it there is no success-versus-context curve, no replay of a job that went wrong,
+                # and no reliability bench for the 24/7 loop — every one of those reads this file.
+                trace_path=settings.home / "scheduler" / "cron_traces.jsonl",
+            ),
         )
         result = agent.run(job.action)
         append_usage(
             usage_path,
             UsageRecord(
                 ts=datetime.now(UTC).isoformat(),
-                session_id=f"cron:{job.id}",
+                # `run_id` in the session field is what joins this row to the trace line and to the
+                # job: three records, one run, one key.
+                session_id=f"cron:{job.id}:{result.run_id}",
                 model=result.model,
                 prompt_tokens=result.prompt_tokens,
                 completion_tokens=result.completion_tokens,
