@@ -76,3 +76,29 @@ def test_the_completion_model_is_editable_from_the_app() -> None:
     """Otherwise the only way to set it is a file the user has to be told about — and the thing they
     need to know (it must be a base tag) lives on the screen that cannot save it."""
     assert is_editable("CHIMERA_COMPLETE_MODEL")
+
+
+def test_doctor_says_whether_a_spend_cap_could_work_here(tmp_path: Path) -> None:
+    """The footgun this answers: the shipped default model has no list price, so a dollar cap would
+    stop on its first call. Learning that from `doctor` costs nothing; learning it when a 3 a.m.
+    cron job halts costs the job."""
+    from chimera.api.config_api import pricing_capability
+
+    unpriced = pricing_capability(_settings(tmp_path, CHIMERA_DEFAULT_MODEL="brand-new-model"))
+    assert unpriced["available"] is False
+    assert "brand-new-model" in unpriced["hint"]
+
+    priced = pricing_capability(
+        _settings(tmp_path, CHIMERA_DEFAULT_MODEL="openrouter/deepseek/deepseek-chat")
+    )
+    assert priced["available"] is True
+    assert priced["hint"] == ""
+
+
+def test_a_local_model_counts_as_priceable(tmp_path: Path) -> None:
+    # It costs no provider dollars, so a cap over it is trivially satisfiable rather than broken.
+    from chimera.api.config_api import pricing_capability
+
+    found = pricing_capability(_settings(tmp_path, CHIMERA_DEFAULT_MODEL="ollama/llama3"))
+
+    assert found["available"] is True

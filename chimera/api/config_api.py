@@ -304,10 +304,39 @@ def doctor(settings: Settings) -> dict[str, Any]:
         # machine nobody looked at, so "the adapter should be there" stops being evidence at exactly
         # the point a user needs the answer — and `npx` missing reads identically to a bug in us.
         "external_agents": available_agents(),
+        # Whether a spend cap could even work here — see pricing_capability.
+        "spend": pricing_capability(settings),
         # The editor's own capabilities, measured on THIS machine. Same reason as the agents above:
         # a downloaded app is the exact place where "it should be installed" stops being evidence,
         # and the answer a new user needs is "what do I install", not "something is unavailable".
         "editor": editor_capabilities(settings),
+    }
+
+
+def pricing_capability(settings: Settings) -> dict[str, object]:
+    """Whether this machine's default model can be priced at all.
+
+    A dollar cap stops the run when it meets a call it cannot price — the safe rule, and the one
+    that turns an unpriced default model into a feature that refuses to work. The moment to learn
+    that is while reading `doctor`, not when a 3 a.m. cron job halts. So the answer is reported
+    before anyone sets a cap, with the model named.
+    """
+    from chimera.fusion.receipts import resolve_price
+
+    model = settings.default_model
+    priced = resolve_price(model) is not None
+    return {
+        "key": "spend_cap",
+        "label": "Spend cap (dollar ceiling)",
+        "available": priced,
+        "probed": True,  # the price table either resolves this model or it does not
+        "detail": model,
+        "hint": (
+            ""
+            if priced
+            else f"no list price known for {model}: a spend cap would stop on its first call. "
+            "Register one with chimera.fusion.receipts.set_price, or cap a priced model."
+        ),
     }
 
 

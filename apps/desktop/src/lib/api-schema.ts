@@ -2377,6 +2377,7 @@ export interface components {
             memory_backend: string;
             /** Sandbox */
             sandbox: string;
+            spend?: components["schemas"]["EditorCapabilityOut"] | null;
             tiers: components["schemas"]["TiersOut"];
         };
         /**
