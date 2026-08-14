@@ -408,13 +408,13 @@ def doctor(
     # external agents actually work on their machine — and, when they do not, the command that
     # changes that. "Unavailable" without a remedy is a shrug.
     from chimera.acp.agents import available_agents
-    from chimera.api.config_api import editor_capabilities
+    from chimera.api.config_api import editor_capabilities, pricing_capability
 
     caps = Table(title="Capabilities", show_header=True, header_style="bold")
     caps.add_column("Capability")
     caps.add_column("Status")
     caps.add_column("How to get it")
-    for row in [*editor_capabilities(settings), *available_agents()]:
+    for row in [pricing_capability(settings), *editor_capabilities(settings), *available_agents()]:
         ready = bool(row.get("available"))
         # "configured" and "available" are different claims and get different words. A completion
         # model nobody has reached is not available; saying so here would be a promise the editor

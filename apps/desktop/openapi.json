@@ -1838,6 +1838,16 @@
             "title": "Sandbox",
             "type": "string"
           },
+          "spend": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EditorCapabilityOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "tiers": {
             "$ref": "#/components/schemas/TiersOut"
           }

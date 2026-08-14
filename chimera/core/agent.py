@@ -24,6 +24,7 @@ from chimera.core.context_budget import ContextBudget, RunState, compact
 from chimera.core.steplog import StepLog, StepRecord, clip, tool_record
 from chimera.core.tool_loop import ToolLoopDetector
 from chimera.governance.ledger import WRITE_TOOLS
+from chimera.orchestration.budget import BudgetExceeded, SpendBudget
 from chimera.providers.gateway import CompletionResult, MessageLike, SupportsComplete
 from chimera.telemetry import get_logger
 from chimera.tools.registry import ToolNotFoundError, ToolRegistry
@@ -119,6 +120,16 @@ class AgentConfig:
     # the prompt, compacting once the prompt crosses `trigger` of it. Off by default because
     # compaction discards messages, and a caller that has not asked for that should not get it.
     context_budget: float | None = None
+    # Dollar ceiling for the whole run. None (the default) keeps the historical behaviour: no cap,
+    # and therefore no new way for a run to stop. Set it and the loop refuses the next model call
+    # once the spend reaches it — checked BEFORE the call, so the money is never spent to discover
+    # it was over budget.
+    #
+    # A call whose model has no known price also stops the run, by the owner's decision: a ceiling
+    # that skips what it cannot price shows green while the real spend climbs. Local models are
+    # priced at zero rather than unknown, so `ollama/` runs are unaffected. See
+    # chimera.orchestration.budget.SpendBudget.
+    max_usd: float | None = None
     #: Turns kept verbatim at the tail when compacting — where the current sub-task lives.
     keep_recent: int = 6
     # The workspace whose AGENTS.md the run should follow. None = read no project instructions,
@@ -173,7 +184,7 @@ class AgentResult:
 
     answer: str
     steps: int
-    stopped_reason: str  # "final" | "max_steps" | "tool_loop"
+    stopped_reason: str  # "final" | "max_steps" | "tool_loop" | "budget"
     transcript: list[MessageLike] = field(default_factory=list)
     tool_calls_made: int = 0
     # Token/cost accounting, summed across every model call in the run (0 when the backend reported
@@ -325,6 +336,10 @@ class Agent:
         tool_calls_made = 0
         tool_names: list[str] = []
         usage = _UsageTally()
+        # Per RUN, not per Agent: the same Agent object serves several runs (a conversation, a
+        # scheduler dispatching jobs), and a cap that carried across them would refuse the second
+        # task because the first one used its allowance.
+        spend = SpendBudget(self.config.max_usd) if self.config.max_usd else None
         steplog = StepLog()
         nudged = False
         loop_detector = ToolLoopDetector() if self.config.detect_tool_loops else None
@@ -339,7 +354,19 @@ class Agent:
             # model. Measuring around the whole iteration would fold the tool calls into the rate
             # and report a shell command as slow generation.
             call_started = time.monotonic()
-            result = self._step(messages, tools=tool_schema, on_token=on_token, usage=usage)
+            try:
+                result = self._step(messages, tools=tool_schema, on_token=on_token, usage=usage, spend=spend)
+            except BudgetExceeded as exc:
+                # Not an error: the run did what it was told to do with the money it was given. The
+                # partial answer is kept — the transcript up to here is the work already paid for,
+                # and throwing it away would spend the budget for nothing.
+                _log.info("run stopped on budget: %s", exc)
+                # `self.config.model`, not the answering model: the call that would have named one
+                # is the call that did not happen.
+                return self._result(
+                    str(exc), step - 1, "budget", messages, tool_calls_made, tool_names, usage,
+                    self.config.model or "", None, steplog, task,
+                )
             call_ms = int((time.monotonic() - call_started) * 1000)
             # `result.prompt_tokens` is the provider's own count for the prompt we just sent — which
             # is exactly the live size of the context. Keeping it per step (instead of only summing
@@ -435,14 +462,14 @@ class Agent:
                     f"Stop — you are repeating the same action ({tripped}). Do not call more tools. "
                     "Give your best final answer now with what you already have."
                 )
-                final = self._step([*messages, {"role": "user", "content": nudge}],
+                final = self._step([*messages, {"role": "user", "content": nudge}], spend=spend,
                                    tools=None, on_token=on_token, usage=usage)
                 messages.append({"role": "assistant", "content": final.content})
                 return self._result(final.content, step, "tool_loop", messages, tool_calls_made,
                                     tool_names, usage, final.model, steplog=steplog, task=task)
 
         # Budget exhausted: ask once more, without tools, for a final answer.
-        final = self._step([*messages, {"role": "user", "content": "Provide your final answer now."}],
+        final = self._step([*messages, {"role": "user", "content": "Provide your final answer now."}], spend=spend,
                            tools=None, on_token=on_token, usage=usage)
         messages.append({"role": "assistant", "content": final.content})
         return self._result(final.content, self.config.max_steps, "max_steps", messages,
@@ -456,10 +483,20 @@ class Agent:
         tools: list[dict[str, Any]] | None,
         on_token: Callable[[str], None] | None,
         usage: _UsageTally,
+        spend: SpendBudget | None = None,
     ) -> CompletionResult:
         """One model call. Streams (with live token deltas) when a token callback is given AND the
         backend supports ``stream_complete``; otherwise a plain blocking ``complete``. Either way the
-        call's token usage is folded into the run-level tally."""
+        call's token usage is folded into the run-level tally.
+
+        The spend cap is enforced HERE because this is the only place in the loop that spends money.
+        Checked before the call and charged after it: a cap consulted afterwards would be a receipt,
+        not a ceiling.
+        """
+        if spend is not None:
+            reason = spend.blocked()
+            if reason is not None:
+                raise BudgetExceeded(reason)
         result: CompletionResult
         if on_token is not None and hasattr(self.backend, "stream_complete"):
             result = self.backend.stream_complete(  # type: ignore[attr-defined]
@@ -471,6 +508,14 @@ class Agent:
                 messages, model=self.config.model, temperature=self.config.temperature, tools=tools,
             )
         usage.add(result)
+        if spend is not None:
+            # The model that ANSWERED: a cascade or a failover can reply on a different one, and
+            # charging the requested model invents a price for a call that never happened.
+            spend.record(
+                str(getattr(result, "model", "") or self.config.model or ""),
+                result.prompt_tokens,
+                result.completion_tokens,
+            )
         return result
 
     def _result(

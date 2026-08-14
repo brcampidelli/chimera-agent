@@ -28,6 +28,78 @@ class BudgetExceeded(RuntimeError):
     """Raised (hard mode) when a call would exceed the delegation's token budget."""
 
 
+class SpendBudget:
+    """A dollar ceiling for one run, and a rule about what to do when the price is unknown.
+
+    Tokens and dollars are different axes and this is deliberately a sibling of
+    :class:`TokenBudget` rather than a second mechanism elsewhere: a project with two spend limiters
+    is a project where the two disagree, and the disagreement surfaces at 3 a.m. on the machine that
+    trades money.
+
+    **An unpriced call stops the run.** That is the owner's decision, and it is the only one that
+    does not lie: a ceiling that skips what it cannot price still shows green while the real spend
+    climbs, and it climbs fastest on exactly the models nobody bothered to price. The stop names the
+    model so the fix is one line of :func:`~chimera.fusion.receipts.set_price` away.
+
+    A **local** model is priced at zero rather than treated as unknown, because it is not unknown —
+    an Ollama run spends electricity, and a dollar cap is not about electricity. That distinction is
+    resolved in :func:`~chimera.fusion.receipts.resolve_price`, so every consumer of the price table
+    gets it, not just this class.
+    """
+
+    def __init__(self, max_usd: float) -> None:
+        if max_usd <= 0:
+            raise ValueError("max_usd must be positive")
+        self.max_usd = max_usd
+        self._spent = 0.0
+        self._unpriced_model: str | None = None
+
+    @property
+    def spent(self) -> float:
+        return round(self._spent, 6)
+
+    @property
+    def remaining(self) -> float:
+        return max(0.0, round(self.max_usd - self._spent, 6))
+
+    @property
+    def unpriced_model(self) -> str | None:
+        """The first model whose price could not be resolved, if any. Sticky: once the run has spent
+        an unknown amount, every later total is unknown too, and clearing it would restore a
+        confidence the run no longer has."""
+        return self._unpriced_model
+
+    def blocked(self) -> str | None:
+        """Why the next call must not happen, or None to proceed.
+
+        Checked BEFORE the call, so the money is never spent to discover it was over budget.
+        """
+        if self._unpriced_model is not None:
+            return (
+                f"the price of {self._unpriced_model} is unknown, so the spend so far cannot be "
+                "known either; set a price for it or run without a budget"
+            )
+        if self._spent >= self.max_usd:
+            return f"spend cap reached: ${self._spent:.4f} of ${self.max_usd:.4f}"
+        return None
+
+    def record(self, model: str, prompt_tokens: int | None, completion_tokens: int | None) -> None:
+        """Charge one completed call at its own model's rate.
+
+        The model that ANSWERED, not the one requested — a cascade, a fusion panel or a failover can
+        reply on a different model, and pricing the requested one invents a number for a call that
+        never happened. Same convention as :class:`~chimera.orchestration.metering.MeteredBackend`.
+        """
+        from chimera.orchestration.receipts import price_delegation
+
+        usd = price_delegation(model, prompt_tokens, completion_tokens) if model else None
+        if usd is None:
+            if self._unpriced_model is None:
+                self._unpriced_model = model or "(unnamed model)"
+            return
+        self._spent += usd
+
+
 class TokenBudget:
     """A mutable token allowance for one delegation.
 

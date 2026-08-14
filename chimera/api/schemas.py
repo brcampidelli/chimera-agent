@@ -514,6 +514,9 @@ class DoctorOut(BaseModel):
     sandbox: str
     external_agents: list[ExternalAgentOut] = []
     editor: list[EditorCapabilityOut] = []
+    #: Whether the default model can be priced. A spend cap stops on a call it cannot price,
+    #: so an unpriced default is a cap that refuses to work — said here, before one is set.
+    spend: EditorCapabilityOut | None = None
 
 
 class ConfigTestOut(BaseModel):

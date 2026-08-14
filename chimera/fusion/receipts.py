@@ -67,12 +67,25 @@ def set_price(pattern: str, price: ModelPrice) -> None:
     _PRICES.insert(0, (pattern.lower(), price))
 
 
+#: Priced at zero, and that is a measurement rather than a default. A model on `ollama/`, `vllm/` or
+#: an LM Studio endpoint bills nothing to any provider — the cost is electricity, which is not what
+#: a dollar figure in a receipt is about. Treating it as *unknown* would be the more cautious-looking
+#: answer and the wrong one: it makes every local run unpriceable, and a spend cap that stops on
+#: unknown prices would refuse to run the one configuration that cannot possibly overspend.
+_LOCAL_ZERO = ModelPrice(0.0, 0.0)
+
+
 def resolve_price(model: str) -> ModelPrice | None:
     """The list price for ``model`` by family substring, or ``None`` if unknown (never guessed)."""
+    from chimera.providers.gateway import _is_local_model
+
     norm = model.lower()
     for pattern, price in _PRICES:
         if pattern in norm:
             return price
+    # After the table, not before: an explicit `set_price` for a local model must still win.
+    if _is_local_model(norm):
+        return _LOCAL_ZERO
     return None
 
 
