@@ -457,6 +457,18 @@ class Settings(BaseSettings):
     # trusts, and every grant is recorded so the choice does not become invisible.
     approval_mode: str = Field(default="ask", validation_alias="CHIMERA_APPROVAL")
 
+    # Governance on the unattended surfaces (`serve`, cron, MCP, A2A, messaging): `off` | `observe`
+    # | `enforce`. Off by default, because turning it on changes what a running deployment is
+    # allowed to do and nobody should get that from an upgrade.
+    #
+    # `observe` runs the entire stack and refuses nothing, recording every action enforcement WOULD
+    # have refused. That middle state exists because the failure it guards against is silent: with
+    # narrowing on and no approver, a job that reads a feed cannot write for the rest of its run,
+    # the refusal arrives as an ordinary observation string, and the run reports success having done
+    # nothing. Going straight to `enforce` on a schedule that watches real positions is how that
+    # gets discovered in production instead of in a report.
+    governance_mode: str = Field(default="off", validation_alias="CHIMERA_GOVERNANCE")
+
     # Deployment-level tool allowlist/denylist (names). Empty allowlist = no restriction (all
     # tools); a non-empty allowlist grants only those. Denylist removes even if allowed.
     #
