@@ -905,7 +905,10 @@ def agent(
 
             kernel = TrustKernel(audit=AuditLog(get_settings().home / "audit.jsonl"))
             registry = govern_registry(registry, kernel)
-        runner = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
+        runner = Agent(
+            backend, registry,
+            AgentConfig(model=model, max_steps=max_steps, project_root=Path(workspace)),
+        )
         result = runner.run(task)
     except MissingCredentialsError as exc:
         console.print(f"[red]{exc}[/red]")
@@ -1014,7 +1017,14 @@ def chat(
         from chimera.fusion import FusionEngine, RoutedBackend
 
         backend = RoutedBackend(gateway, FusionEngine(gateway))
-    agent = Agent(backend, default_registry(Path(workspace)), AgentConfig(model=model, max_steps=max_steps))
+    agent = Agent(
+        backend,
+        default_registry(Path(workspace)),
+        # Same workspace, both arguments: the one that roots the tools also carries the
+        # project's conventions. Splitting them is how `AGENTS.md` came to be read on
+        # four surfaces out of twenty-seven.
+        AgentConfig(model=model, max_steps=max_steps, project_root=Path(workspace)),
+    )
     mem = None if no_memory else _memory_manager()
 
     # The conversation outlives the terminal.
@@ -1136,7 +1146,14 @@ def assist(
     routes_path = Path(settings.home) / "routes.jsonl"
     gateway = LLMGateway()
     backend: SupportsComplete = gateway if no_cascade else _cascade_backend(gateway, settings)
-    agent = Agent(backend, default_registry(Path(workspace)), AgentConfig(model=model, max_steps=max_steps))
+    agent = Agent(
+        backend,
+        default_registry(Path(workspace)),
+        # Same workspace, both arguments: the one that roots the tools also carries the
+        # project's conventions. Splitting them is how `AGENTS.md` came to be read on
+        # four surfaces out of twenty-seven.
+        AgentConfig(model=model, max_steps=max_steps, project_root=Path(workspace)),
+    )
     # Second-brain defaults: memory + graph + profile preamble always on (unless opted out).
     mem = None if no_memory else _memory_manager()
     session = ChatSession(
@@ -1285,7 +1302,14 @@ def tui(
         from chimera.fusion import FusionEngine, RoutedBackend
 
         backend = RoutedBackend(gateway, FusionEngine(gateway))
-    agent = Agent(backend, default_registry(Path(workspace)), AgentConfig(model=model, max_steps=max_steps))
+    agent = Agent(
+        backend,
+        default_registry(Path(workspace)),
+        # Same workspace, both arguments: the one that roots the tools also carries the
+        # project's conventions. Splitting them is how `AGENTS.md` came to be read on
+        # four surfaces out of twenty-seven.
+        AgentConfig(model=model, max_steps=max_steps, project_root=Path(workspace)),
+    )
     mem = None if no_memory else _memory_manager()
     session = ChatSession(
         agent, memory=mem, graph=_recall_graph(mem), profile=_session_profile(mem)
@@ -1380,7 +1404,15 @@ def serve(
         )
         if http_send_tool is not None:
             registry.register(http_send_tool)
-        runner = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
+        runner = Agent(
+            backend,
+            registry,
+            # The same workspace that roots the tools. It was good enough to grant file
+            # capability here and not good enough to convey the project's conventions, which is
+            # incoherent: `serve --workspace X` is the headless deployment from the README, and
+            # its AGENTS.md was never read.
+            AgentConfig(model=model, max_steps=max_steps, project_root=workspace_path),
+        )
         return ChatSession(
             runner,
             memory=shared_memory,
@@ -1635,6 +1667,9 @@ def desktop_app(
                 # The same identity the coding turn applies. Without it a Discord bot and the app
                 # would answer as two different agents from one configuration.
                 instructions=render_identity(load_identity(live.home)),
+                # …and the same workspace that roots the tools below, so the project's own
+                # conventions reach the app's chat the way they reach `solve`.
+                project_root=workspace_path,
             ),
         )
         return ChatSession(
@@ -1741,6 +1776,10 @@ def _start_cron_daemon(
                 model=model,
                 max_steps=max_steps,
                 max_usd=job.max_usd,
+                # The same workspace the job's tools are rooted in. A scheduled job is the surface
+                # LEAST able to be told the conventions any other way — nobody is at a terminal to
+                # restate them — and it was the one reading none.
+                project_root=workspace,
                 # The path that runs the most was the one with no step-level record at all. Without
                 # it there is no success-versus-context curve, no replay of a job that went wrong,
                 # and no reliability bench for the 24/7 loop — every one of those reads this file.
@@ -1784,7 +1823,10 @@ def _start_cron_daemon(
             home=settings.home,
             surface="cron:task",
         )
-        agent = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
+        agent = Agent(
+            backend, registry,
+            AgentConfig(model=model, max_steps=max_steps, project_root=workspace),
+        )
         return agent.run(task).answer
 
     results_path = get_settings().home / "scheduler" / "cron_results.jsonl"
@@ -1951,7 +1993,10 @@ def _serve_mcp(
             home=get_settings().home,
             surface="mcp",
         )
-        worker = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
+        worker = Agent(
+            backend, registry,
+            AgentConfig(model=model, max_steps=max_steps, project_root=workspace_path),
+        )
         auto = AutonomousAgent(
             worker,
             memory=_memory_manager() if recall else None,
@@ -2000,7 +2045,10 @@ def _build_a2a(
             home=get_settings().home,
             surface="a2a",
         )
-        worker = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
+        worker = Agent(
+            backend, registry,
+            AgentConfig(model=model, max_steps=max_steps, project_root=workspace_path),
+        )
         auto = AutonomousAgent(
             worker, config=AutonomousConfig(max_attempts=2, use_planner=False, use_manager=False)
         )
@@ -2051,7 +2099,10 @@ def _serve_platform(
             surface="platform",
         )
         registry.register(send_tool)
-        runner = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
+        runner = Agent(
+            backend, registry,
+            AgentConfig(model=model, max_steps=max_steps, project_root=workspace_path),
+        )
         return ChatSession(runner, memory=memory, graph=graph)
 
     gateway = MessageGateway(factory)
@@ -3458,7 +3509,14 @@ def solve_batch(
             ledger = TaintLedger()
             ledgers[name] = ledger
             registry = ledger_registry(default_registry(ws), ledger, narrow_on_taint=taint)
-            worker = Agent(backend, registry, AgentConfig(model=model, max_steps=max_steps))
+            worker = Agent(
+                backend,
+                registry,
+                # `ws` is this task's isolated worktree — a checkout of the repo, so its AGENTS.md is
+                # the same one. Single-task `solve` has always passed it; the batch did not, which is
+                # the same shape as a batch being quietly weaker than one run done alone.
+                AgentConfig(model=model, max_steps=max_steps, project_root=ws),
+            )
             auto = AutonomousAgent(
                 worker,
                 planner=Planner(gateway, model),

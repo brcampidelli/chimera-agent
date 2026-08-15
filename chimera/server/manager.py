@@ -127,7 +127,14 @@ class MessagingManager:
             registry = default_registry(self._workspace)
             registry.register(send_tool)
             runner = Agent(
-                self._backend, registry, AgentConfig(model=self._model, max_steps=self._max_steps)
+                self._backend,
+                registry,
+                # The same workspace that roots the tools two lines up.
+                AgentConfig(
+                    model=self._model,
+                    max_steps=self._max_steps,
+                    project_root=self._workspace,
+                ),
             )
             return ChatSession(
                 runner,
