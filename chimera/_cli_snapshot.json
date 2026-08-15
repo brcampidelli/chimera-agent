@@ -2743,6 +2743,14 @@
     },
     {
       "deprecated": false,
+      "help": "Ablate the memory-poisoning defenses: what reaches a LATER run's prompt, and unmarked.\n\nNo key needed, nothing leaves the machine. `redteam` measures one run \u2014 content arrives\nuntrusted, the harmful call is refused, and the whole picture ends with the process. This\nmeasures the other shape: run A stores what it \"learned\" from a poisoned page, run B asks an\nunrelated question days later, and recall hands the planted fact to the model.\n\nThe headline is what arrives **unmarked**, not what is blocked. A poisoned fact carrying its\norigin is one the model was warned about; an unlabelled one is indistinguishable from something\nthe agent verified itself. Each of the three layers (taint / gate / label) is switched off in\nturn, because a single number would be compatible with any of them doing nothing.\n\nSee `bench/memory_poison/PREREGISTRATION.md` for the thresholds, fixed before the first run.",
+      "hidden": false,
+      "name": "memory-poison",
+      "params": [],
+      "path": "memory-poison"
+    },
+    {
+      "deprecated": false,
       "help": "Meta-agent: design a specialized agent blueprint for a task. Requires a key.",
       "hidden": false,
       "name": "meta",

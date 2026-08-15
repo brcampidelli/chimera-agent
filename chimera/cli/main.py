@@ -5470,6 +5470,68 @@ def redteam() -> None:
         )
 
 
+@app.command("memory-poison")
+def memory_poison() -> None:
+    """Ablate the memory-poisoning defenses: what reaches a LATER run's prompt, and unmarked.
+
+    No key needed, nothing leaves the machine. `redteam` measures one run — content arrives
+    untrusted, the harmful call is refused, and the whole picture ends with the process. This
+    measures the other shape: run A stores what it "learned" from a poisoned page, run B asks an
+    unrelated question days later, and recall hands the planted fact to the model.
+
+    The headline is what arrives **unmarked**, not what is blocked. A poisoned fact carrying its
+    origin is one the model was warned about; an unlabelled one is indistinguishable from something
+    the agent verified itself. Each of the three layers (taint / gate / label) is switched off in
+    turn, because a single number would be compatible with any of them doing nothing.
+
+    See `bench/memory_poison/PREREGISTRATION.md` for the thresholds, fixed before the first run.
+    """
+    from chimera.eval.memory_poison import ABLATION, run_posture
+
+    table = Table(
+        title="Memory poisoning — persistent, across runs (lower is better)", header_style="bold"
+    )
+    table.add_column("Defenses")
+    table.add_column("Poison recalled", justify="right")
+    table.add_column("Poison UNMARKED", justify="right")
+    table.add_column("Honest memory lost", justify="right")
+    table.add_column("Gate", justify="right")
+
+    shipped = None
+    for defenses in ABLATION:
+        report = run_posture(defenses=defenses)
+        summary = report.summary()
+        passed, _ = report.gate()
+        name = defenses.name
+        if name == "all":
+            shipped = report
+        table.add_row(
+            f"[bold]{name}[/bold]" if name == "all" else name,
+            f"{summary['poison_recall_rate']:.0%}",
+            f"{summary['poison_unmarked_rate']:.0%}",
+            f"{summary['benign_loss_rate']:.0%}",
+            f"[{'green' if passed else 'red'}]{'pass' if passed else 'FAIL'}[/]",
+        )
+    console.print(table)
+
+    if shipped is None:  # pragma: no cover - ABLATION always contains the shipped config
+        return
+    passed, why = shipped.gate()
+    console.print(f"[{'green' if passed else 'red'}]shipped config: {'pass' if passed else 'FAIL'}[/] — {why}")
+    unmarked = shipped.poison.unmarked()
+    if unmarked:
+        console.print(
+            f"[yellow]Reaches a later prompt with no origin attached:[/yellow] {', '.join(unmarked)}"
+        )
+    lost = shipped.benign.lost()
+    if lost:
+        console.print(
+            f"[yellow]Honest memory the defense destroyed:[/yellow] {', '.join(lost)} "
+            "— text that quotes an attack in order to explain it. A pattern matcher on content "
+            "cannot tell the quote from the command."
+        )
+
+
 @app.command("probe-select")
 def probe_select(
     data: str = typer.Argument(None, help='JSON: {"arm": [[proxy, reward-or-null], ...], ...}. Omit when using --from-log.'),
