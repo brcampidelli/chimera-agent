@@ -65,7 +65,14 @@ class SolveLane:
 
         gateway = LLMGateway()
         settings = get_settings()
-        worker = Agent(gateway, default_registry(self.workspace), AgentConfig(model=self.model))
+        worker = Agent(
+            gateway,
+            default_registry(self.workspace),
+            # The card's workspace, in both arguments: it roots the tools and it carries the
+            # project's conventions. A lane is an autonomous path, so nobody is there to
+            # restate them.
+            AgentConfig(model=self.model, project_root=self.workspace),
+        )
         # M19-A4: a lane is an autonomous path too — turn the flywheel on (experience, skills,
         # memory, playbook) so working a card learns exactly as `chimera solve` does.
         evo = build_evolution_context(
@@ -164,6 +171,7 @@ class AgentLane:
                 # untrusted-data fence by being given a personality is not a worker anyone should
                 # be able to define from a text field.
                 instructions=role.system_prompt,
+                project_root=self.workspace,
             ),
         )
         # Same flywheel as every other autonomous path: working a card learns exactly as

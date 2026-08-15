@@ -150,7 +150,14 @@ class MessagingManager:
             # reason to exist, and a denylist aimed at shell must not take the bot's own voice away.
             registry.register(send_tool)
             runner = Agent(
-                self._backend, registry, AgentConfig(model=self._model, max_steps=self._max_steps)
+                self._backend,
+                registry,
+                # The same workspace that roots the tools two lines up.
+                AgentConfig(
+                    model=self._model,
+                    max_steps=self._max_steps,
+                    project_root=self._workspace,
+                ),
             )
             return ChatSession(
                 runner,
