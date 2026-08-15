@@ -335,3 +335,102 @@ def test_each_named_surface_is_declared(surface: str, module: str) -> None:
     body = (PACKAGE / module).read_text(encoding="utf-8")
 
     assert f'surface="{surface}' in body or f'surface=f"{surface}' in body
+
+
+# --- the fence, and what it is NOT filed under ----------------------------------------------------
+
+
+def test_an_explicit_denylist_applies_with_governance_off(tmp_path: pathlib.Path) -> None:
+    """The gap this closes.
+
+    `CHIMERA_GOVERNANCE` defaults to `off`, and `off` used to return the registry untouched — so an
+    owner who wrote `CHIMERA_TOOL_DENYLIST=write_file` in `.env` got no fence on any unattended
+    surface, while `config.py` said the lists apply everywhere. The two are not the same kind of
+    thing: a denylist is an instruction, and there is nothing to stage about removing a named tool.
+    """
+    registry, _ = governed_profile(
+        _registry(),
+        settings=_settings(tmp_path, CHIMERA_TOOL_DENYLIST="write_file"),
+        home=tmp_path,
+    )
+
+    assert "write_file" not in {t.name for t in registry.tools()}, (
+        "the owner's fence did not reach an off-mode surface"
+    )
+
+
+def test_an_explicit_allowlist_applies_with_governance_off(tmp_path: pathlib.Path) -> None:
+    """The other half: a non-empty allowlist grants ONLY those, everything else is dropped."""
+    registry, _ = governed_profile(
+        _registry(),
+        settings=_settings(tmp_path, CHIMERA_TOOL_ALLOWLIST="read_file"),
+        home=tmp_path,
+    )
+
+    # `_Writer` is the only tool in the fixture and it is not `read_file`, so an allowlist that
+    # names something else must leave nothing behind — fail-closed, not fail-open.
+    assert [t.name for t in registry.tools()] == []
+
+
+def test_setting_no_list_still_returns_the_very_same_registry(tmp_path: pathlib.Path) -> None:
+    """The blast radius, asserted rather than claimed.
+
+    Both lists default to empty, both resolve to "no restriction", and the restrict call is skipped
+    — so a deployment that set neither is handed back the identical object. That identity check is
+    what makes this a fix for people who wrote a fence and not a change for everybody else.
+    """
+    raw = _registry()
+
+    wrapped, approvals = governed_profile(raw, settings=_settings(tmp_path), home=tmp_path)
+
+    assert wrapped is raw
+    assert not approvals.granted and not approvals.refused
+
+
+def test_the_inferential_half_is_still_staged(tmp_path: pathlib.Path) -> None:
+    """What must NOT have moved. The kernel and the taint ledger can refuse legitimate work, which
+    is the whole reason `observe` exists — turning those on by default under cover of a fence fix
+    would be exactly the breaking change this avoids."""
+    registry, _ = governed_profile(
+        _registry(),
+        settings=_settings(tmp_path, CHIMERA_TOOL_DENYLIST="nothing_by_this_name"),
+        home=tmp_path,
+    )
+    tool = registry.get("write_file")
+
+    assert tool is not None
+    assert type(tool).__name__ == "_Writer", "off mode wrapped the tool in governance machinery"
+
+
+def test_the_fence_reaches_the_in_app_bot_with_governance_off(tmp_path: pathlib.Path) -> None:
+    """End to end on the surface that started this: the app's Messaging toggle, stock config."""
+    from chimera.config import Settings
+    from chimera.providers import CompletionResult
+    from chimera.server import MessagingManager
+
+    class _Backend:
+        def complete(self, messages: list[Any], **kwargs: Any) -> CompletionResult:
+            return CompletionResult(content="ok", model="fake")
+
+    class _Adapter:
+        platform = "discord"
+
+        def send(self, *a: Any, **k: Any) -> str:
+            return "ok"
+
+    settings = Settings(
+        CHIMERA_HOME=str(tmp_path),
+        CHIMERA_DISCORD_BOT_TOKEN="t",
+        CHIMERA_TOOL_DENYLIST="run_shell",
+        # governance deliberately left at its default `off`
+    )
+    adapter = _Adapter()
+    manager = MessagingManager(
+        settings=settings, backend=_Backend(), model=None, max_steps=4,
+        workspace=tmp_path, adapter_factory=lambda _p: adapter,
+    )
+    on_message = manager._gateway_on_message(adapter)
+    names = {t.name for t in on_message.__self__.session_for("c").agent.tools.tools()}  # type: ignore[attr-defined]
+
+    assert "run_shell" not in names
+    assert "send_message" in names

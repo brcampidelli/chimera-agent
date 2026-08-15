@@ -498,19 +498,17 @@ class Settings(BaseSettings):
     # Deployment-level tool allowlist/denylist (names). Empty allowlist = no restriction (all
     # tools); a non-empty allowlist grants only those. Denylist removes even if allowed.
     #
-    # Where they apply, stated exactly, because the previous wording here ("on every surface") was
-    # not true and reading it as true is how an owner ends up with an unfenced bot:
+    # These apply on every surface, and that sentence was false for three weeks before it was true:
+    # `run`/`solve` in a terminal, the coding turn, the autonomous run, the parallel batch, the
+    # desktop app's chat, and the unattended surfaces — `serve`, the cron dispatch, MCP, A2A, and the
+    # messaging bots started either way.
     #
-    #   ALWAYS — `run`/`solve` in a terminal, the coding turn, the autonomous run, the parallel
-    #   batch, and the desktop app's own chat (which applies them itself, unconditionally).
-    #
-    #   ONLY WITH `CHIMERA_GOVERNANCE=observe|enforce` — the unattended surfaces: `serve`, the cron
-    #   dispatch, MCP, A2A, and the messaging bots started either way. Those go through
-    #   `governed_profile`, and that function returns the registry untouched in `off` mode, which is
-    #   the default. So on a stock deployment a denylist in `.env` does NOT fence the Discord bot.
-    #   That asymmetry is a real gap, not a design: it is written down here rather than papered over,
-    #   and closing it means changing what a default deployment does, which is a decision with a
-    #   migration attached rather than a comment fix.
+    # The last group used to be conditional on `CHIMERA_GOVERNANCE=observe|enforce`, which defaults
+    # to `off`, so on a stock deployment a denylist written here fenced NEITHER Discord bot. That was
+    # a filing error rather than a decision: these lists are an instruction (the tool is in the
+    # registry or it is not), while the trust kernel and taint ledger are an inference that can
+    # refuse legitimate work — only the second needs a rollout to be priced first, and only the
+    # second is still staged behind that variable.
     #
     # Where a request carries its own allowlist the two INTERSECT — this list is a ceiling, and a
     # caller must not be able to raise it.
