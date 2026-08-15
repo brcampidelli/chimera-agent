@@ -7,6 +7,7 @@ the providers it actually calls (see :mod:`chimera.providers.gateway`).
 
 from __future__ import annotations
 
+import logging
 import os
 from functools import lru_cache
 from pathlib import Path
@@ -14,6 +15,16 @@ from typing import TYPE_CHECKING, Annotated
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+# stdlib logging rather than `chimera.telemetry.get_logger`: telemetry reads settings, so importing
+# it here is a cycle. Same logger tree either way — this lands under `chimera.config` like the rest.
+_log = logging.getLogger("chimera.config")
+
+#: The two vocabularies that shared one env var until they were split. Named here rather than
+#: inline so each validator can recognise the OTHER side and say which variable the value belongs
+#: to — a message that only says "invalid" sends someone to the wrong file.
+_POSTURE_WORDS = frozenset({"always", "suspicious", "never"})  # CHIMERA_APPROVAL
+_GOVERNANCE_WORDS = frozenset({"ask", "allow", "deny"})  # CHIMERA_APPROVAL_MODE
 
 if TYPE_CHECKING:
     from chimera.providers.catalog import TierLadder
@@ -455,7 +466,22 @@ class Settings(BaseSettings):
     # the other way would make an unattended deployment the most permissive configuration in the
     # product, which is backwards. `allow` exists for a workspace whose contents the owner already
     # trusts, and every grant is recorded so the choice does not become invisible.
-    approval_mode: str = Field(default="ask", validation_alias="CHIMERA_APPROVAL")
+    #
+    # ⚠ This read `CHIMERA_APPROVAL` — the SAME env var as `approval` above — from the day it was
+    # written. Pydantic populated both fields from one variable, and the two vocabularies do not
+    # overlap in a single value, so every documented setting was broken in one direction or the
+    # other. Measured across all six: `ask`, `allow` and `deny` raised `ValidationError` out of
+    # `deployment_posture` (so `ask`, the documented default HERE, killed every coding turn), while
+    # `always`, `suspicious` and `never` arrived here unrecognised, fell through to the `ask` branch
+    # and — headless, which is what cron is — refused everything. An owner writing "never stop and
+    # ask" got the exact opposite, as a refusal string the agent reads past.
+    #
+    # They are not the same axis and never were. `approval` answers "when should a run pause for
+    # me?" — a posture question, owned by the desktop Settings screen, which writes that variable.
+    # This one answers "what happens when the approver is consulted?" — a policy question, read by
+    # `solve` and by every unattended surface. So this one moves, because nothing writes it and
+    # nothing documented it, while renaming the other would silently break saved app settings.
+    approval_mode: str = Field(default="ask", validation_alias="CHIMERA_APPROVAL_MODE")
 
     # Governance on the unattended surfaces (`serve`, cron, MCP, A2A, messaging): `off` | `observe`
     # | `enforce`. Off by default, because turning it on changes what a running deployment is
@@ -479,6 +505,59 @@ class Settings(BaseSettings):
     # INTERSECT — this list is a ceiling, and a caller must not be able to raise it.
     tool_allowlist: list[str] = Field(default_factory=list, validation_alias="CHIMERA_TOOL_ALLOWLIST")
     tool_denylist: list[str] = Field(default_factory=list, validation_alias="CHIMERA_TOOL_DENYLIST")
+
+    @field_validator("approval", mode="before")
+    @classmethod
+    def _approval_is_a_posture_word(cls, value: object) -> object:
+        """Keep the posture vocabulary out of the governance one, and say so when they are mixed.
+
+        The two fields shared an env var, so a value from the wrong side used to fail deep and late:
+        `CHIMERA_APPROVAL=ask` raised `ValidationError: 1 validation error for Posture` on every
+        coding turn, which names neither the setting nor the fix. Warning at construction and
+        falling back to "state nothing" is the same shape `governed_profile` already uses for an
+        unknown mode — a typo must not silently enable or silently disable something stricter than
+        intended, and "" is the value that changes nothing.
+        """
+        if not isinstance(value, str):
+            return value
+        word = value.strip().lower()
+        if word in _GOVERNANCE_WORDS:
+            _log.warning(
+                "CHIMERA_APPROVAL=%r is the governance vocabulary; that setting is now "
+                "CHIMERA_APPROVAL_MODE. Ignoring it here (no posture floor is stated).",
+                word,
+            )
+            return ""
+        if word and word not in _POSTURE_WORDS:
+            _log.warning(
+                "CHIMERA_APPROVAL=%r is not one of %s; ignoring it (no posture floor is stated).",
+                word, ", ".join(sorted(_POSTURE_WORDS)),
+            )
+            return ""
+        return word
+
+    @field_validator("approval_mode", mode="before")
+    @classmethod
+    def _approval_mode_is_a_policy_word(cls, value: object) -> object:
+        """The mirror. Unknown falls back to `ask`, which degrades to deny with no terminal —
+        the fail-closed end, so a typo cannot widen what an unattended deployment may do."""
+        if not isinstance(value, str):
+            return value
+        word = value.strip().lower()
+        if not word:
+            return "ask"
+        if word in _POSTURE_WORDS:
+            _log.warning(
+                "CHIMERA_APPROVAL_MODE=%r is the posture vocabulary; that setting is "
+                "CHIMERA_APPROVAL. Falling back to 'ask'.",
+                word,
+            )
+            return "ask"
+        if word not in _GOVERNANCE_WORDS:
+            _log.warning("CHIMERA_APPROVAL_MODE=%r is not one of %s; falling back to 'ask'.",
+                         word, ", ".join(sorted(_GOVERNANCE_WORDS)))
+            return "ask"
+        return word
 
     @field_validator(
         "fusion_panel",
