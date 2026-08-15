@@ -5,9 +5,21 @@ endpoint and the messaging adapters each built `default_registry(workspace)` raw
 decision anyone made; it is what happens when the guarantee lives in a convention and the convention
 lives in whoever last edited the file.
 
-So the last test here parses `chimera/cli/main.py` and **fails the build** if any surface constructs
-a bare registry again. A grep would be the obvious way and the wrong one: it cannot tell an
-assembled registry from the string appearing in a docstring or a comment about the fix.
+So the last test here **fails the build** if a surface constructs a bare registry again. A grep would
+be the obvious way and the wrong one: it cannot tell an assembled registry from the string appearing
+in a docstring or a comment about the fix.
+
+**That gate had a blind spot, and it was found the expensive way — by an audit, not by the build.**
+It parsed one file and listed the five surface names inside it, so a sixth unattended surface written
+somewhere else was not "failing"; it was invisible. `chimera/server/manager.py` — the Discord bot
+started from the desktop app's Messaging toggle, the same bot `serve --discord` runs — built its
+registry raw for three weeks after the sweep that was supposed to have covered it.
+
+The shape of the fix matters more than the fix. A list of surfaces to CHECK fails open: forget to add
+one and it is silently unguarded. So it is inverted here — the walk covers every module in the
+package, and what is listed is the set of sites allowed to build a registry ungoverned, each with a
+written reason. A new surface anywhere now fails the build until someone either governs it or says
+in one line why it does not need to be.
 
 The rest is the middle state. `observe` exists because going straight to enforcement on a schedule
 that watches real money is how a silent failure gets discovered in production rather than in a
@@ -30,7 +42,7 @@ from chimera.governance.profile import governed_profile
 from chimera.tools.base import Tool
 from chimera.tools.registry import ToolRegistry
 
-MAIN = pathlib.Path(__file__).resolve().parents[1] / "chimera" / "cli" / "main.py"
+PACKAGE = pathlib.Path(__file__).resolve().parents[1] / "chimera"
 
 
 class _Writer(Tool):
@@ -116,66 +128,155 @@ def test_enforce_actually_wraps(tmp_path: pathlib.Path) -> None:
 # --- the build gate -----------------------------------------------------------------------------
 
 
-#: The entry points that run with nobody watching. Named explicitly rather than "everything",
-#: because the distinction is the point: `run`, `chat` and `solve` are attended — a person is at the
-#: terminal, sees the tool calls, and can stop them — and `solve` additionally assembles its own
-#: stack with options this profile does not model (its own guard/taint flags, the late-bound
-#: subagent). Governing those by fiat here would be a refactor pretending to be a safety gate.
-UNATTENDED = ("serve", "_start_cron_daemon", "_serve_mcp", "_build_a2a", "_serve_platform")
+#: Sites allowed to build a registry WITHOUT the profile, each with the reason.
+#:
+#: Keyed by ``"<module path>:<qualified function>"``. Listing the exemptions rather than the
+#: obligations is the whole design: the previous version listed five surfaces to check, so the sixth
+#: — written in another file three weeks later — was not caught, it was never looked at. Here the
+#: default for a new site is FAIL, and the cost of an exemption is one sentence.
+#:
+#: Two kinds of reason are acceptable and they are not the same. "A person is watching" means the
+#: tool calls scroll past someone who can hit Ctrl-C. "It assembles its own" means the surface builds
+#: an equivalent stack with options this profile does not model — a weaker claim, and every entry
+#: making it is a candidate for consolidation rather than a settled answer.
+EXEMPT: dict[str, str] = {
+    # --- a person is at the terminal, watching the tool calls go by ---
+    "chimera/cli/main.py:agent": "attended: one-shot at the terminal",
+    "chimera/cli/main.py:chat": "attended: interactive REPL",
+    "chimera/cli/main.py:assist": "attended: interactive",
+    "chimera/cli/main.py:tui": "attended: interactive terminal UI",
+    # --- assembles an equivalent stack from its own flags ---
+    "chimera/cli/main.py:solve._run_solve": "own guard/taint/write-region flags + late-bound subagent",
+    "chimera/cli/main.py:solve_batch.make_runner.run": "per-worker ledgers + shared cross-agent monitor",
+    "chimera/cli/main.py:crew_isolated.make_factory.factory": "per-worker ledgers, shared taint view",
+    "chimera/cli/main.py:desktop_app.factory": (
+        "applies _apply_tool_allowlist and the optional chat guard itself. A SECOND implementation "
+        "of what this profile does, kept because it also carries MCP connectors the profile does "
+        "not model — consolidating the two is open work, not a settled answer"
+    ),
+    "chimera/api/code_api.py:assemble_registry": "resolves its own posture floor + taint narrowing",
+    "chimera/kanban/lanes.py:run": "restrict_registry from the card's own role (fail-closed)",
+    # --- not an agent surface at all ---
+    "chimera/api/app.py:build_api_app.tools_endpoint": "lists tool schemas; nothing is invoked",
+    "chimera/cli/main.py:tools": "prints the tool table",
+    "chimera/cli/main.py:schema_bench": "benchmark harness, no deployment",
+    "chimera/cli/main.py:sandbox_bench.factory": "benchmark harness, no deployment",
+    "chimera/cli/main.py:evolve_tune": "offline tuning over recorded trajectories",
+    "chimera/cli/main.py:meta": "designs an agent blueprint; does not run one",
+    "chimera/core/agent.py:_default_skill_registry": "internal default, wrapped by whoever built it",
+    "chimera/orchestration/lifecycle.py:lifecycle_crew": "library constructor; the caller governs",
+    "chimera/workflow/executors.py:build_executors.solve_step": "delegates to solve, governed there",
+}
 
 
-def _bare_registry_calls(tree: ast.Module, *, within: tuple[str, ...] = UNATTENDED) -> list[int]:
-    """Line numbers where an UNATTENDED surface builds `default_registry(...)` outside the profile.
+def _qualname(chain: list[str]) -> str:
+    return ".".join(chain) or "(module)"
+
+
+def _bare_registry_calls(tree: ast.Module, module: str) -> list[tuple[str, int]]:
+    """``(key, lineno)`` for every `default_registry(...)` this module builds outside the profile.
 
     An AST walk rather than a grep, because a grep cannot tell an assembled registry from the same
     words inside a docstring — and this test exists precisely to survive the next person who writes
-    a comment about it. Nested functions count: `serve` builds its registry inside a `factory()`
-    closure, which is exactly where it went missing.
+    a comment about it. Nested functions are walked with their enclosing chain, because that is where
+    it went missing both times: `serve` builds its registry inside a `factory()` closure, and so did
+    the messaging manager.
 
     A call is legitimate when it is an argument to `governed_profile`.
     """
-    scopes = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and node.name in within
-    ]
     governed: set[int] = set()
-    for scope in scopes:
-        for node in ast.walk(scope):
-            if isinstance(node, ast.Call) and getattr(node.func, "id", "") == "governed_profile":
-                for arg in node.args:
-                    for inner in ast.walk(arg):
-                        if isinstance(inner, ast.Call):
-                            governed.add(id(inner))
-    bare = []
-    for scope in scopes:
-        for node in ast.walk(scope):
-            if (
-                isinstance(node, ast.Call)
-                and getattr(node.func, "id", "") == "default_registry"
-                and id(node) not in governed
-            ):
-                bare.append(node.lineno)
-    return sorted(bare)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and getattr(node.func, "id", "") == "governed_profile":
+            for arg in node.args:
+                for inner in ast.walk(arg):
+                    if isinstance(inner, ast.Call):
+                        governed.add(id(inner))
+
+    found: list[tuple[str, int]] = []
+
+    def walk(node: ast.AST, chain: list[str]) -> None:
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+            chain = [*chain, node.name]
+        if (
+            isinstance(node, ast.Call)
+            and getattr(node.func, "id", "") == "default_registry"
+            and id(node) not in governed
+        ):
+            found.append((f"{module}:{_qualname(chain)}", node.lineno))
+        for child in ast.iter_child_nodes(node):
+            walk(child, chain)
+
+    walk(tree, [])
+    return found
 
 
-def test_no_unattended_surface_builds_a_registry_outside_the_profile() -> None:
-    """The test that makes the guarantee structural.
+def _ungoverned_sites() -> list[tuple[str, int]]:
+    """Every site in the package that builds a registry outside the profile and is not exempt."""
+    out: list[tuple[str, int]] = []
+    for path in sorted(PACKAGE.rglob("*.py")):
+        source = path.read_text(encoding="utf-8")
+        if "default_registry(" not in source:
+            continue
+        module = path.relative_to(PACKAGE.parent).as_posix()
+        out.extend(
+            (key, line)
+            for key, line in _bare_registry_calls(ast.parse(source), module)
+            if key not in EXEMPT
+        )
+    return out
 
-    Five surfaces lost their governance not through a decision but through absence: each was written
-    at a different time and none of them called the thing the others called. A convention cannot fix
-    that. A build that fails can.
+
+def test_no_surface_builds_a_registry_outside_the_profile_unless_it_says_why() -> None:
+    """The test that makes the guarantee structural — over the whole package, not one file.
+
+    Surfaces lose their governance through absence rather than decision: each is written at a
+    different time and none calls the thing the others call. A convention cannot fix that. A build
+    that fails can — but only if it looks everywhere, which the first version of this did not.
     """
-    tree = ast.parse(MAIN.read_text(encoding="utf-8"))
+    ungoverned = _ungoverned_sites()
 
-    bare = _bare_registry_calls(tree)
-
-    assert not bare, (
-        "an unattended surface assembles tools without governed_profile, at "
-        f"chimera/cli/main.py:{bare} — every unattended entry point has to go through the same "
-        "profile, or the deployment's allowlist and taint ledger are true only where someone "
-        "remembered"
+    assert not ungoverned, (
+        "a surface assembles tools without governed_profile and is not in EXEMPT: "
+        + ", ".join(f"{key} (line {line})" for key, line in ungoverned)
+        + " — either route it through governed_profile, or add it to EXEMPT with the reason it "
+        "does not need to be. An unlisted surface means the deployment's allowlist and taint "
+        "ledger are true only where someone remembered."
     )
+
+
+def test_the_messaging_manager_is_covered_by_the_walk() -> None:
+    """The specific regression, pinned by name.
+
+    The blind spot was not that `manager.py` was wrong — it was that the gate could not see it. A
+    walk that silently stopped covering this file again would leave the same bot unfenced with a
+    green build, so the coverage itself is asserted rather than assumed.
+    """
+    source = (PACKAGE / "server" / "manager.py").read_text(encoding="utf-8")
+
+    assert "default_registry(" in source, "the file no longer builds a registry — retarget this test"
+    assert "governed_profile(" in source, "the app's messaging bot lost its governance again"
+    assert not [
+        key for key, _ in _bare_registry_calls(ast.parse(source), "chimera/server/manager.py")
+    ], "manager.py builds a registry outside the profile"
+
+
+def test_every_exemption_still_points_at_real_code() -> None:
+    """An exemption list that outlives the code it exempts is how a gate rots into a formality.
+
+    A stale key is not harmless: it is a line saying "this was considered" about a site that no
+    longer exists, next to sites that do.
+    """
+    live = set()
+    for path in sorted(PACKAGE.rglob("*.py")):
+        source = path.read_text(encoding="utf-8")
+        if "default_registry(" not in source:
+            continue
+        module = path.relative_to(PACKAGE.parent).as_posix()
+        live.update(key for key, _ in _bare_registry_calls(ast.parse(source), module))
+
+    stale = sorted(set(EXEMPT) - live)
+
+    assert not stale, f"EXEMPT names sites that no longer build a bare registry: {stale}"
 
 
 def test_the_gate_would_catch_a_regression() -> None:
@@ -190,26 +291,47 @@ def test_the_gate_would_catch_a_regression() -> None:
         """
     )
 
-    assert _bare_registry_calls(ast.parse(source), within=("serve",)) == [4]
+    assert _bare_registry_calls(ast.parse(source), "m.py") == [("m.py:serve.factory", 4)]
 
 
-def test_the_gate_ignores_the_attended_commands() -> None:
-    # Otherwise it would demand a refactor of `solve` under the banner of a security fix — and a
-    # gate that fires on things it was not built to defend gets weakened until it fires on nothing.
+def test_a_governed_call_is_not_flagged() -> None:
+    # The other half: the walk must recognise the legitimate shape, or every governed surface would
+    # have to be exempted and the list would stop meaning anything.
     source = textwrap.dedent(
         """
-        def run():
-            registry = default_registry(ws)
+        def serve():
+            registry, _ = governed_profile(default_registry(ws), settings=s, home=h)
         """
     )
 
-    assert _bare_registry_calls(ast.parse(source)) == []
+    assert _bare_registry_calls(ast.parse(source), "m.py") == []
 
 
-@pytest.mark.parametrize("surface", ["serve", "cron", "mcp", "a2a", "platform"])
-def test_each_named_surface_is_declared(surface: str) -> None:
+def test_the_gate_does_not_demand_a_refactor_of_the_attended_commands() -> None:
+    # Otherwise it would rewrite `solve` under the banner of a security fix — and a gate that fires
+    # on things it was not built to defend gets weakened until it fires on nothing. The exemption is
+    # what expresses that, so what is asserted is that the exemption is doing the work.
+    assert "chimera/cli/main.py:solve._run_solve" in EXEMPT
+    assert not [key for key, _ in _ungoverned_sites() if key.endswith(":chat")]
+
+
+@pytest.mark.parametrize(
+    ("surface", "module"),
+    [
+        ("serve", "cli/main.py"),
+        ("cron", "cli/main.py"),
+        ("mcp", "cli/main.py"),
+        ("a2a", "cli/main.py"),
+        ("platform", "cli/main.py"),
+        # The app's Messaging toggle gets its OWN label rather than reusing "platform": an audit
+        # reading these counts has to be able to say which of the two ways the bot was started,
+        # because for three weeks only one of them was governed at all.
+        ("app-messaging", "server/manager.py"),
+    ],
+)
+def test_each_named_surface_is_declared(surface: str, module: str) -> None:
     # The `surface=` label is what makes an audit line answerable ("which entry point was that?").
     # Cheap to drop while refactoring, and invisible once dropped.
-    body = MAIN.read_text(encoding="utf-8")
+    body = (PACKAGE / module).read_text(encoding="utf-8")
 
     assert f'surface="{surface}' in body or f'surface=f"{surface}' in body

@@ -112,8 +112,21 @@ class MessagingManager:
 
     def _gateway_on_message(self, adapter: Any) -> Callable[[Any], str]:
         """A MessageGateway.on_message wired to the real agent stack, with send_message registered
-        so the agent can reply and reach out. Mirrors the CLI's `_serve_platform` factory."""
+        so the agent can reply and reach out. Mirrors the CLI's `_serve_platform` factory.
+
+        "Mirrors" was a claim this docstring made and the code did not keep. `_serve_platform` runs
+        its registry through :func:`~chimera.governance.profile.governed_profile`; this built one
+        raw, so the identical Discord bot was fenced when started as `chimera serve --discord` and
+        unfenced when started from the app's Messaging toggle. An owner with
+        ``CHIMERA_TOOL_DENYLIST=shell,write_file`` in `.env` got no denylist here, and anyone who
+        could message the bot reached every builtin.
+
+        Nothing chose that. The build gate written to make this structural
+        (``tests/test_governed_surfaces.py``) parsed only ``chimera/cli/main.py``, so this file was
+        invisible to it — which is why that gate now walks the whole package.
+        """
         from chimera.core import Agent, AgentConfig
+        from chimera.governance.profile import governed_profile
         from chimera.integrations import SenderRegistry, SendMessageTool
         from chimera.interface import ChatSession
         from chimera.server import MessageGateway
@@ -124,7 +137,17 @@ class MessagingManager:
         send_tool = SendMessageTool(senders)
 
         def factory() -> ChatSession:
-            registry = default_registry(self._workspace)
+            # A distinct surface name from the CLI's "platform": the audit log has to be able to say
+            # WHICH way the bot was started, because only one of the two paths was ever governed and
+            # a rollout reading those counts needs to tell them apart.
+            registry, _ = governed_profile(
+                default_registry(self._workspace),
+                settings=self._settings,
+                home=self._settings.home,
+                surface="app-messaging",
+            )
+            # After the profile, exactly as `_serve_platform` does: send_message is this surface's
+            # reason to exist, and a denylist aimed at shell must not take the bot's own voice away.
             registry.register(send_tool)
             runner = Agent(
                 self._backend, registry, AgentConfig(model=self._model, max_steps=self._max_steps)
