@@ -472,11 +472,22 @@ class Settings(BaseSettings):
     # Deployment-level tool allowlist/denylist (names). Empty allowlist = no restriction (all
     # tools); a non-empty allowlist grants only those. Denylist removes even if allowed.
     #
-    # These apply on every surface: `run`/`solve` in a terminal, the coding turn, the autonomous
-    # run, the parallel batch, and the chat the messaging bots and /v1/chat/completions ride on.
-    # They used to reach only the first two, which meant an owner could write a fence in `.env` and
-    # have the app ignore it without saying so. Where a request carries its own allowlist the two
-    # INTERSECT — this list is a ceiling, and a caller must not be able to raise it.
+    # Where they apply, stated exactly, because the previous wording here ("on every surface") was
+    # not true and reading it as true is how an owner ends up with an unfenced bot:
+    #
+    #   ALWAYS — `run`/`solve` in a terminal, the coding turn, the autonomous run, the parallel
+    #   batch, and the desktop app's own chat (which applies them itself, unconditionally).
+    #
+    #   ONLY WITH `CHIMERA_GOVERNANCE=observe|enforce` — the unattended surfaces: `serve`, the cron
+    #   dispatch, MCP, A2A, and the messaging bots started either way. Those go through
+    #   `governed_profile`, and that function returns the registry untouched in `off` mode, which is
+    #   the default. So on a stock deployment a denylist in `.env` does NOT fence the Discord bot.
+    #   That asymmetry is a real gap, not a design: it is written down here rather than papered over,
+    #   and closing it means changing what a default deployment does, which is a decision with a
+    #   migration attached rather than a comment fix.
+    #
+    # Where a request carries its own allowlist the two INTERSECT — this list is a ceiling, and a
+    # caller must not be able to raise it.
     tool_allowlist: list[str] = Field(default_factory=list, validation_alias="CHIMERA_TOOL_ALLOWLIST")
     tool_denylist: list[str] = Field(default_factory=list, validation_alias="CHIMERA_TOOL_DENYLIST")
 

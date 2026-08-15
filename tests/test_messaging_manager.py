@@ -123,3 +123,77 @@ def test_stop_all_closes_every_running_adapter(tmp_path: Path) -> None:
     mgr.stop_all()
     assert adapter.stopped
     assert mgr.is_running("discord") is False
+
+
+# --- the fence, which this surface did not have --------------------------------------------------
+
+
+def _session_registry(mgr: MessagingManager, adapter: _FakeAdapter) -> Any:
+    """Build one chat session the way an incoming message does, and hand back its tool registry.
+
+    Through `_gateway_on_message` rather than by reassembling the stack here: a test that built its
+    own registry would pass with the manager's factory broken, and the factory is the thing that was
+    broken for three weeks.
+    """
+    on_message = mgr._gateway_on_message(adapter)
+    gateway = on_message.__self__  # type: ignore[attr-defined]
+    return gateway.session_for("some-chat").agent.tools
+
+
+def test_the_deployment_denylist_reaches_the_in_app_bot(tmp_path: Path) -> None:
+    """The bug this file is now guarding.
+
+    `chimera serve --discord` and the app's Messaging toggle run the SAME bot. Only the first was
+    fenced: an owner with `CHIMERA_TOOL_DENYLIST=shell,write_file` in `.env` who started Discord
+    from the UI handed every builtin to anyone who could message it.
+    """
+    settings = Settings(
+        CHIMERA_HOME=str(tmp_path),
+        CHIMERA_DISCORD_BOT_TOKEN="t",
+        CHIMERA_GOVERNANCE="enforce",
+        CHIMERA_TOOL_DENYLIST="run_shell,write_file",
+    )
+    adapter = _FakeAdapter()
+    mgr = MessagingManager(
+        settings=settings, backend=_FakeBackend(), model=None, max_steps=4,
+        workspace=tmp_path, adapter_factory=lambda _p: adapter,
+    )
+
+    registry = _session_registry(mgr, adapter)
+    names = {tool.name for tool in registry.tools()}
+
+    assert "run_shell" not in names, "the denylist did not reach the in-app bot"
+    assert "write_file" not in names
+    assert "send_message" in names, "the bot lost the one tool that is its reason to exist"
+
+
+def test_governance_off_still_leaves_the_bot_usable(tmp_path: Path) -> None:
+    """The other direction, and it is not a formality: the profile returns the registry untouched in
+    `off` mode, and `off` is the default. A fix that fenced everyone by default would be a breaking
+    change wearing a security label."""
+    adapter = _FakeAdapter()
+    mgr = _manager(tmp_path, adapter=adapter)
+
+    names = {tool.name for tool in _session_registry(mgr, adapter).tools()}
+
+    assert "run_shell" in names and "send_message" in names
+
+
+def test_the_send_tool_survives_a_denylist_aimed_at_everything_else(tmp_path: Path) -> None:
+    """`send_message` is registered AFTER the profile, deliberately — same order as the CLI. A bot
+    that can read but cannot answer is a bot that looks online and is not."""
+    settings = Settings(
+        CHIMERA_HOME=str(tmp_path),
+        CHIMERA_DISCORD_BOT_TOKEN="t",
+        CHIMERA_GOVERNANCE="enforce",
+        CHIMERA_TOOL_ALLOWLIST="read_file",
+    )
+    adapter = _FakeAdapter()
+    mgr = MessagingManager(
+        settings=settings, backend=_FakeBackend(), model=None, max_steps=4,
+        workspace=tmp_path, adapter_factory=lambda _p: adapter,
+    )
+
+    names = {tool.name for tool in _session_registry(mgr, adapter).tools()}
+
+    assert names == {"read_file", "send_message"}
