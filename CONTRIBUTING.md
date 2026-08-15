@@ -130,7 +130,9 @@ npm --prefix apps/desktop run gen:api
 > rename an i18n key, never weaken a test to make it pass, numbers in `bench/` are pre-registered.
 > Every one of those is a rule someone learned the expensive way.
 
-- **Type-safe**: `mypy --strict` clean; avoid `Any`.
+- **Type-safe**: `uv run mypy chimera` clean; avoid `Any`. Strictness lives in `pyproject.toml`, so
+  run it without `--strict` — passing that flag on the command line overrides the project's own
+  `warn_unused_ignores = false` and reports ~15 phantom errors in files you never touched.
 - **Small units**: functions ≤ 40 lines, files ≤ 300 lines where practical.
 - **Tests**: new logic ships with tests; aim for ≥ 80% coverage on new code.
 - **Imports**: absolute imports within the package (`from chimera.x import y`).
