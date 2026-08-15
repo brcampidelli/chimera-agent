@@ -58,6 +58,36 @@ runs an injection corpus through the stack. On the built-in corpus the taint lay
 **attack success rate from 100% to ~14%** — and the report *names* what still gets through
 (exfiltration via an allowed tool) rather than claiming 100%.
 
+### Poisoned memory, across runs
+
+`redteam` measures one run. The other shape is slower and does not fit in a process: run A reads a
+poisoned page and stores what it "learned"; run B asks an unrelated question days later and recall
+hands the planted fact to the model.
+
+```bash
+chimera memory-poison
+```
+
+Also offline and free. It ablates the three layers that sit between those runs — the `tainted`
+provenance flag, the recall admission gate, and the `[unverified]` label the fact wears into the
+prompt — because a single number would be compatible with any of them doing nothing. The headline is
+what arrives **unmarked**, not what is blocked: a poisoned fact carrying its origin is one the model
+was warned about; an unlabelled one is indistinguishable from something the agent verified itself.
+
+Two results from the first run are worth stating plainly, because neither flatters us:
+
+- **The shipped configuration fails its own gate — on cost.** It marks 100% of the poison and
+  destroys 25% of honest memory doing it. The casualties are named: a security document that quotes
+  an attack in order to explain it, and a support ticket forwarding an attempt. A pattern matcher on
+  content cannot tell a quote from a command.
+- **On this corpus the content gate adds nothing the provenance label does not already cover.** Its
+  entire measured effect is the honest memory it removes. Fifteen hand-authored rows is a pointer
+  and not a verdict, which is why nothing has been deleted on the strength of it.
+
+Thresholds, method and what the numbers do *not* license are in
+[`bench/memory_poison/PREREGISTRATION.md`](https://github.com/brcampidelli/chimera-agent/blob/main/bench/memory_poison/PREREGISTRATION.md),
+fixed before the first run.
+
 ## Exposing the HTTP server
 
 `chimera serve` binds to `127.0.0.1` by default. Its state-changing endpoints (`/chat`, `/a2a`,
