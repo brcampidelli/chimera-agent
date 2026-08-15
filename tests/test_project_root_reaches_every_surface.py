@@ -63,23 +63,7 @@ def _sites_without_project_root() -> list[tuple[str, int]]:
         if "default_registry(" not in source or "AgentConfig(" not in source:
             continue
         module = path.relative_to(PACKAGE.parent).as_posix()
-        rooted: set[tuple[str, ...]] = set()
-        configs: list[tuple[tuple[str, ...], int, bool]] = []
-
-        def walk(node: ast.AST, chain: tuple[str, ...]) -> None:
-            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
-                chain = (*chain, node.name)
-            if isinstance(node, ast.Call):
-                name = getattr(node.func, "id", "")
-                if name == "default_registry":
-                    rooted.add(chain)
-                elif name == "AgentConfig":
-                    has_root = "project_root" in {kw.arg for kw in node.keywords}
-                    configs.append((chain, node.lineno, has_root))
-            for child in ast.iter_child_nodes(node):
-                walk(child, chain)
-
-        walk(ast.parse(source), ())
+        rooted, configs = _scan(ast.parse(source))
         for chain, lineno, has_root in configs:
             if has_root:
                 continue
@@ -88,6 +72,35 @@ def _sites_without_project_root() -> list[tuple[str, int]]:
             if any(chain[:n] in rooted for n in range(1, len(chain) + 1)):
                 found.append((f"{module}:{'.'.join(chain)}", lineno))
     return found
+
+
+def _scan(
+    tree: ast.Module,
+) -> tuple[set[tuple[str, ...]], list[tuple[tuple[str, ...], int, bool]]]:
+    """One pass: which scopes root a registry, and every `AgentConfig` with its scope chain.
+
+    A module-level function rather than a closure inside the loop above — a nested one would capture
+    the accumulators from an enclosing `for`, which is a real footgun and which ruff's B023 catches.
+    """
+    rooted: set[tuple[str, ...]] = set()
+    configs: list[tuple[tuple[str, ...], int, bool]] = []
+
+    def walk(node: ast.AST, chain: tuple[str, ...]) -> None:
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+            chain = (*chain, node.name)
+        if isinstance(node, ast.Call):
+            name = getattr(node.func, "id", "")
+            if name == "default_registry":
+                rooted.add(chain)
+            elif name == "AgentConfig":
+                configs.append(
+                    (chain, node.lineno, "project_root" in {kw.arg for kw in node.keywords})
+                )
+        for child in ast.iter_child_nodes(node):
+            walk(child, chain)
+
+    walk(tree, ())
+    return rooted, configs
 
 
 # --- the gate -------------------------------------------------------------------------------------
