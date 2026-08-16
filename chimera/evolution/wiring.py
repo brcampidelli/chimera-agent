@@ -12,6 +12,11 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
+from chimera.core.filelock import atomic_write_text, locked, read_text
+from chimera.telemetry import get_logger
+
+_log = get_logger("evolution.wiring")
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -44,17 +49,41 @@ def playbook_path(settings: Settings) -> Path:
 
 
 def load_playbook(settings: Settings) -> Playbook:
-    """Load the persisted ACE playbook for this home (empty when none exists yet)."""
+    """Load the persisted ACE playbook for this home (empty when none exists yet).
+
+    A corrupt file degrades to an empty playbook rather than raising. `build_evolution_context`
+    loads this before any work starts, so an unreadable file did not cost the playbook — it stopped
+    the next run from starting at all, which is a strictly worse trade for advisory content.
+    """
     from chimera.evolution.playbook import Playbook
 
     path = playbook_path(settings)
-    if not path.exists():
+    raw = read_text(path)
+    if not raw.strip():
         return Playbook()
-    return Playbook.from_dict(json.loads(path.read_text(encoding="utf-8")))
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        _log.warning("playbook at %s is not readable JSON: %s", path, exc)
+        return Playbook()
+    if not isinstance(data, dict):
+        _log.warning("playbook at %s is not an object; ignoring", path)
+        return Playbook()
+    try:
+        return Playbook.from_dict(data)
+    except (KeyError, TypeError, ValueError) as exc:
+        _log.warning("playbook at %s has an unreadable shape: %s", path, exc)
+        return Playbook()
 
 
 def save_playbook(settings: Settings, playbook: Playbook) -> None:
-    """Persist the ACE playbook for this home."""
+    """Persist the ACE playbook for this home, atomically and under a lock.
+
+    This runs after EVERY `solve`, and the whole playbook is one JSON array — so a bare
+    `write_text` that died mid-write did not cost the last bullet, it cost all of them. Two
+    processes doing it at once cost one of the two sets, silently. Same shape and same reasoning
+    as the memory, experience, trajectory and skill stores.
+    """
     path = playbook_path(settings)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(playbook.to_dict(), indent=2), encoding="utf-8")
+    with locked(path):
+        atomic_write_text(path, json.dumps(playbook.to_dict(), indent=2))

@@ -56,7 +56,21 @@ class MemoryStore:
         self._items = {}
         if not self.path.exists():
             return
-        raw = json.loads(read_text(self.path) or "[]")
+        # The per-record guard below exists so "one bad entry must not lose every other memory".
+        # It could not deliver that, because a file truncated mid-write is not a list of records
+        # with one bad entry — it is not JSON, and this line raised before the loop was reached.
+        # Every command builds a memory manager at boot (chat, solve, serve, app, each API
+        # request), so a single truncated file stopped the product rather than one memory.
+        #
+        # The sibling `MemoryGraph.load` already degrades exactly this way, five files over.
+        try:
+            raw = json.loads(read_text(self.path) or "[]")
+        except json.JSONDecodeError as exc:
+            _log.warning("memory store at %s is not readable JSON: %s", self.path, exc)
+            return
+        if not isinstance(raw, list):
+            _log.warning("memory store at %s is not a list; ignoring", self.path)
+            return
         for item in raw:
             # Skip a single malformed record (hand-edit, schema drift, truncated last object) instead
             # of aborting the whole load — one bad entry must not lose every other memory.
