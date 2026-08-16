@@ -9,6 +9,58 @@
       "text": "Una comprobación añadida después de lo que protege es una comprobación que alguien apaga para poder entregar. Déjala cerrada mientras no hay nada que bloquear.",
       "source_sha256": "3458f7683941585bbca67d834bcd4f33f2d5eea3124c194cb08ed6acb9a238b9"
     },
+    "chimera-budget-the-context": {
+      "text": "Gasta contra un presupuesto por debajo de la ventana real, y cuenta los esquemas de herramientas que reenvías en cada paso — son el suelo al que la compactación no puede llegar.",
+      "source_sha256": "d2965f2e791ddf5fd6b631b5f2459d7e2944462e1aafc5bd03adeab99b483788"
+    },
+    "chimera-carry-the-failure-forward": {
+      "text": "Un bucle de reintentos que sobrescribe su variable de feedback le muestra al intento 3 solo el fallo del intento 2 — así que vuelve a derivar el parche que el intento 1 ya probó.",
+      "source_sha256": "0372f2e81fc6c2c1ace4fa675ab102721db8f014966cbfeabe74ed12b8315c36"
+    },
+    "chimera-give-the-denominator": {
+      "text": "Una tasa sin su denominador y sin su composición induce a error aunque cada dígito sea verdadero — di n, y di cuánto del numerador es ruido ya conocido.",
+      "source_sha256": "d8cb19e4d5dce08511d5dfc2b7fca86383702506c4ac19ceb126ddb9b82114e7"
+    },
+    "chimera-ground-it-in-the-source": {
+      "text": "Toma la firma de la versión instalada, no de la memoria — una API plausible es indistinguible de una real hasta que se ejecuta.",
+      "source_sha256": "c1f8f9fa3889007702f4217774c606cc055512521019e456df8be0bc9215e064"
+    },
+    "chimera-list-exemptions-not-obligations": {
+      "text": "Una compuerta que enumera qué comprobar falla en abierto — el sitio que nadie recordó añadir es el que se rompe. Enumera en su lugar las exenciones, cada una con una razón escrita, y el valor por defecto pasa a ser fallar.",
+      "source_sha256": "349ffc5938703251524530fd1a559c2e1ef55cd4fb83508e9432f69716c6c6b1"
+    },
+    "chimera-prove-the-test-discriminates": {
+      "text": "Una prueba de regresión que nunca has visto fallar es una suposición. Vuelve a romper el código y obsérvala ponerse en rojo antes de hacerle commit.",
+      "source_sha256": "5486f466781c30e1b7a11d59f92e9d33c97b5d68ba1adaf412315b5d1cc7018b"
+    },
+    "chimera-reproduce-before-diagnosing": {
+      "text": "Un diagnóstico es una afirmación sobre una máquina que no has ejecutado. Reproduce primero el fallo con un solo comando corto — sobre todo cuando el diagnóstico llegó de otra persona.",
+      "source_sha256": "5de6a9fba19b1026f910426061557407718d11f61ff8e94ccd7990f69ff21fdd"
+    },
+    "chimera-run-the-projects-own-gate-command": {
+      "text": "Ejecuta literalmente el comando de verificación del proyecto — mismo alcance, mismos flags. La variante casi idéntica que improvisas miente en ambas direcciones.",
+      "source_sha256": "480ca99f4b28af2fb27787d43e6a6d29eaf143763ff57237fb6fc98c9311024e"
+    },
+    "chimera-state-what-you-did-not-check": {
+      "text": "Un ranking construido a partir de una parte del sistema se lee como un ranking del sistema — escribe el alcance y las exclusiones junto a los hallazgos, no después de ellos.",
+      "source_sha256": "c2a88dc246d5ecac858cda8ade83016a6ae2fb384898b86a3c6d5db57161dd48"
+    },
+    "chimera-test-the-wiring-not-the-class": {
+      "text": "Una clase ensamblada a mano en una prueba demuestra que la clase funciona, no que algo llegue hasta ella — cubre el camino que producción toma realmente.",
+      "source_sha256": "f3c07e2553a863ee7f43cfa6a7df77378bfc379ed66a0e80bcbf1eac537d5252"
+    },
+    "chimera-thin-vertical-slice": {
+      "text": "Construye un único camino estrecho que atraviese todas las capas y se ejecute, antes de construir ninguna capa por completo — una integración que nunca se ha ejecutado es una suposición.",
+      "source_sha256": "7a7426092fcac41032cf4d8bc5a0fb63f2392fb5bdd5acaba71d753416cf0808"
+    },
+    "chimera-when-two-results-contradict-suspect-the-apparatus": {
+      "text": "Cuando dos de tus propias mediciones discrepan por un margen que ningún mecanismo podría producir, el defecto está en el instrumento. Audita el harness antes de construir teoría encima.",
+      "source_sha256": "ef37f01d111710aec1e07536eba0b4b03ddbddbf15ca62f860d200933ff5abd4"
+    },
+    "chimera-write-the-check-before-the-code": {
+      "text": "Un criterio escrito después de la implementación describe la implementación. Escribe primero la comprobación que falla, obsérvala fallar, y luego construye.",
+      "source_sha256": "533a8370bec93659c286086d8238be269d7c0259bb6903e9814d234e180dcd71"
+    },
     "declare-when-a-setting-takes-effect": {
       "text": "Un control que guarda correctamente y no cambia nada hasta reiniciar es peor que uno que falla. Di cuándo se aplica, y deriva eso de dónde se lee el valor.",
       "source_sha256": "db548604dbe6cfe82f690d90ddfdcf107ff6a76abcfb7f3b73a60616d343453a"

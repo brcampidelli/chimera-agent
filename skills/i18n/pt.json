@@ -9,6 +9,58 @@
       "text": "Uma checagem acrescentada depois daquilo que ela guarda é uma checagem que alguém desliga para entregar. Feche-a enquanto não há nada para bloquear.",
       "source_sha256": "3458f7683941585bbca67d834bcd4f33f2d5eea3124c194cb08ed6acb9a238b9"
     },
+    "chimera-budget-the-context": {
+      "text": "Gaste contra um orçamento abaixo da janela real, e conte os schemas de tools que você reenvia a cada passo — eles são o piso que a compactação não alcança.",
+      "source_sha256": "d2965f2e791ddf5fd6b631b5f2459d7e2944462e1aafc5bd03adeab99b483788"
+    },
+    "chimera-carry-the-failure-forward": {
+      "text": "Um loop de retry que sobrescreve sua variável de feedback mostra à tentativa 3 apenas a falha da tentativa 2 — então ela re-deriva o patch que a tentativa 1 já testou.",
+      "source_sha256": "0372f2e81fc6c2c1ace4fa675ab102721db8f014966cbfeabe74ed12b8315c36"
+    },
+    "chimera-give-the-denominator": {
+      "text": "Uma taxa sem o denominador e sem sua composição engana com todos os dígitos verdadeiros — diga o n, e diga quanto do numerador é ruído já conhecido.",
+      "source_sha256": "d8cb19e4d5dce08511d5dfc2b7fca86383702506c4ac19ceb126ddb9b82114e7"
+    },
+    "chimera-ground-it-in-the-source": {
+      "text": "Pegue a assinatura na versão instalada, não na memória — uma API plausível é indistinguível de uma real até rodar.",
+      "source_sha256": "c1f8f9fa3889007702f4217774c606cc055512521019e456df8be0bc9215e064"
+    },
+    "chimera-list-exemptions-not-obligations": {
+      "text": "Um gate que lista o que checar falha aberto — o site que ninguém lembrou de adicionar é o que quebra. Liste as isenções, cada uma com um motivo escrito, e o padrão passa a ser reprovar.",
+      "source_sha256": "349ffc5938703251524530fd1a559c2e1ef55cd4fb83508e9432f69716c6c6b1"
+    },
+    "chimera-prove-the-test-discriminates": {
+      "text": "Um teste de regressão que você nunca viu falhar é um chute. Quebre o código de novo e veja o teste ficar vermelho antes de commitá-lo.",
+      "source_sha256": "5486f466781c30e1b7a11d59f92e9d33c97b5d68ba1adaf412315b5d1cc7018b"
+    },
+    "chimera-reproduce-before-diagnosing": {
+      "text": "Um diagnóstico é uma afirmação sobre uma máquina que você não rodou. Reproduza a falha em um comando curto primeiro — especialmente quando o diagnóstico veio de outra pessoa.",
+      "source_sha256": "5de6a9fba19b1026f910426061557407718d11f61ff8e94ccd7990f69ff21fdd"
+    },
+    "chimera-run-the-projects-own-gate-command": {
+      "text": "Rode o comando de verificação do projeto literalmente — mesmo escopo, mesmas flags. A variante quase idêntica que você improvisa mente nas duas direções.",
+      "source_sha256": "480ca99f4b28af2fb27787d43e6a6d29eaf143763ff57237fb6fc98c9311024e"
+    },
+    "chimera-state-what-you-did-not-check": {
+      "text": "Um ranking feito a partir de uma parte do sistema é lido como um ranking do sistema — escreva o escopo e as exclusões ao lado dos achados, não depois deles.",
+      "source_sha256": "c2a88dc246d5ecac858cda8ade83016a6ae2fb384898b86a3c6d5db57161dd48"
+    },
+    "chimera-test-the-wiring-not-the-class": {
+      "text": "Uma classe montada à mão num teste prova que a classe funciona, não que algo chega até ela — cubra o caminho que a produção de fato percorre.",
+      "source_sha256": "f3c07e2553a863ee7f43cfa6a7df77378bfc379ed66a0e80bcbf1eac537d5252"
+    },
+    "chimera-thin-vertical-slice": {
+      "text": "Construa um caminho estreito que atravesse todas as camadas e rode, antes de construir qualquer camada por inteiro — uma integração que nunca executou é um chute.",
+      "source_sha256": "7a7426092fcac41032cf4d8bc5a0fb63f2392fb5bdd5acaba71d753416cf0808"
+    },
+    "chimera-when-two-results-contradict-suspect-the-apparatus": {
+      "text": "Quando duas medições suas discordam por uma margem que nenhum mecanismo produziria, o defeito está no instrumento. Audite o harness antes de construir teoria em cima dele.",
+      "source_sha256": "ef37f01d111710aec1e07536eba0b4b03ddbddbf15ca62f860d200933ff5abd4"
+    },
+    "chimera-write-the-check-before-the-code": {
+      "text": "Um critério escrito depois da implementação descreve a implementação. Escreva a checagem que falha primeiro, veja-a falhar, e só então construa.",
+      "source_sha256": "533a8370bec93659c286086d8238be269d7c0259bb6903e9814d234e180dcd71"
+    },
     "declare-when-a-setting-takes-effect": {
       "text": "Um controle que salva com sucesso e não muda nada até reiniciar é pior que um que falha. Diga quando ele passa a valer, e derive isso de onde o valor é lido.",
       "source_sha256": "db548604dbe6cfe82f690d90ddfdcf107ff6a76abcfb7f3b73a60616d343453a"

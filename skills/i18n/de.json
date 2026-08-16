@@ -9,6 +9,58 @@
       "text": "Eine Prüfung, die nach dem eingeführt wird, was sie schützt, ist eine Prüfung, die jemand zum Ausliefern abschaltet. Schließe sie, solange es nichts zu blockieren gibt.",
       "source_sha256": "3458f7683941585bbca67d834bcd4f33f2d5eea3124c194cb08ed6acb9a238b9"
     },
+    "chimera-budget-the-context": {
+      "text": "Rechne gegen ein Budget unterhalb des echten Fensters, und zähle die Tool-Schemas mit, die du bei jedem Schritt erneut mitschickst — sie sind der Boden, den Compaction nicht erreicht.",
+      "source_sha256": "d2965f2e791ddf5fd6b631b5f2459d7e2944462e1aafc5bd03adeab99b483788"
+    },
+    "chimera-carry-the-failure-forward": {
+      "text": "Eine Retry-Schleife, die ihre Feedback-Variable überschreibt, zeigt Versuch 3 nur den Fehlschlag von Versuch 2 — also leitet sie wieder den Patch her, den Versuch 1 schon probiert hat.",
+      "source_sha256": "0372f2e81fc6c2c1ace4fa675ab102721db8f014966cbfeabe74ed12b8315c36"
+    },
+    "chimera-give-the-denominator": {
+      "text": "Eine Rate ohne ihren Nenner und ihre Zusammensetzung führt in die Irre, während jede Ziffer stimmt — nenne n, und nenne, wie viel des Zählers bereits bekanntes Rauschen ist.",
+      "source_sha256": "d8cb19e4d5dce08511d5dfc2b7fca86383702506c4ac19ceb126ddb9b82114e7"
+    },
+    "chimera-ground-it-in-the-source": {
+      "text": "Nimm die Signatur aus der installierten Version, nicht aus dem Gedächtnis — eine plausible API ist von einer echten nicht zu unterscheiden, bis sie läuft.",
+      "source_sha256": "c1f8f9fa3889007702f4217774c606cc055512521019e456df8be0bc9215e064"
+    },
+    "chimera-list-exemptions-not-obligations": {
+      "text": "Ein Gate, das auflistet, was zu prüfen ist, ist fail-open — die Seite, an die niemand gedacht hat, ist die, die bricht. Liste stattdessen die Ausnahmen auf, jede mit einer schriftlichen Begründung, und der Standard wird Fehlschlag.",
+      "source_sha256": "349ffc5938703251524530fd1a559c2e1ef55cd4fb83508e9432f69716c6c6b1"
+    },
+    "chimera-prove-the-test-discriminates": {
+      "text": "Ein Regressionstest, den du nie hast scheitern sehen, ist eine Vermutung. Mach den Code wieder kaputt und sieh zu, wie er rot wird, bevor du ihn committest.",
+      "source_sha256": "5486f466781c30e1b7a11d59f92e9d33c97b5d68ba1adaf412315b5d1cc7018b"
+    },
+    "chimera-reproduce-before-diagnosing": {
+      "text": "Eine Diagnose ist eine Behauptung über eine Maschine, die du nicht ausgeführt hast. Reproduziere den Fehler erst mit einem kurzen Befehl — besonders dann, wenn die Diagnose von jemand anderem kam.",
+      "source_sha256": "5de6a9fba19b1026f910426061557407718d11f61ff8e94ccd7990f69ff21fdd"
+    },
+    "chimera-run-the-projects-own-gate-command": {
+      "text": "Führe den Verifikationsbefehl des Projekts wörtlich aus — gleicher Scope, gleiche Flags. Die fast identische Variante, die du improvisierst, lügt in beide Richtungen.",
+      "source_sha256": "480ca99f4b28af2fb27787d43e6a6d29eaf143763ff57237fb6fc98c9311024e"
+    },
+    "chimera-state-what-you-did-not-check": {
+      "text": "Ein Ranking, das aus einem Teil des Systems entsteht, liest sich als Ranking des Systems — schreibe Umfang und Ausschlüsse neben die Befunde, nicht dahinter.",
+      "source_sha256": "c2a88dc246d5ecac858cda8ade83016a6ae2fb384898b86a3c6d5db57161dd48"
+    },
+    "chimera-test-the-wiring-not-the-class": {
+      "text": "Eine Klasse, die im Test von Hand zusammengebaut wird, beweist, dass die Klasse funktioniert, nicht dass irgendetwas sie erreicht — decke den Pfad ab, den die Produktion tatsächlich nimmt.",
+      "source_sha256": "f3c07e2553a863ee7f43cfa6a7df77378bfc379ed66a0e80bcbf1eac537d5252"
+    },
+    "chimera-thin-vertical-slice": {
+      "text": "Baue einen schmalen Pfad, der jede Schicht durchquert und läuft, bevor du irgendeine Schicht vollständig baust — eine Integration, die nie ausgeführt wurde, ist eine Vermutung.",
+      "source_sha256": "7a7426092fcac41032cf4d8bc5a0fb63f2392fb5bdd5acaba71d753416cf0808"
+    },
+    "chimera-when-two-results-contradict-suspect-the-apparatus": {
+      "text": "Wenn zwei deiner eigenen Messungen um einen Abstand auseinandergehen, den kein Mechanismus erzeugen könnte, liegt der Defekt im Instrument. Prüfe das Harness, bevor du Theorie darauf aufbaust.",
+      "source_sha256": "ef37f01d111710aec1e07536eba0b4b03ddbddbf15ca62f860d200933ff5abd4"
+    },
+    "chimera-write-the-check-before-the-code": {
+      "text": "Ein Kriterium, das nach der Implementierung geschrieben wird, beschreibt die Implementierung. Schreibe zuerst die fehlschlagende Prüfung, sieh sie scheitern, dann baue.",
+      "source_sha256": "533a8370bec93659c286086d8238be269d7c0259bb6903e9814d234e180dcd71"
+    },
     "declare-when-a-setting-takes-effect": {
       "text": "Eine Einstellung, die erfolgreich speichert und bis zum Neustart nichts ändert, ist schlimmer als eine, die fehlschlägt. Sag, wann sie greift, und leite das davon ab, wo sie gelesen wird.",
       "source_sha256": "db548604dbe6cfe82f690d90ddfdcf107ff6a76abcfb7f3b73a60616d343453a"
