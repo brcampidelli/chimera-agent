@@ -3,6 +3,8 @@ name: chimera-run-the-projects-own-gate-command
 description: Run the project's verification command literally — same scope, same flags. The near-identical variant you improvise lies in both directions.
 version: 0.1.0
 kind: pattern
+stage: verify
+topic: devops
 triggers:
 - about to run lint or type checks
 - verifying before a commit or PR

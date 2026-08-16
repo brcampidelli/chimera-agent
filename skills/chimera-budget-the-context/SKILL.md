@@ -3,6 +3,8 @@ name: chimera-budget-the-context
 description: Spend against a budget below the real window, and count the tool schemas you re-send on every step — they are the floor compaction cannot reach.
 version: 0.1.0
 kind: pattern
+stage: build
+topic: ai-agents
 triggers:
 - the run died on context overflow
 - raising max-steps

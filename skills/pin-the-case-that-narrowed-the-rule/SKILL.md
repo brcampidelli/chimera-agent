@@ -3,6 +3,8 @@ name: pin-the-case-that-narrowed-the-rule
 description: When a check fires on the wrong target, the fix makes it weaker. Capture the false positive as a test in the same commit, or the rule erodes silently.
 version: 0.1.0
 kind: pattern
+stage: verify
+topic: software-dev
 triggers:
 - the linter flagged something legitimate
 - adding an exception

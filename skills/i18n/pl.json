@@ -9,6 +9,58 @@
       "text": "Kontrola dodana po tym, co ma strzec, to kontrola, którą ktoś wyłączy, żeby wydać. Zamknij ją, póki nie ma czego blokować.",
       "source_sha256": "3458f7683941585bbca67d834bcd4f33f2d5eea3124c194cb08ed6acb9a238b9"
     },
+    "chimera-budget-the-context": {
+      "text": "Wydawaj w ramach budżetu mniejszego niż realne okno i licz schematy narzędzi, które wysyłasz ponownie na każdym kroku — to podłoga, poniżej której kompaktowanie nie zejdzie.",
+      "source_sha256": "d2965f2e791ddf5fd6b631b5f2459d7e2944462e1aafc5bd03adeab99b483788"
+    },
+    "chimera-carry-the-failure-forward": {
+      "text": "Pętla ponawiania, która nadpisuje swoją zmienną z feedbackiem, pokazuje próbie 3 tylko porażkę próby 2 — więc na nowo wyprowadza łatkę, którą próba 1 już wypróbowała.",
+      "source_sha256": "0372f2e81fc6c2c1ace4fa675ab102721db8f014966cbfeabe74ed12b8315c36"
+    },
+    "chimera-give-the-denominator": {
+      "text": "Wskaźnik bez mianownika i bez swojego składu wprowadza w błąd, choć każda cyfra pozostaje prawdziwa — podaj n i podaj, jaka część licznika to już znany szum.",
+      "source_sha256": "d8cb19e4d5dce08511d5dfc2b7fca86383702506c4ac19ceb126ddb9b82114e7"
+    },
+    "chimera-ground-it-in-the-source": {
+      "text": "Weź sygnaturę z zainstalowanej wersji, nie z pamięci — wiarygodne API jest nie do odróżnienia od prawdziwego, dopóki nie zostanie uruchomione.",
+      "source_sha256": "c1f8f9fa3889007702f4217774c606cc055512521019e456df8be0bc9215e064"
+    },
+    "chimera-list-exemptions-not-obligations": {
+      "text": "Bramka, która wylicza, co sprawdzić, zawodzi otwarciem — psuje się ta strona, o której dodaniu nikt nie pamiętał. Wylicz zamiast tego wyjątki, każdy z zapisanym powodem, a domyślnym wynikiem staje się porażka.",
+      "source_sha256": "349ffc5938703251524530fd1a559c2e1ef55cd4fb83508e9432f69716c6c6b1"
+    },
+    "chimera-prove-the-test-discriminates": {
+      "text": "Test regresji, którego nigdy nie widziałeś zawodzącego, to domysł. Zepsuj kod ponownie i patrz, jak robi się czerwony, zanim go zacommitujesz.",
+      "source_sha256": "5486f466781c30e1b7a11d59f92e9d33c97b5d68ba1adaf412315b5d1cc7018b"
+    },
+    "chimera-reproduce-before-diagnosing": {
+      "text": "Diagnoza to twierdzenie o maszynie, której nie uruchomiłeś. Najpierw odtwórz awarię jednym krótkim poleceniem — zwłaszcza gdy diagnoza przyszła od kogoś innego.",
+      "source_sha256": "5de6a9fba19b1026f910426061557407718d11f61ff8e94ccd7990f69ff21fdd"
+    },
+    "chimera-run-the-projects-own-gate-command": {
+      "text": "Uruchom polecenie weryfikacyjne projektu dosłownie — ten sam zakres, te same flagi. Niemal identyczny wariant, który improwizujesz, kłamie w obie strony.",
+      "source_sha256": "480ca99f4b28af2fb27787d43e6a6d29eaf143763ff57237fb6fc98c9311024e"
+    },
+    "chimera-state-what-you-did-not-check": {
+      "text": "Ranking zbudowany z części systemu czyta się jak ranking całego systemu — zapisz zakres i wyłączenia obok ustaleń, nie po nich.",
+      "source_sha256": "c2a88dc246d5ecac858cda8ade83016a6ae2fb384898b86a3c6d5db57161dd48"
+    },
+    "chimera-test-the-wiring-not-the-class": {
+      "text": "Klasa złożona ręcznie w teście dowodzi, że klasa działa, a nie że cokolwiek do niej dociera — pokryj ścieżkę, którą faktycznie idzie produkcja.",
+      "source_sha256": "f3c07e2553a863ee7f43cfa6a7df77378bfc379ed66a0e80bcbf1eac537d5252"
+    },
+    "chimera-thin-vertical-slice": {
+      "text": "Zbuduj jedną wąską ścieżkę, która przecina każdą warstwę i działa, zanim zbudujesz jakąkolwiek warstwę w całości — integracja, która nigdy się nie wykonała, to domysł.",
+      "source_sha256": "7a7426092fcac41032cf4d8bc5a0fb63f2392fb5bdd5acaba71d753416cf0808"
+    },
+    "chimera-when-two-results-contradict-suspect-the-apparatus": {
+      "text": "Gdy dwa twoje własne pomiary rozchodzą się o margines, którego nie wytworzyłby żaden mechanizm, defekt tkwi w przyrządzie. Zaudytuj harness, zanim zbudujesz na nim teorię.",
+      "source_sha256": "ef37f01d111710aec1e07536eba0b4b03ddbddbf15ca62f860d200933ff5abd4"
+    },
+    "chimera-write-the-check-before-the-code": {
+      "text": "Kryterium napisane po implementacji opisuje implementację. Napisz najpierw zawodzące sprawdzenie, zobacz, jak zawodzi, i dopiero buduj.",
+      "source_sha256": "533a8370bec93659c286086d8238be269d7c0259bb6903e9814d234e180dcd71"
+    },
     "declare-when-a-setting-takes-effect": {
       "text": "Ustawienie, które zapisuje się poprawnie i nic nie zmienia aż do restartu, jest gorsze od takiego, które zawodzi. Powiedz, kiedy zaczyna działać, i wyprowadź to z miejsca, w którym jest odczytywane.",
       "source_sha256": "db548604dbe6cfe82f690d90ddfdcf107ff6a76abcfb7f3b73a60616d343453a"

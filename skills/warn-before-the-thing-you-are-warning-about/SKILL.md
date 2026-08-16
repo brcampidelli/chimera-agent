@@ -3,6 +3,8 @@ name: warn-before-the-thing-you-are-warning-about
 description: A caution placed after the action it concerns arrives after the reader has already decided. Put it above, and make it undismissable when it matters.
 version: 0.1.0
 kind: pattern
+stage: ship
+topic: software-dev
 triggers:
 - writing a download page
 - adding a destructive action

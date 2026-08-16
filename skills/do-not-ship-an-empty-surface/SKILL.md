@@ -3,6 +3,8 @@ name: do-not-ship-an-empty-surface
 description: An empty screen, tab or category is a promise the product is not keeping. Hide it until it has content, or do not build it yet.
 version: 0.1.0
 kind: anti_pattern
+stage: ship
+topic: software-dev
 triggers:
 - adding a tab with no data
 - the category has no posts

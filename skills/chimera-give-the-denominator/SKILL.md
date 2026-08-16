@@ -3,6 +3,8 @@ name: chimera-give-the-denominator
 description: A rate without its denominator and its composition misleads while every digit stays true — say n, and say how much of the numerator is already-known noise.
 version: 0.1.0
 kind: pattern
+stage: review
+topic: research
 triggers:
 - reporting a failure rate
 - a percentage in a summary

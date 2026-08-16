@@ -3,6 +3,8 @@ name: chimera-state-what-you-did-not-check
 description: A ranking built from part of the system reads as a ranking of the system — write the scope and the exclusions next to the findings, not after them.
 version: 0.1.0
 kind: pattern
+stage: review
+topic: research
 triggers:
 - writing a review or audit
 - listing the top risks

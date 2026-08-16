@@ -3,6 +3,8 @@ name: derive-instead-of-transcribing
 description: Anything copied by hand from another file is correct exactly once. If it can be generated, generate it and fail the build when the copy is stale.
 version: 0.1.0
 kind: pattern
+stage: build
+topic: software-dev
 triggers:
 - documenting a command list
 - copying values between projects

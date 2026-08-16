@@ -9,6 +9,58 @@
       "text": "守る対象より後から追加したチェックは、リリースのために誰かが切るチェックです。まだ止めるものが何もないうちに閉じておいてください。",
       "source_sha256": "3458f7683941585bbca67d834bcd4f33f2d5eea3124c194cb08ed6acb9a238b9"
     },
+    "chimera-budget-the-context": {
+      "text": "実際のウィンドウより低く設定した予算に対して消費し、毎ステップ再送信するツールスキーマを数に入れてください——それは圧縮では到達できない下限です。",
+      "source_sha256": "d2965f2e791ddf5fd6b631b5f2459d7e2944462e1aafc5bd03adeab99b483788"
+    },
+    "chimera-carry-the-failure-forward": {
+      "text": "フィードバック用の変数を上書きするリトライループは、3回目の試行に2回目の失敗しか見せません——だから1回目がすでに試したパッチを導き直してしまいます。",
+      "source_sha256": "0372f2e81fc6c2c1ace4fa675ab102721db8f014966cbfeabe74ed12b8315c36"
+    },
+    "chimera-give-the-denominator": {
+      "text": "分母とその内訳を欠いた比率は、どの桁も真実のまま誤解を招きます——n を示し、分子のうちどれだけが既知のノイズなのかを述べてください。",
+      "source_sha256": "d8cb19e4d5dce08511d5dfc2b7fca86383702506c4ac19ceb126ddb9b82114e7"
+    },
+    "chimera-ground-it-in-the-source": {
+      "text": "シグネチャは記憶からではなく、インストール済みのバージョンから取ること——もっともらしい API は、実行するまで本物と見分けがつきません。",
+      "source_sha256": "c1f8f9fa3889007702f4217774c606cc055512521019e456df8be0bc9215e064"
+    },
+    "chimera-list-exemptions-not-obligations": {
+      "text": "チェック対象を列挙するゲートはフェイルオープンします——誰も追加し忘れたサイトこそが壊れるのです。代わりに免除対象を、一つずつ理由を書き添えて列挙すれば、デフォルトはフェイルになります。",
+      "source_sha256": "349ffc5938703251524530fd1a559c2e1ef55cd4fb83508e9432f69716c6c6b1"
+    },
+    "chimera-prove-the-test-discriminates": {
+      "text": "失敗するところを一度も見ていないリグレッションテストは、推測にすぎません。commit する前にコードを壊し直し、赤くなるのを確認してください。",
+      "source_sha256": "5486f466781c30e1b7a11d59f92e9d33c97b5d68ba1adaf412315b5d1cc7018b"
+    },
+    "chimera-reproduce-before-diagnosing": {
+      "text": "診断とは、自分が動かしていないマシンについての主張です。まず短いコマンド一つで失敗を再現してください——とりわけ、その診断が他人から届いたものである場合には。",
+      "source_sha256": "5de6a9fba19b1026f910426061557407718d11f61ff8e94ccd7990f69ff21fdd"
+    },
+    "chimera-run-the-projects-own-gate-command": {
+      "text": "プロジェクトの検証コマンドは、そのまま実行すること——同じ範囲、同じフラグで。その場で組み立てたほぼ同じ変種は、両方向に嘘をつきます。",
+      "source_sha256": "480ca99f4b28af2fb27787d43e6a6d29eaf143763ff57237fb6fc98c9311024e"
+    },
+    "chimera-state-what-you-did-not-check": {
+      "text": "システムの一部から作られたランキングは、システム全体のランキングとして読まれます——調査範囲と除外対象は、結果の後ではなく隣に書いてください。",
+      "source_sha256": "c2a88dc246d5ecac858cda8ade83016a6ae2fb384898b86a3c6d5db57161dd48"
+    },
+    "chimera-test-the-wiring-not-the-class": {
+      "text": "テストの中で手組みしたクラスは、そのクラスが動くことを証明するだけで、そこに何かが到達することは証明しません——本番が実際に通る経路をカバーしてください。",
+      "source_sha256": "f3c07e2553a863ee7f43cfa6a7df77378bfc379ed66a0e80bcbf1eac537d5252"
+    },
+    "chimera-thin-vertical-slice": {
+      "text": "どの層も作り込む前に、全層を貫いて動く細い経路を一本作ること——一度も実行されていない統合は推測にすぎません。",
+      "source_sha256": "7a7426092fcac41032cf4d8bc5a0fb63f2392fb5bdd5acaba71d753416cf0808"
+    },
+    "chimera-when-two-results-contradict-suspect-the-apparatus": {
+      "text": "自分の測定結果ふたつが、どんな仕組みでも生じえない幅で食い違うなら、欠陥は測定器の側にあります。その上に理論を組み立てる前に、ハーネスを監査してください。",
+      "source_sha256": "ef37f01d111710aec1e07536eba0b4b03ddbddbf15ca62f860d200933ff5abd4"
+    },
+    "chimera-write-the-check-before-the-code": {
+      "text": "実装の後に書かれた基準は、その実装を記述しているだけです。まず失敗するチェックを書き、それが失敗するのを確認してから作ってください。",
+      "source_sha256": "533a8370bec93659c286086d8238be269d7c0259bb6903e9814d234e180dcd71"
+    },
     "declare-when-a-setting-takes-effect": {
       "text": "保存には成功するのに再起動まで何も変わらない設定は、失敗する設定より悪いものです。いつ効くのかを明示し、それを読み取り箇所から導いてください。",
       "source_sha256": "db548604dbe6cfe82f690d90ddfdcf107ff6a76abcfb7f3b73a60616d343453a"

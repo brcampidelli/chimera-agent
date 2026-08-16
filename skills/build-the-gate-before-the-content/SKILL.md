@@ -3,6 +3,8 @@ name: build-the-gate-before-the-content
 description: A check added after the thing it guards is a check somebody switches off to ship. Wire it shut while there is nothing to block.
 version: 0.1.0
 kind: pattern
+stage: ship
+topic: devops
 triggers:
 - planning a migration
 - starting a new surface

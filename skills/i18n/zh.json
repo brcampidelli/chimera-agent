@@ -9,6 +9,58 @@
       "text": "在被守护的东西之后才加的检查，是有人为了发布而关掉的检查。趁还没有东西要拦，就把它接死。",
       "source_sha256": "3458f7683941585bbca67d834bcd4f33f2d5eea3124c194cb08ed6acb9a238b9"
     },
+    "chimera-budget-the-context": {
+      "text": "按低于真实窗口的预算来花，并把你每一步都重新发送的工具 schema 算进去——它们是压缩触及不到的地板。",
+      "source_sha256": "d2965f2e791ddf5fd6b631b5f2459d7e2944462e1aafc5bd03adeab99b483788"
+    },
+    "chimera-carry-the-failure-forward": {
+      "text": "覆盖掉自己反馈变量的重试循环，只把第 2 次的失败展示给第 3 次——于是它又推导出第 1 次已经试过的那个补丁。",
+      "source_sha256": "0372f2e81fc6c2c1ace4fa675ab102721db8f014966cbfeabe74ed12b8315c36"
+    },
+    "chimera-give-the-denominator": {
+      "text": "不给出分母和构成的比率，每一位数字都是真的，却依然误导人——说出 n，并说清分子里有多少是本来就已知的噪声。",
+      "source_sha256": "d8cb19e4d5dce08511d5dfc2b7fca86383702506c4ac19ceb126ddb9b82114e7"
+    },
+    "chimera-ground-it-in-the-source": {
+      "text": "从已安装的版本里取签名，不要从记忆里取——一个看似合理的 API，在真正跑起来之前和真的没有区别。",
+      "source_sha256": "c1f8f9fa3889007702f4217774c606cc055512521019e456df8be0bc9215e064"
+    },
+    "chimera-list-exemptions-not-obligations": {
+      "text": "列出要检查什么的门禁是失效即放行的——没人记得加进去的那个站点，正是会出问题的那个。改成列出豁免项，每一条都写明理由，默认就变成了失败。",
+      "source_sha256": "349ffc5938703251524530fd1a559c2e1ef55cd4fb83508e9432f69716c6c6b1"
+    },
+    "chimera-prove-the-test-discriminates": {
+      "text": "一个你从没见它失败过的回归测试只是猜测。提交之前，把代码重新弄坏，看着它变红。",
+      "source_sha256": "5486f466781c30e1b7a11d59f92e9d33c97b5d68ba1adaf412315b5d1cc7018b"
+    },
+    "chimera-reproduce-before-diagnosing": {
+      "text": "诊断是对一台你没有跑过的机器下的论断。先用一条简短的命令复现这次失败——尤其是当诊断来自别人的时候。",
+      "source_sha256": "5de6a9fba19b1026f910426061557407718d11f61ff8e94ccd7990f69ff21fdd"
+    },
+    "chimera-run-the-projects-own-gate-command": {
+      "text": "原封不动地运行项目自己的验证命令——同样的范围，同样的参数。你临时改出来的那个几乎一样的变体，会在两个方向上都说谎。",
+      "source_sha256": "480ca99f4b28af2fb27787d43e6a6d29eaf143763ff57237fb6fc98c9311024e"
+    },
+    "chimera-state-what-you-did-not-check": {
+      "text": "只根据系统的一部分做出的排名，读起来就像是对整个系统的排名——把范围和排除项写在结论旁边，而不是写在结论后面。",
+      "source_sha256": "c2a88dc246d5ecac858cda8ade83016a6ae2fb384898b86a3c6d5db57161dd48"
+    },
+    "chimera-test-the-wiring-not-the-class": {
+      "text": "在测试里手工组装出来的类，只能证明这个类能用，证明不了有任何东西能走到它——要覆盖生产环境真正走的那条路径。",
+      "source_sha256": "f3c07e2553a863ee7f43cfa6a7df77378bfc379ed66a0e80bcbf1eac537d5252"
+    },
+    "chimera-thin-vertical-slice": {
+      "text": "在把任何一层建完整之前，先建一条穿过每一层并且能跑起来的窄路径——一次从未执行过的集成只是猜测。",
+      "source_sha256": "7a7426092fcac41032cf4d8bc5a0fb63f2392fb5bdd5acaba71d753416cf0808"
+    },
+    "chimera-when-two-results-contradict-suspect-the-apparatus": {
+      "text": "当你自己的两次测量相差到没有任何机制能产生的幅度时，缺陷在仪器上。在此之上建立理论之前，先审查那套框架（harness）。",
+      "source_sha256": "ef37f01d111710aec1e07536eba0b4b03ddbddbf15ca62f860d200933ff5abd4"
+    },
+    "chimera-write-the-check-before-the-code": {
+      "text": "在实现之后才写下的标准，描述的是那个实现。先写下会失败的检查，看着它失败，然后再开始构建。",
+      "source_sha256": "533a8370bec93659c286086d8238be269d7c0259bb6903e9814d234e180dcd71"
+    },
     "declare-when-a-setting-takes-effect": {
       "text": "保存成功却要重启才生效的设置，比保存失败还糟。说明它何时生效，并从读取它的地方推导出来。",
       "source_sha256": "db548604dbe6cfe82f690d90ddfdcf107ff6a76abcfb7f3b73a60616d343453a"

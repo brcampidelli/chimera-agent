@@ -1,0 +1,97 @@
+{
+  "_why": "Translated card descriptions, and only the descriptions.\n\nThe body of a card is not prose about the product: it is the payload the agent reads at runtime, the bytes the published SHA-256 attests to, and the text the CLI imports by path. Translating it would break all three at once — the page would show a hash that does not match what the reader is reading, and the translation would never reach the agent anyway, because the CLI only ever imports skills/.\n\nSo the description travels here instead, in a sidecar that leaves SKILL.md byte-identical. Each entry declares source_sha256 of the English description it was made from; when the English changes, the site falls back to it rather than showing a translation of a sentence that no longer exists.",
+  "descriptions": {
+    "assert-what-the-generator-found": {
+      "text": "Генератор, который падает, сообщает, что он не справился; генератор, выдающий правдоподобный результат, не сообщает ничего. Проверяйте, что он нашёл, а не то, что он отработал.",
+      "source_sha256": "059b66d7e09a1aa6ce2b31647672f3c724dbafb4d8b75c1b599d79c0762823f2"
+    },
+    "build-the-gate-before-the-content": {
+      "text": "Проверка, добавленная после того, что она охраняет, — это проверка, которую кто-нибудь отключит ради релиза. Замкните её, пока блокировать нечего.",
+      "source_sha256": "3458f7683941585bbca67d834bcd4f33f2d5eea3124c194cb08ed6acb9a238b9"
+    },
+    "chimera-budget-the-context": {
+      "text": "Расходуйте по бюджету, который ниже реального окна, и учитывайте схемы инструментов, пересылаемые заново на каждом шаге, — это пол, до которого сжатие не достаёт.",
+      "source_sha256": "d2965f2e791ddf5fd6b631b5f2459d7e2944462e1aafc5bd03adeab99b483788"
+    },
+    "chimera-carry-the-failure-forward": {
+      "text": "Цикл повторов, перезаписывающий переменную с обратной связью, показывает третьей попытке только провал второй — и она заново выводит патч, который уже пробовала первая.",
+      "source_sha256": "0372f2e81fc6c2c1ace4fa675ab102721db8f014966cbfeabe74ed12b8315c36"
+    },
+    "chimera-give-the-denominator": {
+      "text": "Доля без знаменателя и без его состава вводит в заблуждение, хотя каждая цифра остаётся верной: укажите n и укажите, какая часть числителя — уже известный шум.",
+      "source_sha256": "d8cb19e4d5dce08511d5dfc2b7fca86383702506c4ac19ceb126ddb9b82114e7"
+    },
+    "chimera-ground-it-in-the-source": {
+      "text": "Берите сигнатуру из установленной версии, а не из памяти: правдоподобный API неотличим от настоящего, пока не будет запущен.",
+      "source_sha256": "c1f8f9fa3889007702f4217774c606cc055512521019e456df8be0bc9215e064"
+    },
+    "chimera-list-exemptions-not-obligations": {
+      "text": "Проверка, перечисляющая, что проверять, работает как fail-open — ломается именно тот сайт, который никто не вспомнил добавить. Перечисляйте вместо этого исключения, каждое с записанной причиной, и поведением по умолчанию станет отказ.",
+      "source_sha256": "349ffc5938703251524530fd1a559c2e1ef55cd4fb83508e9432f69716c6c6b1"
+    },
+    "chimera-prove-the-test-discriminates": {
+      "text": "Регрессионный тест, падения которого вы никогда не видели, — это догадка. Сломайте код обратно и убедитесь, что тест краснеет, прежде чем его коммитить.",
+      "source_sha256": "5486f466781c30e1b7a11d59f92e9d33c97b5d68ba1adaf412315b5d1cc7018b"
+    },
+    "chimera-reproduce-before-diagnosing": {
+      "text": "Диагноз — это утверждение о машине, которую вы не запускали. Сначала воспроизведите сбой одной короткой командой — особенно если диагноз пришёл от кого-то другого.",
+      "source_sha256": "5de6a9fba19b1026f910426061557407718d11f61ff8e94ccd7990f69ff21fdd"
+    },
+    "chimera-run-the-projects-own-gate-command": {
+      "text": "Запускайте команду проверки проекта буквально — тот же охват, те же флаги. Почти идентичный вариант, придуманный вами на ходу, врёт в обе стороны.",
+      "source_sha256": "480ca99f4b28af2fb27787d43e6a6d29eaf143763ff57237fb6fc98c9311024e"
+    },
+    "chimera-state-what-you-did-not-check": {
+      "text": "Рейтинг, построенный по части системы, читается как рейтинг всей системы — пишите охват и исключения рядом с выводами, а не после них.",
+      "source_sha256": "c2a88dc246d5ecac858cda8ade83016a6ae2fb384898b86a3c6d5db57161dd48"
+    },
+    "chimera-test-the-wiring-not-the-class": {
+      "text": "Класс, собранный вручную в тесте, доказывает, что класс работает, а не что до него что-то доходит, — покрывайте тот путь, которым система идёт в production.",
+      "source_sha256": "f3c07e2553a863ee7f43cfa6a7df77378bfc379ed66a0e80bcbf1eac537d5252"
+    },
+    "chimera-thin-vertical-slice": {
+      "text": "Сначала постройте один узкий путь, который проходит через все слои и работает, и только потом стройте любой слой целиком — интеграция, которая ни разу не выполнялась, это догадка.",
+      "source_sha256": "7a7426092fcac41032cf4d8bc5a0fb63f2392fb5bdd5acaba71d753416cf0808"
+    },
+    "chimera-when-two-results-contradict-suspect-the-apparatus": {
+      "text": "Когда два ваших собственных измерения расходятся настолько, что ни один механизм такого дать не может, дефект в инструменте. Проверьте harness, прежде чем строить на нём теорию.",
+      "source_sha256": "ef37f01d111710aec1e07536eba0b4b03ddbddbf15ca62f860d200933ff5abd4"
+    },
+    "chimera-write-the-check-before-the-code": {
+      "text": "Критерий, написанный после реализации, описывает реализацию. Сначала напишите падающую проверку, убедитесь, что она падает, и только потом стройте.",
+      "source_sha256": "533a8370bec93659c286086d8238be269d7c0259bb6903e9814d234e180dcd71"
+    },
+    "declare-when-a-setting-takes-effect": {
+      "text": "Настройка, которая успешно сохраняется и ничего не меняет до перезапуска, хуже той, что завершается ошибкой. Укажите, когда она вступает в силу, и выводите это из того места, где её читают.",
+      "source_sha256": "db548604dbe6cfe82f690d90ddfdcf107ff6a76abcfb7f3b73a60616d343453a"
+    },
+    "derive-instead-of-transcribing": {
+      "text": "Всё, что скопировано вручную из другого файла, верно ровно один раз. Если это можно сгенерировать — генерируйте, и роняйте build, когда копия устарела.",
+      "source_sha256": "ba0e688ec255689f4e441a5f14e2377b0e044b64c1679e303612f0a4dc4439ee"
+    },
+    "do-not-ship-an-empty-surface": {
+      "text": "Пустой экран, вкладка или категория — это обещание, которого продукт не выполняет. Скройте их, пока в них нет содержимого, или пока не стройте вовсе.",
+      "source_sha256": "4b4defbce9c566af11eab06a9ce9d33b65edd59a556ca4555c0b80de3409dd42"
+    },
+    "keep-the-caveat-with-the-number": {
+      "text": "Число и оговорка к нему должны быть одним артефактом. Два абзаца расходятся; один компонент — не может.",
+      "source_sha256": "9560e76d7c148785f634f7d8b71e7bee1525972db4b530af7ec42d67e9588eb6"
+    },
+    "pin-the-case-that-narrowed-the-rule": {
+      "text": "Когда проверка срабатывает не на той цели, исправление делает её слабее. Зафиксируйте ложное срабатывание тестом в том же commit, иначе правило разрушится незаметно.",
+      "source_sha256": "2ec4320899defc512245ee7d45eab69f3911c207a0f9e576341490f76b836a52"
+    },
+    "publish-the-run-that-did-not-work": {
+      "text": "Публикуйте эксперимент, который не удался, сохраняйте отменённый неизменным и никогда не перезапускайте ради значимости. Смещение — в отборе, а не в числе.",
+      "source_sha256": "9e96faac615281ebefeacbac915cdab98215ecf8da14b68048eba557eb0e8064"
+    },
+    "verify-before-claiming": {
+      "text": "Прежде чем сообщить, что задача выполнена, запустите проверку, которая упала бы, если бы это было не так, — объяснение не является исправлением.",
+      "source_sha256": "1d5f5e274b524ce6980b2d980a5504a3350563858b5160b99303962a0b232120"
+    },
+    "warn-before-the-thing-you-are-warning-about": {
+      "text": "Предупреждение, помещённое после действия, к которому оно относится, приходит, когда читатель уже принял решение. Ставьте его выше и делайте неотклоняемым, когда это важно.",
+      "source_sha256": "e1f0c23a799b631b2081b73d1f2941094c34150f6663ea486c6315b63f141fea"
+    }
+  }
+}

@@ -3,6 +3,8 @@ name: publish-the-run-that-did-not-work
 description: Report the experiment that failed, preserve the superseded one unchanged, and never re-roll for significance. Selection is the bias, not the number.
 version: 0.1.0
 kind: pattern
+stage: review
+topic: research
 triggers:
 - the A/B came out negative
 - rerunning the benchmark

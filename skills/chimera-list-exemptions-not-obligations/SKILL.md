@@ -3,6 +3,8 @@ name: chimera-list-exemptions-not-obligations
 description: A gate that lists what to check fails open — the site nobody remembered to add is the one that breaks. List the exemptions instead, each with a written reason, and the default becomes fail.
 version: 0.1.0
 kind: pattern
+stage: ship
+topic: devops
 triggers:
 - writing a build gate
 - enforcing a rule across the whole package

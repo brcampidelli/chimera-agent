@@ -3,6 +3,8 @@ name: keep-the-caveat-with-the-number
 description: A figure and its qualification must be one artifact. Two paragraphs drift apart; one component cannot.
 version: 0.1.0
 kind: pattern
+stage: review
+topic: research
 triggers:
 - publishing a benchmark result
 - writing a metric into a page

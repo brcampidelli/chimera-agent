@@ -3,6 +3,8 @@ name: chimera-test-the-wiring-not-the-class
 description: A class assembled by hand in a test proves the class works, not that anything reaches it — cover the path production actually takes.
 version: 0.1.0
 kind: pattern
+stage: verify
+topic: software-dev
 triggers:
 - feature works in tests but not in the app
 - added a component behind a factory or registry
