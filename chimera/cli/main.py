@@ -25,7 +25,7 @@ import sys
 from collections.abc import Callable
 from datetime import UTC
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import typer
 from rich.console import Console
@@ -190,8 +190,16 @@ def _cascade_backend(gateway: SupportsComplete, settings: Any) -> SupportsComple
 
     Route decisions are appended to ``<home>/routes.jsonl`` (hash+tokens only, never prompt
     text) — the per-session cost receipt and the future router's training data.
+
+    The top rung comes from ``fusion_for_role`` — the user's own ladder — and NOT from a bare
+    ``FusionEngine(gateway)``. That distinction is not a style preference: `api/roles.py` carries
+    a long comment explaining that the bare form was a *measured* bug, because an engine with no
+    config falls through to ``FusionConfig.from_settings()`` and its frontier default panel. Role
+    fusion was fixed; the cascade kept building the bare one, so the escape hatch for a user who
+    picked cheap tiers ended at Opus + GPT-5.5 + Gemini, judged by Opus, with nothing in the run
+    saying which models had answered.
     """
-    from chimera.fusion import FusionEngine
+    from chimera.api.roles import fusion_for_role
     from chimera.fusion.cascade import CascadeBackend, CascadeConfig
 
     ladder = settings.tier_ladder()
@@ -201,7 +209,9 @@ def _cascade_backend(gateway: SupportsComplete, settings: Any) -> SupportsComple
         entry=ladder.entry,
         log_path=Path(settings.home) / "routes.jsonl",
     )
-    return CascadeBackend(gateway, FusionEngine(gateway), config)
+    return CascadeBackend(
+        gateway, cast("SupportsComplete", fusion_for_role(gateway, settings)), config
+    )
 
 
 def _stream_sink(event: AgentEvent) -> None:

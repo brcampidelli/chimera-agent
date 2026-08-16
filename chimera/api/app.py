@@ -1498,8 +1498,13 @@ def _api_cascade_backend(gateway: SupportsComplete, settings: Settings) -> Suppo
     A local mirror of the CLI's ``_cascade_backend`` (chimera/cli/main.py) so the desktop run uses the
     exact same routing without importing the whole CLI. Route decisions are appended to
     ``<home>/routes.jsonl`` (hash+tokens only, never prompt text), as in the CLI.
+
+    "Mirror" includes the top rung: ``fusion_for_role``, never a bare ``FusionEngine(gateway)``. The
+    bare form falls through to the frontier default panel, which `roles.py` documents as a measured
+    billing bug — and a mirror that copied the shape while dropping that fix would put the desktop
+    on frontier rates for a user who chose cheap tiers.
     """
-    from chimera.fusion import FusionEngine
+    from chimera.api.roles import fusion_for_role
     from chimera.fusion.cascade import CascadeBackend, CascadeConfig
 
     ladder = settings.tier_ladder()
@@ -1509,7 +1514,7 @@ def _api_cascade_backend(gateway: SupportsComplete, settings: Settings) -> Suppo
         entry=ladder.entry,
         log_path=settings.home / "routes.jsonl",
     )
-    return CascadeBackend(gateway, FusionEngine(gateway), config)
+    return CascadeBackend(gateway, cast("SupportsComplete", fusion_for_role(gateway, settings)), config)
 
 
 def resolve_verify(requested: str | None, workspace: Path) -> tuple[str | None, str]:

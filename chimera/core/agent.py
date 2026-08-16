@@ -431,6 +431,7 @@ class Agent:
 
             messages.append(self._assistant_tool_message(result))
             tripped: str | None = None
+            answered: set[str] = set()
             for call in result.tool_calls:
                 tool_calls_made += 1
                 tool_names.append(call.name)
@@ -447,11 +448,26 @@ class Agent:
                 messages.append(
                     {"role": "tool", "tool_call_id": call.id, "content": observation}
                 )
+                answered.add(call.id)
                 if loop_detector is not None:
                     verdict = loop_detector.record(call.name, call.arguments, observation)
                     if verdict.tripped:
                         tripped = verdict.reason
                         break
+            # Every declared tool_call needs a `role:"tool"` reply, including the ones the break
+            # above skipped. The assistant message announced them all in one go, so a list that
+            # answers only some is malformed — and the next request sends it: a provider that
+            # validates (every real one does) returns 400, which means the breaker built to SAVE a
+            # spinning run is what ends it. Worse, the malformed transcript is what `CodeSession`
+            # persists, and its trimmer only cuts at a `user` boundary, so the session stays broken
+            # for every later turn. Stubs that declare one call per step never see this.
+            for call in result.tool_calls:
+                if call.id not in answered:
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": call.id,
+                        "content": "error: not run — the tool-loop breaker stopped this step.",
+                    })
             if not drift_reported:
                 drift = steplog.drift
                 if drift.drifting:

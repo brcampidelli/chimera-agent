@@ -103,6 +103,29 @@ def _side_effects(steplog: Any) -> list[str]:
     return seen
 
 
+def _without_verifier_artifacts(snapshot: Any) -> Any:
+    """A copy of ``snapshot`` with files the VERIFIER wrote removed.
+
+    The diff gate's whole claim is "machine truth, never self-report": it asks whether the workspace
+    actually changed. A file the verifier created is not the agent's work, and counting it turns the
+    gate into a rubber stamp for exactly the runs it was built to catch.
+
+    A copy rather than a mutation, because the caller keeps the real snapshot for
+    ``--keep-workspace``: the file is still on disk for anyone who wants to read the generated tests.
+    """
+    from dataclasses import replace
+
+    from chimera.core.spec_test import _TEST_FILE
+
+    if _TEST_FILE not in snapshot.present:
+        return snapshot
+    return replace(
+        snapshot,
+        present=snapshot.present - {_TEST_FILE},
+        files={k: v for k, v in snapshot.files.items() if k != _TEST_FILE},
+    )
+
+
 def _rendered_diff(diffs: list[FileDiff]) -> str:
     """Render per-file diffs as one bounded patch body for retry feedback.
 
@@ -687,6 +710,14 @@ class AutonomousAgent:
 
                 after = self.guard.snapshot()  # one capture feeds both the summary and the per-file diffs
                 last_after = after  # remember for --keep-workspace (restored after the loop if it fails)
+                # `--gen-tests` writes its test file INTO the workspace, and it does so between the
+                # two snapshots (`_verify()` runs above). Left in, the verifier's own artifact counts
+                # as the run's work: `is_productive` becomes True on every attempt, so `--require-diff`
+                # — the gate that exists because SWE-bench run 1 returned 11/19 empty patches — can
+                # never fire while tests are being generated. With `--diff-feedback` it is worse than
+                # inert: the retry is handed the test file under "you already tried this and FAILED",
+                # feedback about an edit the model did not make.
+                after = _without_verifier_artifacts(after)
                 pdiff = diff_snapshots(snapshot, after)
                 diff_productive = pdiff.is_productive
                 diff_summary = pdiff.audit_summary()
