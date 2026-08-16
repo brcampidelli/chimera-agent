@@ -3,6 +3,8 @@ name: declare-when-a-setting-takes-effect
 description: A control that saves successfully and changes nothing until a restart is worse than one that fails. Say when it applies, and derive that from where it is read.
 version: 0.1.0
 kind: pattern
+stage: define
+topic: software-dev
 triggers:
 - adding a settings screen
 - the config is cached

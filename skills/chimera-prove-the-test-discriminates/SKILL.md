@@ -3,6 +3,8 @@ name: chimera-prove-the-test-discriminates
 description: A regression test you never saw fail is a guess. Re-break the code and watch it go red before you commit it.
 version: 0.1.0
 kind: pattern
+stage: verify
+topic: software-dev
 triggers:
 - wrote a regression test
 - fixed a bug and added a test

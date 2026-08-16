@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from chimera.skills.skill_md import _CARD_SECTIONS, parse_skill_md
+from chimera.skills.skill_md import _CARD_SECTIONS, STAGES, TOPICS, parse_skill_md
 
 LIBRARY = Path(__file__).resolve().parent.parent / "skills"
 CARDS = sorted(LIBRARY.glob("*/SKILL.md"))
@@ -117,3 +117,46 @@ def test_round_trips_through_the_renderer(card: Path) -> None:
     twice = parse_skill_md(render_skill_md(once))
     assert twice.manifest == once.manifest
     assert twice.instructions == once.instructions
+
+
+# --- browsing metadata: the hub groups by these, so a card without them is invisible ---------------
+
+
+@pytest.mark.parametrize("card", CARDS, ids=_IDS)
+def test_declares_a_stage_and_a_topic(card: Path) -> None:
+    """A card with no stage lands in no group, and the hub renders only non-empty groups — so the
+    failure is not an ugly "Other" bucket, it is a card that silently does not appear.
+
+    The parser deliberately does NOT enforce this: an imported third-party card may carry a
+    taxonomy that is not ours, and refusing to READ it over a display field would be the wrong
+    trade. "Required" belongs on what we publish, which is here.
+    """
+    skill = parse_skill_md(card.read_text(encoding="utf-8"))
+
+    assert skill.manifest.stage in STAGES, (
+        f"{card.parent.name}: stage must be one of {STAGES} — a value outside the vocabulary is "
+        "dropped to '' by the parser, so a typo removes the card from the hub without any error"
+    )
+    assert skill.manifest.topic in TOPICS, (
+        f"{card.parent.name}: topic must be one of {TOPICS}"
+    )
+
+
+def test_every_stage_the_hub_can_show_has_at_least_one_card() -> None:
+    """The taxonomy is longer than the library on purpose — topics light up as contributions
+    arrive. Stages are different: five is the whole shape of a piece of work, and an empty one
+    means the library has a hole in it rather than room to grow.
+    """
+    seen = {parse_skill_md(c.read_text(encoding="utf-8")).manifest.stage for c in CARDS}
+
+    assert set(STAGES) <= seen, f"no card covers: {sorted(set(STAGES) - seen)}"
+
+
+def test_the_vocabulary_check_would_catch_a_typo() -> None:
+    """Proof the check is not vacuous. `_vocab` returning '' for an unknown value is what makes a
+    typo silent, so this asserts the silence exists and that the test above is what breaks it."""
+    from chimera.skills.skill_md import _vocab
+
+    assert _vocab("Verify", STAGES) == "verify"  # case and spacing are normalised
+    assert _vocab("verifyy", STAGES) == ""  # a typo becomes empty, not an error
+    assert _vocab(None, STAGES) == ""

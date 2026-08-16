@@ -31,6 +31,30 @@ if TYPE_CHECKING:
 
 _CARD_SECTIONS = ("Trigger", "Do", "Avoid", "Check", "Risk")
 
+#: Where in a piece of work the card applies. Ordered, because the order is the reading order on
+#: the hub — a browsing human walks the work, not the alphabet.
+STAGES = ("define", "build", "verify", "review", "ship")
+
+#: What the card is about. These names are the ecosystem's, not ours, and that is deliberate:
+#: somebody arriving from a skills aggregator should recognise the vocabulary. The list is longer
+#: than what the library currently fills, and the hub renders only the groups that have members —
+#: declaring a taxonomy is cheap, and thirty empty drawers on a page advertise absence rather than
+#: breadth. As contributions arrive the extra names light up on their own, with nobody remembering
+#: to enable them.
+TOPICS = (
+    "software-dev",
+    "ai-agents",
+    "research",
+    "devops",
+    "security",
+    "data-science",
+    "productivity",
+    "mlops",
+    "networking",
+    "vision-ai",
+    "translation",
+)
+
 
 class Disclosure(IntEnum):
     """Progressive disclosure level — load the cheapest that answers the question."""
@@ -53,6 +77,12 @@ class SkillManifest:
     triggers: list[str] = field(default_factory=list)
     license: str | None = None
     allowed_tools: list[str] = field(default_factory=list)  # CrewAI/Anthropic pre-approval field
+    # Browsing metadata: where in the work the card applies, and what it is about. Empty is a legal
+    # parse — an imported third-party card will not carry these, and refusing to read it over a
+    # display field would be the wrong trade. The library's own cards are held to both by a test,
+    # which is where "required" belongs: on what we publish, not on what we can read.
+    stage: str = ""
+    topic: str = ""
 
 
 @dataclass
@@ -76,10 +106,29 @@ class SkillMd:
         return "\n\n".join(parts)
 
 
+def _vocab(value: object, allowed: tuple[str, ...]) -> str:
+    """A frontmatter value normalised into a known vocabulary, or ``""`` when it is not one.
+
+    Silently dropping an unknown value is right HERE and wrong for the library. A card imported
+    from somewhere else may carry a taxonomy that is not ours, and that must not make the card
+    unreadable — a display field is no reason to refuse a payload. The library's own cards are held
+    to the vocabulary by a test that fails the build, so a typo in `skills/` is caught where someone
+    can fix it instead of being rendered into an "Other" bucket nobody browses.
+    """
+    if not isinstance(value, str):
+        return ""
+    word = value.strip().lower().replace("_", "-").replace(" ", "-")
+    return word if word in allowed else ""
+
+
 def render_skill_md(skill: SkillMd) -> str:
     """Render a SkillMd as SKILL.md text (YAML frontmatter + markdown body)."""
     m = skill.manifest
     front: dict[str, object] = {"name": m.name, "description": m.description, "version": m.version, "kind": m.kind}
+    if m.stage:
+        front["stage"] = m.stage
+    if m.topic:
+        front["topic"] = m.topic
     if m.triggers:
         front["triggers"] = m.triggers
     front["provenance"] = m.provenance
@@ -121,6 +170,8 @@ def parse_skill_md(text: str) -> SkillMd:
         triggers=[str(t) for t in triggers] if isinstance(triggers, list) else [],
         license=str(front["license"]) if front.get("license") else None,
         allowed_tools=[str(t) for t in allowed] if isinstance(allowed, list) else [],
+        stage=_vocab(front.get("stage"), STAGES),
+        topic=_vocab(front.get("topic"), TOPICS),
     )
     return SkillMd(manifest=manifest, instructions=body.strip())
 

@@ -3,6 +3,8 @@ name: chimera-write-the-check-before-the-code
 description: A criterion written after the implementation describes the implementation. Write the failing check first, watch it fail, then build.
 version: 0.1.0
 kind: pattern
+stage: define
+topic: software-dev
 triggers:
 - about to implement a feature
 - defining what done means

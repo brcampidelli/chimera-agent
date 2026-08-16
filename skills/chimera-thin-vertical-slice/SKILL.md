@@ -3,6 +3,8 @@ name: chimera-thin-vertical-slice
 description: Build one narrow path that crosses every layer and runs, before building any layer in full — an integration that has never executed is a guess.
 version: 0.1.0
 kind: pattern
+stage: define
+topic: software-dev
 triggers:
 - starting a new feature
 - this needs a CLI, a service and storage

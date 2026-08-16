@@ -3,6 +3,8 @@ name: chimera-ground-it-in-the-source
 description: Take the signature from the installed version, not from memory — a plausible API is indistinguishable from a real one until it runs.
 version: 0.1.0
 kind: pattern
+stage: build
+topic: software-dev
 triggers:
 - calling a library I did not write
 - what is the parameter called

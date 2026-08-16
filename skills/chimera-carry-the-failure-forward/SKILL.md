@@ -3,6 +3,8 @@ name: chimera-carry-the-failure-forward
 description: A retry loop that overwrites its feedback variable shows attempt 3 only the failure of attempt 2 — so it re-derives the patch attempt 1 already tried.
 version: 0.1.0
 kind: pattern
+stage: build
+topic: ai-agents
 triggers:
 - writing a retry loop
 - the agent keeps trying the same fix

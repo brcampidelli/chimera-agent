@@ -3,6 +3,8 @@ name: chimera-when-two-results-contradict-suspect-the-apparatus
 description: When two of your own measurements disagree by a margin no mechanism could produce, the defect is in the instrument. Audit the harness before building theory on top of it.
 version: 0.1.0
 kind: pattern
+stage: review
+topic: research
 triggers:
 - two runs disagree wildly
 - the smaller run scored better

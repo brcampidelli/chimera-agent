@@ -3,6 +3,8 @@ name: verify-before-claiming
 description: Before reporting a task as done, run the check that would fail if it were not — an explanation is not a fix.
 version: 0.1.0
 kind: pattern
+stage: verify
+topic: software-dev
 triggers:
 - finished the change
 - about to report success

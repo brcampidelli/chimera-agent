@@ -3,6 +3,8 @@ name: assert-what-the-generator-found
 description: A generator that crashes tells you it failed; one that emits plausible output tells you nothing. Test what it found, never that it ran.
 version: 0.1.0
 kind: pattern
+stage: verify
+topic: software-dev
 triggers:
 - wrote a code generator
 - testing a schema dump

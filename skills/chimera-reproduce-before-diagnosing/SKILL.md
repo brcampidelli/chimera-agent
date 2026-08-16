@@ -3,6 +3,8 @@ name: chimera-reproduce-before-diagnosing
 description: A diagnosis is a claim about a machine you have not run. Reproduce the failure in one short command first — especially when the diagnosis arrived from someone else.
 version: 0.1.0
 kind: pattern
+stage: verify
+topic: software-dev
 triggers:
 - a bug report arrived
 - another agent explained the cause
