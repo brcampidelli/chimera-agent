@@ -1029,7 +1029,15 @@ def chat(
         backend = RoutedBackend(gateway, FusionEngine(gateway))
     agent = Agent(
         backend,
-        default_registry(Path(workspace)),
+        # The deployment fence, exactly as `run` and the desktop app apply it. An explicit
+        # allowlist is an INSTRUCTION, not an inference: `governed_profile`'s kernel and taint
+        # ledger are staged behind CHIMERA_GOVERNANCE because they can refuse legitimate work,
+        # but removing a named tool cannot, so it needs no rollout and no attendance argument.
+        # These three were the only agent surfaces left without it — and the comment below was
+        # added to these very lines a day earlier, for the sibling field, without noticing.
+        _apply_tool_allowlist(
+            default_registry(Path(workspace)), allow=None, deny=None, settings=get_settings()
+        ),
         # Same workspace, both arguments: the one that roots the tools also carries the
         # project's conventions. Splitting them is how `AGENTS.md` came to be read on
         # four surfaces out of twenty-seven.
@@ -1158,7 +1166,15 @@ def assist(
     backend: SupportsComplete = gateway if no_cascade else _cascade_backend(gateway, settings)
     agent = Agent(
         backend,
-        default_registry(Path(workspace)),
+        # The deployment fence, exactly as `run` and the desktop app apply it. An explicit
+        # allowlist is an INSTRUCTION, not an inference: `governed_profile`'s kernel and taint
+        # ledger are staged behind CHIMERA_GOVERNANCE because they can refuse legitimate work,
+        # but removing a named tool cannot, so it needs no rollout and no attendance argument.
+        # These three were the only agent surfaces left without it — and the comment below was
+        # added to these very lines a day earlier, for the sibling field, without noticing.
+        _apply_tool_allowlist(
+            default_registry(Path(workspace)), allow=None, deny=None, settings=get_settings()
+        ),
         # Same workspace, both arguments: the one that roots the tools also carries the
         # project's conventions. Splitting them is how `AGENTS.md` came to be read on
         # four surfaces out of twenty-seven.
@@ -1314,7 +1330,15 @@ def tui(
         backend = RoutedBackend(gateway, FusionEngine(gateway))
     agent = Agent(
         backend,
-        default_registry(Path(workspace)),
+        # The deployment fence, exactly as `run` and the desktop app apply it. An explicit
+        # allowlist is an INSTRUCTION, not an inference: `governed_profile`'s kernel and taint
+        # ledger are staged behind CHIMERA_GOVERNANCE because they can refuse legitimate work,
+        # but removing a named tool cannot, so it needs no rollout and no attendance argument.
+        # These three were the only agent surfaces left without it — and the comment below was
+        # added to these very lines a day earlier, for the sibling field, without noticing.
+        _apply_tool_allowlist(
+            default_registry(Path(workspace)), allow=None, deny=None, settings=get_settings()
+        ),
         # Same workspace, both arguments: the one that roots the tools also carries the
         # project's conventions. Splitting them is how `AGENTS.md` came to be read on
         # four surfaces out of twenty-seven.
