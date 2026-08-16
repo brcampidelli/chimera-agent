@@ -25,6 +25,7 @@ from typing import Any
 
 from chimera.tools.base import Tool
 from chimera.tools.workspace import resolve_in_workspace
+from chimera.tools.write_region import WriteRegion, refuse_write
 
 # Pinned CDN majors — the client-side render path, no Python dep. jsDelivr serves the latest of each.
 _VEGA_CDN = (
@@ -116,8 +117,11 @@ class RenderChartTool(Tool):
         "required": ["spec"],
     }
 
-    def __init__(self, workspace: Path | None = None) -> None:
+    def __init__(
+        self, workspace: Path | None = None, *, write_region: WriteRegion | None = None
+    ) -> None:
         self.workspace = (workspace or Path.cwd()).resolve()
+        self.write_region = write_region
 
     def run(self, **kwargs: Any) -> str:
         spec = _parse_spec(kwargs.get("spec"))
@@ -130,6 +134,8 @@ class RenderChartTool(Tool):
         if shape_error:
             return f"error: invalid Vega-Lite spec: {shape_error}"
         out = resolve_in_workspace(self.workspace, str(kwargs.get("out") or f"chart.{fmt}"))
+        if err := refuse_write(self.workspace, out, self.write_region):
+            return err
         out.parent.mkdir(parents=True, exist_ok=True)
         try:
             if fmt == "html":

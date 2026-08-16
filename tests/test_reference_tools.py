@@ -34,7 +34,10 @@ def test_image_gen_writes_decoded_file(monkeypatch: pytest.MonkeyPatch, tmp_path
 
     monkeypatch.setattr(httpx, "post", lambda *a, **k: Resp())
     out = tmp_path / "img.png"
-    result = ImageGenTool().run(prompt="a cat", out=str(out))
+    # The tool is given the tmp workspace it writes into. Before the write gate reached these
+    # tools they took no workspace at all, so this test used to pass an absolute path and have
+    # it honoured verbatim — the escape itself, asserted as correct.
+    result = ImageGenTool(tmp_path).run(prompt="a cat", out="img.png")
     assert out.read_bytes() == b"PNGDATA"
     assert "saved image" in result
 
@@ -58,7 +61,7 @@ def test_tts_writes_audio_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
 
     monkeypatch.setattr(httpx, "post", lambda *a, **k: Resp())
     out = tmp_path / "speech.mp3"
-    result = TextToSpeechTool().run(text="hello", out=str(out))
+    result = TextToSpeechTool(tmp_path).run(text="hello", out="speech.mp3")
     assert out.read_bytes() == b"MP3BYTES"
     assert "saved audio" in result
 

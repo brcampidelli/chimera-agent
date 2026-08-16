@@ -59,9 +59,17 @@ class _FakeDriver:
         self.calls.append("close")
 
 
-def _tool() -> tuple[BrowserTool, _FakeDriver]:
+def _tool(workspace: object = None) -> tuple[BrowserTool, _FakeDriver]:
+    """The tool under test, rooted at ``workspace`` when a screenshot destination matters.
+
+    `screenshot` used to hand its path straight to the driver, and this tool took no workspace at
+    all — so the tests below passed an absolute path and had it honoured verbatim, which is the
+    escape asserted as correct behaviour. They now write RELATIVE, inside the workspace.
+    """
     driver = _FakeDriver()
-    return BrowserTool(driver=driver), driver
+    import pathlib as _pathlib
+
+    return BrowserTool(driver=driver, workspace=_pathlib.Path(str(workspace)) if workspace else None), driver
 
 
 @pytest.fixture(autouse=True)
@@ -185,9 +193,9 @@ def test_new_actions_are_advertised() -> None:
 def test_screenshot_saves_file_and_confirms(tmp_path: pytest.TempPathFactory) -> None:
     import pathlib
 
-    tool, driver = _tool()
+    tool, driver = _tool(tmp_path)
     dest = pathlib.Path(str(tmp_path)) / "shot.png"
-    out = tool.run(action="screenshot", path=str(dest))
+    out = tool.run(action="screenshot", path="shot.png")
     assert "saved screenshot to" in out and str(dest) in out
     assert dest.is_file() and dest.read_bytes().startswith(b"\x89PNG")  # a real (stub) capture
     assert f"screenshot:{dest}" in driver.calls
@@ -195,11 +203,9 @@ def test_screenshot_saves_file_and_confirms(tmp_path: pytest.TempPathFactory) ->
 
 
 def test_screenshot_with_url_navigates_first(tmp_path: pytest.TempPathFactory) -> None:
-    import pathlib
 
-    tool, driver = _tool()
-    dest = pathlib.Path(str(tmp_path)) / "shot.png"
-    tool.run(action="screenshot", url="https://example.com", path=str(dest))
+    tool, driver = _tool(tmp_path)
+    tool.run(action="screenshot", url="https://example.com", path="shot.png")
     assert driver.calls[0] == "navigate:https://example.com"
     assert any(c.startswith("screenshot:") for c in driver.calls)
 
@@ -212,9 +218,12 @@ def test_screenshot_needs_a_path() -> None:
 def test_screenshot_blocks_ssrf_url(tmp_path: pytest.TempPathFactory) -> None:
     import pathlib
 
-    tool, driver = _tool()
+    # A RELATIVE destination, because the subject here is the SSRF block and an absolute path now
+    # fails earlier for a different reason — a test that stops at the first error stops testing what
+    # it is named after.
+    tool, driver = _tool(tmp_path)
     dest = pathlib.Path(str(tmp_path)) / "shot.png"
-    out = tool.run(action="screenshot", url="http://169.254.169.254/latest/", path=str(dest))
+    out = tool.run(action="screenshot", url="http://169.254.169.254/latest/", path="shot.png")
     assert out.startswith("error:") and "blocked" in out
     assert driver.calls == [] and not dest.exists()  # never navigated, never captured
 
