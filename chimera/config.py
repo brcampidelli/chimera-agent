@@ -512,8 +512,23 @@ class Settings(BaseSettings):
     #
     # Where a request carries its own allowlist the two INTERSECT — this list is a ceiling, and a
     # caller must not be able to raise it.
-    tool_allowlist: list[str] = Field(default_factory=list, validation_alias="CHIMERA_TOOL_ALLOWLIST")
-    tool_denylist: list[str] = Field(default_factory=list, validation_alias="CHIMERA_TOOL_DENYLIST")
+    # `NoDecode` is not decoration. Without it, pydantic-settings' EnvSettingsSource runs
+    # `json.loads` on the raw string BEFORE the comma-splitting validator below ever sees it, so
+    # `CHIMERA_TOOL_DENYLIST=run_shell` raises `SettingsError` at import of `get_settings()` — and
+    # since every entry point builds settings first, the whole CLI stops opening. `chimera --help`
+    # exits 1 on a machine whose only sin was fencing its agent the way `.env.example` says to.
+    #
+    # Ten list fields in this class carry the annotation and these two were the only ones without
+    # it, which is why nothing looked odd. The tests missed it for a sharper reason: they build
+    # `Settings(CHIMERA_TOOL_DENYLIST="...")` by keyword, and a keyword goes through
+    # InitSettingsSource, which does no JSON decoding at all. Thirty-eight green tests exercised a
+    # path no deployment uses.
+    tool_allowlist: Annotated[list[str], NoDecode] = Field(
+        default_factory=list, validation_alias="CHIMERA_TOOL_ALLOWLIST"
+    )
+    tool_denylist: Annotated[list[str], NoDecode] = Field(
+        default_factory=list, validation_alias="CHIMERA_TOOL_DENYLIST"
+    )
 
     @field_validator("approval", mode="before")
     @classmethod
@@ -584,10 +599,29 @@ class Settings(BaseSettings):
     )
     @classmethod
     def _split_panel(cls, value: object) -> object:
-        """Accept a comma-separated string from the environment."""
-        if isinstance(value, str):
-            return [item.strip() for item in value.split(",") if item.strip()]
-        return value
+        """Accept a comma-separated string from the environment — or a JSON array.
+
+        Comma-separated is the documented form and what `.env.example` shows. JSON is accepted
+        because these fields carry ``NoDecode``, which turns pydantic-settings' own decoding off, and
+        without this branch a value someone wrote as ``["a", "b"]`` would be split on the comma into
+        ``['["a"', '"b"]']`` — a *silent* wrong answer where the previous behaviour was a loud crash.
+        For a tool denylist that trade is the wrong way round: a fence made of nonsense names denies
+        nothing and says so nowhere.
+        """
+        if not isinstance(value, str):
+            return value
+        text = value.strip()
+        if text.startswith("[") and text.endswith("]"):
+            import json
+
+            try:
+                parsed = json.loads(text)
+            except ValueError:
+                pass  # not valid JSON after all — fall through to the comma split
+            else:
+                if isinstance(parsed, list):
+                    return [str(item).strip() for item in parsed if str(item).strip()]
+        return [item.strip() for item in text.split(",") if item.strip()]
 
     def tier_ladder(self) -> TierLadder:
         """The resolved weak/mid/top model ladder (explicit override > cost_mode)."""
