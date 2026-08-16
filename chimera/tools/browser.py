@@ -22,10 +22,13 @@ Two things are non-negotiable here:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Protocol
 
 from chimera.governance.ledger_tool import fence
 from chimera.tools.base import Tool
+from chimera.tools.workspace import resolve_in_workspace
+from chimera.tools.write_region import WriteRegion, refuse_write
 
 _MAX_CHARS = 20_000
 # Playwright is a CORE dependency, so this only shows on a broken install (the package went missing).
@@ -186,11 +189,22 @@ class BrowserTool(Tool):
         "required": ["action"],
     }
 
-    def __init__(self, driver: BrowserDriver | None = None, *, headless: bool = True) -> None:
+    def __init__(
+        self,
+        driver: BrowserDriver | None = None,
+        *,
+        headless: bool = True,
+        workspace: Path | None = None,
+        write_region: WriteRegion | None = None,
+    ) -> None:
         # The driver is built lazily on first use so importing this tool never needs Playwright.
         self._driver = driver
         self._own_driver = driver is None
         self._headless = headless
+        # `screenshot` handed its path straight to the driver, and this tool had no workspace to
+        # resolve against — so an absolute path wrote a PNG anywhere the process could reach.
+        self.workspace = (workspace or Path.cwd()).resolve()
+        self.write_region = write_region
 
     def _ensure_driver(self) -> BrowserDriver | None:
         if self._driver is not None:
@@ -257,9 +271,13 @@ class BrowserTool(Tool):
             if action == "back":
                 return render_elements(driver.back())
             if action == "screenshot":
-                path = str(kwargs.get("path", "")).strip()
-                if not path:
+                raw = str(kwargs.get("path", "")).strip()
+                if not raw:
                     return "error: screenshot needs a path"
+                target = resolve_in_workspace(self.workspace, raw)
+                if err := refuse_write(self.workspace, target, self.write_region):
+                    return err
+                path = str(target)
                 url = str(kwargs.get("url", "")).strip()
                 if url:
                     check_url(url)

@@ -110,7 +110,7 @@ def test_image_local_backend(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
     monkeypatch.setattr(media, "get_settings", lambda: SimpleNamespace(
         image_backend="local", image_model_local="flux", key_pool=lambda p: []))
     target = tmp_path / "img.png"
-    res = media.ImageGenTool().run(prompt="a cat", out=str(target))
+    res = media.ImageGenTool(tmp_path).run(prompt="a cat", out=target.name)
     assert "saved image" in res and "local: flux" in res and target.exists()
 
 
@@ -121,5 +121,5 @@ def test_image_local_missing_extra(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     monkeypatch.setattr(media, "_generate_local", raise_import)
     monkeypatch.setattr(media, "get_settings", lambda: SimpleNamespace(
         image_backend="local", image_model_local="flux", key_pool=lambda p: []))
-    res = media.ImageGenTool().run(prompt="x", out=str(tmp_path / "i.png"))
+    res = media.ImageGenTool(tmp_path).run(prompt="x", out="i.png")
     assert res.startswith("error:") and "imagegen-local" in res

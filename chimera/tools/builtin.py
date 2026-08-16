@@ -98,10 +98,10 @@ def default_registry(
     registry.register(YouTubeTranscriptTool())
     from chimera.tools.download import DownloadMediaTool
 
-    registry.register(DownloadMediaTool(workspace))
+    registry.register(DownloadMediaTool(workspace, write_region=write_region))
     from chimera.tools.chart import RenderChartTool
 
-    registry.register(RenderChartTool(workspace))  # Vega-Lite spec -> HTML (dep-free) / PNG-SVG (viz-vega)
+    registry.register(RenderChartTool(workspace, write_region=write_region))  # Vega-Lite -> HTML/PNG/SVG
 
     # Web scraping + secure structured extraction (fetch->clean markdown; schema->JSON via quarantine)
     # + whole-site discovery (map/crawl, robots-aware).
@@ -122,11 +122,11 @@ def default_registry(
     if settings.key_pool("openai") or importlib.util.find_spec("diffusers") is not None:
         from chimera.tools.media import ImageGenTool
 
-        registry.register(ImageGenTool())  # hosted (OpenAI key) or local (diffusers/imagegen-local)
+        registry.register(ImageGenTool(workspace, write_region=write_region))  # hosted key or local diffusers
     if settings.elevenlabs_api_key:
         from chimera.tools.media import TextToSpeechTool
 
-        registry.register(TextToSpeechTool())
+        registry.register(TextToSpeechTool(workspace, write_region=write_region))
     # Speech-to-text lights up with local faster-whisper (the `stt` extra) OR an OpenAI key.
     import importlib.util
 
@@ -153,5 +153,11 @@ def default_registry(
     if importlib.util.find_spec("playwright") is not None:
         from chimera.tools.browser import BrowserTool
 
-        registry.register(BrowserTool(headless=settings.browser_headless))
+        registry.register(
+            BrowserTool(
+                headless=settings.browser_headless,
+                workspace=workspace,
+                write_region=write_region,
+            )
+        )
     return registry

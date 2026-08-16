@@ -14,6 +14,7 @@ from typing import Any
 from chimera.config import get_settings
 from chimera.tools.base import Tool
 from chimera.tools.workspace import resolve_in_workspace
+from chimera.tools.write_region import WriteRegion, refuse_write
 
 _OPENAI_IMAGES = "https://api.openai.com/v1/images/generations"
 _ELEVEN_TTS = "https://api.elevenlabs.io/v1/text-to-speech"
@@ -55,15 +56,27 @@ class ImageGenTool(Tool):
         "required": ["prompt"],
     }
 
-    def __init__(self, *, model: str = "gpt-image-1") -> None:
+    def __init__(
+        self,
+        workspace: Path | None = None,
+        *,
+        model: str = "gpt-image-1",
+        write_region: WriteRegion | None = None,
+    ) -> None:
+        # This tool took no workspace at all, which is why its output path was used verbatim: there
+        # was nothing to resolve against. An absolute `out` wrote wherever it pointed.
+        self.workspace = (workspace or Path.cwd()).resolve()
         self.model = model
+        self.write_region = write_region
 
     def run(self, **kwargs: Any) -> str:
         import httpx  # lazy
 
         settings = get_settings()
         prompt = str(kwargs["prompt"])
-        out = Path(str(kwargs.get("out") or "generated_image.png"))
+        out = resolve_in_workspace(self.workspace, str(kwargs.get("out") or "generated_image.png"))
+        if err := refuse_write(self.workspace, out, self.write_region):
+            return err
         size = str(kwargs.get("size") or "1024x1024")
         keys = settings.key_pool("openai")
 
@@ -122,19 +135,30 @@ class TextToSpeechTool(Tool):
     }
 
     def __init__(
-        self, *, voice_id: str = "21m00Tcm4TlvDq8ikWAM", model_id: str = "eleven_multilingual_v2"
+        self,
+        workspace: Path | None = None,
+        *,
+        voice_id: str = "21m00Tcm4TlvDq8ikWAM",
+        model_id: str = "eleven_multilingual_v2",
+        write_region: WriteRegion | None = None,
     ) -> None:
+        self.workspace = (workspace or Path.cwd()).resolve()
         self.voice_id = voice_id
         self.model_id = model_id
+        self.write_region = write_region
 
     def run(self, **kwargs: Any) -> str:
         import httpx  # lazy
 
+        # Where the audio would land is settled BEFORE the key check and before the request: a
+        # synthesis we are not allowed to save is an API call nobody wanted.
+        out = resolve_in_workspace(self.workspace, str(kwargs.get("out") or "speech.mp3"))
+        if err := refuse_write(self.workspace, out, self.write_region):
+            return err
         key = get_settings().elevenlabs_api_key
         if not key:
             return "error: text_to_speech needs ELEVENLABS_API_KEY (set it in .env)."
         text = str(kwargs["text"])
-        out = Path(str(kwargs.get("out") or "speech.mp3"))
         voice = str(kwargs.get("voice_id") or self.voice_id)
         try:
             response = httpx.post(

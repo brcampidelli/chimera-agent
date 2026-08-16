@@ -13,6 +13,7 @@ from typing import Any
 
 from chimera.tools.base import Tool
 from chimera.tools.workspace import resolve_in_workspace
+from chimera.tools.write_region import WriteRegion, refuse_write
 
 _INSTALL_HINT = (
     "error: media download needs the 'media-dl' extra — install with: "
@@ -54,13 +55,21 @@ class DownloadMediaTool(Tool):
         "required": ["url"],
     }
 
-    def __init__(self, workspace: Path | None = None) -> None:
+    def __init__(
+        self, workspace: Path | None = None, *, write_region: WriteRegion | None = None
+    ) -> None:
         self.workspace = (workspace or Path.cwd()).resolve()
+        self.write_region = write_region
 
     def run(self, **kwargs: Any) -> str:
         url = str(kwargs.get("url", "")).strip()
         if not url:
             return "error: download_media needs a url"
+        # The write gate runs BEFORE the network does: a download we are not allowed to save is a
+        # fetch nobody wanted, and refusing after it has already happened is the wrong order.
+        out_dir = resolve_in_workspace(self.workspace, str(kwargs.get("out_dir") or "downloads"))
+        if err := refuse_write(self.workspace, out_dir, self.write_region):
+            return err
         # SSRF guard: the URL is model-/content-supplied and yt-dlp will happily fetch an
         # http(s) target — reject non-http(s) schemes and hosts resolving to private IPs before
         # handing it off, the same guard http_get/browser use.
@@ -71,7 +80,6 @@ class DownloadMediaTool(Tool):
         except ValueError as exc:
             return f"error: {exc}"
         audio_only = bool(kwargs.get("audio_only"))
-        out_dir = resolve_in_workspace(self.workspace, str(kwargs.get("out_dir") or "downloads"))
         out_dir.mkdir(parents=True, exist_ok=True)
         before = {p.name for p in out_dir.iterdir()}
         try:
