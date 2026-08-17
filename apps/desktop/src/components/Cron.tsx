@@ -114,10 +114,26 @@ export function Cron({ embedded = false }: { embedded?: boolean } = {}) {
                   <span className="truncate text-sm font-medium">{j.name}</span>
                   <Badge tone="muted">{j.trigger}</Badge>
                   {j.created_by === "agent" && <Badge tone="accent">{t("cron.agent")}</Badge>}
+                  {/* A job that has been failing every hour for a week used to render identically
+                      to one that works. The API has carried `consecutive_failures` and `last_error`
+                      the whole time; this screen showed neither, so the only way to find out was to
+                      read the scheduler log — which is exactly the thing a schedule screen exists to
+                      save you from. */}
+                  {j.consecutive_failures > 0 && (
+                    <Badge tone="bad">{t("cron.failing", { n: j.consecutive_failures })}</Badge>
+                  )}
                 </div>
                 <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
                   {j.schedule} → {j.action}
                 </div>
+                {/* Inline, not a tooltip. WHY it failed is the whole reason to look at this row, and
+                    a tooltip is found by accident. Truncated to one line: the full text is in the
+                    title, and a stack trace must not push every other job off the screen. */}
+                {j.consecutive_failures > 0 && j.last_error && (
+                  <div className="mt-0.5 truncate font-mono text-xs text-bad" title={j.last_error}>
+                    {j.last_error}
+                  </div>
+                )}
               </div>
               <button
                 className="opacity-0 transition group-hover:opacity-100"
