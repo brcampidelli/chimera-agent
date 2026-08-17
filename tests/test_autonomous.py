@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -124,6 +125,104 @@ def test_cooperative_stop_halts_before_next_attempt() -> None:
     assert result.success is False
     assert result.stopped_reason == "cancelled"
     assert len(result.attempts) == 1 and result.attempts[0].answer == "partial"
+
+
+def test_stop_reaches_inside_an_attempt_not_only_between_them() -> None:
+    """Stop used to mean "finish the whole attempt first".
+
+    The loop checked its flag between attempts and right before the worker call, and then handed the
+    task to a worker it could not interrupt. On a real task that is up to `max_steps` model calls
+    plus every tool they trigger — minutes of work and money spent after the user asked for it to
+    end. The flag now travels INTO the worker, which returns at its next step boundary.
+
+    This is the wiring half: the worker is actually HANDED the callback, and it is the loop's real
+    flag rather than some fresh lambda that always answers False.
+    """
+    seen: dict[str, object] = {}
+    flag = {"stop": False}
+
+    class StoppableWorker:
+        runs = 0
+
+        def run(
+            self,
+            task: str,
+            *,
+            should_stop: Callable[[], bool] | None = None,
+            **_: object,
+        ) -> AgentResult:
+            type(self).runs += 1
+            seen["callback"] = should_stop
+            # Ask it, the way `Agent.run` asks it at each step boundary.
+            seen["answer_before"] = should_stop() if should_stop else None
+            flag["stop"] = True
+            seen["answer_after"] = should_stop() if should_stop else None
+            return AgentResult(answer="whole", steps=2, stopped_reason="final", transcript=[])
+
+    auto = AutonomousAgent(
+        StoppableWorker(),
+        should_stop=lambda: flag["stop"],
+        config=AutonomousConfig(max_attempts=1, use_planner=False, use_manager=False),
+    )
+    auto.run("watch the flag")
+
+    assert seen["callback"] is not None, "the worker was never given the stop check"
+    # Live, not a snapshot: the same callable answers differently once the flag flips, which is what
+    # makes a mid-attempt poll worth anything.
+    assert seen["answer_before"] is False and seen["answer_after"] is True
+
+
+def test_a_cancelled_attempt_is_not_verified_or_reviewed() -> None:
+    """The expensive half: a partial attempt must not be graded.
+
+    `should_stop` flips only once the worker has been entered, so attempt 1 really runs and comes
+    back marked cancelled. Nothing downstream of it may fire — the verifier here counts calls, and
+    one call is one command the user paid for after pressing Stop.
+    """
+
+    class CountingVerifier:
+        """A real verifier that counts. Returning the true `VerificationResult` matters: a stub that
+        returns the wrong shape makes this test fail with an AttributeError whether or not the fix
+        is present, which would pass the discrimination check for the wrong reason."""
+
+        calls = 0
+
+        def verify(self) -> VerificationResult:
+            type(self).calls += 1
+            return VerificationResult(False, "nope")
+
+    entered = {"yes": False}
+
+    class StoppableWorker:
+        runs = 0
+
+        def run(
+            self,
+            task: str,
+            *,
+            should_stop: Callable[[], bool] | None = None,
+            **_: object,
+        ) -> AgentResult:
+            type(self).runs += 1
+            entered["yes"] = True
+            reason = "cancelled" if (should_stop and should_stop()) else "final"
+            return AgentResult(answer="half", steps=1, stopped_reason=reason, transcript=[])
+
+    worker = StoppableWorker()
+    verifier = CountingVerifier()
+    auto = AutonomousAgent(
+        worker,
+        # False until the worker has been entered: attempt 1 gets past the two pre-checks, runs,
+        # and returns cancelled.
+        should_stop=lambda: entered["yes"],
+        verifier=verifier,
+        config=AutonomousConfig(max_attempts=3, use_planner=False, use_manager=False),
+    )
+    result = auto.run("cancel me")
+
+    assert StoppableWorker.runs == 1, "the worker must not be retried after a cancel"
+    assert CountingVerifier.calls == 0, "a cancelled attempt must not be verified"
+    assert result.stopped_reason == "cancelled" and result.success is False
 
 
 def test_no_stop_check_leaves_loop_unchanged() -> None:
