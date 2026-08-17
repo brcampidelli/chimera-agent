@@ -85,6 +85,12 @@ class AttemptReceipt(BaseModel):
     #: An empty diff means one thing for a run that only touched files and something else entirely
     #: for a run that already sent mail — the receipt should not force that inference.
     side_effects: list[str] = []
+    #: Every tool this attempt called, in order — the last leg of a wire that used to end at the
+    #: loop. A receipt said what an attempt COST and never what it DID, so "how many edits did this
+    #: task take?" was unanswerable from a finished run, and `bench/edit_tools/` could not read its
+    #: own primary metric. Capped like the other bounded fields: a pathological run must not bloat
+    #: `runs.jsonl`, and 200 calls is far past the point where the sequence is still being read.
+    tool_names: list[str] = []
 
 
 class RunReceipt(BaseModel):
@@ -182,6 +188,7 @@ def build_receipt(
             run_id=getattr(a, "run_id", "") or "",
             diff_productive=getattr(a, "diff_productive", None),
             side_effects=list(getattr(a, "side_effects", None) or []),
+            tool_names=[str(n) for n in (getattr(a, "tool_names", None) or [])][:200],
             usd=getattr(a, "usd", None),
             overhead_usd=getattr(a, "overhead_usd", None),
             prompt_tokens=int(getattr(a, "prompt_tokens", 0) or 0),

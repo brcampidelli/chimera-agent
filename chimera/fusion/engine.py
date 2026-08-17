@@ -135,6 +135,21 @@ class FusionTrace:
         return agg
 
 
+def _vendor_of(model: str) -> str:
+    """The lab a slug comes from — ``openrouter/anthropic/claude-opus-4-8`` -> ``anthropic``.
+
+    Deliberately crude: it reads the segment after a leading gateway prefix and gives up rather than
+    guessing. Two models from one lab are not two independent votes, and a wrong guess here would
+    label a receipt with a confidence nobody measured.
+    """
+    parts = [p for p in model.split("/") if p]
+    if not parts:
+        return ""
+    if len(parts) >= 3 and parts[0] in {"openrouter", "litellm", "openai_like"}:
+        return parts[1].lower()
+    return (parts[0] if len(parts) > 1 else "").lower()
+
+
 @dataclass
 class FusionConfig:
     """Which models play each role, and how the panel runs."""
@@ -158,6 +173,27 @@ class FusionConfig:
     # every other task, and any logic task without a majority, still uses judge -> synthesizer.
     task_typed: bool = False
     vote_threshold: float = 0.85
+
+    def role_kinship(self) -> dict[str, object]:
+        """How independent the judge actually is from the panel it grades.
+
+        Fusion is this project's claim to an *independent* signal rather than a self-report, and the
+        shipped default contradicted it: ``_DEFAULT_JUDGE`` was ``_DEFAULT_PANEL[0]``, the same slug
+        verbatim, so the judge graded its own answer. The default is fixed; this reports the case
+        that remains, because a user with one provider key has no way to avoid overlap and deserves
+        a labelled receipt rather than a crash.
+
+        Two degrees, and the weaker one is easy to miss: ``judge_is_panelist`` is the judge grading
+        its own answer, and ``judge_shares_vendor_with`` is the judge and a panelist coming from the
+        same lab — not the same model, but not two independent votes either.
+        """
+        vendor = _vendor_of(self.judge)
+        kin = [m for m in self.panel if m != self.judge and _vendor_of(m) == vendor]
+        return {
+            "judge_is_panelist": self.judge in self.panel,
+            "judge_shares_vendor_with": kin,
+            "independent": self.judge not in self.panel and not kin,
+        }
 
     def temperature_for(self, model: str) -> float:
         """Sampling temperature for one panelist — its slot in the spread, else the single default.

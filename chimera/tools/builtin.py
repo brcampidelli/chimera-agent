@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from chimera.tools.base import Tool
-from chimera.tools.edit import ApplyPatchTool, EditFileTool
+from chimera.tools.edit import ApplyPatchTool, EditBatchTool, EditFileTool
 from chimera.tools.files import ListDirTool, ReadFileTool, WriteFileTool
 from chimera.tools.http import HttpGetTool
 from chimera.tools.registry import ToolRegistry
@@ -80,6 +80,13 @@ def default_registry(
     registry.register(WriteFileTool(workspace, write_region=write_region))
     registry.register(EditFileTool(workspace, write_region=write_region))
     registry.register(ApplyPatchTool(workspace, write_region=write_region))
+    # Arm B of `bench/edit_tools`, and OFF by default on purpose: registering it unconditionally
+    # would delete the control arm, since arm A is defined as today's tool surface. It also costs a
+    # tool schema in every prompt for the whole run, which this project has measured biting before
+    # (bench/skillcard: +300% tokens for a non-significant gain). It goes on when the measurement
+    # says it earns its place — not before.
+    if settings.edit_batch:
+        registry.register(EditBatchTool(workspace, write_region=write_region))
     registry.register(ListDirTool(workspace))
     registry.register(GrepTool(workspace, trust_workspace=trust_workspace))
     registry.register(GlobTool(workspace))

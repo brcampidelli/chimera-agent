@@ -252,6 +252,15 @@ class Attempt:
     #: they remain comparable across runs even where the price is not.
     prompt_tokens: int = 0
     completion_tokens: int = 0
+    #: Every tool this attempt called, in order.
+    #:
+    #: ``AgentResult`` has carried this all along and it died at this boundary: the loop kept the
+    #: attempt's cost and dropped what the attempt *did*. That made a whole class of question
+    #: unanswerable from a finished run — how many edits a task took, whether a tool is ever
+    #: reached, which tool a regression follows — and `bench/edit_tools/` is the first measurement
+    #: to need it. Propagated rather than counted, because a count answers one question and the
+    #: sequence answers the ones nobody has asked yet.
+    tool_names: list[str] = field(default_factory=list)
     #: The model slug that actually answered this attempt (the EDITOR's model under role routing).
     model: str = ""
     #: The id this attempt's trace line was written under, or "" when no trace was written.
@@ -767,6 +776,10 @@ class AutonomousAgent:
             # the worker's result, like  above and for the same reason: it is the worker that
             # knows, and re-deriving it here would be a second place for the two to disagree.
             attempt.run_id = str(getattr(agent_result, 'run_id', '') or '')
+            # What the attempt DID, read off the same result as the id above and for the same
+            # reason: the worker is what knows, and re-deriving it here would be a second place for
+            # the two to disagree.
+            attempt.tool_names = [str(n) for n in (getattr(agent_result, 'tool_names', None) or [])]
             # What this attempt charged. Read off the worker's own result rather than recomputed:
             # `usd` is None there whenever the model's price is unknown, and that None has to
             # survive all the way to the receipt for the "was it worth it?" view to stay honest.
