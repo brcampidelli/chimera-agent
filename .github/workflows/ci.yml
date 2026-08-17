@@ -334,16 +334,55 @@ jobs:
       - name: Set up Python
         run: uv python install 3.12
 
-      - name: Known vulnerabilities in the dependency tree (pip-audit)
-        # Advisory for now: pip-audit fails on any CVE in any transitive package, including ones with
-        # no fix released, which would make a red CI the normal state and teach everyone to ignore it.
-        # Dependabot (.github/dependabot.yml) is what actually moves versions; this reports what is
-        # currently known so it is visible in the run rather than discovered by a user.
+      # THREE ecosystems, because this repository ships three lockfiles and the job is called "known
+      # CVEs". It audited only Python for its whole life. On 2026-08-17 Dependabot was reporting
+      # three open alerts and the highest — a `high` in js-yaml, reachable from the desktop
+      # package-lock — sat in the npm tree, which nothing in CI looked at, while this job reported
+      # green. A gate named for a property it covers one third of is worse than no gate: it is a
+      # green light for the two thirds nobody is checking.
+      #
+      # All three are ADVISORY, for the reason pip-audit already gave: they fail on any CVE in any
+      # transitive package, including ones with no fix released, which would make red the normal
+      # state and teach everyone to ignore it. Dependabot moves versions; this makes what is known
+      # visible in the run instead of discovered by a user.
+      #
+      # Advisory via `continue-on-error` ALONE, with no trailing `|| true`. Both together is one too
+      # many: `continue-on-error` already keeps the job green, and the `|| true` on top additionally
+      # hides the step, so a misspelled flag or a missing binary renders exactly like a clean audit.
+      # A scanner that cannot fail cannot report either, and the whole point of this job is that
+      # somebody sees the output.
+      - name: Known vulnerabilities — Python (pip-audit)
         continue-on-error: true
         run: |
           uvx pip-audit --version
           uv export --format requirements-txt --no-hashes --no-emit-project > /tmp/reqs.txt
-          uvx pip-audit --requirement /tmp/reqs.txt --strict || true
+          uvx pip-audit --requirement /tmp/reqs.txt --strict
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20"
+
+      - name: Known vulnerabilities — npm (the desktop tree ships in the [desktop] extra)
+        continue-on-error: true
+        working-directory: apps/desktop
+        # `--package-lock-only`: audit the committed resolution, not whatever a fresh install picks.
+        # The lockfile is what users get; auditing anything else answers a different question.
+        run: npm audit --package-lock-only
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+
+      - name: Known vulnerabilities — Rust (the Tauri shell)
+        continue-on-error: true
+        run: |
+          cargo install cargo-audit --locked
+          cargo audit --file apps/desktop/src-tauri/Cargo.lock
 
   verdict:
     name: verdict (what red actually means)
