@@ -107,17 +107,23 @@ export function AttachmentTray({
   );
 }
 
-export function AttachButton({ onAdded }: { onAdded: (a: Attachment) => void }) {
-  const t = useT();
-  const input = useRef<HTMLInputElement | null>(null);
+/** Upload files and hand each result to `onAdded`, reporting the ones that did not make it.
+ *
+ * Extracted from the button so that pasting and dropping go through the SAME path. A screenshot
+ * pasted into the composer and a screenshot picked from the file dialog are the same file arriving
+ * by a different door; giving them two upload paths is how one of them quietly stops reporting
+ * failures, or stops clearing the tray, or grows a size limit the other does not have.
+ */
+export function useAttachmentUpload(onAdded: (a: Attachment) => void) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState("");
 
-  async function pick(files: FileList | null) {
-    if (!files?.length) return;
+  async function upload(files: ArrayLike<File> | null | undefined): Promise<void> {
+    const list = files ? Array.from(files) : [];
+    if (list.length === 0) return;
     setBusy(true);
     setFailed("");
-    for (const file of Array.from(files)) {
+    for (const file of list) {
       try {
         onAdded(await uploadAttachment(file));
       } catch {
@@ -126,6 +132,18 @@ export function AttachButton({ onAdded }: { onAdded: (a: Attachment) => void }) 
       }
     }
     setBusy(false);
+  }
+
+  return { upload, busy, failed };
+}
+
+export function AttachButton({ onAdded }: { onAdded: (a: Attachment) => void }) {
+  const t = useT();
+  const input = useRef<HTMLInputElement | null>(null);
+  const { upload, busy, failed } = useAttachmentUpload(onAdded);
+
+  async function pick(files: FileList | null) {
+    await upload(files);
     if (input.current) input.current.value = ""; // so the same file can be picked twice
   }
 

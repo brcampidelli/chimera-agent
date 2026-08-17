@@ -19,7 +19,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/panel";
 import { BrandMark } from "@/components/BrandMark";
-import { AttachButton, AttachmentTray, DictateButton } from "@/components/code/Attachments";
+import {
+  AttachButton,
+  AttachmentTray,
+  DictateButton,
+  useAttachmentUpload,
+} from "@/components/code/Attachments";
 import { BatchProposal } from "@/components/code/BatchProposal";
 import { DiffView } from "@/components/code/DiffView";
 import { decompose } from "@/lib/decompose";
@@ -287,6 +292,13 @@ export function Conversation({
   const [proposal, setProposal] = useState<string[] | null>(null);
   const [fuse, setFuse] = useState(false);
   const [attached, setAttached] = useState<Attachment[]>([]);
+  // Same upload path the paperclip uses — see `useAttachmentUpload`. The button keeps its own
+  // instance for its own spinner; what must not fork is how a file gets uploaded and how a failure
+  // is reported.
+  const { upload, failed: uploadFailed } = useAttachmentUpload((a) =>
+    setAttached((prev) => [...prev, a]),
+  );
+  const [dragging, setDragging] = useState(false);
   // Publish what this turn is doing, so the shell's footer and the activity panel keep working from
   // any screen. There is a test that exists precisely to say the agent must stay visible when you
   // navigate away mid-turn.
@@ -541,10 +553,42 @@ export function Conversation({
         {controls ? <div className="pb-1">{controls}</div> : null}
         <AttachmentTray items={attached} onRemove={(id) => setAttached((p) => p.filter((a) => a.id !== id))} />
         <textarea
-          className="field min-h-[64px] w-full resize-y px-3 py-2 text-sm"
+          className={cn(
+            "field min-h-[64px] w-full resize-y px-3 py-2 text-sm",
+            dragging && "ring-2 ring-accent",
+          )}
           placeholder={t("code.chat.placeholder")}
           value={draft}
           onChange={(ev) => setDraft(ev.target.value)}
+          // Paste is the point. Taking a screenshot and pressing Ctrl+V is how people show a
+          // program what is wrong with it; without this the clipboard image was dropped on the
+          // floor and the only route was Save As, then the file dialog. `items` is where a pasted
+          // image lives — `clipboardData.files` is empty for it on some platforms — and pasted TEXT
+          // must still paste as text, so this only intercepts when a file actually comes out.
+          onPaste={(ev) => {
+            const files = Array.from(ev.clipboardData?.items ?? [])
+              .filter((i) => i.kind === "file")
+              .map((i) => i.getAsFile())
+              .filter((f): f is File => f !== null);
+            if (files.length === 0) return;
+            ev.preventDefault();
+            void upload(files);
+          }}
+          // Drag-and-drop needs its own preventDefault on dragOver or the browser navigates away to
+          // the dropped file — losing the whole conversation, which is a far worse outcome than not
+          // supporting drops at all.
+          onDragOver={(ev) => {
+            if (!ev.dataTransfer?.types?.includes("Files")) return;
+            ev.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(ev) => {
+            if (!ev.dataTransfer?.files?.length) return;
+            ev.preventDefault();
+            setDragging(false);
+            void upload(ev.dataTransfer.files);
+          }}
           onKeyDown={(ev) => {
             // Enter sends, Shift+Enter breaks the line — the chat's habit, chosen for the merged
             // screen. It is the riskier of the two now that a turn edits files, and what makes it
@@ -556,6 +600,12 @@ export function Conversation({
           }}
           disabled={busy}
         />
+        {/* A paste that failed must say so here. The paperclip reports its own failures next to
+            itself; a file that arrived by clipboard has no button to stand beside, and silence
+            would leave someone waiting for a screenshot that was never uploaded. */}
+        {uploadFailed ? (
+          <p className="text-xs text-bad">{t("code.attach.failed", { name: uploadFailed })}</p>
+        ) : null}
         <div className="flex flex-wrap items-center gap-2">
           <AttachButton onAdded={(a) => setAttached((prev) => [...prev, a])} />
           <DictateButton
