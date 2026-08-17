@@ -261,10 +261,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
-      # `tauri.conf.json` points frontendDist at ../dist. Building the real SPA here would duplicate
-      # the `desktop` job above for no gain: these tests never load a page.
-      - name: Placeholder SPA dist
-        run: mkdir -p apps/desktop/dist && touch apps/desktop/dist/index.html
+      # Two placeholders, because `tauri-build` resolves the bundle manifest before it compiles
+      # anything and refuses on either: `frontendDist` points at ../dist, and `bundle.resources`
+      # globs the PyInstaller output, which only the release workflow produces. Building the real
+      # SPA and freezing the real backend here would duplicate two other jobs for no gain — these
+      # tests never load a page and never launch the sidecar; they exercise the code that runs when
+      # launching it FAILS.
+      - name: Placeholders the build script insists on
+        run: |
+          mkdir -p apps/desktop/dist apps/desktop/src-tauri/sidecar-dist/chimera-backend
+          touch apps/desktop/dist/index.html
+          touch apps/desktop/src-tauri/sidecar-dist/chimera-backend/chimera-backend
 
       - name: cargo test
         run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
