@@ -1,7 +1,7 @@
 # Daily research brief — a topic in, a sourced digest out.
 #
 # Run with:  chimera workflow examples/research_brief/brief.yaml -w ./brief_workspace
-# Uses arxiv_search (always on). web_search also fires if CHIMERA_TAVILY_API_KEY is set.
+# Uses arxiv_search (always on). web_search also fires if TAVILY_API_KEY is set.
 #
 # Edit the topic below, or schedule it daily (see README.md) to wake up to a brief.
 name: research-brief

@@ -1,5 +1,5 @@
 ---
-source_sha256: a88090fec9fcabd118b65cf8d40ddecefd47fbb2da49dfa195a66fd57e85c4c1
+source_sha256: f08c31cf980c0d86795fe456d5f9ed6871b58325c9e429e93f48c71b6e998356
 ---
 
 # レシピ
@@ -81,7 +81,7 @@ uv sync --extra documents        # or: pip install 'chimera-agent[documents]'
 
 ## トピックをリサーチする(検索+読み取り)
 
-ウェブ検索とブラウザの `read_text` を組み合わせて何かをリサーチし、出典付きのブリーフを得ます — `web_search`(`CHIMERA_TAVILY_API_KEY` が必要)がページを見つけ、`browser read_text` が(JS重視のサイトを含め)それぞれを読み、`deliver` がブリーフを書きます。
+ウェブ検索とブラウザの `read_text` を組み合わせて何かをリサーチし、出典付きのブリーフを得ます — `web_search`(`TAVILY_API_KEY` が必要)がページを見つけ、`browser read_text` が(JS重視のサイトを含め)それぞれを読み、`deliver` がブリーフを書きます。
 
 ```bash
 uv run chimera solve "Research 'on-device small language models 2026': web_search for sources, \

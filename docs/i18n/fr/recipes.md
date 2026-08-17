@@ -1,5 +1,5 @@
 ---
-source_sha256: a88090fec9fcabd118b65cf8d40ddecefd47fbb2da49dfa195a66fd57e85c4c1
+source_sha256: f08c31cf980c0d86795fe456d5f9ed6871b58325c9e429e93f48c71b6e998356
 ---
 
 # Recettes
@@ -113,7 +113,7 @@ au lieu de Markdown.
 ## Rechercher un sujet (recherche + lecture)
 
 Combinez la recherche web avec le `read_text` du navigateur pour rechercher quelque chose et
-obtenir un brief sourcé — `web_search` (nécessite `CHIMERA_TAVILY_API_KEY`) trouve les pages,
+obtenir un brief sourcé — `web_search` (nécessite `TAVILY_API_KEY`) trouve les pages,
 `browser read_text` lit chacune d'elles (y compris les sites riches en JS), et `deliver` rédige
 le brief :
 

@@ -75,5 +75,5 @@ something a file claims about itself.
 The library is versioned here for review and reuse; the agent reads skills from its own store:
 
 ```bash
-chimera skill import skills/verify-before-claiming
+chimera skills-import skills/verify-before-claiming
 ```

@@ -42,7 +42,7 @@ chimera solve "Research 'small language models on-device 2026': web_search for s
 
 ## Honest notes
 
-- `arxiv_search` covers papers; broad web coverage needs `CHIMERA_TAVILY_API_KEY`. Without
+- `arxiv_search` covers papers; broad web coverage needs `TAVILY_API_KEY`. Without
   it the brief still runs, just narrower.
 - Reading full pages uses the built-in `browser` (add the `documents` extra for clean Markdown
   instead of plain text); the Chromium binary auto-downloads on first use.

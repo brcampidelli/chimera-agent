@@ -47,17 +47,44 @@ npm --prefix apps/desktop run dev   # terminal 2: Vite dev server (proxies /api 
 
 ## What it shows
 
-- **Chat** — three panes mirroring the TUI: a Markdown transcript with syntax-highlighted code, a
-  live token buffer streaming as the model writes, and an **activity** sidebar fed by real per-turn
-  signals only (tools called with ✓/✗, tokens in/out + cache, `~ $cost` or "unavailable", memory
-  facts recalled + which layer). Nothing is fabricated.
-- **Sessions** — a persisted conversation list (new / switch / delete); transcripts survive restarts.
-- **Settings** (models / API keys / cache), **Memory**, **Skills**, **Cron**, **Tasks**, **Fusion**,
-  **Usage**, **Runs**, **Code**, **Agents**, **Governance**, **Maturity**, **Tools**, **Mcp**, and an
-  **Onboarding** flow — all wired in `src/App.tsx` and reachable from the icon rail.
+Five destinations, in the rail's own order (`NAV` in `src/components/IconRail.tsx`), plus
+**Settings** at the foot of the rail. There is no separate chat screen — the conversation lives
+inside **Code**.
 
-> This list used to say Settings/Memory/Skills/Cron/Tasks were "Fase B/C" (not yet built) long after
-> they shipped, which read as half the app being missing. If you add a screen, add it here too.
+- **Code** — the conversation and what it produces. A session list on the left (persisted, filed
+  under the project each conversation was about — new / resume / switch project), the transcript in
+  the middle (Markdown with syntax-highlighted code; the answer streams into the transcript itself,
+  not a scratch pane), and the **activity** inspector on the right, fed by real per-turn signals
+  only (tools called with ✓/✗, tokens in/out + cache, `~ $cost` or "unavailable", memory facts
+  recalled + which layer). Nothing is fabricated. Opening a file adds a viewer with an opt-in
+  editor; who does the work (provider / roles) and the posture line saying what the agent may touch
+  sit with the composer, before you send.
+- **Editor** — a real code editor (CodeMirror, loaded on demand — see the note in `App.tsx`) with
+  the file tree in the shell's left slot.
+- **Work** — what a run *did*: **Runs** (one task, verify-or-revert), the **git** diff it produced,
+  and **worth** (whether the expensive profile earned its cost).
+- **Knowledge** — what the agent knows: **Memory**, **Profile**, **Skills**.
+- **Automation** — what it does unprompted: **Schedule** (cron), **Tasks** (the board), **Agents**
+  (the registry the board dispatches against).
+- **Settings** — **General** (models / API keys / cache), **Connections** (MCP, servers, tools),
+  **Usage**, **Security** (governance).
+
+Two screens exist but are not rail destinations, which is exactly where documentation goes wrong:
+
+- **Onboarding** is a first-run gate, not a place you navigate to. With no provider key configured,
+  `App.tsx` renders it *instead of* the app; skipping it drops you in Settings.
+- **Maturity** reports the Chimera project's OWN test coverage, so it needs a source checkout —
+  in an installed build it would render empty. Both `IconRail.tsx` and `App.tsx` gate it behind
+  `import.meta.env.DEV`, so it appears **only under the Vite dev server**
+  (`npm --prefix apps/desktop run dev`). `chimera app` serves the production build in `dist/`, and
+  the native installers bundle that same build — neither one shows it.
+
+> This list has now drifted twice, in opposite directions. It first called Settings/Memory/Skills/
+> Cron/Tasks "Fase B/C" (not yet built) long after they shipped; then it went on naming them as rail
+> destinations after fifteen icons were grouped into five, listed a **Chat** screen that no longer
+> exists, and called dev-only **Maturity** reachable from the rail. The rail is data — one array in
+> `IconRail.tsx` — so checking this list costs one file. If you add, group, or gate a screen, fix
+> this list in the same commit.
 
 ## Typed API client (no drift)
 
