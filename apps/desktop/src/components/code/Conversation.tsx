@@ -19,7 +19,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/panel";
 import { BrandMark } from "@/components/BrandMark";
-import { AttachButton, AttachmentTray, DictateButton } from "@/components/code/Attachments";
+import {
+  AttachButton,
+  AttachmentTray,
+  DictateButton,
+  useAttachmentUpload,
+} from "@/components/code/Attachments";
 import { BatchProposal } from "@/components/code/BatchProposal";
 import { DiffView } from "@/components/code/DiffView";
 import { decompose } from "@/lib/decompose";
@@ -287,6 +292,20 @@ export function Conversation({
   const [proposal, setProposal] = useState<string[] | null>(null);
   const [fuse, setFuse] = useState(false);
   const [attached, setAttached] = useState<Attachment[]>([]);
+  // Same upload path the paperclip uses — see `useAttachmentUpload`. The button keeps its own
+  // instance for its own spinner; what must not fork is how a file gets uploaded and how a failure
+  // is reported.
+  const { upload, failed: uploadFailed } = useAttachmentUpload((a) =>
+    setAttached((prev) => [...prev, a]),
+  );
+  const [dragging, setDragging] = useState(false);
+  /** A follow-up typed while a turn was still running. Shown, never silent — a message that
+   *  disappeared into a queue nobody can see is indistinguishable from one that was dropped. */
+  const [queued, setQueued] = useState<string | null>(null);
+  /** Set by `releaseQueued`, consumed by the effect below. The send has to happen AFTER `busy` has
+   *  actually gone false, and `setBusy(false)` in the same handler has not landed yet — calling
+   *  `send()` there would hit the `busy` branch and re-queue the message it was releasing. */
+  const queuedToSendRef = useRef<string | null>(null);
   // Publish what this turn is doing, so the shell's footer and the activity panel keep working from
   // any screen. There is a test that exists precisely to say the agent must stay visible when you
   // navigate away mid-turn.
@@ -299,9 +318,59 @@ export function Conversation({
     );
   }, []);
 
-  function send(force = false) {
-    const message = draft.trim();
-    if (!message || busy || busyElsewhere) return;
+  /** What happens to a queued follow-up when the turn it was waiting behind finishes.
+   *
+   *  Auto-send is right for an ordinary turn: the follow-up is the next thing the user was going to
+   *  say, and making them press Enter again for a message they already wrote is the wait this
+   *  feature exists to remove.
+   *
+   *  It is wrong when the turn failed, and this is the part a queue usually gets careless about.
+   *  These turns EDIT FILES. On a failed verification the screen offers Undo and Fix, and a queued
+   *  message firing into that moment races the user's decision — it would run against a tree they
+   *  have not looked at, possibly one they were about to revert. So the text goes back in the box,
+   *  where they can read it against what just happened and decide. Nothing is lost either way; what
+   *  changes is who decides.
+   */
+  // Send the released follow-up only once `busy` has actually gone false. Doing it inside `onDone`
+  // would run before that `setBusy(false)` had landed, so `send()` would take the busy branch and
+  // re-queue the very message it was releasing — a queue that never drains.
+  const sendRef = useRef<(force?: boolean, override?: string) => void>(() => {});
+  useEffect(() => {
+    if (busy) return;
+    const text = queuedToSendRef.current;
+    if (!text) return;
+    queuedToSendRef.current = null;
+    sendRef.current(false, text);
+  }, [busy]);
+
+  const releaseQueued = useCallback((failed: boolean) => {
+    setQueued((text) => {
+      if (!text) return null;
+      if (failed) {
+        setDraft((d) => (d ? `${text}\n${d}` : text));
+        return null;
+      }
+      queuedToSendRef.current = text;
+      return null;
+    });
+  }, []);
+
+  function send(force = false, override?: string) {
+    // `override` is the queued follow-up being released: it was typed into the box, then moved out
+    // of it, so by now `draft` holds whatever was typed AFTER it and reading state here would send
+    // the wrong text.
+    const message = (override ?? draft).trim();
+    if (busyElsewhere) return;
+    // Busy is no longer a wall. Losing a thought because a turn is still running is the whole
+    // complaint; the message waits, visibly, and goes out when the turn ends.
+    if (busy) {
+      if (message) {
+        setQueued(message);
+        setDraft("");
+      }
+      return;
+    }
+    if (!message) return;
     // Several jobs in one message is the request for a parallel batch. It is proposed rather than
     // taken, because worktrees are a real side effect — and `force` is how "send it as one message"
     // gets past this without the proposal reappearing on every keystroke.
@@ -316,6 +385,10 @@ export function Conversation({
     setBusy(true);
     setExchanges((prev) => [...prev, { you: message, answer: "", tools: [], edits: [], done: null }]);
     let touchedFiles = false;
+    // Whether THIS turn's verifier failed. It decides what happens to a queued follow-up, and it
+    // has to be a local rather than state: `onDone` fires in the same tick as the last `setState`,
+    // so reading it from state there would read the previous turn's value.
+    let verifyFailed = false;
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -362,13 +435,17 @@ export function Conversation({
           touchedFiles = true;
           patchLast((e) => ({ ...e, edits: [...e.edits, { path, patch }] }));
         },
-        onVerified: (v) => patchLast((e) => ({ ...e, verified: v })),
+        onVerified: (v) => {
+          verifyFailed = v.state === "failed";
+          patchLast((e) => ({ ...e, verified: v }));
+        },
         onDone: (done) => {
           // The streamed tokens and the final answer are the same text; prefer the final one, which
           // is complete even when the backend never streamed (a non-streaming model, `stream:false`).
           patchLast((e) => ({ ...e, answer: done.answer || e.answer, done }));
           publish({ status: "done", busy: false, report: done });
           setBusy(false);
+          releaseQueued(verifyFailed);
           if (touchedFiles) {
             void qc.invalidateQueries({ queryKey: ["fs-tree"] });
             void qc.invalidateQueries({ queryKey: ["fs-file"] });
@@ -380,11 +457,15 @@ export function Conversation({
           patchLast((e) => ({ ...e, failed: true }));
           publish({ status: "idle", busy: false });
           setBusy(false);
+          // A turn that errored is never a base to send the next one from — hand the text back.
+          releaseQueued(true);
         },
       },
       controller.signal,
     );
   }
+
+  sendRef.current = send;
 
   /** Abandon the turn in flight. The model call cannot be un-made, but the stream stops arriving and
    *  the composer comes back — which is the difference between waiting and being stuck. */
@@ -540,11 +621,63 @@ export function Conversation({
         ) : null}
         {controls ? <div className="pb-1">{controls}</div> : null}
         <AttachmentTray items={attached} onRemove={(id) => setAttached((p) => p.filter((a) => a.id !== id))} />
+        {/* Shown, never silent. A message that vanished into an invisible queue is indistinguishable
+            from one that was dropped, and the user would retype it — which is two sends, not one. */}
+        {queued ? (
+          <div className="mb-1.5 flex items-start gap-2 rounded-chip border border-hairline bg-surface-2 px-2 py-1.5">
+            <span className="shrink-0 text-xs text-muted-foreground">{t("composer.queued")}</span>
+            <span className="min-w-0 flex-1 truncate text-xs">{queued}</span>
+            <button
+              type="button"
+              className="shrink-0 text-xs text-muted-foreground hover:text-bad"
+              // Back into the box rather than deleted: the user wrote it, and a cancel that destroys
+              // text is a worse trade than one that hands it back.
+              onClick={() => {
+                setDraft((d) => (d ? `${queued}\n${d}` : queued));
+                setQueued(null);
+              }}
+            >
+              {t("composer.unqueue")}
+            </button>
+          </div>
+        ) : null}
         <textarea
-          className="field min-h-[64px] w-full resize-y px-3 py-2 text-sm"
+          className={cn(
+            "field min-h-[64px] w-full resize-y px-3 py-2 text-sm",
+            dragging && "ring-2 ring-accent",
+          )}
           placeholder={t("code.chat.placeholder")}
           value={draft}
           onChange={(ev) => setDraft(ev.target.value)}
+          // Paste is the point. Taking a screenshot and pressing Ctrl+V is how people show a
+          // program what is wrong with it; without this the clipboard image was dropped on the
+          // floor and the only route was Save As, then the file dialog. `items` is where a pasted
+          // image lives — `clipboardData.files` is empty for it on some platforms — and pasted TEXT
+          // must still paste as text, so this only intercepts when a file actually comes out.
+          onPaste={(ev) => {
+            const files = Array.from(ev.clipboardData?.items ?? [])
+              .filter((i) => i.kind === "file")
+              .map((i) => i.getAsFile())
+              .filter((f): f is File => f !== null);
+            if (files.length === 0) return;
+            ev.preventDefault();
+            void upload(files);
+          }}
+          // Drag-and-drop needs its own preventDefault on dragOver or the browser navigates away to
+          // the dropped file — losing the whole conversation, which is a far worse outcome than not
+          // supporting drops at all.
+          onDragOver={(ev) => {
+            if (!ev.dataTransfer?.types?.includes("Files")) return;
+            ev.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(ev) => {
+            if (!ev.dataTransfer?.files?.length) return;
+            ev.preventDefault();
+            setDragging(false);
+            void upload(ev.dataTransfer.files);
+          }}
           onKeyDown={(ev) => {
             // Enter sends, Shift+Enter breaks the line — the chat's habit, chosen for the merged
             // screen. It is the riskier of the two now that a turn edits files, and what makes it
@@ -554,8 +687,16 @@ export function Conversation({
               send();
             }
           }}
-          disabled={busy}
+          // NOT disabled while busy. Blocking the box was the whole complaint: a follow-up that
+          // occurs to you mid-turn had nowhere to go, so it was either lost or typed elsewhere and
+          // pasted back. Send still refuses to start a second turn — it queues instead.
         />
+        {/* A paste that failed must say so here. The paperclip reports its own failures next to
+            itself; a file that arrived by clipboard has no button to stand beside, and silence
+            would leave someone waiting for a screenshot that was never uploaded. */}
+        {uploadFailed ? (
+          <p className="text-xs text-bad">{t("code.attach.failed", { name: uploadFailed })}</p>
+        ) : null}
         <div className="flex flex-wrap items-center gap-2">
           <AttachButton onAdded={(a) => setAttached((prev) => [...prev, a])} />
           <DictateButton
