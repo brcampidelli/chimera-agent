@@ -9,10 +9,12 @@
 //! at that localhost origin. The SPA is served BY the sidecar (same origin), so its relative `/api`
 //! calls just work — no divergent server code, no base-URL rewiring. The sidecar is killed on exit.
 
+use std::collections::VecDeque;
+use std::io::{BufRead, BufReader};
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command};
-use std::sync::Mutex;
+use std::process::{Child, Command, Stdio};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use tauri::menu::{Menu, MenuItem};
@@ -103,6 +105,77 @@ fn port_of(url: &str) -> Option<u16> {
 }
 
 /// Launch the sidecar and return the running child plus the URL it reported.
+/// Lines the backend's stderr is worth keeping. A traceback is the last ~30; the rest is boot noise,
+/// and an unbounded buffer is how a chatty backend eats memory over a long session.
+const STDERR_KEEP: usize = 80;
+
+/// Read the child's stderr on a thread, keeping the last [`STDERR_KEEP`] lines.
+///
+/// A thread rather than a read-on-failure: an unread pipe fills, and a process blocked writing into
+/// a full pipe never gets to say the thing we wanted to hear. Diagnosing a hang by causing one is
+/// the wrong trade.
+fn drain_stderr(child: &mut Child) -> Arc<Mutex<VecDeque<String>>> {
+    let tail = Arc::new(Mutex::new(VecDeque::with_capacity(STDERR_KEEP)));
+    let Some(stderr) = child.stderr.take() else {
+        return tail;
+    };
+    let sink = Arc::clone(&tail);
+    std::thread::spawn(move || {
+        for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+            // A poisoned lock here must not take the reader down: the backend keeps running, and
+            // losing the tail is a worse-diagnosed failure, not a second failure.
+            if let Ok(mut buf) = sink.lock() {
+                if buf.len() == STDERR_KEEP {
+                    buf.pop_front();
+                }
+                buf.push_back(line);
+            }
+        }
+    });
+    tail
+}
+
+/// Write what we know about a failed startup, and return the path.
+///
+/// Best-effort throughout: this runs on the path where something already went wrong, and a
+/// diagnostics writer that can itself fail the startup would be the joke writing itself. Every
+/// error here degrades to a less complete file, never to a second failure.
+fn write_startup_report(
+    data_dir: &Path,
+    exe: &Path,
+    child: &mut Child,
+    tail: &Arc<Mutex<VecDeque<String>>>,
+    why: &str,
+) -> PathBuf {
+    let path = data_dir.join("startup-failure.txt");
+    let exit = match child.try_wait() {
+        Ok(Some(status)) => format!("{status}"),
+        Ok(None) => "still running (killed after this report)".to_string(),
+        Err(e) => format!("unknown: {e}"),
+    };
+    let stderr = tail
+        .lock()
+        .map(|buf| buf.iter().cloned().collect::<Vec<_>>().join("\n"))
+        .unwrap_or_else(|_| "<stderr buffer unavailable>".to_string());
+    let body = format!(
+        "Chimera desktop — backend failed to start\n\
+         version: {}\n\
+         backend: {}\n\
+         pid: {}\n\
+         exit: {exit}\n\
+         reason: {why}\n\
+         \n\
+         --- last {STDERR_KEEP} lines of backend stderr ---\n{}\n",
+        env!("CARGO_PKG_VERSION"),
+        exe.display(),
+        child.id(),
+        if stderr.is_empty() { "<the backend printed nothing>" } else { &stderr },
+    );
+    let _ = std::fs::create_dir_all(data_dir);
+    let _ = std::fs::write(&path, body);
+    path
+}
+
 fn start_sidecar(app: &tauri::App) -> Result<(Child, String), String> {
     let exe = sidecar_path(app)?;
     if !exe.exists() {
@@ -130,16 +203,36 @@ fn start_sidecar(app: &tauri::App) -> Result<(Child, String), String> {
     let wanted = remembered_port(&memo);
     let wanted_arg = wanted.to_string();
 
-    let child = Command::new(&exe)
+    // stderr is PIPED so a backend that dies on startup leaves its last words somewhere. It used to
+    // be inherited, which on a windowed Windows build means discarded: the sidecar would print a
+    // traceback into a console that does not exist, `start_sidecar` would return a timeout with no
+    // detail, and the user would click the icon and get nothing at all — no window, no log, no file.
+    //
+    // Four competing agent apps each hardened this same step, independently and in four different
+    // frameworks. That is not convergent taste; it is the failure everyone met in the field.
+    let mut child = Command::new(&exe)
         .args(["--no-open", "--port", &wanted_arg, "--emit-port-file"])
         .arg(&port_file)
         .env("CHIMERA_HOME", data_dir.join("data"))
+        .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("failed to launch backend {exe:?}: {e}"))?;
 
+    // Drain it on a thread. Reading it only after a failure would deadlock instead of diagnosing:
+    // a pipe nobody reads fills, and a backend blocked writing to a full pipe never reaches the
+    // line that would have told us what was wrong.
+    let stderr_tail = drain_stderr(&mut child);
+
     // The frozen exe unpacks + boots; give it a generous window before giving up.
-    let url = wait_for_url(&port_file, Duration::from_secs(45))?;
-    wait_for_listening(&url, Duration::from_secs(30))?;
+    let url = wait_for_url(&port_file, Duration::from_secs(45))
+        .and_then(|url| wait_for_listening(&url, Duration::from_secs(30)).map(|()| url))
+        .map_err(|why| {
+            // Whatever the backend managed to say, plus the exit code if it already died — written
+            // BEFORE this error propagates, because everything above it is about to be unwound.
+            let report = write_startup_report(&data_dir, &exe, &mut child, &stderr_tail, &why);
+            let _ = child.kill();
+            format!("{why}\n\nDiagnostics written to:\n{}", report.display())
+        })?;
     let _ = std::fs::remove_file(&port_file);
 
     // Remember what we actually got, which is not always what we asked for. Best-effort on purpose:
@@ -155,7 +248,128 @@ fn start_sidecar(app: &tauri::App) -> Result<(Child, String), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{port_of, remembered_port};
+    use super::{drain_stderr, port_of, remembered_port, write_startup_report, STDERR_KEEP};
+    use std::process::{Command, Stdio};
+
+    /// A backend that dies on startup must leave its last words behind.
+    ///
+    /// This is the regression the whole change exists for: stderr used to be inherited, which on a
+    /// windowed Windows build means discarded — the traceback went to a console that does not exist.
+    #[test]
+    fn a_dying_backend_leaves_its_stderr_in_the_report() {
+        let dir = std::env::temp_dir().join(format!("chimera-startup-test-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+
+        let mut child = Command::new(if cfg!(windows) { "cmd" } else { "sh" })
+            .args(if cfg!(windows) {
+                vec!["/C", "echo ModuleNotFoundError: no module named chimera 1>&2 & exit 3"]
+            } else {
+                vec!["-c", "echo 'ModuleNotFoundError: no module named chimera' >&2; exit 3"]
+            })
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("spawn the stand-in backend");
+
+        let tail = drain_stderr(&mut child);
+        let _ = child.wait();
+        // The draining thread races the exit; give it a moment to finish the last line.
+        std::thread::sleep(std::time::Duration::from_millis(300));
+
+        let path = write_startup_report(
+            &dir,
+            std::path::Path::new("chimera-backend"),
+            &mut child,
+            &tail,
+            "timed out waiting for the port file",
+        );
+        let body = std::fs::read_to_string(&path).expect("the report was written");
+
+        assert!(body.contains("ModuleNotFoundError"), "the backend's own words are missing: {body}");
+        assert!(body.contains("timed out waiting"), "the reason is missing");
+        assert!(body.contains("exit"), "the exit status is missing");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A backend that says nothing must still produce a readable file, not an empty one.
+    #[test]
+    fn a_silent_backend_still_gets_a_report_that_says_so() {
+        let dir = std::env::temp_dir().join(format!("chimera-silent-test-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let mut child = Command::new(if cfg!(windows) { "cmd" } else { "sh" })
+            .args(if cfg!(windows) { vec!["/C", "exit 1"] } else { vec!["-c", "exit 1"] })
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("spawn");
+        let tail = drain_stderr(&mut child);
+        let _ = child.wait();
+        let path = write_startup_report(&dir, std::path::Path::new("x"), &mut child, &tail, "why");
+        let body = std::fs::read_to_string(&path).unwrap();
+        assert!(
+            body.contains("the backend printed nothing"),
+            "an empty tail must say so rather than leave a blank section: {body}"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The three tests above are HELPER tests, and I found that out by trying to break them.
+    ///
+    /// Removing `.stderr(Stdio::piped())` from `start_sidecar` left all three green, because each
+    /// spawns its own child and pipes it explicitly — they prove `drain_stderr` and
+    /// `write_startup_report` work, and say nothing about whether the sidecar path calls them. That
+    /// is the same "tests the class, not the wiring" defect this project has a skill card about.
+    ///
+    /// `start_sidecar` takes `&tauri::App`, which a unit test cannot construct, so the behavioural
+    /// version would mean restructuring it to accept a path. Worth doing; not worth blocking the
+    /// fix on. Until then this is a source-level assertion — weaker than behaviour, but it fails on
+    /// exactly the regression that matters and is honest about being a stand-in.
+    #[test]
+    fn the_sidecar_actually_pipes_its_stderr() {
+        let source = include_str!("main.rs");
+        // Cut the tests off FIRST. Two earlier versions of this window passed with the fix reverted:
+        // one took everything after the function name (reaching this very test, which mentions the
+        // string), and one bounded at the next top-level `fn` — but `mod tests` sits between
+        // `start_sidecar` and `kill_sidecar`, so that window swallowed the three tests below, and
+        // they pipe stderr themselves. A search window wide enough to contain its own answer proves
+        // nothing, and I wrote two of them before checking.
+        let production = source
+            .split_once("#[cfg(test)]")
+            .expect("the test module marks where production code ends")
+            .0;
+        let body = production
+            .split_once("fn start_sidecar")
+            .expect("start_sidecar exists")
+            .1;
+        // `start_sidecar` is the last function before the tests today; if one is added after it,
+        // this narrows further rather than opening up.
+        let spawn = body.split_once("\nfn ").map_or(body, |(head, _)| head);
+        assert!(
+            spawn.contains(".stderr(Stdio::piped())"),
+            "start_sidecar stopped piping stderr — a backend that dies on startup is silent again"
+        );
+        assert!(
+            spawn.contains("write_startup_report"),
+            "start_sidecar stopped writing a report on failure"
+        );
+    }
+
+    /// The buffer is bounded: a chatty backend must not grow it without limit.
+    #[test]
+    fn the_stderr_tail_is_bounded() {
+        let dir = std::env::temp_dir().join(format!("chimera-bound-test-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let script = format!("for i in $(seq 1 {}); do echo line$i >&2; done", STDERR_KEEP * 3);
+        let win = format!("for /L %i in (1,1,{}) do @echo line%i 1>&2", STDERR_KEEP * 3);
+        let mut child = Command::new(if cfg!(windows) { "cmd" } else { "sh" })
+            .args(if cfg!(windows) { vec!["/C", &win] } else { vec!["-c", &script] })
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("spawn");
+        let tail = drain_stderr(&mut child);
+        let _ = child.wait();
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        assert!(tail.lock().unwrap().len() <= STDERR_KEEP);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn a_url_yields_its_port() {
@@ -245,9 +459,24 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             // Bring up the backend, then open the window at its origin.
-            let (child, url) = start_sidecar(app).map_err(|e| -> Box<dyn std::error::Error> {
-                Box::<dyn std::error::Error>::from(e)
-            })?;
+            //
+            // The failure branch is the point. This used to be a bare `?`, which propagated to the
+            // `.expect()` on `build()` — and under `windows_subsystem = "windows"` a panic writes to
+            // a stderr that does not exist. Clicking the icon did nothing at all: no window, no
+            // console, no file. "Nothing happens" is the least diagnosable failure a desktop app can
+            // have, and it was ours on the platform this project is developed on.
+            let (child, url) = match start_sidecar(app) {
+                Ok(pair) => pair,
+                Err(why) => {
+                    // Blocking, so the process cannot exit before the user has read it.
+                    app.dialog()
+                        .message(&why)
+                        .title("Chimera could not start")
+                        .buttons(MessageDialogButtons::Ok)
+                        .blocking_show();
+                    return Err(Box::<dyn std::error::Error>::from(why));
+                }
+            };
             app.state::<Sidecar>().0.lock().unwrap().replace(child);
 
             WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url.parse()?))
