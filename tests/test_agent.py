@@ -181,6 +181,50 @@ def test_agent_hits_max_steps_and_forces_answer() -> None:
     assert backend.final_calls == 1
 
 
+def test_a_stop_request_ends_the_loop_at_the_next_step() -> None:
+    """A cancel must cost at most one more model call, not the rest of the attempt.
+
+    Before this the only cancel check lived in `AutonomousLoop`, between attempts. Stop therefore
+    meant "finish this attempt first": every remaining step of the tool loop, each a model call plus
+    whatever tools it triggers. On a real task that is minutes and money spent after the user asked
+    for it to end.
+    """
+    always_tool = CompletionResult(
+        content="", model="fake", tool_calls=[ToolCall(id="c", name="echo", arguments={"text": "x"})],
+    )
+
+    class CountingBackend:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def complete(self, messages: list[Any], *, tools: Any = None, **kwargs: Any) -> CompletionResult:
+            self.calls += 1
+            return CompletionResult(content="forced", model="fake") if tools is None else always_tool
+
+    backend = CountingBackend()
+    agent = Agent(backend, _echo_registry(), AgentConfig(max_steps=20))
+    # Up after the second model call: the loop must stop at the top of step 3, not grind to 20.
+    result = agent.run("loop forever", should_stop=lambda: backend.calls >= 2)
+
+    assert result.stopped_reason == "cancelled"
+    assert backend.calls == 2, "one more model call than the flag allowed is one too many"
+    assert result.steps == 2, "the steps actually taken, not the step it was about to start"
+    assert result.answer, "an empty answer reads as 'it produced nothing', which is a different claim"
+
+
+def test_without_a_stop_check_the_loop_is_byte_for_byte_what_it_was() -> None:
+    """The default path must not move. `should_stop=None` is every existing caller."""
+    backend = ScriptedBackend([CompletionResult(content="done", model="fake")])
+    plain = Agent(backend, _echo_registry(), AgentConfig()).run("x")
+
+    backend2 = ScriptedBackend([CompletionResult(content="done", model="fake")])
+    explicit = Agent(backend2, _echo_registry(), AgentConfig()).run("x", should_stop=None)
+
+    assert plain.stopped_reason == explicit.stopped_reason == "final"
+    assert plain.answer == explicit.answer == "done"
+    assert plain.steps == explicit.steps
+
+
 def test_agent_handles_unknown_tool_gracefully() -> None:
     backend = ScriptedBackend(
         [

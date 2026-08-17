@@ -38,6 +38,10 @@ _log = get_logger("core.agent")
 # Bound on a single live per-edit unified diff (chars), so a huge write can't flood the event stream.
 _MAX_EDIT_DIFF_CHARS = 4000
 
+# What a cancelled run answers. Not "" — an empty answer reads as "it produced nothing", which is a
+# different claim from "somebody asked it to stop", and callers render the two identically.
+_CANCELLED_ANSWER = "Stopped at your request. The work up to this point is in the transcript."
+
 # Cached builtin skill registry for context retrieval (name/description only — no backend, no network).
 _DEFAULT_SKILLS: SkillRegistry | None = None
 
@@ -184,7 +188,7 @@ class AgentResult:
 
     answer: str
     steps: int
-    stopped_reason: str  # "final" | "max_steps" | "tool_loop" | "budget"
+    stopped_reason: str  # "final" | "max_steps" | "tool_loop" | "budget" | "cancelled"
     transcript: list[MessageLike] = field(default_factory=list)
     tool_calls_made: int = 0
     # Token/cost accounting, summed across every model call in the run (0 when the backend reported
@@ -278,6 +282,7 @@ class Agent:
         on_edit: Callable[[str, str], None] | None = None,
         history: list[MessageLike] | None = None,
         images: list[str] | None = None,
+        should_stop: Callable[[], bool] | None = None,
     ) -> AgentResult:
         """Run the tool loop. ``on_token`` streams model text deltas as they arrive (when the backend
         supports it); ``on_tool`` fires once per tool call with its outcome. ``on_edit`` fires with
@@ -291,7 +296,12 @@ class Agent:
         difference between a second turn that remembers reading a file and one that reads it again:
         a caller that flattens the conversation to prose (as ``ChatSession`` does, by design, for
         chat) necessarily discards every tool call, so the agent starts each turn blind. None keeps
-        the historical single-shot behaviour, byte-identical."""
+        the historical single-shot behaviour, byte-identical.
+
+        ``should_stop`` is polled once per step and ends the run with ``stopped_reason="cancelled"``,
+        keeping everything done so far. A model call already in flight cannot be interrupted, so a
+        step boundary is as fine as cancellation gets — but it is far finer than an attempt
+        boundary, which is where the only cancel check used to live."""
         system_prompt = self.config.system_prompt
         skill_block = self._skill_context(task)
         if skill_block:
@@ -354,6 +364,19 @@ class Agent:
         drift_reported = False
 
         for step in range(1, self.config.max_steps + 1):
+            # Cooperative cancel, checked once per step. A model call in flight cannot be
+            # interrupted, so a step boundary is the finest grain available — and it is much finer
+            # than what the caller had before. `AutonomousLoop` checked its stop flag only BETWEEN
+            # attempts, so Stop in the app meant "finish the whole attempt first": up to `max_steps`
+            # model calls plus every tool they trigger, which on a real task is minutes of work and
+            # money after the user asked for it to end. Nothing is discarded — the partial answer is
+            # the work already paid for.
+            if should_stop is not None and should_stop():
+                _log.info("run cancelled at step %d", step)
+                return self._result(
+                    _CANCELLED_ANSWER, step - 1, "cancelled", messages, tool_calls_made, tool_names,
+                    usage, self.config.model or "", None, steplog, task,
+                )
             # Timed here and nowhere else: this call is the only thing in the loop that is the
             # model. Measuring around the whole iteration would fold the tool calls into the rate
             # and report a shell command as slow generation.

@@ -157,10 +157,13 @@ def _format_requirements(requirements: list[Any]) -> str:
 class Worker(Protocol):
     """Anything that can execute a task and return a result (the agent loop).
 
-    Both callbacks are optional and structural: ``on_edit`` receives ``(path, patch)`` for each file
-    the worker changes mid-run (the live per-edit diff), and ``on_tool`` fires once per tool call
-    with its outcome. The loop passes each one only to workers whose ``run`` actually accepts it
-    (checked by signature), so a Worker that supports neither is never broken.
+    All three keyword arguments are optional and structural: ``on_edit`` receives ``(path, patch)``
+    for each file the worker changes mid-run (the live per-edit diff), ``on_tool`` fires once per
+    tool call with its outcome, and ``should_stop`` is polled by the worker so a cancel takes effect
+    inside an attempt rather than at the end of it. The loop passes each one only to workers whose
+    ``run`` actually accepts it (checked by signature), so a Worker that supports none is never
+    broken — an external agent driven over ACP accepts none of the three, and the loop's own
+    between-attempt cancel still applies to it.
     """
 
     def run(
@@ -169,6 +172,7 @@ class Worker(Protocol):
         *,
         on_edit: Callable[[str, str], None] | None = None,
         on_tool: Callable[[Any], None] | None = None,
+        should_stop: Callable[[], bool] | None = None,
     ) -> AgentResult: ...
 
 
@@ -442,18 +446,25 @@ class AutonomousAgent:
         ``worker.run(prompt)`` it always was, and a worker whose ``run`` accepts neither callback
         (any Worker implementation that predates them) is called the same way. The support check
         reads the real signature; a TypeError fallback covers a wrapper whose signature lied.
+
+        ``should_stop`` travels the same way, and it is NOT an event: it is checked even with no
+        sink, because a cancel must work in a headless run too. Passing it down is what makes Stop
+        take effect within a step instead of at the end of the attempt — the loop's own checks are
+        between attempts, so without this a stop request waits out every remaining model call and
+        every tool they trigger.
         """
-        if self.on_event is None:
-            return worker.run(prompt)
         try:
             accepted = set(inspect.signature(worker.run).parameters)
         except (TypeError, ValueError):  # unintrospectable callable (C impl / odd wrapper)
             accepted = set()
         kwargs: dict[str, Any] = {}
-        if "on_edit" in accepted:
-            kwargs["on_edit"] = self._emit_edit
-        if "on_tool" in accepted:
-            kwargs["on_tool"] = self._emit_tool
+        if self.should_stop is not None and "should_stop" in accepted:
+            kwargs["should_stop"] = self.should_stop
+        if self.on_event is not None:
+            if "on_edit" in accepted:
+                kwargs["on_edit"] = self._emit_edit
+            if "on_tool" in accepted:
+                kwargs["on_tool"] = self._emit_tool
         if not kwargs:
             return worker.run(prompt)
         try:
@@ -617,11 +628,25 @@ class AutonomousAgent:
             )
             if worker is self.escalate_worker:
                 _log.debug("attempt %d: task proved hard, escalating retry to fusion worker", index)
-            # Re-check right before the (uninterruptible) worker call, so a stop that arrived while the
-            # snapshot was being taken still halts before we pay for a model step.
+            # Re-check right before the worker call, so a stop that arrived while the snapshot was
+            # being taken still halts before we pay for a model step. The call is no longer
+            # uninterruptible: `_run_worker` hands `should_stop` down, and a worker that accepts it
+            # returns at its next step boundary.
             if self.should_stop is not None and self.should_stop():
                 return self._finalize_cancelled(task, attempts, plan, thread_id)
             agent_result = self._run_worker(worker, prompt)
+            # A worker that cut itself short produced a PARTIAL attempt, and verifying, reviewing and
+            # scoring one is worse than useless: those are model calls the user has already asked us
+            # not to make, spent to judge work that stopped halfway — and the failing verdict would
+            # be recorded as evidence the task is hard.
+            #
+            # On `stopped_reason`, deliberately NOT on the flag. The flag says a stop was requested
+            # at some point; only the reason says THIS attempt is incomplete. A worker that does not
+            # accept `should_stop` runs to the end even after a stop arrives, and that attempt is
+            # whole — discarding it would throw away a finished piece of work and, with
+            # `max_attempts=1`, return a run with no attempts at all.
+            if getattr(agent_result, "stopped_reason", "") == "cancelled":
+                return self._finalize_cancelled(task, attempts, plan, thread_id)
             answer = agent_result.answer
             # Surface a degrading trajectory where a person will see it, not only in the trace. It
             # is advisory: the attempt is judged on its result as always, and the run continues.
