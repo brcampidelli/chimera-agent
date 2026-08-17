@@ -1,5 +1,5 @@
 ---
-source_sha256: a88090fec9fcabd118b65cf8d40ddecefd47fbb2da49dfa195a66fd57e85c4c1
+source_sha256: f08c31cf980c0d86795fe456d5f9ed6871b58325c9e429e93f48c71b6e998356
 ---
 
 # 配方（Recipes）
@@ -104,7 +104,7 @@ uv sync --extra documents        # or: pip install 'chimera-agent[documents]'
 ## 研究一个主题（搜索 + 阅读）
 
 把网页搜索和浏览器的 `read_text` 结合起来，研究某个主题并得到一份附来源的简报——`web_search`
-（需要 `CHIMERA_TAVILY_API_KEY`）负责找到相关页面，`browser read_text` 逐一阅读它们（包括
+（需要 `TAVILY_API_KEY`）负责找到相关页面，`browser read_text` 逐一阅读它们（包括
 JS 重度依赖的网站），`deliver` 负责把简报写出来：
 
 ```bash

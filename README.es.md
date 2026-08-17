@@ -33,7 +33,7 @@ de verdad funciona.
 > **Gratis y open-source (Apache-2.0), en desarrollo temprano pero activo.** Ya funciona de principio
 > a fin: conversa con él, deja que complete tareas por su cuenta, ejecútalo como un bot en tu app de
 > mensajería favorita, despliégalo en un servidor para que trabaje 24/7 y míralo aprender de lo que
-> hace. Está en **alpha** — sólido y probado a fondo (**más de 2.000 tests automatizados**, verificación
+> hace. Está en **alpha** — sólido y probado a fondo (**más de 2.800 tests automatizados**, verificación
 > de tipos estricta y linting en cada cambio), pero todavía no curtido en producción.
 
 ---
@@ -48,7 +48,7 @@ especial, en pocas palabras:
 
 - 🧠 **Muchas mentes, una respuesta.** Para las preguntas difíciles, Chimera pregunta lo mismo a varios modelos, deja que un modelo compare sus respuestas y hace que un modelo final redacte la mejor respuesta combinada — así obtienes algo más equilibrado y con menos probabilidad de estar mal que cualquier modelo por sí solo. (Lo hace solo cuando vale la pena, para seguir siendo rápido y económico.)
 - 🚀 **Hace el trabajo, no solo habla.** Dale un objetivo. Lo desglosa, usa herramientas, edita archivos, ejecuta los tests y **conserva un cambio solo si pasa**. Si algo se rompe, lo deshace y lo intenta de nuevo — así no deja un desastre atrás.
-- 🧬 **Mejora cuanto más lo usas.** Recuerda tus preferencias y datos importantes entre conversaciones, y convierte discretamente las tareas que repite en skills reutilizables. Está diseñado para seguir mejorando en lugar de empeorar poco a poco a lo largo de ejecuciones largas — un problema que degrada silenciosamente a muchos agentes.
+- 🧬 **Recuerda, y está construido para seguir mejorando.** Recuerda tus preferencias y datos importantes entre conversaciones, y convierte discretamente las tareas que repite en skills reutilizables, resistiendo la lenta degradación que deteriora a muchos agentes a lo largo de ejecuciones largas. **Advertencia honesta:** que ese aprendizaje acumulado lo haga mediblemente *mejor en las tareas* no está demostrado — siete ejecuciones pre-registradas no encontraron ningún efecto significativo, y retractamos el único positivo que no se replicó ([`bench/learning_lift/RESULTS.md`](bench/learning_lift/RESULTS.md)).
 - 🛡️ **Seguro por diseño.** Toda acción arriesgada pasa primero por una verificación de seguridad, cualquier acción destructiva pide confirmación, y el código no confiable puede ejecutarse en un contenedor blindado y sin red. (Esas verificaciones son un primer filtro barato, no la frontera real — el sandbox lo es; y el aislamiento en contenedor es opcional. Consulta [SECURITY.md](SECURITY.md).)
 - 🔌 **Cualquier modelo, corre donde sea.** Usa grandes modelos alojados en la nube o los tuyos propios en local a través de una única interfaz — en tu portátil o en un servidor de $5, las 24 horas.
 - 🧩 **Realmente tuyo.** Open-source, sin ataduras, sin necesidad de una cuenta de proveedor. Tú lo ejecutas, tú lo controlas, puedes cambiar lo que quieras.
@@ -60,16 +60,19 @@ cosas que un verdadero estudio de ingeniería inversa de cinco líderes (OpenCla
 CrewAI, LangGraph) descubrió que **todos dejan abiertas** — y las convierte en su núcleo:
 
 - 🧬 **Auto-evolución con una señal de aptitud.** Los demás "aprenden" añadiendo lo que sea que ocurrió, o mediante pull requests humanos — nada mide si un cambio aprendido realmente ayudó. Chimera conserva un cambio **solo cuando un resultado verificado demuestra que lo hizo**: el paso de evolución está condicionado al diff real del árbol de trabajo y a un A/B honesto, nunca a la palabra del modelo. Evidencia independiente de que esto importa: [EvoAgentBench (arXiv 2607.05202)](https://arxiv.org/abs/2607.05202) midió que los métodos de codificación de experiencia *automáticos* y sin control producen habitualmente **transferencia negativa** — un método popular retrocedió **−12,3 puntos** en tareas para las que no fue ajustado. El control de Chimera ahora también ejecuta un **holdout de transferencia**: un cambio aprendido no debe empeorar un segmento disjunto de la misma capacidad antes de promoverse, de modo que no pueda simplemente memorizar su propia evaluación.
-- 🛡️ **Seguridad por arquitectura.** La inyección de prompts ahora se considera ampliamente *imparcheable*; los agentes populares la mitigan en la capa de aplicación o la declaran fuera de alcance (uno lanzó 135k instancias expuestas públicamente y un marketplace ~12% lleno de skills maliciosas). Chimera incorpora una capa de defensa real — **opcional con `--taint`, desactivada por defecto**: rastrea la procedencia de la contaminación de forma *heurística* (flujo de referencia/contenido literal, **no** dataflow real — un modelo que parafrasea el texto contaminado lo "lava"), elimina los tokens de control del contenido no confiable, restringe el acceso a herramientas peligrosas durante el resto de una ejecución contaminada y protege los reintentos con efectos secundarios; el código no confiable se ejecuta en un contenedor blindado, opcional. En el corpus incorporado de **7 ataques**, **6 de 7** llamadas dañinas son bloqueadas (**~14%** aún pasan) — medido sobre un agente **ya inyectado** que intenta la llamada del atacante, sin modelo en el circuito. El brazo sin defensa es 100% por construcción, no por medición: una herramienta sin wrapper siempre se ejecuta, así que trátalo como el piso definicional contra el que se compara esta capa, no como un sistema de referencia. Esto no dice nada sobre lo fácil que es inyectar el modelo — la mitad más difícil, aún abierta ([`chimera/eval/injection.py`](chimera/eval/injection.py)). [`SECURITY.md`](SECURITY.md) dice con claridad qué sigue pasando (traspaso entre subagentes, fusión/resumen, puntos de entrada fuera de la CLI): la frontera de contención es el sandbox; esta capa es defensa en profundidad sobre él.
-- 📊 **Benchmarks honestos y publicados.** ~20% de los casos "resueltos" de un leaderboard popular en realidad están mal. Chimera reporta cada número con un intervalo de confianza — **incluidas las ejecuciones en las que no ganó** — y nunca vuelve a tirar los dados en busca de significancia. Una ejecución pareada registrada muestra el bucle completo **elevando un modelo débil en una suite pre-registrada de 100 tareas — 48% → 71% (+23pp), IC 95% [+12,6%, +28,6%] — estadísticamente significativa** (el IC excluye el cero), a partir de **28 tareas que recuperó** (fallo crudo → aprobación verificada) frente a 5 regresiones. Una sola ejecución, sin repeticiones. Esto **reemplaza una ejecución anterior de la misma suite** (9% → 15%, +6pp) cuyo harness calificaba con un archivo de test que el agente podía editar — y que, al repetirla, editó una vez. La dirección y la significancia se replicaron y se reforzaron al endurecer la calificación; la fe de erratas, la evidencia de manipulación preservada y por qué las tasas absolutas de la ejecución original eran tan bajas están en [`bench/local_lift/RESULTS.md`](bench/local_lift/RESULTS.md). Y en el **Terminal-Bench oficial**, un A/B pre-registrado de N=40 aterrizó en un **suelo dominado por la varianza sin diferencia significativa en ninguna dirección** — publicado tal cual ([`bench/terminal_bench/RESULTS.md`](bench/terminal_bench/RESULTS.md)), incluida la **retractación de una lectura intermedia errónea** una vez que se midió el brazo de control. Los resultados nulos y las autocorrecciones también se publican; ese es el punto.
+- 🛡️ **Seguridad por arquitectura.** La inyección de prompts ahora se considera ampliamente *imparcheable*; los agentes populares la mitigan en la capa de aplicación o la declaran fuera de alcance (uno lanzó 135k instancias expuestas públicamente y un marketplace ~12% lleno de skills maliciosas). Chimera incorpora una capa de defensa real — **opcional con `--taint`, desactivada por defecto**: rastrea la procedencia de la contaminación de forma *heurística* (flujo de referencia/contenido literal, **no** dataflow real — un modelo que parafrasea el texto contaminado lo "lava"), elimina los tokens de control del contenido no confiable, restringe el acceso a herramientas peligrosas durante el resto de una ejecución contaminada y protege los reintentos con efectos secundarios; el código no confiable se ejecuta en un contenedor blindado, opcional. En el corpus incorporado de **7 ataques**, **6 de 7** llamadas dañinas son bloqueadas (**~14%** aún pasan) — medido sobre un agente **ya inyectado** que intenta la llamada del atacante, sin modelo en el circuito. Esa tasa de bloqueo nunca se publica sola: el mismo informe lleva cuánto trabajo *legítimo* rechaza ese estrechamiento, medido sobre un corpus benigno que activa la misma superficie, y la compuerta no lee una mitad sin la otra (`chimera redteam` imprime las dos — una defensa puntuada solo con ataques tiene un máximo trivial: rechazarlo todo). El brazo sin defensa es 100% por construcción, no por medición: una herramienta sin wrapper siempre se ejecuta, así que trátalo como el piso definicional contra el que se compara esta capa, no como un sistema de referencia. Esto no dice nada sobre lo fácil que es inyectar el modelo — la mitad más difícil, aún abierta ([`chimera/eval/injection.py`](chimera/eval/injection.py)). [`SECURITY.md`](SECURITY.md) dice con claridad qué sigue pasando (traspaso entre subagentes, fusión/resumen, puntos de entrada fuera de la CLI): la frontera de contención es el sandbox; esta capa es defensa en profundidad sobre él.
+- 📊 **Benchmarks honestos y publicados.** ~20% de los casos "resueltos" de un leaderboard popular en realidad están mal. Chimera reporta cada número con un intervalo de confianza — **incluidas las ejecuciones en las que no ganó** —, nunca vuelve a tirar los dados en busca de significancia, y retracta sus propias afirmaciones cuando una replicación las mata. Los números, los nulos y las retractaciones están todos en [Benchmarks](#benchmarks-honestos).
 
 **En una línea: el agente auto-evolutivo gobernado — probado y gobernado.** Está en alpha, y lo dice.
 
 ## Benchmarks (honestos)
 
-Dos números registrados, ambos ciertos, publicados juntos a propósito — uno ya significativo, otro
-humillante. (También aparecen en la pantalla **Madurez y Benchmarks** de la app de escritorio,
-directamente desde el snapshot incluido.)
+Cuatro resultados registrados, publicados juntos a propósito: dos que sostienen la tesis (uno
+significativo solo al agruparlos), uno que salió en nuestra contra y uno que retractamos. (También
+aparecen en la pantalla **Madurez y Benchmarks** de la app de escritorio, directamente desde el
+snapshot incluido — esa pantalla informa de la cobertura del propio proyecto, así que solo se
+renderiza bajo el servidor de desarrollo de Vite (`npm --prefix apps/desktop run dev`). `chimera app`
+sirve la compilación de producción y no la muestra; un instalador nativo, tampoco.)
 
 - **Elevación de un modelo débil (significativa).** Un modelo barato (`mistral-small-3.2-24b`) + el
   bucle de reintento de Chimera frente al mismo modelo solo, en una **suite pre-registrada de n=100**
@@ -88,7 +91,7 @@ directamente desde el snapshot incluido.)
   [`bench/local_lift/RESULTS.md`](bench/local_lift/RESULTS.md).
   Fuente: [`bench/local_lift/_reverify_n100/paired.json`](bench/local_lift/_reverify_n100/paired.json), [`PREREGISTRATION.md`](bench/local_lift/PREREGISTRATION.md).
 - **SWE-bench Verified — la evidencia externa más fuerte, y sobrevivió a una replicación diseñada para
-  matarla.** Tres ejecuciones pre-registradas sobre porciones de `django/django`, calificadas
+  matarla.** Cuatro ejecuciones pre-registradas sobre porciones de `django/django`, calificadas
   **únicamente** por el harness oficial `swebench` 4.1.0 en Docker — nunca auto-reportadas.
 
   | ejecución | porción | baseline | + Chimera | Δ pareado | IC 95% | |
@@ -164,7 +167,11 @@ registradas *antes* de cada ejecución, victorias **y** derrotas publicadas — 
 nivel medio por sí solo obtuvo 100% con 846 tokens; la fusión completa también obtuvo 100% — por
 **9.526 tokens (~11×)**. Así que la fusión queda detrás de una cascada barato→control→medio→fusión
 que escala solo cuando falla un control gratuito, alcanzando calidad ~media a ~1/12 del costo de la
-fusión.
+fusión. Su propio criterio registrado — *cascada ≥ tasa de aprobación del nivel medio a un costo
+materialmente menor* — **no se cumplió**: la cascada aterrizó en 91,7% frente al 100% del nivel
+medio, porque en esta suite el nivel medio ya satura y no deja margen. El único fallo es
+instructivo: una compuerta léxica gratuita no puede pillar una respuesta segura-pero-equivocada
+([`bench/cascade/RESULTS.md`](bench/cascade/RESULTS.md)).
 
 **La orquestación jerárquica gana solo donde debe — y por una ley que podemos escribir.**
 `chimera orchestrate` reparte una tarea entre workers acotados en lugar de un único gran contexto.
@@ -195,13 +202,14 @@ silenciosamente el número de tokens como si fuera un número en dólares.
 
 ### 🧠 Pensar y hacer
 - **Combina varios modelos en una respuesta** (`chimera fuse`) — un panel de modelos, un juez que saca a la luz dónde coinciden, dónde discrepan o qué se les escapa, y un sintetizador que redacta la respuesta final. Un enrutador inteligente solo dedica este esfuerzo extra a los problemas difíciles, y cuando los primeros modelos ya coinciden se detiene antes de tiempo — medido en **~20–28% menos tokens** en nuestros benchmarks — con la precisión entre 0 y −8,3pp en tres ejecuciones, una oscilación que leemos como no determinismo del modelo porque cae por completo en el grupo escalado, donde selectivo y completo ejecutan el mismo pipeline. (La fusión / mixture-of-agents en sí no es exclusiva nuestra — la encuentras en OpenRouter y otras herramientas; la diferencia aquí es que está integrada en el bucle del agente, detrás de ese enrutador consciente del costo, y está medida, no es un modelo que eliges.)
-- **Completa tareas por su cuenta** (`chimera solve`) — planifica, actúa con herramientas y luego **verifica y revierte**: ejecuta tu comprobación (p. ej. tests) y conserva el cambio solo si pasa; de lo contrario lo deshace y reintenta. Opcionalmente trabaja sobre una copia aislada de tu proyecto para que no se toque nada hasta que esté probado. **Y un párrafo convincente no es una solución:** sin un `--verify` al que apelar, una ejecución que no cambió nada en disco se reporta como fallo, no como éxito — porque lo único que quedaría juzgándola sería un modelo leyendo prosa, que nunca ve el diff. Cada intento registra *quién* lo aprobó (`verifier` / `diff+manager` / `manager` / `none`), así que un recibo nunca dice "éxito" sin nombrar la autoridad detrás.
+- **Completa tareas por su cuenta** (`chimera solve`) — planifica, actúa con herramientas y luego **verifica y revierte**: ejecuta tu comprobación (p. ej. tests) y conserva el cambio solo si pasa; de lo contrario lo deshace y reintenta. Opcionalmente trabaja sobre una copia aislada de tu proyecto para que no se toque nada hasta que esté probado. **Y un párrafo convincente no es una solución:** sin un `--verify` al que apelar, una ejecución que no cambió nada en disco se reporta como fallo, no como éxito — porque lo único que quedaría juzgándola sería un modelo leyendo prosa, que nunca ve el diff. Cada intento registra *quién* lo aprobó (`verifier` / `diff+manager` / `diff` / `manager` / `none`), así que un recibo nunca dice "éxito" sin nombrar la autoridad detrás.
 - **Equipos de especialistas** (`chimera crew`, `chimera crew-isolated`) — varios agentes enfocados en roles se reparten un mismo trabajo. En modo aislado, cada uno trabaja en su **propia copia privada en paralelo**; las ediciones seguras se fusionan, los conflictos se señalan en lugar de sobrescribirse en silencio, y los cambios de un worker defectuoso pueden rechazarse mediante un test por worker. Un supervisor puede reunir el trabajo de todos en un único informe unificado.
 - **Delega y explora** — cualquier agente puede pasar una subtarea autocontenida a un **subagente** nuevo que solo informa del resultado, manteniendo limpio el contexto principal. El **Explorador de Contexto** (`chimera explore`) encuentra los archivos y las líneas correctas en un código y devuelve una respuesta breve en lugar de volcarlo todo.
 
 ### 🧬 Memoria y automejora
 - **Memoria a largo plazo** — mantiene memorias a corto plazo, recientes, factuales y sobre ti, además de un mapa de cómo se relacionan las cosas. Puede guardar memorias en una base de datos de texto completo rápida, llevar un perfil de tus preferencias a cada conversación, fusionar notas duplicadas automáticamente y sugerirte con delicadeza guardar una preferencia cuando mencionas una.
 - **Aprende nuevas skills** — cuando tiene éxito en el mismo tipo de tarea más de una vez, lo convierte automáticamente en una skill probada y reutilizable.
+- **Una biblioteca de skills curada que puedes leer y ampliar** — 23 tarjetas de skill en [`skills/`](skills/), 13 de ellas escritas a partir de los incidentes del propio proyecto. Una tarjeta es **datos, no código**: frontmatter más `Trigger` / `Do` / `Avoid` / `Check` / `Risk`, y no ejecuta nada — el agente la lee dentro del prompt cuando una tarjeta encaja, **opcional con `--skill-cards` (o `CHIMERA_SKILL_CARDS=1`), desactivado por defecto**: el A/B registrado que habría activado esa lectura volvió con +16,7pp pero *no significativo* y con +300% de tokens, así que suspendió su propia compuerta de cambio y se quedó apagado ([`bench/skillcard/RESULTS.md`](bench/skillcard/RESULTS.md)). Están agrupadas por el punto del trabajo en el que aplican (`define` · `build` · `verify` · `review` · `ship`), con descripción, cuerpo y chips de disparo traducidos a nueve idiomas — mantenidos honestos por un test que falla ante una traducción que se ha quedado obsoleta o está a medias. Importa una con `chimera skills-import skills/<nombre>`. Es además el sitio con menor barrera para contribuir: revisar tu pull request es leer una página de markdown, no auditar un diff ([`skills/README.md`](skills/README.md)).
 - **Autoentrenamiento opcional (avanzado)** — puede registrar su propia experiencia para que luego puedas afinar un modelo a partir de ella. Desactivado por defecto; nada se entrena sin que lo pidas.
 
 ### 📏 Un bucle que se puede medir — y que avisa cuando se ha perdido
@@ -222,13 +230,15 @@ la suya:
 ### 🚀 Corre donde sea, con seguridad
 - **Cualquier modelo, una interfaz** — modelos alojados en la nube o los tuyos en local, con conmutación automática si uno está caído y rotación entre varias claves.
 - **Despliegue en servidor con un comando** — ejecútalo con Docker (o en bare-metal) para que siga activo y se reinicie al arrancar. Consulta **[docs/deploy.md](docs/deploy.md)**.
-- **Núcleo de seguridad** — una verificación en cada acción (permitir / advertir / bloquear / preguntar), un contenedor con red aislada **opcional** para código no confiable (`CHIMERA_SANDBOX=docker`; el runner local por defecto *no* está aislado) y un registro de auditoría completo de lo que hizo.
+- **Núcleo de seguridad** — una verificación en cada acción (permitir / advertir / revisar / bloquear), un contenedor con red aislada **opcional** para código no confiable (`CHIMERA_SANDBOX=docker`; el runner local por defecto *no* está aislado) y un registro de auditoría completo de lo que hizo. Que un veredicto de `review` se detenga a preguntarte o simplemente rechace lo decide el modo de aprobación (`CHIMERA_APPROVAL_MODE=ask|deny|allow`) — sin nadie delante, rechaza en vez de inventarse tu consentimiento.
 - **Detente antes de que finalice, cuando leyó algo en lo que no se debe confiar** (`--pause-on-taint`) — una ejecución que consumió contenido no confiable se aparca en lugar de finalizar, y te espera. Puedes aceptar el resultado, aceptar una versión que tú editaste, enviar indicaciones y dejar que lo intente de nuevo, o rechazarlo del todo — desde la terminal *o* desde la app de escritorio. Nada se guarda y nada se aprende hasta que decides, y una pausa nunca se reporta como fallo: no ha llegado a un veredicto, está esperando a una persona.
 - **Una app de escritorio que pilota una ejecución, no solo la lanza** — cinco destinos en vez de un menú de quince, en diez idiomas. Inicia una ejecución y vete: el progreso sigue ahí cuando vuelves, la barra de estado nombra lo que el agente está haciendo desde cualquier pantalla, y Detener funciona desde todas. Instaladores nativos para Windows / macOS / Linux en [Releases](https://github.com/brcampidelli/chimera-agent/releases).
 
 ## Inicio rápido
 
-Necesitas **Python 3.11–3.13** y [uv](https://docs.astral.sh/uv/) (un instalador de Python rápido).
+Necesitas **Python 3.11–3.13** ([python.org](https://www.python.org/downloads/) — comprueba el tuyo
+con `python --version`) y, para una copia del código fuente, [uv](https://docs.astral.sh/uv/) (un
+instalador de Python rápido).
 
 **1. Instalar** — desde PyPI:
 ```bash
@@ -300,7 +310,7 @@ quieras (mira la columna "Necesita"). **¿Usas Docker? La imagen oficial ya incl
 | **Chat que te recuerda** | — | `chimera chat` |
 | **Hacer una pregunta** | — | `chimera run "explica X en 3 puntos"` |
 | **App de terminal a pantalla completa** | — | `chimera tui` |
-| **App de escritorio** (chat · trabajo · código · conocimiento · automatización, en 10 idiomas) | `[desktop]` o una descarga | `chimera app`, o descarga un instalador nativo (`.exe`/`.dmg`/`.AppImage`/`.deb`) desde [Releases](https://github.com/brcampidelli/chimera-agent/releases) |
+| **App de escritorio** (código · editor · trabajo · conocimiento · automatización, en 10 idiomas) | `[desktop]` o una descarga | `chimera app`, o descarga un instalador nativo (`.exe`/`.dmg`/`.AppImage`/`.deb`) desde [Releases](https://github.com/brcampidelli/chimera-agent/releases) |
 | **Hacer una tarea y conservarla solo si pasa una comprobación** | — | `chimera solve "añade hello() a app.py + un test" --verify "pytest -q"` |
 | **Pregúntame antes de finalizar algo que leyó de la web** | — | añade `--pause-on-taint` a `chimera solve` |
 | **Ver lo que costó de verdad una ejecución, paso a paso** | — | se escribe solo en `.chimera/traces.jsonl` (o `$CHIMERA_HOME`) |
@@ -316,7 +326,8 @@ quieras (mira la columna "Necesita"). **¿Usas Docker? La imagen oficial ya incl
 | **Buscar en la web** | clave: Tavily | `chimera run "busca en la web: la última versión de Python"` |
 | **Leer y extraer páginas web reales** (un navegador de verdad) | — | `chimera run "abre example.com y dime el título"` |
 | **Memoria a largo plazo** | — | `chimera memory add "..."` · `chimera memory search "..."` |
-| **Aprender skills reutilizables solo** | — | ocurre durante `chimera solve`; lista con `chimera skills` |
+| **Aprender skills reutilizables solo** | — | ocurre durante `chimera solve`; lista con `chimera skills-stats` (`chimera skills` lista las integradas) |
+| **Usar una tarjeta de skill curada** (23 de ellas, 9 idiomas) | — | `chimera skills-import skills/verify-before-claiming` |
 | **Programar trabajo recurrente** | — | `chimera cron add brief "0 8 * * *" "resume las noticias"` |
 | **Ejecutar como bot de chat** (Discord/Telegram/Slack/Signal/WhatsApp) | `[messaging]` | `chimera serve --cron --discord` |
 | **Conectar cualquier herramienta externa** (MCP) | `[mcp]` | guía: [docs/mcp.md](docs/mcp.md) |
@@ -327,16 +338,10 @@ quieras (mira la columna "Necesita"). **¿Usas Docker? La imagen oficial ya incl
 > `stt`, `data`, `viz`, `youtube` (todos incluidos en `full`), además de `imagegen-local` y `train` (solo GPU).
 > Ejemplo: `pip install 'chimera-agent[documents,stt]'`.
 
-### ¿Primera vez? Seis pasos para principiantes
-1. **Instala Python 3.11–3.13** ([python.org](https://www.python.org/downloads/)); comprueba con `python --version`.
-2. **Instala Chimera:** `pip install 'chimera-agent[full]'` (o solo `chimera-agent` para el núcleo ligero).
-3. **Consigue una clave de IA** — una clave de [OpenRouter](https://openrouter.ai) es la más fácil (una clave → 100+ modelos).
-4. **Dale la clave a Chimera:** copia `.env.example` a `.env` y pon `CHIMERA_OPENROUTER_KEYS=sk-or-...`.
-5. **Comprueba que está listo:** `chimera doctor` — te dice qué está configurado y qué falta.
-6. **Pruébalo:** `chimera chat`.
-
-A partir de aquí, cualquier comando de la tabla de arriba ya funciona. Referencia completa de comandos
-con ejemplos para copiar y pegar: **[docs/usage.md](docs/usage.md)**.
+¿Primera vez aquí? Los cuatro pasos de [Inicio rápido](#inicio-rápido) más arriba son toda la
+configuración — instalar, una clave, `chimera doctor`, `chimera chat` — y a partir de ahí cualquier
+comando de la tabla ya funciona. Referencia completa de comandos con ejemplos para copiar y pegar:
+**[docs/usage.md](docs/usage.md)**.
 
 ## Cómo funciona
 
@@ -386,6 +391,10 @@ chimera cron add "brief" "0 8 * * *" "Summarize the news"       # programa traba
 chimera memory add / graph / consolidate      # memoria a largo plazo: guarda, relaciona, ordena
 chimera kanban add/board/run                   # un tablero de tareas que despacha trabajo al agente
 chimera workflow flow.yaml                     # ejecuta una automatización repetible descrita en un archivo
+chimera orchestrate "TASK" --dry-run           # reparte entre workers acotados; --dry-run no cuesta nada
+chimera project start spec.yaml -w .           # lleva un proyecto entero hasta el final, preguntando antes de los pasos arriesgados
+chimera skills-import skills/<nombre>          # carga una tarjeta de skill curada (datos, no código)
+chimera skills-stats / skills-pending          # skills aprendidas: uso, tasa de acierto, lo que espera revisión
 chimera migrate <source> <dir> --apply         # importa configuración, skills y memoria de otra herramienta de agentes
 chimera evolve status / tune / recipe          # opcional: autooptimización; prepara datos para afinar un modelo
 chimera fusion-bench / skillcard-bench / schema-bench / sandbox-bench   # benchmarks A/B honestos: mide coste, calidad y efectos secundarios antes de confiar en una funcionalidad
@@ -406,12 +415,15 @@ chimera/
   memory/        memoria a corto plazo / reciente / factual / sobre ti + un grafo de relaciones
   skills/        la biblioteca de skills integrada y cómo se encuentran las skills relevantes
   evolution/     aprender nuevas skills a partir del éxito, y la experiencia de la que aprende
-  governance/    el núcleo de seguridad (permitir/advertir/bloquear/preguntar), registro de auditoría y controles de cambio
+  governance/    el núcleo de seguridad (permitir/advertir/revisar/bloquear), registro de auditoría y controles de cambio
   orchestration/ equipos de agentes: roles, crews, workers aislados en paralelo, informes unificados
   ecosystem/     automejora avanzada: agentes que diseñan agentes, entrenamiento de modelo opcional
   kanban/        un tablero de tareas que entrega tarjetas al agente
   workflow/      describe una automatización repetible en un archivo simple y ejecútala
+  eval/          los harness de benchmark honesto: SWE-bench, Terminal-Bench, red-team de inyección
   tools/         herramientas integradas (archivos, shell, web, búsqueda) + ejecución de código
+  scrape/        lectura de páginas totalmente renderizadas, scraping y rastreo de sitios
+  rag/           recuperación semántica sobre un repositorio — la pregunta que no tiene una cadena exacta
   sandbox/       ejecuta herramientas en local o dentro de un contenedor blindado
   integrations/  conecta herramientas externas y cualquier API web
   scheduler/     tareas recurrentes + el daemon que las dispara a tiempo
@@ -419,6 +431,12 @@ chimera/
   providers/     una interfaz para cada modelo, con fallback y rotación de claves
   interface/     el motor de conversación compartido (usado por chat, la app y los bots)
   server/        el gateway de mensajería y el endpoint HTTP
+  api/           la API HTTP+SSE con la que habla la app de escritorio
+  acp/           el Agent Client Protocol, en los dos sentidos: dirige a otro agente de código, o deja que te dirija un editor
+  lsp/           diagnósticos de un servidor de lenguaje real, para que el editor coincida con CI
+  complete/      completado en línea — el texto gris que aparece delante del cursor
+  proc/          procesos hijos de larga vida: ciclo de vida, framing y supervisión
+  tui/           la app de terminal a pantalla completa
   cli/           el comando `chimera`
 ```
 
@@ -459,7 +477,9 @@ uv run pytest -q         # la suite de tests
 Las contribuciones son muy bienvenidas — código, documentación, ideas, reportes de errores. Empieza
 con [CONTRIBUTING.md](CONTRIBUTING.md) y nuestro [Código de Conducta](CODE_OF_CONDUCT.md).
 ¿Quieres enseñarle algo nuevo a Chimera? La **[guía de extensión](docs/extending.md)** explica cómo
-añadir tu propia **herramienta, skill o receta** (con ejemplos listos para copiar).
+añadir tu propia **herramienta, skill o receta** (con ejemplos listos para copiar). La contribución
+con menor barrera de entrada es una **tarjeta de skill** — un único archivo markdown en
+[`skills/`](skills/), sin Python y sin necesidad de abrir una issue.
 ¿Encontraste un problema de seguridad? Consulta [SECURITY.md](SECURITY.md).
 
 ## Comunidad

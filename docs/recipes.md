@@ -101,7 +101,7 @@ plain text instead of Markdown.
 ## Researching a topic (search + read)
 
 Combine web search with the browser's `read_text` to research something and get a sourced brief —
-`web_search` (needs `CHIMERA_TAVILY_API_KEY`) finds the pages, `browser read_text` reads each one
+`web_search` (needs `TAVILY_API_KEY`) finds the pages, `browser read_text` reads each one
 (including JS-heavy sites), and `deliver` writes the brief:
 
 ```bash

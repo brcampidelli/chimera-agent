@@ -1,5 +1,5 @@
 ---
-source_sha256: a88090fec9fcabd118b65cf8d40ddecefd47fbb2da49dfa195a66fd57e85c4c1
+source_sha256: f08c31cf980c0d86795fe456d5f9ed6871b58325c9e429e93f48c71b6e998356
 ---
 
 # Recipes
@@ -112,7 +112,7 @@ texto plano en lugar de Markdown.
 ## Investigar un tema (buscar + leer)
 
 Combina la búsqueda web con el `read_text` del navegador para investigar algo y obtener un
-informe con fuentes — `web_search` (necesita `CHIMERA_TAVILY_API_KEY`) encuentra las páginas,
+informe con fuentes — `web_search` (necesita `TAVILY_API_KEY`) encuentra las páginas,
 `browser read_text` lee cada una (incluyendo sitios pesados en JS), y `deliver` escribe el
 informe:
 

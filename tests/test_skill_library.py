@@ -36,7 +36,7 @@ def test_the_library_is_not_empty() -> None:
 @pytest.mark.parametrize("card", CARDS, ids=_IDS)
 def test_name_matches_its_directory(card: Path) -> None:
     """Two names for one thing drift apart. The directory is the address; the frontmatter is what
-    the agent and the CLI use, and `chimera skill import skills/<dir>` assumes they agree."""
+    the agent and the CLI use, and `chimera skills-import skills/<dir>` assumes they agree."""
     skill = parse_skill_md(card.read_text(encoding="utf-8"))
     assert skill.manifest.name == card.parent.name
 

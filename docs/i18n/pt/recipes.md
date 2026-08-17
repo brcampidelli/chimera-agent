@@ -1,5 +1,5 @@
 ---
-source_sha256: a88090fec9fcabd118b65cf8d40ddecefd47fbb2da49dfa195a66fd57e85c4c1
+source_sha256: f08c31cf980c0d86795fe456d5f9ed6871b58325c9e429e93f48c71b6e998356
 ---
 
 # Recipes
@@ -109,7 +109,7 @@ do leitor quarentenado em vez de agir sobre o texto bruto da página. Sem o extr
 ## Pesquisando um tópico (buscar + ler)
 
 Combine busca web com o `read_text` do browser para pesquisar algo e obter um resumo com fontes —
-`web_search` (precisa de `CHIMERA_TAVILY_API_KEY`) encontra as páginas, `browser read_text` lê
+`web_search` (precisa de `TAVILY_API_KEY`) encontra as páginas, `browser read_text` lê
 cada uma (inclusive sites pesados em JS), e `deliver` escreve o resumo:
 
 ```bash
