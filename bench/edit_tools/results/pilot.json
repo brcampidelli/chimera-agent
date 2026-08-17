@@ -1,0 +1,259 @@
+{
+  "arm": "A (today's tool surface)",
+  "runs": 18,
+  "solved": 15,
+  "excluded_unsolved_tasks": [
+    "import_module_moved"
+  ],
+  "edit_calls_by_task": {
+    "rename_helper": [
+      4,
+      4,
+      4
+    ],
+    "signature_swap_args": [
+      3,
+      3,
+      3
+    ],
+    "constant_move_module": [
+      8,
+      11,
+      8
+    ],
+    "param_add_default": [
+      2,
+      3,
+      2
+    ],
+    "string_repeated_typo": [
+      3,
+      3,
+      3
+    ]
+  },
+  "required_n_for_stage_2": {
+    "n": 3,
+    "sd_within": 0.816,
+    "sd_of_difference": 1.155,
+    "why": "pooled within-task sd 0.82; difference sd 1.15; effect 2.0 edit calls; 80% power; alpha .05 two-sided. Errs HIGH \u2014 arm correlation lowers it."
+  },
+  "rows": [
+    {
+      "task": "rename_helper",
+      "family": "rename",
+      "rep": 0,
+      "passed": true,
+      "exit": 0,
+      "edit_calls": 4,
+      "tool_calls": 11,
+      "completion_tokens": 935,
+      "seconds": 29.0,
+      "tail": "unction definition in `shop/money.py`\n- Updated imports and calls in `shop/cart.py` and `shop/report.py`\n- Updated re-export and `__all__` in `shop/__init__.py`\n- Verified no remaining `calc_total` references in `shop`\n\nTests were not run before your final-answer request.\nsuccess after 1 attempt(s)\n"
+    },
+    {
+      "task": "rename_helper",
+      "family": "rename",
+      "rep": 1,
+      "passed": true,
+      "exit": 0,
+      "edit_calls": 4,
+      "tool_calls": 8,
+      "completion_tokens": 491,
+      "seconds": 20.7,
+      "tail": "[11:25:02] INFO     approval mode 'ask' with no terminal: denying and recording \nRenamed `calc_total` to `compute_total` throughout the `shop` package and \nverified there are no remaining `calc_total` references in `shop`.\nsuccess after 1 attempt(s)\n"
+    },
+    {
+      "task": "rename_helper",
+      "family": "rename",
+      "rep": 2,
+      "passed": true,
+      "exit": 0,
+      "edit_calls": 4,
+      "tool_calls": 14,
+      "completion_tokens": 715,
+      "seconds": 24.4,
+      "tail": "oney.py`\n- Updated imports and calls in `shop/cart.py`, `shop/report.py`, and \n`shop/__init__.py`\n- Confirmed no remaining `calc_total` references exist in `shop`\n\nAttempted to run `pytest -q`, but test execution was blocked by the host \nenvironment (`CHIMERA_HOST_EXEC`).\nsuccess after 1 attempt(s)\n"
+    },
+    {
+      "task": "signature_swap_args",
+      "family": "signature",
+      "rep": 0,
+      "passed": true,
+      "exit": 0,
+      "edit_calls": 3,
+      "tool_calls": 11,
+      "completion_tokens": 489,
+      "seconds": 25.2,
+      "tail": "[11:25:47] INFO     approval mode 'ask' with no terminal: denying and recording \nImplemented the `format_name(last, first)` signature change and updated all \ncallers in `people` to pass `(last, first)` while preserving output formatting.\nsuccess after 1 attempt(s)\n"
+    },
+    {
+      "task": "signature_swap_args",
+      "family": "signature",
+      "rep": 1,
+      "passed": true,
+      "exit": 0,
+      "edit_calls": 3,
+      "tool_calls": 11,
+      "completion_tokens": 547,
+      "seconds": 25.2,
+      "tail": "[11:26:12] INFO     approval mode 'ask' with no terminal: denying and recording \nImplemented the `format_name(last, first)` signature change and updated all \n`people` package call sites to preserve output behavior.\nsuccess after 1 attempt(s)\n"
+    },
+    {
+      "task": "signature_swap_args",
+      "family": "signature",
+      "rep": 2,
+      "passed": true,
+      "exit": 0,
+      "edit_calls": 3,
+      "tool_calls": 11,
+      "completion_tokens": 538,
+      "seconds": 27.0,
+      "tail": "[11:26:37] INFO     approval mode 'ask' with no terminal: denying and recording \nImplemented the `format_name(last, first)` signature change and updated all \n`people` package call sites to pass arguments in the new order while preserving \noutput formatting.\nsuccess after 1 attempt(s)\n"
+    },
+    {
+      "task": "constant_move_module",
+      "family": "constant",
+      "rep": 0,
+      "passed": true,
+      "exit": 0,
+      "edit_calls": 8,
+      "tool_calls": 21,
+      "completion_tokens": 3943,
+      "seconds": 93.0,
+      "tail": "recording \nImplemented the move:\n\n- Created `net/settings.py` with `TIMEOUT = 30`\n- Updated `net/client.py` to read `settings.TIMEOUT` without exporting `TIMEOUT`\n- Updated `net/retry.py` and `net/report.py` to import `TIMEOUT` from \n`net.settings` instead of `net.client`\nsuccess after 2 attempt(s)\n"
+    },
+    {
+      "task": "constant_move_module",
+      "family": "constant",
+      "rep": 1,
+      "passed": true,
+      "exit": 0,
+      "edit_calls": 11,
+      "tool_calls": 32,
+      "completion_tokens": 4343,
+      "seconds": 126.6,
+      "tail": "ings.py` with `TIMEOUT = 30`\n- Removed local `TIMEOUT` from `net/client.py`\n- Updated `fetch()` to read `settings.TIMEOUT`\n- Updated `net/report.py` and `net/retry.py` to import `TIMEOUT` from \n`net.settings`\n- Confirmed no remaining imports of `TIMEOUT` from `net.client`\nsuccess after 3 attempt(s)\n"
+    },
+    {
+      "task": "constant_move_module",
+      "family": "constant",
+      "rep": 2,
+      "passed": true,
+      "exit": 0,
+      "edit_calls": 8,
+      "tool_calls": 22,
+      "completion_tokens": 1478,
+      "seconds": 60.5,
+      "tail": "with no terminal: denying and recording \nImplemented the move of `TIMEOUT` to `net/settings.py`, updated imports in \n`net/retry.py` and `net/report.py`, and adjusted `net/client.py` so `TIMEOUT` is\nno longer in `vars(net.client)` while `fetch()` still uses the same value.\nsuccess after 2 attempt(s)\n"
+    },
+    {
+      "task": "param_add_default",
+      "family": "param",
+      "rep": 0,
+      "passed": true,
+      "exit": 0,
+      "edit_calls": 2,
+      "tool_calls": 10,
+      "completion_tokens": 674,
+      "seconds": 28.7,
+      "tail": "ved existing default behavior for existing callers.\n- Added explicit `sep='-'` test coverage alongside alternate `sep='_'`.\n\nNote: Attempted to run `pytest -q`, but host execution was declined by the \nenvironment (`CHIMERA_HOST_EXEC`), so tests could not be executed here.\nsuccess after 1 attempt(s)\n"
+    },
+    {
+      "task": "param_add_default",
+      "family": "param",
+      "rep": 1,
+      "passed": true,
+      "exit": 0,
+      "edit_calls": 3,
+      "tool_calls": 11,
+      "completion_tokens": 1341,
+      "seconds": 34.9,
+      "tail": "r existing callers.\n\nAlso added tests for:\n- Custom `_` separator\n- Repeated/non-alphanumeric separators\n- Leading/trailing non-alphanumeric characters\n- Empty string\n\nI attempted to run the test suite with `pytest -q`, but host execution was \ndeclined by the environment.\nsuccess after 1 attempt(s)\n"
+    },
+    {
+      "task": "param_add_default",
+      "family": "param",
+      "rep": 2,
+      "passed": true,
+      "exit": 0,
+      "edit_calls": 2,
+      "tool_calls": 9,
+      "completion_tokens": 841,
+      "seconds": 31.6,
+      "tail": "k' with no terminal: denying and recording \nImplemented `slugify(text, sep='-')` with default-compatible behavior and custom\nseparator support.\n\nUpdated:\n- `blog/slug.py`\n- `tests/test_blog.py`\n\nExisting `blog` callers remain unchanged and continue using `'-'` by default.\nsuccess after 1 attempt(s)\n"
+    },
+    {
+      "task": "string_repeated_typo",
+      "family": "string",
+      "rep": 0,
+      "passed": true,
+      "exit": 0,
+      "edit_calls": 3,
+      "tool_calls": 12,
+      "completion_tokens": 499,
+      "seconds": 25.7,
+      "tail": "[11:33:20] INFO     approval mode 'ask' with no terminal: denying and recording \nFixed all `recieved` occurrences in the `mail` package to `received`:\n\n- `mail/inbox.py`\n- `mail/log.py`\n- `mail/status.py`\nsuccess after 1 attempt(s)\n"
+    },
+    {
+      "task": "string_repeated_typo",
+      "family": "string",
+      "rep": 1,
+      "passed": true,
+      "exit": 0,
+      "edit_calls": 3,
+      "tool_calls": 10,
+      "completion_tokens": 513,
+      "seconds": 24.8,
+      "tail": "5] INFO     approval mode 'ask' with no terminal: denying and recording \nFixed all `recieved` typos in the `mail` package to `received`:\n\n- `mail/inbox.py`\n- `mail/log.py`\n- `mail/status.py`\n\nI did not run the test suite because you requested the final answer immediately.\nsuccess after 1 attempt(s)\n"
+    },
+    {
+      "task": "string_repeated_typo",
+      "family": "string",
+      "rep": 2,
+      "passed": true,
+      "exit": 0,
+      "edit_calls": 3,
+      "tool_calls": 8,
+      "completion_tokens": 379,
+      "seconds": 21.4,
+      "tail": "approval mode 'ask' with no terminal: denying and recording \nFixed all occurrences of `recieved` to `received` in the `mail` package:\n\n- `mail/inbox.py`\n- `mail/log.py`\n- `mail/status.py`\n\nVerified there are no remaining matches for `recieved`, `Recieved`, or \n`RECIEVED`.\nsuccess after 1 attempt(s)\n"
+    },
+    {
+      "task": "import_module_moved",
+      "family": "import",
+      "rep": 0,
+      "passed": false,
+      "exit": 1,
+      "edit_calls": 5,
+      "tool_calls": 30,
+      "completion_tokens": 4052,
+      "seconds": 111.7,
+      "tail": "                  CHIMERA_SANDBOX=docker to run them isolated, or             \n                    CHIMERA_HOST_EXEC=allow to accept host execution unattended.\nI need to finish applying the requested move before giving the final answer.\n\nThe move is not fully complete yet.\nfailed after 3 attempt(s)\n"
+    },
+    {
+      "task": "import_module_moved",
+      "family": "import",
+      "rep": 1,
+      "passed": false,
+      "exit": 1,
+      "edit_calls": 11,
+      "tool_calls": 35,
+      "completion_tokens": 2551,
+      "seconds": 80.4,
+      "tail": "d, or             \n                    CHIMERA_HOST_EXEC=allow to accept host execution unattended.\nI still need to complete the requested move by removing the old file and \nverifying the tests.\n\nNot complete yet: I still need to remove `util/text.py` and run verification.\nfailed after 3 attempt(s)\n"
+    },
+    {
+      "task": "import_module_moved",
+      "family": "import",
+      "rep": 2,
+      "passed": false,
+      "exit": 1,
+      "edit_calls": 10,
+      "tool_calls": 37,
+      "completion_tokens": 3510,
+      "seconds": 99.1,
+      "tail": "hem isolated, or             \n                    CHIMERA_HOST_EXEC=allow to accept host execution unattended.\nImplemented the move to `util/strings/text.py`, added \n`util/strings/__init__.py`, and updated imports in `util/a.py` and `util/b.py` \nto use `util.strings.text`.\nfailed after 3 attempt(s)\n"
+    }
+  ]
+}

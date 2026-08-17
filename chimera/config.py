@@ -34,7 +34,20 @@ _DEFAULT_PANEL = [
     "openrouter/openai/gpt-5.5",
     "openrouter/google/gemini-3.1-pro",
 ]
-_DEFAULT_JUDGE = "openrouter/anthropic/claude-opus-4-8"
+# The judge must not be a panelist. It shipped as `_DEFAULT_PANEL[0]` — the same slug, verbatim —
+# which made the default fusion self-evaluating in the one place this project claims to have an
+# independent signal rather than a self-report. Nothing guarded it; `validate_fusion_roles` below
+# does now. DeepSeek-R1 is a fourth vendor (the panel is Anthropic/OpenAI/Google) and is reasoning-
+# tuned, which is what judging asks for.
+_DEFAULT_JUDGE = "openrouter/deepseek/deepseek-r1"
+# Spelled out rather than reusing `_DEFAULT_JUDGE`, which is what it did before. Changing the judge
+# would otherwise have moved the synthesiser too, silently — the synthesiser's job is composition,
+# not evaluation, so it is a separate decision and stays where it was.
+#
+# It is still `_DEFAULT_PANEL[0]`, and that is a milder version of the same smell: the model that
+# wrote one of the candidate answers also writes the final one. Left alone deliberately — the
+# measured finding was about the judge — and recorded here so it is visible instead of buried.
+_DEFAULT_SYNTHESIZER = "openrouter/anthropic/claude-opus-4-8"
 
 # Panel used only to TEST whether a learned skill transfers — never to reason. Transfer asks
 # "does this run and pass somewhere else?", which is a diversity question, not a capability one:
@@ -149,7 +162,7 @@ class Settings(BaseSettings):
     )
     fusion_judge: str = Field(default=_DEFAULT_JUDGE, validation_alias="CHIMERA_FUSION_JUDGE")
     fusion_synthesizer: str = Field(
-        default=_DEFAULT_JUDGE, validation_alias="CHIMERA_FUSION_SYNTHESIZER"
+        default=_DEFAULT_SYNTHESIZER, validation_alias="CHIMERA_FUSION_SYNTHESIZER"
     )
 
     # --- Selective fusion: run a probe of the first `fusion_probe_k` panel models; if
@@ -241,6 +254,13 @@ class Settings(BaseSettings):
     # name+description+triggers) and inject the top-k into the worker's reasoning context.
     # Off by default (an experiment — injection can raise cost if retrieval misfires);
     # measure with `chimera skillcard-bench` before enabling. ---
+    #: Arm B of `bench/edit_tools`: a counted, multi-file batch edit in one tool call.
+    #:
+    #: Off until the bench says otherwise. Arm A of that bench IS "today's tool surface", so turning
+    #: this on by default would delete the control arm before the comparison ran — and the schema
+    #: rides in every prompt for the rest of the run, a cost this project has watched swallow a
+    #: gain before (`bench/skillcard/RESULTS.md`: +16.7pp, not significant, at +300% tokens).
+    edit_batch: bool = Field(default=False, validation_alias="CHIMERA_EDIT_BATCH")
     skill_cards: bool = Field(default=False, validation_alias="CHIMERA_SKILL_CARDS")
     skill_cards_k: int = Field(default=1, validation_alias="CHIMERA_SKILL_CARDS_K")
     # Relevance gate + render budget (M19-A1 cost reduction): inject a card only when it shares at

@@ -18,12 +18,24 @@ Honest status (measured 2026-07-08): the marker is applied correctly and the gat
 captures cache tokens when a provider reports them (verified on DeepSeek auto-caching:
 ``cache_read`` went 0 -> 5 on a repeated call). BUT a live probe on
 ``openrouter/anthropic/claude-haiku-4.5`` did NOT surface cache tokens
-(``cache_read=0``, ``cache_write=None`` on both calls) — litellm routes the
-``openrouter/`` prefix through its OpenAI-compatible path, which does not appear to
-forward Anthropic's content-block ``cache_control`` to the provider. The path that
-populates these fields is the **native** ``anthropic/...`` provider (with an
-``ANTHROPIC_API_KEY``) or a caching-native OpenRouter route. Shipped opt-in and
-correct; the OpenRouter→Anthropic caveat is documented, not hidden.
+(``cache_read=0``, ``cache_write=None`` on both calls).
+
+**The CAUSE of that is not established, and this docstring used to claim it was.** It
+stated as fact that litellm routes the ``openrouter/`` prefix through its
+OpenAI-compatible path and drops Anthropic's content-block ``cache_control``. That is a
+plausible story, it was never probed, and a review found evidence against it. Retracted
+rather than reworded: the observation (no cache tokens surfaced) stands; the explanation
+does not.
+
+Other explanations fit the same observation and were never ruled out: the probe's prefix
+may have been under the provider's minimum cacheable size, the marker may arrive
+correctly and the *usage* fields simply not be echoed back through the gateway, or the
+route may cache without reporting it.
+
+Anyone extending this — marking the transcript tail, or marking tool definitions — should
+**probe first**. Building on an unverified cause is how the wrong fix ships looking
+right. ``cache_read_input_tokens`` is already captured in ``gateway.py``, so a probe is a
+long transcript sent twice and a diff of two numbers.
 """
 
 from __future__ import annotations

@@ -177,3 +177,129 @@ class ApplyPatchTool(_WorkspaceTool):
         out.append(content[cursor:])
         atomic_write_text(path, "".join(out), newline=newline)  # preserve line endings; atomic
         return f"applied {len(hunks)} hunk(s) to {rel}"
+
+
+class EditBatchTool(_WorkspaceTool):
+    """Arm B of ``bench/edit_tools`` — several counted edits, across several files, in one call.
+
+    Two ideas, and only the second is a performance bet.
+
+    **Counted.** Every edit declares how many occurrences it expects (``count``, default 1) and a
+    mismatch aborts the whole batch before anything is written. ``edit_file`` already refuses an
+    ambiguous single edit — but its ``replace_all`` branch is the one write path with no cardinality
+    guard at all: it replaces whatever it finds and *reports* the number afterwards, so a model that
+    meant three and hit eleven learns that from the receipt. Declaring the number turns silent
+    over-reach into a refusal.
+
+    **Batched across files.** This is the part the bench exists to judge, and it is not adopted on
+    anybody's word: the source idea reports 1 edit call against 9–11, measured on models we do not
+    run. Our pilot puts arm A between 2 and 11 edit calls per task, with a within-task sd of 0.82.
+
+    ⚠️ **The write region is checked per path, inside the loop.** Every other writer here takes a
+    single ``path`` argument, and the guards read that argument — so a multi-file payload with no
+    top-level ``path`` would sail past a check that never ran, turning a fenced tool into an
+    unfenced one. Every target is resolved and refused individually, in phase 1, before a byte is
+    written anywhere.
+    """
+
+    name = "edit_batch"
+    description = (
+        "Apply several exact-match edits across MULTIPLE workspace files in one call. Each edit "
+        "declares the number of occurrences it expects ('count', default 1); if any file is "
+        "missing, any anchor does not match, or any count differs, NOTHING is written and the "
+        "failing edit is named. Prefer this when one change touches several files."
+    )
+    parameters = {
+        "type": "object",
+        "properties": {
+            "edits": {
+                "type": "array",
+                "description": "The edits to apply, all-or-nothing.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "path": {"type": "string", "description": "Path relative to the workspace."},
+                        "old": {"type": "string", "description": "Exact text to find."},
+                        "new": {"type": "string", "description": "Replacement text."},
+                        "count": {
+                            "type": "integer",
+                            "description": "How many occurrences you expect (default 1). A mismatch aborts the batch.",
+                        },
+                    },
+                    "required": ["path", "old", "new"],
+                },
+            }
+        },
+        "required": ["edits"],
+    }
+
+    def run(self, **kwargs: Any) -> str:
+        edits = kwargs.get("edits")
+        if not isinstance(edits, list) or not edits:
+            return "error: 'edits' must be a non-empty array"
+
+        # --- phase 1: resolve, guard and validate EVERYTHING. No writes. ---
+        planned: dict[Path, tuple[str, str]] = {}  # path -> (new content, newline)
+        for index, raw in enumerate(edits, start=1):
+            if not isinstance(raw, dict):
+                return f"error: edit {index} is not an object"
+            rel = str(raw.get("path", ""))
+            old, new = str(raw.get("old", "")), str(raw.get("new", ""))
+            if not rel:
+                return f"error: edit {index} has no 'path'"
+            if old == "":
+                return f"error: edit {index} has an empty 'old' (it anchors the edit)"
+            if old == new:
+                return f"error: edit {index} has identical 'old' and 'new' — nothing to change"
+            try:
+                expected = int(raw.get("count", 1))
+            except (TypeError, ValueError):
+                return f"error: edit {index} has a non-integer 'count'"
+            if expected < 1:
+                return f"error: edit {index} expects {expected} occurrences — must be >= 1"
+
+            path = resolve_in_workspace(self.workspace, rel)
+            # The per-path guard. Outside the loop this would not run for a payload with no
+            # top-level `path`, and the tool would write wherever it was told.
+            if err := refuse_write(self.workspace, path, self.write_region):
+                return f"batch aborted, nothing written — edit {index} ({rel}): {err}"
+            if not path.is_file():
+                return f"batch aborted, nothing written — edit {index}: file not found: {rel}"
+
+            # Later edits see earlier ones IN THIS BATCH: two edits to one file must compose, and
+            # counting both against the original would refuse a legitimate pair.
+            if path in planned:
+                content, newline = planned[path]
+            else:
+                try:
+                    content, newline = read_text_for_edit(path)
+                except UnicodeDecodeError:
+                    return f"batch aborted, nothing written — edit {index}: {rel} is not UTF-8 text"
+
+            found = content.count(old)
+            if found != expected:
+                return (
+                    f"batch aborted, NOTHING was written — edit {index} ({rel}): 'old' occurs "
+                    f"{found} time(s), expected {expected}. Re-read the file and set 'count' to the "
+                    "exact number."
+                )
+            planned[path] = (content.replace(old, new), newline)
+
+        # --- phase 2: write. ---
+        #
+        # Atomicity here is about VALIDATION, not about the disk: phase 1 guarantees every edit was
+        # resolvable before any write began, and each file lands atomically. It does NOT guarantee
+        # that a mid-loop I/O failure leaves nothing behind — so when that happens, say which files
+        # already landed instead of reporting a clean abort that is not true.
+        written: list[str] = []
+        for path, (content, newline) in planned.items():
+            try:
+                atomic_write_text(path, content, newline=newline)
+            except OSError as exc:
+                done = ", ".join(written) or "none"
+                return (
+                    f"error: PARTIAL WRITE — {exc}. Already written: {done}. "
+                    f"Failed on: {path.relative_to(self.workspace)}. The workspace is inconsistent."
+                )
+            written.append(str(path.relative_to(self.workspace)).replace("\\", "/"))
+        return f"edited {len(written)} file(s) in one batch: {', '.join(written)}"

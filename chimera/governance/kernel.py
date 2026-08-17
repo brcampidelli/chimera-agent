@@ -9,7 +9,9 @@ with no matching rule and no judge, the default is ALLOW.
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable
+from typing import cast
 
 from chimera.governance.audit import AuditLog
 from chimera.governance.policy import Decision, Rule, RuleSet, Verdict, more_severe
@@ -19,6 +21,30 @@ from chimera.telemetry import get_logger
 _log = get_logger("governance.kernel")
 
 JudgeFn = Callable[[str], Verdict]
+#: A judge that also gets *why* the action is being taken. ``rm -rf build/`` reads very differently
+#: mid-build than it does inside a task about reading logs, and a judge handed only the command has
+#: no way to tell those apart.
+ContextJudgeFn = Callable[[str, str], Verdict]
+
+
+def _accepts_context(judge: object) -> bool:
+    """Whether ``judge`` can be called with ``(action, context)`` as well as ``(action)``.
+
+    Inspected once, at construction, rather than guessed per call — and it fails *closed* to the
+    one-argument form. A judge whose signature cannot be read (a C callable, a mock, a partial over
+    ``*args``) keeps the old behaviour instead of getting a second positional argument it may not
+    take, which would turn a governance decision into a TypeError at the worst moment.
+    """
+    if judge is None or not callable(judge):
+        return False
+    try:
+        params = list(inspect.signature(judge).parameters.values())
+    except (TypeError, ValueError):
+        return False
+    positional = [
+        p for p in params if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)
+    ]
+    return len(positional) >= 2
 
 
 class TrustKernel:
@@ -28,7 +54,7 @@ class TrustKernel:
         self,
         ruleset: RuleSet | None = None,
         *,
-        judge: JudgeFn | None = None,
+        judge: JudgeFn | ContextJudgeFn | None = None,
         audit: AuditLog | None = None,
         precedents: PrecedentStore | None = None,
         default: Decision = Decision.ALLOW,
@@ -39,8 +65,25 @@ class TrustKernel:
         self.audit = audit
         self.precedents = precedents
         self.default = default
+        self._judge_takes_context = _accepts_context(judge)
 
     def evaluate(self, action: str, *, context: str = "") -> Verdict:
+        """Decide on ``action``, optionally told *why* it is happening.
+
+        ``context`` was declared here and read nowhere: the signature accepted it, the body never
+        mentioned it, and the one production caller (``GovernedTool``) never passed it. A parameter
+        that silently discards what you give it is worse than no parameter, because a caller can
+        believe the kernel is judging with information it never received.
+
+        It now reaches two places. The **judge** gets it when the judge can take it — arity is
+        inspected once at construction, so a one-argument judge written before this keeps working.
+        The **audit** gets it always, which is the cheaper half and the one that matters when
+        somebody reads the log afterwards asking why an action was allowed.
+
+        It deliberately does NOT reach the precedent store: precedents are keyed on the action, and
+        folding context into that key would fragment the cache so finely that nothing would ever
+        match twice — turning a cost optimisation into a cost multiplier.
+        """
         verdict = more_severe(self.ruleset.evaluate(action), self.learned.evaluate(action))
         source = "lexical"
         # Precedent RAG: a confirmed precedent (2 judges agreed) answers a similar
@@ -51,7 +94,10 @@ class TrustKernel:
                 verdict = Verdict(recalled, "matched a confirmed precedent", "precedent")
                 source = "precedent"
         if verdict is None and self.judge is not None:
-            verdict = self.judge(action)
+            if self._judge_takes_context:
+                verdict = cast("ContextJudgeFn", self.judge)(action, context)
+            else:
+                verdict = cast("JudgeFn", self.judge)(action)
             source = "judge"
             if self.precedents is not None:
                 self.precedents.observe(action, verdict.decision)
@@ -68,6 +114,9 @@ class TrustKernel:
                     "rule": verdict.rule,
                     "reason": verdict.reason,
                     "source": source,
+                    # Truncated like ``action`` above, and omitted when empty so the log does not
+                    # grow a column of empty strings for the callers that have no context to give.
+                    **({"context": context[:200]} if context else {}),
                 },
             )
         return verdict

@@ -17,15 +17,29 @@ from chimera.tools.base import Tool, is_untrusted_output
 from chimera.tools.registry import ToolRegistry
 
 ApproveFn = Callable[[Verdict, str], bool]
+#: Supplies the reason an action is being taken, read fresh at each tool call.
+ContextFn = Callable[[], str]
 
 
 class GovernedTool(Tool):
     """A tool whose execution is gated by the trust kernel."""
 
-    def __init__(self, inner: Tool, kernel: TrustKernel, *, approve: ApproveFn | None = None) -> None:
+    def __init__(
+        self,
+        inner: Tool,
+        kernel: TrustKernel,
+        *,
+        approve: ApproveFn | None = None,
+        context: ContextFn | None = None,
+    ) -> None:
         self.inner = inner
         self.kernel = kernel
         self.approve = approve
+        # Why the action is happening — the kernel's ``context``, which used to be declared and
+        # discarded. A callable rather than a string because the task changes between runs while
+        # the wrapped registry is built once: a fixed string would pin the first task forever and
+        # label every later action with a stale reason, which is worse than no reason at all.
+        self.context = context
         self.name = inner.name
         self.description = inner.description
         self.parameters = inner.parameters
@@ -35,7 +49,7 @@ class GovernedTool(Tool):
 
     def run(self, **kwargs: Any) -> str:
         action = f"{self.name} {kwargs}"
-        verdict = self.kernel.evaluate(action)
+        verdict = self.kernel.evaluate(action, context=self._context())
         if verdict.decision == Decision.BLOCK:
             return f"[governance: BLOCKED — {verdict.reason}]"
         if verdict.decision == Decision.REVIEW:
@@ -44,12 +58,30 @@ class GovernedTool(Tool):
                 return f"[governance: needs review — {verdict.reason}]"
         return self.inner.run(**kwargs)
 
+    def _context(self) -> str:
+        """The current task, or ``""``. Never raises: a broken provider must not block a tool.
+
+        Governance failing *open* on a missing reason is the right trade — the verdict is still
+        made, it is just made without the extra signal. Failing closed here would let a typo in
+        somebody's context callable take down every tool call in the run.
+        """
+        if self.context is None:
+            return ""
+        try:
+            return str(self.context() or "")
+        except Exception:  # noqa: BLE001 — see docstring: never block a tool over a missing reason
+            return ""
+
 
 def govern_registry(
-    registry: ToolRegistry, kernel: TrustKernel, *, approve: ApproveFn | None = None
+    registry: ToolRegistry,
+    kernel: TrustKernel,
+    *,
+    approve: ApproveFn | None = None,
+    context: ContextFn | None = None,
 ) -> ToolRegistry:
     """Return a new registry with every tool wrapped in a :class:`GovernedTool`."""
     governed = ToolRegistry()
     for tool in registry.tools():
-        governed.register(GovernedTool(tool, kernel, approve=approve))
+        governed.register(GovernedTool(tool, kernel, approve=approve, context=context))
     return governed
