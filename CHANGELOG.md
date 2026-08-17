@@ -4,6 +4,61 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.46.0] - 2026-08-16
+
+A release about things that were written down and not applied to the thing next to them. Nine of
+them, found by looking for the *shape* rather than the instance, plus the skill card library that
+grew out of writing the incidents down.
+
+### Added
+
+- **A curated skill library** — 23 cards in `skills/`, 13 written from this project's own incidents.
+  A card is data, not code: frontmatter plus Trigger / Do / Avoid / Check / Risk, executing nothing.
+  Grouped by where in the work they apply (`define · build · verify · review · ship`) with a `topic`
+  field, and browsable at `/skills/`. Reading a card into the prompt is **opt-in and off by default**
+  (`--skill-cards`): the registered A/B came back +16.7pp but not significant at +300% tokens, so it
+  failed its own flip gate. Importing is `chimera skills-import skills/<name>`.
+- **Card description, body and trigger chips translated into nine languages**, in a sidecar that
+  leaves `SKILL.md` byte-identical so the published SHA-256 still attests to what the agent reads.
+- **`tests/test_skill_translations.py`** — the gate that keeps them honest. It separates three states
+  that look alike in a file: *stale* (claims to translate text that changed) and *incomplete* (four
+  of five sections) always fail; *missing* is honest debt, counted and capped, because a gate
+  demanding nine translations before a card could merge would kill the contribution surface.
+- **A poisoned-memory benchmark** that measures what a bad memory costs a *later* run, not the run
+  that wrote it.
+
+### Fixed
+
+- **Five JSON stores lost data without saying so.** Read-modify-write with no lock: two processes,
+  and the second silently erased the first's work. One was the skill store, so a run that learned
+  something could be erased by the run that learned it. All five now take a lock and write atomically.
+- **A fence nobody could switch on.** Enabling governance killed the CLI at import, so nobody had
+  ever run with it enabled and nobody found out.
+- **The app's Discord bot ran unfenced**, and the build gate could not see it.
+- **The single write gate had three of eight callers.**
+- **One environment variable was read to mean two different things**, which broke all six of its
+  legal values.
+- **The workspace rooted the tools and not the conventions** in AGENTS.md handling.
+- Three agent defects, each undermining something load-bearing, plus the last three from the scope
+  audit.
+
+### Documentation
+
+- **Sixteen claims the README made that the code does not support**, corrected in all ten languages.
+  Five were false rather than stale: governance is `allow / warn / review / block` (not `ask`, which
+  is a different axis); the desktop rail is `code · editor · work · knowledge · automation` with no
+  chat destination; the Maturity screen renders only under the Vite dev server; `chimera skills`
+  lists the built-ins and learned skills come from `skills-stats`; and `docs/recipes.md` sent readers
+  to `CHIMERA_TAVILY_API_KEY`, a variable with zero occurrences in the product.
+- **Two claims gained the caveat that was missing.** "It gets better the more you use it" is the one
+  our own evidence retracted — seven pre-registered runs, no significant effect, the single positive
+  did not replicate — and the caveat now sits next to the claim instead of ninety lines below it.
+
+### Note on cadence
+
+`RELEASING.md` asks for one stable a week and `v0.45.1` shipped two days ago. This one was cut early
+on purpose, with the rule read first rather than forgotten.
+
 ## [0.45.1] - 2026-08-14
 
 ### Fixed
