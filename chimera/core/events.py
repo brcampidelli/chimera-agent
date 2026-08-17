@@ -65,7 +65,27 @@ TOOL_OBSERVATION_CHARS = 400
 
 
 def _clip(text: str, limit: int) -> str:
+    """Keep the head. Right for an *argument*, whose first characters are what identify it."""
     return text if len(text) <= limit else text[:limit] + f"… (+{len(text) - limit} chars)"
+
+
+def _clip_observation(text: str, limit: int) -> str:
+    """Keep both ends of an *observation*, because the useful half of a tool result is the last one.
+
+    Head-clipping is how a failing test run becomes invisible in the UI. The first 400 characters of
+    pytest are the platform banner, the rootdir and the plugin list; the assertion, the traceback and
+    the ``FAILED …`` summary are all at the other end, and the caption therefore showed the part that
+    is identical whether the suite passed or failed. The same holds for a compiler, a linter, an npm
+    build, and for a Python traceback, whose exception line is last by construction.
+
+    The head is kept too, and deliberately: it carries the command, the path, or the first error,
+    which is what tells the reader *which* of several running things they are looking at.
+    """
+    if len(text) <= limit:
+        return text
+    head = limit * 2 // 5
+    tail = limit - head
+    return f"{text[:head]}\n… (+{len(text) - limit} chars)\n{text[-tail:]}"
 
 
 def tool(name: str, arguments: dict[str, Any], ok: bool, observation: str = "") -> AgentEvent:
@@ -88,7 +108,7 @@ def tool(name: str, arguments: dict[str, Any], ok: bool, observation: str = "") 
             "name": name,
             "arguments": clipped,
             "ok": ok,
-            "observation": _clip(observation or "", TOOL_OBSERVATION_CHARS),
+            "observation": _clip_observation(observation or "", TOOL_OBSERVATION_CHARS),
         },
     )
 
