@@ -114,6 +114,16 @@ def kill_tree(proc: subprocess.Popen[Any]) -> None:
     workers — so killing the one we hold leaves the ones doing the work, and the workspace stays
     locked by a process nobody can see. This is the difference between stopping an agent and
     orphaning it.
+
+    ⚠️ **PRECONDITION: spawn the child with :func:`_spawn_flags` (or `start_new_session=True`).**
+    On POSIX this sends `SIGKILL` to the child's whole process *group*, and a child that was not
+    given its own group is still in **yours** — so this kills the caller. That is not theoretical:
+    it took down a test runner during this function's own test, and the only symptom was an exit
+    code with no output, which is about as hard to read as a failure gets.
+
+    Every caller in this package already isolates (`exec_stream`, `sandbox/local`, `lsp/transport`
+    all pass the flags). The requirement is written here because nothing enforces it, and the cost
+    of forgetting is paid by the wrong process.
     """
     if proc.poll() is not None:
         return

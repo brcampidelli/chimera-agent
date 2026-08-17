@@ -30,9 +30,25 @@ def build_executors(*, workspace: Path, model: str | None = None) -> dict[str, S
         return StepResult(True, gateway.quick(prompt, model=model))
 
     def shell_step(step: WorkflowStep) -> StepResult:
-        from chimera.sandbox import get_sandbox
+        """A `shell:` step, gated by `CHIMERA_HOST_EXEC` like every other host-exec path.
 
-        result = get_sandbox().run(str(step.with_.get("command", "")), cwd=workspace)
+        It was the one caller of five that ran ungated. Someone who writes `deny` expects it to hold
+        everywhere — a fence with one documented gap is worse than no fence, because the gap is
+        exactly where a run goes when the fenced routes refuse it. And a workflow is the least
+        supervised of the five: it runs unattended, so nobody is watching to notice.
+
+        The gate is skipped for an isolated sandbox, matching `RunShellTool`: the confirmation asks
+        about running on the HOST, and inside a container that question does not arise.
+        """
+        from chimera.sandbox import get_sandbox
+        from chimera.sandbox.confirm import resolve_host_exec_confirm, sandbox_is_isolated
+
+        command = str(step.with_.get("command", ""))
+        sandbox = get_sandbox()
+        confirm = resolve_host_exec_confirm()
+        if confirm is not None and not sandbox_is_isolated(sandbox) and not confirm(command):
+            return StepResult(False, "host execution declined (CHIMERA_HOST_EXEC). Not run.")
+        result = sandbox.run(command, cwd=workspace)
         return StepResult(result.exit_code == 0, result.output[:_MAX_OUTPUT])
 
     def solve_step(step: WorkflowStep) -> StepResult:

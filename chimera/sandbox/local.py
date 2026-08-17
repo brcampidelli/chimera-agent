@@ -7,11 +7,11 @@ the governance kernel gates what reaches it, and DockerSandbox provides real iso
 from __future__ import annotations
 
 import os
-import signal
 import subprocess
 from contextlib import suppress
 from pathlib import Path
 
+from chimera.proc.stdio import kill_tree
 from chimera.sandbox.base import SandboxResult
 
 # Env-var name fragments that mark a secret — scrubbed from the child env so an injected/rogue command
@@ -69,13 +69,13 @@ class LocalSandbox:
         try:
             out, err = proc.communicate(timeout=timeout)
         except subprocess.TimeoutExpired:
-            if posix:
-                try:
-                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)  # type: ignore[attr-defined]
-                except (ProcessLookupError, PermissionError):
-                    proc.kill()
-            else:
-                proc.kill()
+            # `kill_tree` rather than a second copy of the same logic. This branch reimplemented the
+            # POSIX half and stopped there: on Windows it was a bare `proc.kill()`, which kills the
+            # shell and leaves whatever the shell started — `npm test` dies, the node workers holding
+            # the workspace do not. A timeout that orphans the processes it was meant to stop is the
+            # failure it exists to prevent, and it only ever happened on Windows, which is where this
+            # project is developed.
+            kill_tree(proc)
             with suppress(subprocess.TimeoutExpired):
                 proc.communicate(timeout=5)
             return SandboxResult(
