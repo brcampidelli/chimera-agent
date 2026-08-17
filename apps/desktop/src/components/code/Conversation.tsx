@@ -28,6 +28,21 @@ import { useAgent } from "@/lib/agent-context";
 import { useStickToBottom } from "@/lib/useStickToBottom";
 import { cn } from "@/lib/utils";
 
+/** Share of the model's window this screen spends on the prompt before compacting.
+ *
+ *  The library default is OFF, deliberately: compaction discards messages, and an API caller who
+ *  never asked for that should not silently get it. A long-running chat is the case where that
+ *  default is wrong. Without a budget the message list only grows and an overflow is terminal —
+ *  the provider raises, the failover table maps CONTEXT_OVERFLOW to ABORT, and a conversation the
+ *  user has been building for an hour ends on a provider error with no way to continue it. Nobody
+ *  is standing by to restart a chat window the way an operator restarts a job.
+ *
+ *  0.6 is the library's own `DEFAULT_BUDGET_FRACTION`, matched on purpose so the app and `chimera
+ *  solve --context-budget` behave the same at the same number. Compaction here is free: no
+ *  summarising model call, just a structural note plus the recent tail, and it fires at 80% of the
+ *  budget so there is still room to compact into. */
+const CONTEXT_BUDGET = 0.6;
+
 /** One exchange. The assistant side carries what the agent DID (tools, edits) alongside what it
  *  said, because in a coding conversation the tool calls are the substance and the prose is the
  *  caption — a transcript that shows only the prose is a transcript of the wrong half. */
@@ -313,6 +328,9 @@ export function Conversation({
         session_id: sessionId,
         workspace: workspace || null,
         open_file: openFile,
+        // See CONTEXT_BUDGET. Sent on every turn because the agent is rebuilt per turn from this
+        // request — a budget sent once is a budget that applied once.
+        context_budget: CONTEXT_BUDGET,
         posture,
         profile,
         fuse,

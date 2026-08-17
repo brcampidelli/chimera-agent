@@ -262,8 +262,32 @@ def test_tool_event_clips_arguments_and_observation_visibly() -> None:
     assert event.data["arguments"]["path"] == "a.py"  # a big sibling never crowds out a small one
     content = event.data["arguments"]["content"]
     assert content.startswith("x" * TOOL_ARG_CHARS) and "+4800 chars" in content
-    assert event.data["observation"].startswith("y" * TOOL_OBSERVATION_CHARS)
-    assert "+4600 chars" in event.data["observation"]
+    observation = event.data["observation"]
+    assert len(observation.replace("\n", "")) - len("… (+4600 chars)") == TOOL_OBSERVATION_CHARS
+    assert "+4600 chars" in observation
+
+
+def test_a_clipped_observation_keeps_the_end_where_the_failure_is() -> None:
+    """A failing test run says what failed at the END, and the caption used to keep only the start.
+
+    The first 400 characters of pytest are the platform banner, the rootdir and the plugin list —
+    byte-identical whether the suite passed or failed. Clipping to them meant the desktop showed a
+    red tool call whose caption contained no evidence of anything being wrong, and a user with the
+    UI open had to go read the transcript to learn what a failure was. Same shape for a compiler, a
+    linter, and a Python traceback, whose exception line is last by construction.
+    """
+    from chimera.core.events import TOOL_OBSERVATION_CHARS, tool
+
+    banner = "=" * 30 + " test session starts " + "=" * 30 + "\n"
+    log = banner + "collected 3230 items\n" + "." * 4000 + "\nE   assert 1 == 2\nFAILED tests/test_x.py"
+    observation = tool("run_shell", {"cmd": "pytest"}, False, log).data["observation"]
+
+    assert "FAILED tests/test_x.py" in observation, "the verdict must survive the clip"
+    assert "assert 1 == 2" in observation, "so must the assertion that produced it"
+    assert "test session starts" in observation, "the head still says which run this is"
+    assert "chars)" in observation, "and the gap is marked, never silent"
+    # Still bounded: this is a progress caption, not the transcript.
+    assert len(observation) <= TOOL_OBSERVATION_CHARS + len("… (+9999 chars)") + 2
 
 
 class ScriptedBackend:
