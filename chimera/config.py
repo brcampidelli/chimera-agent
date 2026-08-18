@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Iterable
 from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
@@ -738,6 +739,36 @@ class Settings(BaseSettings):
             "SPOTIFY_CLIENT_ID": self.spotify_client_id,
             "SPOTIFY_CLIENT_SECRET": self.spotify_client_secret,
         }
+
+
+#: The environment variable NAMES this process inherited, upper-cased, captured at import.
+#:
+#: A real environment variable beats ``.env`` — that is pydantic-settings' precedence for every field
+#: here, and :func:`_export_env_file_credentials` below deliberately mirrors it with ``setdefault``.
+#: So a ``CHIMERA_*`` exported by whatever started this process (``docker run -e``, a systemd unit, a
+#: shell) is not just the value in force: it is a value the Settings screen cannot change, because
+#: ``patch_config`` writes ``.env`` and the variable wins again at the next launch. The save
+#: confirms, the value sticks for the session (the patch also writes ``os.environ``), and it reverts
+#: at restart with nothing having said so — which is the worst shape a setting can have.
+#:
+#: Captured in the module body, which is provably before the first write: nothing can call
+#: ``patch_config`` without importing this module first. Diffing ``os.environ`` against ``.env`` at
+#: read time was the other candidate and it is wrong — it reports nothing while the two agree, which
+#: is exactly the moment before the user saves the change that will silently revert.
+#:
+#: Upper-cased because ``model_config`` declares ``case_sensitive=False``: a lower-case export is
+#: honoured by pydantic, so matching it case-sensitively here would miss a real pin.
+_STARTUP_ENV: frozenset[str] = frozenset(name.upper() for name in os.environ)
+
+
+def pinned_by_environment(keys: Iterable[str]) -> list[str]:
+    """Which of ``keys`` came from the environment rather than from ``.env``, sorted.
+
+    Membership, not equality of values: a key present in the startup environment cannot be changed
+    durably from the UI regardless of what it currently holds, so the honest test is "was this
+    inherited", not "does it differ from the file today".
+    """
+    return sorted(key for key in keys if key.upper() in _STARTUP_ENV)
 
 
 def _export_env_file_credentials() -> None:

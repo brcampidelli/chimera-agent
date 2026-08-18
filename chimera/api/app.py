@@ -78,6 +78,7 @@ from chimera.api.schemas import (
     McpTestOut,
     MessagingPlatformOut,
     NewSessionOut,
+    OllamaModelsOut,
     PausedRunOut,
     PlanOut,
     PoolAddIn,
@@ -566,6 +567,29 @@ def build_api_app(
         from chimera.api.config_test import test_provider
 
         return test_provider(req.model)
+
+    @app.get("/api/models/ollama", dependencies=[guard], response_model=OllamaModelsOut)
+    def ollama_models_endpoint() -> dict[str, Any]:
+        """The model tags this machine's Ollama has pulled.
+
+        Its own endpoint rather than a field on ``/api/doctor``, for the reason
+        ``editor_capabilities`` states about the completion model: doctor is fetched by several
+        screens, and putting a network round-trip to a possibly-absent server behind it would make
+        every one of them wait on a machine that may simply be asleep.
+
+        ``live_settings()`` and not the launch photograph: the URL this asks is edited one row above
+        the picker on the same screen, so a picker built from the boot-time value would answer about
+        the previous server the first time someone points it at a new one.
+        """
+        from chimera.providers.ollama import installed_models
+
+        found = installed_models(live_settings().ollama_base_url)
+        return {
+            "base_url": found.base_url,
+            "reachable": found.reachable,
+            "models": list(found.models),
+            "reason": found.reason,
+        }
 
     # --- Messaging: reach the user on Discord/Telegram, controlled from the UI --------------------
     @app.get("/api/messaging", dependencies=[guard], response_model=dict[str, MessagingPlatformOut])

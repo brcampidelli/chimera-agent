@@ -1180,6 +1180,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/models/ollama": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ollama Models Endpoint
+         * @description The model tags this machine's Ollama has pulled.
+         *
+         *     Its own endpoint rather than a field on ``/api/doctor``, for the reason
+         *     ``editor_capabilities`` states about the completion model: doctor is fetched by several
+         *     screens, and putting a network round-trip to a possibly-absent server behind it would make
+         *     every one of them wait on a machine that may simply be asleep.
+         *
+         *     ``live_settings()`` and not the launch photograph: the URL this asks is edited one row above
+         *     the picker on the same screen, so a picker built from the boot-time value would answer about
+         *     the previous server the first time someone points it at a new one.
+         */
+        get: operations["ollama_models_endpoint_api_models_ollama_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/plan": {
         parameters: {
             query?: never;
@@ -2016,6 +2045,21 @@ export interface components {
             /** File */
             file: string;
         };
+        /**
+         * BrowserCfgOut
+         * @description Whether the agent's Chromium runs where you can see it.
+         *
+         *     The switch has been wired since the browser tool shipped and had no control anywhere, so the only
+         *     way to watch a page the agent was driving was to edit ``.env`` and restart — which is the same as
+         *     not being able to watch it, for anyone who did not read the source.
+         */
+        BrowserCfgOut: {
+            /**
+             * Headless
+             * @default true
+             */
+            headless: boolean;
+        };
         /** CacheCfgOut */
         CacheCfgOut: {
             /** Completion */
@@ -2268,11 +2312,14 @@ export interface components {
             };
             automation: components["schemas"]["AutomationCfgOut"];
             autonomy: components["schemas"]["AutonomyCfgOut"];
+            browser?: components["schemas"]["BrowserCfgOut"];
             cache: components["schemas"]["CacheCfgOut"];
             guard: components["schemas"]["GuardCfgOut"];
             mcp: components["schemas"]["McpCfgOut"];
             memory: components["schemas"]["MemoryCfgOut"];
             models: components["schemas"]["ModelsCfgOut"];
+            /** Pinned */
+            pinned?: string[];
             /** Pools */
             pools?: components["schemas"]["PoolOut"][];
             /** Providers */
@@ -3082,6 +3129,30 @@ export interface components {
         NewSessionOut: {
             /** Id */
             id: string;
+        };
+        /**
+         * OllamaModelsOut
+         * @description What the configured Ollama has pulled, so a model field stops being a memory test.
+         *
+         *     ``reachable`` is a separate field from an empty ``models`` on purpose, and it is the whole point
+         *     of this response. A picker rendered from an empty list says *you have no models*; that is a claim
+         *     about the user's machine, and when nothing answered the door we have no basis for it. Reachable
+         *     with nothing pulled and unreachable are two states with opposite remedies, so the client is given
+         *     both and can say which one it is.
+         */
+        OllamaModelsOut: {
+            /** Base Url */
+            base_url: string;
+            /** Models */
+            models?: string[];
+            /** Reachable */
+            reachable: boolean;
+            /**
+             * Reason
+             * @default
+             * @enum {string}
+             */
+            reason: "" | "no_url" | "unreachable" | "http_error" | "not_ollama";
         };
         /**
          * PausedRunOut
@@ -5856,6 +5927,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ollama_models_endpoint_api_models_ollama_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OllamaModelsOut"];
                 };
             };
         };

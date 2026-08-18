@@ -10,6 +10,9 @@ vi.mock("@/lib/api", () => ({
   getDoctor: vi.fn(),
   getInstructions: vi.fn(),
   getMessaging: vi.fn(),
+  // Answers, rather than being left undefined: the Ollama picker asks on mount, and an unresolved
+  // query would put every test here through a rejected promise for a control none of them is about.
+  getOllamaModels: vi.fn(async () => ({ base_url: "", reachable: false, models: [], reason: "no_url" })),
   patchConfig: vi.fn(),
   putInstructions: vi.fn(),
   startMessaging: vi.fn(),

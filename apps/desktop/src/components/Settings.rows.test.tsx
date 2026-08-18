@@ -16,6 +16,9 @@ vi.mock("@/lib/api", () => ({
   getDoctor: vi.fn(),
   getInstructions: vi.fn(),
   getMessaging: vi.fn(),
+  // Answers, rather than being left undefined: the Ollama picker asks on mount, and an unresolved
+  // query would put every test here through a rejected promise for a control none of them is about.
+  getOllamaModels: vi.fn(async () => ({ base_url: "", reachable: false, models: [], reason: "no_url" })),
   patchConfig: vi.fn(async () => ({ updated: [] })),
   putInstructions: vi.fn(),
   startMessaging: vi.fn(),
@@ -139,6 +142,33 @@ describe("Settings — the controls that were one row away", () => {
     await user.click(await screen.findByRole("switch", { name: "Use what it learned" }));
     await waitFor(() => expect(patchConfig).toHaveBeenCalledOnce());
     expect(vi.mocked(patchConfig).mock.calls[0][0]).toEqual({ CHIMERA_SKILL_CARDS: "true" });
+  });
+
+  it("lets you watch the page the agent is browsing", async () => {
+    // `CHIMERA_BROWSER_HEADLESS` was wired to the browser tool from the day it shipped and refused
+    // by `PATCH /api/config`, so the only way to see what the agent was doing on a web page was to
+    // edit `.env` by hand and restart — a file the app never mentions.
+    const user = userEvent.setup();
+    renderWithProviders(<Settings />);
+
+    await user.click(await screen.findByRole("switch", { name: "Show the browser window" }));
+    await waitFor(() => expect(patchConfig).toHaveBeenCalledOnce());
+    // Inverted, because the setting is `headless` and the control is named for what turning it ON
+    // does. Sending "true" here would open a window by asking for the state that has none.
+    expect(vi.mocked(patchConfig).mock.calls[0][0]).toEqual({ CHIMERA_BROWSER_HEADLESS: "false" });
+  });
+
+  it("reads as off when the server does not mention the browser at all", async () => {
+    // A server one release behind sends no `browser` block, and the switch has to default to the
+    // shipped behaviour. Defaulting the other way would show a window that is not going to open.
+    renderWithProviders(<Settings />);
+    expect(await screen.findByRole("switch", { name: "Show the browser window" })).not.toBeChecked();
+  });
+
+  it("reads as on once the browser is headful", async () => {
+    vi.mocked(getConfig).mockResolvedValue(config({ browser: { headless: false } }) as never);
+    renderWithProviders(<Settings />);
+    expect(await screen.findByRole("switch", { name: "Show the browser window" })).toBeChecked();
   });
 
   it("hides the container image until there is a container", async () => {

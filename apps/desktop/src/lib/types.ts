@@ -47,6 +47,8 @@ export type DiagnosticsResult = Schemas["DiagnosticsOut"];
 export type LspDiagnostic = Schemas["DiagnosticOut"];
 export type InlineCompletion = Schemas["CompletionOut"];
 export type CompletionAcceptance = Schemas["AcceptanceOut"];
+/** What the configured Ollama has pulled. `reachable` and an empty `models` are different answers. */
+export type OllamaModels = Schemas["OllamaModelsOut"];
 export type GitStatus = Schemas["GitStatusOut"];
 export type GitFile = Schemas["GitFileOut"];
 export type GitDiff = Schemas["GitDiffOut"];

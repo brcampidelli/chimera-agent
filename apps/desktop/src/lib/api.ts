@@ -29,6 +29,7 @@ import type {
   MemoryItem,
   MemoryLayers,
   MemoryProfile,
+  OllamaModels,
   PlanResult,
   PoolWrite,
   ProjectState,
@@ -98,6 +99,9 @@ export const putAgent = (agent: AgentDef) =>
 export const deleteAgent = (id: string) =>
   json<AgentDef[]>(`/api/agents/registry/${encodeURIComponent(id)}`, { method: "DELETE" });
 export const getDoctor = () => json<DoctorInfo>("/api/doctor");
+/** The Ollama tags this machine has pulled. NOT part of `doctor`: that response is fetched by
+ *  several screens, and a round-trip to a server that may be off would make all of them wait. */
+export const getOllamaModels = () => json<OllamaModels>("/api/models/ollama");
 export const getUsage = () => json<UsageSummary>("/api/usage");
 // `workspace` narrows to one project; omitted returns every project's runs, which is what a
 // caller with no project selected means and what this endpoint has always done.

@@ -7,6 +7,7 @@ import {
   getDoctor,
   getInstructions,
   getMessaging,
+  getOllamaModels,
   patchConfig,
   putInstructions,
   removePoolKey,
@@ -58,6 +59,30 @@ function AppliesNote({ when }: { when?: string }) {
       {t(when === "next_launch" ? "settings.applies.nextLaunch" : "settings.applies.nextConversation")}
     </div>
   );
+}
+
+/** The env vars this server inherited from its own environment, so a Row can say it is one of them. */
+const PinnedContext = createContext<ReadonlySet<string>>(new Set());
+
+/**
+ * When the server's environment outranks the save this screen is about to make.
+ *
+ * A real environment variable beats `.env`, and `PATCH /api/config` writes `.env`. So for a key the
+ * server was STARTED with, Save succeeds, the value holds for the whole session (the patch writes
+ * `os.environ` too) and then reverts at the next launch. The delay is what makes this worse than a
+ * refusal: by the time the old value is back, nobody connects it to the save, and the screen has
+ * spent its credibility on a control that reported a change it could not keep.
+ *
+ * The list comes from the server (`config.pinned`), like `applies` and for the same reason: only the
+ * process that was started knows what it was started with, and a copy kept here would be a guess
+ * about someone else's deployment. It is normally empty — this is a container / systemd / remote
+ * concern, reachable at all because the app can be pointed at a server somebody else runs.
+ */
+function PinnedNote({ env }: { env?: string }) {
+  const t = useT();
+  const pinned = useContext(PinnedContext);
+  if (!env || !pinned.has(env)) return null;
+  return <div className="text-xs text-warn">{t("settings.pinned")}</div>;
 }
 
 /**
@@ -168,21 +193,21 @@ function AutonomyCard({ c, save }: { c: AppConfig; save: (u: Record<string, stri
 
   return (
     <Card title={t("settings.card.autonomy")}>
-      <Row label={t("settings.row.reach")} hint={t("settings.hint.reach")}>
+      <Row label={t("settings.row.reach")} hint={t("settings.hint.reach")} env="CHIMERA_REACH">
         <Select
           value={c.autonomy.reach || "unset"}
           options={["unset", "read_only", "workspace", "workspace_shell"]}
           onChange={(v) => save({ CHIMERA_REACH: v === "unset" ? "" : v })}
         />
       </Row>
-      <Row label={t("settings.row.approval")} hint={t("settings.hint.approval")}>
+      <Row label={t("settings.row.approval")} hint={t("settings.hint.approval")} env="CHIMERA_APPROVAL">
         <Select
           value={c.autonomy.approval || "unset"}
           options={["unset", "always", "suspicious", "never"]}
           onChange={(v) => save({ CHIMERA_APPROVAL: v === "unset" ? "" : v })}
         />
       </Row>
-      <Row label={t("settings.row.hostExec")} hint={t("settings.hint.hostExec")}>
+      <Row label={t("settings.row.hostExec")} hint={t("settings.hint.hostExec")} env="CHIMERA_HOST_EXEC">
         <Select
           value={c.autonomy.host_exec}
           options={["ask", "deny", "allow"]}
@@ -220,7 +245,7 @@ function AutonomyCard({ c, save }: { c: AppConfig; save: (u: Record<string, stri
         </div>
       )}
       {(c.autonomy.denied_tools ?? []).length > 0 && (
-        <Row label={t("settings.row.deniedTools")} hint={t("settings.hint.deniedTools")}>
+        <Row label={t("settings.row.deniedTools")} hint={t("settings.hint.deniedTools")} env="CHIMERA_TOOL_DENYLIST">
           <span className="max-w-56 truncate font-mono text-xs text-muted-foreground">
             {(c.autonomy.denied_tools ?? []).join(", ")}
           </span>
@@ -234,11 +259,14 @@ function Row({
   label,
   hint,
   applies,
+  env,
   children,
 }: {
   label: string;
   hint?: string;
   applies?: string;
+  /** The single env var this row writes, so the row can say when the server's environment pins it. */
+  env?: string;
   children: ReactNode;
 }) {
   return (
@@ -247,6 +275,7 @@ function Row({
         <div className="text-sm font-medium">{label}</div>
         {hint && <div className="text-xs text-muted-foreground">{hint}</div>}
         <AppliesNote when={applies} />
+        <PinnedNote env={env} />
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <RowLabelContext.Provider value={label}>{children}</RowLabelContext.Provider>
@@ -285,6 +314,87 @@ function TextField({
         {t("common.save")}
       </Button>
     </>
+  );
+}
+
+/**
+ * The models the configured Ollama actually has pulled.
+ *
+ * `ProviderPicker` makes this argument for external agents and it is the same argument here:
+ * availability is settled on the machine the sidecar runs on, and a list shipped in the bundle would
+ * offer a tag that is not pulled. That failure does not arrive at save time — it arrives on the first
+ * call, mid-run, as a 404 from a server the user believed was ready, which is the worst moment and
+ * the least legible one. The URL is already stored and already handed to LiteLLM, so asking it is one
+ * request.
+ *
+ * Where this departs from `ProviderPicker` is what happens when the answer is nothing, and it is the
+ * whole reason this renders a sentence instead of disappearing: "Ollama is not running" and "Ollama
+ * is running with nothing pulled" have opposite remedies, and an empty dropdown states neither. It
+ * states *you have no models* — a claim about a machine we did not manage to ask.
+ *
+ * The URL is in the query key rather than read once, so editing the row above re-asks the new
+ * server instead of answering about the old one.
+ */
+function OllamaModelPicker({
+  baseUrl,
+  current,
+  onPick,
+}: {
+  baseUrl: string;
+  /** The default model as configured, so a slug already pointing at Ollama shows as selected. */
+  current: string;
+  onPick: (slug: string) => void;
+}) {
+  const t = useT();
+  // Read up here with the other hooks, not down at the `<select>`: every branch below returns early,
+  // and a `useContext` after one of them is a hook that runs on some renders and not others.
+  const rowLabel = useContext(RowLabelContext);
+  const found = useQuery({
+    queryKey: ["ollama-models", baseUrl],
+    queryFn: getOllamaModels,
+    // Never cached across time: a model pulled in a terminal thirty seconds ago is exactly the one
+    // the user came here to select, and a stale list would send them back to typing it.
+    staleTime: 0,
+    gcTime: 0,
+  });
+
+  const data = found.data;
+  // Silent while loading, and silent on an error from OUR OWN endpoint — which is not evidence about
+  // the user's Ollama. Rendering "nothing answered at localhost:11434" because our sidecar hiccuped
+  // would be the same fabrication this component exists to prevent, pointed at the wrong machine.
+  if (!data) return null;
+  if (!data.reachable) {
+    // A missing reason on an unreachable answer is a server bug; saying nothing beats inventing one.
+    if (!data.reason) return null;
+    return (
+      <span className="max-w-72 text-xs text-muted-foreground">
+        {t(`settings.ollama.reason.${data.reason}`, { url: data.base_url })}
+      </span>
+    );
+  }
+  const models = data.models ?? [];
+  if (models.length === 0) {
+    return <span className="max-w-72 text-xs text-muted-foreground">{t("settings.ollama.empty")}</span>;
+  }
+
+  // Selected only when the configured default IS one of these tags. A default pointing at a cloud
+  // model must not be shown as a local one, and a stale `ollama/…` slug for a tag that has since been
+  // removed must show as unchosen rather than as a model that is there.
+  const selected = models.find((tag) => current === `ollama/${tag}`) ?? "";
+  return (
+    <select
+      className={inputCls}
+      value={selected}
+      aria-label={rowLabel}
+      onChange={(e) => e.target.value && onPick(`ollama/${e.target.value}`)}
+    >
+      <option value="">{t("settings.ollama.choose")}</option>
+      {models.map((tag) => (
+        <option key={tag} value={tag}>
+          {tag}
+        </option>
+      ))}
+    </select>
   );
 }
 
@@ -492,6 +602,7 @@ export function MessagingCard({
       <Row
         label={t("settings.row.botToken", { platform: label })}
         hint={t("settings.hint.botToken", { platform: label })}
+        env={tokenEnv}
       >
         {editing ? (
           <>
@@ -534,6 +645,7 @@ export function MessagingCard({
       <Row
         label={t("settings.row.botRun", { platform: label })}
         hint={t("settings.hint.botRun")}
+        env="CHIMERA_APP_MESSAGING"
       >
         <div className="flex items-center gap-2">
           {d?.error && !running && (
@@ -600,6 +712,10 @@ export function Settings() {
   ];
 
   return (
+    // Built here and read by every Row, rather than threaded through eleven cards as a prop: the
+    // rows that need it are three components deep and none of them is otherwise interested in the
+    // config object.
+    <PinnedContext.Provider value={new Set(c.pinned ?? [])}>
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-2 px-6 pt-6">
         <KeyRound className="h-5 w-5 text-accent" />
@@ -643,14 +759,14 @@ export function Settings() {
         )}
 
         <Card title={t("settings.card.model")}>
-          <Row label={t("settings.row.defaultModel")}>
+          <Row label={t("settings.row.defaultModel")} env="CHIMERA_DEFAULT_MODEL">
             <TextField
               value={c.models.default}
               placeholder="openrouter/…"
               onSave={(v) => save({ CHIMERA_DEFAULT_MODEL: v })}
             />
           </Row>
-          <Row label={t("settings.row.costMode")} hint={t("settings.hint.costMode")}>
+          <Row label={t("settings.row.costMode")} hint={t("settings.hint.costMode")} env="CHIMERA_COST_MODE">
             <Select
               value={c.models.cost_mode}
               options={["auto", "cheap", "balanced", "premium"]}
@@ -661,21 +777,21 @@ export function Settings() {
               was no way to pin any of it: someone who wanted cheap-on-easy and strong-on-hard could
               read what they were getting and not change it. Empty means "let the cost mode decide",
               which is what every install has. */}
-          <Row label={t("settings.row.weakModel")} hint={t("settings.hint.roleModels")}>
+          <Row label={t("settings.row.weakModel")} hint={t("settings.hint.roleModels")} env="CHIMERA_WEAK_MODEL">
             <TextField
               value={c.models.weak}
               placeholder={t("settings.placeholder.byCostMode")}
               onSave={(v) => save({ CHIMERA_WEAK_MODEL: v })}
             />
           </Row>
-          <Row label={t("settings.row.midModel")}>
+          <Row label={t("settings.row.midModel")} env="CHIMERA_MID_MODEL">
             <TextField
               value={c.models.mid}
               placeholder={t("settings.placeholder.byCostMode")}
               onSave={(v) => save({ CHIMERA_MID_MODEL: v })}
             />
           </Row>
-          <Row label={t("settings.row.orchestratorModel")}>
+          <Row label={t("settings.row.orchestratorModel")} env="CHIMERA_ORCHESTRATOR_MODEL">
             <TextField
               value={c.models.orchestrator}
               placeholder={t("settings.placeholder.byCostMode")}
@@ -685,7 +801,7 @@ export function Settings() {
           {/* What makes a fully local install reachable from the interface rather than from a file.
               Ollama and vLLM both speak the OpenAI protocol, so this one field is the difference
               between "supports local models" and "supports local models if you edit .env". */}
-          <Row label={t("settings.row.apiBase")} hint={t("settings.hint.apiBase")}>
+          <Row label={t("settings.row.apiBase")} hint={t("settings.hint.apiBase")} env="CHIMERA_API_BASE">
             <TextField
               value={c.models.api_base ?? ""}
               placeholder="http://localhost:11434/v1"
@@ -696,23 +812,38 @@ export function Settings() {
               EVERY call, so pointing it at Ollama redirects the cloud providers too. This one only
               tells LiteLLM's Ollama provider where the server is, which is what someone running
               Ollama on another machine actually wants. */}
-          <Row label={t("settings.row.ollamaUrl")} hint={t("settings.hint.ollamaUrl")}>
+          <Row
+            label={t("settings.row.ollamaUrl")}
+            hint={t("settings.hint.ollamaUrl")}
+            env="CHIMERA_OLLAMA_BASE_URL"
+          >
             <TextField
               value={c.models.ollama_base_url}
               placeholder="http://localhost:11434"
               onSave={(v) => save({ CHIMERA_OLLAMA_BASE_URL: v })}
             />
           </Row>
+          {/* Directly under the URL it asks, because the answer is only as good as that field — and
+              because every model box on this screen was a memory test until this row existed. It
+              writes the default model rather than a fourth model field of its own: "point this at a
+              model I actually have" is the whole reason someone came here. */}
+          <Row label={t("settings.row.ollamaModels")} hint={t("settings.hint.ollamaModels")}>
+            <OllamaModelPicker
+              baseUrl={c.models.ollama_base_url}
+              current={c.models.default}
+              onPick={(slug) => save({ CHIMERA_DEFAULT_MODEL: slug })}
+            />
+          </Row>
           {/* Directly under the Ollama URL, because it is useless without it and the pair is one
               decision. The hint carries the part nobody guesses: it must be a BASE tag. */}
-          <Row label={t("settings.row.completeModel")} hint={t("settings.hint.completeModel")}>
+          <Row label={t("settings.row.completeModel")} hint={t("settings.hint.completeModel")} env="CHIMERA_COMPLETE_MODEL">
             <TextField
               value={c.models.complete_model}
               placeholder="qwen2.5-coder:1.5b-base"
               onSave={(v) => save({ CHIMERA_COMPLETE_MODEL: v })}
             />
           </Row>
-          <Row label={t("settings.row.fallbackModels")} hint={t("settings.hint.fallbackModels")}>
+          <Row label={t("settings.row.fallbackModels")} hint={t("settings.hint.fallbackModels")} env="CHIMERA_FALLBACK_MODELS">
             <TextField
               value={c.models.fallback_models.join(", ")}
               placeholder="openrouter/…, openrouter/…"
@@ -723,6 +854,7 @@ export function Settings() {
             label={t("settings.row.cascade")}
             hint={t("settings.hint.cascade")}
             applies={c.applies?.CHIMERA_CASCADE}
+            env="CHIMERA_CASCADE"
           >
             <Toggle on={c.models.cascade} onChange={(v) => save({ CHIMERA_CASCADE: String(v) })} />
           </Row>
@@ -730,7 +862,7 @@ export function Settings() {
 
         <Card title={t("settings.card.apiKeys")}>
           {c.providers.map((p) => (
-            <Row key={p.env} label={p.label} hint={p.env}>
+            <Row key={p.env} label={p.label} hint={p.env} env={p.env}>
               <SecretField provider={p} onSave={(v) => save({ [p.env]: v })} />
             </Row>
           ))}
@@ -743,7 +875,7 @@ export function Settings() {
             <span />
           </Row>
           {(c.pools ?? []).map((p) => (
-            <Row key={p.provider} label={p.provider} hint={p.env}>
+            <Row key={p.provider} label={p.provider} hint={p.env} env={p.env}>
               <PoolField
                 pool={p}
                 onChanged={() => void qc.invalidateQueries({ queryKey: ["config"] })}
@@ -753,14 +885,14 @@ export function Settings() {
         </Card>
 
         <Card title={t("settings.card.memory")}>
-          <Row label={t("settings.row.backend")}>
+          <Row label={t("settings.row.backend")} env="CHIMERA_MEMORY_BACKEND">
             <Select
               value={c.memory.backend}
               options={["json", "sqlite"]}
               onChange={(v) => save({ CHIMERA_MEMORY_BACKEND: v })}
             />
           </Row>
-          <Row label={t("settings.row.semantic")} hint={t("settings.hint.semantic")}>
+          <Row label={t("settings.row.semantic")} hint={t("settings.hint.semantic")} env="CHIMERA_SEMANTIC_MEMORY">
             <Toggle
               on={c.memory.semantic}
               onChange={(v) => save({ CHIMERA_SEMANTIC_MEMORY: String(v) })}
@@ -769,14 +901,14 @@ export function Settings() {
           {/* Directly under the switch that depends on it. Semantic recall falls back to lexical on
               ANY embedder failure, silently — so an embed model the user's key cannot serve made the
               toggle above confirm a change it did not make. */}
-          <Row label={t("settings.row.embedModel")} hint={t("settings.hint.embedModel")}>
+          <Row label={t("settings.row.embedModel")} hint={t("settings.hint.embedModel")} env="CHIMERA_EMBED_MODEL">
             <TextField
               value={c.memory.embed_model}
               placeholder="openrouter/openai/text-embedding-3-small"
               onSave={(v) => save({ CHIMERA_EMBED_MODEL: v })}
             />
           </Row>
-          <Row label={t("settings.row.autoConsolidate")} hint={t("settings.hint.autoConsolidate")}>
+          <Row label={t("settings.row.autoConsolidate")} hint={t("settings.hint.autoConsolidate")} env="CHIMERA_AUTO_CONSOLIDATE">
             <Toggle
               on={c.memory.auto_consolidate}
               onChange={(v) => save({ CHIMERA_AUTO_CONSOLIDATE: String(v) })}
@@ -784,7 +916,7 @@ export function Settings() {
           </Row>
           {/* The one that closes the loop. Skills are extracted from successful runs either way;
               without this they are never read back, so the agent learns and does not use it. */}
-          <Row label={t("settings.row.skillCards")} hint={t("settings.hint.skillCards")}>
+          <Row label={t("settings.row.skillCards")} hint={t("settings.hint.skillCards")} env="CHIMERA_SKILL_CARDS">
             <Toggle
               on={c.memory.skill_cards}
               onChange={(v) => save({ CHIMERA_SKILL_CARDS: String(v) })}
@@ -794,6 +926,7 @@ export function Settings() {
             label={t("settings.row.rememberChat")}
             hint={t("settings.hint.rememberChat")}
             applies={c.applies?.CHIMERA_CHAT_MEMORY}
+            env="CHIMERA_CHAT_MEMORY"
           >
             <Toggle
               on={c.memory.remember_from_chat}
@@ -810,13 +943,13 @@ export function Settings() {
         />
 
         <Card title={t("settings.card.cacheSandbox")}>
-          <Row label={t("settings.row.completionCache")} hint={t("settings.hint.completionCache")}>
+          <Row label={t("settings.row.completionCache")} hint={t("settings.hint.completionCache")} env="CHIMERA_CACHE">
             <Toggle on={c.cache.completion} onChange={(v) => save({ CHIMERA_CACHE: String(v) })} />
           </Row>
-          <Row label={t("settings.row.promptCache")} hint={t("settings.hint.promptCache")}>
+          <Row label={t("settings.row.promptCache")} hint={t("settings.hint.promptCache")} env="CHIMERA_PROMPT_CACHE">
             <Toggle on={c.cache.prompt} onChange={(v) => save({ CHIMERA_PROMPT_CACHE: String(v) })} />
           </Row>
-          <Row label={t("settings.row.sandbox")}>
+          <Row label={t("settings.row.sandbox")} env="CHIMERA_SANDBOX">
             <Select
               value={c.sandbox.mode}
               options={["local", "docker"]}
@@ -826,7 +959,7 @@ export function Settings() {
           {/* Only meaningful under the docker sandbox, so it is shown only then — a field that
               changes nothing is a field someone will change and then wonder about. */}
           {c.sandbox.mode === "docker" ? (
-            <Row label={t("settings.row.sandboxImage")}>
+            <Row label={t("settings.row.sandboxImage")} env="CHIMERA_SANDBOX_IMAGE">
               <TextField
                 value={c.sandbox.image}
                 placeholder="python:3.12-slim"
@@ -834,6 +967,23 @@ export function Settings() {
               />
             </Row>
           ) : null}
+          {/* Filed with the sandbox rows because it answers the same question they do — where does
+              the agent's work happen on this machine — for the one tool that has a window.
+
+              The switch is inverted on purpose. The setting is `headless`, which is the state you
+              cannot see; a control has to be named for what turning it ON does, and "Headless: off"
+              asks the reader to hold a negation to find out whether they will see anything. */}
+          <Row
+            label={t("settings.row.showBrowser")}
+            hint={t("settings.hint.showBrowser")}
+            applies={c.applies?.CHIMERA_BROWSER_HEADLESS}
+            env="CHIMERA_BROWSER_HEADLESS"
+          >
+            <Toggle
+              on={!(c.browser?.headless ?? true)}
+              onChange={(v) => save({ CHIMERA_BROWSER_HEADLESS: String(!v) })}
+            />
+          </Row>
           {/* The switch the posture line names when it reports a conversation as unguarded. Off by
               default because this registry is shared with the messaging gateway: arming it silently
               would take shell away from agents someone already runs in Discord. */}
@@ -841,6 +991,7 @@ export function Settings() {
             label={t("settings.row.guardChat")}
             hint={t("settings.hint.guardChat")}
             applies={c.applies?.CHIMERA_GUARD_CHAT}
+            env="CHIMERA_GUARD_CHAT"
           >
             <Toggle on={c.guard.chat} onChange={(v) => save({ CHIMERA_GUARD_CHAT: String(v) })} />
           </Row>
@@ -851,6 +1002,7 @@ export function Settings() {
             label={t("settings.row.mcpAutoload")}
             hint={t("settings.hint.mcpAutoload")}
             applies={c.applies?.CHIMERA_MCP_AUTOLOAD}
+            env="CHIMERA_MCP_AUTOLOAD"
           >
             <Toggle
               on={c.mcp.autoload}
@@ -864,6 +1016,7 @@ export function Settings() {
             label={t("settings.row.appCron")}
             hint={t("settings.hint.appCron")}
             applies={c.applies?.CHIMERA_APP_CRON}
+            env="CHIMERA_APP_CRON"
           >
             <Toggle
               on={c.automation.cron}
@@ -873,7 +1026,7 @@ export function Settings() {
         </Card>
 
         <Card title={t("settings.card.server")}>
-          <Row label={t("settings.row.bearer")} hint={t("settings.hint.bearer")}>
+          <Row label={t("settings.row.bearer")} hint={t("settings.hint.bearer")} env="CHIMERA_SERVER_TOKEN">
             <SecretField
               // Not a provider — SecretField's masked-write behaviour is what is being reused. The
               // model/keys_url fields are empty because there is nothing on the other end of this
@@ -898,5 +1051,6 @@ export function Settings() {
         </TabPanel>
       </div>
     </div>
+    </PinnedContext.Provider>
   );
 }
