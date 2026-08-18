@@ -32,7 +32,7 @@ from chimera.governance.ledger import (
 )
 from chimera.governance.policy import Decision
 from chimera.governance.sanitize import sanitize_untrusted
-from chimera.tools.base import Tool, is_untrusted_output
+from chimera.tools.base import Tool, is_untrusted_output, refusal
 from chimera.tools.registry import ToolRegistry
 
 ApproveFn = Callable[[SequenceAssessment], bool]
@@ -130,7 +130,8 @@ class LedgeredTool(Tool):
                 self.audit.record("taint_narrowed", {"tool": self.name, "reason": reason})
             approved = self.approve(SequenceAssessment(True, Decision.REVIEW, reason)) if self.approve else False
             if not approved:
-                return f"[taint: needs review — {reason}]"
+                return refusal(f"[taint: needs review — {reason}] "
+                               f"The tool did NOT run. Do not report this as done.")
 
         # 1. Sequence-aware pre-check: does this action consume tainted input?
         assessment = assess_action(self.name, kwargs, self.ledger)
@@ -148,7 +149,8 @@ class LedgeredTool(Tool):
                 )
             approved = self.approve(assessment) if self.approve else False
             if not approved:
-                return f"[taint: needs review — {assessment.reason}]"
+                return refusal(f"[taint: needs review — {assessment.reason}] "
+                               f"The tool did NOT run. Do not report this as done.")
 
         # 1b. Idempotency guard (M15-A5): a non-idempotent external side effect (send/post) is run
         #     at most once per identical (name, args). A retry re-issuing the same call gets the

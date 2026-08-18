@@ -71,3 +71,28 @@ def is_untrusted_output(tool: Any) -> bool:
         current = getattr(current, "inner", None)
         seen += 1
     return False
+
+#: Marks an observation as a gate REFUSING to run the tool, rather than the tool having run.
+#:
+#: Here, on the leaf both the governance wrappers and the loop already import, because the question
+#: "did this call do what it said" has been answered by string-sniffing in two places
+#: (`Agent.run` and `ToolRegistry.run`) with the same rule written twice. A refusal that one of them
+#: recognises and the other does not is the same class of bug as a wrapper that drops a taint
+#: marker: the answer must not depend on who is asking.
+_REFUSAL_MARK = "\u26d4"  # ⛔
+
+
+def refusal(text: str) -> str:
+    """Build a refusal observation. Every gate that declines to run a tool must go through here."""
+    return f"{_REFUSAL_MARK} {text}"
+
+
+def is_refusal(observation: str) -> bool:
+    """True if a gate declined to run the tool, so nothing happened.
+
+    NOT the same as an error, and deliberately NOT the same as `[idempotent: …]`. That one says the
+    effect ALREADY HAPPENED and is not being repeated — reporting it as a refusal would claim the
+    action did not occur, when it did. The difference matters most to whoever reads a receipt
+    afterwards, which is the only reason any of this is being distinguished at all.
+    """
+    return observation.startswith(_REFUSAL_MARK)
