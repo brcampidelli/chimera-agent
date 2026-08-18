@@ -1766,17 +1766,13 @@ def _build_solve_agent(
     # Plan mode: an approved/edited plan is injected verbatim (parsed the same way the planner parses
     # its own output), so the run follows the human-reviewed steps and makes no planning call.
     provided_plan = Plan.from_text(req.plan) if req.plan else None
-    # What a compaction has to put back. Without this the budget above would compact blind: it would
-    # keep the recent tail and drop the plan the run is executing, which is the one thing an agent
-    # cannot re-derive from its own tail. Seeded only from what is known here — the task and the
-    # approved plan; the open file arrives per-turn from the UI and is set there, not remembered.
-    for agent in (worker, escalate_worker):
-        if agent is None:
-            continue
-        agent.run_state.current_state = req.task
-        if provided_plan is not None:
-            agent.run_state.plan = provided_plan.as_text()
-            agent.run_state.tasks = list(provided_plan.steps)
+    # No run_state seeding here any more, deliberately. Assigning it per entry point is how the
+    # fields drifted: this endpoint filled `plan`/`tasks` and put `req.task` in `current_state` — a
+    # field documented as "what the agent was doing and how far it had got" — while a run that
+    # planned for itself filled neither. The solve loop now writes `task` and `plan` once per
+    # attempt, downstream of all four points where the plan is decided and of the checkpoint restore
+    # this code cannot see. Duplicating `req.task` into `current_state` from here would only restore
+    # the same sentence twice under two headings. The open file still arrives per-turn from the UI.
     # The verify command: what the caller typed, or what the project says about itself.
     #
     # `None` means "look", not "none". The field is gone from the screen, and deleting it without
