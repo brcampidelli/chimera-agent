@@ -13,8 +13,10 @@ from __future__ import annotations
 import shutil
 import subprocess
 import tempfile
+import time
 import uuid
 from collections.abc import Callable
+from contextlib import suppress
 from pathlib import Path
 from typing import TypeVar
 
@@ -40,6 +42,90 @@ def is_git_repo(path: Path) -> bool:
     return result.returncode == 0 and result.stdout.strip() == "true"
 
 
+#: A leftover temp directory younger than this is assumed to belong to a run that is still starting.
+#: `GitWorktree.create` makes the directory and registers it with git a moment later, and pruning
+#: inside that window would delete a live worktree out from under a concurrent process.
+_ORPHAN_MIN_AGE_SECONDS = 3600
+
+
+def live_worktree_paths(repo_root: Path) -> set[Path]:
+    """Paths git currently knows as worktrees of this repo."""
+    result = _git(["worktree", "list", "--porcelain"], repo_root)
+    paths: set[Path] = set()
+    for line in result.stdout.splitlines():
+        if line.startswith("worktree "):
+            with suppress(OSError, ValueError):
+                paths.add(Path(line[len("worktree ") :].strip()).resolve())
+    return paths
+
+
+def prune_orphans(repo_root: Path, *, prefix: str = "chimera") -> dict[str, int]:
+    """Clean up what a killed run leaves behind. Returns what was removed, by kind.
+
+    `GitWorktree.remove` runs in a `finally`, so the ordinary paths — success, failure, an
+    exception — all clean up. SIGKILL does not run `finally`, and neither does a power cut or a
+    container stop, and there was nothing anywhere that collected the remains:
+
+      * an entry under `.git/worktrees`,
+      * a branch `chimera/attempt-<hex>`,
+      * a temp directory.
+
+    All three land in the USER's repository. `git worktree list` and `git branch` are things people
+    read, so this is litter we leave in someone's house — and `git worktree prune` was not called
+    from anywhere in the codebase.
+
+    DELIBERATELY NOT a registry of our own, which is what the proposal asked for. Git already keeps
+    a durable one in `.git/worktrees`, and a second record can disagree with it — at which point the
+    cleanup is deciding between two sources of truth about whether a directory is live. What git
+    does not track is the branch and the temp directory, and those are handled from git's own state
+    rather than from a file we would have to keep correct across crashes.
+
+    HONEST STARTING POINT: this repository has zero `chimera/*` branches right now. The item is
+    justified by the shape of the failure, not by observed leakage.
+    """
+    removed = {"worktrees": 0, "branches": 0, "directories": 0}
+    if not is_git_repo(repo_root):
+        return removed
+    repo_root = Path(repo_root).resolve()
+
+    # 1. Git's own pruning: drops `.git/worktrees` entries whose directory is gone. Safe by
+    #    construction — it only forgets what is already missing.
+    before = live_worktree_paths(repo_root)
+    _git(["worktree", "prune"], repo_root)
+    live = live_worktree_paths(repo_root)
+    removed["worktrees"] = max(0, len(before) - len(live))
+
+    # 2. Branches with no worktree attached. `git branch -D` refuses a branch checked out in a live
+    #    worktree, so a run in flight cannot be harmed even if the listing raced.
+    result = _git(["branch", "--list", f"{prefix}/attempt-*", "--format=%(refname:short)"], repo_root)
+    for branch in (b.strip() for b in result.stdout.splitlines() if b.strip()):
+        if _git(["branch", "-D", branch], repo_root).returncode == 0:
+            removed["branches"] += 1
+
+    # 3. Temp directories git no longer knows about. Age-gated: `create` makes the directory and
+    #    registers it a moment later, and pruning inside that window would delete a live worktree
+    #    belonging to another process.
+    now = time.time()
+    with suppress(OSError):
+        for candidate in Path(tempfile.gettempdir()).glob("chimera-wt-*"):
+            if not candidate.is_dir() or candidate.resolve() in live:
+                continue
+            with suppress(OSError):
+                if now - candidate.stat().st_mtime < _ORPHAN_MIN_AGE_SECONDS:
+                    continue
+                shutil.rmtree(candidate, ignore_errors=True)
+                removed["directories"] += 1
+
+    if any(removed.values()):
+        _log.info("pruned orphaned worktrees: %s", removed)
+    return removed
+
+
+#: Pruned once per process, before the first worktree is created — "on boot" in the only sense that
+#: matters, and free for the runs that never use one.
+_pruned_repos: set[Path] = set()
+
+
 class GitWorktree:
     """A throwaway git worktree on its own branch, created from the repo's HEAD."""
 
@@ -51,6 +137,12 @@ class GitWorktree:
     @classmethod
     def create(cls, repo_root: Path, *, prefix: str = "chimera") -> GitWorktree:
         repo_root = Path(repo_root).resolve()
+        if repo_root not in _pruned_repos:
+            _pruned_repos.add(repo_root)
+            with suppress(Exception):
+                # Best-effort and never fatal: failing to tidy up after a previous crash is not a
+                # reason to refuse to start this run.
+                prune_orphans(repo_root, prefix=prefix)
         branch = f"{prefix}/attempt-{uuid.uuid4().hex[:8]}"
         path = Path(tempfile.mkdtemp(prefix="chimera-wt-"))
         path.rmdir()  # `git worktree add` needs the target not to exist yet
