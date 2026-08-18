@@ -27,7 +27,17 @@ def get_sandbox(settings: Settings | None = None) -> Sandbox:
 
     settings = settings or get_settings()
     if (settings.sandbox or "local").lower() == "docker":
-        return DockerSandbox(image=settings.sandbox_image, runtime=settings.sandbox_runtime)
+        # Every one of these was a constructor parameter the factory never passed. `network` and
+        # `memory` in particular were accepted, documented, and dead: no caller could reach them, so
+        # the container was hard-wired to no-network/512m whatever the settings said.
+        return DockerSandbox(
+            image=settings.sandbox_image,
+            network=(settings.sandbox_network or "none").lower() == "bridge",
+            memory=settings.sandbox_memory,
+            cpus=settings.sandbox_cpus,
+            pids_limit=settings.sandbox_pids_limit,
+            runtime=settings.sandbox_runtime,
+        )
     return LocalSandbox()
 
 

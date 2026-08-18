@@ -370,6 +370,20 @@ class Settings(BaseSettings):
     keep_think: bool = Field(default=False, validation_alias="CHIMERA_KEEP_THINK")
     # Optional OCI runtime for the docker sandbox (e.g. runsc = gVisor); empty = daemon default.
     sandbox_runtime: str = Field(default="", validation_alias="CHIMERA_SANDBOX_RUNTIME")
+    # Container network. "none" (the default) is the isolation the sandbox is for; "bridge" exists
+    # because a task that has to `pip install` cannot run without it, and the honest answer to "how
+    # many tasks need it" is a number nobody has measured yet. Setting this is what makes that
+    # measurable rather than theoretical.
+    #
+    # NOT an egress allowlist, and that is not an omission: Chimera is a pip install on a laptop,
+    # and there is no DOCKER-USER chain to hook on Docker Desktop for Windows or macOS. If the
+    # adoption number ever justifies filtering, the route is an egress proxy in a compose file,
+    # never iptables on the host.
+    sandbox_network: str = Field(default="none", validation_alias="CHIMERA_SANDBOX_NETWORK")
+    # Container limits. Memory was already a constructor parameter with no way to set it.
+    sandbox_memory: str = Field(default="512m", validation_alias="CHIMERA_SANDBOX_MEMORY")
+    sandbox_cpus: str = Field(default="2", validation_alias="CHIMERA_SANDBOX_CPUS")
+    sandbox_pids_limit: int = Field(default=256, validation_alias="CHIMERA_SANDBOX_PIDS")
     # Posture for running the agent's commands/code ON THE HOST (i.e. sandbox=local). Because most
     # `pip install` users have no Docker, host execution is the common path — so the model deciding to
     # run a shell command must not silently execute on the machine. Values:
