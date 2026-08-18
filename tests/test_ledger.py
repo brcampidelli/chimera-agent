@@ -217,6 +217,10 @@ def test_ledgered_escalation_is_audited() -> None:
         assert any(e["type"] == "taint_review" for e in audit.entries())
     finally:
         audit.path.unlink(missing_ok=True)
+        # `record()` now takes an advisory lock on a sibling `.lock` before appending, so a probe
+        # that writes into the source tree leaves two files behind rather than one. Untracked junk
+        # after a test run is how a `git status` check starts lying.
+        Path(str(audit.path) + ".lock").unlink(missing_ok=True)
 
 
 def test_ledger_registry_wraps_every_tool() -> None:
@@ -363,3 +367,7 @@ def test_narrowing_is_audited() -> None:
         assert any(e["type"] == "taint_narrowed" for e in audit.entries())
     finally:
         audit.path.unlink(missing_ok=True)
+        # `record()` now takes an advisory lock on a sibling `.lock` before appending, so a probe
+        # that writes into the source tree leaves two files behind rather than one. Untracked junk
+        # after a test run is how a `git status` check starts lying.
+        Path(str(audit.path) + ".lock").unlink(missing_ok=True)
