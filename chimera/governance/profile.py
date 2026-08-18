@@ -29,7 +29,7 @@ for — so on a stock deployment they reached neither Discord bot, while `config
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from chimera.telemetry import get_logger
 
@@ -37,6 +37,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from pathlib import Path
 
     from chimera.config import Settings
+    from chimera.governance.audit import AuditLog
 
 _log = get_logger("governance.profile")
 
@@ -44,6 +45,89 @@ _log = get_logger("governance.profile")
 #: governance" and "this surface was assembled in observe mode" are different states and the
 #: distinction is what the rollout is about.
 MODES = ("off", "observe", "enforce")
+
+
+class GovernanceStep(NamedTuple):
+    """What the deployment's governance decided, and the registry it produced."""
+
+    registry: Any
+    approvals: Any
+    """The record of what was refused or granted. Empty when ``mode`` is ``"off"``."""
+    approve: Any | None
+    """The approver the kernel was given. ``None`` when governance is off — which is NOT the same as
+    the ``approve=None`` a wrapper reads as "nobody can approve, so refuse". A caller passing this
+    on to another layer must check ``mode`` first."""
+    mode: str
+
+
+def govern_step(
+    registry: Any,
+    *,
+    settings: Settings,
+    audit: AuditLog,
+    mode: str = "",
+    surface: str = "",
+    attended: bool = True,
+    audit_allows: bool = True,
+) -> GovernanceStep:
+    """Apply the deployment's trust kernel to ``registry``, under the deployment's mode.
+
+    Split out of :func:`governed_profile` for the one caller that could not use the whole thing. The
+    API's ``assemble_registry`` builds its own write region, its own union of posture and denylist,
+    and its own taint ledger **which it hands back to the caller** — so wrapping the profile around
+    that assembly would have produced a SECOND ``TaintLedger``, outermost, watching the tools while
+    the caller held the inner one. ``assemble_registry`` already says why that is fatal: "the run
+    that got tainted and the run that gets asked about it would be different objects, and the pause
+    would never fire." (An earlier draft of this paragraph also claimed a duplicated
+    ``restrict_registry`` would spam the audit. That was wrong and is recorded here rather than
+    deleted: ``assemble_registry`` calls it with no ``audit`` at all, and it writes one line per
+    construction, not per call. The ledger is the whole reason.)
+
+    So the kernel — the one layer that path genuinely lacked — moves here, and both callers read the
+    mode off the same lines. Two copies of "what does ``enfroce`` mean" is how one of them ends up
+    answering differently.
+
+    ``attended`` is the API's reason for this being a parameter at all. ``approver_for("ask")``
+    prompts on **the server's** stdin, and degrades to deny only when that stdin is not a terminal —
+    so a ``chimera serve`` started from a shell would, under ``enforce``, stop an HTTP request and
+    wait for whoever happens to be looking at the console to type ``y``. That person did not make
+    the request and cannot see what it was for, and the worker blocks until they answer. An approval
+    means something only when the person answering is the person who asked, which on this surface is
+    never — so an unattended caller passes ``attended=False`` and the prompt is never built.
+    """
+    from chimera.governance import ApprovalLedger, TrustKernel
+    from chimera.governance.approval import allow as allow_everything
+    from chimera.governance.approval import approver_for
+    from chimera.governance.governed_tool import govern_registry
+
+    resolved = (mode or settings.governance_mode or "off").strip().lower()
+    if resolved not in MODES:
+        _log.warning("unknown governance mode %r on %s: treating as 'off'", resolved, surface)
+        resolved = "off"
+
+    approvals = ApprovalLedger()
+    if resolved == "off":
+        return GovernanceStep(registry, approvals, None, resolved)
+
+    # In observe the approver says yes to everything and writes down that it did. Every call that
+    # reaches an approver is one the policy WOULD have refused, so `approvals.granted` is exactly
+    # the report a rollout needs: what enforcement would cost, per surface, measured not guessed.
+    if resolved == "observe":
+        approve = allow_everything(approvals)
+    else:
+        wanted = settings.approval_mode
+        if not attended and wanted == "ask":
+            # `deny` is what `approver_for` picks for itself once it finds no terminal; this reaches
+            # the same fail-closed answer one step earlier, before a tty that belongs to somebody
+            # else can be mistaken for the requester.
+            wanted = "deny"
+        approve = approver_for(wanted, approvals)
+
+    registry = govern_registry(
+        registry, TrustKernel(audit=audit, audit_allows=audit_allows), approve=approve
+    )
+    _log.info("governance %s on %s", resolved, surface or "(unnamed surface)")
+    return GovernanceStep(registry, approvals, approve, resolved)
 
 
 def governed_profile(
@@ -66,21 +150,9 @@ def governed_profile(
     caller that cannot tell "the job did its work" from "the job was not allowed to" — which is the
     failure this whole module exists to make impossible.
     """
-    from chimera.governance import ApprovalLedger, TaintLedger, TrustKernel
-    from chimera.governance.approval import allow as allow_everything
-    from chimera.governance.approval import approver_for
-    from chimera.governance.governed_tool import govern_registry
-    from chimera.governance.ledger_tool import ledger_registry
-
-    resolved = (mode or settings.governance_mode or "off").strip().lower()
-    if resolved not in MODES:
-        _log.warning("unknown governance mode %r on %s: treating as 'off'", resolved, surface)
-        resolved = "off"
-
-    approvals = ApprovalLedger()
-
-    from chimera.governance import restrict_registry
+    from chimera.governance import TaintLedger, restrict_registry
     from chimera.governance.audit import AuditLog
+    from chimera.governance.ledger_tool import ledger_registry
 
     audit = AuditLog(home / "audit.jsonl")
 
@@ -118,24 +190,16 @@ def governed_profile(
         registry = restrict_registry(registry, allow=allow_names, deny=deny_names, audit=audit)
         _log.info("tool fence applied on %s", surface or "(unnamed surface)")
 
-    if resolved == "off":
-        return registry, approvals
-
     # --- the inferential machinery: still staged behind observe/enforce ---------------------------
     #
-    # In observe mode the approver says yes to everything and writes down that it did. Every call
-    # that reaches an approver is one the policy WOULD have refused, so `approvals.granted` is
-    # exactly the report a rollout needs: what enforcement would have cost, per surface, measured
-    # rather than guessed.
-    approve = (
-        allow_everything(approvals)
-        if resolved == "observe"
-        else approver_for(settings.approval_mode, approvals)
-    )
+    # The mode resolution and the kernel now live in `govern_step`, which the API's own assembly
+    # calls too. They were written out here and nowhere else, which is why for a long time the kernel
+    # reached `chimera run --guard` and the cron and nothing served over HTTP.
+    step = govern_step(registry, settings=settings, audit=audit, mode=mode, surface=surface)
+    if step.mode == "off":
+        return step.registry, step.approvals
 
-    registry = govern_registry(registry, TrustKernel(audit=audit), approve=approve)
     registry = ledger_registry(
-        registry, TaintLedger(), audit=audit, narrow_on_taint=True, approve=approve
+        step.registry, TaintLedger(), audit=audit, narrow_on_taint=True, approve=step.approve
     )
-    _log.info("governance %s on %s", resolved, surface or "(unnamed surface)")
-    return registry, approvals
+    return registry, step.approvals

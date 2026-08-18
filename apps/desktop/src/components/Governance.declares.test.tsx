@@ -52,9 +52,12 @@ describe("Governance — what it is measuring, and what it is not", () => {
     vi.mocked(getGovernanceInjection).mockResolvedValue(REPORT as never);
   });
 
-  it("names the layer that is not on this path, even when the score is good", async () => {
+  it("names the layer this score does not cover, even when the score is good", async () => {
     renderWithProviders(<Governance />);
-    await screen.findByText(/BLOCK\/REVIEW policy rules are not on this path/i);
+    // "nothing here measures", not "not on this path": the rules DO run on the run and turn
+    // endpoints once CHIMERA_GOVERNANCE is set, and the old sentence went stale in ten languages
+    // at once. What stays true in every configuration is that this suite does not exercise them.
+    await screen.findByText(/Nothing here measures the BLOCK\/REVIEW policy rules/i);
   });
 
   it("says the measured defence is switched off, before showing the numbers it produced", async () => {

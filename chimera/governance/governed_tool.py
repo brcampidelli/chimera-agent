@@ -21,6 +21,25 @@ ApproveFn = Callable[[Verdict, str], bool]
 ContextFn = Callable[[], str]
 
 
+#: Argument names whose value is a document, not an identifier. Their contents never reach the audit.
+#:
+#: By NAME rather than by length, because the useful half of an audit line is exactly the short
+#: values — `run_shell {'command': 'git push --force origin main'}` is the whole point of the
+#: record, and a blanket length cap would keep the first 200 characters of a `.env` while throwing
+#: away the command someone opens the log to read.
+_DOCUMENT_ARGS = frozenset(
+    {"content", "patch", "diff", "text", "body", "data", "new_str", "old_str", "new_text"}
+)
+
+
+def elide_values(kwargs: dict[str, Any]) -> dict[str, Any]:
+    """``kwargs`` with document-shaped values replaced by their size."""
+    return {
+        key: (f"<{len(str(value))} chars>" if key in _DOCUMENT_ARGS else value)
+        for key, value in kwargs.items()
+    }
+
+
 class GovernedTool(Tool):
     """A tool whose execution is gated by the trust kernel."""
 
@@ -49,7 +68,15 @@ class GovernedTool(Tool):
 
     def run(self, **kwargs: Any) -> str:
         action = f"{self.name} {kwargs}"
-        verdict = self.kernel.evaluate(action, context=self._context())
+        # The rules read the WHOLE action; the audit gets the elided one. Redaction alone was not
+        # enough: it catches credential SHAPES, and the body of a private key has no shape — a
+        # governed `write_file` of `deploy/id_rsa` put `-----BEGIN RSA PRIVATE KEY-----` and the
+        # first lines of the key into a file the app serves over HTTP. Nothing about an audit trail
+        # needs the contents of the file that was written; it needs to know which file, and why the
+        # call was stopped.
+        verdict = self.kernel.evaluate(
+            action, context=self._context(), record_as=f"{self.name} {elide_values(kwargs)}"
+        )
         if verdict.decision == Decision.BLOCK:
             return refusal(f"[governance: BLOCKED — {verdict.reason}] "
                            f"The tool did NOT run. Do not report this as done.")

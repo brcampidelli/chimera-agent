@@ -154,7 +154,13 @@ EXEMPT: dict[str, str] = {
         "of what this profile does, kept because it also carries MCP connectors the profile does "
         "not model — consolidating the two is open work, not a settled answer"
     ),
-    "chimera/api/code_api.py:assemble_registry": "resolves its own posture floor + taint narrowing",
+    "chimera/api/code_api.py:assemble_registry": (
+        "resolves its own posture floor + taint narrowing, and installs the deployment's "
+        "kernel itself via govern_step — the profile would have built a SECOND TaintLedger "
+        "over the one this surface hands back to its caller. Pinned by "
+        "tests/test_governance_on_the_api_path.py, because an exemption is prose and prose "
+        "goes stale"
+    ),
     "chimera/kanban/lanes.py:run": "restrict_registry from the card's own role (fail-closed)",
     # --- not an agent surface at all ---
     "chimera/api/app.py:build_api_app.tools_endpoint": "lists tool schemas; nothing is invoked",
@@ -327,6 +333,11 @@ def test_the_gate_does_not_demand_a_refactor_of_the_attended_commands() -> None:
         # reading these counts has to be able to say which of the two ways the bot was started,
         # because for three weeks only one of them was governed at all.
         ("app-messaging", "server/manager.py"),
+        # The two HTTP surfaces that reach `assemble_registry`. Added with the kernel that now runs
+        # there: the labels were written and not declared, which is the exact shape this gate exists
+        # to catch — cheap to drop while refactoring, and invisible once dropped.
+        ("api:run", "api/app.py"),
+        ("api:turn", "api/code_api.py"),
     ],
 )
 def test_each_named_surface_is_declared(surface: str, module: str) -> None:

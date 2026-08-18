@@ -281,6 +281,7 @@ def assemble_registry(
     gateway: Any,
     *,
     steps: int,
+    surface: str = "api",
 ) -> tuple[ToolRegistry, Any]:
     """Build the tool registry for a coding turn, and the taint ledger watching it.
 
@@ -289,7 +290,8 @@ def assemble_registry(
     1. the **write region** scopes the native write tools as they are constructed;
     2. the **allowlist** is applied BEFORE the meta-tools, so a sub-agent inherits it;
     3. the **explorer** is registered into that already-scoped registry;
-    4. the **taint ledger** wraps everything, so it sees every call including the sub-agent's.
+    4. the **trust kernel** wraps that, so BLOCK/REVIEW is decided before a tool can run;
+    5. the **taint ledger** wraps everything, so it sees every call including the sub-agent's.
 
     Returns the registry and the ledger, because the same ledger has to reach the agent as ``taint=``
     — that is what lets a run know it read untrusted content and is therefore pausable. Building two
@@ -299,6 +301,7 @@ def assemble_registry(
     from chimera.core import ExploreRepositoryTool
     from chimera.governance import TaintLedger, ledger_registry, restrict_registry
     from chimera.governance.audit import AuditLog
+    from chimera.governance.profile import govern_step
     from chimera.tools import default_registry
 
     registry = default_registry(ws, write_region=build_write_region(seams.write_region, ws))
@@ -358,11 +361,43 @@ def assemble_registry(
     #
     # Until now the app wrote nothing here at all, which made the Security screen's empty state mean
     # "nothing is recording" while it read as "nothing has happened". Those are opposite claims.
-    return ledger_registry(
+    audit = AuditLog(settings.home / "audit.jsonl")
+    # The trust kernel, under the deployment's own governance mode — `off` by default, so a stock
+    # install behaves exactly as it did. Every surface served over HTTP was assembled without it:
+    # `POST /api/runs`, `POST /api/agents` and `POST /api/code/turn` all arrive here, and measured
+    # before this line existed, the chain around a write tool was `LedgeredTool -> WriteFileTool`
+    # with nothing in between. The kernel returns `review` for `git push --force origin main` — and
+    # on this path that verdict was reached by nobody, because no wrapper was there to ask.
+    #
+    # It goes HERE, after every registration and before the ledger, so the order matches the one
+    # `governed_profile` has always used and the ledger stays outermost, seeing exactly what the
+    # kernel saw. (Not, as an earlier draft of this comment said, so the kernel can see a
+    # sub-agent's calls: `SubAgentTool` is built in one place, `cli/main.py`, and never here. The
+    # only sub-agent on this surface is `ExploreRepositoryTool`, which builds its own read-only
+    # registry internally — so it is governed as a TOOL and its inner calls are not governed at
+    # all. That is a real gap; it is just not this comment's.)
+    #
+    # `attended=False`: nobody is at this server's console on behalf of an HTTP caller.
+    # `audit_allows=False`: an ALLOW per tool call would bury this log's rare events in a day.
+    #
+    # Deliberately NOT passing `step.approve` to the ledger below. In `observe` that approver says
+    # yes to everything, so handing it to the taint layer would turn taint narrowing on this path
+    # from REFUSING a dangerous call after untrusted input into allowing it — someone switching to
+    # `observe` in order to MEASURE would silently weaken the surface. Observe adds measurement; it
+    # must never subtract protection that was already there.
+    step = govern_step(
         registry,
+        settings=settings,
+        audit=audit,
+        surface=surface,
+        attended=False,
+        audit_allows=False,
+    )
+    return ledger_registry(
+        step.registry,
         ledger,
         narrow_on_taint=narrow,
-        audit=AuditLog(settings.home / "audit.jsonl"),
+        audit=audit,
     ), ledger
 
 
@@ -469,7 +504,9 @@ def register_code_api(
 
         gateway = LLMGateway()
         steps = resolve_steps(req.max_steps)
-        registry, ledger = assemble_registry(req, ws, live(), gateway, steps=steps)
+        registry, ledger = assemble_registry(
+            req, ws, live(), gateway, steps=steps, surface="api:turn"
+        )
         # Recalled facts ride in the SYSTEM prompt, and that placement is load-bearing: `absorb`
         # drops system messages when it stores the transcript, so the recall is refreshed each turn
         # instead of accumulating stale copies of itself in the conversation forever.

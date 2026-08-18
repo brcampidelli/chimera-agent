@@ -60,6 +60,31 @@ class ChainCheck:
         return self.ok
 
 
+def _redacted(payload: dict[str, Any]) -> dict[str, Any]:
+    """Run every string in ``payload`` through the trace's redactor before it is written.
+
+    `chimera.core.redact` existed and was wired into the step trace only. This file is the one that
+    gets SERVED — `/api/governance/audit` reads it straight onto the Security screen — and it was
+    the one with no redaction at all. Measured, with a governed write of a `.env`:
+
+        LINHAS CONTENDO A CHAVE LITERAL: 1
+        write_file {'path': '.env', 'content': 'OPENAI_API_KEY=sk-AAAABBBBCCCCDDDD1234\n'}
+
+    Note *which* rule wrote that line: `secret_material`, the rule whose entire job is to notice a
+    credential. It noticed, and then persisted it.
+
+    Applied here rather than at each caller so the guarantee covers the whole file, and applied
+    BEFORE the hash so the digest is over what is actually stored. It is a second net and not a
+    promise — see the redactor's own docstring for what it cannot catch, which is why
+    :func:`chimera.governance.governed_tool.elide_values` drops the argument bodies as well.
+    """
+    from chimera.core.redact import redact
+
+    return {
+        key: redact(value) if isinstance(value, str) else value for key, value in payload.items()
+    }
+
+
 class AuditLog:
     """An append-only, hash-chained JSONL audit trail."""
 
@@ -75,7 +100,7 @@ class AuditLog:
             self._head = GENESIS
 
     def record(self, event_type: str, payload: dict[str, Any]) -> dict[str, Any]:
-        entry: dict[str, Any] = {"seq": self._count, "type": event_type, **payload}
+        entry: dict[str, Any] = {"seq": self._count, "type": event_type, **_redacted(payload)}
         # Chain fields are written last on purpose: a payload cannot overwrite them.
         entry["prev"] = self._head
         entry["hash"] = _digest(entry)

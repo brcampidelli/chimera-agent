@@ -56,6 +56,7 @@ class TrustKernel:
         *,
         judge: JudgeFn | ContextJudgeFn | None = None,
         audit: AuditLog | None = None,
+        audit_allows: bool = True,
         precedents: PrecedentStore | None = None,
         default: Decision = Decision.ALLOW,
     ) -> None:
@@ -63,11 +64,25 @@ class TrustKernel:
         self.learned = RuleSet(use_defaults=False)
         self.judge = judge
         self.audit = audit
+        # Whether an ALLOW — the overwhelmingly common verdict — earns a line. On cron that is a few
+        # hundred a day and worth keeping. On an interactive coding turn it is one per tool call,
+        # and the Security screen reads the newest 200, so about twenty-five turns would push every
+        # taint and narrowing event, the rare ones that screen exists for, off the first page.
+        # `assemble_registry` had already reached this conclusion for `restrict_registry` and
+        # written it down: "a trail nobody can read is the same as no trail."
+        #
+        # The cost, named because it is the same shape as a bug this file's neighbours have fixed
+        # twice: with it off and nothing refused, the log holds no governance line at all — so "the
+        # kernel is installed and allowed everything" and "the kernel is not installed" look
+        # identical to whoever reads the Security screen. Those are opposite claims. Distinguishing
+        # them needs a line that says the kernel STARTED, written once per assembly rather than once
+        # per call; that is not this parameter's job and it is not yet anyone's.
+        self.audit_allows = audit_allows
         self.precedents = precedents
         self.default = default
         self._judge_takes_context = _accepts_context(judge)
 
-    def evaluate(self, action: str, *, context: str = "") -> Verdict:
+    def evaluate(self, action: str, *, context: str = "", record_as: str | None = None) -> Verdict:
         """Decide on ``action``, optionally told *why* it is happening.
 
         ``context`` was declared here and read nowhere: the signature accepted it, the body never
@@ -105,11 +120,14 @@ class TrustKernel:
             verdict = Verdict(self.default, "no rule matched; default policy", "default")
             source = "default"
 
-        if self.audit is not None:
+        if self.audit is not None and (self.audit_allows or verdict.decision != Decision.ALLOW):
             self.audit.record(
                 "governance",
                 {
-                    "action": action[:200],
+                    # `record_as` is the caller's audit-safe rendering of the same action — the
+                    # rules judge the full text, the log keeps a version with document bodies
+                    # elided. Falls back to `action` for the callers that have nothing to hide.
+                    "action": (record_as or action)[:200],
                     "decision": verdict.decision.value,
                     "rule": verdict.rule,
                     "reason": verdict.reason,

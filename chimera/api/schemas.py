@@ -1093,9 +1093,12 @@ class InjectionReportOut(BaseModel):
     """Whether that layer is switched ON in this install (CHIMERA_TAINT_NARROW). False means the
     defended column describes a build the reader does not have."""
     trust_kernel: bool = False
-    """Whether the BLOCK/REVIEW policy rules are on this path. They are wired into `chimera run
-    --guard` / `solve --guard` only, so nothing here measures them — said out loud, because a good
-    score invites the reader to assume every layer they have heard of is present."""
+    """Whether these numbers cover the BLOCK/REVIEW policy rules. They never do — the suite
+    exercises taint narrowing only — so this is a constant, and deliberately not derived from
+    `CHIMERA_GOVERNANCE`. Where the rules RUN is a different question with a different answer per
+    endpoint, and a single boolean that tried to answer it would have gone quiet for the four HTTP
+    surfaces that still have no kernel. Said out loud, because a good score invites the reader to
+    assume every layer they have heard of is behind it."""
 
 
 class AuditEventOut(BaseModel):

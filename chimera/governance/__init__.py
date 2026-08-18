@@ -72,6 +72,8 @@ if TYPE_CHECKING:
 _LAZY: dict[str, tuple[str, str]] = {
     "ApprovalLedger": ("approval", "ApprovalLedger"),
     "governed_profile": ("profile", "governed_profile"),
+    "govern_step": ("profile", "govern_step"),
+    "GovernanceStep": ("profile", "GovernanceStep"),
     "Approver": ("approval", "Approver"),
     "approver_for": ("approval", "approver_for"),
     "ActorResult": ("actors", "ActorResult"),
@@ -164,6 +166,8 @@ __all__ = [
     "fields_schema",
     "ApprovalLedger",
     "governed_profile",
+    "govern_step",
+    "GovernanceStep",
     "Approver",
     "approver_for",
     "SkillValidator",
