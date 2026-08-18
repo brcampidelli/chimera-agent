@@ -360,6 +360,14 @@ class Settings(BaseSettings):
     sandbox_image: str = Field(
         default="python:3.12-slim", validation_alias="CHIMERA_SANDBOX_IMAGE"
     )
+    # Keep `<think>` blocks in the answer instead of filtering them out.
+    #
+    # Off by default because a reasoning block in `message.content` is never what the caller asked
+    # for — it lands in the terminal, in the desktop transcript, and in whatever consumes the answer
+    # next. The escape exists because a filter with no way off is worse than the noise it removes:
+    # someone working ON reasoning tags needs the raw stream, and finding out that the tool silently
+    # ate their data is a bad afternoon.
+    keep_think: bool = Field(default=False, validation_alias="CHIMERA_KEEP_THINK")
     # Optional OCI runtime for the docker sandbox (e.g. runsc = gVisor); empty = daemon default.
     sandbox_runtime: str = Field(default="", validation_alias="CHIMERA_SANDBOX_RUNTIME")
     # Posture for running the agent's commands/code ON THE HOST (i.e. sandbox=local). Because most

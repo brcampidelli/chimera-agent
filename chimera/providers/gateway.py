@@ -32,6 +32,7 @@ from chimera.providers.failover import (
     classify,
 )
 from chimera.providers.prompt_cache import apply_cache_control
+from chimera.providers.thinking import ThinkFilter, strip_think
 from chimera.telemetry import get_logger
 
 _log = get_logger("providers.gateway")
@@ -540,6 +541,19 @@ class LLMGateway:
         messages.append(Message(role="user", content=prompt))
         return self.complete(messages, model=model).content
 
+
+    def _think_filter(self) -> ThinkFilter | None:
+        """A fresh filter per call, or None when the user asked to keep the tags.
+
+        Per CALL, never shared: the filter carries depth and a carry buffer across deltas, so one
+        instance reused by two concurrent streams would splice their states together and each would
+        drop the other's text.
+
+        Read through `self.settings`, not `get_settings()`, so a gateway constructed with a frozen
+        override honours it — which is the whole meaning of passing one.
+        """
+        return None if self.settings.keep_think else ThinkFilter()
+
     def stream(
         self,
         messages: list[MessageLike],
@@ -570,10 +584,18 @@ class LLMGateway:
             stream=True,
             **call_kwargs,
         )
+        think = self._think_filter()
         for chunk in response:
             text = _delta_text(chunk)
             if text:
-                yield text
+                shown = think.feed(text) if think else text
+                if shown:
+                    yield shown
+        if think:
+            # A stream that ends inside an unclosed block still owes the caller its text.
+            tail = think.flush()
+            if tail:
+                yield tail
 
     def stream_complete(
         self,
@@ -619,14 +641,27 @@ class LLMGateway:
         content: list[str] = []
         tool_acc: dict[int, dict[str, Any]] = {}
         usage: dict[str, int | None] = {}
+        think = self._think_filter()
         for chunk in response:
             text = _delta_text(chunk)
             if text:
-                content.append(text)
-                if on_delta is not None:
-                    on_delta(text)
+                # Filtered BEFORE it is accumulated, not only before it is displayed. The reasoning
+                # would otherwise stay in `content`, which is what goes back into the message list
+                # for the next turn — so it would be hidden from the user and still paid for, every
+                # turn, forever.
+                shown = think.feed(text) if think else text
+                if shown:
+                    content.append(shown)
+                    if on_delta is not None:
+                        on_delta(shown)
             _delta_tool_calls(chunk, tool_acc)
             _accumulate_stream_usage(chunk, usage)
+        if think:
+            tail = think.flush()
+            if tail:
+                content.append(tail)
+                if on_delta is not None:
+                    on_delta(tail)
         return CompletionResult(
             content="".join(content),
             model=resolved,
@@ -666,7 +701,10 @@ class LLMGateway:
         completion_tokens: int | None = None
         try:
             message = response.choices[0].message
-            content = message.content or ""
+            # Non-streaming lands here, and a local model reasons in tags whether or not anyone is
+            # streaming. Same function as the streaming path — two implementations of one rule is
+            # how one of them quietly stops handling code fences.
+            content = strip_think(message.content or "")
             tool_calls = LLMGateway._parse_tool_calls(message)
         except (AttributeError, IndexError, TypeError):
             _log.warning("could not extract content from response for model=%s", model)
