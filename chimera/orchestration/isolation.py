@@ -66,6 +66,30 @@ class IsolatedBatch(Generic[T]):
         return all(result.ok for result in self.results)
 
 
+def _batch_deadline(timeout: float | None) -> float | None:
+    """The deadline a batch actually runs under: the caller's if it named one, else the deployment's.
+
+    ``None`` used to mean *wait forever*, and every production caller but one left it at ``None`` —
+    so the deadline machinery below existed, was tested, and was reached by nobody. One hung worker
+    then held its whole batch. Two of the four call sites are served over HTTP — ``POST /api/agents``
+    and ``POST /api/kanban/run``, both dispatching on a worker thread behind an SSE stream — so
+    there is nobody at a terminal to Ctrl-C them. On the first, the client stayed pinned open *and*
+    the endpoint's ``finally`` — the one that pops ``_agents_cancels[batch_id]`` — never ran, so the
+    batch leaked for the life of the process.
+
+    Resolving it here rather than at each call site is the whole point: a safe default a caller has
+    to remember is the same bug holding a ticket for the next caller. An explicit ``timeout`` still
+    wins, and any non-positive value — here or in ``CHIMERA_BATCH_TIMEOUT`` — means *no deadline*.
+    ``0`` must never reach :func:`run_all_with_deadline`, where it would expire every unit at once.
+    """
+    if timeout is not None:
+        return timeout if timeout > 0 else None
+    from chimera.config import get_settings
+
+    configured = get_settings().batch_timeout
+    return configured if configured > 0 else None
+
+
 def run_isolated(
     workspace: Path,
     units: list[IsolatedUnit[T]],
@@ -80,11 +104,16 @@ def run_isolated(
     merge and listed in ``IsolatedBatch.conflicts`` for the caller to resolve. Outside a git
     repo, units run against ``workspace`` directly (no isolation) — safe, but concurrent
     edits are the caller's responsibility there.
+
+    ``timeout`` bounds the WHOLE batch in wall-clock seconds. Omitting it does **not** mean
+    *forever* — it means the deployment's ``CHIMERA_BATCH_TIMEOUT`` (see :func:`_batch_deadline`,
+    which explains why the default lives there and not in each caller). Pass ``0`` for no bound.
     """
     workspace = Path(workspace).resolve()
     if not units:
         return IsolatedBatch(results=[])
     git = is_git_repo(workspace)
+    deadline = _batch_deadline(timeout)
 
     # Create one worktree per unit up front (in the parent), so each worker only runs its fn.
     trees: dict[str, GitWorktree | None] = {}
@@ -99,10 +128,10 @@ def run_isolated(
         outcomes = run_all_with_deadline(
             [(name, partial(fn, paths[name])) for name, fn in units],
             max_workers=max_workers,
-            timeout=timeout,
+            timeout=deadline,
         )
         for name, _ in units:
-            results[name] = _collect(outcomes[name], trees[name], succeeded, timeout)
+            results[name] = _collect(outcomes[name], trees[name], succeeded, deadline)
         conflicts, merged = _merge_back(workspace, trees, results)
     finally:
         for tree in trees.values():
@@ -171,9 +200,14 @@ def run_in_processes(
     :class:`IsolatedResult` — the orchestrator survives, and a hung unit's *process* is killed
     rather than abandoned. Only data crosses the process boundary, so pass module-level callables
     that return picklable values (the RPC seam), not closures over live backends.
+
+    ``timeout`` resolves exactly as in :func:`run_isolated`: omitted means the deployment's
+    ``CHIMERA_BATCH_TIMEOUT``, not forever. Same rule in both siblings on purpose — a reader
+    should not have to know which of the two got the fix.
     """
     if not units:
         return []
+    deadline = _batch_deadline(timeout)
     out: dict[str, IsolatedResult[T]] = {}
     # As in run_isolated: the deadline belongs on as_completed (the call that waits), not on
     # future.result() of an already-finished future. Without it the documented "hangs past timeout
@@ -182,7 +216,7 @@ def run_in_processes(
     try:
         futures = {pool.submit(fn): name for name, fn in units}
         try:
-            for future in as_completed(futures, timeout=timeout):
+            for future in as_completed(futures, timeout=deadline):
                 name = futures[future]
                 try:
                     out[name] = IsolatedResult(name, ok=True, value=future.result())
@@ -193,7 +227,7 @@ def run_in_processes(
                 if name in out:
                     continue
                 future.cancel()
-                out[name] = IsolatedResult(name, ok=False, error=f"timed out after {timeout}s")
+                out[name] = IsolatedResult(name, ok=False, error=f"timed out after {deadline}s")
     finally:
         # Snapshot the workers BEFORE shutting down: `shutdown` sets the executor's process map to
         # None, so reading it afterwards finds nothing to kill and the straggler survives.

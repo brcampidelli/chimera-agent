@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import threading
 import time
 from pathlib import Path
 
@@ -136,6 +137,52 @@ def _sleep_forever() -> int:
 
     time.sleep(600)
     return 0
+
+
+def test_run_isolated_bounds_a_hung_unit_nobody_asked_it_to_bound(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No `timeout=` argument, and the batch still comes back.
+
+    The deadline machinery was in place and covered by the test above — and three of the four
+    production call sites never passed a timeout, so `None` meant "wait forever" and none of it ran.
+    A default that each caller has to remember is the same bug waiting for the next caller, so the
+    default now lives in `_batch_deadline` and this asserts the *no-argument* path, which is the one
+    every caller actually takes.
+
+    Bounded at 15s rather than forever for the same reason as the API test: a regression must make
+    this go RED, not make the suite hang.
+    """
+    release = threading.Event()
+
+    def blocks(_ws: Path) -> str:
+        release.wait(15.0)
+        return "finished after all"
+
+    monkeypatch.setenv("CHIMERA_BATCH_TIMEOUT", "1")
+    try:
+        batch = run_isolated(tmp_path, [("hung", blocks)])
+    finally:
+        release.set()
+
+    assert not batch.ok
+    # Names the deadline it actually enforced, so a bound quietly substituted for another one shows.
+    assert batch.results[0].error == "timed out after 1.0s", batch.results[0].error
+
+
+def test_a_zero_batch_timeout_disables_the_bound_it_does_not_expire_everything(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """0 means "no deadline", and the failure it guards against is the loud one.
+
+    `run_all_with_deadline` computes `now + timeout`, so a 0 forwarded verbatim gives every unit
+    `remaining == 0` and the whole batch times out *instantly* — an opt-out that behaves as its exact
+    opposite, and one that would look like the units themselves being broken. `_batch_deadline`
+    therefore turns any non-positive value into `None` before it can get there.
+    """
+    monkeypatch.setenv("CHIMERA_BATCH_TIMEOUT", "0")
+    batch = run_isolated(tmp_path, [("quick", _writer("z.txt", "Z"))])
+    assert batch.ok and batch.results[0].value == "Z"
 
 
 def test_run_in_processes_timeout_bounds_a_hung_unit() -> None:

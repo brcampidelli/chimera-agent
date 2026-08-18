@@ -953,6 +953,10 @@ class AgentResultOut(BaseModel):
     reverted: bool  # any attempt was rolled back after verification failed
     changed_paths: list[str]  # files this task's worktree changed (merged back unless a conflict)
     diffs: list[FileDiffOut]  # the terminal attempt's real per-file unified diffs (never fabricated)
+    error: str  # why this task produced NO result: "timed out after Ns" (the batch's wall-clock
+    # deadline blew while this task was still running) or the exception that killed the unit. Empty
+    # whenever the task actually ran — a task that ran and did not pass says so through ``success``,
+    # and the two must not look alike on screen.
 
 
 class AgentsBatchOut(BaseModel):

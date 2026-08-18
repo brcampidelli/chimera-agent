@@ -416,6 +416,26 @@ class Settings(BaseSettings):
     # completion is not cut short; 0 disables the bound (the pre-2026-07 behaviour).
     request_timeout: float = Field(default=600.0, validation_alias="CHIMERA_REQUEST_TIMEOUT")
 
+    # The outermost deadline (seconds) for ONE parallel fan-out of isolated agents — the batch
+    # behind POST /api/agents, `chimera solve-batch` and parallel kanban dispatch. Not the same
+    # bound as CHIMERA_REQUEST_TIMEOUT above, which bounds a single model CALL: a worker can stop
+    # making progress with no call in flight at all (a shell tool that never returns, a lock, a
+    # loop), and then the batch waited forever. On the API that meant an SSE client pinned open and
+    # the batch's cancel registry never popped, with nobody at a terminal to press Ctrl-C.
+    #
+    # Wall-clock for the WHOLE fan-out, not per task (see chimera.concurrency.run_all_with_deadline,
+    # which argues the case): a bigger batch on fewer workers therefore gets less time per task.
+    # That is deliberate — what this bounds is how long one request may hold the process, not each
+    # task's fairness.
+    #
+    # 4h is roughly 8x the heaviest batch anyone has a reason to run (8 tasks / 4 workers / 3
+    # attempts of single-digit minutes each ≈ 30 min) and far past what a human waits for. It does
+    # NOT clear the arithmetic worst case — 3 attempts × ~10 calls × the 600s call deadline is ~5h
+    # for ONE task — and that is the honest limit of this default: a run in which every single call
+    # parks at the provider's deadline is a broken provider, not work worth waiting out. 0 disables
+    # the bound entirely (the pre-2026-08 behaviour) for a deployment that disagrees.
+    batch_timeout: float = Field(default=14400.0, validation_alias="CHIMERA_BATCH_TIMEOUT")
+
     # Arm the taint-adaptive tool narrowing on the API server (`chimera app` / `chimera serve`).
     # Once a run consumes untrusted content, DANGEROUS_WHEN_TAINTED tools need approval; the server
     # has no tool-level approver yet, so that resolves to a refusal with an explanatory result —
