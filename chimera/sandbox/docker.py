@@ -33,12 +33,16 @@ class DockerSandbox:
         *,
         network: bool = False,
         memory: str = "512m",
+        cpus: str = "2",
+        pids_limit: int = 256,
         runtime: str | None = None,
         fallback: Sandbox | None = None,
     ) -> None:
         self.image = image
         self.network = network
         self.memory = memory
+        self.cpus = cpus
+        self.pids_limit = pids_limit
         # Optional OCI runtime (e.g. "runsc" for gVisor); empty/None uses the daemon default.
         self.runtime = (runtime or "").strip() or None
         self.fallback: Sandbox = fallback or LocalSandbox()
@@ -58,6 +62,39 @@ class DockerSandbox:
                 self._available = False
         return self._available
 
+    def _argv(self, name: str, command: str, workdir: Path, env_args: list[str]) -> list[str]:
+        """The full `docker run` command line.
+
+        A method rather than an inline literal so the limits below can be asserted without a running
+        daemon — which is the only way they get checked at all, since CI has no Docker and the
+        machine this was written on had none either.
+        """
+        return [
+            "docker", "run", "--rm", "--name", name,
+            "--network", "bridge" if self.network else "none",
+            "--memory", self.memory,
+            # Pinned to `--memory` on purpose. Without it Docker grants swap equal to the memory
+            # limit ON TOP of it, so a `--memory 512m` container can touch a gigabyte and the cap
+            # reads as roughly decorative. Same value = no swap, which is what a limit should mean.
+            "--memory-swap", self.memory,
+            # A busy loop in a container with no CPU cap starves the machine the agent is running
+            # on — including the agent.
+            "--cpus", self.cpus,
+            # The one flag here that is not copied from anyone: a fork bomb inside the container
+            # exhausts the HOST's process table, because PIDs are not namespaced by default. The
+            # existing `fork_bomb` lexical rule only fires under governance, which is off by default.
+            "--pids-limit", str(self.pids_limit),
+            # Deliberately NOT here: `--storage-opt size=`. Docker refuses it outside xfs with
+            # pquota, and the common case (overlay2 on ext4, every default laptop install) would
+            # turn a working sandbox into a hard failure. A disk cap that only works on one
+            # filesystem is not a disk cap.
+            *(("--runtime", self.runtime) if self.runtime else ()),
+            *env_args,
+            "-v", f"{workdir}:/workspace",
+            "-w", "/workspace",
+            self.image, "sh", "-c", command,
+        ]
+
     def run(self, command: str, *, timeout: int = 60, cwd: Path | None = None) -> SandboxResult:
         if not self.available():
             _log.warning("docker unavailable; falling back to the local sandbox")
@@ -74,16 +111,7 @@ class DockerSandbox:
         import uuid
 
         name = f"chimera-{uuid.uuid4().hex[:12]}"
-        argv = [
-            "docker", "run", "--rm", "--name", name,
-            "--network", "bridge" if self.network else "none",
-            "--memory", self.memory,
-            *(("--runtime", self.runtime) if self.runtime else ()),
-            *env_args,
-            "-v", f"{workdir}:/workspace",
-            "-w", "/workspace",
-            self.image, "sh", "-c", command,
-        ]
+        argv = self._argv(name, command, workdir, env_args)
         try:
             proc = subprocess.run(
                 argv, capture_output=True, text=True, timeout=timeout + 15, stdin=subprocess.DEVNULL
