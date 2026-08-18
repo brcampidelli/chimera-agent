@@ -56,6 +56,7 @@ class TrustKernel:
         *,
         judge: JudgeFn | ContextJudgeFn | None = None,
         audit: AuditLog | None = None,
+        audit_allows: bool = True,
         precedents: PrecedentStore | None = None,
         default: Decision = Decision.ALLOW,
     ) -> None:
@@ -63,6 +64,13 @@ class TrustKernel:
         self.learned = RuleSet(use_defaults=False)
         self.judge = judge
         self.audit = audit
+        # Whether an ALLOW — the overwhelmingly common verdict — earns a line. On cron that is a few
+        # hundred a day and worth keeping. On an interactive coding turn it is one per tool call,
+        # and the Security screen reads the newest 200, so about twenty-five turns would push every
+        # taint and narrowing event, the rare ones that screen exists for, off the first page.
+        # `assemble_registry` had already reached this conclusion for `restrict_registry` and
+        # written it down: "a trail nobody can read is the same as no trail."
+        self.audit_allows = audit_allows
         self.precedents = precedents
         self.default = default
         self._judge_takes_context = _accepts_context(judge)
@@ -105,7 +113,7 @@ class TrustKernel:
             verdict = Verdict(self.default, "no rule matched; default policy", "default")
             source = "default"
 
-        if self.audit is not None:
+        if self.audit is not None and (self.audit_allows or verdict.decision != Decision.ALLOW):
             self.audit.record(
                 "governance",
                 {

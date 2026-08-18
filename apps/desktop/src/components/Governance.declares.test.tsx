@@ -52,9 +52,11 @@ describe("Governance — what it is measuring, and what it is not", () => {
     vi.mocked(getGovernanceInjection).mockResolvedValue(REPORT as never);
   });
 
-  it("names the layer that is not on this path, even when the score is good", async () => {
+  it("names the layer this score does not cover, even when the score is good", async () => {
     renderWithProviders(<Governance />);
-    await screen.findByText(/BLOCK\/REVIEW policy rules are not on this path/i);
+    // "off in this install", not "not on this path": the kernel reaches every HTTP surface once
+    // CHIMERA_GOVERNANCE is set, and the old sentence went stale in ten languages at once.
+    await screen.findByText(/BLOCK\/REVIEW policy rules are off in this install/i);
   });
 
   it("says the measured defence is switched off, before showing the numbers it produced", async () => {

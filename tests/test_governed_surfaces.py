@@ -154,7 +154,13 @@ EXEMPT: dict[str, str] = {
         "of what this profile does, kept because it also carries MCP connectors the profile does "
         "not model — consolidating the two is open work, not a settled answer"
     ),
-    "chimera/api/code_api.py:assemble_registry": "resolves its own posture floor + taint narrowing",
+    "chimera/api/code_api.py:assemble_registry": (
+        "resolves its own posture floor + taint narrowing, and installs the deployment's "
+        "kernel itself via govern_step — the profile would have built a SECOND TaintLedger "
+        "over the one this surface hands back to its caller. Pinned by "
+        "tests/test_governance_on_the_api_path.py, because an exemption is prose and prose "
+        "goes stale"
+    ),
     "chimera/kanban/lanes.py:run": "restrict_registry from the card's own role (fail-closed)",
     # --- not an agent surface at all ---
     "chimera/api/app.py:build_api_app.tools_endpoint": "lists tool schemas; nothing is invoked",

@@ -153,8 +153,10 @@ function InjectionPanel({ data, t }: { data: InjectionReport; t: TFunc }) {
       ) : null}
 
       <p className="px-4 py-3 text-xs text-muted-foreground">{t("governance.injection.note")}</p>
-      {/* Naming the layer that is NOT here. A scoreboard invites the reader to assume every defence
-          they have heard of is behind it, and the trust kernel is the one that isn't. */}
+      {/* Naming the layer this score does not cover. A scoreboard invites the reader to assume
+          every defence they have heard of is behind it. The kernel now reaches this path whenever
+          `CHIMERA_GOVERNANCE` is on — so the line says "off in this install", which is a fact about
+          configuration, rather than "not on this path", which stopped being true. */}
       {!data.trust_kernel ? (
         <p className="px-4 pb-3 text-xs text-muted-foreground">
           {t("governance.injection.kernel")}

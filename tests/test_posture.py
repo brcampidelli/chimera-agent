@@ -224,17 +224,26 @@ def test_a_defence_that_fires_leaves_a_line_in_the_audit_trail(tmp_path: Any) ->
     assert entries[0]["prev"] == "0" * 64 and entries[0]["hash"]  # the hash chain starts here
 
 
-def test_the_injection_scoreboard_reports_this_install_not_the_capability() -> None:
+def test_the_injection_scoreboard_reports_this_install_not_the_capability(
+    monkeypatch: Any,
+) -> None:
     """The layer these numbers describe is switchable, and the one they do not cover is not.
 
     With CHIMERA_TAINT_NARROW=0 the suite still runs its corpus with narrowing forced on, because
     that is what it is measuring — so the defended column would describe a configuration the reader
-    is not running unless the report says so. And the trust kernel is named as absent for the
-    opposite reason: nothing here exercises it, and a good score is exactly what invites someone to
-    assume every defence they have heard of is behind it.
+    is not running unless the report says so. And the trust kernel is named for the opposite reason:
+    nothing here exercises it, and a good score is exactly what invites someone to assume every
+    defence they have heard of is behind it.
+
+    It reads False here because a stock install leaves `CHIMERA_GOVERNANCE` off — no longer because
+    the kernel is missing from this path, which it is not since `assemble_registry` began calling
+    `govern_step`. The env is cleared rather than assumed: the flag is derived from configuration
+    now, so a developer with that variable exported would otherwise fail this on their machine and
+    nowhere else. `tests/test_governance_on_the_api_path.py` covers the other side of the switch.
     """
     from chimera.api.governance import run_injection_suite
 
+    monkeypatch.delenv("CHIMERA_GOVERNANCE", raising=False)
     armed = run_injection_suite(Settings())
     assert armed["armed"] is True
     assert armed["defense"] == "taint_narrowing"

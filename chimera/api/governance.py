@@ -93,8 +93,14 @@ def run_injection_suite(settings: Settings | None = None) -> dict[str, Any]:
         # What this scoreboard is about, and whether it is switched on where you are reading it.
         "defense": "taint_narrowing",
         "armed": bool(settings.taint_narrow),
-        # The governance layer that exists in the codebase and is NOT on this path.
-        "trust_kernel": False,
+        # Whether the BLOCK/REVIEW kernel is INSTALLED on this path — derived, because it was
+        # written here as a literal `False` and stayed false through the change that made it
+        # true. A hardcoded fact about the rest of the system is a fact with no way to notice
+        # the system moved.
+        #
+        # Installed, not measured: the suite below still exercises taint narrowing only, so a
+        # reader must not take this flag as a score for the kernel.
+        "trust_kernel": (settings.governance_mode or "off").strip().lower() in ("observe", "enforce"),
     }
 
 
