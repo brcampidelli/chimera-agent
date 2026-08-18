@@ -58,6 +58,9 @@ interface Exchange {
   edits: { path: string; patch: string }[];
   done: CodeTurnDone | null;
   failed?: boolean;
+  /** What the server actually said when the turn failed. A wrong API key, a rate limit, a model
+   *  that does not exist and a provider outage all look identical without it. */
+  error?: string;
   /** The verdict on what this turn WROTE. Absent when the turn wrote nothing. */
   verified?: CodeVerified;
   /** Set once the offered undo was taken (or refused by the server) — the offer is single-use. */
@@ -124,36 +127,71 @@ function Verdict({
   );
 }
 
-/** A tool call, compactly: what ran, on what, and whether it worked.
+/** A tool call, compactly: what ran, on what, whether it worked — and what it said.
  *
- *  The observation is deliberately behind a title rather than inline — it is clipped server-side,
- *  and a clipped build log rendered as if it were the whole thing is how someone concludes the
- *  tests passed from the first four hundred characters of output. */
+ *  The observation used to live in a native `title=`, which cannot be selected, cannot be copied,
+ *  and is truncated again by the OS at a length we do not control. A failing command's output is
+ *  the thing a person most wants to paste somewhere, and it was the one thing they could not take.
+ *
+ *  It stays FOLDED, and the summary says the output is clipped. The clip is real — the server keeps
+ *  the head and the tail of 400 characters — and this deliberately does not offer "full output",
+ *  because there is no route on our side that has it. Promising it and then showing the same 400
+ *  characters would be worse than the tooltip. */
 function ToolRow({ tool, onOpenFile }: { tool: CodeToolEvent; onOpenFile?: (p: string) => void }) {
+  const t = useT();
   const primary = String(Object.values(tool.arguments)[0] ?? "");
+  const [copied, setCopied] = useState(false);
   // A path the agent touched is the handle for looking at it. With the file tree gone this is
   // how the viewer opens — the same way you would click a filename in a terminal that linkifies
   // them. Heuristic on purpose: an argument that looks like a path is offered as one, and one
   // that is not stays plain text rather than becoming a button that does nothing.
   const looksLikePath = /[/\.]/.test(primary) && !primary.includes(" ");
   return (
-    <div
-      className="flex items-baseline gap-2 font-mono text-xs"
-      title={tool.observation || undefined}
-    >
-      <span className={cn("shrink-0", tool.ok ? "text-ok" : "text-bad")}>{tool.ok ? "✓" : "✗"}</span>
-      <span className="shrink-0 text-foreground/80">{tool.name}</span>
-      {looksLikePath && onOpenFile ? (
-        <button
-          type="button"
-          onClick={() => onOpenFile(primary)}
-          className="truncate text-left text-muted-foreground underline decoration-dotted hover:text-accent"
-        >
-          {primary}
-        </button>
-      ) : (
-        <span className="truncate text-muted-foreground">{primary}</span>
-      )}
+    <div className="font-mono text-xs">
+      <div className="flex items-baseline gap-2">
+        <span className={cn("shrink-0", tool.ok ? "text-ok" : "text-bad")}>{tool.ok ? "✓" : "✗"}</span>
+        <span className="shrink-0 text-foreground/80">{tool.name}</span>
+        {looksLikePath && onOpenFile ? (
+          <button
+            type="button"
+            onClick={() => onOpenFile(primary)}
+            className="truncate text-left text-muted-foreground underline decoration-dotted hover:text-accent"
+          >
+            {primary}
+          </button>
+        ) : (
+          <span className="truncate text-muted-foreground">{primary}</span>
+        )}
+      </div>
+      {tool.observation ? (
+        <details className="ml-5 mt-0.5" open={!tool.ok}>
+          {/* Open by default when the tool FAILED. That is the case where the output is the reason
+              the user is reading this screen at all; for a successful `read_file` it is noise. */}
+          <summary className="cursor-pointer select-none text-muted-foreground hover:text-foreground">
+            {t("code.chat.tool.output")}
+          </summary>
+          <div className="relative">
+            <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded-chip bg-surface-2 p-2 pr-16 text-muted-foreground">
+              {tool.observation}
+            </pre>
+            <button
+              type="button"
+              className="absolute right-1 top-2 rounded-chip bg-surface-1 px-1.5 py-0.5 text-muted-foreground hover:text-foreground"
+              onClick={() => {
+                // Best-effort: `navigator.clipboard` is absent in a non-secure context and rejects
+                // when the window is not focused. Failing silently leaves the button looking
+                // broken, so the label only changes once the write actually resolved.
+                void navigator.clipboard
+                  ?.writeText(tool.observation)
+                  .then(() => setCopied(true))
+                  .catch(() => setCopied(false));
+              }}
+            >
+              {t(copied ? "code.chat.tool.copied" : "code.chat.tool.copy")}
+            </button>
+          </div>
+        </details>
+      ) : null}
     </div>
   );
 }
@@ -162,9 +200,26 @@ function ToolRow({ tool, onOpenFile }: { tool: CodeToolEvent; onOpenFile?: (p: s
  *
  *  `usd` is null when the model's price is unknown, and this renders that as "price unknown" rather
  *  than as 0 or as nothing — the backend never guesses a price and neither does the UI. */
+/** Reasons a turn ended that the user needs to know about. `final` is absent on purpose: a turn
+ *  that finished needs no badge saying so, and adding one would bury the four that mean the work
+ *  is INCOMPLETE among nine that are routine. */
+const STOP_REASONS: Record<string, string> = {
+  max_steps: "code.chat.stopped.maxSteps",
+  tool_loop: "code.chat.stopped.toolLoop",
+  budget: "code.chat.stopped.budget",
+  cancelled: "code.chat.stopped.cancelled",
+};
+
 function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
+  // `stopped_reason` arrives on every `done` frame and, outside types and mocks, nothing read it.
+  // So a turn that hit the step ceiling and stopped mid-task was pixel-for-pixel identical to one
+  // that finished the work — the receipt drew nine badges and not the one that says whether to
+  // believe the other nine.
+  const stopped = STOP_REASONS[done.stopped_reason ?? ""];
   return (
     <div className="flex flex-wrap items-center gap-1.5">
+      {/* First, ahead of every measurement, because it is what decides how to read them. */}
+      {stopped ? <Badge tone="warn">{t(stopped)}</Badge> : null}
       {/* Who did the work, first — it is the fact that reframes every badge after it. */}
       {done.external ? <Badge tone="warn">{t("code.chat.external", { agent: done.external })}</Badge> : null}
       {/* Null, not zero: an external turn's steps happened inside somebody else's loop and it did
@@ -453,8 +508,12 @@ export function Conversation({
             onEdited();
           }
         },
-        onError: () => {
-          patchLast((e) => ({ ...e, failed: true }));
+        // The parameter is the whole fix. This read `onError: () => {…}` — the message arrives
+        // (api.ts passes `payload.message`) and was discarded by the signature itself, while
+        // Agents.tsx, Tasks.tsx and editor/Runner.tsx in this same app all show it. Not a design
+        // choice about noise; an inconsistency nobody noticed.
+        onError: (message) => {
+          patchLast((e) => ({ ...e, failed: true, error: message }));
           publish({ status: "idle", busy: false });
           setBusy(false);
           // A turn that errored is never a base to send the next one from — hand the text back.
@@ -566,7 +625,24 @@ export function Conversation({
                 <Markdown rehypePlugins={[rehypeHighlight]}>{e.answer}</Markdown>
               </div>
             ) : null}
-            {e.failed ? <p className="text-xs text-bad">{t("code.chat.error")}</p> : null}
+            {e.failed ? (
+              <div className="space-y-1">
+                <p className="text-xs text-bad">{t("code.chat.error")}</p>
+                {/* Folded, not hidden: the headline stays one line for the common case where the
+                    user only wants to retry, and the raw provider message is one click away for
+                    the case where it says `invalid_api_key` and settles the whole question. */}
+                {e.error ? (
+                  <details className="text-xs">
+                    <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                      {t("code.chat.errorDetail")}
+                    </summary>
+                    <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-chip bg-surface-2 p-2 font-mono text-muted-foreground">
+                      {e.error}
+                    </pre>
+                  </details>
+                ) : null}
+              </div>
+            ) : null}
             {e.done?.fused ? (
               // At the answer, which is the only place it lands in time. The composer warns before
               // the click; neither warning is visible at the moment someone reads a confident
