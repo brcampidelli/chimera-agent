@@ -31,6 +31,7 @@ import type {
   MemoryItem,
   MemoryLayers,
   MemoryProfile,
+  ModelListing,
   OllamaModels,
   PlanResult,
   PoolWrite,
@@ -104,6 +105,14 @@ export const getDoctor = () => json<DoctorInfo>("/api/doctor");
 /** The Ollama tags this machine has pulled. NOT part of `doctor`: that response is fetched by
  *  several screens, and a round-trip to a server that may be off would make all of them wait. */
 export const getOllamaModels = () => json<OllamaModels>("/api/models/ollama");
+/** The models a turn may name — the curated catalogue merged with OpenRouter's live index and
+ *  whatever Ollama has pulled, filtered to the keys this install actually has.
+ *
+ *  `provider` forces one remote catalogue to be listed regardless of the keys present. Onboarding
+ *  passes it, because there the user is holding a key that has not been saved yet and "what does
+ *  this buy" is exactly the question. Everywhere else, omit it. */
+export const getModels = (provider?: string) =>
+  json<ModelListing>(`/api/models${provider ? `?provider=${encodeURIComponent(provider)}` : ""}`);
 export const getUsage = () => json<UsageSummary>("/api/usage");
 // `workspace` narrows to one project; omitted returns every project's runs, which is what a
 // caller with no project selected means and what this endpoint has always done.

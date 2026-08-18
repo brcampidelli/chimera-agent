@@ -55,6 +55,12 @@ export type InlineCompletion = Schemas["CompletionOut"];
 export type CompletionAcceptance = Schemas["AcceptanceOut"];
 /** What the configured Ollama has pulled. `reachable` and an empty `models` are different answers. */
 export type OllamaModels = Schemas["OllamaModelsOut"];
+/** The models a turn may name, from every catalogue this install can reach. `reason` is set NEXT TO
+ *  a non-empty list when the remote index failed and only the curated one answered. */
+export type ModelListing = Schemas["ModelsOut"];
+/** One pickable model. `tools: null` is "we were not told", which is not `false` — a turn without
+ *  tool calling can only describe an edit, and the UI has to say which of the two it knows. */
+export type ModelOption = Schemas["ModelOptionOut"];
 export type GitStatus = Schemas["GitStatusOut"];
 export type GitFile = Schemas["GitFileOut"];
 export type GitDiff = Schemas["GitDiffOut"];

@@ -8,7 +8,15 @@ import type {
   RoleModels,
   WorthReport,
 } from "@/lib/api";
-import type { AttemptReceipt, FsFile, FsNode, FsTree, GitStatus, RunReceipt } from "@/lib/types";
+import type {
+  AttemptReceipt,
+  FsFile,
+  FsNode,
+  FsTree,
+  GitStatus,
+  ModelOption,
+  RunReceipt,
+} from "@/lib/types";
 
 /** The `@/lib/api` surface the Code screen touches. Used as the `vi.mock` factory (via a dynamic
  *  import, so it survives the factory hoisting) — the network is never reached from a test. */
@@ -85,6 +93,31 @@ export function makeCodeApiMock() {
       sandbox: "local",
       external_agents: [],
     })),
+    // The model picker's catalogue. Resolved by default with ONE recommended model, because the
+    // dialog is opened by several suites that are not about models and an unresolved query would
+    // leave them staring at "Loading…" — but small, so a suite that IS about models sets its own.
+    getModels: vi.fn(async () => ({
+      default: "test/model",
+      models: [
+        {
+          slug: "openrouter/vendor/mid",
+          label: "Vendor: Mid",
+          vendor: "Vendor",
+          source: "openrouter",
+          context_k: 128,
+          input_per_m: 0.25,
+          output_per_m: 0.95,
+          tools: true,
+          vision: false,
+          free: false,
+          recommended: true,
+        },
+      ],
+      sources: ["catalog", "openrouter"],
+      reason: "",
+    })),
+    // Written by "Make it the default", which is the only mutation this screen owns.
+    patchConfig: vi.fn(async () => ({ updated: ["CHIMERA_DEFAULT_MODEL"] })),
     getPausedRuns: vi.fn(),
     respondToRun: vi.fn(),
     streamAgents: vi.fn(),
@@ -123,6 +156,25 @@ export function roleModels(over: Partial<RoleModels> = {}): RoleModels {
     review: "vendor/top",
     fuse_plan: true,
     fuse_review: false,
+    ...over,
+  };
+}
+
+/** One model as `/api/models` reports it. Defaults describe an ordinary paid mid-tier with tools,
+ *  so a test that says nothing about capability gets the case where nothing is warned about. */
+export function modelOption(over: Partial<ModelOption> = {}): ModelOption {
+  return {
+    slug: "openrouter/vendor/model",
+    label: "Vendor: Model",
+    vendor: "Vendor",
+    source: "openrouter",
+    context_k: 128,
+    input_per_m: 0.25,
+    output_per_m: 0.95,
+    tools: true,
+    vision: false,
+    free: false,
+    recommended: false,
     ...over,
   };
 }

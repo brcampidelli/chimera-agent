@@ -1245,8 +1245,10 @@ def test_patch_config_updates_process_env_live(monkeypatch: Any, tmp_path: Any) 
 def test_config_endpoint_shape(tmp_path: Any) -> None:
     cfg = _client(tmp_path).get("/api/config").json()
     assert {"models", "memory", "cache", "sandbox", "server", "providers"} <= set(cfg)
-    # no provider entry ever carries a raw key field
-    fields = {"env", "label", "set", "hint", "llm", "model", "keys_url"}
+    # no provider entry ever carries a raw key field. `name` is the provider's routing slug
+    # ("openrouter"), sent so a client asking a provider-scoped question — the model list the wizard
+    # shows — does not re-derive it from the env var name and drift from the server's rule.
+    fields = {"env", "name", "label", "set", "hint", "llm", "model", "keys_url"}
     assert all(set(p) == fields for p in cfg["providers"])
 
 

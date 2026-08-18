@@ -223,6 +223,11 @@ def read_config(settings: Settings) -> dict[str, Any]:
     providers = [
         {
             "env": env,
+            # The provider's routing name, derived here rather than in the client. It is the env var
+            # minus the suffix, lowercased — the same rule `discovery.provider_from_env_var` applies
+            # — and a second copy of that rule in TypeScript is how a screen ends up asking about
+            # `OPENROUTER` while the gateway is routing `openrouter`.
+            "name": env.removesuffix("_API_KEY").lower(),
             "label": _PROVIDER_LABELS[env],
             "set": bool(creds.get(env)),
             "hint": _hint(creds.get(env)),
@@ -245,6 +250,7 @@ def read_config(settings: Settings) -> dict[str, Any]:
         providers.append(
             {
                 "env": env,
+                "name": name,
                 "label": name.title(),
                 "set": bool(value),
                 "hint": _hint(value),

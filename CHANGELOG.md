@@ -4,6 +4,41 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+You could not choose which model answered you. The endpoint accepted one all along.
+
+### Added
+
+- **Pick the model from the composer.** `/api/code/turn` has accepted a `model` field since it
+  existed and no client ever sent one, so every conversation in the app ran on
+  `CHIMERA_DEFAULT_MODEL` — and changing that meant Settings, a text box, and a slug typed from
+  memory. The composer now has a **Model** chip beside the worker row: a searchable list of what
+  this install can actually call, with the price per 1M, the context window, and a mark on the ones
+  that cannot call tools. The pick lasts for the conversation; the dialog offers to make it the
+  standing default. It is hidden when an external agent is doing the work — Claude Code and Gemini
+  choose their own model, and offering a choice there would describe a routing that does not happen.
+- **`GET /api/models`** — the list behind it: OpenRouter's live public index merged with the curated
+  catalogue and whatever Ollama has pulled, filtered to the keys this install actually has. Listing
+  four hundred OpenRouter slugs to someone holding only an Anthropic key is four hundred 401s, so a
+  remote catalogue appears only when its provider is configured; `?provider=` overrides that for the
+  first-run wizard, which is holding a key it has not saved yet. A fetch that fails comes back as a
+  reason token NEXT TO the curated models rather than as an empty menu, because an empty menu reads
+  as "your key buys nothing". An unquoted price stays `null` — never `$0`, which is both a claim and
+  a number a spend ceiling would divide by.
+- **The wizard can browse the same list** instead of asking for a slug from memory.
+
+### Changed
+
+- **The default model is DeepSeek V3.1, not GPT-5.5.** A default is what a fresh install spends
+  money on before anyone has made a decision, and this one was the most expensive model in the
+  catalogue: $0.25/$0.95 per 1M against $5.00/$30.00 at the list prices when this changed. The new
+  default is the `mid` rung of every cost preset and the model this repo's own benches ran on.
+  `CHIMERA_DEFAULT_MODEL` still wins, and the picker changes it per conversation.
+- A curated slug that OpenRouter's live index no longer carries is dropped from the list rather than
+  offered — the catalogue documents its own slugs as perishable, and a retired one is a 404 on the
+  first call, after the user chose it.
+
 ## [0.47.0] - 2026-08-18
 
 The governance layer said it was protecting you, and on several counts it was not. Seven of these

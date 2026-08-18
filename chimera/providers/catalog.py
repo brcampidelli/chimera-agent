@@ -156,12 +156,15 @@ class ProviderInfo:
 #: last year's generation. Every entry below is the vendor's own "start here if you are unsure",
 #: which is exactly the question a first run is asking.
 PROVIDERS: tuple[ProviderInfo, ...] = (
-    # Left on 5.5 deliberately: this must MATCH ``Settings.default_model``, because for OpenRouter
-    # the wizard shows the suggestion without writing it. Showing 5.6 here while 5.5 is what runs
-    # would put a number on screen that is not the one in use. Refreshing the product default is a
-    # separate decision, and it moves the presets and the fusion panel with it.
+    # This must MATCH ``Settings.default_model``, because for OpenRouter the wizard shows the
+    # suggestion WITHOUT writing it — a different slug here would put a number on screen that is not
+    # the one in use. Both moved to DeepSeek V3.1 together: see the note on `default_model` for why a
+    # first install should not start on the most expensive model in the catalogue.
     ProviderInfo(
-        "OPENROUTER_API_KEY", "OpenRouter", "openrouter/openai/gpt-5.5", "https://openrouter.ai/keys"
+        "OPENROUTER_API_KEY",
+        "OpenRouter",
+        "openrouter/deepseek/deepseek-chat-v3.1",
+        "https://openrouter.ai/keys",
     ),
     # gpt-5.6-sol, via its documented alias; same $5/$30 as the 5.5 it replaces.
     ProviderInfo(

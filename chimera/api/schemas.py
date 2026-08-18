@@ -257,6 +257,10 @@ class ProviderOut(BaseModel):
     """One credential slot, as the screen that offers it needs to understand it."""
 
     env: str
+    #: The provider's routing name (``"openrouter"``) — the env var without its suffix, lowercased.
+    #: Sent so a client asking a provider-scoped question does not have to re-implement that rule and
+    #: drift from :func:`chimera.providers.discovery.provider_from_env_var`.
+    name: str = ""
     label: str
     set: bool
     hint: str
@@ -496,6 +500,47 @@ class OllamaModelsOut(BaseModel):
     #: same reason as ``PostureFacts``: this app ships ten languages, and English prose from the
     #: server would leave the line that explains an unavailable feature untranslated.
     reason: Literal["", "no_url", "unreachable", "http_error", "not_ollama"] = ""
+
+
+class ModelOptionOut(BaseModel):
+    """One model the user could pick, with the facts that decide whether they should.
+
+    Every optional field is optional because it is genuinely unknown for some source. ``tools: null``
+    is the one that must not be read as ``false``: a coding turn without tool calling can only
+    DESCRIBE an edit, so "we were not told" and "it cannot" deserve different words on screen.
+    """
+
+    #: Already prefixed for LiteLLM (``openrouter/…``, ``ollama/…``) — the UI never assembles a slug.
+    slug: str
+    label: str
+    vendor: str
+    #: Which catalogue this came from: Chimera's curated list, OpenRouter's index, or local Ollama.
+    source: Literal["catalog", "openrouter", "ollama"]
+    context_k: int | None = None
+    #: USD per 1M tokens. null = unknown (never guessed); 0.0 = genuinely free.
+    input_per_m: float | None = None
+    output_per_m: float | None = None
+    tools: bool | None = None
+    vision: bool | None = None
+    free: bool = False
+    #: In Chimera's curated catalogue — a model this project has actually run.
+    recommended: bool = False
+
+
+class ModelsOut(BaseModel):
+    """The models this install can pick from, and what we failed to reach while listing them.
+
+    ``reason`` is a token the client translates, never a sentence — same shape and same reason as
+    ``OllamaModelsOut``. It is set NEXT TO a non-empty list whenever the remote index failed but the
+    curated catalogue answered, so the picker can say *the full list is unavailable* instead of
+    rendering an empty menu, which reads as *your key buys nothing*.
+    """
+
+    #: The model a turn runs on when nothing is chosen, so the picker can mark it rather than guess.
+    default: str
+    models: list[ModelOptionOut] = Field(default_factory=list)
+    sources: list[Literal["catalog", "openrouter", "ollama"]] = Field(default_factory=list)
+    reason: Literal["", "no_provider", "unreachable", "http_error", "unreadable"] = ""
 
 
 class ExecCancelOut(BaseModel):

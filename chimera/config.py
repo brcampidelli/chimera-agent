@@ -117,8 +117,23 @@ class Settings(BaseSettings):
     spotify_client_secret: str | None = Field(default=None, validation_alias="SPOTIFY_CLIENT_SECRET")
 
     # --- Default single model (Tier 1 / cheap tasks) ---
+    #
+    # DeepSeek V3.1 rather than a frontier model, and the reason is what a default IS: the model a
+    # fresh install spends money on before anyone has made a decision. This one is the `mid` rung of
+    # every cost preset, the one this repo's own benches ran on, and — at the live OpenRouter list
+    # price when this changed — $0.25/$0.95 per 1M against GPT-5.5's $5.00/$30.00. Twenty times
+    # cheaper in, thirty times cheaper out, for the questions a first conversation asks.
+    #
+    # It is a floor, not a ceiling: the composer's model picker changes it per conversation and
+    # offers to make any pick the standing default, and `CHIMERA_DEFAULT_MODEL` still wins over
+    # this. Starting expensive and asking people to notice is the wrong way round — the bill arrives
+    # before the knowledge that there was a choice.
+    #
+    # MUST stay in sync with the OpenRouter entry in `chimera.providers.catalog.PROVIDERS`: the
+    # wizard SHOWS that suggestion without writing it when the user leaves it alone, so a mismatch
+    # puts one slug on screen and runs another.
     default_model: str = Field(
-        default="openrouter/openai/gpt-5.5", validation_alias="CHIMERA_DEFAULT_MODEL"
+        default="openrouter/deepseek/deepseek-chat-v3.1", validation_alias="CHIMERA_DEFAULT_MODEL"
     )
 
     # --- Model tiers (M16): weak -> mid -> top, vendor-agnostic. Any LiteLLM/OpenRouter

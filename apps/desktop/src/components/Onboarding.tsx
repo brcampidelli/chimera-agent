@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ExternalLink, KeyRound, Loader2, X } from "lucide-react";
+import { Check, ExternalLink, KeyRound, List, Loader2, X } from "lucide-react";
 import { getConfig, patchConfig, testProviderKey } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { ModelDialog } from "@/components/code/ModelPicker";
 import { useT } from "@/lib/i18n";
 import type { ConfigTest } from "@/lib/types";
 
@@ -23,6 +24,7 @@ export function Onboarding({ onSkip }: { onSkip: () => void }) {
   // Whether the model field is the user's answer or ours. It decides two things: whether switching
   // provider may overwrite the field, and whether the value is worth writing to .env at all.
   const [modelTouched, setModelTouched] = useState(false);
+  const [picking, setPicking] = useState(false);
   const [costMode, setCostMode] = useState("auto");
   const [saved, setSaved] = useState(false);
   const [result, setResult] = useState<ConfigTest | null>(null);
@@ -150,17 +152,36 @@ export function Onboarding({ onSkip }: { onSkip: () => void }) {
             <label htmlFor="ob-model" className="text-xs font-medium text-muted-foreground">
               {t("onboarding.model")}
             </label>
-            <input
-              id="ob-model"
-              className={inputCls}
-              value={shownModel}
-              onChange={(e) => {
-                setModel(e.target.value);
-                setModelTouched(true);
-                setSaved(false);
-                setResult(null);
-              }}
-            />
+            <div className="flex items-center gap-1.5">
+              <input
+                id="ob-model"
+                className={inputCls}
+                value={shownModel}
+                onChange={(e) => {
+                  setModel(e.target.value);
+                  setModelTouched(true);
+                  setSaved(false);
+                  setResult(null);
+                }}
+              />
+              {/* The field stays — someone who knows the slug should not have to click through to
+                  it, and it is what a paste from the docs uses. The list is for everyone else, who
+                  otherwise has to guess a slug and find out on the first call.
+
+                  Scoped to the provider selected ABOVE rather than to the keys already configured:
+                  on this screen the key has not been saved yet, so filtering by what is configured
+                  would answer about a provider the user is in the middle of leaving. */}
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={!pick?.name}
+                onClick={() => setPicking(true)}
+              >
+                <List className="h-4 w-4" />
+                {t("onboarding.browseModels")}
+              </Button>
+            </div>
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">
@@ -179,6 +200,23 @@ export function Onboarding({ onSkip }: { onSkip: () => void }) {
             </select>
           </div>
         </div>
+
+        <ModelDialog
+          open={picking}
+          onOpenChange={setPicking}
+          value={shownModel}
+          provider={pick?.name}
+          onPick={(slug) => {
+            // "" is the list's way back to the install default, and on this screen that means "keep
+            // the suggestion" rather than "clear the field" — a wizard that empties the box because
+            // you changed your mind has taken something away.
+            if (!slug) return;
+            setModel(slug);
+            setModelTouched(true);
+            setSaved(false);
+            setResult(null);
+          }}
+        />
 
         <div className="flex items-center gap-2">
           <Button disabled={!key.trim() || saveMutation.isPending} onClick={saveKey}>
