@@ -240,8 +240,21 @@ jobs:
     # which is precisely the code a user hits when nothing else works, so a guard that only runs on
     # the author's laptop is the same defect one layer up.
     name: desktop shell (Rust tests)
-    timeout-minutes: 25
-    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # WINDOWS, and for two reasons that point the same way.
+    #
+    # The flake: on ubuntu this job needs `apt-get install libwebkit2gtk-4.1-dev …`, and that step
+    # hung on three consecutive runs (#104, #106, #107) — each killed at exactly 25m00s by the old
+    # timeout, which GitHub reports as `cancelled` rather than `failure`, so the verdict job
+    # correctly called it infrastructure and each PR needed a manual re-run. The usual cause is the
+    # dpkg lock held by unattended-upgrades at runner boot. Windows needs no system deps at all:
+    # WebView2 ships with the OS, which is why `desktop-release.yml` gates its apt step to ubuntu.
+    #
+    # The better reason: this crate's bugs are Windows bugs. `windows_subsystem = "windows"` is what
+    # made a panic write to a stderr that does not exist, which is the failure the tests in
+    # `main.rs` exist to prevent — and on Linux that code path is not the one that runs. Testing the
+    # startup path on the platform where it broke is worth more than testing it where it never did.
+    runs-on: windows-latest
     needs: quality
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -254,24 +267,20 @@ jobs:
         with:
           workspaces: apps/desktop/src-tauri -> target
 
-      # The same four packages desktop-release.yml installs — tauri does not compile on Linux without
-      # them, and `cargo test` compiles the whole crate.
-      - name: Linux system deps for Tauri
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-
       # Two placeholders, because `tauri-build` resolves the bundle manifest before it compiles
       # anything and refuses on either: `frontendDist` points at ../dist, and `bundle.resources`
       # globs the PyInstaller output, which only the release workflow produces. Building the real
       # SPA and freezing the real backend here would duplicate two other jobs for no gain — these
       # tests never load a page and never launch the sidecar; they exercise the code that runs when
       # launching it FAILS.
+      #
+      # `shell: bash` because the runner's default here is pwsh, where `mkdir -p` is a parse error.
       - name: Placeholders the build script insists on
+        shell: bash
         run: |
           mkdir -p apps/desktop/dist apps/desktop/src-tauri/sidecar-dist/chimera-backend
           touch apps/desktop/dist/index.html
-          touch apps/desktop/src-tauri/sidecar-dist/chimera-backend/chimera-backend
+          touch apps/desktop/src-tauri/sidecar-dist/chimera-backend/chimera-backend.exe
 
       - name: cargo test
         run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
