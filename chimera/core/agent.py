@@ -27,6 +27,7 @@ from chimera.governance.ledger import WRITE_TOOLS
 from chimera.orchestration.budget import BudgetExceeded, SpendBudget
 from chimera.providers.gateway import CompletionResult, MessageLike, SupportsComplete
 from chimera.telemetry import get_logger
+from chimera.tools.base import is_refusal
 from chimera.tools.registry import ToolNotFoundError, ToolRegistry
 from chimera.tools.workspace import resolve_in_workspace
 
@@ -465,8 +466,14 @@ class Agent:
                 if on_edit is not None and edit_before is not None:
                     self._emit_edit(edit_before, on_edit)
                 if on_tool is not None:
-                    on_tool(ToolActivity(call.name, call.arguments,
-                                         not observation.startswith("error:"), observation))
+                    # A refusal is not a success. This read `not startswith("error:")`, so a
+                    # governance or taint gate declining to run the tool produced `ok=True` — the
+                    # screen drew a tick, the receipt counted a completed call, and the model,
+                    # reading an ordinary-looking observation, answered "Done. I force-pushed the
+                    # branch to origin as requested" for a command that never ran. Measured, on
+                    # this loop, with the real kernel.
+                    ran = not observation.startswith("error:") and not is_refusal(observation)
+                    on_tool(ToolActivity(call.name, call.arguments, ran, observation))
                 record.tools.append(tool_record(call.name, call.arguments, observation))
                 messages.append(
                     {"role": "tool", "tool_call_id": call.id, "content": observation}

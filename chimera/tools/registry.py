@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from chimera.telemetry import get_logger
-from chimera.tools.base import Tool
+from chimera.tools.base import Tool, is_refusal
 
 _log = get_logger("tools.registry")
 
@@ -67,5 +67,10 @@ class ToolRegistry:
 
         with span("tool.run", **{"tool.name": name}) as sp:
             out = self.get(name).run(**kwargs)
-            sp.set(**{"tool.ok": not out.startswith("error:"), "tool.output_chars": len(out)})
+            # Same question as `Agent.run` asks, so it must have the same answer — the rule
+            # was written out twice and only one copy knew about refusals.
+            sp.set(**{
+                "tool.ok": not out.startswith("error:") and not is_refusal(out),
+                "tool.output_chars": len(out),
+            })
             return out

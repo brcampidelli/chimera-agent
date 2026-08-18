@@ -13,7 +13,7 @@ from typing import Any
 
 from chimera.governance.kernel import TrustKernel
 from chimera.governance.policy import Decision, Verdict
-from chimera.tools.base import Tool, is_untrusted_output
+from chimera.tools.base import Tool, is_untrusted_output, refusal
 from chimera.tools.registry import ToolRegistry
 
 ApproveFn = Callable[[Verdict, str], bool]
@@ -51,11 +51,14 @@ class GovernedTool(Tool):
         action = f"{self.name} {kwargs}"
         verdict = self.kernel.evaluate(action, context=self._context())
         if verdict.decision == Decision.BLOCK:
-            return f"[governance: BLOCKED — {verdict.reason}]"
+            return refusal(f"[governance: BLOCKED — {verdict.reason}] "
+                           f"The tool did NOT run. Do not report this as done.")
         if verdict.decision == Decision.REVIEW:
             approved = self.approve(verdict, action) if self.approve else False
             if not approved:
-                return f"[governance: needs review — {verdict.reason}]"
+                return refusal(f"[governance: needs review — {verdict.reason}] "
+                               f"The tool did NOT run and nobody approved it. Do not "
+                               f"report this as done.")
         return self.inner.run(**kwargs)
 
     def _context(self) -> str:
