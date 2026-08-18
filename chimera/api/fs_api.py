@@ -5,6 +5,12 @@ file tools use — so a ``..`` or absolute escape raises ``PathEscapesWorkspaceE
 maps it to HTTP 400). Neither ever raises on a binary/dir/missing file: they degrade to an honest
 note. The tree is lazy (immediate children only) so a huge repo doesn't serialize at once, and prunes
 the same build/VCS dirs the checkpoint guard skips.
+
+:func:`read_image` is the one path that hands back raw bytes, and it goes through the SAME
+``resolve_in_workspace`` call as the text read — deliberately, because a second copy of a path guard
+is a guard that ends up covering one of two callers. What it adds on top is a refusal: an extension
+allowlist that yields ``image/*`` and nothing else. That refusal is the load-bearing part and the
+reason this is an image reader rather than a byte reader — see :data:`_IMAGE_MEDIA_TYPES`.
 """
 
 from __future__ import annotations
@@ -17,6 +23,42 @@ from chimera.tools.workspace import atomic_write_text, read_text_for_edit, resol
 
 _MAX_READ_CHARS = 20_000  # mirrors ReadFileTool's cap
 _MAX_WRITE_BYTES = 1_000_000  # 1 MB cap for the editable viewer's save
+_MAX_IMAGE_BYTES = 20_000_000  # 20 MB cap for an inline preview, matching the attachment ceiling
+
+#: The ONLY content types this module will ever put on a response body, keyed by extension.
+#:
+#: An allowlist, not :func:`mimetypes.guess_type`, because the failure mode is not a wrong icon. The
+#: backend injects the bearer token into ``index.html`` as a ``<meta>`` tag for a loopback client, so
+#: any DOCUMENT this origin serves can read that token back out of index.html with one same-origin
+#: fetch and then drive the whole API as the user. ``guess_type`` answers ``text/html`` for a
+#: ``.html`` file sitting in the workspace — exactly the file an attacker would plant there, via the
+#: agent itself if a fetched page talked it into writing one.
+#:
+#: SVG is absent on purpose even though it *is* ``image/*``. An ``<img>`` will not run script inside
+#: one, but a top-level navigation to the same URL will — in this origin, with the token one fetch
+#: away. Nothing is lost by leaving it out: an SVG is UTF-8 text, so :func:`read_file` already
+#: returns its source and the viewer highlights it. The case this reader exists for — the file the
+#: viewer could not show at all — is the raster one.
+#:
+#: Kept separate from ``attachments.IMAGE_SUFFIXES`` even though the two lists nearly agree. That one
+#: answers "will a vision model accept this?"; this one answers "may a browser render this in our
+#: origin?". Sharing a constant would widen the second the next time somebody widens the first.
+_IMAGE_MEDIA_TYPES: dict[str, str] = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".bmp": "image/bmp",
+}
+
+
+class UnsupportedImageError(Exception):
+    """The path is not on the image allowlist, so its bytes are not served (the endpoint: 415)."""
+
+
+class ImageTooLargeError(Exception):
+    """The image is over the inline-preview byte cap (the endpoint: 413)."""
 
 
 def list_tree(workspace: Path, rel: str, *, max_entries: int = 500) -> dict[str, Any]:
@@ -69,6 +111,43 @@ def read_file(workspace: Path, rel: str) -> dict[str, Any]:
     if truncated:
         text = text[:_MAX_READ_CHARS]
     return {"path": rel, "content": text, "truncated": truncated, "note": ""}
+
+
+def read_image(
+    workspace: Path, rel: str, *, max_bytes: int = _MAX_IMAGE_BYTES
+) -> tuple[bytes, str]:
+    """Raw bytes of ``rel`` plus the ``image/*`` type it may be served as.
+
+    Why it exists: ``render_chart`` and ``generate_image`` write PNGs into the workspace, and
+    :func:`read_file` can only answer "binary or non-text" about them — our own app could not show
+    the output of our own tools.
+
+    Path-guarded by the SAME :func:`resolve_in_workspace` call the text read uses, so a ``..`` or
+    absolute escape raises ``PathEscapesWorkspaceError`` exactly as it does there. Unlike the text
+    read this one RAISES instead of degrading to a note, because there is no honest place to put a
+    note in a response whose body is bytes — the caller turns each exception into a status.
+
+    The media type comes from :data:`_IMAGE_MEDIA_TYPES` and from nowhere else. A ``.html`` in the
+    workspace is REFUSED here rather than labelled: it would be served by us, same-origin, and this
+    origin's page carries the bearer token in a ``<meta>`` tag. The suffix is read off the RESOLVED
+    path so that the string which chose the type and the file which was opened cannot disagree.
+
+    Raises ``PathEscapesWorkspaceError``, :class:`UnsupportedImageError`, ``FileNotFoundError``
+    (missing path, or a directory) or :class:`ImageTooLargeError`.
+    """
+    root = Path(workspace).resolve()
+    path = resolve_in_workspace(root, rel)  # raises PathEscapesWorkspaceError on escape
+    media_type = _IMAGE_MEDIA_TYPES.get(path.suffix.lower())
+    if media_type is None:
+        raise UnsupportedImageError(f"{rel!r} is not a displayable image type")
+    if not path.is_file():
+        raise FileNotFoundError(rel)
+    size = path.stat().st_size
+    if size > max_bytes:
+        # Checked before the read, not after: pulling a 2 GB file into memory in order to then
+        # refuse it IS the denial of service, not the protection against one.
+        raise ImageTooLargeError(f"{rel!r} is {size} bytes, over the {max_bytes}-byte preview cap")
+    return path.read_bytes(), media_type
 
 
 def write_file(

@@ -13,6 +13,7 @@ import {
 import {
   getConfig,
   getFsFile,
+  getFsImage,
   saveFile,
   type Approval,
   type Profile,
@@ -68,6 +69,78 @@ function highlightFile(content: string, name: string): string {
     div.textContent = content;
     return div.innerHTML;
   }
+}
+
+/** Extensions the byte endpoint will serve, mirroring `_IMAGE_MEDIA_TYPES` in `chimera/api/fs_api.py`.
+ *
+ * Duplicated rather than fetched because this list decides only whether to ASK. The server decides
+ * what it will hand back, and a stale copy here can at worst produce a request that comes back 415 —
+ * never a file served on this list's say-so. Widening this without widening the server's changes
+ * nothing about what is served, which is the property that makes the duplication safe.
+ *
+ * SVG is absent for the same reason it is absent server-side: it is script-capable under a top-level
+ * navigation, and it needs nothing here anyway — an SVG is text, so the highlighted view already
+ * shows it. */
+const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp"]);
+
+function isImagePath(path: string): boolean {
+  const ext = path.includes(".") ? path.split(".").pop()!.toLowerCase() : "";
+  return IMAGE_EXTS.has(ext);
+}
+
+/** The chart the agent just drew, on the screen.
+ *
+ * `render_chart` and `generate_image` write into the workspace and the viewer answered "binary or
+ * non-text" — our own app could not display the output of our own tools, in ten languages.
+ *
+ * The bytes arrive through `fetch` and become an object URL rather than going straight into
+ * `<img src>`, because the request has to carry the bearer token in a header and an `<img>` cannot
+ * send one. Putting the token in the query string instead would write it into every access log.
+ *
+ * The URL is revoked when the file changes or the panel unmounts: an object URL pins its blob in
+ * memory until it is released, so a session spent clicking through screenshots would otherwise
+ * accumulate every one of them. */
+function ImagePreview({ workspace, path }: { workspace: string; path: string }) {
+  const t = useT();
+  const q = useQuery({
+    queryKey: ["fs-image", workspace, path],
+    queryFn: () => getFsImage(workspace || null, path),
+  });
+  const blob = q.data;
+  const [url, setUrl] = useState("");
+
+  useEffect(() => {
+    if (!blob) {
+      setUrl("");
+      return;
+    }
+    const objectUrl = URL.createObjectURL(blob);
+    setUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [blob]);
+
+  if (q.isError) {
+    // Named separately from the generic binary note: "we could not load this image" is a different
+    // fact from "this is not an image", and answering the second when the first happened would send
+    // someone looking for a bug in a file that is fine.
+    return <div className="px-4 py-6 text-sm text-bad">{t("code.imageError")}</div>;
+  }
+  if (!url) {
+    return (
+      <div className="flex justify-center py-10 text-muted-foreground">
+        <Loader2 className="h-5 w-5 animate-spin" />
+      </div>
+    );
+  }
+  return (
+    <div className="p-4">
+      <img
+        src={url}
+        alt={t("code.imageAlt", { path })}
+        className="max-w-full rounded-chip border border-hairline"
+      />
+    </div>
+  );
 }
 
 /** The center column: a syntax-highlighted viewer with an opt-in editor. Read-only is the default;
@@ -193,7 +266,12 @@ function Viewer({ workspace, path }: { workspace: string; path: string | null })
             </div>
           ) : q.isError ? (
             <div className="px-4 py-6 text-sm text-bad">{t("code.fileError")}</div>
+          ) : q.data?.note && path !== null && isImagePath(path) ? (
+            <ImagePreview workspace={workspace} path={path} />
           ) : q.data?.note ? (
+            // Still the honest answer for a .zip or a .wasm: there is no way to show those, and an
+            // <img> pointed at one renders a broken-image icon, which claims a failure that did not
+            // happen.
             <div className="px-4 py-6 text-sm text-muted-foreground">{t("code.binaryNote")}</div>
           ) : (
             <pre className="overflow-x-auto p-4 text-[12.5px] leading-relaxed">

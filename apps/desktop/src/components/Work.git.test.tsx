@@ -2,7 +2,7 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Work } from "@/components/Work";
-import { getFsTree, getGitStatus, getRuns, gitCommit, streamRun } from "@/lib/api";
+import { getFsTree, getGitStatus, getRuns, gitCommit, gitInit, streamRun } from "@/lib/api";
 import { emptyTree, gitStatus } from "@/test/code-api-mock";
 import { renderWithProviders } from "@/test/utils";
 import type { GitFile } from "@/lib/types";
@@ -36,10 +36,47 @@ describe("Work — the git panel", () => {
     await openTab(/^Git$/);
 
     expect(
-      await screen.findByText("Not a git repo — run `git init` in this folder to enable the panel."),
+      await screen.findByText(
+        "Not a git repo — nothing to commit against, and no way to undo what a run changes.",
+      ),
     ).toBeInTheDocument();
     expect(screen.queryByPlaceholderText(/commit message/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Commit/ })).not.toBeInTheDocument();
+  });
+
+  it("offers to initialise the repo instead of naming a command to run in a terminal", async () => {
+    // The whole thesis of the app is that you do not need a terminal, and this panel used to end at
+    // "run `git init` in this folder" — translated into ten languages, ten times an instruction to
+    // leave. The button does the init AND a snapshot commit, so there is a point of return before
+    // the agent is given write and shell access.
+    const user = userEvent.setup();
+    vi.mocked(getGitStatus).mockResolvedValue(gitStatus({ is_repo: false, branch: "" }));
+    vi.mocked(gitInit).mockResolvedValue({ ok: true, commit: "abc1234", output: "", error: null });
+    await openTab(/^Git$/);
+
+    await user.click(await screen.findByRole("button", { name: /Initialise git here/ }));
+
+    expect(gitInit).toHaveBeenCalledWith(null);
+  });
+
+  it("reports a failed init instead of a button that appears to do nothing", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getGitStatus).mockResolvedValue(gitStatus({ is_repo: false, branch: "" }));
+    vi.mocked(gitInit).mockResolvedValue({
+      ok: false,
+      commit: "",
+      output: "",
+      error: "already a git repo",
+    });
+    await openTab(/^Git$/);
+
+    await user.click(await screen.findByRole("button", { name: /Initialise git here/ }));
+
+    expect(
+      await screen.findByText(
+        "Couldn't initialise git here — is git installed, and the folder writable?",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("says the tree is clean rather than showing an empty file list", async () => {

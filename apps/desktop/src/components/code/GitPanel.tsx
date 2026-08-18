@@ -6,6 +6,7 @@ import { getGitDiff, getGitStatus, gitCommit } from "@/lib/api";
 import type { GitFile } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { DiffView } from "@/components/code/DiffView";
+import { GitInitButton } from "@/components/code/GitInitButton";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -63,7 +64,9 @@ function GitRow({
 
 /** The git panel: real `git status` grouped by staged / modified / untracked, a per-file diff on
  *  click, and a commit box that stages the EXPLICITLY selected paths (never `git add -A`). When the
- *  folder isn't a git repo (or git is missing), an honest empty-state invites `git init`. */
+ *  folder isn't a git repo (or git is missing), the empty state OFFERS to initialise one — it used
+ *  to name the terminal command instead, which in an app built so you don't need a terminal is a
+ *  diagnosis followed by a shrug. */
 export function GitPanel({ workspace }: { workspace: string }) {
   const t = useT();
   const qc = useQueryClient();
@@ -171,7 +174,10 @@ export function GitPanel({ workspace }: { workspace: string }) {
           <Loader2 className="h-4 w-4 animate-spin" />
         </div>
       ) : !status?.is_repo ? (
-        <p className="px-4 py-3 text-xs text-muted-foreground">{t("code.git.notRepo")}</p>
+        <div className="flex flex-col items-start gap-2 px-4 py-3">
+          <p className="text-xs text-muted-foreground">{t("code.git.notRepo")}</p>
+          <GitInitButton workspace={workspace} />
+        </div>
       ) : files.length === 0 ? (
         <p className="px-4 py-3 text-xs text-muted-foreground">{t("code.git.clean")}</p>
       ) : (

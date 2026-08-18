@@ -16,12 +16,19 @@ export function makeCodeApiMock() {
   return {
     cancelRun: vi.fn(),
     getFsFile: vi.fn(),
+    // Rejected by default rather than left bare: the viewer only calls this for a path that LOOKS
+    // like an image, so a suite that is not about previews never reaches it — and a `vi.fn()`
+    // resolving `undefined` would hand `URL.createObjectURL` a non-Blob in whichever suite did.
+    getFsImage: vi.fn(async () => {
+      throw new Error("no image fixture in this suite");
+    }),
     getFsTree: vi.fn(),
     getGitDiff: vi.fn(),
     getGitStatus: vi.fn(),
     getPlan: vi.fn(),
     getRuns: vi.fn(),
     gitCommit: vi.fn(),
+    gitInit: vi.fn(),
     gitRevert: vi.fn(),
     saveFile: vi.fn(),
     streamExec: vi.fn(),

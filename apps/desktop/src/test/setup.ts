@@ -81,6 +81,19 @@ if (!Range.prototype.getClientRects) {
   Range.prototype.getBoundingClientRect = () => new DOMRect();
 }
 
+// jsdom implements no object URLs at all (`URL.createObjectURL` is simply undefined in v25), and the
+// image preview turns a fetched Blob into one. Without this the component throws on its first
+// render, which reads as "the preview is broken" rather than "the environment has no blob store".
+//
+// The counter is deliberate: the identity of the returned string is the only observable an object
+// URL has, so a fake that returned a constant would make "the previous URL was revoked when the
+// file changed" unassertable — and leaking object URLs is exactly the bug worth pinning here.
+if (!URL.createObjectURL) {
+  let issued = 0;
+  URL.createObjectURL = () => `blob:chimera-test/${++issued}`;
+  URL.revokeObjectURL = () => {};
+}
+
 // Unmount anything a test rendered and drop any persisted UI state, so tests can't leak into each
 // other (VersionBadge, for one, reads localStorage on mount).
 afterEach(() => {

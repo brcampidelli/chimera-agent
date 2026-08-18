@@ -3,6 +3,7 @@ import { AlertTriangle, Boxes } from "lucide-react";
 
 import { getGitStatus } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { GitInitButton } from "@/components/code/GitInitButton";
 import { useT } from "@/lib/i18n";
 
 /** The one question the parallel batch still asks.
@@ -17,6 +18,11 @@ import { useT } from "@/lib/i18n";
  * old screen showed "this batch ran WITHOUT isolation" in the results banner — after N agents had
  * already edited the same directory, which is the point at which nothing can be done about it. Here
  * it is a fact about what WOULD happen, next to the button that would make it happen.
+ *
+ * And now next to the fix, too. Naming a problem the user cannot act on from where they are reading
+ * about it leaves them the choice between running the batch unprotected and going to find a
+ * terminal — so the warning carries the one-press repair, taken BEFORE the agents start writing,
+ * which is the only time it can be taken.
  */
 export function BatchProposal({
   tasks,
@@ -50,10 +56,13 @@ export function BatchProposal({
         ))}
       </ol>
       {noIsolation ? (
-        <p className="flex items-start gap-1.5 text-xs text-bad">
-          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          {t("code.batch.noIsolation")}
-        </p>
+        <div className="space-y-2">
+          <p className="flex items-start gap-1.5 text-xs text-bad">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            {t("code.batch.noIsolation")}
+          </p>
+          <GitInitButton workspace={workspace} />
+        </div>
       ) : null}
       <div className="flex flex-wrap gap-2">
         <Button size="sm" onClick={onConfirm}>

@@ -2329,6 +2329,58 @@
         "title": "GitFileOut",
         "type": "object"
       },
+      "GitInitOut": {
+        "properties": {
+          "commit": {
+            "title": "Commit",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "output": {
+            "title": "Output",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "commit",
+          "output",
+          "error"
+        ],
+        "title": "GitInitOut",
+        "type": "object"
+      },
+      "GitInitRequest": {
+        "properties": {
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          }
+        },
+        "title": "GitInitRequest",
+        "type": "object"
+      },
       "GitRevertOut": {
         "properties": {
           "error": {
@@ -6621,6 +6673,55 @@
         "summary": "Fs File Write Endpoint"
       }
     },
+    "/api/fs/image": {
+      "get": {
+        "description": "The raw bytes of an image in the workspace, so `render_chart`'s PNG can reach the screen.\n\nThe response headers are the security half and each one is load-bearing:\n\n* The **content type comes from the allowlist in `fs_api`** and can only ever be `image/*`.\n  A `.html` in the workspace is a 415, not a labelled document \u2014 this origin's page carries\n  the bearer token in a `<meta>` tag, so a document served from here can read it with one\n  same-origin fetch and then drive the API as the user.\n* **`nosniff`**, because the allowlist only chooses the label. A file named `.png` whose\n  bytes are `<html>` is still served as `image/png`; without this header a browser is free to\n  sniff past that label and render it as a document, which is the same hole by a longer road.\n* **A `sandbox` CSP**, for the one case `<img>` does not cover: someone opening the URL\n  directly. An opaque origin has no same-origin anything to read.\n\nNo `Content-Disposition`: the filename would have to be echoed from the request path into a\nheader, and header-quoting a user-controlled string is a bug waiting to be written for a\nfield nothing here needs.",
+        "operationId": "fs_image_endpoint_api_fs_image_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "title": "Path",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workspace"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Fs Image Endpoint"
+      }
+    },
     "/api/fs/search": {
       "post": {
         "description": "Find a string across the workspace, as structured hits.\n\nA POST because the query is user text \u2014 a `q=` in a URL is logged by every proxy between\nhere and nowhere, and someone searching their own repository for a token they are trying to\nremove should not have it written to an access log on the way.\n\nRead-only and scoped to the workspace, like the tree and the file reader beside it. The\nanswer names the engine that produced it: ripgrep where it exists, a bounded Python walk\nwhere it does not, and never a silent swap between the two.",
@@ -6824,6 +6925,44 @@
           }
         },
         "summary": "Git Diff Endpoint"
+      }
+    },
+    "/api/git/init": {
+      "post": {
+        "operationId": "git_init_endpoint_api_git_init_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitInitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitInitOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Git Init Endpoint"
       }
     },
     "/api/git/revert": {

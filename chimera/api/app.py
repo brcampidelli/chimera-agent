@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
@@ -64,6 +64,7 @@ from chimera.api.schemas import (
     FsTreeOut,
     GitCommitOut,
     GitDiffOut,
+    GitInitOut,
     GitRevertOut,
     GitStatusOut,
     GovernanceAuditOut,
@@ -221,6 +222,11 @@ class GitRevertRequest(BaseModel):
     """The workspace (repo) the revert is scoped to. None = the app's launch workspace."""
     paths: list[str]
     """The run's changed paths to discard (git-backed revert, scoped to these only)."""
+
+
+class GitInitRequest(BaseModel):
+    workspace: str | None = None
+    """The folder to turn into a repo. None = the app's launch workspace."""
 
 
 class PlanRequest(BaseModel):
@@ -1047,6 +1053,49 @@ def build_api_app(
         except ValueError as exc:  # content over the byte cap
             raise HTTPException(status_code=400, detail="content too large") from exc
 
+    @app.get("/api/fs/image", dependencies=[guard], response_class=Response)
+    def fs_image_endpoint(path: str, workspace: str | None = None) -> Response:
+        """The raw bytes of an image in the workspace, so `render_chart`'s PNG can reach the screen.
+
+        The response headers are the security half and each one is load-bearing:
+
+        * The **content type comes from the allowlist in `fs_api`** and can only ever be `image/*`.
+          A `.html` in the workspace is a 415, not a labelled document — this origin's page carries
+          the bearer token in a `<meta>` tag, so a document served from here can read it with one
+          same-origin fetch and then drive the API as the user.
+        * **`nosniff`**, because the allowlist only chooses the label. A file named `.png` whose
+          bytes are `<html>` is still served as `image/png`; without this header a browser is free to
+          sniff past that label and render it as a document, which is the same hole by a longer road.
+        * **A `sandbox` CSP**, for the one case `<img>` does not cover: someone opening the URL
+          directly. An opaque origin has no same-origin anything to read.
+
+        No `Content-Disposition`: the filename would have to be echoed from the request path into a
+        header, and header-quoting a user-controlled string is a bug waiting to be written for a
+        field nothing here needs.
+        """
+        from chimera.api.fs_api import ImageTooLargeError, UnsupportedImageError, read_image
+        from chimera.tools.workspace import PathEscapesWorkspaceError
+
+        ws = _resolve_fs_workspace(workspace)
+        try:
+            data, media_type = read_image(ws, path)
+        except PathEscapesWorkspaceError as exc:
+            raise HTTPException(status_code=400, detail="invalid path") from exc
+        except UnsupportedImageError as exc:
+            raise HTTPException(status_code=415, detail="not a displayable image type") from exc
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail="not found") from exc
+        except ImageTooLargeError as exc:
+            raise HTTPException(status_code=413, detail="image too large to preview") from exc
+        return Response(
+            content=data,
+            media_type=media_type,
+            headers={
+                "X-Content-Type-Options": "nosniff",
+                "Content-Security-Policy": "default-src 'none'; sandbox",
+            },
+        )
+
     @app.post("/api/fs/search", dependencies=[guard], response_model=SearchOut)
     def fs_search(req: SearchRequest) -> dict[str, Any]:
         """Find a string across the workspace, as structured hits.
@@ -1236,6 +1285,17 @@ def build_api_app(
         from chimera.api.exec_stream import cancel as cancel_exec
 
         return {"cancelled": cancel_exec(req.id)}
+
+    @app.post("/api/git/init", dependencies=[guard], response_model=GitInitOut)
+    def git_init_endpoint(req: GitInitRequest) -> dict[str, Any]:
+        # `git init` + a snapshot commit, so the folder has a point of return BEFORE the agent is
+        # given write and shell access to it. Strictly less power than POST /api/fs/exec, which can
+        # already run `git init` and anything else; this exists so the app stops telling people to
+        # open a terminal to get the isolation and the undo its own panels depend on.
+        # An already-initialised folder returns {ok: False, error} — never a 500.
+        from chimera.api.git_api import git_init
+
+        return git_init(_resolve_fs_workspace(req.workspace))
 
     @app.get("/api/git/status", dependencies=[guard], response_model=GitStatusOut)
     def git_status_endpoint(workspace: str | None = None) -> dict[str, Any]:
