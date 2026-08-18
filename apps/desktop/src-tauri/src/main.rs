@@ -11,9 +11,10 @@
 
 use std::collections::VecDeque;
 use std::io::{BufRead, BufReader};
-use std::net::TcpStream;
+use std::net::{SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -23,14 +24,70 @@ use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 use tauri_plugin_updater::UpdaterExt;
 
-/// Holds the sidecar child so it can be killed when the app exits.
-struct Sidecar(Mutex<Option<Child>>);
+/// A running backend: the process, the origin it serves, and the last thing it said.
+///
+/// The stderr tail is kept for the whole life of the process, not just its startup. A backend that
+/// failed to start already left a report; one that died an hour into a session used to leave
+/// nothing at all, and "it just stopped" is not a diagnosis anybody can act on.
+struct Backend {
+    child: Child,
+    url: String,
+    stderr: Arc<Mutex<VecDeque<String>>>,
+}
+
+/// The sidecar the app is holding, and whether the app is on its way out.
+///
+/// `stopping` is not ceremony. The supervisor spawns a replacement WITHOUT holding the lock — a
+/// cold start can take 45 seconds, and holding the mutex across it would freeze the exit hook for
+/// exactly that long — so there is a window in which the user can quit mid-restart. Without this
+/// flag that window ends with a backend nobody owns still running after the window is gone.
+struct Sidecar {
+    backend: Mutex<Option<Backend>>,
+    stopping: AtomicBool,
+}
+
+/// Where the backend is, where its data goes, and where it reports the port it bound.
+///
+/// Resolved once from `&tauri::App` so every function below takes plain paths. That is not
+/// tidiness: `start_sidecar` used to take `&tauri::App`, which a unit test cannot construct, so the
+/// startup path could only be checked by asserting on the SOURCE of this file. Now it is called for
+/// real by its own tests, and by the supervisor, which has no `App` either.
+#[derive(Clone)]
+struct Paths {
+    exe: PathBuf,
+    data_dir: PathBuf,
+    port_file: PathBuf,
+}
 
 /// Resolve the bundled sidecar executable inside the app's resource dir.
 fn sidecar_path(app: &tauri::App) -> Result<PathBuf, String> {
     let resource_dir = app.path().resource_dir().map_err(|e| e.to_string())?;
     let exe = if cfg!(windows) { "chimera-backend.exe" } else { "chimera-backend" };
     Ok(resource_dir.join("sidecar-dist").join("chimera-backend").join(exe))
+}
+
+/// Everything the sidecar needs, resolved from the app once.
+///
+/// Where this install keeps its data — memory, run receipts, sessions, traces.
+///
+/// `Settings.home` defaults to the RELATIVE path `.chimera`, which is right for the CLI (data sits
+/// beside the project you ran it in) and wrong for a packaged app, which has no meaningful working
+/// directory. Without this the sidecar inherited whatever CWD the launcher happened to give it: the
+/// install directory under Program Files on Windows (not writable), or a different folder per
+/// shortcut — so the same app could show two different histories depending on how it was opened,
+/// and a fresh install could fail to write at all.
+fn resolve_paths(app: &tauri::App) -> Result<Paths, String> {
+    let exe = sidecar_path(app)?;
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&data_dir).map_err(|e| format!("cannot create {data_dir:?}: {e}"))?;
+    Ok(Paths {
+        exe,
+        data_dir,
+        // Keyed by OUR pid, in temp: two copies of the app share one data dir and would otherwise
+        // read each other's port announcement and point their windows at the same backend.
+        port_file: std::env::temp_dir()
+            .join(format!("chimera-app-port-{}.txt", std::process::id())),
+    })
 }
 
 /// Poll `port_file` until the backend writes its `http://host:port` URL (or time out).
@@ -48,21 +105,32 @@ fn wait_for_url(port_file: &Path, timeout: Duration) -> Result<String, String> {
     Err("backend did not report its URL in time".into())
 }
 
+/// The address behind `http://host:port`. Parsed by hand rather than pulling in an HTTP client.
+fn address_of(url: &str) -> Option<SocketAddr> {
+    let hostport = url.strip_prefix("http://").unwrap_or(url);
+    hostport.split('/').next()?.to_socket_addrs_first()
+}
+
+/// Is anything accepting connections there, right now?
+///
+/// A TCP connect rather than an HTTP request, and the choice matters in both directions. The kernel
+/// completes the handshake from the listen backlog even while the server is busy, so a backend
+/// under load is never mistaken for a dead one — a false positive here would kill a working session,
+/// which is worse than the outage this whole file is about. What it therefore cannot see is a
+/// process whose socket is open and whose event loop is wedged; that failure reaches the user as
+/// requests that never answer, and it is the window's own `/api/doctor` poll that notices it. This
+/// probe is not a health check and saying otherwise would be the comfortable, false comment.
+fn listening(url: &str) -> bool {
+    address_of(url)
+        .is_some_and(|addr| TcpStream::connect_timeout(&addr, Duration::from_millis(500)).is_ok())
+}
+
 /// Wait until the backend's TCP port accepts a connection, so the window doesn't load before it binds.
 fn wait_for_listening(url: &str, timeout: Duration) -> Result<(), String> {
-    // Parse "http://host:port" without pulling an HTTP client dependency.
-    let hostport = url.strip_prefix("http://").unwrap_or(url);
-    let hostport = hostport.split('/').next().unwrap_or(hostport);
+    let addr = address_of(url).ok_or("could not resolve backend address")?;
     let start = Instant::now();
     while start.elapsed() < timeout {
-        if TcpStream::connect_timeout(
-            &hostport
-                .to_socket_addrs_first()
-                .ok_or("could not resolve backend address")?,
-            Duration::from_millis(500),
-        )
-        .is_ok()
-        {
+        if TcpStream::connect_timeout(&addr, Duration::from_millis(500)).is_ok() {
             return Ok(());
         }
         std::thread::sleep(Duration::from_millis(150));
@@ -135,19 +203,50 @@ fn drain_stderr(child: &mut Child) -> Arc<Mutex<VecDeque<String>>> {
     tail
 }
 
-/// Write what we know about a failed startup, and return the path.
+/// What went wrong with a backend, and therefore which file the user should be pointed at.
+///
+/// Two files rather than one, because a crash loop produces both and each answers a different
+/// question: the crash report says what the backend was saying when it died, and the startup
+/// report says why the replacement could not take its place. Writing both into one path means the
+/// second overwrites the answer to the first.
+#[derive(Clone, Copy)]
+enum Trouble {
+    /// It never came up.
+    FailedToStart,
+    /// It was serving, and then it was not.
+    DiedMidSession,
+}
+
+impl Trouble {
+    fn file(self) -> &'static str {
+        match self {
+            Self::FailedToStart => "startup-failure.txt",
+            Self::DiedMidSession => "backend-crash.txt",
+        }
+    }
+
+    fn headline(self) -> &'static str {
+        match self {
+            Self::FailedToStart => "backend failed to start",
+            Self::DiedMidSession => "backend stopped while the app was running",
+        }
+    }
+}
+
+/// Write what we know about a broken backend, and return the path.
 ///
 /// Best-effort throughout: this runs on the path where something already went wrong, and a
 /// diagnostics writer that can itself fail the startup would be the joke writing itself. Every
 /// error here degrades to a less complete file, never to a second failure.
-fn write_startup_report(
+fn write_report(
     data_dir: &Path,
+    trouble: Trouble,
     exe: &Path,
     child: &mut Child,
     tail: &Arc<Mutex<VecDeque<String>>>,
     why: &str,
 ) -> PathBuf {
-    let path = data_dir.join("startup-failure.txt");
+    let path = data_dir.join(trouble.file());
     let exit = match child.try_wait() {
         Ok(Some(status)) => format!("{status}"),
         Ok(None) => "still running (killed after this report)".to_string(),
@@ -158,7 +257,7 @@ fn write_startup_report(
         .map(|buf| buf.iter().cloned().collect::<Vec<_>>().join("\n"))
         .unwrap_or_else(|_| "<stderr buffer unavailable>".to_string());
     let body = format!(
-        "Chimera desktop — backend failed to start\n\
+        "Chimera desktop — {}\n\
          version: {}\n\
          backend: {}\n\
          pid: {}\n\
@@ -166,6 +265,7 @@ fn write_startup_report(
          reason: {why}\n\
          \n\
          --- last {STDERR_KEEP} lines of backend stderr ---\n{}\n",
+        trouble.headline(),
         env!("CARGO_PKG_VERSION"),
         exe.display(),
         child.id(),
@@ -176,31 +276,45 @@ fn write_startup_report(
     path
 }
 
-fn start_sidecar(app: &tauri::App) -> Result<(Child, String), String> {
-    let exe = sidecar_path(app)?;
+/// How long a start may take before it counts as failed.
+///
+/// A field rather than a constant because the supervisor's own tests drive a backend that never
+/// comes up, and a test that waits 45 seconds to prove a timeout is a test nobody runs — which is
+/// how the timeout path goes unexercised until a user meets it.
+#[derive(Clone, Copy)]
+struct Budget {
+    url: Duration,
+    listen: Duration,
+}
+
+impl Default for Budget {
+    fn default() -> Self {
+        // The frozen exe unpacks and imports the whole agent stack before it binds anything.
+        Self { url: Duration::from_secs(45), listen: Duration::from_secs(30) }
+    }
+}
+
+/// The memo naming the port this install bound last time.
+fn memo_path(data_dir: &Path) -> PathBuf {
+    data_dir.join("last-port.txt")
+}
+
+/// Launch the backend and wait until it is serving. `wanted` is the port to ask for — see
+/// [`remembered_port`] for the first launch, and the supervisor for a restart, where asking for the
+/// SAME port is what lets the already-loaded page recover without a reload.
+fn start_sidecar(paths: &Paths, wanted: u16, budget: Budget) -> Result<Backend, String> {
+    let exe = paths.exe.clone();
     if !exe.exists() {
         return Err(format!("bundled backend not found at {exe:?}"));
     }
-    let port_file = std::env::temp_dir().join(format!("chimera-app-port-{}.txt", std::process::id()));
+    let port_file = paths.port_file.clone();
     let _ = std::fs::remove_file(&port_file);
+    let data_dir = paths.data_dir.clone();
 
-    // Where this install keeps its data — memory, run receipts, sessions, traces.
-    //
-    // `Settings.home` defaults to the RELATIVE path `.chimera`, which is right for the CLI (data
-    // sits beside the project you ran it in) and wrong for a packaged app, which has no meaningful
-    // working directory. Without this the sidecar inherited whatever CWD the launcher happened to
-    // give it: the install directory under Program Files on Windows (not writable), or a different
-    // folder per shortcut — so the same app could show two different histories depending on how it
-    // was opened, and a fresh install could fail to write at all.
-    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    std::fs::create_dir_all(&data_dir).map_err(|e| format!("cannot create {data_dir:?}: {e}"))?;
-
-    // Ask for the port we used last time so the window keeps its origin — see `remembered_port`.
     // Asking is all this does: the backend falls back to an OS-assigned free port when the requested
     // one is taken, so a port claimed by something else (or by a second copy of this app) costs a
     // fresh origin once, never a failure to start.
-    let memo = data_dir.join("last-port.txt");
-    let wanted = remembered_port(&memo);
+    let memo = memo_path(&data_dir);
     let wanted_arg = wanted.to_string();
 
     // stderr is PIPED so a backend that dies on startup leaves its last words somewhere. It used to
@@ -224,13 +338,15 @@ fn start_sidecar(app: &tauri::App) -> Result<(Child, String), String> {
     let stderr_tail = drain_stderr(&mut child);
 
     // The frozen exe unpacks + boots; give it a generous window before giving up.
-    let url = wait_for_url(&port_file, Duration::from_secs(45))
-        .and_then(|url| wait_for_listening(&url, Duration::from_secs(30)).map(|()| url))
+    let url = wait_for_url(&port_file, budget.url)
+        .and_then(|url| wait_for_listening(&url, budget.listen).map(|()| url))
         .map_err(|why| {
             // Whatever the backend managed to say, plus the exit code if it already died — written
             // BEFORE this error propagates, because everything above it is about to be unwound.
-            let report = write_startup_report(&data_dir, &exe, &mut child, &stderr_tail, &why);
+            let report =
+                write_report(&data_dir, Trouble::FailedToStart, &exe, &mut child, &stderr_tail, &why);
             let _ = child.kill();
+            let _ = child.wait();
             format!("{why}\n\nDiagnostics written to:\n{}", report.display())
         })?;
     let _ = std::fs::remove_file(&port_file);
@@ -243,13 +359,301 @@ fn start_sidecar(app: &tauri::App) -> Result<(Child, String), String> {
             let _ = std::fs::write(&memo, actual.to_string());
         }
     }
-    Ok((child, url))
+    Ok(Backend { child, url, stderr: stderr_tail })
+}
+
+/// Consecutive silent looks before a process that is alive and answering nothing is treated as dead.
+///
+/// One is not enough. A single refused connection can be a moment of exhaustion on a busy machine,
+/// and killing a working backend over it would make this feature the cause of the outage it was
+/// written to end.
+const SILENT_STRIKES: usize = 3;
+
+/// How often the backend is looked at, and how much restarting is worth attempting.
+///
+/// The window fuse is the one every supervisor has: five restarts inside two minutes, then stop.
+/// The second limit exists because the window alone has a hole in it. A backend that HANGS on
+/// startup — a config it cannot parse, a port it can never have — fails one budget at a time, and
+/// attempts spaced 75 seconds apart never coexist inside a 120-second window. With only the window,
+/// such a backend is respawned once a minute for as long as the app is open: an invisible loop
+/// replacing a visible failure, which is the trade a fuse exists to refuse.
+///
+/// The tick is a `try_wait` and one loopback TCP connect — cheap, but it does run for the life of
+/// the app, which is why it is two seconds and not two hundred milliseconds.
+///
+/// A struct rather than constants because the tests below drive every one of these paths, and a
+/// suite that waits two minutes to prove a two-minute rule is a suite nobody runs.
+#[derive(Clone, Copy)]
+struct Tuning {
+    tick: Duration,
+    budget: Budget,
+    max_in_window: usize,
+    window: Duration,
+    max_consecutive_failures: usize,
+}
+
+impl Default for Tuning {
+    fn default() -> Self {
+        Self {
+            tick: Duration::from_secs(2),
+            budget: Budget::default(),
+            max_in_window: 5,
+            window: Duration::from_secs(120),
+            max_consecutive_failures: 3,
+        }
+    }
+}
+
+/// The restart budget.
+///
+/// Kept apart from the loop that spends it because it is the entire safety argument, and because
+/// arithmetic over a sliding window is the part that can be wrong while everything around it looks
+/// right.
+struct Fuse {
+    window: Duration,
+    max_in_window: usize,
+    max_consecutive_failures: usize,
+    recent: VecDeque<Instant>,
+    failures: usize,
+    spent: usize,
+}
+
+impl Fuse {
+    fn new(tuning: &Tuning) -> Self {
+        Self {
+            window: tuning.window,
+            max_in_window: tuning.max_in_window,
+            max_consecutive_failures: tuning.max_consecutive_failures,
+            recent: VecDeque::new(),
+            failures: 0,
+            spent: 0,
+        }
+    }
+
+    /// May the backend be restarted right now? Records the attempt when the answer is yes.
+    fn allows(&mut self, now: Instant) -> bool {
+        while self.recent.front().is_some_and(|t| now.duration_since(*t) > self.window) {
+            self.recent.pop_front();
+        }
+        if self.recent.len() >= self.max_in_window || self.failures >= self.max_consecutive_failures
+        {
+            return false;
+        }
+        self.recent.push_back(now);
+        self.spent += 1;
+        true
+    }
+
+    /// How the attempt just allowed turned out. A start that worked clears the consecutive count:
+    /// a backend that dies once an hour is not a backend that cannot start.
+    fn attempt_ended(&mut self, started: bool) {
+        self.failures = if started { 0 } else { self.failures + 1 };
+    }
+}
+
+/// What one look at the backend can tell us.
+#[derive(Debug, PartialEq, Eq)]
+enum Health {
+    /// Running, and something accepts connections on its port.
+    Serving,
+    /// The process is gone.
+    Exited,
+    /// The process is alive and its port answers nothing.
+    Silent,
+}
+
+fn look(backend: &mut Backend) -> Health {
+    match backend.child.try_wait() {
+        Ok(Some(_)) => Health::Exited,
+        Ok(None) if listening(&backend.url) => Health::Serving,
+        Ok(None) => Health::Silent,
+        // We could not ask. Assume it is fine: this branch is a broken handle, not a broken
+        // backend, and a restart we cannot justify ends a session that was working.
+        Err(_) => Health::Serving,
+    }
+}
+
+/// What one turn of the supervisor's loop found in the slot the backend lives in.
+///
+/// `Missing` is its own case and that is the point: an empty slot means either that the app took
+/// the backend on its way out or that the previous restart failed and there is nothing there YET.
+/// Reading both as "the app is quitting" ends the supervision at the exact moment it is needed —
+/// which is what the first version of this loop did, and what its own test caught.
+enum Found {
+    Alive,
+    Missing,
+    JustDied(Backend),
+}
+
+/// Something the supervisor did that the app has to act on.
+enum Supervised {
+    /// The backend is back, at this URL — usually the one it had, because a restart asks for the
+    /// port the window is already pointing at. When it is NOT the same, the page in the window is
+    /// talking to an origin that no longer exists and has to be moved there.
+    Restarted(String),
+    /// Out of budget; nothing further will be tried. The message says what happened, what to do,
+    /// and which file holds the backend's own words.
+    GaveUp(String),
+}
+
+/// The message shown when the supervisor stops trying.
+///
+/// It names a file on purpose. A give-up with nothing to open is the "nothing happens" failure
+/// again, one level up: the user is told the app is broken and given no way to find out why.
+fn gave_up_message(fuse: &Fuse, report: Option<&Path>, last_error: Option<&str>) -> String {
+    let mut message = format!(
+        "Chimera's backend stopped, and the app could not bring it back (it tried {} times).\n\n\
+         Close Chimera and open it again.",
+        fuse.spent
+    );
+    if let Some(path) = report {
+        message.push_str(&format!("\n\nWhat the backend said before it stopped:\n{}", path.display()));
+    }
+    if let Some(why) = last_error {
+        message.push_str(&format!("\n\nThe last attempt to restart it: {why}"));
+    }
+    message
+}
+
+/// Watch the backend, and bring it back when it dies.
+///
+/// This is the whole of the "it comes back on its own" half. Without it, a backend that died
+/// mid-session left the window loaded and every panel in it showing a "Try again" that could only
+/// ever fail, and the only fix was for the user to guess they should close and reopen the app.
+///
+/// Three things it is careful about, each of which is a way to make the situation worse:
+///
+///   1. **It reads the corpse before replacing it.** The dead process's stderr is the only
+///      diagnosis anyone has, and it exists only until the process is dropped.
+///   2. **It asks for the same port.** The window's origin — and, browsers being what they are, the
+///      `localStorage` behind it — is `http://127.0.0.1:<port>`. A backend that comes back
+///      somewhere else leaves the loaded page talking to nothing at all.
+///   3. **It gives up.** See [`Tuning`].
+fn supervise(
+    state: Arc<Sidecar>,
+    paths: Paths,
+    tuning: Tuning,
+    mut announce: impl FnMut(Supervised),
+) {
+    let mut fuse = Fuse::new(&tuning);
+    let mut silent = 0usize;
+    // The port to ask for. Carried across failed attempts so a backend that takes three tries to
+    // come up still comes up where the window is looking.
+    let mut wanted: u16 = 0;
+    let mut last_report: Option<PathBuf> = None;
+    let mut last_error: Option<String> = None;
+
+    loop {
+        std::thread::sleep(tuning.tick);
+        if state.stopping.load(Ordering::SeqCst) {
+            return;
+        }
+
+        // Looking and taking the corpse out happen in ONE critical section, so a quit that lands
+        // between them cannot find a backend that is neither owned by the app nor killed.
+        let found = {
+            let Ok(mut guard) = state.backend.lock() else { return };
+            match guard.as_mut() {
+                // `kill_sidecar` sets `stopping` BEFORE it takes the backend, so a flag read here
+                // cannot miss a quit that has already happened. Anything else empty is our own gap
+                // between a failed restart and the next attempt — see `Found`.
+                None if state.stopping.load(Ordering::SeqCst) => return,
+                None => Found::Missing,
+                Some(backend) => match look(backend) {
+                    Health::Serving => {
+                        silent = 0;
+                        Found::Alive
+                    }
+                    Health::Silent => {
+                        silent += 1;
+                        if silent < SILENT_STRIKES {
+                            Found::Alive
+                        } else {
+                            silent = 0;
+                            let _ = backend.child.kill();
+                            guard.take().map_or(Found::Missing, Found::JustDied)
+                        }
+                    }
+                    Health::Exited => {
+                        silent = 0;
+                        guard.take().map_or(Found::Missing, Found::JustDied)
+                    }
+                },
+            }
+        };
+
+        if let Found::JustDied(mut dead) = found {
+            // The last words, read before anything replaces the process that said them. A respawn
+            // that skipped this would delete the only account of why the backend keeps dying — and
+            // a restart loop with no record is indistinguishable from an app that is merely slow.
+            wanted = port_of(&dead.url).unwrap_or(wanted);
+            // Reap first, then diagnose: it leaves no zombie behind, and it means the report shows
+            // the real exit status instead of "still running" for a process this loop killed one
+            // line earlier — a sentence that would be false in exactly the file somebody opens to
+            // find out what happened.
+            let _ = dead.child.wait();
+            last_report = Some(write_report(
+                &paths.data_dir,
+                Trouble::DiedMidSession,
+                &paths.exe,
+                &mut dead.child,
+                &dead.stderr,
+                "the backend stopped answering while the app was running",
+            ));
+        } else if let Found::Alive = found {
+            continue;
+        }
+
+        if !fuse.allows(Instant::now()) {
+            announce(Supervised::GaveUp(gave_up_message(
+                &fuse,
+                last_report.as_deref(),
+                last_error.as_deref(),
+            )));
+            return;
+        }
+
+        match start_sidecar(&paths, wanted, tuning.budget) {
+            Ok(mut fresh) => {
+                fuse.attempt_ended(true);
+                wanted = port_of(&fresh.url).unwrap_or(wanted);
+                let url = fresh.url.clone();
+                {
+                    // Storing it and checking `stopping` are one critical section for the reason
+                    // given on `Sidecar`: quitting during a restart must not leave the replacement
+                    // running after the window that owned it is gone.
+                    let Ok(mut guard) = state.backend.lock() else { return };
+                    if state.stopping.load(Ordering::SeqCst) {
+                        let _ = fresh.child.kill();
+                        return;
+                    }
+                    *guard = Some(fresh);
+                }
+                last_error = None;
+                announce(Supervised::Restarted(url));
+            }
+            Err(why) => {
+                // `start_sidecar` has already written its own report and named it inside `why`.
+                fuse.attempt_ended(false);
+                last_error = Some(why);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{drain_stderr, port_of, remembered_port, write_startup_report, STDERR_KEEP};
-    use std::process::{Command, Stdio};
+    use super::{
+        drain_stderr, look, port_of, remembered_port, start_sidecar, supervise, write_report,
+        Backend, Budget, Fuse, Health, Paths, Sidecar, Supervised, Trouble, Tuning, STDERR_KEEP,
+    };
+    use std::collections::VecDeque;
+    use std::net::TcpListener;
+    use std::path::{Path, PathBuf};
+    use std::process::{Child, Command, Stdio};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    use std::sync::{Arc, Mutex};
+    use std::time::{Duration, Instant};
 
     /// A backend that dies on startup must leave its last words behind.
     ///
@@ -275,9 +679,10 @@ mod tests {
         // The draining thread races the exit; give it a moment to finish the last line.
         std::thread::sleep(std::time::Duration::from_millis(300));
 
-        let path = write_startup_report(
+        let path = write_report(
             &dir,
-            std::path::Path::new("chimera-backend"),
+            Trouble::FailedToStart,
+            Path::new("chimera-backend"),
             &mut child,
             &tail,
             "timed out waiting for the port file",
@@ -302,7 +707,8 @@ mod tests {
             .expect("spawn");
         let tail = drain_stderr(&mut child);
         let _ = child.wait();
-        let path = write_startup_report(&dir, std::path::Path::new("x"), &mut child, &tail, "why");
+        let path =
+            write_report(&dir, Trouble::FailedToStart, Path::new("x"), &mut child, &tail, "why");
         let body = std::fs::read_to_string(&path).unwrap();
         assert!(
             body.contains("the backend printed nothing"),
@@ -311,17 +717,18 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
-    /// The three tests above are HELPER tests, and I found that out by trying to break them.
+    /// The two tests above are HELPER tests, and I found that out by trying to break them.
     ///
-    /// Removing `.stderr(Stdio::piped())` from `start_sidecar` left all three green, because each
-    /// spawns its own child and pipes it explicitly — they prove `drain_stderr` and
-    /// `write_startup_report` work, and say nothing about whether the sidecar path calls them. That
-    /// is the same "tests the class, not the wiring" defect this project has a skill card about.
+    /// Removing `.stderr(Stdio::piped())` from `start_sidecar` left them green, because each spawns
+    /// its own child and pipes it explicitly — they prove `drain_stderr` and `write_report` work,
+    /// and say nothing about whether the sidecar path calls them. That is the same "tests the class,
+    /// not the wiring" defect this project has a skill card about.
     ///
-    /// `start_sidecar` takes `&tauri::App`, which a unit test cannot construct, so the behavioural
-    /// version would mean restructuring it to accept a path. Worth doing; not worth blocking the
-    /// fix on. Until then this is a source-level assertion — weaker than behaviour, but it fails on
-    /// exactly the regression that matters and is honest about being a stand-in.
+    /// The note that used to live here said the behavioural version would mean restructuring
+    /// `start_sidecar` to take a path instead of `&tauri::App`, and that it was worth doing. It has
+    /// been done: `a_dead_backend_is_started_again_without_the_user_doing_anything` and its
+    /// neighbours below call the real function against a stand-in backend. This stays anyway,
+    /// because it is a one-line guard on the exact regression and it costs nothing.
     #[test]
     fn the_sidecar_actually_pipes_its_stderr() {
         let source = include_str!("main.rs");
@@ -347,7 +754,7 @@ mod tests {
             "start_sidecar stopped piping stderr — a backend that dies on startup is silent again"
         );
         assert!(
-            spawn.contains("write_startup_report"),
+            spawn.contains("write_report"),
             "start_sidecar stopped writing a report on failure"
         );
     }
@@ -398,13 +805,439 @@ mod tests {
         assert_eq!(remembered_port(&memo), 51234);
         let _ = std::fs::remove_file(&memo);
     }
+    // ---------------------------------------------------------------------------------------
+    // The supervisor.
+    //
+    // These run the real `start_sidecar` and the real `supervise` against a stand-in backend, which
+    // is what the note above promised and could not do while the function needed a `tauri::App`.
+    // ---------------------------------------------------------------------------------------
+
+    /// Timings for a test. Small, but not so small that a loaded CI runner reads a slow spawn as a
+    /// failure — the budget only costs time when a start is EXPECTED to fail, and the tests that
+    /// expect that shorten it themselves.
+    fn quick(tuning: Tuning) -> Tuning {
+        Tuning { tick: Duration::from_millis(50), ..tuning }
+    }
+
+    static SCRATCH: AtomicUsize = AtomicUsize::new(0);
+
+    /// A private directory for one test. Unique per call, because cargo runs these in parallel
+    /// threads of ONE process and a shared path is a silent cross-test overwrite.
+    fn scratch(name: &str) -> PathBuf {
+        let n = SCRATCH.fetch_add(1, Ordering::SeqCst);
+        let dir = std::env::temp_dir().join(format!("chimera-{name}-{}-{n}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("a scratch directory");
+        dir
+    }
+
+    /// A stand-in for the frozen Python backend.
+    ///
+    /// The real one is a PyInstaller build produced by another job and cannot be a test fixture.
+    /// That is not a compromise for what these tests ask: every one of them is about what the SHELL
+    /// does when the process on the other end appears, dies, or never arrives.
+    struct Fake<'a> {
+        dir: &'a Path,
+        /// The URL it announces into the `--emit-port-file` path, which is argument 5.
+        url: &'a str,
+        /// Whether it stays alive after announcing, or exits the moment it has.
+        lingers: bool,
+        /// While this file exists it refuses to come up: no announcement, non-zero exit.
+        breaks_when: Option<&'a Path>,
+        /// A line appended on every run, so a test can count spawns without asking the supervisor
+        /// how many it thinks it made.
+        tally: Option<&'a Path>,
+    }
+
+    impl Fake<'_> {
+        fn write(self) -> PathBuf {
+            let path = self.dir.join(if cfg!(windows) { "backend.cmd" } else { "backend.sh" });
+            let mut body = String::new();
+            if cfg!(windows) {
+                body.push_str("@echo off\r\n");
+                if let Some(tally) = self.tally {
+                    body.push_str(&format!(">>\"{}\" echo ran\r\n", tally.display()));
+                }
+                body.push_str("echo fake backend speaking 1>&2\r\n");
+                if let Some(marker) = self.breaks_when {
+                    body.push_str(&format!("if exist \"{}\" exit /b 9\r\n", marker.display()));
+                }
+                // The redirection goes FIRST on purpose: `echo http://127.0.0.1:51234>%~5` makes cmd
+                // read that trailing `3` as a file handle and write the URL one character short —
+                // a stand-in that lies about the thing under test.
+                body.push_str(&format!(">\"%~5\" echo {}\r\n", self.url));
+                body.push_str(if self.lingers {
+                    "ping -n 20 127.0.0.1 >nul\r\n"
+                } else {
+                    "exit /b 0\r\n"
+                });
+            } else {
+                body.push_str("#!/bin/sh\n");
+                if let Some(tally) = self.tally {
+                    body.push_str(&format!("echo ran >> \"{}\"\n", tally.display()));
+                }
+                body.push_str("echo 'fake backend speaking' >&2\n");
+                if let Some(marker) = self.breaks_when {
+                    body.push_str(&format!("[ -f \"{}\" ] && exit 9\n", marker.display()));
+                }
+                body.push_str(&format!("echo '{}' > \"$5\"\n", self.url));
+                body.push_str(if self.lingers { "sleep 20\n" } else { "exit 0\n" });
+            }
+            std::fs::write(&path, body).expect("write the stand-in backend");
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
+                    .expect("make the stand-in executable");
+            }
+            path
+        }
+    }
+
+    /// A process that just sits there, so a test can ask what one look at a LIVE one reports.
+    fn lingering_process() -> Child {
+        Command::new(if cfg!(windows) { "cmd" } else { "sh" })
+            .args(if cfg!(windows) {
+                vec!["/C", "ping -n 20 127.0.0.1 >nul"]
+            } else {
+                vec!["-c", "sleep 20"]
+            })
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("spawn a lingering process")
+    }
+
+    fn dead_process() -> Child {
+        let mut child = Command::new(if cfg!(windows) { "cmd" } else { "sh" })
+            .args(if cfg!(windows) { vec!["/C", "exit 0"] } else { vec!["-c", "exit 0"] })
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("spawn");
+        let _ = child.wait();
+        child
+    }
+
+    fn backend_of(child: Child, url: &str) -> Backend {
+        Backend {
+            child,
+            url: url.to_string(),
+            stderr: Arc::new(Mutex::new(VecDeque::new())),
+        }
+    }
+
+    /// Everything the supervisor has announced once one of them starts with `needle`.
+    fn wait_for(seen: &Arc<Mutex<Vec<String>>>, needle: &str, patience: Duration) -> Vec<String> {
+        let start = Instant::now();
+        while start.elapsed() < patience {
+            let notes = seen.lock().unwrap().clone();
+            if notes.iter().any(|n| n.starts_with(needle)) {
+                return notes;
+            }
+            std::thread::sleep(Duration::from_millis(25));
+        }
+        panic!("the supervisor never said {needle:?}: {:?}", seen.lock().unwrap());
+    }
+
+    /// Start a supervisor over `state`, collecting what it announces.
+    fn watch(
+        state: &Arc<Sidecar>,
+        paths: &Paths,
+        tuning: Tuning,
+    ) -> (Arc<Mutex<Vec<String>>>, std::thread::JoinHandle<()>) {
+        let seen = Arc::new(Mutex::new(Vec::<String>::new()));
+        let (state, paths, sink) = (Arc::clone(state), paths.clone(), Arc::clone(&seen));
+        let handle = std::thread::spawn(move || {
+            supervise(state, paths, tuning, move |event| {
+                let note = match event {
+                    Supervised::Restarted(url) => format!("restarted {url}"),
+                    Supervised::GaveUp(why) => format!("gave up {why}"),
+                };
+                sink.lock().unwrap().push(note);
+            });
+        });
+        (seen, handle)
+    }
+
+    /// End the session the way the app's exit hook does, and wait for the thread to notice.
+    fn stop(state: &Arc<Sidecar>, watcher: std::thread::JoinHandle<()>) {
+        state.stopping.store(true, Ordering::SeqCst);
+        if let Some(mut backend) = state.backend.lock().unwrap().take() {
+            let _ = backend.child.kill();
+        }
+        watcher.join().expect("the supervisor thread ended");
+    }
+
+    /// The regression the whole change exists for: a backend that dies mid-session comes back
+    /// without the user doing anything, and the dead one's last words survive the replacement.
+    #[test]
+    fn a_dead_backend_is_started_again_without_the_user_doing_anything() {
+        let dir = scratch("restart");
+        // The test owns the socket the stand-in "serves" on: `start_sidecar` waits for the port to
+        // accept a connection, and a batch file cannot listen. What is under test is the shell's
+        // reaction to the process, not the socket underneath it.
+        let listener = TcpListener::bind("127.0.0.1:0").expect("a port to pretend on");
+        let url = format!("http://127.0.0.1:{}", listener.local_addr().unwrap().port());
+        let paths = Paths {
+            exe: Fake { dir: &dir, url: &url, lingers: true, breaks_when: None, tally: None }
+                .write(),
+            data_dir: dir.clone(),
+            port_file: dir.join("port.txt"),
+        };
+        let tuning = quick(Tuning::default());
+
+        let first = start_sidecar(&paths, 0, tuning.budget).expect("the stand-in backend came up");
+        assert_eq!(first.url, url, "the announced URL is what the shell adopted");
+        let first_pid = first.child.id();
+
+        let state = Arc::new(Sidecar {
+            backend: Mutex::new(Some(first)),
+            stopping: AtomicBool::new(false),
+        });
+        let (seen, watcher) = watch(&state, &paths, tuning);
+
+        // Kill it the way a crash would.
+        state.backend.lock().unwrap().as_mut().unwrap().child.kill().expect("kill the backend");
+
+        let notes = wait_for(&seen, "restarted", Duration::from_secs(30));
+        assert_eq!(notes, vec![format!("restarted {url}")], "one restart, on the same origin");
+
+        {
+            let mut guard = state.backend.lock().unwrap();
+            let fresh = guard.as_mut().expect("the supervisor put a backend back");
+            assert_ne!(fresh.child.id(), first_pid, "the replacement cannot be the dead process");
+            assert_eq!(look(fresh), Health::Serving);
+        }
+
+        let crash = std::fs::read_to_string(dir.join("backend-crash.txt"))
+            .expect("a crash report was written before the replacement");
+        assert!(
+            crash.contains("fake backend speaking"),
+            "the dead backend's own words did not survive the restart: {crash}"
+        );
+
+        stop(&state, watcher);
+        drop(listener);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A backend that comes up and dies, over and over, is not restarted forever.
+    #[test]
+    fn a_flapping_backend_burns_the_fuse_and_the_app_says_so() {
+        let dir = scratch("flap");
+        let listener = TcpListener::bind("127.0.0.1:0").expect("a port to pretend on");
+        let url = format!("http://127.0.0.1:{}", listener.local_addr().unwrap().port());
+        let tally = dir.join("runs.txt");
+        let paths = Paths {
+            exe: Fake {
+                dir: &dir,
+                url: &url,
+                lingers: false,
+                breaks_when: None,
+                tally: Some(&tally),
+            }
+            .write(),
+            data_dir: dir.clone(),
+            port_file: dir.join("port.txt"),
+        };
+        let tuning = quick(Tuning { max_in_window: 3, ..Tuning::default() });
+
+        let first = start_sidecar(&paths, 0, tuning.budget).expect("it starts — it just does not stay");
+        let state = Arc::new(Sidecar {
+            backend: Mutex::new(Some(first)),
+            stopping: AtomicBool::new(false),
+        });
+        let (seen, watcher) = watch(&state, &paths, tuning);
+
+        let notes = wait_for(&seen, "gave up", Duration::from_secs(60));
+        let verdict = notes.last().unwrap();
+        assert!(verdict.contains("Close Chimera and open it again"), "{verdict}");
+        assert!(verdict.contains("backend-crash.txt"), "the verdict names no file: {verdict}");
+
+        // Counted from the stand-in's own tally rather than from the supervisor's account of
+        // itself: the fuse is only real if the number of PROCESSES stops growing.
+        let runs = std::fs::read_to_string(&tally).unwrap().lines().count();
+        assert_eq!(
+            runs,
+            1 + tuning.max_in_window,
+            "the shell started one and the fuse allowed {} more",
+            tuning.max_in_window
+        );
+
+        stop(&state, watcher);
+        drop(listener);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A backend that cannot come up AT ALL is given up on, even though every attempt is slow.
+    ///
+    /// This is the case a sliding window alone never catches: each failure costs a whole start
+    /// budget, so the attempts never coexist inside the window and the app would respawn a
+    /// permanently broken backend for as long as it stayed open.
+    #[test]
+    fn a_backend_that_will_not_come_up_is_given_up_on() {
+        let dir = scratch("broken");
+        let broken = dir.join("broken.flag");
+        std::fs::write(&broken, "").expect("mark the backend broken");
+        let tally = dir.join("runs.txt");
+        let paths = Paths {
+            exe: Fake {
+                dir: &dir,
+                url: "http://127.0.0.1:1",
+                lingers: false,
+                breaks_when: Some(&broken),
+                tally: Some(&tally),
+            }
+            .write(),
+            data_dir: dir.clone(),
+            port_file: dir.join("port.txt"),
+        };
+        let tuning = quick(Tuning {
+            // Short, because here the budget is the cost: this is the one test that waits for a
+            // start to time out, three times over.
+            budget: Budget {
+                url: Duration::from_millis(400),
+                listen: Duration::from_millis(400),
+            },
+            max_consecutive_failures: 2,
+            ..Tuning::default()
+        });
+
+        // Start from a backend that is already dead rather than from a start that has to succeed:
+        // a stand-in that never comes up cannot provide the first one, and this test is about what
+        // happens after the first death anyway.
+        let state = Arc::new(Sidecar {
+            backend: Mutex::new(Some(backend_of(dead_process(), "http://127.0.0.1:1"))),
+            stopping: AtomicBool::new(false),
+        });
+        let (seen, watcher) = watch(&state, &paths, tuning);
+
+        let notes = wait_for(&seen, "gave up", Duration::from_secs(60));
+        assert!(
+            notes.iter().all(|n| n.starts_with("gave up")),
+            "nothing came back, so nothing should have been announced as restarted: {notes:?}"
+        );
+        assert!(
+            notes[0].contains("startup-failure.txt"),
+            "the verdict does not point at what the failed start left behind: {}",
+            notes[0]
+        );
+        let report = std::fs::read_to_string(dir.join("startup-failure.txt"))
+            .expect("a startup report from the last failed attempt");
+        assert!(
+            report.contains("fake backend speaking"),
+            "a failed RESTART lost the backend's own words: {report}"
+        );
+        let runs = std::fs::read_to_string(&tally).unwrap().lines().count();
+        assert_eq!(runs, tuning.max_consecutive_failures, "the fuse did not bound the attempts");
+
+        stop(&state, watcher);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_process_that_exited_reads_as_gone() {
+        let mut backend = backend_of(dead_process(), "http://127.0.0.1:1");
+        assert_eq!(look(&mut backend), Health::Exited);
+    }
+
+    #[test]
+    fn a_live_process_whose_port_answers_nothing_reads_as_silent() {
+        // A port that was bound and released: nothing listens there now and the process is alive —
+        // exactly the state a `try_wait`-only check calls healthy.
+        let port = TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
+        let mut backend = backend_of(lingering_process(), &format!("http://127.0.0.1:{port}"));
+        assert_eq!(look(&mut backend), Health::Silent);
+        let _ = backend.child.kill();
+    }
+
+    #[test]
+    fn a_live_process_with_a_listener_reads_as_serving() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://127.0.0.1:{}", listener.local_addr().unwrap().port());
+        let mut backend = backend_of(lingering_process(), &url);
+        assert_eq!(look(&mut backend), Health::Serving);
+        let _ = backend.child.kill();
+    }
+
+    #[test]
+    fn the_fuse_allows_a_burst_and_then_stops_it() {
+        let t0 = Instant::now();
+        let mut fuse = Fuse::new(&Tuning { max_in_window: 3, ..Tuning::default() });
+        for i in 0..3 {
+            assert!(fuse.allows(t0 + Duration::from_secs(i)), "restart {i} should be allowed");
+        }
+        assert!(!fuse.allows(t0 + Duration::from_secs(4)), "the fourth is over budget");
+        // …and the budget is a WINDOW, not a lifetime cap: a crash an hour later is not the same
+        // event as a crash loop, and refusing it would strand a session that could recover.
+        assert!(fuse.allows(t0 + Duration::from_secs(200)));
+    }
+
+    #[test]
+    fn a_backend_that_never_starts_burns_the_fuse_even_when_each_attempt_is_slow() {
+        // Three attempts 75 seconds apart never coexist in a 120-second window, so the window alone
+        // would let this run forever. This is the second limit, and this is why it is there.
+        let t0 = Instant::now();
+        let mut fuse =
+            Fuse::new(&Tuning { max_consecutive_failures: 3, ..Tuning::default() });
+        for i in 0..3 {
+            assert!(fuse.allows(t0 + Duration::from_secs(i * 75)), "attempt {i}");
+            fuse.attempt_ended(false);
+        }
+        assert!(!fuse.allows(t0 + Duration::from_secs(225)));
+    }
+
+    #[test]
+    fn a_start_that_worked_clears_the_run_of_failures() {
+        let t0 = Instant::now();
+        let mut fuse = Fuse::new(&Tuning { max_consecutive_failures: 2, ..Tuning::default() });
+        assert!(fuse.allows(t0));
+        fuse.attempt_ended(false);
+        assert!(fuse.allows(t0 + Duration::from_secs(1)));
+        fuse.attempt_ended(true); // it came up this time
+        assert!(
+            fuse.allows(t0 + Duration::from_secs(2)),
+            "a backend that recovered once is not a backend that cannot start"
+        );
+    }
+
+    /// A source-level assertion, for the same reason as `the_sidecar_actually_pipes_its_stderr`:
+    /// `main`'s setup closure cannot run without a `tauri::App`.
+    ///
+    /// It guards the one regression the tests above cannot see — a supervisor that is written,
+    /// tested, and never started. This file already carries the lesson in another form: a guard
+    /// outside the flow guards nothing.
+    ///
+    /// `rsplit_once`, and I learned why the way the test above says you learn it. The first version
+    /// searched forward from the first `fn main()` in the file — which is the string literal two
+    /// lines below — so the window contained its own answer and stayed GREEN with the supervisor
+    /// call deleted. The real definitions are the LAST occurrence of each name in this file.
+    #[test]
+    fn the_app_starts_the_supervisor_and_shuts_it_down() {
+        let source = include_str!("main.rs");
+        let main_body = source.rsplit_once("fn main()").expect("main exists").1;
+        assert!(
+            main_body.contains("supervise("),
+            "the supervisor is never started — a backend that dies stays dead"
+        );
+        let kill = source.rsplit_once("fn kill_sidecar").expect("kill_sidecar exists").1;
+        let kill = kill.split_once("\nfn ").map_or(kill, |(head, _)| head);
+        assert!(
+            kill.contains("stopping.store(true"),
+            "quitting no longer tells the supervisor to stop — it can respawn a backend that then \
+             outlives the window"
+        );
+    }
 }
 
 fn kill_sidecar(app: &tauri::AppHandle) {
-    if let Some(state) = app.try_state::<Sidecar>() {
-        if let Ok(mut guard) = state.0.lock() {
-            if let Some(mut child) = guard.take() {
-                let _ = child.kill();
+    if let Some(state) = app.try_state::<Arc<Sidecar>>() {
+        // Set BEFORE the child is taken. The supervisor reads this flag under the same lock, so a
+        // restart already in flight kills its own replacement instead of orphaning it — see
+        // `Sidecar`. Storing it after the take would leave exactly that race open.
+        state.stopping.store(true, Ordering::SeqCst);
+        if let Ok(mut guard) = state.backend.lock() {
+            if let Some(mut backend) = guard.take() {
+                let _ = backend.child.kill();
             }
         }
     }
@@ -454,7 +1287,6 @@ async fn check_for_update(app: tauri::AppHandle) -> Result<(), Box<dyn std::erro
 
 fn main() {
     tauri::Builder::default()
-        .manage(Sidecar(Mutex::new(None)))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
@@ -465,7 +1297,11 @@ fn main() {
             // a stderr that does not exist. Clicking the icon did nothing at all: no window, no
             // console, no file. "Nothing happens" is the least diagnosable failure a desktop app can
             // have, and it was ours on the platform this project is developed on.
-            let (child, url) = match start_sidecar(app) {
+            let started = resolve_paths(app).and_then(|paths| {
+                let wanted = remembered_port(&memo_path(&paths.data_dir));
+                start_sidecar(&paths, wanted, Budget::default()).map(|backend| (paths, backend))
+            });
+            let (paths, backend) = match started {
                 Ok(pair) => pair,
                 Err(why) => {
                     // Blocking, so the process cannot exit before the user has read it.
@@ -477,7 +1313,12 @@ fn main() {
                     return Err(Box::<dyn std::error::Error>::from(why));
                 }
             };
-            app.state::<Sidecar>().0.lock().unwrap().replace(child);
+            let url = backend.url.clone();
+            let sidecar = Arc::new(Sidecar {
+                backend: Mutex::new(Some(backend)),
+                stopping: AtomicBool::new(false),
+            });
+            app.manage(Arc::clone(&sidecar));
 
             WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url.parse()?))
                 .title("Chimera")
@@ -499,6 +1340,45 @@ fn main() {
                 }
             })
             .build(app)?;
+
+            // Watch the backend for the rest of the session, on its own thread.
+            //
+            // A thread rather than the async runtime: the loop sleeps, blocks on a TCP connect and
+            // can block for a whole start budget, none of which belongs on an executor shared with
+            // the update check.
+            let supervisor = app.handle().clone();
+            let watched = paths.clone();
+            let mut showing = url.clone();
+            std::thread::spawn(move || {
+                supervise(sidecar, watched, Tuning::default(), move |event| match event {
+                    Supervised::Restarted(fresh) => {
+                        // Same origin is the normal case and needs nothing: the page is still
+                        // loaded, and its next poll simply succeeds. A DIFFERENT origin means the
+                        // backend could not have its old port back, and the loaded page is now
+                        // talking to nothing — so move the window, which costs a reload and the
+                        // per-origin `localStorage` behind it, and is still the only way back.
+                        if fresh != showing {
+                            if let (Some(window), Ok(target)) =
+                                (supervisor.get_webview_window("main"), fresh.parse::<tauri::Url>())
+                            {
+                                let _ = window.navigate(target);
+                            }
+                            showing = fresh;
+                        }
+                    }
+                    Supervised::GaveUp(why) => {
+                        // The screen says the backend is down on its own (it polls `/api/doctor`),
+                        // but only this side knows that nothing more will be tried. Blocking is safe
+                        // here for the same reason as in the updater: this is not the main thread.
+                        supervisor
+                            .dialog()
+                            .message(&why)
+                            .title("Chimera's backend stopped")
+                            .buttons(MessageDialogButtons::Ok)
+                            .blocking_show();
+                    }
+                });
+            });
 
             // Fire-and-forget update check. Any error (offline, no update, verification failure) is
             // swallowed — the check must never nag or crash. The pip/web "update signal" is separate
