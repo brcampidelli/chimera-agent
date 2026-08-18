@@ -27,6 +27,7 @@ import {
 } from "@/components/code/Attachments";
 import { BatchProposal } from "@/components/code/BatchProposal";
 import { DiffView } from "@/components/code/DiffView";
+import { SpendCeiling } from "@/components/code/SpendCeiling";
 import { decompose } from "@/lib/decompose";
 import {
   exchangeToMarkdown,
@@ -383,6 +384,11 @@ export function Conversation({
 
   const [proposal, setProposal] = useState<string[] | null>(null);
   const [fuse, setFuse] = useState(false);
+  /** A dollar ceiling for each turn of this conversation, or null for none (the default, and the
+   *  behaviour every earlier build had). Session-local like `provider` rather than persisted: a
+   *  standing spend limit is a different promise from "cap this piece of work", and a ceiling that
+   *  quietly stayed on from last week would stop a turn for a reason nobody remembers choosing. */
+  const [maxUsd, setMaxUsd] = useState<number | null>(null);
   const [attached, setAttached] = useState<Attachment[]>([]);
   // Same upload path the paperclip uses — see `useAttachmentUpload`. The button keeps its own
   // instance for its own spinner; what must not fork is how a file gets uploaded and how a failure
@@ -543,6 +549,10 @@ export function Conversation({
         // See CONTEXT_BUDGET. Sent on every turn because the agent is rebuilt per turn from this
         // request — a budget sent once is a budget that applied once.
         context_budget: CONTEXT_BUDGET,
+        // Same reason, and omitted rather than sent null when nothing is armed: the server refuses
+        // a non-positive ceiling, so the only two things this field may ever carry are a real
+        // ceiling and nothing at all.
+        ...(maxUsd === null ? {} : { max_usd: maxUsd }),
         posture,
         profile,
         fuse,
@@ -582,7 +592,15 @@ export function Conversation({
           // The streamed tokens and the final answer are the same text; prefer the final one, which
           // is complete even when the backend never streamed (a non-streaming model, `stream:false`).
           patchLast((e) => ({ ...e, answer: done.answer || e.answer, done }));
-          publish({ status: "done", busy: false, report: done });
+          // The ceiling rides with the receipt because the bar cannot read it anywhere else: the
+          // `done` frame reports what this turn SPENT, and a denominator is a property of what was
+          // ASKED for, which only the request knows.
+          //
+          // It is the ceiling this turn actually ran under, not whatever the box says by the time
+          // it finishes: `send` closes over this render's `maxUsd`, so the request above and this
+          // line read one value that cannot change under either of them. (The control is disabled
+          // while the turn runs as well, which is belt and braces rather than the mechanism.)
+          publish({ status: "done", busy: false, report: { ...done, max_usd: maxUsd } });
           setBusy(false);
           if (notifyOnFinish) {
             void notifyTurnFinished(t("code.chat.notify.title"), message.slice(0, 120));
@@ -927,6 +945,10 @@ export function Conversation({
           >
             <Network className="h-4 w-4" /> {t("composer.fuse")}
           </Button>
+          {/* What this turn may COST, next to what it may DO. Both are per-turn choices, and this
+              one is the only limit in the app that can end a turn on its own — so it belongs where
+              the decision is made rather than in a settings screen visited once. */}
+          <SpendCeiling onChange={setMaxUsd} disabled={busy} />
           {busy ? (
             <Button size="sm" variant="outline" onClick={abandon}>
               <Square className="h-4 w-4" /> {t("code.chat.stop")}

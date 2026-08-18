@@ -1924,6 +1924,8 @@ export interface components {
             max_attempts: number;
             /** Max Steps */
             max_steps?: number | null;
+            /** Max Usd */
+            max_usd?: number | null;
             /**
              * Max Workers
              * @default 4
@@ -2350,6 +2352,8 @@ export interface components {
             fuse: boolean;
             /** Max Steps */
             max_steps?: number | null;
+            /** Max Usd */
+            max_usd?: number | null;
             /** Message */
             message: string;
             /** Model */
@@ -3718,6 +3722,8 @@ export interface components {
             max_attempts: number;
             /** Max Steps */
             max_steps?: number | null;
+            /** Max Usd */
+            max_usd?: number | null;
             /** Model */
             model?: string | null;
             /**
