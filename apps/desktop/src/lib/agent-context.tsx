@@ -23,6 +23,13 @@ export interface AgentReport {
   prompt_tokens: number;
   completion_tokens: number;
   usd: number | null;
+  /** The dollar ceiling this turn ran under, or absent when it ran uncapped.
+   *
+   *  Comes from the request rather than the `done` frame, because it is a property of what was
+   *  ASKED for: a turn that answered in one cheap step and a turn that stopped on the cap report the
+   *  same spend, and the number the bar needs is the one the turn was launched with. Absent, not
+   *  zero — "no ceiling" and "a ceiling of nothing" are opposite claims. */
+  max_usd?: number | null;
   /** Optional because the two surfaces measure different things, and an absent number is not zero:
    *  rendering "0 facts recalled" for a surface that never looked is a measurement nobody took. */
   cache_read_tokens?: number;

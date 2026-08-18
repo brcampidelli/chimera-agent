@@ -104,6 +104,25 @@ class CodeSeams(BaseModel):
     terminal. This pairs with ``max_steps`` and should usually move with it — raising the step
     ceiling without a budget raises the chance of dying on overflow instead of finishing."""
 
+    max_usd: float | None = Field(default=None, gt=0)
+    """Dollar ceiling for the model calls of ONE loop. None (the default) = no cap, as before.
+
+    The mechanism has existed since ``AgentConfig.max_usd`` and no route reached it, so the only
+    caller that could set a ceiling was the cron dispatcher. It is checked BEFORE each call, so the
+    money is never spent to discover it was over budget, and the partial answer survives the stop —
+    see :class:`~chimera.orchestration.budget.SpendBudget`.
+
+    ``gt=0`` because zero is the one value that would lie in the dangerous direction:
+    :class:`~chimera.core.agent.AgentConfig` reads this field for truthiness, so ``0`` would read as
+    "spend nothing" and mean "spend anything", and a negative would reach ``SpendBudget`` and raise
+    from inside a streaming response, where the client sees a broken stream rather than a bad field.
+
+    On ``/api/runs`` this bounds an ATTEMPT, not the run: ``AutonomousAgent`` calls the worker once
+    per attempt and each call builds a fresh budget, so a $1 ceiling with ``max_attempts=3`` can
+    spend $3. Stated here because the field name does not say it, and it is not divided by the
+    attempt count on the way in — that would invent arithmetic nobody asked for and make the same
+    number mean different money on the two endpoints."""
+
     repo_map: bool = False
     """Prepend a bounded structural digest of the repository, ranked by importance, so the agent can
     aim at the right file instead of exploring blind (mirrors ``chimera solve --repo-map``)."""
@@ -469,6 +488,10 @@ def register_code_api(
                 system_prompt=system_prompt,
                 max_steps=steps,
                 context_budget=req.context_budget,
+                # A conversational turn is exactly one loop, so the ceiling and the turn's bill are
+                # the same number — the one surface where the cap means what its name says without
+                # a footnote about attempts.
+                max_usd=req.max_usd,
                 project_root=ws,
                 # Read per turn, so editing the identity applies to the next question rather than
                 # to the next launch.

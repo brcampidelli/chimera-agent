@@ -588,6 +588,10 @@ export interface RunRequestInput {
   // Who chose `profile`: "user" or "system". The screen stopped asking, so the app sends a default;
   // the receipt must not record that default as a decision somebody made.
   profile_source?: string;
+  /** Dollar ceiling per ATTEMPT, not per run: the worker is called once per attempt and each call
+   *  gets a fresh allowance, so this times `max_attempts` is what a run can cost. Named that way on
+   *  the server too (`CodeSeams.max_usd`), because the field name alone does not say it. */
+  max_usd?: number | null;
 }
 
 /** Preview a plan for a task: runs ONLY the planner (a single model call) — NO edits, NO tools, no
@@ -722,6 +726,12 @@ export interface CodeTurnInput {
   open_file?: string | null;
   max_steps?: number | null;
   context_budget?: number | null;
+  /** Dollar ceiling for this turn. The loop refuses the call that would cross it, BEFORE making it,
+   *  and keeps what it already has. Omit for no ceiling — the behaviour every earlier client had.
+   *
+   *  Sent per turn, like `context_budget`: the agent is rebuilt from this request each time, so a
+   *  ceiling sent once is a ceiling that applied once. */
+  max_usd?: number | null;
   repo_map?: boolean;
   explorer?: boolean;
   posture?: { reach: Reach; approval: Approval } | null;

@@ -299,6 +299,18 @@
             ],
             "title": "Max Steps"
           },
+          "max_usd": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Usd"
+          },
           "max_workers": {
             "default": 4,
             "title": "Max Workers",
@@ -1240,6 +1252,18 @@
               }
             ],
             "title": "Max Steps"
+          },
+          "max_usd": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Usd"
           },
           "message": {
             "title": "Message",
@@ -4535,6 +4559,18 @@
               }
             ],
             "title": "Max Steps"
+          },
+          "max_usd": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Usd"
           },
           "model": {
             "anyOf": [

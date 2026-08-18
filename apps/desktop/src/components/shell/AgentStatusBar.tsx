@@ -85,9 +85,23 @@ export function AgentStatusBar({ onOpenUsage }: { onOpenUsage?: () => void }) {
               focusRing,
             )}
           >
+            {/* A ceiling is shown only beside a cost that is KNOWN. When the turn ran on a model
+                with no list price the numerator is unknown, and pairing an unknown with a
+                denominator invites reading it as small — the same reason `Usage.tsx` prints "—" for
+                an unpriced group instead of $0.0000. So the unavailable case keeps saying only
+                that, with no limit beside it.
+
+                Four decimals on BOTH sides, matching `SpendBudget.blocked()`: when the cap does
+                bite, the sentence in the answer and the number in this bar have to be the same
+                number, not two roundings of it. */}
             {report.usd === null || report.usd === undefined
               ? t("activity.costUnavailable")
-              : `~ $${report.usd.toFixed(4)}`}
+              : report.max_usd
+                ? t("activity.costOfCap", {
+                    spent: `$${report.usd.toFixed(4)}`,
+                    cap: `$${report.max_usd.toFixed(4)}`,
+                  })
+                : `~ $${report.usd.toFixed(4)}`}
           </button>
         </>
       )}

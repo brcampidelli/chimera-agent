@@ -738,6 +738,9 @@ def test_the_coding_seams_are_all_off_unless_asked(tmp_path: Any) -> None:
     agent = _solve_agent(tmp_path)
     assert agent.worker.config.max_steps == AgentConfig.max_steps
     assert agent.worker.config.context_budget is None  # compaction stays off unless asked for
+    # And no dollar ceiling, which is the one seam that can END a run: a limiter that switched
+    # itself on for callers who never asked for one is a regression shipped as a feature.
+    assert agent.worker.config.max_usd is None
     assert agent.repo_map is False
     assert "explore_repository" not in agent.worker.tools.names()
 
@@ -756,6 +759,55 @@ def test_context_budget_reaches_the_worker(tmp_path: Any) -> None:
     finishing, so the two fields have to be reachable together — not one without the other."""
     agent = _solve_agent(tmp_path, max_steps=40, context_budget=0.6)
     assert agent.worker.config.context_budget == 0.6
+
+
+def test_the_spend_ceiling_reaches_the_worker(tmp_path: Any) -> None:
+    """The loose wire this reconnects.
+
+    ``AgentConfig.max_usd`` has stopped a loop before the call that would break the cap since it was
+    written, and no HTTP route could set it — the cron dispatcher was its only caller in the whole
+    codebase. So the one surface where a person watches money being spent could not name a number,
+    and the mechanism read as absent rather than as unreachable.
+    """
+    assert _solve_agent(tmp_path, max_usd=0.25).worker.config.max_usd == 0.25
+
+
+def test_a_batch_task_carries_the_ceiling_its_batch_was_given(tmp_path: Any) -> None:
+    """A seam a batch accepts and drops is worse than one it refuses.
+
+    The caller reads back a capped batch and gets an uncapped one — per task, concurrently, which is
+    the shape that spends fastest. Every other seam already travels here (see
+    ``test_a_batch_task_is_governed_exactly_like_a_single_run``); this is the one that costs money.
+    """
+    from chimera.api import build_api_app
+    from chimera.api.app import RunRequest
+    from chimera.core.events import EventSink
+
+    ws = tmp_path / "plain"
+    ws.mkdir()
+    seen: list[float | None] = []
+
+    def factory(
+        req: RunRequest,
+        task_ws: Any,
+        on_event: EventSink,
+        _settings: Any,
+        _should_stop: Callable[[], bool] | None = None,
+    ) -> Any:
+        seen.append(req.max_usd)
+        return _WritingAgent(task_ws, on_event, "x.txt", req.task)
+
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    client = TestClient(
+        build_api_app(lambda: ChatSession(_FakeAgent()), settings=settings, solve_agent_factory=factory)
+    )
+
+    client.post(
+        "/api/agents",
+        json={"tasks": [{"task": "t"}], "workspace": str(ws), "max_usd": 0.5},
+    )
+
+    assert seen == [0.5]
 
 
 def test_run_state_carries_the_plan_across_a_compaction(tmp_path: Any) -> None:

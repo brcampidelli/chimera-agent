@@ -182,6 +182,66 @@ def test_the_run_endpoint_and_the_turn_endpoint_share_one_set_of_seams() -> None
     assert issubclass(RunRequest, CodeSeams) and issubclass(CodeTurnRequest, CodeSeams)
 
 
+def _configs(tmp_path: Path, monkeypatch: Any) -> tuple[TestClient, list[Any]]:
+    """The real endpoint with only ``Agent`` replaced, keeping every ``AgentConfig`` it was built with.
+
+    Asserting on the config rather than on a streamed frame is deliberate: a ceiling only exists if
+    it reaches the object that enforces it, and every observable effect of one — a stopped loop, a
+    partial answer — needs a real model call to appear.
+    """
+    import chimera.core
+    from chimera.core.agent import AgentConfig
+
+    seen: list[AgentConfig] = []
+    agent = _ScriptedAgent()
+
+    def build(*args: Any, **_kw: Any) -> Any:
+        seen.extend(a for a in args if isinstance(a, AgentConfig))
+        return agent
+
+    monkeypatch.setattr(chimera.core, "Agent", build, raising=True)
+    return _client(tmp_path, agent), seen
+
+
+def test_the_turns_spend_ceiling_reaches_the_agent(tmp_path: Path, monkeypatch: Any) -> None:
+    """A conversational turn is exactly one loop, so this cap is the turn's own bill.
+
+    It is also the only surface where the app can show consumption against the number: the status
+    bar reports the turn's cost, and until now it reported it with no denominator.
+    """
+    client, configs = _configs(tmp_path, monkeypatch)
+
+    client.post("/api/code/turn", json={"message": "read a.py", "max_usd": 0.25})
+
+    assert [c.max_usd for c in configs] == [0.25]
+
+
+def test_a_turn_that_names_no_ceiling_builds_no_budget(tmp_path: Path, monkeypatch: Any) -> None:
+    # The default has to be inert. Every client that predates the field must keep the turn it had,
+    # and a budget is a new way for a turn to END — the worst kind of surprise default.
+    client, configs = _configs(tmp_path, monkeypatch)
+
+    client.post("/api/code/turn", json={"message": "read a.py"})
+
+    assert [c.max_usd for c in configs] == [None]
+
+
+def test_a_ceiling_of_zero_is_refused_rather_than_read_as_unlimited(
+    tmp_path: Path, patched: Any
+) -> None:
+    """Zero is the one value that would fail in the direction nobody checks.
+
+    ``AgentConfig.max_usd`` is read for truthiness, so ``0`` would build no budget at all: the
+    request says "spend nothing", the run hears "spend anything", and nothing anywhere disagrees. A
+    negative reaches ``SpendBudget``, which raises — from inside a streaming response, where the
+    client sees a broken stream rather than a bad field.
+    """
+    client = _client(tmp_path, patched)
+
+    assert client.post("/api/code/turn", json={"message": "hi", "max_usd": 0}).status_code == 422
+    assert client.post("/api/code/turn", json={"message": "hi", "max_usd": -1}).status_code == 422
+
+
 # --- What the turn WROTE gets a verdict, and a failing one offers an undo ---------------------
 #
 # This is the pair that made one button honest. Send used to edit your workspace and keep whatever
