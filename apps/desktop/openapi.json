@@ -901,6 +901,18 @@
         "title": "Body_upload_attachment_api_attachments_post",
         "type": "object"
       },
+      "BrowserCfgOut": {
+        "description": "Whether the agent's Chromium runs where you can see it.\n\nThe switch has been wired since the browser tool shipped and had no control anywhere, so the only\nway to watch a page the agent was driving was to edit ``.env`` and restart \u2014 which is the same as\nnot being able to watch it, for anyone who did not read the source.",
+        "properties": {
+          "headless": {
+            "default": true,
+            "title": "Headless",
+            "type": "boolean"
+          }
+        },
+        "title": "BrowserCfgOut",
+        "type": "object"
+      },
       "CacheCfgOut": {
         "properties": {
           "completion": {
@@ -1439,6 +1451,9 @@
           "autonomy": {
             "$ref": "#/components/schemas/AutonomyCfgOut"
           },
+          "browser": {
+            "$ref": "#/components/schemas/BrowserCfgOut"
+          },
           "cache": {
             "$ref": "#/components/schemas/CacheCfgOut"
           },
@@ -1453,6 +1468,13 @@
           },
           "models": {
             "$ref": "#/components/schemas/ModelsCfgOut"
+          },
+          "pinned": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Pinned",
+            "type": "array"
           },
           "pools": {
             "items": {
@@ -3546,6 +3568,44 @@
           "id"
         ],
         "title": "NewSessionOut",
+        "type": "object"
+      },
+      "OllamaModelsOut": {
+        "description": "What the configured Ollama has pulled, so a model field stops being a memory test.\n\n``reachable`` is a separate field from an empty ``models`` on purpose, and it is the whole point\nof this response. A picker rendered from an empty list says *you have no models*; that is a claim\nabout the user's machine, and when nothing answered the door we have no basis for it. Reachable\nwith nothing pulled and unreachable are two states with opposite remedies, so the client is given\nboth and can say which one it is.",
+        "properties": {
+          "base_url": {
+            "title": "Base Url",
+            "type": "string"
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "reachable": {
+            "title": "Reachable",
+            "type": "boolean"
+          },
+          "reason": {
+            "default": "",
+            "enum": [
+              "",
+              "no_url",
+              "unreachable",
+              "http_error",
+              "not_ollama"
+            ],
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "base_url",
+          "reachable"
+        ],
+        "title": "OllamaModelsOut",
         "type": "object"
       },
       "PausedRunOut": {
@@ -7803,6 +7863,25 @@
           }
         },
         "summary": "Messaging Stop"
+      }
+    },
+    "/api/models/ollama": {
+      "get": {
+        "description": "The model tags this machine's Ollama has pulled.\n\nIts own endpoint rather than a field on ``/api/doctor``, for the reason\n``editor_capabilities`` states about the completion model: doctor is fetched by several\nscreens, and putting a network round-trip to a possibly-absent server behind it would make\nevery one of them wait on a machine that may simply be asleep.\n\n``live_settings()`` and not the launch photograph: the URL this asks is edited one row above\nthe picker on the same screen, so a picker built from the boot-time value would answer about\nthe previous server the first time someone points it at a new one.",
+        "operationId": "ollama_models_endpoint_api_models_ollama_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OllamaModelsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Ollama Models Endpoint"
       }
     },
     "/api/plan": {

@@ -12,7 +12,7 @@ contract check with no change to the handler bodies.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -308,11 +308,23 @@ class GuardCfgOut(BaseModel):
     chat: bool
 
 
+class BrowserCfgOut(BaseModel):
+    """Whether the agent's Chromium runs where you can see it.
+
+    The switch has been wired since the browser tool shipped and had no control anywhere, so the only
+    way to watch a page the agent was driving was to edit ``.env`` and restart — which is the same as
+    not being able to watch it, for anyone who did not read the source.
+    """
+
+    headless: bool = True
+
+
 class ConfigOut(BaseModel):
     models: ModelsCfgOut
     memory: MemoryCfgOut
     cache: CacheCfgOut
     sandbox: SandboxCfgOut
+    browser: BrowserCfgOut = Field(default_factory=BrowserCfgOut)
     autonomy: AutonomyCfgOut
     server: ServerCfgOut
     mcp: McpCfgOut
@@ -328,6 +340,18 @@ class ConfigOut(BaseModel):
     Only the exceptions are listed; a key absent here applies to the next call. The screen reads
     this instead of carrying its own list, so a control can never quietly outlive the reason it was
     labelled — see ``chimera.api.config_api.APPLIES_WHEN``."""
+
+    pinned: list[str] = Field(default_factory=list)
+    """Env-var names this deployment inherited from its environment rather than from ``.env``.
+
+    A save for one of these writes the file, reports success, holds for the session — and is
+    overridden again at the next launch, because a real environment variable outranks ``.env``. That
+    is the one failure mode a settings screen cannot recover from on its own, since nothing about it
+    is visible until days later, so the server names the keys and the screen says so on the row.
+
+    Empty on an ordinary desktop install, which is the point: this is a container/systemd/remote
+    concern, and it becomes reachable precisely because the app can be pointed at a server somebody
+    else deployed (``apps/desktop/src/lib/server.ts``)."""
 
 
 class AgentIdentityOut(BaseModel):
@@ -435,6 +459,28 @@ class AcceptanceOut(BaseModel):
     rate: float | None
     mean_ms: int | None
     note: str
+
+
+class OllamaModelsOut(BaseModel):
+    """What the configured Ollama has pulled, so a model field stops being a memory test.
+
+    ``reachable`` is a separate field from an empty ``models`` on purpose, and it is the whole point
+    of this response. A picker rendered from an empty list says *you have no models*; that is a claim
+    about the user's machine, and when nothing answered the door we have no basis for it. Reachable
+    with nothing pulled and unreachable are two states with opposite remedies, so the client is given
+    both and can say which one it is.
+    """
+
+    #: The URL that was asked, so the client names the same address the user typed rather than a
+    #: default it assumed.
+    base_url: str
+    reachable: bool
+    #: Tags as Ollama spells them (``llama3:latest``); prefix with ``ollama/`` for a model slug.
+    models: list[str] = Field(default_factory=list)
+    #: Why no list came back, as a token the client translates — never a sentence. Same shape and
+    #: same reason as ``PostureFacts``: this app ships ten languages, and English prose from the
+    #: server would leave the line that explains an unavailable feature untranslated.
+    reason: Literal["", "no_url", "unreachable", "http_error", "not_ollama"] = ""
 
 
 class ExecCancelOut(BaseModel):

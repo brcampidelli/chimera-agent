@@ -9,6 +9,9 @@ vi.mock("@/lib/api", () => ({
   getDoctor: vi.fn(),
   getInstructions: vi.fn(),
   getMessaging: vi.fn(),
+  // Answers, rather than being left undefined: the Ollama picker asks on mount, and an unresolved
+  // query would put every test here through a rejected promise for a control none of them is about.
+  getOllamaModels: vi.fn(async () => ({ base_url: "", reachable: false, models: [], reason: "no_url" })),
   patchConfig: vi.fn(),
   putInstructions: vi.fn(),
   startMessaging: vi.fn(),
@@ -51,12 +54,16 @@ const CONFIG = {
   automation: { cron: true },
   guard: { chat: false },
   providers: [],
+  // Mirrors `config_api.APPLIES_WHEN`. It has to: these tests assert that the screen renders exactly
+  // what the server declares, and a fixture that has drifted from the declaration would keep passing
+  // while the real screen said something else.
   applies: {
     CHIMERA_APP_CRON: "next_launch",
     CHIMERA_MCP_AUTOLOAD: "next_launch",
     CHIMERA_CASCADE: "next_conversation",
     CHIMERA_GUARD_CHAT: "next_conversation",
     CHIMERA_CHAT_MEMORY: "next_conversation",
+    CHIMERA_BROWSER_HEADLESS: "next_conversation",
   },
 };
 
@@ -88,15 +95,16 @@ describe("Settings — when a saved change starts applying", () => {
   it("says so on the ones that take effect on the next conversation", async () => {
     renderWithProviders(<Settings />);
     const notes = await screen.findAllByText(/applies to your next conversation/i);
-    expect(notes).toHaveLength(3); // cascade + guard the chat + remember from chat
+    // cascade + guard the chat + remember from chat + show the browser window
+    expect(notes).toHaveLength(4);
   });
 
   it("stays silent on everything that applies to the next call", async () => {
-    // The screen has ~17 controls; only five carry a caveat. If this ever counts more, something
+    // The screen has ~18 controls; only six carry a caveat. If this ever counts more, something
     // grew a delay without anyone declaring it — or a label outlived its reason.
     renderWithProviders(<Settings />);
     await screen.findAllByText(/applies the next time you start the app/i);
-    expect(screen.queryAllByText(/^saved —/i)).toHaveLength(5);
+    expect(screen.queryAllByText(/^saved —/i)).toHaveLength(6);
   });
 
   it("shows nothing when the server declares no exceptions at all", async () => {

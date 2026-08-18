@@ -18,7 +18,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from chimera.config import Settings, get_settings
+from chimera.config import Settings, get_settings, pinned_by_environment
 from chimera.providers.catalog import PROVIDERS
 
 # Credential env-vars (secret) and the non-secret settings the UI may edit. Anything outside this set
@@ -71,6 +71,11 @@ _EDITABLE_SETTINGS = {
     "CHIMERA_GUARD_CHAT",  # assemble the chat agent with the coding turn's denylist + taint ledger
     "CHIMERA_SANDBOX",
     "CHIMERA_SANDBOX_IMAGE",
+    # Watch the page the agent is on. The setting was written, wired and reachable only by editing
+    # `.env`: `default_registry` has always passed `settings.browser_headless` to the browser tool,
+    # and `PATCH /api/config` has always refused the key. So the one way to see what the agent is
+    # doing on a web page was a file the app never mentions.
+    "CHIMERA_BROWSER_HEADLESS",
     "CHIMERA_MCP_AUTOLOAD",
     # The learn-to-use wire. Off by default, which means the agent writes skills and never reads one
     # back — the promise of the product with the switch missing from the product.
@@ -118,6 +123,11 @@ APPLIES_WHEN: dict[str, str] = {
     "CHIMERA_CASCADE": NEXT_CONVERSATION,
     "CHIMERA_GUARD_CHAT": NEXT_CONVERSATION,
     "CHIMERA_CHAT_MEMORY": NEXT_CONVERSATION,
+    # Read once, when `default_registry` constructs the browser tool — and the tool then keeps the
+    # Chromium it launched for as long as it lives. Re-reading the value could not pull a window
+    # onto the screen of a browser that is already running headless, so the honest answer is the
+    # next conversation, which is when a fresh registry (and a fresh browser) is built.
+    "CHIMERA_BROWSER_HEADLESS": NEXT_CONVERSATION,
     # These start something at boot — a daemon thread and a set of MCP subprocesses. Re-reading the
     # value would not undo that, so the honest answer is the relaunch, not a re-read.
     "CHIMERA_APP_CRON": NEXT_LAUNCH,
@@ -244,6 +254,7 @@ def read_config(settings: Settings) -> dict[str, Any]:
             }
         )
     ladder = settings.tier_ladder()
+    pools = read_pools(settings)
     return {
         "models": {
             "default": settings.default_model,
@@ -268,6 +279,7 @@ def read_config(settings: Settings) -> dict[str, Any]:
         },
         "cache": {"completion": settings.cache, "prompt": settings.prompt_cache},
         "sandbox": {"mode": settings.sandbox, "image": settings.sandbox_image},
+        "browser": {"headless": settings.browser_headless},
         "autonomy": {
             "reach": settings.reach,
             "approval": settings.approval,
@@ -281,9 +293,16 @@ def read_config(settings: Settings) -> dict[str, Any]:
         "mcp": {"autoload": settings.mcp_autoload},
         "automation": {"cron": settings.app_cron},
         "providers": providers,
-        "pools": read_pools(settings),
+        "pools": pools,
         # Keys absent here apply to the next call; see APPLIES_WHEN.
         "applies": dict(APPLIES_WHEN),
+        # Which of those keys this deployment's environment pins — see `pinned_by_environment`.
+        # Every writable key is offered, secrets included: an `OPENROUTER_API_KEY` exported by the
+        # unit file reverts a key pasted here exactly the same way a `CHIMERA_REACH` does, and it is
+        # the one this screen is least likely to be believed about. The pool variables are in the
+        # set for the same reason and are NOT in `ALLOWED_KEYS`: they are written by the pool
+        # endpoints rather than by `patch_config`, through the same `.env` and with the same fate.
+        "pinned": pinned_by_environment(ALLOWED_KEYS | {str(p["env"]) for p in pools}),
     }
 
 
