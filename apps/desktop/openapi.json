@@ -132,6 +132,10 @@
             "title": "Diffs",
             "type": "array"
           },
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
           "index": {
             "title": "Index",
             "type": "integer"
@@ -156,7 +160,8 @@
           "attempts",
           "reverted",
           "changed_paths",
-          "diffs"
+          "diffs",
+          "error"
         ],
         "title": "AgentResultOut",
         "type": "object"

@@ -424,6 +424,80 @@ def test_post_agents_non_git_repo_sets_is_repo_false(tmp_path: Any) -> None:
     assert (ws / "x.txt").read_text(encoding="utf-8") == "t"  # the edit happened in-place
 
 
+def test_post_agents_a_hung_task_does_not_hold_the_batch(tmp_path: Any) -> None:
+    """A task that stops making progress must not pin the stream open — and must SAY that is why.
+
+    This endpoint is the one surface with nobody at a terminal. Before the batch had a deadline, a
+    worker that never returned held `run_isolated` forever: the client sat on an SSE stream that
+    would never end, and the `finally` that pops `_agents_cancels[batch_id]` never ran, so the
+    batch's cancel Events leaked for the life of the process. Both are asserted below, because
+    "the response came back" alone would still pass if the registry leaked.
+
+    The stub blocks for 15s and then reports SUCCESS rather than blocking forever. That is
+    deliberate: a unit that truly never returns turns a regression here into a hung test suite, and
+    a hang is the one failure that does not read as a failure. Reporting success on the far side
+    means an unbounded batch comes back *wrong* (a pass, no error) instead of not coming back.
+    """
+    import threading as _threading
+
+    from chimera.api import app as app_module
+    from chimera.api import build_api_app
+    from chimera.api.app import RunRequest
+    from chimera.core.events import EventSink
+
+    ws = tmp_path / "ws"
+    _init_repo(ws)
+    release = _threading.Event()
+
+    class _HungAgent:
+        def run(self, task: str) -> Any:
+            from chimera.core.autonomous import Attempt, AutonomousResult
+
+            release.wait(15.0)
+            return AutonomousResult(
+                answer="late",
+                success=True,
+                attempts=[
+                    Attempt(
+                        index=0, answer="late", approved=True, verified=True, reverted=False, success=True
+                    )
+                ],
+            )
+
+    def factory(
+        _req: RunRequest,
+        _ws: Any,
+        _on_event: EventSink,
+        _settings: Any,
+        _should_stop: Callable[[], bool] | None = None,
+    ) -> Any:
+        return _HungAgent()
+
+    # 1s via the INJECTED settings — an app built with its own Settings must run under those, which
+    # is only true because the endpoint reads the deadline from live_settings() instead of leaving
+    # run_isolated to fall back on the process-wide value.
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"), CHIMERA_BATCH_TIMEOUT=1.0)
+    client = TestClient(
+        build_api_app(lambda: ChatSession(_FakeAgent()), settings=settings, solve_agent_factory=factory)
+    )
+    try:
+        resp = client.post("/api/agents", json={"tasks": [{"task": "hangs"}], "workspace": str(ws)})
+    finally:
+        release.set()  # let the abandoned worker finish instead of parking a thread for 15s
+
+    assert resp.status_code == 200
+    events = _read_sse(resp.text)
+    assert [e for e, _ in events][-1] == "batch_done"  # the stream ENDED, on the batch's own terms
+    only = next(d for e, d in events if e == "batch_done")["results"][0]
+    assert only["success"] is False
+    # The reason is named. A timeout that arrives as a bare `success: false` is indistinguishable
+    # from a task that ran and did not pass, which is the lie this field exists to stop.
+    assert only["error"].startswith("timed out after"), only["error"]
+    assert only["attempts"] == 0 and only["changed_paths"] == [] and only["diffs"] == []
+    batch_id = next(d for e, d in events if e == "batch")["batch_id"]
+    assert batch_id not in app_module._agents_cancels  # the finally ran: nothing leaked
+
+
 def test_post_agents_emits_batch_id_frame_and_leaves_no_cancel_path_untouched(tmp_path: Any) -> None:
     """The batch stream leads with a `batch` frame carrying its id (the cancel handle), and the DEFAULT
     path — no cancel requested — still streams exactly as before: start → tagged events → batch_done,
