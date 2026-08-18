@@ -50,7 +50,7 @@ if TYPE_CHECKING:
         fence,
         ledger_registry,
     )
-    from chimera.governance.policy import Decision, Rule, RuleSet, Verdict
+    from chimera.governance.policy import Decision, Rule, RuleSet, Scope, Verdict
     from chimera.governance.precedent import PrecedentStore
     from chimera.governance.quarantine import (
         QuarantinedReader,
@@ -106,6 +106,7 @@ _LAZY: dict[str, tuple[str, str]] = {
     "Decision": ("policy", "Decision"),
     "Rule": ("policy", "Rule"),
     "RuleSet": ("policy", "RuleSet"),
+    "Scope": ("policy", "Scope"),
     "Verdict": ("policy", "Verdict"),
     "PrecedentStore": ("precedent", "PrecedentStore"),
     "QuarantinedReader": ("quarantine", "QuarantinedReader"),
@@ -140,6 +141,7 @@ __all__ = [
     "Verdict",
     "Rule",
     "RuleSet",
+    "Scope",
     "TrustKernel",
     "AuditLog",
     "GovernedTool",

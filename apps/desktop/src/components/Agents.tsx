@@ -113,6 +113,14 @@ function AgentCard({
 
         {done ? (
           <>
+            {/* Why this card has nothing on it. A task the batch stopped waiting for and a task
+                that ran and did not pass both arrive as `success: false` with zero attempts and
+                no files — identical on screen, and the first of the two is not the user's code
+                being wrong. Printed verbatim from the server (`timed out after Ns`, or the
+                exception that killed the unit); this component never invents the reason. */}
+            {result.error ? (
+              <p className="break-words font-mono text-xs text-bad">{result.error}</p>
+            ) : null}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
               <span>
                 {t("agents.attempts")}: {result.attempts}

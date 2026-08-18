@@ -40,6 +40,42 @@ def elide_values(kwargs: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def render_action(name: str, kwargs: dict[str, Any]) -> tuple[str, str]:
+    """Split a tool call into ``(action, document)`` for the rules to judge separately.
+
+    The action used to be ``f"{name} {kwargs}"``. Interpolating a dict calls ``repr`` on it, and
+    ``repr`` escapes a newline into the two characters ``\\`` and ``n`` — so the ``n`` fused with the
+    next word (``\\nrm`` arrived as the text ``nrm``) and killed the ``\\b`` that every rule in
+    :mod:`~chimera.governance.policy` starts with. Measured before the fix:
+
+        review  git_force_push  'git push --force origin main'
+        allow   default         'echo hi\\ngit push --force origin main'
+        block   rm_rf_root      'rm -rf /var/lib/data'
+        allow   default         'set -e\\nrm -rf /var/lib/data'
+
+    The protection was inverted: every real shell script has more than one line, so the two-line
+    version of a blocked command walked through, while a markdown file *quoting* ``rm -rf /tmp/x``
+    was hard-blocked. Values now go in raw, one per line — the separator matters, because the rules
+    are already written line-aware (``[^\\n]*``), so a newline between arguments is what stops two
+    unrelated values from fusing into a signature neither of them contains.
+
+    Document bodies go to the second return value instead of the first, reusing the one definition
+    of "this is a body, not an identifier" that :data:`_DOCUMENT_ARGS` already carries for the audit
+    — so a gap in that list is one gap to fix, not two that can drift apart.
+
+    The tool NAME leads the action. That was checked rather than assumed: all ten default rules are
+    shell or credential signatures and not one of them mentions a tool, so putting the name on its
+    own line costs no match today and keeps the judge told what was called.
+    """
+    command = "\n".join(
+        [name, *(str(value) for key, value in kwargs.items() if key not in _DOCUMENT_ARGS)]
+    )
+    document = "\n".join(
+        str(value) for key, value in kwargs.items() if key in _DOCUMENT_ARGS
+    )
+    return command, document
+
+
 class GovernedTool(Tool):
     """A tool whose execution is gated by the trust kernel."""
 
@@ -67,15 +103,19 @@ class GovernedTool(Tool):
         self.untrusted_output = is_untrusted_output(inner)
 
     def run(self, **kwargs: Any) -> str:
-        action = f"{self.name} {kwargs}"
-        # The rules read the WHOLE action; the audit gets the elided one. Redaction alone was not
-        # enough: it catches credential SHAPES, and the body of a private key has no shape — a
+        action, document = render_action(self.name, kwargs)
+        # The rules read both halves — command signatures against `action`, credential signatures
+        # against both. The audit gets the elided rendering and neither half raw. Redaction alone was
+        # not enough: it catches credential SHAPES, and the body of a private key has no shape — a
         # governed `write_file` of `deploy/id_rsa` put `-----BEGIN RSA PRIVATE KEY-----` and the
         # first lines of the key into a file the app serves over HTTP. Nothing about an audit trail
         # needs the contents of the file that was written; it needs to know which file, and why the
         # call was stopped.
         verdict = self.kernel.evaluate(
-            action, context=self._context(), record_as=f"{self.name} {elide_values(kwargs)}"
+            action,
+            context=self._context(),
+            record_as=f"{self.name} {elide_values(kwargs)}",
+            document=document,
         )
         if verdict.decision == Decision.BLOCK:
             return refusal(f"[governance: BLOCKED — {verdict.reason}] "

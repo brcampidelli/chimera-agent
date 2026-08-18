@@ -20,6 +20,7 @@ function result(over: Partial<AgentResult> = {}): AgentResult {
     reverted: false,
     changed_paths: [],
     diffs: [],
+    error: "",
     ...over,
   };
 }
@@ -119,6 +120,32 @@ describe("Agents", () => {
     expect(within(passed).queryByText("failed")).not.toBeInTheDocument();
     expect(within(failed).getByText("failed")).toBeInTheDocument();
     expect(within(failed).getByText(/Attempts: 3/)).toBeInTheDocument();
+  });
+
+  it("prints why a card has no result, so a timed-out task cannot read as a failed one", async () => {
+    // The batch's wall-clock deadline blew while task 1 was still running. It comes back with the
+    // same `success: false` + zero attempts + no files as a task that genuinely did not pass, so
+    // without the server's reason on screen the two are the same card.
+    await runBatch(
+      batch({
+        results: [
+          result({ index: 0, task: "add a test" }),
+          result({
+            index: 1,
+            task: "fix the lint",
+            success: false,
+            attempts: 0,
+            error: "timed out after 14400.0s",
+          }),
+        ],
+      }),
+    );
+
+    const stalled = screen.getByTitle("fix the lint").closest("div.flex-col") as HTMLElement;
+    const passed = screen.getByTitle("add a test").closest("div.flex-col") as HTMLElement;
+    expect(within(stalled).getByText("timed out after 14400.0s")).toBeInTheDocument();
+    // And a card that really ran says nothing extra — the line is a reason, not decoration.
+    expect(within(passed).queryByText(/timed out/)).not.toBeInTheDocument();
   });
 
   it("renders cross-task conflicts prominently and marks the colliding file on its card", async () => {

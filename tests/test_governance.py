@@ -19,7 +19,7 @@ from chimera.governance import (
     govern_registry,
 )
 from chimera.tools import default_registry
-from chimera.tools.builtin import EchoTool
+from chimera.tools.base import Tool
 
 # --- policy / rules ---------------------------------------------------------
 
@@ -112,25 +112,48 @@ def test_schedule_validator() -> None:
 
 # --- governed tools ---------------------------------------------------------
 
+class _Runner(Tool):
+    """A tool whose argument is a COMMAND, which is the shape governance exists for.
+
+    These three tests used ``EchoTool(text=...)``. ``text`` is a document body by this project's own
+    definition (``governed_tool._DOCUMENT_ARGS``), and ``echo`` hands the string back rather than
+    running it — so ``echo(text="rm -rf /")`` is a tool being asked to *quote* a command, the same
+    shape as a markdown file that mentions one. Once command rules stopped reading document bodies,
+    these passed or failed for a reason that had nothing to do with the kernel working, so the
+    argument was changed to one that really is executed.
+    """
+
+    name = "run_shell"
+    description = "run a command"
+    parameters = {
+        "type": "object",
+        "properties": {"command": {"type": "string"}},
+        "required": ["command"],
+    }
+
+    def run(self, **kwargs: Any) -> str:
+        return str(kwargs.get("command", ""))
+
+
 def test_governed_tool_blocks() -> None:
-    tool = GovernedTool(EchoTool(), TrustKernel())
-    out = tool.run(text="rm -rf /")
+    tool = GovernedTool(_Runner(), TrustKernel())
+    out = tool.run(command="rm -rf /")
     assert "BLOCKED" in out
-    assert "rm -rf" not in out.replace("BLOCKED", "")  # the inner echo did not run
+    assert "rm -rf" not in out.replace("BLOCKED", "")  # the inner tool did not run
 
 
 def test_governed_tool_allows() -> None:
-    tool = GovernedTool(EchoTool(), TrustKernel())
-    assert tool.run(text="hello world") == "hello world"
+    tool = GovernedTool(_Runner(), TrustKernel())
+    assert tool.run(command="echo hello world") == "echo hello world"
 
 
 def test_governed_tool_review_requires_approval() -> None:
     kernel = TrustKernel()
-    needs = GovernedTool(EchoTool(), kernel)
-    assert "needs review" in needs.run(text="git push --force origin main")
+    needs = GovernedTool(_Runner(), kernel)
+    assert "needs review" in needs.run(command="git push --force origin main")
 
-    approved = GovernedTool(EchoTool(), kernel, approve=lambda v, a: True)
-    assert approved.run(text="git push --force origin main") == "git push --force origin main"
+    approved = GovernedTool(_Runner(), kernel, approve=lambda v, a: True)
+    assert approved.run(command="git push --force origin main") == "git push --force origin main"
 
 
 def test_govern_registry_wraps_all(tmp_path: Path) -> None:
