@@ -370,6 +370,33 @@ jobs:
         # The lockfile is what users get; auditing anything else answers a different question.
         run: npm audit --package-lock-only
 
+      - name: Install the desktop tree (audit signatures needs a real install)
+        working-directory: apps/desktop
+        # `npm audit signatures` reads the installed tree, not the lockfile. Measured: without
+        # node_modules it exits 1 with "found no dependencies to audit" — loud rather than a silent
+        # pass, which is the right failure, but it still has to actually run to be worth having.
+        run: npm ci
+
+      # NOT advisory, unlike the three above, and the difference is the point.
+      #
+      # A CVE advisory can appear on a package with no fix released — nothing the repository can do
+      # that day, which is why those three only report. A signature mismatch is different in kind:
+      # it says the tarball in the registry is not the one its publisher signed, and there is no
+      # version of that which is acceptable to build on.
+      #
+      # This closes the one window the hashes do not. `uv.lock` carries 2352 hashes and
+      # `package-lock.json` 495 integrity fields, so tampering AFTER the lock was written is already
+      # caught — but a tarball substituted at the moment the lock was GENERATED hashes cleanly
+      # forever after. Registry signatures are what check that.
+      #
+      # Narrow-window hygiene, not a new capability — worth saying plainly rather than announcing as
+      # a security feature. `--ignore-scripts` deliberately NOT added: it would risk the Tauri/vite
+      # build, and lifecycle scripts reaching a publish token are already blocked architecturally by
+      # the privilege split in publish.yml.
+      - name: Registry signatures (the window a hash cannot close)
+        working-directory: apps/desktop
+        run: npm audit signatures --omit=dev
+
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
