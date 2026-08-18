@@ -83,6 +83,15 @@ def main() -> int:
         "--collect-all", "ctranslate2",
         "--collect-all", "onnxruntime",
         "--collect-data", "chimera",
+        # The package's own .dist-info. `--collect-data` gathers files INSIDE the package and this is
+        # not one of them: it lives beside it in site-packages, and without it
+        # `importlib.metadata.version("chimera-agent")` raises inside the bundle. `chimera.__version__`
+        # then falls back to "0.0.0+source", which is what every installed app has been printing in
+        # its footer — and, because that string does not parse as a version, `/api/version` could
+        # never confirm a newer release, so the in-app update notice was dead for everyone who
+        # installed from an installer. The native Tauri updater was unaffected (it compares the
+        # binary's own version), which is exactly why this went unnoticed for so long.
+        "--copy-metadata", "chimera-agent",
         "--add-data", add_data,
         "--add-data", skills_data,
         "--hidden-import", "uvicorn",

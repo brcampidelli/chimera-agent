@@ -100,6 +100,33 @@ jobs:
             test -f apps/desktop/src-tauri/sidecar-dist/chimera-backend/chimera-backend
           fi
 
+      # Ask the BINARY what version it is, rather than trusting that the freeze carried it. Every
+      # installer this project has published reported "0.0.0+source" in the app's footer, because
+      # PyInstaller does not collect a package's .dist-info unless told to and nothing here could
+      # notice: the version is only observable by running the artefact, and the artefact is only ever
+      # built in CI. That is the definition of a check that belongs in the pipeline.
+      #
+      # Silencing the footer was the visible half. The invisible half is that `/api/version` compares
+      # versions and refuses to compare an unparseable one — so the in-app "update available" notice
+      # was off for every installed user, for every release.
+      - name: The frozen sidecar knows its own version
+        shell: bash
+        run: |
+          BIN=apps/desktop/src-tauri/sidecar-dist/chimera-backend/chimera-backend
+          # `if`, not `[ … ] && …`: this step runs under `bash -e`, where a false test on the last
+          # (or any) command is a failed step. The one-liner would abort the job on every non-Windows
+          # runner, which is the kind of green-to-red that reads as a broken build rather than a
+          # broken condition.
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then BIN="$BIN.exe"; fi
+          VERSION=$("$BIN" --version)
+          echo "frozen sidecar reports: $VERSION"
+          case "$VERSION" in
+            0.0.0*|"")
+              echo "::error::the freeze lost the package metadata — the app would report $VERSION"
+              exit 1
+              ;;
+          esac
+
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
