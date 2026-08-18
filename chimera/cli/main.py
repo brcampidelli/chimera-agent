@@ -2966,6 +2966,11 @@ def solve(
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
     max_attempts: int = typer.Option(3, "--max-attempts", help="Max verify-or-revert attempts."),
     max_steps: int = typer.Option(8, "--max-steps", help="Max tool-calling steps per attempt."),
+    context_budget: float = typer.Option(
+        None,
+        "--context-budget",
+        help="Fraction of the model's window to spend on the prompt before compacting (e.g. 0.6).",
+    ),
     no_plan: bool = typer.Option(False, "--no-plan", help="Skip the planning step."),
     no_manager: bool = typer.Option(False, "--no-manager", help="Skip Manager review."),
     rubric: bool = typer.Option(False, "--rubric", help="Manager reviews via the cascade rubric."),
@@ -3280,6 +3285,12 @@ def solve(
             # cleanly and means nothing.
             model=roles.models.edit or model,
             max_steps=max_steps,
+            # Compaction, off unless asked — the library default stays `None` (see AgentConfig:
+            # "off by default because compaction discards messages"). What changes is that a CLI
+            # caller can now ask at all. Every terminal surface ran without it and had no way to
+            # request it, while an overflow is TERMINAL: `failover.py` maps CONTEXT_OVERFLOW to
+            # ABORT, so a long run died on the provider's error rather than shrinking its prompt.
+            context_budget=context_budget,
             insist_on_action=True,
             # The workspace's own AGENTS.md, so `chimera solve` follows the conventions of the
             # repository it is solving in — the same instructions every other agent tool reads.
@@ -3489,6 +3500,11 @@ def solve_batch(
     workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root (a git repo, to isolate)."),
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
     max_steps: int = typer.Option(6, "--max-steps", help="Max tool-calling steps per task."),
+    context_budget: float = typer.Option(
+        None,
+        "--context-budget",
+        help="Fraction of the model's window to spend on the prompt before compacting (e.g. 0.6).",
+    ),
     max_attempts: int = typer.Option(2, "--max-attempts", help="Max verify-or-revert attempts per task."),
     max_workers: int = typer.Option(4, "--max-workers", help="Max concurrent isolated workers."),
     fuse: bool = typer.Option(False, "--fuse", help="Route deep-reasoning turns through fusion."),
@@ -3550,7 +3566,12 @@ def solve_batch(
                 # `ws` is this task's isolated worktree — a checkout of the repo, so its AGENTS.md is
                 # the same one. Single-task `solve` has always passed it; the batch did not, which is
                 # the same shape as a batch being quietly weaker than one run done alone.
-                AgentConfig(model=model, max_steps=max_steps, project_root=ws),
+                AgentConfig(
+                    model=model,
+                    max_steps=max_steps,
+                    context_budget=context_budget,
+                    project_root=ws,
+                ),
             )
             auto = AutonomousAgent(
                 worker,
