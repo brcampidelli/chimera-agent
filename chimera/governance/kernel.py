@@ -82,7 +82,14 @@ class TrustKernel:
         self.default = default
         self._judge_takes_context = _accepts_context(judge)
 
-    def evaluate(self, action: str, *, context: str = "", record_as: str | None = None) -> Verdict:
+    def evaluate(
+        self,
+        action: str,
+        *,
+        context: str = "",
+        record_as: str | None = None,
+        document: str = "",
+    ) -> Verdict:
         """Decide on ``action``, optionally told *why* it is happening.
 
         ``context`` was declared here and read nowhere: the signature accepted it, the body never
@@ -98,8 +105,18 @@ class TrustKernel:
         It deliberately does NOT reach the precedent store: precedents are keyed on the action, and
         folding context into that key would fragment the cache so finely that nothing would ever
         match twice — turning a cost optimisation into a cost multiplier.
+
+        ``document`` is the body the tool is about to write, kept apart from ``action`` so that
+        command signatures are not matched against prose. It reaches the **rules** only. It is
+        deliberately withheld from the judge (an LLM call whose cost scales with a file's size), from
+        the precedent key (a body is unique per call, so caching on it never hits), and above all
+        from the **audit** — which is the guarantee `record_as` and :func:`audit._redacted` exist to
+        make, and undoing it here would put file contents back on a screen served over HTTP.
         """
-        verdict = more_severe(self.ruleset.evaluate(action), self.learned.evaluate(action))
+        verdict = more_severe(
+            self.ruleset.evaluate(action, document=document),
+            self.learned.evaluate(action, document=document),
+        )
         source = "lexical"
         # Precedent RAG: a confirmed precedent (2 judges agreed) answers a similar
         # action cheaply, before the expensive judge is consulted again.
