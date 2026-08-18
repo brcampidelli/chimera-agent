@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import ast
+import json
 from pathlib import Path
 from typing import Any
 
@@ -54,6 +56,31 @@ class ReadFileTool(_WorkspaceTool):
         return text
 
 
+def syntax_error(path: Path, content: str) -> str | None:
+    """Why ``content`` cannot be the whole of ``path``, or None if it can.
+
+    Only formats we can check for free with the standard library, and only on a FULL overwrite.
+    That scope is the whole idea: a surgical edit may legitimately pass through a state that does
+    not parse — a half-applied rename, a function being moved — while a complete file that does not
+    parse is never what anyone meant. Checking both would turn a normal editing rhythm into a fight.
+    """
+    suffix = path.suffix.lower()
+    if suffix == ".py":
+        try:
+            ast.parse(content)
+        except SyntaxError as exc:
+            where = f" (line {exc.lineno}" + (f", col {exc.offset}" if exc.offset else "") + ")"
+            return f"{exc.msg}{where}"
+        except ValueError as exc:  # e.g. source with NUL bytes
+            return str(exc)
+    elif suffix == ".json":
+        try:
+            json.loads(content)
+        except json.JSONDecodeError as exc:
+            return f"{exc.msg} (line {exc.lineno}, col {exc.colno})"
+    return None
+
+
 class WriteFileTool(_WorkspaceTool):
     name = "write_file"
     description = "Write (create or overwrite) a UTF-8 text file in the workspace."
@@ -62,6 +89,13 @@ class WriteFileTool(_WorkspaceTool):
         "properties": {
             "path": {"type": "string", "description": "Path relative to the workspace."},
             "content": {"type": "string", "description": "Full file content to write."},
+            "allow_invalid": {
+                "type": "boolean",
+                "description": (
+                    "Write even if the content does not parse (.py/.json). Use for templates, "
+                    "fixtures and partial files that are invalid on purpose."
+                ),
+            },
         },
         "required": ["path", "content"],
     }
@@ -71,6 +105,20 @@ class WriteFileTool(_WorkspaceTool):
         if err := refuse_write(self.workspace, path, self.write_region):
             return err
         content = str(kwargs.get("content", ""))
+        # Refused BEFORE the write, not reported after. A file that does not parse is one the next
+        # step cannot read, import or test, so writing it costs a whole verify cycle to discover
+        # something `ast.parse` knew for free — and on a full overwrite it also destroys the version
+        # that did parse.
+        #
+        # The escape hatch is not optional. Templates, fixtures and deliberately-broken examples are
+        # real files, and a guard with no way past turns "the agent wrote something odd" into "the
+        # agent cannot do this at all".
+        if not bool(kwargs.get("allow_invalid", False)) and (why := syntax_error(path, content)):
+            return (
+                f"error: refused to overwrite {path.name} — the content is not valid "
+                f"{path.suffix.lstrip('.')}: {why}. Fix it, or pass allow_invalid=true if the file "
+                f"is meant to be invalid."
+            )
         path.parent.mkdir(parents=True, exist_ok=True)
         # Byte-exact atomic write: never OS-translate the model's newlines, and never truncate an
         # existing file if the write is interrupted (temp + replace).
