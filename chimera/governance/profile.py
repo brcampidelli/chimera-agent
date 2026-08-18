@@ -14,9 +14,37 @@ join and leave a project, and this one is held by nobody at 3 a.m.
 `narrow_on_taint` on and no approver, a job that reads a news feed or a ticket becomes unable to
 write for the rest of its run — and the refusal arrives as an ordinary observation string, so the
 agent reads it, carries on, and the run reports success having done nothing. On a position guardian
-that is real money unwatched behind a green tick. So `observe` runs the whole stack, records every
-action that WOULD have been refused, and refuses none of them. Turning it to `enforce` is a decision
-someone makes with that count in front of them.
+that is real money unwatched behind a green tick. So `observe` runs the whole stack and records what
+enforcement would cost, so that turning it to `enforce` is a decision someone makes with that count
+in front of them.
+
+**What `observe` stages is the INFERENCE, and this paragraph replaces one that said "refuses none of
+them" — which was false, and false in the direction that matters.** A BLOCK verdict is returned
+before the approver is consulted at all, so `observe` measured the REVIEWs and *applied* the BLOCKs.
+Measured on this tree, after PR #122 removed the newline false positive, over a 33-call corpus of
+real tool calls:
+
+    allow 20 · warn 2 · review 3 · block 8      refused under `observe`: 8
+    the report those 8 landed in:               granted=3  refused=0
+
+Two defects, one cause. The count under-stated enforcement's price by leaving out every hard refusal,
+and the mode's own documentation denied that the refusals happened.
+
+**The refusals stay.** The distinction three paragraphs down — instruction versus inference — is the
+one that settles it, and it was already load-bearing here for the explicit fence. The four BLOCK
+rules are instruction: fixed signatures (`rm -rf /`, `mkfs`, a fork bomb, `chmod -R 777 /`) with no
+benign variant, which is why `policy.py` holds the invariant that a benign action is never
+hard-blocked. Six of the eight above were exactly those. What needs staging is the part that
+*infers*: REVIEW (a force push, `curl | bash`, an upload — each with a legitimate form) and taint
+narrowing, which infers danger from provenance. Letting `observe` pass a BLOCK would mean that
+switching it on to MEASURE starts EXECUTING `rm -rf /`; the whole module exists to stop observation
+from subtracting protection, and `test_observe_never_weakens_what_was_already_protecting` fails the
+build if it does.
+
+The two remaining false positives in that corpus were not the BLOCK's doing: `edit_file` (`old`,
+`new`) and `execute_code` (`code`) pass document bodies through `_DOCUMENT_ARGS`, which does not
+list them, so a runbook quoting a command is judged as one. That is a gap in
+`governed_tool._DOCUMENT_ARGS` and it is fixed there, not by loosening a mode.
 
 **But an explicit fence is not part of that rollout, and filing it under the same switch was a
 mistake.** `CHIMERA_TOOL_ALLOWLIST` / `CHIMERA_TOOL_DENYLIST` are an instruction, not an inference:
@@ -110,9 +138,16 @@ def govern_step(
         return GovernanceStep(registry, approvals, None, resolved)
 
     # In observe the approver says yes to everything and writes down that it did. Every call that
-    # reaches an approver is one the policy WOULD have refused, so `approvals.granted` is exactly
-    # the report a rollout needs: what enforcement would cost, per surface, measured not guessed.
+    # reaches an approver is one the policy WOULD have refused, so `approvals` is the report a
+    # rollout needs: what enforcement would cost, per surface, measured not guessed.
+    #
+    # `granted` ALONE is not that report, which is what this comment used to claim. A BLOCK is
+    # returned before any approver is consulted, so the eight hard refusals in the corpus in this
+    # module's docstring reached neither list. `GovernedTool` now writes them to `refused` — the
+    # `ledger=` below is what lets it — and the price of enforcement is `granted` (would start
+    # refusing) plus `refused` (already refusing, in every mode).
     if resolved == "observe":
+        approver_name = "allow"
         approve = allow_everything(approvals)
     else:
         wanted = settings.approval_mode
@@ -121,10 +156,52 @@ def govern_step(
             # the same fail-closed answer one step earlier, before a tty that belongs to somebody
             # else can be mistaken for the requester.
             wanted = "deny"
+        approver_name = wanted
         approve = approver_for(wanted, approvals)
 
     registry = govern_registry(
-        registry, TrustKernel(audit=audit, audit_allows=audit_allows), approve=approve
+        registry,
+        TrustKernel(audit=audit, audit_allows=audit_allows),
+        approve=approve,
+        ledger=approvals,
+    )
+    # One line per assembly, and the only place the deployment's mode is written where a reader can
+    # find it. Two holes close here.
+    #
+    # The first is `kernel.py`'s, named there and left for nobody in particular: with
+    # `audit_allows=False` and nothing refused, the log holds no governance line at all — so "the
+    # kernel is installed and allowed everything" and "the kernel is not installed" look identical
+    # on the Security screen, and those are opposite claims. Telling them apart needs a line written
+    # once per ASSEMBLY rather than once per call. This is it.
+    #
+    # The second is `observe`'s own report. `assemble_registry` throws `approvals` away, so on every
+    # HTTP surface the count nobody reads is the count the rollout was meant to be decided on.
+    # Carrying the object up to a reader would mean a third return value through two call sites and
+    # a seam the tests inject, and it would still show nothing until a client drew a new field —
+    # returning it for nobody to read is the same silence one layer up. The audit already HAS a
+    # reader (`GET /api/governance/audit` -> the Security screen) and `_audit_event` flattens any
+    # entry into `{seq, type, summary}`, so a new line shows up with no frontend change. Next to it,
+    # the per-verdict lines the kernel already writes are the report: this line says which approver
+    # they met, so `decision=review` under `approver=allow` reads as "enforcement would have stopped
+    # this" and `decision=block` reads as "this WAS stopped".
+    #
+    # A separate `type` on purpose: `test_the_refusal_is_recorded_and_the_ordinary_calls_are_not`
+    # reads `decision` off every `type == "governance"` entry, and a mode line has no verdict to give
+    # it. The cost, named rather than discovered later: one line per request on an HTTP surface,
+    # against a screen that reads the newest 200. That is an order of magnitude below the per-call
+    # rate `audit_allows` exists to avoid, and it is the entry that gives the rare ones their meaning.
+    audit.record(
+        "governance_mode",
+        {
+            "mode": resolved,
+            "surface": surface or "(unnamed surface)",
+            "approver": approver_name,
+            "attended": attended,
+            # Said out loud because the mode's NAME does not say it, and its docstring used to deny
+            # it: a BLOCK is a fixed signature and is refused under `observe` too. See this module's
+            # docstring for why that is the right answer rather than a leak in the staging.
+            "blocks": "refused in every mode",
+        },
     )
     _log.info("governance %s on %s", resolved, surface or "(unnamed surface)")
     return GovernanceStep(registry, approvals, approve, resolved)
