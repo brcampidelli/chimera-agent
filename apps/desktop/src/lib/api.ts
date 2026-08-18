@@ -23,6 +23,8 @@ import type {
   Benchmarks,
   GovernanceAudit,
   InjectionReport,
+  LibraryCard,
+  CodeSessionRaw,
   Maturity,
   McpServers,
   McpTest,
@@ -327,6 +329,23 @@ export const approveSkill = (name: string) =>
   json<{ approved: boolean }>(`/api/skills/${name}/approve`, { method: "POST" });
 export const retireSkill = (name: string) =>
   json<{ retired: boolean }>(`/api/skills/${name}/retire`, { method: "POST" });
+
+/** The curated skill cards that ship with Chimera — distinct from the learned ones above.
+ *
+ * Those are distilled from the user's own verified runs, so on a fresh install there are none and
+ * the Skills screen was empty for everybody on day one. These twenty-three ship in the box and had
+ * no route at all: the only documented way to use one was a CLI command naming a repo-relative
+ * path, which resolves only inside a git checkout. */
+export const getSkillLibrary = () => json<LibraryCard[]>("/api/skills/library");
+/** One card WITH its body. The list carries metadata only — twenty-three Trigger/Do/Avoid/Check/Risk
+ *  bodies is a quarter of a megabyte to draw a list of names. */
+export const getSkillLibraryCard = (name: string) =>
+  json<LibraryCard>(`/api/skills/library/${encodeURIComponent(name)}`);
+export const importSkillLibraryCard = (name: string) =>
+  json<{ imported: boolean; name: string; status: string }>(
+    `/api/skills/library/${encodeURIComponent(name)}/import`,
+    { method: "POST" },
+  );
 
 // --- Messaging (reach the user on Discord/Telegram) ---
 export type MessagingPlatform = { configured: boolean; running: boolean; error: string | null };
@@ -1116,6 +1135,23 @@ export const deleteCodeSession = (sessionId: string) =>
   json<{ ok: boolean }>(`/api/code/sessions/${encodeURIComponent(sessionId)}`, {
     method: "DELETE",
   });
+
+/** Branch a conversation into a new one, and get the new one's sidebar row back.
+ *
+ * A conversation is a linear message list that each turn replaces, so trying a different approach
+ * costs the thread you were on. The row returned is the FORK's — resuming with the parent's would
+ * put you back in the conversation you just branched away from. */
+export const forkCodeSession = (sessionId: string) =>
+  json<CodeSessionMeta>(`/api/code/sessions/${encodeURIComponent(sessionId)}/fork`, {
+    method: "POST",
+  });
+
+/** The conversation's stored file, unparsed.
+ *
+ * `getCodeSession` folds messages into exchanges, which is what a screen should render and the
+ * wrong thing to debug with: a message the parser dropped is invisible in it. */
+export const getCodeSessionRaw = (sessionId: string) =>
+  json<CodeSessionRaw>(`/api/code/sessions/${encodeURIComponent(sessionId)}/raw`);
 
 /** A run that stopped before finalizing and is waiting for a human verdict. Arrives on the stream's
  *  `paused` frame INSTEAD of `done` — a pause is not a verdict, and treating it as a failed run

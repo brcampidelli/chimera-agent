@@ -10,6 +10,7 @@ Commands:
   explore QUERY                  locate code via the isolated Context Explorer subagent
   crew-isolated TASK -W ...       tool-using workers split one task in parallel worktrees
   tools / skills                 list native tools / built-in skills
+  skills-library [NAME]          browse the curated skill cards that ship in the box
   memory ...                     curated long-term memory (add/search/list)
   cron ...                       scheduled jobs (add/list/remove/enable/disable/learn)
   migrate SOURCE DIR             import config/skills/memory from another agent
@@ -3753,6 +3754,50 @@ def skills() -> None:
     for skill in registry.skills():
         table.add_row(skill.name, skill.version, skill.description)
     console.print(table)
+    # These six are LLM-backed procedures, and they are not what the README means by "the skill
+    # library" — that is the curated markdown in `skills/`, which this command never mentioned and
+    # which had no listing command of its own. Someone reading "Built-in skills" here concluded
+    # there were six.
+    console.print("\n[dim]The curated skill cards are a separate set. See[/dim] "
+                  "[bold]chimera skills-library[/bold]")
+
+
+@app.command("skills-library")
+def skills_library(
+    name: str = typer.Argument(None, help="Show one card in full; omit to list the library."),
+) -> None:
+    """Browse the curated skill cards that ship with Chimera.
+
+    Data, not code: each is a markdown page of Trigger/Do/Avoid/Check/Risk that the agent reads into
+    its prompt when it matches. Load one into your own store with ``chimera skills-import <name>``.
+    """
+    from chimera.skills.library import load_card, load_library
+
+    if name:
+        card = load_card(name)
+        if card is None:
+            console.print(f"[red]No curated card named {name!r}.[/red] See: chimera skills-library")
+            raise typer.Exit(code=1)
+        console.print(Panel(escape(card.instructions), title=escape(card.manifest.name)))
+        console.print(f"[dim]Import it with:[/dim] chimera skills-import {name}")
+        return
+
+    cards = load_library()
+    if not cards:
+        # Not "you have no skills": the library is shipped, never earned, so an empty one means the
+        # build lost it rather than that the user has not done anything yet.
+        console.print("[yellow]This build ships no curated skill library.[/yellow] "
+                      "Expected it at chimera/_skill_library or skills/ in a source checkout.")
+        return
+    table = Table(title=f"Curated skill cards ({len(cards)})", show_header=True, header_style="bold")
+    for column in ("Card", "Stage", "Topic", "Description"):
+        table.add_column(column)
+    for card in cards:
+        m = card.manifest
+        table.add_row(m.name, m.stage or "-", m.topic or "-", m.description)
+    console.print(table)
+    console.print("[dim]Read one: chimera skills-library <name> · Load one: "
+                  "chimera skills-import <name>[/dim]")
 
 
 @app.command("skills-pending")
@@ -3849,9 +3894,14 @@ def skills_export(
 
 @app.command("skills-import")
 def skills_import(
-    path: str = typer.Argument(..., help="Path to a SKILL.md (or a skill directory containing one)."),
+    path: str = typer.Argument(..., help="A curated card name, or a path to a SKILL.md / its directory."),
 ) -> None:
     """Import a SKILL.md into the store. A tainted-provenance skill is held pending for review.
+
+    Accepts the plain name of a curated card (``chimera skills-import verify-before-claiming``) as
+    well as a path. The documented form was ``skills/<name>``, a repo-relative path that resolves
+    only inside a checkout — so the one line the README gives for using the shipped library failed
+    for everybody who installed Chimera instead of cloning it.
 
     Validated on the way in. This is the only path by which a skill written by somebody else enters
     the store, and it was the only one that skipped the validator the agent's own proposals must
@@ -3861,15 +3911,23 @@ def skills_import(
     """
     from chimera.evolution import SkillStore
     from chimera.governance import SkillValidator
+    from chimera.skills.library import load_card
     from chimera.skills.skill_md import parse_skill_md, to_learned
 
     src = Path(path)
     if src.is_dir():
         src = src / "SKILL.md"
+    # A real file on disk wins over a same-named curated card: an argument that names something the
+    # user can see in their own directory must not silently import a different file from the wheel.
     if not src.exists():
-        console.print(f"[red]No SKILL.md at {src}.[/red]")
-        raise typer.Exit(code=1)
-    skill = to_learned(parse_skill_md(src.read_text(encoding="utf-8")))
+        curated = load_card(path)
+        if curated is None:
+            console.print(f"[red]No SKILL.md at {src}[/red] and no curated card named {path!r}.")
+            raise typer.Exit(code=1)
+        parsed = curated
+    else:
+        parsed = parse_skill_md(src.read_text(encoding="utf-8"))
+    skill = to_learned(parsed)
     verdict = SkillValidator().validate(skill.to_dict())
     if not verdict.accepted:
         console.print(f"[red]Refused[/red] {skill.name}: {'; '.join(verdict.reasons)}")

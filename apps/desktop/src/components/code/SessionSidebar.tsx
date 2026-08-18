@@ -1,9 +1,24 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Check, FolderGit2, FolderPlus, Pencil, Plus, X } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  Braces,
+  Check,
+  CopyPlus,
+  FolderGit2,
+  FolderPlus,
+  Pencil,
+  Plus,
+  X,
+} from "lucide-react";
 
-import { listCodeSessions, type CodeSessionMeta } from "@/lib/api";
+import {
+  forkCodeSession,
+  getCodeSessionRaw,
+  listCodeSessions,
+  type CodeSessionMeta,
+} from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { useT } from "@/lib/i18n";
 import {
   addProject,
@@ -61,6 +76,7 @@ export function SessionSidebar({
   onProject: (workspace: string) => void;
 }) {
   const t = useT();
+  const qc = useQueryClient();
   const q = useQuery({ queryKey: ["code-sessions"], queryFn: listCodeSessions });
   // Local rather than server state: both are preferences about this interface, and neither has an
   // endpoint. Held in state so adding or renaming redraws without a reload.
@@ -70,7 +86,24 @@ export function SessionSidebar({
   const [draft, setDraft] = useState("");
   const [renaming, setRenaming] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState("");
+  const [inspecting, setInspecting] = useState<CodeSessionMeta | null>(null);
   const groups = groupByProject(q.data ?? [], registered);
+
+  const fork = useMutation({
+    mutationFn: forkCodeSession,
+    onSuccess: (branch) => {
+      qc.invalidateQueries({ queryKey: ["code-sessions"] });
+      // Straight into the branch. Forking and leaving the user in the parent would mean the next
+      // thing they typed landed in the conversation they were trying to leave alone — which is the
+      // one outcome duplicating exists to prevent.
+      onResume(branch);
+    },
+  });
+  const raw = useQuery({
+    queryKey: ["code-session-raw", inspecting?.id],
+    queryFn: () => getCodeSessionRaw(inspecting?.id as string),
+    enabled: inspecting !== null,
+  });
 
   function commitAdd() {
     const path = draft.trim();
@@ -202,25 +235,81 @@ export function SessionSidebar({
                 </div>
               )}
               {sessions.map((session) => (
-                <button
-                  key={session.id}
-                  type="button"
-                  onClick={() => onResume(session)}
-                  title={session.title || t("code.sessions.untitled")}
-                  className={cn(
-                    "block w-full truncate px-3 py-1 pl-8 text-left text-xs transition-colors",
-                    session.id === activeSession
-                      ? "bg-accent/15 text-accent"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {session.title || t("code.sessions.untitled")}
-                </button>
+                // A row, not one big button: the two actions below are buttons themselves, and a
+                // button inside a button is invalid markup that browsers resolve by dropping one of
+                // them — usually the inner one, silently.
+                <div key={session.id} className="group/session flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => onResume(session)}
+                    title={session.title || t("code.sessions.untitled")}
+                    className={cn(
+                      "min-w-0 flex-1 truncate px-3 py-1 pl-8 text-left text-xs transition-colors duration-1 ease-out",
+                      session.id === activeSession
+                        ? "bg-accent/15 text-accent"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {session.title || t("code.sessions.untitled")}
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={t("code.sessions.forkOne", {
+                      name: session.title || t("code.sessions.untitled"),
+                    })}
+                    disabled={fork.isPending}
+                    className="px-1 text-muted-foreground opacity-0 hover:text-foreground focus:opacity-100 group-hover/session:opacity-100"
+                    onClick={() => fork.mutate(session.id)}
+                  >
+                    <CopyPlus className="h-3 w-3" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={t("code.sessions.jsonOne", {
+                      name: session.title || t("code.sessions.untitled"),
+                    })}
+                    className="px-2 text-muted-foreground opacity-0 hover:text-foreground focus:opacity-100 group-hover/session:opacity-100"
+                    onClick={() => setInspecting(session)}
+                  >
+                    <Braces className="h-3 w-3" />
+                  </button>
+                </div>
               ))}
             </div>
           ))
         )}
       </div>
+
+      <Dialog
+        open={inspecting !== null}
+        onOpenChange={(next) => !next && setInspecting(null)}
+        title={t("code.sessions.json")}
+        description={inspecting?.title || undefined}
+      >
+        <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-all text-xs text-muted-foreground">
+          {raw.data ? readable(raw.data.text) : t("common.loading")}
+        </pre>
+        {raw.data ? (
+          <p className="mt-2 text-xs text-muted-foreground">
+            {t("code.sessions.jsonBytes", { n: raw.data.bytes })}
+          </p>
+        ) : null}
+      </Dialog>
     </aside>
   );
+}
+
+/** The stored file, indented for reading — or verbatim when it will not parse.
+ *
+ * The server sends the bytes on disk, which are written without indentation and arrive as one very
+ * long line. Indenting for display is a screen concern, and the fallback is the point rather than
+ * politeness: the reason to open this at all is usually that something about a conversation is
+ * wrong, and a pretty-printer that swallows a malformed file would hide exactly what was asked for.
+ */
+function readable(text: string): string {
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2);
+  } catch {
+    return text;
+  }
 }

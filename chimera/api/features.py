@@ -35,6 +35,8 @@ from chimera.api.schemas import (
     KanbanCardIn,
     KanbanMoveIn,
     KanbanRunIn,
+    LibraryCardOut,
+    LibraryImportOut,
     MemoryAddOut,
     MemoryItemOut,
     MemoryLayersOut,
@@ -130,6 +132,22 @@ def _skill_store() -> Any:
     return SkillStore(get_settings().home / "skills.json")
 
 
+def _library_card_dict(card: Any, *, owned: set[str], body: str = "") -> dict[str, Any]:
+    m = card.manifest
+    return {
+        "name": m.name,
+        "description": m.description,
+        "version": m.version,
+        "kind": m.kind,
+        "stage": m.stage,
+        "topic": m.topic,
+        "triggers": list(m.triggers),
+        "license": m.license,
+        "body": body,
+        "imported": m.name in owned,
+    }
+
+
 def _load_project(project_id: str) -> Any:
     """Rebuild the orchestrator from disk for an HITL write. Constructing the solve lane makes NO
     model call — the LLM only runs inside step()/run(), which the approve/deny endpoints never call.
@@ -223,6 +241,55 @@ def register_features(
         if not _skill_store().retire(name):
             raise HTTPException(status_code=404, detail="skill not found")
         return {"retired": True}
+
+    # ---- The curated library ----------------------------------------------------------------------
+    # The routes above are about skills the agent LEARNED — an empty store on a fresh install, which
+    # is what the Skills screen showed everyone on day one. The twenty-three cards that ship in the
+    # box had no route at all, so the app could not mention them and the only documented way to use
+    # one was a CLI command naming a repo-relative path.
+    @app.get("/api/skills/library", dependencies=[guard], response_model=list[LibraryCardOut])
+    def list_library() -> list[dict[str, Any]]:
+        """The curated cards, metadata only — enough to browse, not enough to read."""
+        from chimera.skills.library import load_library
+
+        owned = set(_skill_store().names())
+        return [_library_card_dict(card, owned=owned) for card in load_library()]
+
+    @app.get("/api/skills/library/{name}", dependencies=[guard], response_model=LibraryCardOut)
+    def get_library_card(name: str) -> dict[str, Any]:
+        """One card with its body — the Trigger/Do/Avoid/Check/Risk a person actually reads."""
+        from chimera.skills.library import load_card
+
+        card = load_card(name)
+        if card is None:
+            raise HTTPException(status_code=404, detail="no such curated skill card")
+        owned = set(_skill_store().names())
+        return _library_card_dict(card, owned=owned, body=card.instructions)
+
+    @app.post(
+        "/api/skills/library/{name}/import", dependencies=[guard], response_model=LibraryImportOut
+    )
+    def import_library_card(name: str) -> dict[str, Any]:
+        """Load a curated card into the user's store — `chimera skills-import <name>`, over HTTP.
+
+        Runs the same validator the CLI does. The cards are ours and pass it, which is exactly why
+        skipping it here would be the wrong economy: the gate is what makes the import path safe for
+        the day a card arrives from somewhere else, and a second entrance that bypasses it is how a
+        gate stops being one.
+        """
+        from chimera.governance import SkillValidator
+        from chimera.skills.library import load_card
+        from chimera.skills.skill_md import to_learned
+
+        card = load_card(name)
+        if card is None:
+            raise HTTPException(status_code=404, detail="no such curated skill card")
+        skill = to_learned(card)
+        verdict = SkillValidator().validate(skill.to_dict())
+        if not verdict.accepted:
+            raise HTTPException(status_code=400, detail="; ".join(verdict.reasons))
+        _skill_store().add(skill)
+        return {"imported": True, "name": skill.name, "status": skill.status}
 
     # ---- Cron -------------------------------------------------------------------------------------
     @app.get("/api/cron", dependencies=[guard], response_model=list[CronJobOut])

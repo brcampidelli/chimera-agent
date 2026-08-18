@@ -62,6 +62,12 @@ export function makeCodeApiMock() {
     // throw "Query data cannot be undefined" in a dozen suites that have nothing to do with
     // sessions. A default of "no past conversations" is also the honest starting state.
     listCodeSessions: vi.fn(async () => []),
+    // Bare `vi.fn()`, unlike `listCodeSessions` above, and the difference is not an oversight: both
+    // are only reached by an explicit action — clicking Duplicate, opening the JSON view — and the
+    // raw query is gated on a session being selected, so neither ever resolves undefined into
+    // react-query in a suite that does not touch them.
+    forkCodeSession: vi.fn(),
+    getCodeSessionRaw: vi.fn(),
     // The provider picker reads the live catalogue of external agents from here. Resolved by
     // default with an EMPTY list, which is the state of a machine with no adapters installed — so
     // every suite that is not about external agents sees the screen it saw before they existed.
