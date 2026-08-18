@@ -25,6 +25,10 @@ export function makeCodeApiMock() {
     getFsTree: vi.fn(),
     getGitDiff: vi.fn(),
     getGitStatus: vi.fn(),
+    // Resolves an EMPTY conversation by default, not `undefined`: the replay path reads
+    // `.exchanges` on whatever comes back, and a bare `vi.fn()` makes every suite that mounts the
+    // conversation die on a property access that has nothing to do with what it is testing.
+    getCodeSession: vi.fn(async () => ({ id: "s1", workspace: "/w", exchanges: [] })),
     getPlan: vi.fn(),
     getRuns: vi.fn(),
     gitCommit: vi.fn(),

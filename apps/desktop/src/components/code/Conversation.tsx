@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState , type ReactNode } from "react
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, Eraser, MessageSquare, Network, Send, ShieldCheck, Square, Undo2, Wrench } from "lucide-react";
+import { ArrowDown, Copy, Download, Eraser, MessageSquare, Network, Send, ShieldCheck, Square, Undo2, Wrench } from "lucide-react";
 import {
   deleteCodeSession,
   getCodeSession,
@@ -28,6 +28,13 @@ import {
 import { BatchProposal } from "@/components/code/BatchProposal";
 import { DiffView } from "@/components/code/DiffView";
 import { decompose } from "@/lib/decompose";
+import {
+  exchangeToMarkdown,
+  reconcile,
+  toMarkdown,
+  transcriptFilename,
+  type TranscriptExchange,
+} from "@/lib/transcript";
 import { useT, type TFunc } from "@/lib/i18n";
 import { useAgent } from "@/lib/agent-context";
 import { useStickToBottom } from "@/lib/useStickToBottom";
@@ -256,6 +263,36 @@ function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
   );
 }
 
+/** Tell the user their turn finished, when they are not looking at it.
+ *
+ *  A three-minute run is a reason to go and do something else, and coming back to find it finished
+ *  four minutes ago is the whole complaint. No IPC and no plugin: the app is served from 127.0.0.1,
+ *  which is a secure context by specification, so the Web Notification API is available on the page.
+ *
+ *  Only when the window is NOT focused. A notification for something the user is already watching
+ *  is the fastest way to have every notification muted, including the one that mattered.
+ *
+ *  ⚠️ macOS IS UNVERIFIED. WKWebView has historically not implemented `Notification`, and there was
+ *  no Mac to test on. Every call is guarded by a capability check and every failure is swallowed, so
+ *  the worst case is silence rather than a crash — but "it works on macOS" is NOT a claim being made
+ *  here. If it turns out not to, the fix is a native plugin, which is a bigger job than this item.
+ */
+async function notifyTurnFinished(title: string, body: string): Promise<void> {
+  try {
+    if (typeof Notification === "undefined") return;
+    if (document.visibilityState === "visible" && document.hasFocus()) return;
+    // Asked at the moment it is first needed, not on load: a permission prompt that appears before
+    // the user has done anything is the one people deny reflexively.
+    const permission =
+      Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
+    if (permission !== "granted") return;
+    new Notification(title, { body });
+  } catch {
+    // A denied permission, a webview without the API, a platform quirk — none of them are worth
+    // interrupting a finished turn over.
+  }
+}
+
 /** A coding conversation over one workspace: turns that read and edit, keeping their tool calls.
  *
  *  The composer has two buttons and they are not two modes of the same thing. **Send** is a turn:
@@ -354,6 +391,12 @@ export function Conversation({
     setAttached((prev) => [...prev, a]),
   );
   const [dragging, setDragging] = useState(false);
+  /** Off by default: an app that starts sending desktop notifications without being asked is one
+   *  people turn off entirely. Stored per browser profile, which is per install. */
+  const [notifyOnFinish, setNotifyOnFinish] = useState(
+    () => localStorage.getItem("chimera.notifyOnFinish") === "1",
+  );
+  const [exportNote, setExportNote] = useState("");
   /** A follow-up typed while a turn was still running. Shown, never silent — a message that
    *  disappeared into a queue nobody can see is indistinguishable from one that was dropped. */
   const [queued, setQueued] = useState<string | null>(null);
@@ -397,6 +440,47 @@ export function Conversation({
     queuedToSendRef.current = null;
     sendRef.current(false, text);
   }, [busy]);
+
+  /** Write the conversation to a Markdown file the user chooses.
+   *
+   *  The stored copy is fetched FIRST and reconciled with what is in memory. A session replayed
+   *  after a reload, or continued in a second window, can hold turns this component never saw, and
+   *  a transcript that is quietly missing the middle is worse than no transcript — it will be
+   *  believed. When the two disagree the user is told, rather than the difference being smoothed
+   *  over.
+   */
+  const exportTranscript = useCallback(async () => {
+    setExportNote("");
+    let stored: TranscriptExchange[] | null = null;
+    if (sessionId) {
+      try {
+        stored = (await getCodeSession(sessionId)).exchanges as TranscriptExchange[];
+      } catch {
+        // A transcript from memory is worth more than none. Say so rather than failing the export.
+        setExportNote(t("code.chat.export.storedUnreachable"));
+      }
+    }
+    const { exchanges: rows, recovered } = reconcile(exchanges as TranscriptExchange[], stored);
+    if (recovered > 0) setExportNote(t("code.chat.export.recovered", { n: recovered }));
+
+    const exportedAt = new Date().toISOString();
+    const markdown = toMarkdown(rows, { workspace: workspace || undefined, exportedAt });
+    const name = transcriptFilename(exportedAt);
+    try {
+      // A Blob download inside the Tauri webview is the uncertain half of this item, so the failure
+      // is caught rather than assumed away: if the anchor click does nothing, the text still reaches
+      // the clipboard and the user is told where it went.
+      const url = URL.createObjectURL(new Blob([markdown], { type: "text/markdown" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch {
+      await navigator.clipboard?.writeText(markdown).catch(() => undefined);
+      setExportNote(t("code.chat.export.toClipboard"));
+    }
+  }, [exchanges, sessionId, workspace, t]);
 
   const releaseQueued = useCallback((failed: boolean) => {
     setQueued((text) => {
@@ -500,6 +584,9 @@ export function Conversation({
           patchLast((e) => ({ ...e, answer: done.answer || e.answer, done }));
           publish({ status: "done", busy: false, report: done });
           setBusy(false);
+          if (notifyOnFinish) {
+            void notifyTurnFinished(t("code.chat.notify.title"), message.slice(0, 120));
+          }
           releaseQueued(verifyFailed);
           if (touchedFiles) {
             void qc.invalidateQueries({ queryKey: ["fs-tree"] });
@@ -516,6 +603,11 @@ export function Conversation({
           patchLast((e) => ({ ...e, failed: true, error: message }));
           publish({ status: "idle", busy: false });
           setBusy(false);
+          // A failure is MORE worth interrupting for than a success: the user walked away expecting
+          // work to happen, and it stopped.
+          if (notifyOnFinish) {
+            void notifyTurnFinished(t("code.chat.notify.failed"), message.slice(0, 120));
+          }
           // A turn that errored is never a base to send the next one from — hand the text back.
           releaseQueued(true);
         },
@@ -572,11 +664,40 @@ export function Conversation({
         <MessageSquare className="h-4 w-4" />
         <h2 className="text-sm font-semibold text-foreground">{t("code.chat.title")}</h2>
         {exchanges.length > 0 ? (
-          <Button size="sm" variant="ghost" className="ml-auto" onClick={() => void clear()}>
-            <Eraser className="h-3.5 w-3.5" /> {t("code.chat.clear")}
-          </Button>
+          <div className="ml-auto flex items-center gap-1">
+            {/* A record of what an agent did to a repository should be able to leave the window it
+                happened in. Until this, the only clipboard call in the whole app copied a `pip
+                install` line. */}
+            <Button size="sm" variant="ghost" onClick={() => void exportTranscript()}>
+              <Download className="h-3.5 w-3.5" /> {t("code.chat.export.label")}
+            </Button>
+            {/* Off by default and remembered per install. An app that starts sending desktop
+                notifications unasked is one people turn off entirely, including for the run that
+                mattered. */}
+            <Button
+              size="sm"
+              variant={notifyOnFinish ? "primary" : "ghost"}
+              aria-pressed={notifyOnFinish}
+              title={t("code.chat.notify.hint")}
+              onClick={() => {
+                const next = !notifyOnFinish;
+                setNotifyOnFinish(next);
+                localStorage.setItem("chimera.notifyOnFinish", next ? "1" : "0");
+              }}
+            >
+              {t("code.chat.notify.label")}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => void clear()}>
+              <Eraser className="h-3.5 w-3.5" /> {t("code.chat.clear")}
+            </Button>
+          </div>
         ) : null}
       </div>
+      {/* Said out loud rather than logged. "Your export is missing four turns" is exactly the kind
+          of thing that must not be discovered later, by someone reading the file. */}
+      {exportNote ? (
+        <p className="border-b border-hairline px-3 py-1 text-xs text-warn">{exportNote}</p>
+      ) : null}
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
         {/* `role="log"` tells a screen reader this region accumulates; `aria-busy` says the agent is
@@ -621,8 +742,24 @@ export function Conversation({
               // Markdown with syntax highlighting, which the chat had and this did not — a coding
               // conversation rendering a fenced block as prose is the one formatting failure that
               // matters here.
-              <div className="md min-w-0 text-sm leading-relaxed text-foreground/90">
-                <Markdown rehypePlugins={[rehypeHighlight]}>{e.answer}</Markdown>
+              <div className="group relative">
+                <div className="md min-w-0 text-sm leading-relaxed text-foreground/90">
+                  <Markdown rehypePlugins={[rehypeHighlight]}>{e.answer}</Markdown>
+                </div>
+                {/* Copies the exchange as MARKDOWN, not the rendered text: what the reader wants to
+                    paste into an issue is the fenced code that made it worth reading, and the
+                    rendered version loses exactly that. */}
+                <button
+                  type="button"
+                  aria-label={t("code.chat.copyAnswer")}
+                  title={t("code.chat.copyAnswer")}
+                  className="absolute right-0 top-0 rounded-chip p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 focus:opacity-100"
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(exchangeToMarkdown(e)).catch(() => undefined);
+                  }}
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                </button>
               </div>
             ) : null}
             {e.failed ? (
