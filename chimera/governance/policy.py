@@ -37,6 +37,24 @@ class Verdict:
         return self.decision in (Decision.ALLOW, Decision.WARN)
 
 
+class Scope(StrEnum):
+    """What a rule is entitled to read.
+
+    Every rule this module ships is either a **shell-command signature** (``rm -rf /``, a force
+    push, ``curl | bash``) or a **credential signature**. Only the first kind cares whether the text
+    is going to be executed, and running it over text that is merely being *written* is how a
+    markdown file that says "never run ``rm -rf /tmp/x``" got hard-blocked while the real two-line
+    script ran. Measured on a 42-case corpus: judging document bodies as commands cost 4 false
+    positives; not judging them at all cost 2 missed credentials. Scoping costs neither.
+    """
+
+    COMMAND = "command"
+    """Reads only text the tool is about to execute or act on."""
+
+    ANY_TEXT = "any_text"
+    """Reads document bodies too — for signatures that are dangerous wherever they appear."""
+
+
 @dataclass
 class Rule:
     """A lexical rule: a regex that maps a matching action to a decision."""
@@ -45,16 +63,30 @@ class Rule:
     pattern: re.Pattern[str]
     decision: Decision
     reason: str
+    scope: Scope = Scope.COMMAND
+    """Defaults to COMMAND: a new rule is a command signature until someone says otherwise."""
+
+
+def _pattern(source: str) -> re.Pattern[str]:
+    """Compile line-aware, so ``$`` means end of **line** rather than end of the whole action.
+
+    Two rules below anchor with ``$`` to say "this has to be the last argument": ``rm -rf .`` and
+    ``scp file host:/path``. An action holds a whole script, not one command, so without this flag
+    ``$`` meant end-of-script and both rules only fired when the dangerous command happened to be on
+    the final line — ``cd /srv\\nrm -rf .\\necho ok`` matched nothing. No default rule uses ``^``, so
+    the flag's other half changes no behaviour here; that was checked, not assumed.
+    """
+    return re.compile(source, re.MULTILINE)
 
 
 def _default_rules() -> list[Rule]:
     return [
-        Rule("rm_rf_root", re.compile(r"\brm\s+(-[a-zA-Z]*r[a-zA-Z]*f|-[a-zA-Z]*f[a-zA-Z]*r)\s+(/|~|\*|\.\s*$)"), Decision.BLOCK, "recursive force delete of a root/home/glob path"),
-        Rule("disk_destroy", re.compile(r"\bmkfs\b|\bdd\s+if=.*\bof=/dev/"), Decision.BLOCK, "disk format/overwrite"),
-        Rule("fork_bomb", re.compile(r":\s*\(\s*\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:"), Decision.BLOCK, "fork bomb"),
-        Rule("chmod_777_root", re.compile(r"\bchmod\s+-R\s+777\s+/"), Decision.BLOCK, "world-writable root"),
-        Rule("curl_pipe_shell", re.compile(r"\b(curl|wget)\b[^\n|]*\|\s*(sudo\s+)?(bash|sh|zsh)\b"), Decision.REVIEW, "piping a remote script straight into a shell"),
-        Rule("git_force_push", re.compile(r"\bgit\s+push\b[^\n]*(--force\b|--force-with-lease\b|\s-f\b)"), Decision.REVIEW, "force push"),
+        Rule("rm_rf_root", _pattern(r"\brm\s+(-[a-zA-Z]*r[a-zA-Z]*f|-[a-zA-Z]*f[a-zA-Z]*r)\s+(/|~|\*|\.\s*$)"), Decision.BLOCK, "recursive force delete of a root/home/glob path"),
+        Rule("disk_destroy", _pattern(r"\bmkfs\b|\bdd\s+if=.*\bof=/dev/"), Decision.BLOCK, "disk format/overwrite"),
+        Rule("fork_bomb", _pattern(r":\s*\(\s*\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:"), Decision.BLOCK, "fork bomb"),
+        Rule("chmod_777_root", _pattern(r"\bchmod\s+-R\s+777\s+/"), Decision.BLOCK, "world-writable root"),
+        Rule("curl_pipe_shell", _pattern(r"\b(curl|wget)\b[^\n|]*\|\s*(sudo\s+)?(bash|sh|zsh)\b"), Decision.REVIEW, "piping a remote script straight into a shell"),
+        Rule("git_force_push", _pattern(r"\bgit\s+push\b[^\n]*(--force\b|--force-with-lease\b|\s-f\b)"), Decision.REVIEW, "force push"),
         # The eight rules this set shipped with all watch what comes IN (a remote script piped into
         # a shell) or what gets DESTROYED (rm -rf, mkfs, a force push). None of them watched data
         # going OUT, and the taint ledger does not cover it either: it escalates an exec only once
@@ -75,7 +107,7 @@ def _default_rules() -> list[Rule]:
         # whatever the mode is, so these fire there from the moment they land.
         Rule(
             "data_upload_egress",
-            re.compile(
+            _pattern(
                 # curl reading a LOCAL file into the request body. `-T`/`--upload-file` take a
                 # filename directly; `-d` and `-F` only read a file when the value starts with `@`,
                 # and without it they carry an inline literal that never touched the disk.
@@ -98,15 +130,25 @@ def _default_rules() -> list[Rule]:
         # somewhere its owner never configured, and no force flag is involved.
         Rule(
             "git_push_foreign_remote",
-            re.compile(
+            _pattern(
                 r"\bgit\s+push\b(?![^\n]*\borigin\b)[^\n]*"
                 r"\s(?:https?://|git@|ssh://|[\w.-]+@[\w.-]+:)"
             ),
             Decision.REVIEW,
             "push to a remote other than origin",
         ),
-        Rule("sudo_rm", re.compile(r"\bsudo\s+rm\b"), Decision.WARN, "privileged delete"),
-        Rule("secret_material", re.compile(r"sk-[A-Za-z0-9]{16,}|AKIA[0-9A-Z]{16}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"), Decision.WARN, "possible secret/credential in the action"),
+        Rule("sudo_rm", _pattern(r"\bsudo\s+rm\b"), Decision.WARN, "privileged delete"),
+        # The one rule here that is NOT a shell-command signature, and so the one that reads
+        # document bodies as well. A key does not become safe by being written to a file instead of
+        # exported in a shell — `write_file {'path': '.env', 'content': 'OPENAI_API_KEY=sk-…'}` is
+        # the exact call this fired on in the measurement that produced `audit._redacted`.
+        Rule(
+            "secret_material",
+            _pattern(r"sk-[A-Za-z0-9]{16,}|AKIA[0-9A-Z]{16}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
+            Decision.WARN,
+            "possible secret/credential in the action",
+            scope=Scope.ANY_TEXT,
+        ),
     ]
 
 
@@ -121,11 +163,19 @@ class RuleSet:
     def add(self, rule: Rule) -> None:
         self.rules.append(rule)
 
-    def evaluate(self, action: str) -> Verdict | None:
-        """Return the most severe matching rule's verdict, or None if no match."""
+    def evaluate(self, action: str, *, document: str = "") -> Verdict | None:
+        """Return the most severe matching rule's verdict, or None if no match.
+
+        ``action`` is what the tool is about to *do*; ``document`` is the body it is about to
+        *write* — a file's contents, a patch, the text of a page. Only :attr:`Scope.ANY_TEXT` rules
+        see the second one, because a command signature found inside prose is a quotation, not a
+        command. ``document`` defaults to empty, so a caller with nothing to separate (``chimera
+        guard``, a distilled rule under test) behaves exactly as before.
+        """
         best: Verdict | None = None
         for rule in self.rules:
-            if rule.pattern.search(action):
+            haystack = f"{action}\n{document}" if rule.scope is Scope.ANY_TEXT and document else action
+            if rule.pattern.search(haystack):
                 candidate = Verdict(rule.decision, rule.reason, rule.name)
                 if best is None or _SEVERITY[candidate.decision] > _SEVERITY[best.decision]:
                     best = candidate
