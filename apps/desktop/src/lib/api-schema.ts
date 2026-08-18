@@ -1851,6 +1851,8 @@ export interface components {
             changed_paths: string[];
             /** Diffs */
             diffs: components["schemas"]["FileDiffOut"][];
+            /** Error */
+            error: string;
             /** Index */
             index: number;
             /** Reverted */

@@ -970,8 +970,24 @@ def build_api_app(
                     },
                 )
                 units = [(f"task{i}", make_run(i, t)) for i, t in enumerate(req.tasks)]
+                # Named here rather than left to the default, for the reason every other
+                # user-editable knob on this endpoint is read from ``live_settings()``: an app
+                # built with an injected ``Settings`` (a test, a bench) would otherwise silently
+                # run under the PROCESS-wide value instead of the one it was handed.
+                #
+                # This is the surface where the bound stops being a nicety. There is no terminal
+                # to Ctrl-C, so a hung worker held the SSE stream open with no way to interrupt
+                # it — and, worse because it outlives the request, the ``finally`` below never
+                # ran, so ``_agents_cancels[batch_id]`` leaked for the life of the process. When
+                # the deadline fires the batch still LANDS: the timed-out tasks come back as
+                # failures carrying ``timed out after Ns``, which is why this is a bound and not
+                # a crash.
                 batch = run_isolated(
-                    ws, units, succeeded=lambda r: r.success, max_workers=max_workers
+                    ws,
+                    units,
+                    succeeded=lambda r: r.success,
+                    max_workers=max_workers,
+                    timeout=live_settings().batch_timeout,
                 )
                 emit("batch_done", _agents_batch_dict(req, ws, batch))
             except Exception as exc:  # noqa: BLE001 — surfaced to the client as an error event
@@ -1547,10 +1563,19 @@ def _agents_batch_dict(req: AgentsRequest, ws: Path, batch: IsolatedBatch[Any]) 
                     "reverted": any(a.reverted for a in auto.attempts),
                     "changed_paths": isolated.changed_paths,
                     "diffs": diffs,
+                    # Empty here by construction — a unit that returned a result has no error —
+                    # but read from the same field as the branch below so there is one source of
+                    # truth for it rather than a literal that could drift.
+                    "error": isolated.error,
                 }
             )
         else:
-            # The unit crashed before returning a result (isolation caught it) — honest empty shape.
+            # No result at all: the unit crashed, or the batch's deadline blew before it finished.
+            # Both used to arrive as the same anonymous ``success: false`` with zero attempts, which
+            # is the shape of a task that simply did not pass — so "we stopped waiting for it" was
+            # indistinguishable from "it tried and failed". ``error`` carries the real reason
+            # (``timed out after Ns`` or the exception type), which is the only part of this shape
+            # that was ever missing; everything else stays honestly empty.
             results.append(
                 {
                     "index": index,
@@ -1560,6 +1585,7 @@ def _agents_batch_dict(req: AgentsRequest, ws: Path, batch: IsolatedBatch[Any]) 
                     "reverted": False,
                     "changed_paths": isolated.changed_paths,
                     "diffs": [],
+                    "error": isolated.error,
                 }
             )
     return {
