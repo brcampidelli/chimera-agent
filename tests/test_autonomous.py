@@ -1011,3 +1011,199 @@ def test_require_diff_cannot_fail_without_a_workspace_guard() -> None:
 
 def test_require_diff_defaults_off() -> None:
     assert AutonomousAgent(FakeWorker()).require_diff is False
+
+
+# --- what a compaction restores: seeded where the plan is decided, not by each caller ---
+
+
+class _StatefulWorker:
+    """A worker that owns a ``run_state`` like the real Agent, recording what it held per run.
+
+    Records the RESTORED MESSAGE, not just the fields: the message is what a compaction actually
+    re-injects, and the bug this section guards is a plan landing in the wrong field rather than a
+    plan going missing. A field-only assertion cannot see that.
+    """
+
+    def __init__(self, answer: str = "nope") -> None:
+        from chimera.core.context_budget import RunState
+
+        self.answer = answer
+        self.run_state = RunState()
+        self.plans_seen: list[str] = []
+        self.restored_seen: list[str] = []
+
+    def run(self, task: str) -> AgentResult:
+        # Exactly what `Agent.run` does with the prompt it is handed (chimera/core/agent.py:331-332),
+        # and NOT an incidental detail: the prompt is `_compose` output, which embeds the plan, so
+        # this copy is how an unset `task` comes to hold plan A and freeze it for the whole run. A
+        # double that skips it cannot fail against the bug — verified, not assumed: without this
+        # line the re-plan test below stays green when the fix is reduced to seeding `plan` alone.
+        if not self.run_state.task:
+            self.run_state.task = task
+        self.plans_seen.append(self.run_state.plan)
+        self.restored_seen.append(str((self.run_state.as_message() or {}).get("content", "")))
+        return AgentResult(answer=self.answer, steps=1, transcript=[], stopped_reason="done")
+
+
+class _FixedPlanner:
+    """Plans differently each call, so a re-plan is distinguishable from the plan it replaced."""
+
+    def __init__(self, *plans: list[str]) -> None:
+        from chimera.core.planner import Plan
+
+        self._plans = [Plan(steps=list(steps)) for steps in plans]
+        self.calls = 0
+
+    def plan(self, task: str, *, context: str = "") -> Any:
+        self.calls += 1
+        return self._plans[min(self.calls - 1, len(self._plans) - 1)]
+
+
+def test_a_run_that_plans_for_itself_puts_its_plan_in_the_plan_field() -> None:
+    """``run_state.plan`` was assigned by ``/api/runs`` and by nothing else, so a self-planning run
+    left it empty. Not a loss — ``_compose`` embeds the plan in the prompt and ``Agent.run`` copies
+    the prompt into ``task`` — but it put the plan under "The task you were given", which is what
+    makes a re-plan restore the abandoned steps below.
+    """
+    worker = _StatefulWorker()
+    auto = AutonomousAgent(
+        worker,  # type: ignore[arg-type]
+        planner=_FixedPlanner(["read the file", "write the fix"]),  # type: ignore[arg-type]
+        config=AutonomousConfig(max_attempts=1, use_planner=True, use_manager=False),
+    )
+    auto.run("fix the bug")
+
+    # Asserted on what the worker held WHILE it ran, not afterwards: a value written after the run
+    # is a value no compaction could ever have restored.
+    assert worker.plans_seen == ["1. read the file\n2. write the fix"]
+    assert "read the file" in worker.restored_seen[0]
+
+
+def test_the_task_field_holds_the_request_not_the_composed_prompt() -> None:
+    """``Agent.run`` fills ``task`` with whatever string it was called with, and on this path that
+    is ``_compose`` output — the plan plus the whole spine/lessons context block. Restoring that
+    verbatim re-injects, under the wrong label, the very context compaction just paid to drop."""
+    worker = _StatefulWorker()
+    auto = AutonomousAgent(
+        worker,  # type: ignore[arg-type]
+        planner=_FixedPlanner(["read the file"]),  # type: ignore[arg-type]
+        config=AutonomousConfig(max_attempts=1, use_planner=True, use_manager=False),
+    )
+    auto.run("fix the bug")
+
+    assert worker.run_state.task == "fix the bug"
+    # The prompt's own framing is the tell: `_compose` writes "Task: <task>", so its presence in the
+    # restored message means the composed prompt was copied in wholesale.
+    assert "Task: fix the bug" not in worker.restored_seen[0]
+
+
+def test_the_plan_is_not_duplicated_into_the_task_list() -> None:
+    """``tasks`` is a task list *with status* — it exists so finished work is not redone. The steps
+    carry none, so copying them there re-prints the plan under a heading claiming progress the loop
+    does not track."""
+    worker = _StatefulWorker()
+    auto = AutonomousAgent(
+        worker,  # type: ignore[arg-type]
+        planner=_FixedPlanner(["read the file", "write the fix"]),  # type: ignore[arg-type]
+        config=AutonomousConfig(max_attempts=1, use_planner=True, use_manager=False),
+    )
+    auto.run("fix the bug")
+
+    assert worker.run_state.tasks == []
+    restored = str((worker.run_state.as_message() or {}).get("content", ""))
+    assert "Tasks:" not in restored
+    assert restored.count("read the file") == 1  # once, under "Plan:" — not twice in two styles
+
+
+def test_after_a_replan_the_abandoned_plan_is_nowhere_in_what_is_restored() -> None:
+    """The one that matters, and the one a plan-field-only fix still fails.
+
+    On a stall the loop rebuilds the plan. Writing plan B into ``plan`` is not enough: ``Agent.run``
+    freezes ``task`` on attempt 1, so it still holds attempt 1's composed prompt — plan A, verbatim,
+    under the heading ``as_message`` renders FIRST. The agent would be handed both plans, with the
+    abandoned one presented as the task it was given, and nothing to tell it which is live.
+    """
+    from chimera.evolution.stagnation import StagnationDetector
+
+    worker = _StatefulWorker()
+    planner = _FixedPlanner(["A-step"], ["B-step"])
+    auto = AutonomousAgent(
+        worker,  # type: ignore[arg-type]
+        planner=planner,  # type: ignore[arg-type]
+        manager=_FeedbackManager(),  # type: ignore[arg-type]
+        stagnation=StagnationDetector(window=2),  # two identical failures = a stall
+        replan_on_stall=True,
+        config=AutonomousConfig(max_attempts=3, use_planner=True, use_manager=True),
+    )
+    auto.run("do the thing")
+
+    assert planner.calls >= 2  # the stall really did re-plan; without that this proves nothing
+    assert worker.plans_seen[0] == "1. A-step"
+    assert worker.plans_seen[-1] == "1. B-step"
+
+    restored = worker.restored_seen[-1]
+    assert "B-step" in restored  # the live plan is there
+    assert "A-step" not in restored  # and the abandoned one is not, in ANY field
+
+
+def test_the_escalate_worker_is_seeded_too_not_just_the_cheap_one() -> None:
+    """It is a separate Agent with its own RunState, and it runs every attempt after the first —
+    the same attempts a re-plan lands on. Seeding only ``self.worker`` would restore nothing on
+    exactly the retries that have the most history to compact away."""
+    cheap, fused = _StatefulWorker(), _StatefulWorker()
+    auto = AutonomousAgent(
+        cheap,  # type: ignore[arg-type]
+        escalate_worker=fused,  # type: ignore[arg-type]
+        planner=_FixedPlanner(["the only step"]),  # type: ignore[arg-type]
+        verifier=FlakyVerifier(fail_times=1),  # attempt 1 fails, so attempt 2 escalates
+        config=AutonomousConfig(max_attempts=2, use_planner=True, use_manager=False),
+    )
+    auto.run("do the thing")
+
+    assert fused.plans_seen == ["1. the only step"]
+    assert fused.run_state.task == "do the thing"
+
+
+def test_a_resumed_run_seeds_the_plan_it_restored_from_disk(tmp_path: Path) -> None:
+    """A checkpoint carries the plan, so a resumed run has to reach its worker with it too: that
+    path rebuilds `plan` from the stored steps and had no caller to re-seed it either."""
+    from chimera.core.runstate import RunCheckpointer
+
+    store = RunCheckpointer(tmp_path / "runs.db")
+    store.save(
+        "job",
+        {
+            "task": "do the thing",
+            "attempts": [],
+            "next_index": 2,
+            "feedback": "attempt 1 failed",
+            "plan_steps": ["the plan from before the crash"],
+            "plan_raw": "1. the plan from before the crash",
+        },
+    )
+    worker = _StatefulWorker()
+    auto = AutonomousAgent(
+        worker,  # type: ignore[arg-type]
+        planner=_FixedPlanner(["the plan this process just made"]),  # type: ignore[arg-type]
+        checkpointer=store,
+        config=AutonomousConfig(max_attempts=2, use_planner=True, use_manager=False),
+    )
+    auto.run("do the thing", thread_id="job")
+
+    # The resume DISCARDS the plan this process made moments earlier. Seeded at the planning call
+    # instead of here, the run would carry the plan it threw away while executing another.
+    assert worker.plans_seen == ["1. the plan from before the crash"]
+    assert "the plan this process just made" not in worker.restored_seen[0]
+
+
+def test_a_worker_without_a_run_state_still_runs() -> None:
+    # `Worker` promises only `run`; an agent driven over ACP has none, and a worker we cannot
+    # restore into is not a worker we may refuse to run.
+    worker = FakeWorker("done")
+    auto = AutonomousAgent(
+        worker,
+        planner=_FixedPlanner(["a step"]),  # type: ignore[arg-type]
+        config=AutonomousConfig(max_attempts=1, use_planner=True, use_manager=False),
+    )
+    assert auto.run("do the thing").success is True
+    assert not hasattr(worker, "run_state")

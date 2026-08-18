@@ -810,17 +810,22 @@ def test_a_batch_task_carries_the_ceiling_its_batch_was_given(tmp_path: Any) -> 
     assert seen == [0.5]
 
 
-def test_run_state_carries_the_plan_across_a_compaction(tmp_path: Any) -> None:
-    """Compaction keeps the recent tail; the plan is the one thing an agent cannot re-derive from it.
+def test_the_api_no_longer_seeds_run_state_by_hand(tmp_path: Any) -> None:
+    """Being the only entry point that filled these fields is how they drifted: this one wrote
+    `plan`, copied the steps into `tasks` (a field documented as carrying status) and put the raw
+    task in `current_state` (documented as progress) — while a run that planned for itself wrote
+    none of them and got the plan restored inside `task` instead, as part of the composed prompt.
 
-    ``Agent.run_state`` existed with a comment saying it expected a caller and had none — so the
-    budget above would have compacted blind. This is that caller.
+    The solve loop now writes `task` and `plan` once per attempt, downstream of all four points
+    where the plan is decided. Asserted there, against a run that actually runs — see
+    `tests/test_autonomous.py`; an assembled-but-never-started agent cannot show what a compaction
+    would restore. What this pins is that the endpoint no longer writes a second, staler copy.
     """
     agent = _solve_agent(tmp_path, plan="1. do it\n2. verify it")
     state = agent.worker.run_state
-    assert state.current_state == "t"
-    assert state.tasks == ["do it", "verify it"]
-    assert "do it" in (state.as_message() or {}).get("content", "")
+    assert (state.task, state.plan, state.tasks, state.current_state) == ("", "", [], "")
+    assert agent.provided_plan is not None  # the approved plan still reaches the loop that seeds it
+    assert agent.provided_plan.steps == ["do it", "verify it"]
 
 
 def test_write_region_actually_refuses_a_write_outside_it(tmp_path: Any) -> None:

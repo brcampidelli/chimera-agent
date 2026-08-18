@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
+    from chimera.core.context_budget import RunState
     from chimera.evolution.diff_gate import FileDiff
     from chimera.fusion.probe_log import ProbeLog
 
@@ -472,6 +473,46 @@ class AutonomousAgent:
         except TypeError:  # signature lied (e.g. **kwargs-only) — fall back to the plain call
             return worker.run(prompt)
 
+    def _seed_run_state(self, worker: Worker, task: str, plan: Plan | None) -> None:
+        """Tell the worker what it was asked and which plan it is on, in the fields that mean those.
+
+        Not "the plan was missing". The plan already survived compaction, by accident: the worker is
+        prompted with ``_compose`` output, which embeds ``Plan:\\n…``, and ``Agent.run`` copies its
+        whole prompt into ``run_state.task`` when no caller set one. So the real defect is FORM —
+        the plan was restored inside the field labelled *"The task you were given"*, along with the
+        entire spine/repo-map/lessons context block that compaction had just paid to remove.
+
+        That accident turns harmful on a re-plan. ``Agent.run`` freezes ``task`` on the first
+        attempt, so it keeps the composed prompt of attempt 1 — plan A — verbatim, and
+        ``as_message`` renders it FIRST, above the tail where the worker is executing plan B.
+        Writing plan B into ``plan`` and leaving ``task`` alone would restore both and let the agent
+        pick. Seeding the raw task here pre-empts the copy (``Agent.run`` only fills a task nobody
+        set), which is what makes one plan the only plan.
+
+        Here rather than in each caller because the plan is a local written at four points — given
+        by the caller, self-planned, restored from a checkpoint, replaced by a stall re-plan — and
+        no caller sees the last three. This is the one place downstream of all four, so it is also
+        after the checkpoint restore *discards* the plan the run made moments earlier: seeded at the
+        planning call instead, a resumed run would carry the plan it threw away.
+
+        ``RunState.tasks`` is deliberately untouched. It is a task list *with status* — it exists so
+        finished work is not redone — and bare steps assert that nothing is done. This loop counts
+        attempts, not steps, so it has no completion to report and inventing one would be a lie in
+        the field whose entire purpose is to be believed.
+
+        Duck-typed for the same reason ``_run_worker`` introspects: ``Worker`` promises only
+        ``run``. An agent driven over ACP has no ``run_state``, and a worker we cannot restore into
+        is not a broken worker.
+        """
+        state: RunState | None = getattr(worker, "run_state", None)
+        if state is None:
+            return
+        # Both assigned every attempt, and the escalate worker is a different Agent with its own
+        # RunState that only ever runs attempts > 1 — the same attempts a re-plan lands on. Values
+        # written once would be stale exactly where they are read.
+        state.task = task
+        state.plan = plan.as_text() if plan is not None else ""
+
     def run(self, task: str, *, thread_id: str | None = None) -> AutonomousResult:
         spine = assemble_spine(self.spine_workspace, task) if self.spine_workspace else ""
         # Behavioural loop: fold lessons from PRIOR runs (recalled before this run
@@ -628,6 +669,11 @@ class AutonomousAgent:
             )
             if worker is self.escalate_worker:
                 _log.debug("attempt %d: task proved hard, escalating retry to fusion worker", index)
+            # After the choice, so this lands on the worker that actually runs the attempt: the
+            # escalate worker is a separate Agent with its own RunState. `task`, not `plan_task` —
+            # the field documents itself as the request verbatim, and a resume rebinds `task` from
+            # the checkpoint while `plan_task` was normalised before that and would be stale.
+            self._seed_run_state(worker, task, plan)
             # Re-check right before the worker call, so a stop that arrived while the snapshot was
             # being taken still halts before we pay for a model step. The call is no longer
             # uninterruptible: `_run_worker` hands `should_stop` down, and a worker that accepts it

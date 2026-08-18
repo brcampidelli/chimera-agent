@@ -104,8 +104,14 @@ class RunState:
     #: removed. A file it can re-read; an instruction it cannot.
     #:
     #: Set by :meth:`Agent.run` itself rather than by each caller, because the callers that most
-    #: need it are the ones nobody remembered to update: `/api/runs` populates plan and tasks, and
+    #: need it are the ones nobody remembered to update: `/api/runs` populated plan and tasks, and
     #: the conversational coding turn — the screen that compacts most — set only ``open_file``.
+    #:
+    #: That default is a copy of whatever string ``run`` was called with, which is right for a chat
+    #: turn and wrong for the autonomous loop, where the argument is a composed prompt carrying the
+    #: plan and the whole retrieved-context block. So ``AutonomousAgent`` writes the raw request
+    #: here first and ``run`` leaves it alone. Anything else that prompts an agent with an assembled
+    #: string owes this field the request that string was assembled FROM.
     #:
     #: Two independent papers measure this failure class (arXiv 2608.11242: compactors retain 17%
     #: of injected session constraints; 2608.11392: rule-form items survive a compaction far better
@@ -114,9 +120,12 @@ class RunState:
     task: str = ""
     #: Path of the file currently being worked on, and its content — re-read, not remembered.
     open_file: tuple[str, str] | None = None
-    #: The plan the run is executing.
+    #: The plan the run is executing — the CURRENT one. Refreshed per attempt by the loop that owns
+    #: the plan, because a run that re-plans on a stall would otherwise restore the steps it just
+    #: abandoned: worse than restoring nothing, since the agent then works confidently from them.
     plan: str = ""
-    #: Task list with status, so finished work is not redone.
+    #: Task list with status, so finished work is not redone. Status is the point: a bare copy of
+    #: the plan's steps asserts that none are done, which is a claim, not a blank.
     tasks: list[str] = field(default_factory=list)
     #: One paragraph: what the agent was doing and how far it had got.
     current_state: str = ""
