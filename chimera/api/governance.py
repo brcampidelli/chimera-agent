@@ -39,10 +39,12 @@ def run_injection_suite(settings: Settings | None = None) -> dict[str, Any]:
     ``narrow_on_taint=True``. That layer is armed on every app surface — but it is switchable, and
     with ``CHIMERA_TAINT_NARROW=0`` this same defended figure would describe a build the reader does
     not have. So ``armed`` reports the install rather than the capability, and ``trust_kernel``
-    reports the layer that is NOT here: the BLOCK/REVIEW policy rules exist and are wired only into
-    ``chimera run --guard`` / ``solve --guard``, so nothing on this screen measures them and nothing
-    on the app path runs them. Naming an absent layer is cheaper than having someone infer it is
-    present from a good score.
+    reports the layer these numbers do NOT cover: the BLOCK/REVIEW policy rules are exercised by
+    nothing in this suite. It is a constant `False` because that is a fact about the SUITE, which
+    does not change with configuration — unlike where the rules run, which since `assemble_registry`
+    began calling `govern_step` is `chimera run --guard`, `solve --guard`, and the run and turn
+    endpoints whenever ``CHIMERA_GOVERNANCE`` is set. Naming an unmeasured layer is cheaper than
+    having someone infer it is scored from a good number.
     """
     settings = settings or get_settings()
     defended = run_redteam(default_attacks(), defended=True)
@@ -93,14 +95,15 @@ def run_injection_suite(settings: Settings | None = None) -> dict[str, Any]:
         # What this scoreboard is about, and whether it is switched on where you are reading it.
         "defense": "taint_narrowing",
         "armed": bool(settings.taint_narrow),
-        # Whether the BLOCK/REVIEW kernel is INSTALLED on this path — derived, because it was
-        # written here as a literal `False` and stayed false through the change that made it
-        # true. A hardcoded fact about the rest of the system is a fact with no way to notice
-        # the system moved.
-        #
-        # Installed, not measured: the suite below still exercises taint narrowing only, so a
-        # reader must not take this flag as a score for the kernel.
-        "trust_kernel": (settings.governance_mode or "off").strip().lower() in ("observe", "enforce"),
+        # MEASURED, not installed — and the distinction is why this is a constant rather than
+        # something derived from `governance_mode`. It was briefly derived, and that was wrong
+        # in the dangerous direction: the app hides this whole line when the flag is true
+        # (Governance.tsx), so turning governance on would have silenced the disclaimer for
+        # `/api/chat/stream`, `/v1/chat/completions`, `/api/kanban/run` and `/api/projects` —
+        # four HTTP surfaces that do not go through `assemble_registry` and still have no
+        # kernel. One boolean cannot describe a layer that is on some endpoints and not
+        # others; what it CAN say truthfully is that nothing on this screen measures it.
+        "trust_kernel": False,
     }
 
 

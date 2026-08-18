@@ -70,12 +70,19 @@ class TrustKernel:
         # taint and narrowing event, the rare ones that screen exists for, off the first page.
         # `assemble_registry` had already reached this conclusion for `restrict_registry` and
         # written it down: "a trail nobody can read is the same as no trail."
+        #
+        # The cost, named because it is the same shape as a bug this file's neighbours have fixed
+        # twice: with it off and nothing refused, the log holds no governance line at all — so "the
+        # kernel is installed and allowed everything" and "the kernel is not installed" look
+        # identical to whoever reads the Security screen. Those are opposite claims. Distinguishing
+        # them needs a line that says the kernel STARTED, written once per assembly rather than once
+        # per call; that is not this parameter's job and it is not yet anyone's.
         self.audit_allows = audit_allows
         self.precedents = precedents
         self.default = default
         self._judge_takes_context = _accepts_context(judge)
 
-    def evaluate(self, action: str, *, context: str = "") -> Verdict:
+    def evaluate(self, action: str, *, context: str = "", record_as: str | None = None) -> Verdict:
         """Decide on ``action``, optionally told *why* it is happening.
 
         ``context`` was declared here and read nowhere: the signature accepted it, the body never
@@ -117,7 +124,10 @@ class TrustKernel:
             self.audit.record(
                 "governance",
                 {
-                    "action": action[:200],
+                    # `record_as` is the caller's audit-safe rendering of the same action — the
+                    # rules judge the full text, the log keeps a version with document bodies
+                    # elided. Falls back to `action` for the callers that have nothing to hide.
+                    "action": (record_as or action)[:200],
                     "decision": verdict.decision.value,
                     "rule": verdict.rule,
                     "reason": verdict.reason,

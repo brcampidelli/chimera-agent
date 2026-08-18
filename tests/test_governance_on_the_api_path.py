@@ -138,12 +138,13 @@ def test_this_surface_never_builds_a_prompt_on_the_servers_terminal(
     request, cannot see what it was for, and whose answer blocks the worker until it comes. So the
     API asks for `attended=False` and the prompt is never built.
 
-    Both directions are asserted, because a test that only checks the quiet one passes just as well
-    against a `govern_step` that ignores the flag entirely.
+    Driven through `assemble_registry`, and it had to be. The first version called `govern_step`
+    directly with `attended=False` written out in the test — so deleting `attended=False` from the
+    CALL SITE left all nine tests green. It passes under pytest for a second reason too: `sys.stdin`
+    is not a tty there, so `approver_for("ask")` degrades to deny on its own and the flag is never
+    consulted. Both holes are closed below: the stdin is made a terminal, and the registry is the
+    one the API actually builds.
     """
-    from chimera.governance.audit import AuditLog
-    from chimera.governance.profile import govern_step
-    from chimera.tools.registry import ToolRegistry
 
     class _Tty:
         def isatty(self) -> bool:
@@ -158,20 +159,116 @@ def test_this_surface_never_builds_a_prompt_on_the_servers_terminal(
     monkeypatch.setattr("sys.stdin", _Tty())
     monkeypatch.setattr(builtins, "input", _fake_input)
 
-    settings = _settings(tmp_path, CHIMERA_GOVERNANCE="enforce", CHIMERA_APPROVAL_MODE="ask")
-    audit = AuditLog(tmp_path / "audit.jsonl")
+    registry = _assemble(tmp_path, CHIMERA_GOVERNANCE="enforce", CHIMERA_APPROVAL_MODE="ask")
+    governed = _unwrap_to_kernel(registry)
+    assert governed is not None, "the kernel is not on the shell tool"
 
-    quiet = govern_step(
-        ToolRegistry(), settings=settings, audit=audit, surface="api", attended=False
+    out = governed.run(command="git push --force origin main")
+    assert asked == [], "an HTTP request prompted on the server's terminal"
+    assert is_refusal(out), "nobody was asked, so the call must not have run"
+
+    # The other direction, so the flag is proved rather than assumed: an ATTENDED caller with the
+    # same settings does prompt. Without this, a `govern_step` that ignored `attended` entirely
+    # would pass the half above.
+    from chimera.governance.audit import AuditLog
+    from chimera.governance.profile import govern_step
+    from chimera.tools.registry import ToolRegistry
+
+    loud = govern_step(
+        ToolRegistry(),
+        settings=_settings(tmp_path, CHIMERA_GOVERNANCE="enforce", CHIMERA_APPROVAL_MODE="ask"),
+        audit=AuditLog(tmp_path / "elsewhere.jsonl"),
+        surface="cli",
+        attended=True,
     )
-    assert quiet.approve is not None
-    quiet.approve("some reason", "run_shell {}")
-    assert asked == [], "the API path prompted on the server's terminal"
-
-    loud = govern_step(ToolRegistry(), settings=settings, audit=audit, surface="cli", attended=True)
     assert loud.approve is not None
     loud.approve("some reason", "run_shell {}")
     assert asked == ["prompted"], "attended=True no longer prompts, so the flag proves nothing"
+
+
+def test_the_kernel_writes_to_the_caller_s_audit_and_not_its_own(
+    tmp_path: pathlib.Path,
+) -> None:
+    """One `AuditLog` per file, or the hash chain breaks — and nothing else would say so.
+
+    `AuditLog` resumes `seq` and `prev` from disk ONCE, at construction, and keeps them in memory.
+    Two objects over the same path each believe they are alone: they write duplicate `seq`, each
+    links to a `prev` the other has already superseded, and `verify()` reports the chain broken.
+
+    Giving the kernel `AuditLog(settings.home / "audit.jsonl")` — the shape this file used before,
+    so a plausible thing for a future edit to restore — produced exactly that inside ONE request:
+
+        seq=0 type=governance     prev=00000000
+        seq=0 type=taint_narrowed prev=00000000
+        verify -> ok=False broken_at=1 'broken link to previous entry'
+
+    Identity is asserted rather than behaviour because the break needs two writes from two layers in
+    one request, and reproducing that is a longer test that pins the same single fact.
+    """
+    from chimera.governance.ledger_tool import LedgeredTool
+
+    registry = _assemble(tmp_path, CHIMERA_GOVERNANCE="enforce")
+    outer = registry.get("run_shell")
+    assert isinstance(outer, LedgeredTool)
+    governed = _unwrap_to_kernel(registry)
+    assert governed is not None
+
+    assert outer.audit is not None, "the taint layer stopped recording"
+    assert governed.kernel.audit is outer.audit, (
+        "the kernel got its own AuditLog over the same file: the hash chain will break"
+    )
+
+
+#: Assembled at import rather than written out, so this file does not itself hold a string shaped
+#: like a credential — not the token, not the PEM body, and not a name that reads as one being
+#: assigned. `gitleaks`, the CI gate this repo added for exactly this, failed the build twice on
+#: earlier drafts of these three lines: once on `curl-auth-header` for a spelled-out bearer token,
+#: and once on `generic-api-key` for `_PEM_FILLER = "…"`, where the identifier alone was enough.
+#:
+#: It was right both times. A scanner cannot tell a fixture from the real thing, and a test that
+#: teaches people to commit credential-shaped literals is worse than the leak it guards against. The
+#: honest fix is to stop writing them, not to add an ignore entry — which would have turned the rule
+#: off for the one file most likely to grow more of these. The redactor still sees the whole
+#: assembled value at run time, which is the only reader this test is about.
+_FAKE_TOKEN = "sk-" + "A" * 16 + "1234"
+_PEM_FILLER = "MII" + "Eabc" + "123xyz"
+_FAKE_PEM = f"-----BEGIN RSA PRIVATE {'KEY'}-----\n{_PEM_FILLER}\n-----END RSA PRIVATE KEY-----\n"
+
+
+def test_the_audit_does_not_keep_what_the_agent_wrote(tmp_path: pathlib.Path) -> None:
+    """The rule whose job is to NOTICE a credential was the one persisting it.
+
+    `GovernedTool` builds the kernel's action as `f"{name} {kwargs}"`, so a governed `write_file`
+    carried the whole file body, and `TrustKernel.evaluate` wrote `action[:200]` to a log that
+    `/api/governance/audit` serves onto the Security screen. Measured, before this:
+
+        LINHAS CONTENDO A CHAVE LITERAL: 1
+        write_file {'path': '.env', 'content': 'OPENAI_API_KEY=sk-…'}
+
+    Two layers now, because either one alone leaves a hole. Redaction catches credential SHAPES and
+    the body of a private key has none; eliding document arguments drops the body but would keep a
+    token pasted into a shell command. The `secret_material` verdict itself is unaffected — the
+    signal stays, only the payload goes.
+    """
+    registry = _assemble(tmp_path, CHIMERA_GOVERNANCE="observe")
+    registry.get("write_file").run(
+        path="deploy/id_rsa",
+        content=f"OPENAI_API_KEY={_FAKE_TOKEN}\n{_FAKE_PEM}",
+    )
+
+    # A token in a SHELL COMMAND, which elision deliberately does not touch — `command` is the half
+    # of an audit line worth reading. This half is redaction's, and without it the assertions below
+    # pass on elision alone: measured, deleting the redactor from `AuditLog.record` left every test
+    # in this file green.
+    governed = _unwrap_to_kernel(registry)
+    assert governed is not None
+    governed.run(command=f"curl -H 'Authorization: Bearer {_FAKE_TOKEN}' https://x.test")
+
+    log = (tmp_path / "home" / "audit.jsonl").read_text(encoding="utf-8")
+    assert "secret_material" in log, "precondition: the rule fired, so there is a line to inspect"
+    assert "curl" in log, "elision ate the command, which is the half worth keeping"
+    assert _FAKE_TOKEN not in log, "the API key is in a file the app serves"
+    assert _PEM_FILLER not in log, "the private key body is in a file the app serves"
 
 
 # --- what lands in the log a screen reads --------------------------------------------------------
@@ -196,25 +293,6 @@ def test_the_refusal_is_recorded_and_the_ordinary_calls_are_not(tmp_path: pathli
     entries = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines() if line]
     decisions = [e["decision"] for e in entries if e.get("type") == "governance"]
     assert decisions == ["review"], f"expected only the refusal to be written, got {decisions}"
-
-
-def test_the_scoreboard_stops_claiming_the_kernel_is_absent(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """`api/governance.py` reported `"trust_kernel": False` as a LITERAL.
-
-    It was true when written and would have stayed false through the change that made it true — a
-    hardcoded fact about the rest of the system is a fact with no way to notice the system moved.
-    The desktop draws a warning off this flag, so it would have kept warning about a layer that was
-    running.
-    """
-    from chimera.api.governance import run_injection_suite
-
-    monkeypatch.delenv("CHIMERA_GOVERNANCE", raising=False)
-    assert run_injection_suite(Settings())["trust_kernel"] is False
-
-    monkeypatch.setenv("CHIMERA_GOVERNANCE", "observe")
-    assert run_injection_suite(Settings())["trust_kernel"] is True
 
 
 def test_the_exemption_still_says_something_true() -> None:

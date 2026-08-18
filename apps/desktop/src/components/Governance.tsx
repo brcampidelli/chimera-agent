@@ -154,9 +154,9 @@ function InjectionPanel({ data, t }: { data: InjectionReport; t: TFunc }) {
 
       <p className="px-4 py-3 text-xs text-muted-foreground">{t("governance.injection.note")}</p>
       {/* Naming the layer this score does not cover. A scoreboard invites the reader to assume
-          every defence they have heard of is behind it. The kernel now reaches this path whenever
-          `CHIMERA_GOVERNANCE` is on — so the line says "off in this install", which is a fact about
-          configuration, rather than "not on this path", which stopped being true. */}
+          every defence they have heard of is behind it. `trust_kernel` is a constant on purpose:
+          deriving it from `CHIMERA_GOVERNANCE` would hide this line exactly when governance is on,
+          and four HTTP endpoints still have no kernel then. */}
       {!data.trust_kernel ? (
         <p className="px-4 pb-3 text-xs text-muted-foreground">
           {t("governance.injection.kernel")}

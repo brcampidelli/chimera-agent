@@ -78,8 +78,10 @@ def govern_step(
     that assembly would have produced a SECOND ``TaintLedger``, outermost, watching the tools while
     the caller held the inner one. ``assemble_registry`` already says why that is fatal: "the run
     that got tainted and the run that gets asked about it would be different objects, and the pause
-    would never fire." It would also have run ``restrict_registry`` a second time against the same
-    audit, burying the rare events somebody opens that log to find.
+    would never fire." (An earlier draft of this paragraph also claimed a duplicated
+    ``restrict_registry`` would spam the audit. That was wrong and is recorded here rather than
+    deleted: ``assemble_registry`` calls it with no ``audit`` at all, and it writes one line per
+    construction, not per call. The ledger is the whole reason.)
 
     So the kernel — the one layer that path genuinely lacked — moves here, and both callers read the
     mode off the same lines. Two copies of "what does ``enfroce`` mean" is how one of them ends up

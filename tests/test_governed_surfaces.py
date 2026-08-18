@@ -333,6 +333,11 @@ def test_the_gate_does_not_demand_a_refactor_of_the_attended_commands() -> None:
         # reading these counts has to be able to say which of the two ways the bot was started,
         # because for three weeks only one of them was governed at all.
         ("app-messaging", "server/manager.py"),
+        # The two HTTP surfaces that reach `assemble_registry`. Added with the kernel that now runs
+        # there: the labels were written and not declared, which is the exact shape this gate exists
+        # to catch — cheap to drop while refactoring, and invisible once dropped.
+        ("api:run", "api/app.py"),
+        ("api:turn", "api/code_api.py"),
     ],
 )
 def test_each_named_surface_is_declared(surface: str, module: str) -> None:

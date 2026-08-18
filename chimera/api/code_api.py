@@ -369,9 +369,13 @@ def assemble_registry(
     # with nothing in between. The kernel returns `review` for `git push --force origin main` — and
     # on this path that verdict was reached by nobody, because no wrapper was there to ask.
     #
-    # It goes HERE, after the explorer is registered and before the ledger, for the same reason the
-    # order is load-bearing everywhere else: the kernel must see the sub-agent's calls too, and the
-    # ledger must be outermost so it sees exactly what the kernel saw.
+    # It goes HERE, after every registration and before the ledger, so the order matches the one
+    # `governed_profile` has always used and the ledger stays outermost, seeing exactly what the
+    # kernel saw. (Not, as an earlier draft of this comment said, so the kernel can see a
+    # sub-agent's calls: `SubAgentTool` is built in one place, `cli/main.py`, and never here. The
+    # only sub-agent on this surface is `ExploreRepositoryTool`, which builds its own read-only
+    # registry internally — so it is governed as a TOOL and its inner calls are not governed at
+    # all. That is a real gap; it is just not this comment's.)
     #
     # `attended=False`: nobody is at this server's console on behalf of an HTTP caller.
     # `audit_allows=False`: an ALLOW per tool call would bury this log's rare events in a day.
