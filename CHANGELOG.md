@@ -28,6 +28,36 @@ You could not choose which model answered you. The endpoint accepted one all alo
   a number a spend ceiling would divide by.
 - **The wizard can browse the same list** instead of asking for a slug from memory.
 
+### Fixed
+
+- **Six shipped model slugs no longer existed at the provider.** An audit against OpenRouter's live
+  index found six of the fourteen catalogue entries withdrawn, and not the decorative six: the
+  `weak` rung of every cost preset (so any role routed to the weak tier — explore, k-sample probes —
+  called a model that does not exist), two of the three models in the DEFAULT FUSION PANEL plus the
+  default synthesiser (the feature whose premise is several independent models answering was
+  convening one model and two 404s), and two members of the transfer panel that decides whether a
+  learned skill generalises. Every surviving entry also had a stale price or context window —
+  DeepSeek V3.1 was listed at $0.14/$0.28 and charges $0.25/$0.95. Both `:free` slugs were among the
+  casualties, so the presets no longer depend on a free tier: a rung that relies on a vendor's
+  donation breaks when the donation ends. `tests/test_catalog_is_live.py` checks all of it against
+  the live index, marked `integration` so a slow morning at OpenRouter never reds a build.
+- **Every installed app reported its version as `0.0.0+source`.** PyInstaller does not collect a
+  package's `.dist-info` unless told to, so inside the frozen sidecar
+  `importlib.metadata.version("chimera-agent")` raised and the fallback string became the version in
+  the app's footer. The invisible half is worse: `/api/version` only claims an update when it can
+  compare two parsed versions, and that string does not parse — so the in-app "update available"
+  notice has been dead for every user who installed from an installer, for every release. (The
+  native Tauri updater was unaffected; it compares the binary's own version.) The freeze now copies
+  the metadata, the frozen sidecar answers `--version`, and the release workflow asks it and fails
+  on `0.0.0` — the version is only observable by running the artefact, and the artefact is only ever
+  built in CI.
+- **"Price unknown" under the turn you just paid for.** Receipts priced a turn from a table of ~20
+  model families and reported nothing for anything else — including the product default, so the most
+  common receipt in the app was the one that could not say what it cost. The published price of
+  every model is now remembered on disk (refreshed whenever the model list is fetched, warmed once
+  at app boot) and consulted by exact slug. It also corrects a quiet error: the family pattern
+  `deepseek-chat` matched `deepseek-chat-v3.1` and priced it at the v3 rate, 3x low on output.
+
 ### Changed
 
 - **The default model is DeepSeek V3.1, not GPT-5.5.** A default is what a fresh install spends
