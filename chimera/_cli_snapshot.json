@@ -4299,6 +4299,16 @@
           "type": "int"
         },
         {
+          "help": "Fraction of the model's window to spend on the prompt before compacting (e.g. 0.6).",
+          "kind": "option",
+          "name": "context_budget",
+          "opts": [
+            "--context-budget"
+          ],
+          "required": false,
+          "type": "float"
+        },
+        {
           "help": "Skip the planning step.",
           "kind": "option",
           "name": "no_plan",
@@ -4788,6 +4798,16 @@
           ],
           "required": false,
           "type": "int"
+        },
+        {
+          "help": "Fraction of the model's window to spend on the prompt before compacting (e.g. 0.6).",
+          "kind": "option",
+          "name": "context_budget",
+          "opts": [
+            "--context-budget"
+          ],
+          "required": false,
+          "type": "float"
         },
         {
           "default": "2",
