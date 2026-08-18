@@ -38,8 +38,24 @@ def _trace(*, early_stopped: bool = False) -> FusionTrace:
 
 
 def test_resolve_price_by_family_substring() -> None:
-    assert resolve_price("openrouter/deepseek/deepseek-chat-v3.1") == ModelPrice(0.14, 0.28)
+    # A family the static table owns and the catalogue does not.
     assert resolve_price("meta-llama/llama-3.1-8b-instruct") == ModelPrice(0.05, 0.05)
+
+    # And one the catalogue owns, with the expectation READ from the catalogue rather than pinned.
+    # This assertion used to be the literal `ModelPrice(0.14, 0.28)`, which was simultaneously the
+    # static table's number and the catalogue's — so it passed for two reasons and failed the day
+    # the catalogue was corrected to the price DeepSeek actually charges. A test that pins somebody
+    # else's price is a test that fails when they change it, which is not a defect worth a red build.
+    #
+    # `register_catalog_prices` is called here rather than relied upon: it is what feeds the
+    # catalogue into the table, and whether some earlier test already ran it is not this test's
+    # business. Calling it makes the outcome independent of test order.
+    from chimera.providers.catalog import CATALOG, register_catalog_prices
+
+    register_catalog_prices()
+    entry = next(e for e in CATALOG if e.slug == "openrouter/deepseek/deepseek-chat-v3.1")
+    assert entry.input_per_m is not None and entry.output_per_m is not None
+    assert resolve_price(entry.slug) == ModelPrice(entry.input_per_m, entry.output_per_m)
 
 
 def test_unknown_model_prices_to_none_not_a_guess() -> None:
