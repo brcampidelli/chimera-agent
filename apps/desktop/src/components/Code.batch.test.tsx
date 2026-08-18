@@ -7,6 +7,7 @@ import {
   getGitStatus,
   getPostureFacts,
   getRuns,
+  gitInit,
   streamAgents,
   streamCodeTurn,
 } from "@/lib/api";
@@ -88,5 +89,19 @@ describe("Code — several jobs become a batch, once", () => {
 
     await screen.findByText(/not a git repository/i);
     expect(streamAgents).not.toHaveBeenCalled(); // still only a proposal
+  });
+
+  it("offers the repair beside the warning, while it can still be taken", async () => {
+    // Naming a problem the user cannot act on from where they are reading about it leaves them the
+    // choice between running unprotected and going to find a terminal. And the moment matters: a
+    // snapshot commit is only a point of return if it is taken before the agents start writing.
+    vi.mocked(getGitStatus).mockResolvedValue(gitStatus({ is_repo: false }));
+    vi.mocked(gitInit).mockResolvedValue({ ok: true, commit: "abc1234", output: "", error: null });
+    const user = await type(TWO_JOBS);
+
+    await user.click(await screen.findByRole("button", { name: /Initialise git here/ }));
+
+    expect(gitInit).toHaveBeenCalledOnce();
+    expect(streamAgents).not.toHaveBeenCalled(); // the repair is not a confirmation
   });
 });

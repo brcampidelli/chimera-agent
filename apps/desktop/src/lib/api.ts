@@ -11,6 +11,7 @@ import type {
   FsTree,
   GitCommitResult,
   GitDiff,
+  GitInitResult,
   GitRevertResult,
   GitStatus,
   RouteMeta,
@@ -127,6 +128,32 @@ export const saveFile = (workspace: string | null | undefined, path: string, con
     method: "PUT",
     body: JSON.stringify({ workspace: workspace || null, path, content }),
   });
+/** The raw bytes of an image in the workspace, as a Blob to point an `<img>` at.
+ *
+ * Not `json()`, and not an `<img src="/api/fs/image?…">` either. The token travels in a header, and
+ * an `<img>` element cannot send one — the only way to put it in the URL instead would be a query
+ * parameter, which writes the bearer token into every access log and every browser history between
+ * here and nowhere. So the bytes are fetched like any other guarded call and handed to the element
+ * as an object URL, which the caller must revoke.
+ *
+ * The server serves `image/*` and only `image/*` (allowlist + `nosniff`), so what comes back cannot
+ * be a document that reads the token back out of this origin.
+ */
+export async function getFsImage(
+  workspace: string | null | undefined,
+  path: string,
+): Promise<Blob> {
+  const params = new URLSearchParams({ path });
+  if (workspace) params.set("workspace", workspace);
+  // Auth without a `Content-Type`: a GET has no body to describe, and the response type is the
+  // server's to state — this request must not appear to be asking for JSON.
+  const res = await fetch(apiUrl(`/api/fs/image?${params.toString()}`), {
+    headers: authHeadersNoContentType(),
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.blob();
+}
+
 // --- Cross-file search ---
 // A POST, not a GET with `?q=`: the query is the user's own text, and a URL is written to every
 // access log between here and nowhere. Someone searching their repository for a token they are
@@ -221,6 +248,20 @@ export const gitRevert = (workspace: string | null | undefined, paths: string[])
   json<GitRevertResult>("/api/git/revert", {
     method: "POST",
     body: JSON.stringify({ workspace: workspace || null, paths }),
+  });
+/** `git init` in the folder, plus a commit of what is already there.
+ *
+ * The commit is the reason this is one call rather than two. `git init` alone leaves a repo with no
+ * HEAD: the isolation the batch runner wants exists, but there is nothing to go back TO — and the
+ * moment after this returns is the moment the agent gets write and shell access to the folder.
+ *
+ * An already-initialised folder answers `{ok: false, error}` rather than committing over the user's
+ * work, so a double-click is safe.
+ */
+export const gitInit = (workspace: string | null | undefined) =>
+  json<GitInitResult>("/api/git/init", {
+    method: "POST",
+    body: JSON.stringify({ workspace: workspace || null }),
   });
 
 export const getMaturity = () => json<Maturity>("/api/maturity");

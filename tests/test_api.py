@@ -865,6 +865,104 @@ def test_fs_file_put_writes_and_guards(tmp_path: Any) -> None:
     assert client.put("/api/fs/file", json={"path": "big.txt", "content": big}).status_code == 400
 
 
+def _fs_client(tmp_path: Any, ws: Any) -> Any:
+    from chimera.api import build_api_app
+
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    return TestClient(
+        build_api_app(lambda: ChatSession(_FakeAgent()), settings=settings, workspace=ws)
+    )
+
+
+def test_fs_image_serves_the_bytes_a_chart_tool_wrote(tmp_path: Any) -> None:
+    """`render_chart` writes a PNG into the workspace and the viewer could only say "binary".
+
+    This is the endpoint that makes our own tool's output reachable from our own app.
+    """
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    png = b"\x89PNG\r\n\x1a\n" + b"payload"
+    (ws / "chart.png").write_bytes(png)
+    client = _fs_client(tmp_path, ws)
+
+    resp = client.get("/api/fs/image", params={"path": "chart.png"})
+
+    assert resp.status_code == 200
+    assert resp.content == png  # the file's own bytes, not a re-encoding
+    assert resp.headers["content-type"] == "image/png"
+
+
+def test_fs_image_refuses_to_serve_html_from_this_origin(tmp_path: Any) -> None:
+    """The refusal this endpoint is built around, asserted where the header is actually set.
+
+    The app's page carries the bearer token in a `<meta>` tag, so an HTML document served from this
+    same origin can fetch index.html, read the token, and then drive the whole API as the user. The
+    status is what matters; the assertion on the body is there because a 200 with `text/html` would
+    be the vulnerability and must not be reachable by any future response-model change.
+    """
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "steal.html").write_text("<script>fetch('/')</script>", encoding="utf-8")
+    (ws / "chart.svg").write_text("<svg xmlns='http://www.w3.org/2000/svg'/>", encoding="utf-8")
+    client = _fs_client(tmp_path, ws)
+
+    for name in ("steal.html", "chart.svg"):  # svg is script-capable under a top-level navigation
+        resp = client.get("/api/fs/image", params={"path": name})
+        assert resp.status_code == 415, name
+        assert "text/html" not in resp.headers["content-type"], name
+
+
+def test_fs_image_tells_the_browser_not_to_sniff_past_the_label(tmp_path: Any) -> None:
+    """The allowlist picks the label; `nosniff` is what makes the browser honour it.
+
+    A file named `.png` whose bytes are `<html>` is on the allowlist and IS served as `image/png` —
+    that is fine and it is the point: without this header a browser may sniff the body, decide it is
+    a document, and render it in this origin, which is the same hole reached by a longer road.
+    """
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "evil.html.png").write_bytes(b"<html><script>fetch('/')</script></html>")
+    client = _fs_client(tmp_path, ws)
+
+    resp = client.get("/api/fs/image", params={"path": "evil.html.png"})
+
+    assert resp.status_code == 200 and resp.headers["content-type"] == "image/png"
+    assert resp.headers["x-content-type-options"] == "nosniff"
+    assert "sandbox" in resp.headers["content-security-policy"]
+
+
+def test_fs_image_guards_the_path_and_the_missing_file(tmp_path: Any) -> None:
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (tmp_path / "secret.png").write_bytes(b"\x89PNG")  # outside the workspace, on purpose
+    client = _fs_client(tmp_path, ws)
+
+    assert client.get("/api/fs/image", params={"path": "../secret.png"}).status_code == 400
+    assert client.get("/api/fs/image", params={"path": "gone.png"}).status_code == 404
+
+
+def test_git_init_endpoint_makes_a_repo_with_a_snapshot(tmp_path: Any) -> None:
+    """The button that replaces "run `git init` in this folder" in an app that has no terminal."""
+    import shutil
+
+    if shutil.which("git") is None:
+        pytest.skip("git not on PATH")
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "app.py").write_text("print('x')\n", encoding="utf-8")
+    client = _fs_client(tmp_path, ws)
+
+    resp = client.post("/api/git/init", json={})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ok"] is True and body["commit"] and body["error"] is None
+    # The panels that were empty before now have a repo to describe, which is the user-visible point.
+    assert client.get("/api/git/status").json()["is_repo"] is True
+    # And a second press is refused rather than committing over the first snapshot.
+    assert client.post("/api/git/init", json={}).json()["error"] == "already a git repo"
+
+
 def test_session_is_persisted_and_listed_and_deletable(tmp_path: Any) -> None:
     client = _client(tmp_path)
     resp = client.post("/api/chat/stream", json={"message": "remember me", "stream": True})

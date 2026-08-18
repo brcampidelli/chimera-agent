@@ -949,6 +949,13 @@ class GitCommitOut(BaseModel):
     error: str | None  # a short git error when ok is False; null on success
 
 
+class GitInitOut(BaseModel):
+    ok: bool  # True when the folder is a repo afterwards (an empty folder counts — nothing to snapshot)
+    commit: str  # the short hash of the snapshot commit; "" when there was nothing to commit
+    output: str  # the combined git stdout+stderr, truncated
+    error: str | None  # a short git error when ok is False; null on success
+
+
 class GitRevertOut(BaseModel):
     ok: bool  # True when the scoped revert completed (git checkout + clean on the passed paths)
     reverted: list[str]  # the paths the revert was scoped to (echoed back on success)

@@ -645,6 +645,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/fs/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fs Image Endpoint
+         * @description The raw bytes of an image in the workspace, so `render_chart`'s PNG can reach the screen.
+         *
+         *     The response headers are the security half and each one is load-bearing:
+         *
+         *     * The **content type comes from the allowlist in `fs_api`** and can only ever be `image/*`.
+         *       A `.html` in the workspace is a 415, not a labelled document — this origin's page carries
+         *       the bearer token in a `<meta>` tag, so a document served from here can read it with one
+         *       same-origin fetch and then drive the API as the user.
+         *     * **`nosniff`**, because the allowlist only chooses the label. A file named `.png` whose
+         *       bytes are `<html>` is still served as `image/png`; without this header a browser is free to
+         *       sniff past that label and render it as a document, which is the same hole by a longer road.
+         *     * **A `sandbox` CSP**, for the one case `<img>` does not cover: someone opening the URL
+         *       directly. An opaque origin has no same-origin anything to read.
+         *
+         *     No `Content-Disposition`: the filename would have to be echoed from the request path into a
+         *     header, and header-quoting a user-controlled string is a bug waiting to be written for a
+         *     field nothing here needs.
+         */
+        get: operations["fs_image_endpoint_api_fs_image_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/fs/search": {
         parameters: {
             query?: never;
@@ -718,6 +754,23 @@ export interface paths {
         get: operations["git_diff_endpoint_api_git_diff_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/git/init": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Git Init Endpoint */
+        post: operations["git_init_endpoint_api_git_init_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2570,6 +2623,22 @@ export interface components {
             x: string;
             /** Y */
             y: string;
+        };
+        /** GitInitOut */
+        GitInitOut: {
+            /** Commit */
+            commit: string;
+            /** Error */
+            error: string | null;
+            /** Ok */
+            ok: boolean;
+            /** Output */
+            output: string;
+        };
+        /** GitInitRequest */
+        GitInitRequest: {
+            /** Workspace */
+            workspace?: string | null;
         };
         /** GitRevertOut */
         GitRevertOut: {
@@ -4874,6 +4943,36 @@ export interface operations {
             };
         };
     };
+    fs_image_endpoint_api_fs_image_get: {
+        parameters: {
+            query: {
+                path: string;
+                workspace?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     fs_search_api_fs_search_post: {
         parameters: {
             query?: never;
@@ -4992,6 +5091,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GitDiffOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    git_init_endpoint_api_git_init_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GitInitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GitInitOut"];
                 };
             };
             /** @description Validation Error */

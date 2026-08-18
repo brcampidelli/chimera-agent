@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from chimera.api.git_api import git_commit, git_diff, git_revert_paths, git_status
+from chimera.api.git_api import git_commit, git_diff, git_init, git_revert_paths, git_status
 
 pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git not on PATH")
 
@@ -30,6 +30,120 @@ def _head(path: Path) -> str:
     return subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=path, capture_output=True, text=True, check=True
     ).stdout.strip()
+
+
+def mock_branch(path: Path) -> str:
+    """Whatever `git init` named the default branch here (main or master, per the git version)."""
+    return subprocess.run(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=path, capture_output=True, text=True
+    ).stdout.strip()
+
+
+def git_init_with_home(path: Path, home: Path) -> dict[str, object]:
+    """Run `git_init` with git pointed at an EMPTY home, i.e. with no user identity configured.
+
+    Pointing HOME/XDG at a temp dir is the only way to observe the fresh-laptop case from a machine
+    that has a global .gitconfig — and every machine that runs this suite has one, which is why the
+    fallback shipped untested the first time somebody wrote this feature by hand.
+    """
+    import os
+
+    saved = {k: os.environ.get(k) for k in ("HOME", "USERPROFILE", "XDG_CONFIG_HOME", "GIT_CONFIG_GLOBAL")}
+    os.environ.update({"HOME": str(home), "USERPROFILE": str(home), "XDG_CONFIG_HOME": str(home)})
+    os.environ["GIT_CONFIG_GLOBAL"] = str(home / "gitconfig-that-does-not-exist")
+    try:
+        return git_init(path)
+    finally:
+        for key, value in saved.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+
+# --- init ---------------------------------------------------------------------------------------
+
+
+def test_init_makes_a_repo_and_a_snapshot_to_come_back_to(tmp_path: Path) -> None:
+    """`git init` alone leaves a repo with no HEAD — isolation with nothing to return to.
+
+    The commit is what makes this worth a button: it is taken before the agent is handed write and
+    shell access to the folder, which is the only moment at which it can be taken.
+    """
+    (tmp_path / "app.py").write_text("print('x')\n", encoding="utf-8")
+
+    result = git_init(tmp_path)
+
+    assert result["ok"] is True and result["error"] is None
+    assert result["commit"]  # a real short hash, so there is something to return to
+    assert git_status(tmp_path) == {"is_repo": True, "branch": mock_branch(tmp_path), "files": []}
+
+
+def test_init_commits_even_when_git_does_not_know_who_you_are(tmp_path: Path) -> None:
+    """The common case on a fresh laptop, and the one that made this a terminal errand.
+
+    `git commit` refuses outright without a `user.email`. A button whose answer is "now go configure
+    git" has the exact failure this feature exists to remove, so the snapshot falls back to an
+    identity of its own.
+    """
+    (tmp_path / "app.py").write_text("x\n", encoding="utf-8")
+    home = tmp_path / "empty-home"  # no ~/.gitconfig, so git has no identity to find
+    home.mkdir()
+
+    result = git_init_with_home(tmp_path, home)
+
+    assert result["ok"] is True and result["commit"]
+
+
+def test_init_refuses_a_folder_that_is_already_a_repo(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    head = _head(tmp_path)
+
+    result = git_init(tmp_path)
+
+    assert result["ok"] is False and result["error"] == "already a git repo"
+    assert _head(tmp_path) == head  # and it did not commit over the user's work
+
+
+def test_init_refuses_a_subdirectory_of_an_existing_repo(tmp_path: Path) -> None:
+    """A nested repo reads as a helpful button and behaves as a folder that left its project."""
+    _init_repo(tmp_path)
+    child = tmp_path / "vendor"
+    child.mkdir()
+
+    assert git_init(child)["ok"] is False
+    assert not (child / ".git").exists()
+
+
+def test_an_empty_folder_is_initialised_with_nothing_to_snapshot(tmp_path: Path) -> None:
+    # `git commit` with an empty index exits non-zero, so "nothing to commit" has to be CHECKED —
+    # inferring it from the exit code would report a working init as a failure.
+    result = git_init(tmp_path)
+
+    assert result["ok"] is True and result["commit"] == "" and result["error"] is None
+    assert git_status(tmp_path)["is_repo"] is True
+
+
+def test_init_on_a_machine_without_git_is_an_error_not_a_crash(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The one helper here that runs git after `is_git_repo` has already answered no.
+
+    A machine with no git makes that gate return False — the same answer as "an ordinary folder" —
+    so this helper proceeds and hits the missing binary itself. `FileNotFoundError` is an OSError and
+    NOT a `subprocess.SubprocessError`, which is how the first version of this caught the timeout and
+    let the missing binary through as a 500.
+    """
+    from chimera.api import git_api
+
+    def no_git(args: list[str], cwd: Path) -> object:
+        raise FileNotFoundError(2, "No such file or directory: 'git'")
+
+    monkeypatch.setattr(git_api, "_git", no_git)
+    monkeypatch.setattr(git_api, "is_git_repo", lambda _path: False)
+
+    result = git_api.git_init(Path("."))
+
+    assert result["ok"] is False
+    assert result["error"] and "git failed" in result["error"]
 
 
 # --- status -------------------------------------------------------------------------------------

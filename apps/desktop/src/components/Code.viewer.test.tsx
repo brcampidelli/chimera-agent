@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Code } from "@/components/Code";
 import {
   getFsFile,
+  getFsImage,
   getGitStatus,
   getPostureFacts,
   getRuns,
@@ -34,21 +35,19 @@ function editorOf(): HTMLElement {
  *  the agent read or wrote, not at a browser you have to navigate yourself. It also means the
  *  viewer can only show files that are part of the conversation, which is a real narrowing and the
  *  intended one. */
-async function openFile(file: FsFile = fsFile()) {
+async function openFile(file: FsFile = fsFile(), path = "src/app.py") {
   const user = userEvent.setup();
   vi.mocked(getFsFile).mockResolvedValue(file);
   vi.mocked(streamCodeTurn).mockImplementation(
     scriptTurn({
-      tools: [
-        { name: "read_file", arguments: { path: "src/app.py" }, ok: true, observation: "" },
-      ],
+      tools: [{ name: "read_file", arguments: { path }, ok: true, observation: "" }],
     }),
   );
   renderWithProviders(<Code />);
 
   await user.type(screen.getByPlaceholderText(/Ask about this code/i), "look at it");
   await user.click(screen.getByRole("button", { name: /Send/ }));
-  await user.click(await screen.findByRole("button", { name: "src/app.py" }));
+  await user.click(await screen.findByRole("button", { name: path }));
   return user;
 }
 
@@ -143,6 +142,35 @@ describe("Code — the file viewer", () => {
 
     expect(await screen.findByText("Binary or non-text file — not shown.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Edit/ })).not.toBeInTheDocument();
+  });
+
+  it("shows the chart the agent drew, instead of calling it a binary file", async () => {
+    // `render_chart` and `generate_image` write PNGs into the workspace and the viewer answered
+    // "binary or non-text" about them — our own app could not display our own tool's output.
+    vi.mocked(getFsImage).mockResolvedValue(new Blob([new Uint8Array([137, 80, 78, 71])]));
+    await openFile(fsFile({ path: "chart.png", note: "binary", content: "" }), "chart.png");
+
+    const img = await screen.findByRole("img", { name: /chart\.png/ });
+    expect(img).toHaveAttribute("src", expect.stringContaining("blob:"));
+    expect(getFsImage).toHaveBeenCalledWith(null, "chart.png");
+    expect(screen.queryByText("Binary or non-text file — not shown.")).not.toBeInTheDocument();
+  });
+
+  it("still refuses to guess at a binary that is not an image", async () => {
+    // An <img> pointed at a .zip renders a broken-image icon, which claims a failure that did not
+    // happen. The honest note is still the right answer here, and it must not be asked for either.
+    await openFile(fsFile({ path: "bundle.zip", note: "binary", content: "" }), "bundle.zip");
+
+    expect(await screen.findByText("Binary or non-text file — not shown.")).toBeInTheDocument();
+    expect(getFsImage).not.toHaveBeenCalled();
+  });
+
+  it("says an image failed to load rather than showing an empty frame", async () => {
+    vi.mocked(getFsImage).mockRejectedValue(new Error("415 unsupported"));
+    await openFile(fsFile({ path: "chart.png", note: "binary", content: "" }), "chart.png");
+
+    expect(await screen.findByText("Couldn't load this image.")).toBeInTheDocument();
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
 
   it("surfaces a failed save instead of claiming the file was saved", async () => {

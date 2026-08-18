@@ -52,6 +52,7 @@ export type GitFile = Schemas["GitFileOut"];
 export type GitDiff = Schemas["GitDiffOut"];
 export type GitCommitResult = Schemas["GitCommitOut"];
 export type GitRevertResult = Schemas["GitRevertOut"];
+export type GitInitResult = Schemas["GitInitOut"];
 export type InjectionReport = Schemas["InjectionReportOut"];
 export type GovernanceAudit = Schemas["GovernanceAuditOut"];
 export type ToolInfo = Schemas["ToolInfoOut"];

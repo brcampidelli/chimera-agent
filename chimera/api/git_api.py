@@ -1,4 +1,4 @@
-"""Structured git helpers for the Code screen: status / diff / commit / scoped revert.
+"""Structured git helpers for the Code screen: init / status / diff / commit / scoped revert.
 
 Thin, honest wrappers over :func:`chimera.core.worktree._git` (list-arg subprocess, no shell, 60 s
 timeout, non-zero inspected — never raised). EVERY helper gates on
@@ -16,6 +16,7 @@ what git can (tracked modifications/deletions + untracked files it created among
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,20 @@ from chimera.core.worktree import _git, is_git_repo
 
 _MAX_OUTPUT = 4000  # bound the combined git output echoed back to the UI
 _MAX_ERR = 500  # bound a short error string
+
+#: The message on the commit :func:`git_init` makes. Says what the commit is FOR, because the person
+#: reading it in six months is reading a log entry for a commit they did not type.
+_SNAPSHOT_MESSAGE = "Snapshot before letting an agent edit this folder"
+
+#: The identity a snapshot commit is authored with when the machine has none configured.
+#:
+#: `git commit` REFUSES on a machine with no `user.email` ("Please tell me who you are"), which on a
+#: freshly installed laptop is the common case, not the exotic one. A button that answers "now go
+#: configure git in a terminal" has exactly the failure this feature exists to remove, so the commit
+#: falls back to an identity of its own — and only when there is none to respect, because attributing
+#: someone's snapshot to "Chimera" when git knows their name would be the app overwriting a fact.
+_FALLBACK_NAME = "Chimera"
+_FALLBACK_EMAIL = "chimera@localhost"
 
 
 def _combined(*results: Any) -> str:
@@ -50,6 +65,81 @@ def _unquote(path: str) -> str:
     if len(path) >= 2 and path.startswith('"') and path.endswith('"'):
         return path[1:-1]
     return path
+
+
+def _identity_args(root: Path) -> list[str]:
+    """``-c user.*`` overrides for the snapshot commit, or nothing when git already knows who you are."""
+    email = _git(["config", "user.email"], root)
+    name = _git(["config", "user.name"], root)
+    if email.returncode == 0 and email.stdout.strip() and name.returncode == 0 and name.stdout.strip():
+        return []
+    return ["-c", f"user.name={_FALLBACK_NAME}", "-c", f"user.email={_FALLBACK_EMAIL}"]
+
+
+def git_init(ws: Path) -> dict[str, Any]:
+    """``git init`` in ``ws`` plus one commit of whatever is already there.
+
+    The commit is the point. ``git init`` alone leaves a repo with no HEAD, so the isolation the
+    batch runner wants exists but there is still nothing to go back TO — and the moment after this
+    button is pressed is the moment the agent is given write and shell access to the folder. The
+    snapshot is the return ticket, taken before the ride rather than after it.
+
+    Refuses when the folder is ALREADY inside a repo. ``is_git_repo`` is true for a subdirectory of
+    one, so this also refuses to nest a second repository inside somebody's checkout — which reads as
+    a helpful button and behaves as a directory that quietly stops being part of its project.
+
+    An empty folder is a success with an empty ``commit``: the repo is initialised and there was
+    nothing to snapshot, which is not a failure and must not be reported as one (``git commit`` with
+    an empty index exits non-zero, so this is checked rather than inferred from the exit code).
+
+    Returns ``{ok, commit, output, error}`` — the shape :func:`git_commit` returns, because the UI
+    reports both the same way.
+    """
+    root = Path(ws)
+    if is_git_repo(root):
+        return {"ok": False, "commit": "", "output": "", "error": "already a git repo"}
+    try:
+        init = _git(["init"], root)
+        if init.returncode != 0:
+            return {
+                "ok": False,
+                "commit": "",
+                "output": _combined(init)[:_MAX_OUTPUT],
+                "error": (init.stderr.strip() or "git init failed")[:_MAX_ERR],
+            }
+        add = _git(["add", "-A"], root)
+        staged = _git(["diff", "--cached", "--name-only"], root)
+    except (OSError, subprocess.SubprocessError) as exc:
+        # This is the ONE helper in this module that runs git AFTER `is_git_repo` has said no — and
+        # "no" is also what a machine with no git installed answers. Every other helper returns its
+        # empty-state at that point and never reaches a subprocess; this one proceeds, so it is the
+        # only one that has to catch what `_git` does not:
+        #
+        #   * `FileNotFoundError` (an OSError, NOT a SubprocessError — checked, because catching only
+        #     `subprocess.SubprocessError` here would turn "git is not installed" into a 500 that
+        #     reads as the app being broken rather than as a missing tool);
+        #   * `TimeoutExpired` from the 60 s cap, which this helper can genuinely hit where the
+        #     others cannot: `add -A` over a folder nobody has ever indexed is minutes of work on a
+        #     home directory.
+        return {"ok": False, "commit": "", "output": "", "error": f"git failed: {exc}"[:_MAX_ERR]}
+    if not staged.stdout.strip():
+        return {"ok": True, "commit": "", "output": _combined(init, add)[:_MAX_OUTPUT], "error": None}
+    commit = _git([*_identity_args(root), "commit", "-m", _SNAPSHOT_MESSAGE], root)
+    output = _combined(init, commit)[:_MAX_OUTPUT]
+    if commit.returncode != 0:
+        return {
+            "ok": False,
+            "commit": "",
+            "output": output,
+            "error": (commit.stderr.strip() or commit.stdout.strip() or "git commit failed")[:_MAX_ERR],
+        }
+    rev = _git(["rev-parse", "--short", "HEAD"], root)
+    return {
+        "ok": True,
+        "commit": rev.stdout.strip() if rev.returncode == 0 else "",
+        "output": output,
+        "error": None,
+    }
 
 
 def git_status(ws: Path) -> dict[str, Any]:
