@@ -277,6 +277,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/sessions/{session_id}/fork": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fork Code Session
+         * @description Branch a conversation: a copy under a new id, sharing its past and nothing after it.
+         *
+         *     404 rather than the delete route's soft ``{ok: false}``, because the two failures are not
+         *     the same event. Deleting something already gone is the state a second click lands in and
+         *     the user's intent is satisfied either way; forking something that is not there produces no
+         *     conversation to open, and the caller needs to know that before it navigates.
+         */
+        post: operations["fork_code_session_api_code_sessions__session_id__fork_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/sessions/{session_id}/raw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Raw Code Session
+         * @description The conversation's stored file, verbatim.
+         *
+         *     Everything else this API returns about a session has been through a parser and a fold into
+         *     exchanges — which is the right thing to render and the wrong thing to debug with, because a
+         *     message the parser dropped is invisible in it. This is the one view where a malformed file
+         *     looks malformed.
+         */
+        get: operations["raw_code_session_api_code_sessions__session_id__raw_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/turn": {
         parameters: {
             query?: never;
@@ -1477,6 +1527,71 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/skills/library": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Library
+         * @description The curated cards, metadata only — enough to browse, not enough to read.
+         */
+        get: operations["list_library_api_skills_library_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/skills/library/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Library Card
+         * @description One card with its body — the Trigger/Do/Avoid/Check/Risk a person actually reads.
+         */
+        get: operations["get_library_card_api_skills_library__name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/skills/library/{name}/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Library Card
+         * @description Load a curated card into the user's store — `chimera skills-import <name>`, over HTTP.
+         *
+         *     Runs the same validator the CLI does. The cards are ours and pass it, which is exactly why
+         *     skipping it here would be the wrong economy: the gate is what makes the import path safe for
+         *     the day a card arrives from somewhere else, and a second entrance that bypasses it is how a
+         *     gate stops being one.
+         */
+        post: operations["import_library_card_api_skills_library__name__import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/skills/{name}/approve": {
         parameters: {
             query?: never;
@@ -2181,6 +2296,22 @@ export interface components {
             /** Workspace */
             workspace: string;
         };
+        /**
+         * CodeSessionRawOut
+         * @description A stored conversation's file, unparsed.
+         *
+         *     ``text`` is the bytes on disk, not a re-serialisation. Everything else the API says about a
+         *     session has been through a parser and folded into exchanges, which is what you want on screen
+         *     and useless when the question is what the parser dropped.
+         */
+        CodeSessionRawOut: {
+            /** Bytes */
+            bytes: number;
+            /** Id */
+            id: string;
+            /** Text */
+            text: string;
+        };
         /** CodeToolOut */
         CodeToolOut: {
             /** Arguments */
@@ -2881,6 +3012,51 @@ export interface components {
             workers: number;
             /** Workspace */
             workspace?: string | null;
+        };
+        /**
+         * LibraryCardOut
+         * @description One curated skill card, at the level the browser asked for.
+         *
+         *     ``body`` is empty in the list and filled on the detail route — the progressive disclosure the
+         *     card format is built around (metadata decides relevance, instructions load when chosen). Sending
+         *     all twenty-three bodies to draw a list would be a quarter of a megabyte to render one line each.
+         */
+        LibraryCardOut: {
+            /**
+             * Body
+             * @default
+             */
+            body: string;
+            /** Description */
+            description: string;
+            /**
+             * Imported
+             * @default false
+             */
+            imported: boolean;
+            /** Kind */
+            kind: string;
+            /** License */
+            license: string | null;
+            /** Name */
+            name: string;
+            /** Stage */
+            stage: string;
+            /** Topic */
+            topic: string;
+            /** Triggers */
+            triggers: string[];
+            /** Version */
+            version: string;
+        };
+        /** LibraryImportOut */
+        LibraryImportOut: {
+            /** Imported */
+            imported: boolean;
+            /** Name */
+            name: string;
+            /** Status */
+            status: string;
         };
         /** MaturityOut */
         MaturityOut: {
@@ -4348,6 +4524,68 @@ export interface operations {
                     "application/json": {
                         [key: string]: boolean;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fork_code_session_api_code_sessions__session_id__fork_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSessionMetaOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    raw_code_session_api_code_sessions__session_id__raw_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSessionRawOut"];
                 };
             };
             /** @description Validation Error */
@@ -6457,6 +6695,88 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SkillsOut"];
+                };
+            };
+        };
+    };
+    list_library_api_skills_library_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryCardOut"][];
+                };
+            };
+        };
+    };
+    get_library_card_api_skills_library__name__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryCardOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_library_card_api_skills_library__name__import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryImportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

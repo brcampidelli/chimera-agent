@@ -16,6 +16,12 @@ export type MemoryItem = Schemas["MemoryItemOut"];
 export type MemoryLayers = Schemas["MemoryLayersOut"];
 export type MemoryProfile = Schemas["MemoryProfileOut"];
 export type SkillStat = Schemas["SkillStatOut"];
+/** One curated skill card that ships in the box, as opposed to a `SkillStat`, which is one the
+ *  agent distilled from the user's own runs. `body` is empty in the list and filled on detail. */
+export type LibraryCard = Schemas["LibraryCardOut"];
+/** A stored coding conversation's file, unparsed — the one view in which a damaged session
+ *  looks damaged rather than empty. */
+export type CodeSessionRaw = Schemas["CodeSessionRawOut"];
 export type CronJob = Schemas["CronJobOut"];
 export type TaskCard = Schemas["TaskCardOut"];
 export type ProjectState = Schemas["ProjectStateOut"];

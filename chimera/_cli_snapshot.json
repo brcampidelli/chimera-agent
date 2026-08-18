@@ -4061,12 +4061,12 @@
     },
     {
       "deprecated": false,
-      "help": "Import a SKILL.md into the store. A tainted-provenance skill is held pending for review.\n\nValidated on the way in. This is the only path by which a skill written by somebody else enters\nthe store, and it was the only one that skipped the validator the agent's own proposals must\npass \u2014 the gate was applied to the code we wrote and not to the code we were handed, which is\nbackwards. A skill card ends up in the system prompt, so an unvalidated one is an instruction\nfrom a stranger with the standing of an instruction from the owner.",
+      "help": "Import a SKILL.md into the store. A tainted-provenance skill is held pending for review.\n\nAccepts the plain name of a curated card (``chimera skills-import verify-before-claiming``) as\nwell as a path. The documented form was ``skills/<name>``, a repo-relative path that resolves\nonly inside a checkout \u2014 so the one line the README gives for using the shipped library failed\nfor everybody who installed Chimera instead of cloning it.\n\nValidated on the way in. This is the only path by which a skill written by somebody else enters\nthe store, and it was the only one that skipped the validator the agent's own proposals must\npass \u2014 the gate was applied to the code we wrote and not to the code we were handed, which is\nbackwards. A skill card ends up in the system prompt, so an unvalidated one is an instruction\nfrom a stranger with the standing of an instruction from the owner.",
       "hidden": false,
       "name": "skills-import",
       "params": [
         {
-          "help": "Path to a SKILL.md (or a skill directory containing one).",
+          "help": "A curated card name, or a path to a SKILL.md / its directory.",
           "kind": "argument",
           "name": "path",
           "opts": [
@@ -4077,6 +4077,25 @@
         }
       ],
       "path": "skills-import"
+    },
+    {
+      "deprecated": false,
+      "help": "Browse the curated skill cards that ship with Chimera.\n\nData, not code: each is a markdown page of Trigger/Do/Avoid/Check/Risk that the agent reads into\nits prompt when it matches. Load one into your own store with ``chimera skills-import <name>``.",
+      "hidden": false,
+      "name": "skills-library",
+      "params": [
+        {
+          "help": "Show one card in full; omit to list the library.",
+          "kind": "argument",
+          "name": "name",
+          "opts": [
+            "name"
+          ],
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "path": "skills-library"
     },
     {
       "deprecated": false,

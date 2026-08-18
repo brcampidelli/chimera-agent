@@ -60,6 +60,7 @@ from chimera.api.schemas import (
     AttachmentOut,
     CodeSessionMetaOut,
     CodeSessionOut,
+    CodeSessionRawOut,
     DictationOut,
     TranscriptOut,
     VisionOut,
@@ -864,6 +865,52 @@ def register_code_api(
             "workspace": str(data.get("workspace") or ""),
             "exchanges": exchanges_from_messages(messages),
         }
+
+    @app.post(
+        "/api/code/sessions/{session_id}/fork",
+        dependencies=[guard],
+        response_model=CodeSessionMetaOut,
+    )
+    def fork_code_session(session_id: str) -> dict[str, Any]:
+        """Branch a conversation: a copy under a new id, sharing its past and nothing after it.
+
+        404 rather than the delete route's soft ``{ok: false}``, because the two failures are not
+        the same event. Deleting something already gone is the state a second click lands in and
+        the user's intent is satisfied either way; forking something that is not there produces no
+        conversation to open, and the caller needs to know that before it navigates.
+        """
+        try:
+            new_id = store.fork(session_id)
+        except ValueError as exc:  # an id with no usable characters — a client error, not a 500
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if new_id is None:
+            raise HTTPException(status_code=404, detail="no such conversation")
+        meta = next((m for m in store.list_meta() if m["id"] == new_id), None)
+        # The fork's own row, not the source's: the caller drops it straight into the sidebar, and
+        # a row carrying the parent's id would resume the conversation the user just branched away
+        # from — the exact outcome forking exists to avoid.
+        return meta or {"id": new_id, "title": "", "workspace": "", "turns": 0, "updated_at": 0.0}
+
+    @app.get(
+        "/api/code/sessions/{session_id}/raw",
+        dependencies=[guard],
+        response_model=CodeSessionRawOut,
+    )
+    def raw_code_session(session_id: str) -> dict[str, Any]:
+        """The conversation's stored file, verbatim.
+
+        Everything else this API returns about a session has been through a parser and a fold into
+        exchanges — which is the right thing to render and the wrong thing to debug with, because a
+        message the parser dropped is invisible in it. This is the one view where a malformed file
+        looks malformed.
+        """
+        try:
+            text = store.raw(session_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if text is None:
+            raise HTTPException(status_code=404, detail="no such conversation")
+        return {"id": session_id, "text": text, "bytes": len(text.encode("utf-8"))}
 
     @app.post("/api/code/revert/{token}", dependencies=[guard])
     def revert_turn(token: str) -> dict[str, Any]:

@@ -139,6 +139,21 @@ class CodeSessionOut(BaseModel):
     exchanges: list[CodeExchangeOut]
 
 
+class CodeSessionRawOut(BaseModel):
+    """A stored conversation's file, unparsed.
+
+    ``text`` is the bytes on disk, not a re-serialisation. Everything else the API says about a
+    session has been through a parser and folded into exchanges, which is what you want on screen
+    and useless when the question is what the parser dropped.
+    """
+
+    id: str
+    text: str
+    #: Size of ``text`` in UTF-8 bytes — the one number that answers "why is this conversation slow"
+    #: without reading it.
+    bytes: int
+
+
 class TurnOut(BaseModel):
     user: str
     assistant: str
@@ -616,6 +631,39 @@ class ApprovedOut(BaseModel):
 
 class RetiredOut(BaseModel):
     retired: bool
+
+
+class LibraryCardOut(BaseModel):
+    """One curated skill card, at the level the browser asked for.
+
+    ``body`` is empty in the list and filled on the detail route — the progressive disclosure the
+    card format is built around (metadata decides relevance, instructions load when chosen). Sending
+    all twenty-three bodies to draw a list would be a quarter of a megabyte to render one line each.
+    """
+
+    name: str
+    description: str
+    version: str
+    kind: str
+    #: Where in the work it applies (define/build/verify/review/ship) — "" on a card that declares
+    #: none, which an imported third-party card legitimately does.
+    stage: str
+    topic: str
+    triggers: list[str]
+    license: str | None
+    body: str = ""
+    #: True when a skill of this name is already in the user's store, so the app can say "imported"
+    #: instead of offering an action that silently overwrites.
+    imported: bool = False
+
+
+class LibraryImportOut(BaseModel):
+    imported: bool
+    name: str
+    #: `pending` when the card came in tainted and is held for review, `active` otherwise. The app
+    #: needs the distinction: an imported card that is not retrievable yet looks identical to one
+    #: that is, and the difference is the whole point of the review gate.
+    status: str
 
 
 # --- cron -----------------------------------------------------------------------------------------

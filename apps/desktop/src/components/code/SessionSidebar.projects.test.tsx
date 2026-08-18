@@ -6,7 +6,14 @@ import { listCodeSessions } from "@/lib/api";
 import { addProject, readAliases, setAlias } from "@/lib/projects";
 import { renderWithProviders } from "@/test/utils";
 
-vi.mock("@/lib/api", () => ({ listCodeSessions: vi.fn() }));
+// The two row actions are stubbed but never driven here — this file is about the project grouping.
+// They still have to exist: an unmocked export the component imports fails the whole file at mount,
+// which reads as "the projects are broken" rather than "the mock is short two names".
+vi.mock("@/lib/api", () => ({
+  listCodeSessions: vi.fn(),
+  forkCodeSession: vi.fn(),
+  getCodeSessionRaw: vi.fn(),
+}));
 
 function session(over: Record<string, unknown> = {}) {
   return {

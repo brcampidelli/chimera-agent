@@ -10,7 +10,17 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-_SKILL_NAME = re.compile(r"^[a-z][a-z0-9_]{1,40}$")
+# Hyphens and 64 chars, not underscores and 41. The rule was written for names the agent MINTS,
+# which are snake_case — and the curated library that shipped later is kebab-case, so the validator
+# refused all 23 of the project's own official cards. `chimera skills-import skills/verify-before-
+# claiming`, the one line the README gives for using them, printed "Refused" and exited 0. 41 was
+# also short: the longest shipped card is 57 characters.
+#
+# What the rule is actually for is unchanged, which is why widening it is safe: the name is used as
+# a store key and as a directory name by `skills-export`, so it must stay a single path segment. A
+# leading lowercase letter plus `[a-z0-9_-]` still admits no dot, slash, space or control character,
+# so `..`, absolute paths and shell metacharacters remain impossible.
+_SKILL_NAME = re.compile(r"^[a-z][a-z0-9_-]{1,63}$")
 _MAX_TEMPLATE_CHARS = 4000
 _FORBIDDEN_PHRASES = (
     "ignore previous",
@@ -35,7 +45,9 @@ class SkillValidator:
         reasons: list[str] = []
         name = str(data.get("name") or "")
         if not _SKILL_NAME.fullmatch(name):
-            reasons.append("name must be snake_case (2-41 chars, start with a letter)")
+            reasons.append(
+                "name must be lowercase a-z0-9 with _ or - (2-64 chars, start with a letter)"
+            )
 
         template = str(data.get("prompt_template") or "")
         do = str(data.get("do") or "")

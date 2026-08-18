@@ -30,6 +30,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent  # apps/desktop/src-tauri
 REPO = HERE.parents[2]  # repo root
 SPA_DIST = REPO / "apps" / "desktop" / "dist"
+SKILL_LIBRARY = REPO / "skills"
 ENTRY = HERE / "sidecar" / "chimera_backend.py"
 OUT = HERE / "sidecar-dist"  # gitignored; bundled by Tauri, rebuilt every release
 
@@ -51,6 +52,11 @@ def main() -> int:
     # --add-data uses os.pathsep between SRC and DEST (';' on Windows, ':' on POSIX) — the one platform
     # wrinkle, handled here so the CI matrix runs this script unchanged on all three OSes.
     add_data = f"{SPA_DIST}{os.pathsep}chimera/_desktop_dist"
+    # The curated skill cards, by the same route and for the same reason. `--collect-data chimera`
+    # below only collects what is INSIDE the installed package, and `skills/` lives one level above
+    # it — the wheel's force-include puts it in place, but this freeze runs against the source
+    # checkout, where nothing has. Without this line the desktop app ships with an empty library.
+    skills_data = f"{SKILL_LIBRARY}{os.pathsep}chimera/_skill_library"
     mode = "--onefile" if args.onefile else "--onedir"
     cmd = [
         sys.executable, "-m", "PyInstaller",
@@ -78,6 +84,7 @@ def main() -> int:
         "--collect-all", "onnxruntime",
         "--collect-data", "chimera",
         "--add-data", add_data,
+        "--add-data", skills_data,
         "--hidden-import", "uvicorn",
         "--hidden-import", "sse_starlette",
         str(ENTRY),

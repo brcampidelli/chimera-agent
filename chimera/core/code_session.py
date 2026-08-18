@@ -295,3 +295,51 @@ class CodeSessionStore:
             return False
         path.unlink()
         return True
+
+    def fork(self, session_id: str) -> str | None:
+        """Copy a stored conversation to a new id and return it, or ``None`` if there is none.
+
+        A conversation is a linear message list, so trying an idea in one costs the thread you were
+        on: the transcript that comes back replaces what was there, and there is no way back to the
+        turn before. Branching is the answer, and the honest form of it is a *copy* — the two
+        conversations share a past and nothing else, so a turn in the fork cannot reach back into
+        the original the way any shared-state scheme eventually does.
+
+        Copied at the document level rather than through ``CodeSession``: a fork needs no agent,
+        makes no model call, and must preserve fields this class does not know about, so a session
+        written by a newer version does not lose them by round-tripping through today's fields.
+        """
+        source = self._path(session_id)
+        if not source.is_file():
+            return None
+        try:
+            data = json.loads(source.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            _log.warning("code session %s unreadable, not forked: %s", session_id, exc)
+            return None
+        if not isinstance(data, dict):
+            return None
+        new_id = uuid.uuid4().hex
+        data["session_id"] = new_id
+        target = self._path(new_id)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(data), encoding="utf-8")
+        return new_id
+
+    def raw(self, session_id: str) -> str | None:
+        """The stored file's text exactly as it is on disk, or ``None`` when there is no such file.
+
+        Deliberately not parsed and re-serialised. The reason to look at this at all is that
+        something about a conversation is not what you expected — a turn missing, a tool result
+        orphaned by trimming, a file that ``load()`` quietly gave up on — and a copy that has been
+        through ``json.loads`` is a copy of what the parser accepted, which is the very thing in
+        question.
+        """
+        path = self._path(session_id)
+        if not path.is_file():
+            return None
+        try:
+            return path.read_text(encoding="utf-8")
+        except OSError as exc:
+            _log.warning("code session %s could not be read: %s", session_id, exc)
+            return None

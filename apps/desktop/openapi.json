@@ -1118,6 +1118,30 @@
         "title": "CodeSessionOut",
         "type": "object"
       },
+      "CodeSessionRawOut": {
+        "description": "A stored conversation's file, unparsed.\n\n``text`` is the bytes on disk, not a re-serialisation. Everything else the API says about a\nsession has been through a parser and folded into exchanges, which is what you want on screen\nand useless when the question is what the parser dropped.",
+        "properties": {
+          "bytes": {
+            "title": "Bytes",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "bytes"
+        ],
+        "title": "CodeSessionRawOut",
+        "type": "object"
+      },
       "CodeToolOut": {
         "properties": {
           "arguments": {
@@ -2893,6 +2917,98 @@
           }
         },
         "title": "KanbanRunIn",
+        "type": "object"
+      },
+      "LibraryCardOut": {
+        "description": "One curated skill card, at the level the browser asked for.\n\n``body`` is empty in the list and filled on the detail route \u2014 the progressive disclosure the\ncard format is built around (metadata decides relevance, instructions load when chosen). Sending\nall twenty-three bodies to draw a list would be a quarter of a megabyte to render one line each.",
+        "properties": {
+          "body": {
+            "default": "",
+            "title": "Body",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "imported": {
+            "default": false,
+            "title": "Imported",
+            "type": "boolean"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "license": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          },
+          "topic": {
+            "title": "Topic",
+            "type": "string"
+          },
+          "triggers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Triggers",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "version",
+          "kind",
+          "stage",
+          "topic",
+          "triggers",
+          "license"
+        ],
+        "title": "LibraryCardOut",
+        "type": "object"
+      },
+      "LibraryImportOut": {
+        "properties": {
+          "imported": {
+            "title": "Imported",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "imported",
+          "name",
+          "status"
+        ],
+        "title": "LibraryImportOut",
         "type": "object"
       },
       "MaturityOut": {
@@ -5940,6 +6056,86 @@
         "summary": "Get Code Session"
       }
     },
+    "/api/code/sessions/{session_id}/fork": {
+      "post": {
+        "description": "Branch a conversation: a copy under a new id, sharing its past and nothing after it.\n\n404 rather than the delete route's soft ``{ok: false}``, because the two failures are not\nthe same event. Deleting something already gone is the state a second click lands in and\nthe user's intent is satisfied either way; forking something that is not there produces no\nconversation to open, and the caller needs to know that before it navigates.",
+        "operationId": "fork_code_session_api_code_sessions__session_id__fork_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSessionMetaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Fork Code Session"
+      }
+    },
+    "/api/code/sessions/{session_id}/raw": {
+      "get": {
+        "description": "The conversation's stored file, verbatim.\n\nEverything else this API returns about a session has been through a parser and a fold into\nexchanges \u2014 which is the right thing to render and the wrong thing to debug with, because a\nmessage the parser dropped is invisible in it. This is the one view where a malformed file\nlooks malformed.",
+        "operationId": "raw_code_session_api_code_sessions__session_id__raw_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSessionRawOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Raw Code Session"
+      }
+    },
     "/api/code/turn": {
       "post": {
         "operationId": "code_turn_api_code_turn_post",
@@ -8501,6 +8697,109 @@
           }
         },
         "summary": "List Skills"
+      }
+    },
+    "/api/skills/library": {
+      "get": {
+        "description": "The curated cards, metadata only \u2014 enough to browse, not enough to read.",
+        "operationId": "list_library_api_skills_library_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LibraryCardOut"
+                  },
+                  "title": "Response List Library Api Skills Library Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Library"
+      }
+    },
+    "/api/skills/library/{name}": {
+      "get": {
+        "description": "One card with its body \u2014 the Trigger/Do/Avoid/Check/Risk a person actually reads.",
+        "operationId": "get_library_card_api_skills_library__name__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryCardOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Library Card"
+      }
+    },
+    "/api/skills/library/{name}/import": {
+      "post": {
+        "description": "Load a curated card into the user's store \u2014 `chimera skills-import <name>`, over HTTP.\n\nRuns the same validator the CLI does. The cards are ours and pass it, which is exactly why\nskipping it here would be the wrong economy: the gate is what makes the import path safe for\nthe day a card arrives from somewhere else, and a second entrance that bypasses it is how a\ngate stops being one.",
+        "operationId": "import_library_card_api_skills_library__name__import_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryImportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Import Library Card"
       }
     },
     "/api/skills/{name}/approve": {
