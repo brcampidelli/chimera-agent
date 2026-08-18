@@ -46,6 +46,16 @@ _log = get_logger("core.repomap")
 _DEFAULT_IGNORE = {
     ".git", "__pycache__", ".venv", "venv", "node_modules", ".mypy_cache",
     ".pytest_cache", ".ruff_cache", "dist", "build", ".chimera", ".idea", ".vscode",
+    # `.claude/worktrees/` is where an agent harness puts an isolated checkout, so it holds one FULL
+    # COPY of the repository per concurrent agent. Measured with four of them running: 9,870 extra
+    # Python files, and `chimera/api/app.py` dropped out of the map's budget entirely — the same
+    # file whose disappearance `tests/test_repomap_ranking.py` exists to catch.
+    #
+    # It fails in the worst direction. The map does not shrink and does not error; it stays the same
+    # size and quietly fills with duplicates, so the agent receives something that "looks like a
+    # map" — this module's own opening words — while the entry point it needed is missing. Nobody
+    # would report that, because the only symptom is an agent looking in the wrong place.
+    ".claude",
 }
 
 #: Extensions the map understands. Anything else is invisible to it — stated here rather than

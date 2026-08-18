@@ -146,3 +146,41 @@ def test_the_cache_does_not_serve_a_stale_file(tmp_path: Path, monkeypatch: obje
     target.write_text("def after(): ...\ndef also_after(): ...\n", encoding="utf-8")
     digest = build_repo_map(tmp_path)
     assert "after()" in digest and "before()" not in digest
+
+
+def test_an_agent_worktree_never_enters_the_map(tmp_path: Path) -> None:
+    """A nested checkout is not part of the repository, and the map must not think it is.
+
+    Agent harnesses put isolated worktrees under `.claude/worktrees/`, which puts one FULL COPY of
+    the repository inside the repository per concurrent agent. Measured on this tree with four of
+    them running: 9,870 extra Python files, and `chimera/api/app.py` dropped out of the map's budget
+    entirely — the same file whose disappearance the first test in this module exists to catch.
+
+    The DIRECTION is what makes it worth pinning. The map does not shrink and does not error; it
+    stays the same size and quietly fills with duplicates, so the agent receives something that
+    looks like a map while the file it needed is missing. The only symptom is an agent looking in
+    the wrong place, which nobody reports as a bug.
+
+    What is asserted here is the containment, not the crowding. Reproducing the crowd-out
+    synthetically needs a fixture as lopsided as the real repository, and two earlier versions of
+    this test passed against the bug while pretending otherwise — one because fifty short files do
+    not fill a 4000-character budget, and one because it looked for a `".claude/"` prefix the map
+    never prints (paths arrive as `claude/worktrees/...`, no leading dot). The crowd-out is real and
+    was measured; it is documented above rather than faked below.
+    """
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg" / "core.py").write_text("def real() -> None: ...\n", encoding="utf-8")
+    (tmp_path / "main.py").write_text("from pkg.core import real\n", encoding="utf-8")
+
+    clone = tmp_path / ".claude" / "worktrees" / "agent-1" / "pkg"
+    clone.mkdir(parents=True)
+    body = "".join(f"def sym_{i}() -> None: ...\n" for i in range(12))
+    for i in range(300):
+        (clone / f"copy{i}.py").write_text(body, encoding="utf-8")
+
+    digest = build_repo_map(tmp_path)
+
+    # Matched on the substring rather than a prefix: the map strips the leading dot, and pinning the
+    # exact rendering would make this pass again the day that changes.
+    assert "worktrees/agent-1" not in digest, "a copy inside .claude reached the map"
+    assert _rank_of(digest, "pkg/core.py") >= 0, "the real file must still be there"
