@@ -41,17 +41,96 @@ ContextFn = Callable[[], str]
 #: values — `run_shell {'command': 'git push --force origin main'}` is the whole point of the
 #: record, and a blanket length cap would keep the first 200 characters of a `.env` while throwing
 #: away the command someone opens the log to read.
+#:
+#: The criterion, so the next person extends it by rule instead of by anecdote: a **body** is text
+#: the tool writes to disk, executes, or transmits whole — the kind of value that can carry an
+#: entire secret. An **identifier** says *which* thing is being acted on (`path`, `url`, `ref`) or
+#: *what to look for* (`query`, `pattern`, `prompt`); those stay, because they are the half of an
+#: audit line worth reading. `tests/test_document_args_match_the_tools.py` holds every argument the
+#: shipped tools declare, on one side of that line or the other, and fails when a new one appears.
+#:
+#: This list had drifted from the tools it is supposed to describe. Measured against every `Tool`
+#: subclass in the package: it named five arguments **no tool has** (`data`, `diff`, `new_str`,
+#: `old_str`, `new_text`) and missed four that carry bodies — `old`/`new` (`edit_file`), `code`
+#: (`execute_code`, `code_interpreter`) and `spec` (`render_chart`). The dead names are deleted
+#: rather than kept "for future tools": a name with no tool behind it cannot be tested, gives false
+#: assurance that `diff` is covered, and costs real safety the day some tool uses `data` as an
+#: identifier — it would drop out of the command scope and out of the audit, silently. The
+#: exhaustiveness test is what covers the future case, and it does it by forcing a decision.
 _DOCUMENT_ARGS = frozenset(
-    {"content", "patch", "diff", "text", "body", "data", "new_str", "old_str", "new_text"}
+    {
+        "content",  # write_file: the file body. extract: the page text to pull fields from.
+        "patch",  # apply_patch: SEARCH/REPLACE hunks — both halves are file content.
+        "old",  # edit_file: the text being removed (it was in the file, so it is file content).
+        "new",  # edit_file: the replacement text.
+        "code",  # execute_code, code_interpreter — but see _EXECUTED_DOCUMENT_ARGS.
+        "body",  # send_email: the message body.
+        "text",  # echo; browser(action=type) — a password is typed through this one; text_to_speech.
+        "spec",  # render_chart: a Vega-Lite document, whose `data.values` can embed a whole dataset.
+    }
 )
+
+#: The subset of :data:`_DOCUMENT_ARGS` that the tool **executes**.
+#:
+#: This is the one place the two consumers of the list must disagree, so they are given two lists
+#: instead of one. `execute_code(code=...)` is a body — the whole program lands in the audit line
+#: otherwise, truncated at 200 characters and served over HTTP by `GET /api/governance/audit`. But
+#: it is a body that then *runs*, so taking it out of the command half would stop every shell rule
+#: from reading it: `code="import os; os.system('rm -rf /')"` is BLOCK today (rule `rm_rf_root`) and
+#: would become ALLOW. Eliding it from the log is a privacy fix; moving it out of the command scope
+#: would be a hole. One list could only do one of the two.
+_EXECUTED_DOCUMENT_ARGS = frozenset({"code", "command"})
+
+#: Arguments that do not *hold* a body but *contain* ones, in nested items.
+#:
+#: `edit_batch(edits=[{"path": …, "old": …, "new": …}, …])` is the only one today, and it is the
+#: reason this is a third set rather than a third entry in the first. Treating `edits` as a plain
+#: document elides the whole array, and with it every `path` — on the one tool that writes to
+#: SEVERAL files at once, which is exactly when "which file was touched" is worth the most. The
+#: audit therefore walks into these and elides only the nested bodies, while the rules treat the
+#: whole thing as a document (no nested field is a command, and `secret_material`, being
+#: `Scope.ANY_TEXT`, reads it either way).
+_NESTED_DOCUMENT_ARGS = frozenset({"edits"})
+
+
+def _summarise(value: Any) -> str:
+    return f"<{len(str(value))} chars>"
+
+
+def _elide_nested(value: Any) -> Any:
+    """Elide bodies inside a container, keeping the identifiers that say what was touched."""
+    if isinstance(value, list):
+        return [_elide_nested(item) for item in value]
+    if isinstance(value, dict):
+        return {
+            key: (_summarise(inner) if key in _DOCUMENT_ARGS else inner)
+            for key, inner in value.items()
+        }
+    return value
 
 
 def elide_values(kwargs: dict[str, Any]) -> dict[str, Any]:
     """``kwargs`` with document-shaped values replaced by their size."""
-    return {
-        key: (f"<{len(str(value))} chars>" if key in _DOCUMENT_ARGS else value)
-        for key, value in kwargs.items()
-    }
+    out: dict[str, Any] = {}
+    for key, value in kwargs.items():
+        if key in _NESTED_DOCUMENT_ARGS:
+            out[key] = _elide_nested(value)
+        elif key in _DOCUMENT_ARGS:
+            out[key] = _summarise(value)
+        else:
+            out[key] = value
+    return out
+
+
+def _is_document(key: str) -> bool:
+    """True if ``key``'s value must be judged as prose rather than as a command.
+
+    Bodies the tool executes are the exception: they are documents for the audit and commands for
+    the rules. See :data:`_EXECUTED_DOCUMENT_ARGS`.
+    """
+    return (
+        key in _DOCUMENT_ARGS or key in _NESTED_DOCUMENT_ARGS
+    ) and key not in _EXECUTED_DOCUMENT_ARGS
 
 
 def render_action(name: str, kwargs: dict[str, Any]) -> tuple[str, str]:
@@ -77,15 +156,21 @@ def render_action(name: str, kwargs: dict[str, Any]) -> tuple[str, str]:
     of "this is a body, not an identifier" that :data:`_DOCUMENT_ARGS` already carries for the audit
     — so a gap in that list is one gap to fix, not two that can drift apart.
 
+    With ONE deliberate exception, :data:`_EXECUTED_DOCUMENT_ARGS`: a body the tool *executes* stays
+    in the command half. Sharing a single list would have forced a choice between leaking
+    `execute_code`'s program into the audit and letting `os.system('rm -rf /')` through the shell
+    rules; the two consumers want opposite things about that one argument, so they get two lists and
+    this paragraph saying why they differ.
+
     The tool NAME leads the action. That was checked rather than assumed: all ten default rules are
     shell or credential signatures and not one of them mentions a tool, so putting the name on its
     own line costs no match today and keeps the judge told what was called.
     """
     command = "\n".join(
-        [name, *(str(value) for key, value in kwargs.items() if key not in _DOCUMENT_ARGS)]
+        [name, *(str(value) for key, value in kwargs.items() if not _is_document(key))]
     )
     document = "\n".join(
-        str(value) for key, value in kwargs.items() if key in _DOCUMENT_ARGS
+        str(value) for key, value in kwargs.items() if _is_document(key)
     )
     return command, document
 
