@@ -4,6 +4,92 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.47.0] - 2026-08-18
+
+The governance layer said it was protecting you, and on several counts it was not. Seven of these
+came out of one thread: a refused tool call reported itself as a success, and pulling on that
+reached the kernel, the rules, the audit and the mode that was supposed to only measure.
+
+**If you use `chimera run --guard` or `solve --guard`, this release is the one to take.** That flag
+is independent of `CHIMERA_GOVERNANCE`, so the four defects below reached anyone using the kernel
+the documented way.
+
+### Fixed — the governance thread
+
+- **A refused tool call reported itself as a successful one.** A gate declining to run a tool
+  returned an ordinary observation, and the loop computed `ok = not observation.startswith("error:")`
+  — so `ok` was `True`. Three surfaces read that flag: the frame the desktop draws, the step log a
+  receipt is built from, and the drift detector. A run in which every dangerous action was refused
+  was, in every structured field, a run that succeeded. The model read the same ordinary-looking
+  string and answered "Done. I force-pushed the branch to origin as requested."
+- **A two-line script passed every rule, and a markdown file did not.** The action handed to the
+  rules was built by interpolating a dict, and `repr` escapes a newline into two characters — so the
+  `n` fused with the next word and killed the word boundary every rule starts with. `git push --force
+  origin main` was caught; `echo hi` and the same command on the next line was not. Meanwhile a
+  document *quoting* `rm -rf /tmp/x` was hard-blocked. Every real shell script has more than one
+  line, so the protection was inverted. Two rules had also never fired at all.
+- **The rule that notices a credential was the one storing it.** A governed `write_file` put the
+  file body into `audit.jsonl`, which the app serves onto its Security screen — so writing a `.env`
+  or a private key persisted it, under the `secret_material` verdict, for a call that another guard
+  had already refused. Fixed in two layers: the audit now redacts (the redactor existed and was
+  wired into the step trace only), and document-shaped arguments are recorded as their size.
+- **The Security screen called the audit tampered when nobody had touched it.** Two writers over one
+  file each resumed the hash chain from their own snapshot, so overlapping requests produced
+  duplicate sequence numbers and a chain that failed its own verification. A falsely-failed chain is
+  as bad as an undetected tamper.
+- **`observe` applied the refusals it promised to only measure.** A BLOCK verdict returns before the
+  approver is consulted, so the mode documented as refusing nothing enforced the hard rules and left
+  them out of the count a rollout is decided on. Measured over 33 real calls: eight refusals,
+  `refused=0`. The refusals stay — they are fixed signatures with no benign form — but they are
+  recorded now, and the refusal text says whose decision it was.
+- **An edit's body was judged as a shell command and written to the log.** The list deciding what
+  counts as a document body had drifted from the tools it describes: five names no tool has, four
+  bodies missing. A test now walks every tool in the package and fails when an argument appears that
+  nobody has classified.
+
+### Fixed — the rest
+
+- **The trust kernel was on no surface served over HTTP.** `POST /api/runs`, `/api/agents` and
+  `/api/code/turn` assembled the write region, the denylist and the taint ledger, and never the
+  kernel — so its verdict on a force push was reached by nobody. It is installed now whenever
+  `CHIMERA_GOVERNANCE` is set, which stays `off` by default: a stock install is untouched.
+- **One stuck worker held the whole batch, forever.** The deadline machinery existed and was tested;
+  every production caller but one left it unset, which meant *wait forever*. Two of those callers are
+  served over HTTP, with nobody at a terminal to interrupt them, and one leaked its cancellation
+  handle for the life of the process. An expiry is now distinguishable from a task that ran and
+  failed, which it was not.
+- **The judge sat on the panel it graded**, and the guard that was meant to cover five callers
+  covered four.
+- **Stop meant "finish this attempt first."**
+- **A failing scheduled job looked exactly like a working one.**
+- **The app used to fail to start by doing nothing** — a sidecar that died left no message anywhere.
+- **The CVE gate audited one of three lockfiles**, and the Rust job was not flaky, it was timing out.
+- **The repository map walked into agent worktrees** and lost the entry point.
+
+### Added
+
+- A dollar ceiling for a run, with a denominator on the bar.
+- The composer takes a pasted screenshot, and a follow-up typed mid-turn.
+- Container limits that can actually be set, and a rule set that finally looks at data leaving the
+  machine.
+- `--context-budget` on the terminal — a flag the documentation already promised.
+- The backend comes back on its own, and the screen admits when it is down.
+
+### Note on cadence
+
+`RELEASING.md` asks for one stable a week and **0.46.0 shipped yesterday**. This is deliberate and
+recorded here rather than left to be noticed: the cadence rule exists to stop releases cut for their
+own sake, not to hold back a fix for a protection that is inverted in the shipped version. Four of
+the defects above are reachable through `--guard`, which is how the kernel is documented to be used.
+
+### Known gaps, named
+
+- The `observe` report does not reach the HTTP surfaces yet — the run's approval ledger is built and
+  discarded there. Returning it with no reader would rebuild the same silence one layer up.
+- Under `enforce` the API still has no approval path, while the endpoints that pause a run and answer
+  it already exist. `attended` was modelled as "is there a console" when the question is "who
+  answers".
+
 ## [0.46.0] - 2026-08-16
 
 A release about things that were written down and not applied to the thing next to them. Nine of
