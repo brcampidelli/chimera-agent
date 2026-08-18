@@ -1,5 +1,5 @@
-import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconRail, type View } from "@/components/IconRail";
 import { useRoute } from "@/lib/router";
 import { Settings } from "@/components/Settings";
@@ -10,6 +10,7 @@ import { Work } from "@/components/Work";
 import { Maturity } from "@/components/Maturity";
 import { Onboarding } from "@/components/Onboarding";
 import { Activity } from "@/components/Activity";
+import { BackendDown } from "@/components/BackendDown";
 import { AppShell } from "@/components/shell/AppShell";
 import { CommandPalette, type Command } from "@/components/shell/CommandPalette";
 import { useHotkeys } from "@/lib/hotkeys";
@@ -57,6 +58,14 @@ function Loading({ children }: { children: ReactNode }) {
 }
 
 /**
+ * How often the app asks the backend whether it is still there.
+ *
+ * Exported because the test drives this exact interval: a poll the test hardcodes could pass while
+ * the app polls once an hour.
+ */
+export const HEARTBEAT_MS = 5_000;
+
+/**
  * The theme preference, persisted.
  *
  * The inline script in index.html has already painted the right theme by the time this runs; this
@@ -87,6 +96,47 @@ function useTheme() {
   return { dark, theme, setTheme, toggle: () => setTheme(dark ? "light" : "dark") };
 }
 
+/**
+ * When the backend comes back, tell every other query about it.
+ *
+ * React Query does not retry a query that already failed because a DIFFERENT one succeeded, so
+ * without this the app reconnects and still looks broken: the heartbeat goes green, the banner
+ * disappears, and every panel underneath keeps its error state until the user clicks its own "Try
+ * again" by hand. Invalidating once on the down→up edge (never on every render, and never while
+ * still down) is what turns a reconnection into a recovery.
+ */
+function useRecoverFromOutage(down: boolean): void {
+  const queryClient = useQueryClient();
+  const wasDown = useRef(false);
+  useEffect(() => {
+    if (down) {
+      wasDown.current = true;
+      return;
+    }
+    if (wasDown.current) {
+      wasDown.current = false;
+      void queryClient.invalidateQueries();
+    }
+  }, [down, queryClient]);
+}
+
+/**
+ * The app, with room above it for a bar that is usually not there.
+ *
+ * `#root` is 100% tall and everything under it asks for `h-full`, so a banner added as a plain
+ * sibling would push the shell's own footer past the bottom of the window. One flex column, with
+ * the shell in a `min-h-0 flex-1` cell, is what lets the bar take its ~40 pixels from the app
+ * instead of from the viewport.
+ */
+function Framed({ banner, children }: { banner: ReactNode; children: ReactNode }) {
+  return (
+    <div className="flex h-full flex-col">
+      {banner}
+      <div className="min-h-0 flex-1">{children}</div>
+    </div>
+  );
+}
+
 export default function App() {
   const t = useT();
   const { dark, toggle } = useTheme();
@@ -94,7 +144,19 @@ export default function App() {
   const ignite = useIgnition();
   // First-run gate: no provider key => show the Onboarding wizard instead of the app (a keyed user
   // never sees it). Session-local "skip" lets a GUI-first user jump to Settings without a key yet.
-  const doctor = useQuery({ queryKey: ["doctor"], queryFn: getDoctor });
+  //
+  // It is also the app's heartbeat, and that is the second job this one call now does. Without the
+  // interval it ran once at mount and never again, so the error branch below could only ever
+  // describe a backend that never came up — while a backend that DIED mid-session left every panel
+  // showing its own "Try again" (each of which would fail forever) and nothing on screen saying
+  // why. One query that every screen already waits for is the honest place to ask the question.
+  //
+  // The retry policy in `main.tsx` doubles as the de-bounce: six quick retries mean the ordinary
+  // case — the shell noticing a dead sidecar and replacing it within a couple of seconds — never
+  // reaches `isError` at all, so nothing flashes on screen for an outage the user never had.
+  const doctor = useQuery({ queryKey: ["doctor"], queryFn: getDoctor, refetchInterval: HEARTBEAT_MS });
+  const backendDown = doctor.isError;
+  useRecoverFromOutage(backendDown);
   const [skipOnboarding, setSkipOnboarding] = useState(false);
   // The screen lives in the URL now. It was a `useState`, which is enough until something outside
   // this switch needs to point at a place — "open this file at line 42" from a diagnostic or a
@@ -138,6 +200,10 @@ export default function App() {
     },
   });
 
+  // The bar goes above whatever is on screen, including the onboarding wizard — which needs the
+  // backend exactly as much as the rest of the app does.
+  const outage = backendDown ? <BackendDown onRetry={() => void doctor.refetch()} /> : null;
+
   if (doctor.isLoading) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
@@ -146,7 +212,9 @@ export default function App() {
       </div>
     );
   }
-  if (doctor.isError) {
+  // A backend that has NEVER answered is a different situation from one that stopped: there is no
+  // app underneath to put a bar on top of, so this stays the whole-screen state it always was.
+  if (backendDown && !doctor.data) {
     return (
       <div className="flex h-full items-center justify-center">
         <ErrorState error={doctor.error} onRetry={() => doctor.refetch()} />
@@ -155,12 +223,14 @@ export default function App() {
   }
   if (doctor.data && !doctor.data.has_any_key && !skipOnboarding) {
     return (
-      <Onboarding
-        onSkip={() => {
-          setSkipOnboarding(true);
-          navigate("settings");
-        }}
-      />
+      <Framed banner={outage}>
+        <Onboarding
+          onSkip={() => {
+            setSkipOnboarding(true);
+            navigate("settings");
+          }}
+        />
+      </Framed>
     );
   }
 
@@ -174,6 +244,7 @@ export default function App() {
           you navigate away mid-run. */}
       <RunSessionProvider>
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} commands={commands} />
+      <Framed banner={outage}>
       <AppShell
         ignite={ignite}
         viewKey={view}
@@ -224,6 +295,7 @@ export default function App() {
         {view === "maturity" && import.meta.env.DEV && <Maturity />}
         {view === "settings" && <Settings />}
       </AppShell>
+      </Framed>
       </RunSessionProvider>
     </AgentProvider>
   );
