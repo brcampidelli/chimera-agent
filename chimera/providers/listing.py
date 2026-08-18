@@ -29,8 +29,11 @@ price does not support, and it is the number a spend ceiling would divide by.
 
 from __future__ import annotations
 
+import json
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Literal
 
 from chimera.telemetry import get_logger
@@ -343,6 +346,12 @@ def available_models(
             merged.append(option)
             seen.add(option.slug)
 
+    # Remember what everything costs. Done HERE, at the one place a fresh index exists, so the
+    # receipt under a turn can price a model nobody hand-added to the static table — including the
+    # product default, which reported "price unknown" for as long as it was GPT-5.5.
+    if remote:
+        remember_prices(remote)
+
     local = _ollama_options(getattr(settings, "ollama_base_url", ""))
     for option in local:
         if option.slug not in seen:
@@ -357,3 +366,119 @@ def available_models(
     if local:
         sources.append("ollama")
     return ModelListing(models=tuple(merged), sources=tuple(sources), reason=reason)
+
+
+# --- The price side: what a model costs, remembered between runs ---------------------------------
+#
+# `chimera.fusion.receipts` prices a turn from a hand-maintained table of ~20 family substrings, and
+# anything it does not recognise reports "price unknown" — including, until this release, the product
+# default. The index fetched above carries the real per-token price of every model OpenRouter serves,
+# so the gap was never data. It was that the data arrived at the wrong moment: only when a user
+# opened the model menu, and only in memory.
+#
+# So it is written to disk. Three properties, each deliberate:
+#
+# - **Exact slugs, no substrings.** The existing table matches `"deepseek-chat"` against anything
+#   containing it, which is how `deepseek-chat-v3.1` was priced at the v3 rate for months. Four
+#   hundred substring patterns would multiply that failure: `gpt-5.5` is a substring of
+#   `gpt-5.5-mini`. This map is keyed by the whole slug and answers only for that slug.
+# - **Written whenever the index is fetched, for any reason.** No separate refresh path to forget.
+# - **Only real prices.** A model OpenRouter quotes per request has no number here — the receipt says
+#   "unknown", which is true, rather than "$0", which is both false and divisible.
+
+#: Where the map lives, under ``settings.home``.
+PRICE_CACHE_NAME = "model-prices.json"
+
+# (path, mtime, table). Keyed by path and mtime so a test that repoints CHIMERA_HOME, or a fetch that
+# rewrites the file, is picked up without a process restart.
+_price_cache: tuple[Path, float, dict[str, tuple[float, float]]] | None = None
+
+
+def _price_cache_path() -> Path:
+    from chimera.config import get_settings
+
+    return Path(get_settings().home) / PRICE_CACHE_NAME
+
+
+def remember_prices(models: Sequence[ModelOption]) -> None:
+    """Persist every KNOWN price from a freshly fetched listing. Never raises.
+
+    Called from :func:`available_models`, so the map refreshes as a side effect of the picker being
+    used — there is no second code path that has to remember to run. A failure to write is a debug
+    line: the app must not fall over because a cache directory is read-only.
+    """
+    priced = {
+        m.slug: (m.input_per_m, m.output_per_m)
+        for m in models
+        if m.input_per_m is not None and m.output_per_m is not None
+    }
+    if not priced:
+        return
+    path = _price_cache_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        # `fetched_at` is stored for a human reading the file, not consulted: a price from last month
+        # is a better estimate than no price, and expiring it would put "unknown" back on screen for
+        # anyone who has been offline for a while.
+        payload = {"fetched_at": _now_iso(), "prices": {k: list(v) for k, v in priced.items()}}
+        path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    except Exception as exc:  # noqa: BLE001 — a read-only home must not break a turn
+        _log.debug("could not write the price cache at %s: %s", path, exc)
+
+
+def known_price(slug: str) -> tuple[float, float] | None:
+    """USD per 1M (input, output) for this EXACT slug, or None when we have never seen it priced.
+
+    Reads the file at most once per (path, mtime) — this is called inside the loop that prices a
+    turn, so it must not touch the disk on every call, and it must never do I/O over the network.
+    """
+    global _price_cache
+    path = _price_cache_path()
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        return None  # no cache yet: the caller falls back to its own table, as it always did
+
+    if _price_cache is None or _price_cache[0] != path or _price_cache[1] != mtime:
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            entries = raw["prices"]
+            table = {
+                str(k): (float(v[0]), float(v[1]))
+                for k, v in entries.items()
+                if isinstance(v, list) and len(v) == 2
+            }
+        except Exception as exc:  # noqa: BLE001 — a truncated cache is a missing cache
+            _log.debug("could not read the price cache at %s: %s", path, exc)
+            table = {}
+        _price_cache = (path, mtime, table)
+
+    return _price_cache[2].get(slug)
+
+
+def _now_iso() -> str:
+    from datetime import UTC, datetime
+
+    return datetime.now(UTC).isoformat(timespec="seconds")
+
+
+def warm_price_cache(settings: Any) -> None:
+    """Fetch the index once and persist its prices. Never raises; safe to call from a thread.
+
+    Exists so a receipt does not depend on somebody having opened the model menu. Without it the
+    price of a turn would be known on installs where the picker had been used and unknown on the
+    rest — and a number that appears for some users and not others is harder to trust than one that
+    is consistently absent.
+
+    Only when an OpenRouter key is configured. The index is public and would answer regardless, but
+    someone whose models all come from elsewhere has no reason to make the call, and an app that
+    reaches a third party for no benefit to that user is doing it for itself.
+    """
+    try:
+        if "openrouter" not in settings.configured_providers():
+            return
+        models, reason = openrouter_models()
+        if reason == "":
+            remember_prices(models)
+    except Exception as exc:  # noqa: BLE001 — a warm-up must never take the process with it
+        _log.debug("price cache warm-up failed: %s", exc)

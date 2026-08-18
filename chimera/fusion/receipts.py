@@ -76,10 +76,38 @@ _LOCAL_ZERO = ModelPrice(0.0, 0.0)
 
 
 def resolve_price(model: str) -> ModelPrice | None:
-    """The list price for ``model`` by family substring, or ``None`` if unknown (never guessed)."""
+    """The list price for ``model``, or ``None`` if unknown (never guessed).
+
+    Four sources, most specific first, and the ORDER is the whole design:
+
+    1. **An exact match in the table.** ``set_price("openrouter/x/y", …)`` names one model, and
+       somebody who named a model meant that model.
+    2. **The provider's own published price**, for this exact slug, from the index the model picker
+       fetches (see :func:`chimera.providers.listing.known_price`). This is why the default model
+       stopped reporting "price unknown": the table below is hand-maintained and knew about twenty
+       families, while the index knows four hundred models and is refreshed by using the app.
+    3. **The table by family substring** — the original behaviour, unchanged, and still the answer
+       for every model the index has never seen (a local gateway, a vendor not on OpenRouter).
+    4. Local models, which bill nothing.
+
+    Why the index sits BETWEEN the two table lookups rather than after both: those patterns are
+    substrings, and a substring is a guess about a family. ``deepseek-chat`` matched
+    ``deepseek-chat-v3.1`` and priced it at the v3 rate — off by 3x on output — for as long as both
+    existed. The provider's number for the exact slug is better evidence than our guess about its
+    family, and worse evidence than a price a human typed for that one model.
+    """
     from chimera.providers.gateway import _is_local_model
+    from chimera.providers.listing import known_price
 
     norm = model.lower()
+    for pattern, price in _PRICES:
+        if pattern == norm:
+            return price
+
+    live = known_price(model)
+    if live is not None:
+        return ModelPrice(live[0], live[1])
+
     for pattern, price in _PRICES:
         if pattern in norm:
             return price

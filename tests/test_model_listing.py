@@ -23,6 +23,7 @@ READ, and a live catalogue would test whichever models happened to be published 
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import httpx
@@ -348,3 +349,128 @@ def test_the_endpoint_reports_the_default_next_to_the_list(monkeypatch: pytest.M
     assert body["default"], "the response does not say what runs when nothing is picked"
     assert isinstance(body["models"], list)
     assert body["reason"] in {"", "no_provider", "unreachable", "http_error", "unreadable"}
+
+
+# --- The price side ------------------------------------------------------------------------------
+#
+# Everything below is about one sentence a user reads: "price unknown", under a turn they just paid
+# for. It appeared because the receipt priced models from a hand-written table of ~20 families, and
+# the product's own default was not one of them. The fix is not "add the default to the table" — the
+# table would be wrong again on the next release — it is to remember what the provider publishes.
+
+
+def test_a_fetched_listing_leaves_the_prices_on_disk(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path))
+    _answer(monkeypatch, _Response(200, {"data": [_entry("vendor/model")]}))
+
+    available_models(_Settings(["openrouter"]))
+
+    cache = tmp_path / listing.PRICE_CACHE_NAME
+    assert cache.exists(), "the fetched index did not leave its prices anywhere"
+    saved = json.loads(cache.read_text(encoding="utf-8"))
+    assert saved["prices"]["openrouter/vendor/model"] == [0.25, 0.95]
+
+
+def test_a_model_quoted_per_request_is_not_written_as_a_price(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    # The one entry that must NOT reach the cache. A `-1` written as `0` would make a billed model
+    # read as free in the receipt, which is worse than the "unknown" it replaces.
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path))
+    # Two models, so the file exists to be inspected: a listing where NOTHING is priceable writes
+    # nothing at all, which is correct and would make this assertion vacuous.
+    _answer(
+        monkeypatch,
+        _Response(
+            200,
+            {
+                "data": [
+                    _entry("vendor/variable", pricing={"prompt": "-1", "completion": "-1"}),
+                    _entry("vendor/priced"),
+                ]
+            },
+        ),
+    )
+
+    available_models(_Settings(["openrouter"]))
+
+    saved = json.loads((tmp_path / listing.PRICE_CACHE_NAME).read_text(encoding="utf-8"))
+    assert "openrouter/vendor/priced" in saved["prices"]
+    assert "openrouter/vendor/variable" not in saved["prices"]
+
+
+def test_the_price_is_read_back_for_that_exact_slug_only(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    # Exact, never substring. Four hundred substring patterns is how `gpt-5.5` starts pricing
+    # `gpt-5.5-mini` — the failure the existing family table already has and this must not add to.
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path))
+    _answer(monkeypatch, _Response(200, {"data": [_entry("vendor/model")]}))
+    available_models(_Settings(["openrouter"]))
+
+    assert listing.known_price("openrouter/vendor/model") == (0.25, 0.95)
+    assert listing.known_price("openrouter/vendor/model-mini") is None
+    assert listing.known_price("vendor/model") is None
+
+
+def test_no_cache_is_an_absent_price_not_a_crash(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    # The state every install starts in, and the state of any machine that has never reached the
+    # index. The caller falls back to its own table, exactly as before this existed.
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path / "nothing-here"))
+    assert listing.known_price("openrouter/vendor/model") is None
+
+
+def test_the_receipt_prices_a_model_the_static_table_never_heard_of(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    """The end this whole thing is for: a turn that used to say "price unknown" says a number.
+
+    `vendor/model` is deliberately not in `_PRICES` — matching one of those families would prove the
+    old path works, not the new one.
+    """
+    from chimera.fusion.receipts import resolve_price
+
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path))
+    assert resolve_price("openrouter/vendor/model") is None  # before
+
+    _answer(monkeypatch, _Response(200, {"data": [_entry("vendor/model")]}))
+    available_models(_Settings(["openrouter"]))
+
+    priced = resolve_price("openrouter/vendor/model")  # after
+    assert priced is not None
+    assert (priced.input_per_m, priced.output_per_m) == (0.25, 0.95)
+
+
+def test_an_exact_hand_set_price_still_beats_the_published_one(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    """`set_price` documents itself as "checked first", and somebody who names one model means it —
+    a negotiated rate, a proxy, a provider whose public number is not what they pay."""
+    from chimera.fusion.receipts import ModelPrice, resolve_price, set_price
+
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path))
+    _answer(monkeypatch, _Response(200, {"data": [_entry("vendor/negotiated")]}))
+    available_models(_Settings(["openrouter"]))
+
+    set_price("openrouter/vendor/negotiated", ModelPrice(0.01, 0.02))
+
+    assert resolve_price("openrouter/vendor/negotiated") == ModelPrice(0.01, 0.02)
+
+
+def test_the_warm_up_stays_home_when_openrouter_is_not_configured(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    # An app that phones a third party for no benefit to this user is doing it for itself.
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path))
+
+    def forbidden(url: str, **kwargs: Any) -> _Response:
+        raise AssertionError("warmed the price cache from OpenRouter without an OpenRouter key")
+
+    monkeypatch.setattr(httpx, "get", forbidden)
+    listing.warm_price_cache(_Settings(["anthropic"]))
+
+    assert not (tmp_path / listing.PRICE_CACHE_NAME).exists()
