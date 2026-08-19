@@ -57,8 +57,12 @@ inside **Code**.
   not a scratch pane), and the **activity** inspector on the right, fed by real per-turn signals
   only (tools called with ✓/✗, tokens in/out + cache, `~ $cost` or "unavailable", memory facts
   recalled + which layer). Nothing is fabricated. Opening a file adds a viewer with an opt-in
-  editor; who does the work (provider / roles) and the posture line saying what the agent may touch
-  sit with the composer, before you send.
+  editor; who does the work (provider / roles), **which model answers** and the posture line saying
+  what the agent may touch sit with the composer, before you send. The model picker lists what this
+  install can actually call — OpenRouter's live index when a key for it is configured, merged with
+  the curated catalogue and whatever Ollama has pulled — with the price, the context window and a
+  mark on the ones that cannot call tools. The pick lasts for the conversation; the dialog offers to
+  make it the standing default.
 - **Editor** — a real code editor (CodeMirror, loaded on demand — see the note in `App.tsx`) with
   the file tree in the shell's left slot.
 - **Work** — what a run *did*: **Runs** (one task, verify-or-revert), the **git** diff it produced,

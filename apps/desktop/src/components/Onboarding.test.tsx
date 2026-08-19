@@ -2,11 +2,14 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Onboarding } from "@/components/Onboarding";
-import { getConfig, patchConfig, testProviderKey } from "@/lib/api";
+import { getConfig, getModels, patchConfig, testProviderKey } from "@/lib/api";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", () => ({
   getConfig: vi.fn(),
+  // The wizard's model field can now be filled from the live catalogue instead of typed. Resolved
+  // rather than bare so a suite about provider selection never waits on a list it does not use.
+  getModels: vi.fn(async () => ({ default: "", models: [], sources: [], reason: "" })),
   patchConfig: vi.fn(async () => ({ updated: [] })),
   testProviderKey: vi.fn(async () => ({ ok: true, model: "x", error: null })),
 }));
@@ -28,6 +31,9 @@ function providers() {
     ["DEEPSEEK_API_KEY", "DeepSeek", "deepseek/deepseek-chat", "https://platform.deepseek.com/api_keys"],
   ].map(([env, label, model, keys_url]) => ({
     env,
+    // The provider's routing name, which the model list is scoped by — derived server-side so the
+    // client never re-implements "env var minus the suffix".
+    name: env.replace("_API_KEY", "").toLowerCase(),
     label,
     set: false,
     hint: "",
@@ -41,6 +47,7 @@ function providers() {
     ["STABILITY_API_KEY", "Stability (images)"],
   ].map(([env, label]) => ({
     env,
+    name: env.replace("_API_KEY", "").toLowerCase(),
     label,
     set: false,
     hint: "",
@@ -126,6 +133,48 @@ describe("the first-run wizard", () => {
     expect(sent.CHIMERA_DEFAULT_MODEL).toBeUndefined();
   });
 
+  it("fills the model field from the live list, scoped to the key being pasted", async () => {
+    // The wizard asks a question the rest of the app does not: what does THIS key buy, before it is
+    // saved. Filtering by configured providers here would answer about whatever is already set up.
+    const user = userEvent.setup();
+    vi.mocked(getModels).mockResolvedValue({
+      default: "",
+      models: [
+        {
+          slug: "anthropic/claude-opus-5",
+          label: "Anthropic: Claude Opus 5",
+          vendor: "Anthropic",
+          source: "openrouter",
+          context_k: 200,
+          input_per_m: 5,
+          output_per_m: 25,
+          tools: true,
+          vision: true,
+          free: false,
+          recommended: false,
+        },
+      ],
+      sources: ["openrouter"],
+      reason: "",
+    });
+    renderWithProviders(<Onboarding onSkip={() => {}} />);
+    await waitFor(() => expect(screen.getByRole("option", { name: "Anthropic" })).toBeTruthy());
+    await user.selectOptions(combo(), "ANTHROPIC_API_KEY");
+
+    await user.click(screen.getByRole("button", { name: /Browse/i }));
+    await waitFor(() => expect(getModels).toHaveBeenCalledWith("anthropic"));
+    await user.click(await screen.findByText("Anthropic: Claude Opus 5"));
+
+    expect(screen.getByDisplayValue("anthropic/claude-opus-5")).toBeTruthy();
+
+    await user.type(keyField(), "sk-ant");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(patchConfig).toHaveBeenCalled());
+    expect(vi.mocked(patchConfig).mock.calls[0][0].CHIMERA_DEFAULT_MODEL).toBe(
+      "anthropic/claude-opus-5",
+    );
+  });
+
   it("keeps a model the user typed when they switch provider afterwards", async () => {
     const user = userEvent.setup();
     renderWithProviders(<Onboarding onSkip={() => {}} />);
@@ -174,6 +223,9 @@ describe("the first-run wizard", () => {
     const cfg = providers();
     cfg.providers.push({
       env: "GROQ_API_KEY",
+      // Discovered providers carry a routing name too — that is the whole point of deriving it from
+      // the env var rather than from a table of the five we ship.
+      name: "groq",
       label: "Groq",
       set: true,
       hint: "…abcd",

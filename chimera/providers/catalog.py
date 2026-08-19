@@ -43,81 +43,106 @@ class CatalogEntry:
     notes: str = ""
 
 
-# Curated multi-vendor suggestions per tier (mid-2026). DATA ONLY — extend/correct
-# freely; `chimera models` renders this and `resolve_tiers` picks defaults from it.
+# Curated multi-vendor suggestions per tier. DATA ONLY — extend/correct freely; `chimera models`
+# renders this and `resolve_tiers` picks defaults from it.
+#
+# **Every slug and price below was checked against OpenRouter's live index on 2026-08-18**, and that
+# pass is the reason this comment is longer than the last one. Six of the fourteen entries had been
+# WITHDRAWN by the provider — including the `weak` rung of every cost preset, so a run that routed a
+# role to the weak tier was calling a model that does not exist. Nothing detected it: the catalogue
+# is data, data has no tests, and the failure only appears as a provider error inside somebody's run.
+# Every surviving entry also had the wrong price, the wrong context window, or both.
+#
+# The lesson is in `tests/test_catalog_is_live.py`: a slug is a claim about somebody else's product,
+# and it decays whether or not anyone looks. That test looks — `-m integration`, so it never reds a
+# working build over a network hiccup.
+#
+# Two deliberate consequences of the withdrawals:
+#
+# - **The free tiers are gone from the presets.** Both `:free` slugs were retired (the paid variants
+#   of the same models survive), and a preset that depends on a free tier is a preset that breaks
+#   when the vendor stops donating. `weak` is now the cheapest PAID model here — cents, and it works.
+# - **Prices come from the live index now, not from this table.** The picker in the app reads them at
+#   runtime; these are for `chimera models` and for the estimate when nothing else knows. They are
+#   still approximate by nature, so the same warning applies: verify, then trust.
 CATALOG: tuple[CatalogEntry, ...] = (
-    # --- weak: free/near-free probes. Cheap first drafts, k-sample agreement. ---
+    # --- weak: near-free probes. Cheap first drafts, k-sample agreement. ---
     CatalogEntry(
-        "openrouter/qwen/qwen3-next-80b-a3b-instruct:free", "weak", "Qwen (Alibaba)",
-        0.0, 0.0, tools=False, context_k=256,
-        notes="free tier; rate-limited; unreliable tool calling",
-    ),
-    CatalogEntry(
-        "openrouter/meta-llama/llama-3.3-70b-instruct:free", "weak", "Meta",
-        0.0, 0.0, tools=False, context_k=128,
-        notes="free tier; rate-limited",
+        "openrouter/deepseek/deepseek-v4-flash", "weak", "DeepSeek",
+        0.074, 0.148, tools=True, context_k=1048,
+        notes="cheapest capable probe here, with a frontier-sized window; unmeasured in this repo",
     ),
     CatalogEntry(
         "openrouter/mistralai/mistral-small-3.2-24b-instruct", "weak", "Mistral",
-        0.10, 0.30, tools=True, context_k=128,
+        0.094, 0.25, tools=True, context_k=256,
         notes="the local-lift goldilocks model; cheap paid weak with usable tools",
+    ),
+    CatalogEntry(
+        "openrouter/meta-llama/llama-3.3-70b-instruct", "weak", "Meta",
+        0.10, 0.32, tools=True, context_k=131,
+        notes="the paid variant; the :free one was withdrawn on 2026-08-18",
+    ),
+    CatalogEntry(
+        "openrouter/openai/gpt-oss-20b:free", "weak", "OpenAI",
+        0.0, 0.0, tools=True, context_k=131,
+        notes="genuinely free and rate-limited; a free tier can be withdrawn without notice",
     ),
     # --- mid: the daily workhorses. Reliable tools, cents per task. ---
     CatalogEntry(
         "openrouter/deepseek/deepseek-chat-v3.1", "mid", "DeepSeek",
-        0.14, 0.28, tools=True, context_k=128,
-        notes="proven in this repo's benches; excellent cost/quality",
+        0.25, 0.95, tools=True, context_k=163,
+        notes="proven in this repo's benches; the product default",
     ),
     CatalogEntry(
         "openrouter/z-ai/glm-4.6", "mid", "Zhipu (GLM)",
-        None, None, tools=True, context_k=200,
-        notes="strong agentic mid; check current OpenRouter price",
+        0.50, 2.00, tools=True, context_k=204,
+        notes="strong agentic mid",
     ),
     CatalogEntry(
         "openrouter/google/gemini-2.5-flash", "mid", "Google",
-        None, None, tools=True, context_k=1000,
-        notes="huge context; check current price",
+        0.30, 2.50, tools=True, context_k=1048,
+        notes="huge context",
     ),
     CatalogEntry(
-        "openrouter/openai/gpt-5.5-mini", "mid", "OpenAI",
-        None, None, tools=True, context_k=400,
-        notes="check current price",
+        "openrouter/openai/gpt-5.6-luna", "mid", "OpenAI",
+        0.20, 1.20, tools=True, context_k=1050,
+        notes="replaces gpt-5.5-mini, withdrawn on 2026-08-18",
     ),
     CatalogEntry(
         "openrouter/qwen/qwen3-coder", "mid", "Qwen (Alibaba)",
-        0.20, 0.80, tools=True, context_k=256,
+        0.30, 1.00, tools=True, context_k=262,
         notes="code-leaning mid",
     ),
     # --- top: orchestrator/judge class. Decompose, adjudicate, synthesize. ---
     CatalogEntry(
         "openrouter/deepseek/deepseek-r1", "top", "DeepSeek",
-        0.55, 2.19, tools=False, context_k=128,
-        notes="economic reasoner; the default economic orchestrator",
+        0.70, 2.50, tools=True, context_k=64,
+        notes="economic reasoner; the default economic orchestrator. Note the SMALL window",
     ),
     CatalogEntry(
         "openrouter/moonshotai/kimi-k2", "top", "Moonshot (Kimi)",
-        None, None, tools=True, context_k=256,
-        notes="strong agentic frontier-class; check current price",
+        0.57, 2.30, tools=True, context_k=131,
+        notes="strong agentic frontier-class",
     ),
     CatalogEntry(
         "openrouter/openai/gpt-5.5", "top", "OpenAI",
-        None, None, tools=True, context_k=400,
-        notes="frontier; this repo's historical default_model",
+        5.00, 30.00, tools=True, context_k=1050,
+        notes="frontier; this repo's default_model until 2026-08-18, and the reason it changed",
     ),
     CatalogEntry(
-        "openrouter/google/gemini-3.1-pro", "top", "Google",
-        None, None, tools=True, context_k=1000,
-        notes="frontier; huge context",
+        "openrouter/google/gemini-3.1-pro-preview", "top", "Google",
+        2.00, 12.00, tools=True, context_k=1048,
+        notes="replaces gemini-3.1-pro, withdrawn on 2026-08-18",
     ),
     CatalogEntry(
-        "openrouter/anthropic/claude-opus-4-8", "top", "Anthropic",
-        None, None, tools=True, context_k=200,
-        notes="frontier; this repo's fusion-judge default",
+        "openrouter/anthropic/claude-opus-5", "top", "Anthropic",
+        5.00, 25.00, tools=True, context_k=1000,
+        notes="frontier; replaces claude-opus-4-8, withdrawn on 2026-08-18",
     ),
     CatalogEntry(
-        "openrouter/qwen/qwen-max", "top", "Qwen (Alibaba)",
-        None, None, tools=True, context_k=256,
-        notes="check current price",
+        "openrouter/qwen/qwen3-max", "top", "Qwen (Alibaba)",
+        0.78, 3.90, tools=True, context_k=262,
+        notes="replaces qwen-max, withdrawn on 2026-08-18",
     ),
 )
 
@@ -156,12 +181,15 @@ class ProviderInfo:
 #: last year's generation. Every entry below is the vendor's own "start here if you are unsure",
 #: which is exactly the question a first run is asking.
 PROVIDERS: tuple[ProviderInfo, ...] = (
-    # Left on 5.5 deliberately: this must MATCH ``Settings.default_model``, because for OpenRouter
-    # the wizard shows the suggestion without writing it. Showing 5.6 here while 5.5 is what runs
-    # would put a number on screen that is not the one in use. Refreshing the product default is a
-    # separate decision, and it moves the presets and the fusion panel with it.
+    # This must MATCH ``Settings.default_model``, because for OpenRouter the wizard shows the
+    # suggestion WITHOUT writing it — a different slug here would put a number on screen that is not
+    # the one in use. Both moved to DeepSeek V3.1 together: see the note on `default_model` for why a
+    # first install should not start on the most expensive model in the catalogue.
     ProviderInfo(
-        "OPENROUTER_API_KEY", "OpenRouter", "openrouter/openai/gpt-5.5", "https://openrouter.ai/keys"
+        "OPENROUTER_API_KEY",
+        "OpenRouter",
+        "openrouter/deepseek/deepseek-chat-v3.1",
+        "https://openrouter.ai/keys",
     ),
     # gpt-5.6-sol, via its documented alias; same $5/$30 as the 5.5 it replaces.
     ProviderInfo(
@@ -240,21 +268,26 @@ class TierLadder:
 # Preset ladders per cost mode. `auto` deliberately ENTERS AT MID (the user's
 # "automático prioriza o médio"): the weak tier is skipped as an entry point but
 # stays available for k-sample probes; escalation still climbs to top/fusion.
+# The weak rung was a `:free` slug in three of these four, and on 2026-08-18 that slug no longer
+# existed — so every profile that routed a role to the weak tier (explore, k-sample probes) was
+# calling a model OpenRouter had withdrawn. It is a paid model now, at roughly a tenth of a cent per
+# thousand tokens: a preset whose cheapest rung depends on a vendor's donation is a preset that
+# breaks when the donation ends, and it ended.
 _PRESETS: dict[CostMode, TierLadder] = {
     "cheap": TierLadder(
-        weak="openrouter/qwen/qwen3-next-80b-a3b-instruct:free",
+        weak="openrouter/mistralai/mistral-small-3.2-24b-instruct",
         mid="openrouter/deepseek/deepseek-chat-v3.1",
         top="openrouter/deepseek/deepseek-chat-v3.1",  # never pay reasoner rates
         entry="weak",
     ),
     "balanced": TierLadder(
-        weak="openrouter/qwen/qwen3-next-80b-a3b-instruct:free",
+        weak="openrouter/mistralai/mistral-small-3.2-24b-instruct",
         mid="openrouter/deepseek/deepseek-chat-v3.1",
         top="openrouter/deepseek/deepseek-r1",
         entry="weak",
     ),
     "auto": TierLadder(
-        weak="openrouter/qwen/qwen3-next-80b-a3b-instruct:free",
+        weak="openrouter/mistralai/mistral-small-3.2-24b-instruct",
         mid="openrouter/deepseek/deepseek-chat-v3.1",
         top="openrouter/deepseek/deepseek-r1",
         entry="mid",
@@ -262,7 +295,7 @@ _PRESETS: dict[CostMode, TierLadder] = {
     "premium": TierLadder(
         weak="openrouter/deepseek/deepseek-chat-v3.1",
         mid="openrouter/openai/gpt-5.5",
-        top="openrouter/anthropic/claude-opus-4-8",
+        top="openrouter/anthropic/claude-opus-5",
         entry="mid",
     ),
 }

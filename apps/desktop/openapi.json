@@ -3630,6 +3630,105 @@
         "title": "MessagingPlatformOut",
         "type": "object"
       },
+      "ModelOptionOut": {
+        "description": "One model the user could pick, with the facts that decide whether they should.\n\nEvery optional field is optional because it is genuinely unknown for some source. ``tools: null``\nis the one that must not be read as ``false``: a coding turn without tool calling can only\nDESCRIBE an edit, so \"we were not told\" and \"it cannot\" deserve different words on screen.",
+        "properties": {
+          "context_k": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context K"
+          },
+          "free": {
+            "default": false,
+            "title": "Free",
+            "type": "boolean"
+          },
+          "input_per_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Per M"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "output_per_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Per M"
+          },
+          "recommended": {
+            "default": false,
+            "title": "Recommended",
+            "type": "boolean"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "catalog",
+              "openrouter",
+              "ollama"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "tools": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tools"
+          },
+          "vendor": {
+            "title": "Vendor",
+            "type": "string"
+          },
+          "vision": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vision"
+          }
+        },
+        "required": [
+          "slug",
+          "label",
+          "vendor",
+          "source"
+        ],
+        "title": "ModelOptionOut",
+        "type": "object"
+      },
       "ModelsCfgOut": {
         "properties": {
           "api_base": {
@@ -3700,6 +3799,51 @@
           "tiers"
         ],
         "title": "ModelsCfgOut",
+        "type": "object"
+      },
+      "ModelsOut": {
+        "description": "The models this install can pick from, and what we failed to reach while listing them.\n\n``reason`` is a token the client translates, never a sentence \u2014 same shape and same reason as\n``OllamaModelsOut``. It is set NEXT TO a non-empty list whenever the remote index failed but the\ncurated catalogue answered, so the picker can say *the full list is unavailable* instead of\nrendering an empty menu, which reads as *your key buys nothing*.",
+        "properties": {
+          "default": {
+            "title": "Default",
+            "type": "string"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/ModelOptionOut"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "reason": {
+            "default": "",
+            "enum": [
+              "",
+              "no_provider",
+              "unreachable",
+              "http_error",
+              "unreadable"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "enum": [
+                "catalog",
+                "openrouter",
+                "ollama"
+              ],
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "default"
+        ],
+        "title": "ModelsOut",
         "type": "object"
       },
       "NewSessionOut": {
@@ -4255,6 +4399,11 @@
           "model": {
             "default": "",
             "title": "Model",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
             "type": "string"
           },
           "set": {
@@ -8100,6 +8249,53 @@
           }
         },
         "summary": "Messaging Stop"
+      }
+    },
+    "/api/models": {
+      "get": {
+        "description": "The models a request may name, so choosing one stops being a memory test.\n\nFiltered by the keys this install actually has \u2014 listing OpenRouter's four hundred models to\nsomeone holding only an Anthropic key is four hundred slugs that answer 401. ``?provider=``\noverrides that for the onboarding wizard, which asks *what does this key buy* while holding a\nkey it has not saved yet.\n\nIts own endpoint rather than a field on ``/api/doctor``, for the same reason the Ollama tag\nlist is: doctor is fetched by several screens, and a network round-trip behind it would make\nall of them wait on a fetch only the picker needs.\n\nRun on a worker thread \u2014 the fetch is blocking httpx and holding the event loop for it would\nstall every other request, including the SSE stream of a turn already in flight.",
+        "operationId": "models_endpoint_api_models_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "provider",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Provider"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Models Endpoint"
       }
     },
     "/api/models/ollama": {

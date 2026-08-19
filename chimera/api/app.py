@@ -77,6 +77,7 @@ from chimera.api.schemas import (
     McpServersOut,
     McpTestOut,
     MessagingPlatformOut,
+    ModelsOut,
     NewSessionOut,
     OllamaModelsOut,
     PausedRunOut,
@@ -590,6 +591,37 @@ def build_api_app(
             "models": list(found.models),
             "reason": found.reason,
         }
+
+    @app.get("/api/models", dependencies=[guard], response_model=ModelsOut)
+    async def models_endpoint(provider: str | None = None) -> dict[str, Any]:
+        """The models a request may name, so choosing one stops being a memory test.
+
+        Filtered by the keys this install actually has — listing OpenRouter's four hundred models to
+        someone holding only an Anthropic key is four hundred slugs that answer 401. ``?provider=``
+        overrides that for the onboarding wizard, which asks *what does this key buy* while holding a
+        key it has not saved yet.
+
+        Its own endpoint rather than a field on ``/api/doctor``, for the same reason the Ollama tag
+        list is: doctor is fetched by several screens, and a network round-trip behind it would make
+        all of them wait on a fetch only the picker needs.
+
+        Run on a worker thread — the fetch is blocking httpx and holding the event loop for it would
+        stall every other request, including the SSE stream of a turn already in flight.
+        """
+        from chimera.providers.listing import available_models
+
+        settings_now = live_settings()
+
+        def resolve() -> dict[str, Any]:
+            listing = available_models(settings_now, provider=provider)
+            return {
+                "default": settings_now.default_model,
+                "models": [option.__dict__ for option in listing.models],
+                "sources": list(listing.sources),
+                "reason": listing.reason,
+            }
+
+        return await asyncio.get_running_loop().run_in_executor(None, resolve)
 
     # --- Messaging: reach the user on Discord/Telegram, controlled from the UI --------------------
     @app.get("/api/messaging", dependencies=[guard], response_model=dict[str, MessagingPlatformOut])

@@ -1033,6 +1033,8 @@ export function Settings() {
               // token to suggest a model for or to send anyone to sign up at.
               provider={{
                 env: "CHIMERA_SERVER_TOKEN",
+                // Not a routing name either — nothing serves models on the other end of this token.
+                name: "",
                 label: "token",
                 set: c.server.token_set,
                 hint: "",

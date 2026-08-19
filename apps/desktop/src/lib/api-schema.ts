@@ -1230,6 +1230,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Models Endpoint
+         * @description The models a request may name, so choosing one stops being a memory test.
+         *
+         *     Filtered by the keys this install actually has — listing OpenRouter's four hundred models to
+         *     someone holding only an Anthropic key is four hundred slugs that answer 401. ``?provider=``
+         *     overrides that for the onboarding wizard, which asks *what does this key buy* while holding a
+         *     key it has not saved yet.
+         *
+         *     Its own endpoint rather than a field on ``/api/doctor``, for the same reason the Ollama tag
+         *     list is: doctor is fetched by several screens, and a network round-trip behind it would make
+         *     all of them wait on a fetch only the picker needs.
+         *
+         *     Run on a worker thread — the fetch is blocking httpx and holding the event loop for it would
+         *     stall every other request, including the SSE stream of a turn already in flight.
+         */
+        get: operations["models_endpoint_api_models_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/models/ollama": {
         parameters: {
             query?: never;
@@ -3277,6 +3309,47 @@ export interface components {
             /** Running */
             running: boolean;
         };
+        /**
+         * ModelOptionOut
+         * @description One model the user could pick, with the facts that decide whether they should.
+         *
+         *     Every optional field is optional because it is genuinely unknown for some source. ``tools: null``
+         *     is the one that must not be read as ``false``: a coding turn without tool calling can only
+         *     DESCRIBE an edit, so "we were not told" and "it cannot" deserve different words on screen.
+         */
+        ModelOptionOut: {
+            /** Context K */
+            context_k?: number | null;
+            /**
+             * Free
+             * @default false
+             */
+            free: boolean;
+            /** Input Per M */
+            input_per_m?: number | null;
+            /** Label */
+            label: string;
+            /** Output Per M */
+            output_per_m?: number | null;
+            /**
+             * Recommended
+             * @default false
+             */
+            recommended: boolean;
+            /** Slug */
+            slug: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "catalog" | "openrouter" | "ollama";
+            /** Tools */
+            tools?: boolean | null;
+            /** Vendor */
+            vendor: string;
+            /** Vision */
+            vision?: boolean | null;
+        };
         /** ModelsCfgOut */
         ModelsCfgOut: {
             /** Api Base */
@@ -3306,6 +3379,29 @@ export interface components {
             tiers: components["schemas"]["TiersOut"];
             /** Weak */
             weak: string;
+        };
+        /**
+         * ModelsOut
+         * @description The models this install can pick from, and what we failed to reach while listing them.
+         *
+         *     ``reason`` is a token the client translates, never a sentence — same shape and same reason as
+         *     ``OllamaModelsOut``. It is set NEXT TO a non-empty list whenever the remote index failed but the
+         *     curated catalogue answered, so the picker can say *the full list is unavailable* instead of
+         *     rendering an empty menu, which reads as *your key buys nothing*.
+         */
+        ModelsOut: {
+            /** Default */
+            default: string;
+            /** Models */
+            models?: components["schemas"]["ModelOptionOut"][];
+            /**
+             * Reason
+             * @default
+             * @enum {string}
+             */
+            reason: "" | "no_provider" | "unreachable" | "http_error" | "unreadable";
+            /** Sources */
+            sources?: ("catalog" | "openrouter" | "ollama")[];
         };
         /** NewSessionOut */
         NewSessionOut: {
@@ -3593,6 +3689,11 @@ export interface components {
              * @default
              */
             model: string;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
             /** Set */
             set: boolean;
         };
@@ -6164,6 +6265,37 @@ export interface operations {
                     "application/json": {
                         [key: string]: components["schemas"]["MessagingPlatformOut"];
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    models_endpoint_api_models_get: {
+        parameters: {
+            query?: {
+                provider?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelsOut"];
                 };
             };
             /** @description Validation Error */

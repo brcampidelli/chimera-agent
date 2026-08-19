@@ -57,12 +57,17 @@ def test_an_openrouter_user_keeps_the_preset() -> None:
 
 
 def test_the_provider_is_the_slug_prefix_not_the_vendor() -> None:
-    """`openrouter/anthropic/claude-opus-4-8` needs an OPENROUTER key. Matching on the catalogue's
-    vendor field would give the exact opposite answer for the most common case, so this pins the
-    rule the gateway itself uses."""
+    """An `openrouter/anthropic/…` slug needs an OPENROUTER key. Matching on the catalogue's vendor
+    field would give the exact opposite answer for the most common case, so this pins the rule the
+    gateway itself uses.
+
+    Stated as "some Anthropic-vendored rung", not as a literal slug: the literal was
+    `claude-opus-4-8`, and the day Anthropic withdrew it this test failed for a reason that had
+    nothing to do with prefix-versus-vendor. The property is what is under test.
+    """
     ladder = resolve_tiers(_S(["openrouter"], cost_mode="premium", default_model="x/y"))
 
-    assert "openrouter/anthropic/claude-opus-4-8" in ladder.ladder()
+    assert any(slug.startswith("openrouter/anthropic/") for slug in ladder.ladder()), ladder.ladder()
     assert ladder.source == "preset"  # reachable through OpenRouter, so nothing was rewritten
 
 

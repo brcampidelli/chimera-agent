@@ -184,9 +184,15 @@ def test_spend_tracks_totals_and_flags_estimates() -> None:
 
 
 def test_cost_uses_the_catalog_price() -> None:
-    # mistral-small is 0.10/0.30 per million in the catalog.
-    cost = cost_usd("openrouter/mistralai/mistral-small-3.2-24b-instruct", 1_000_000, 1_000_000)
-    assert round(cost, 4) == 0.40
+    # The expectation comes FROM the catalogue: what is under test is that `cost_usd` reads it, not
+    # what Mistral charges this month. Pinning the literal 0.40 made this fail when the catalogue was
+    # corrected to the live price — a red build over a number nobody in this repo controls.
+    from chimera.providers.catalog import CATALOG
+
+    entry = next(e for e in CATALOG if e.slug == "openrouter/mistralai/mistral-small-3.2-24b-instruct")
+    assert entry.input_per_m is not None and entry.output_per_m is not None
+    cost = cost_usd(entry.slug, 1_000_000, 1_000_000)
+    assert round(cost, 4) == round(entry.input_per_m + entry.output_per_m, 4)
 
 
 def test_unknown_model_costs_zero_for_the_guard_but_is_countable() -> None:

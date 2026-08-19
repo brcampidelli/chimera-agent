@@ -30,10 +30,14 @@ _GOVERNANCE_WORDS = frozenset({"ask", "allow", "deny"})  # CHIMERA_APPROVAL_MODE
 if TYPE_CHECKING:
     from chimera.providers.catalog import TierLadder
 
+# Two of these three were WITHDRAWN by their providers and nobody noticed until the catalogue was
+# audited on 2026-08-18 — so the default fusion panel, the feature whose entire premise is several
+# independent models answering, was convening one model and two 404s. A default that names somebody
+# else's product decays on their schedule; `tests/test_catalog_is_live.py` now checks these too.
 _DEFAULT_PANEL = [
-    "openrouter/anthropic/claude-opus-4-8",
+    "openrouter/anthropic/claude-opus-5",
     "openrouter/openai/gpt-5.5",
-    "openrouter/google/gemini-3.1-pro",
+    "openrouter/google/gemini-3.1-pro-preview",
 ]
 # The judge must not be a panelist. It shipped as `_DEFAULT_PANEL[0]` — the same slug, verbatim —
 # which made the default fusion self-evaluating in the one place this project claims to have an
@@ -48,7 +52,7 @@ _DEFAULT_JUDGE = "openrouter/deepseek/deepseek-r1"
 # It is still `_DEFAULT_PANEL[0]`, and that is a milder version of the same smell: the model that
 # wrote one of the candidate answers also writes the final one. Left alone deliberately — the
 # measured finding was about the judge — and recorded here so it is visible instead of buried.
-_DEFAULT_SYNTHESIZER = "openrouter/anthropic/claude-opus-4-8"
+_DEFAULT_SYNTHESIZER = "openrouter/anthropic/claude-opus-5"
 
 # Panel used only to TEST whether a learned skill transfers — never to reason. Transfer asks
 # "does this run and pass somewhere else?", which is a diversity question, not a capability one:
@@ -62,8 +66,8 @@ _DEFAULT_TRANSFER_PANEL = [
     "openrouter/google/gemini-2.5-flash",
     "openrouter/mistralai/mistral-small-3.2-24b-instruct",
     "openrouter/moonshotai/kimi-k2",
-    "openrouter/openai/gpt-5.5-mini",
-    "openrouter/qwen/qwen-max",
+    "openrouter/openai/gpt-5.6-luna",
+    "openrouter/qwen/qwen3-max",
     "openrouter/qwen/qwen3-coder",
     "openrouter/z-ai/glm-4.6",
 ]
@@ -117,8 +121,23 @@ class Settings(BaseSettings):
     spotify_client_secret: str | None = Field(default=None, validation_alias="SPOTIFY_CLIENT_SECRET")
 
     # --- Default single model (Tier 1 / cheap tasks) ---
+    #
+    # DeepSeek V3.1 rather than a frontier model, and the reason is what a default IS: the model a
+    # fresh install spends money on before anyone has made a decision. This one is the `mid` rung of
+    # every cost preset, the one this repo's own benches ran on, and — at the live OpenRouter list
+    # price when this changed — $0.25/$0.95 per 1M against GPT-5.5's $5.00/$30.00. Twenty times
+    # cheaper in, thirty times cheaper out, for the questions a first conversation asks.
+    #
+    # It is a floor, not a ceiling: the composer's model picker changes it per conversation and
+    # offers to make any pick the standing default, and `CHIMERA_DEFAULT_MODEL` still wins over
+    # this. Starting expensive and asking people to notice is the wrong way round — the bill arrives
+    # before the knowledge that there was a choice.
+    #
+    # MUST stay in sync with the OpenRouter entry in `chimera.providers.catalog.PROVIDERS`: the
+    # wizard SHOWS that suggestion without writing it when the user leaves it alone, so a mismatch
+    # puts one slug on screen and runs another.
     default_model: str = Field(
-        default="openrouter/openai/gpt-5.5", validation_alias="CHIMERA_DEFAULT_MODEL"
+        default="openrouter/deepseek/deepseek-chat-v3.1", validation_alias="CHIMERA_DEFAULT_MODEL"
     )
 
     # --- Model tiers (M16): weak -> mid -> top, vendor-agnostic. Any LiteLLM/OpenRouter

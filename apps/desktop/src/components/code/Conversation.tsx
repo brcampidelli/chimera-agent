@@ -311,6 +311,7 @@ export function Conversation({
   busyElsewhere,
   posture,
   provider = "",
+  model = "",
   profile,
   controls,
   onOpenFile,
@@ -323,6 +324,11 @@ export function Conversation({
   posture: { reach: Reach; approval: Approval };
   /** Who does the work: "" for Chimera's own loop, or an external agent key. */
   provider?: string;
+  /** Which model answers, for THIS conversation. "" leaves the install's default in charge, which
+   *  is what every build before the picker did. Ignored when `provider` names an external agent —
+   *  Claude Code and Gemini choose their own, and sending one would describe a routing that did not
+   *  happen. */
+  model?: string;
   /** Which tier each role draws from — the same profile the verified run uses. */
   profile: Profile;
   /** Start a verified run with this text, in the panel that owns the run machinery. */
@@ -560,6 +566,11 @@ export function Conversation({
         // string is a value the server would have to special-case, and a caller that never heard of
         // providers must send exactly what it sent before.
         ...(provider ? { provider } : {}),
+        // Same rule, one line later: no model chosen is the field ABSENT, which is what makes the
+        // server fall back to `CHIMERA_DEFAULT_MODEL`. Sent per turn because the agent is rebuilt
+        // from this request each time — and because the picker is allowed to change mid-conversation,
+        // so the receipt under each answer names the model that answered THAT one.
+        ...(provider || !model ? {} : { model }),
         attachments: attached.map((a) => a.id),
       },
       {

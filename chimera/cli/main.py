@@ -1590,6 +1590,18 @@ def desktop_app(
             "add a key there to start chatting."
         )
 
+    # Learn what models cost, in the background, once per boot. The receipt under every turn prices
+    # itself from a hand-maintained table of ~20 model families, and anything outside it reported
+    # "price unknown" — which included the product's own default. The provider publishes the real
+    # number for every model it serves; the only thing missing was fetching it before somebody needed
+    # it. A daemon thread so a slow index never delays the window opening, and it fails silently: a
+    # missing price is exactly the state this improves on, never a reason not to start.
+    import threading
+
+    from chimera.providers.listing import warm_price_cache
+
+    threading.Thread(target=warm_price_cache, args=(settings,), daemon=True).start()
+
     llm = LLMGateway()
     from chimera.fusion import FusionEngine, RoutedBackend
 

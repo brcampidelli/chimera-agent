@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/panel";
 import { Agents } from "@/components/Agents";
 import { Conversation } from "@/components/code/Conversation";
 import { PostureNote } from "@/components/code/PostureNote";
+import { ModelPicker } from "@/components/code/ModelPicker";
 import { ProviderPicker } from "@/components/code/ProviderPicker";
 import { SessionSidebar } from "@/components/code/SessionSidebar";
 import { ProjectPicker } from "@/components/code/ProjectPicker";
@@ -329,6 +330,11 @@ export function Code() {
   // company's agent is a decision per piece of work, not a setting that quietly stays on from the
   // last time — and a persisted default here would be the app choosing on the user's behalf.
   const [provider, setProvider] = useState("");
+  // Which model answers, for this conversation. Session-local for the same reason as `provider` and
+  // the spend ceiling: a model quietly carried over from a week ago is how a turn ends up costing
+  // thirty times what the person expected. "" means the install's default, and the picker offers to
+  // make a pick the standing default — which is the same intent, stated rather than accumulated.
+  const [model, setModel] = useState("");
   // Same: a default the system applies, and the receipt records `profile_source: "system"` so the
   // cost panel never counts it beside a profile somebody deliberately picked.
   const profile: Profile = "balanced";
@@ -458,6 +464,7 @@ export function Code() {
             busyElsewhere={runBusy}
             posture={posture}
             provider={provider}
+            model={model}
             profile={profile}
             /* No selectors. What they expressed is now a server default the app SENDS (never omits
                — an absent posture means no tool denials and no pause at all, which is more permissive
@@ -469,6 +476,12 @@ export function Code() {
                     Reversed, someone reads what the agent may do to their files and then changes
                     who the agent is — which is the order in which a promise stops being true. */}
                 <ProviderPicker value={provider} onChange={setProvider} disabled={runBusy} />
+                {/* Only for Chimera's own loop. Claude Code and Gemini pick their own model, so a
+                    selector next to them would offer a choice this app cannot make — and the turn
+                    would run on something other than what the row says. */}
+                {provider === "" ? (
+                  <ModelPicker value={model} onChange={setModel} disabled={runBusy} />
+                ) : null}
                 <PostureNote
                   workspace={workspace}
                   reach={reach}
