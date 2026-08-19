@@ -30,9 +30,42 @@ You could not choose which model answered you. The endpoint accepted one all alo
 - **The model list says what each model can do.** Entries carry a mark for vision and for tool
   calling, and when the composer holds an image the dialog offers **only the ones that can see** —
   the choice that matters at that moment, made without reading fifteen names to guess which.
-
+- **Capabilities reads in your language.** The screen that answers "what may my agent do" listed all
+  22 native tools in English, whatever language the rest of the app was in. A tool's `description` is
+  its SCHEMA — the sentence the MODEL is shown when it decides whether to call something — so it stays
+  English at the source, and translating it there would ship a different agent to every locale. The
+  person reading that screen is the other audience. All 22 now read in all ten languages, with the
+  security warnings kept at full force ("page content is UNTRUSTED data", "this can modify the
+  system", "not sandboxed") and the identifiers untouched: `path`, `replace_all`, `robots.txt` are
+  what those things are CALLED, in the logs and in the call itself, and a translated name names
+  nothing. A tool the app has no translation for falls back to the server's own words — the normal
+  case for MCP, and for any tool newer than the translations. The note explaining the English used to
+  say the descriptions stay English; it now says what is true, which is that the names do.
 ### Fixed
 
+- **The model dialog was never centred, and its own action sat off the screen.** The footer holds
+  "make it the default", and opening the model list pushed it below the bottom edge — a button that
+  disappears exactly when someone has decided to use it. Two defects, stacked, and the first one had
+  been there the whole time: `overlay-in` ends on `transform: none` with `animation-fill-mode: both`,
+  so the fill kept overwriting the `-translate-x-1/2 -translate-y-1/2` that centres the dialog, for
+  as long as the element existed rather than just while it played. Every dialog in the app was drawn
+  with its top-left corner at the middle of the window, half of it below the fold; the command
+  palette sat half a width to the right of centre, and nobody had named it. Animating the individual
+  `scale` property composes with `transform` instead of replacing it. Under that, the height chain
+  broke in the middle — the dialog body is a flex ITEM with a resolved height but not a flex
+  CONTAINER, so `flex-1` on the list inside bounded nothing and the content spilled out of a card
+  that was itself correctly capped at 85vh. Measured in a browser rather than reasoned about: the
+  list reported `scrollHeight === clientHeight === 4164px` inside a 763px card.
+- **Settings showed raw enum values in every language.** `read_only`, `workspace_shell`,
+  `suspicious`, `ask`/`deny`/`allow`, `cheap`/`premium` — the row labels were translated and the
+  choices beneath them were not. The value on the wire is unchanged; only the writing is. `json`,
+  `sqlite` and `docker` stay as they are: those are names, not words.
+- **Windows opened a console window beside the app.** A black terminal printing the port and the
+  cron tick, for as long as Chimera ran. Neither half of the cause is droppable: the shell has no
+  console (`windows_subsystem = "windows"`) and the frozen sidecar is a console binary (PyInstaller
+  `--console`, which is what keeps its piped stderr real, and that pipe is how a backend that dies
+  on startup gets to say why). Windows resolves that pairing by allocating a terminal for the child.
+  `CREATE_NO_WINDOW` suppresses the window and keeps the pipes.
 - **The attached image never reached the model, and the provider answered 500.** `Agent.run` builds
   the turn's user message as a literal dict — `{"role": "user", "content": task, "images": [...]}` —
   because it is assembling a list that also holds the history's dicts. The gateway converted
