@@ -107,6 +107,26 @@ State honest caveats in the notes themselves — unsigned installers warn on fir
 cooperative. **Don't quote counts that rot** (a v0.33.0 note said "the 50 tests" for a release that
 shipped 51). Describe the guard, not the tally.
 
+## Telling the website
+
+The download page resolves its links at build time, so the site only learns about a release when it
+is rebuilt. `desktop-release.yml` sends it a `repository_dispatch` as the **last step of the manifest
+job** — after every installer and `latest.json` are attached, never at publish time: the site drops a
+release whose assets are still uploading, so an early notice would make it skip the new version and
+keep advertising the previous one until the nightly.
+
+The site has listened for that event since its deploy workflow was written. Nothing sent it until
+2026-08-19, so the nightly cron at 04:17 UTC was doing the whole job and a fresh release could sit
+for hours behind a download page showing the last one.
+
+**It needs a token, and it is optional.** Create a fine-grained PAT with **Contents: read and write**
+on `brcampidelli/chimera-site` (that is what `POST /dispatches` requires) and store it here as
+`SITE_DISPATCH_TOKEN`. Without the secret the step is skipped — a release must never go red because
+a website was not notified — and the site falls back to the nightly, which is where it was before.
+
+Verify it on the next release: the step prints `notified chimera-site about vX.Y.Z`, and the site's
+Deploy workflow should show a run whose event is `repository_dispatch` within a minute.
+
 ## The signing key
 
 Updates are Minisign-signed by `TAURI_SIGNING_PRIVATE_KEY` / `..._PASSWORD` (repo secrets). **GitHub
