@@ -44,14 +44,24 @@ describe("Tools", () => {
     mockGetTools.mockResolvedValue(
       toolsOut([
         tool(),
-        tool({ name: "run_shell", description: "Run a shell command.", params: ["command", "cwd"], tags: ["exec"] }),
+        tool({
+          name: "run_shell",
+          description: "Run a shell command.",
+          params: ["command", "cwd"],
+          tags: ["exec"],
+        }),
       ]),
     );
     renderWithProviders(<Tools />);
 
     expect(await screen.findByText("read_file")).toBeInTheDocument();
     expect(screen.getByText("run_shell")).toBeInTheDocument();
-    expect(screen.getByText("Read a file from the workspace.")).toBeInTheDocument();
+    // The shipped English text for read_file, which is the schema itself — pinned to the registry
+    // by tests/test_tool_descriptions_reach_the_user.py. The fixture's own description is ignored
+    // for a tool the app has a description of, and that is the behaviour, not an accident.
+    expect(
+      screen.getByText("Read a UTF-8 text file from the workspace."),
+    ).toBeInTheDocument();
     expect(screen.getByText("read")).toBeInTheDocument();
     expect(screen.getByText("exec")).toBeInTheDocument();
     // The heading reports the backend's real count, not the rendered row count.
@@ -60,7 +70,9 @@ describe("Tools", () => {
 
   it("flags a tool whose output is untrusted", async () => {
     mockGetTools.mockResolvedValue(
-      toolsOut([tool({ name: "web_fetch", tags: ["network"], untrusted_output: true })]),
+      toolsOut([
+        tool({ name: "web_fetch", tags: ["network"], untrusted_output: true }),
+      ]),
     );
     renderWithProviders(<Tools />);
 
@@ -68,7 +80,9 @@ describe("Tools", () => {
   });
 
   it("says 'no parameters' rather than leaving a tool's params blank", async () => {
-    mockGetTools.mockResolvedValue(toolsOut([tool({ name: "list_skills", params: [] })]));
+    mockGetTools.mockResolvedValue(
+      toolsOut([tool({ name: "list_skills", params: [] })]),
+    );
     renderWithProviders(<Tools />);
 
     expect(await screen.findByText("no parameters")).toBeInTheDocument();
@@ -86,7 +100,10 @@ describe("Tools", () => {
     mockGetTools.mockResolvedValue(toolsOut([tool()]));
     renderWithProviders(<Tools />);
 
-    await user.type(await screen.findByPlaceholderText(/search/i), "nonexistent");
+    await user.type(
+      await screen.findByPlaceholderText(/search/i),
+      "nonexistent",
+    );
 
     expect(screen.getByText("No tools match that search.")).toBeInTheDocument();
     expect(screen.queryByText("No tools registered.")).not.toBeInTheDocument();
@@ -98,7 +115,11 @@ describe("Tools", () => {
     mockGetTools.mockResolvedValue(
       toolsOut([
         tool(),
-        tool({ name: "git_commit", description: "Commit staged paths.", tags: ["write"] }),
+        tool({
+          name: "git_commit",
+          description: "Commit staged paths.",
+          tags: ["write"],
+        }),
       ]),
     );
     renderWithProviders(<Tools />);
@@ -120,7 +141,9 @@ describe("Tools", () => {
 
     // The terminal error state, not a spinner that hangs forever on `!data`.
     expect(await screen.findByText("Couldn't load this.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /try again/i }),
+    ).toBeInTheDocument();
   });
 
   it("recovers when the user hits Try again after a transient failure", async () => {
@@ -134,20 +157,54 @@ describe("Tools", () => {
     expect(await screen.findByText("read_file")).toBeInTheDocument();
   });
 
-  it("keeps each description verbatim while the screen around it is translated, and says why", async () => {
-    // A tool's description and parameter names are the function schema sent to the model, not our
-    // copy about the agent. Translating them would make the one screen whose job is an honest
-    // inventory describe an agent that does not exist — so the screen explains the English instead
-    // of hiding it, and this asserts both halves: the chrome translates, the schema does not.
+  it("says what a tool does in the reader's language, and keeps the identifiers", async () => {
+    // The description the API returns is the tool's SCHEMA — the sentence the MODEL is shown when
+    // it decides whether to call something — so it is English at the source and stays that way.
+    // This screen has the other reader: someone deciding what their agent may do, who should not
+    // have to read English to answer that. So the sentence is translated and the identifiers are
+    // not: `read_file` and `path` are what the thing is CALLED, in the logs, in the docs and in the
+    // call itself, and a translated copy of a name names nothing.
     localStorage.setItem("chimera.lang", "pt");
     try {
       mockGetTools.mockResolvedValue(toolsOut([tool()]));
       renderWithProviders(<Tools />);
 
       expect(await screen.findByText("1 ferramentas")).toBeInTheDocument();
-      expect(screen.getByText("Read a file from the workspace.")).toBeInTheDocument();
+      expect(
+        screen.getByText(/Lê um arquivo de texto UTF-8 do workspace/),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText("Read a file from the workspace."),
+      ).not.toBeInTheDocument();
+      // The name and the parameter, untouched.
+      expect(screen.getByText("read_file")).toBeInTheDocument();
       expect(screen.getByText("path")).toBeInTheDocument();
-      expect(screen.getByText(/schema enviado ao modelo/)).toBeInTheDocument();
+    } finally {
+      localStorage.removeItem("chimera.lang");
+    }
+  });
+
+  it("shows a tool it has no translation for exactly as the server described it", async () => {
+    // Every MCP tool lands here: its description comes from somebody else's server and cannot be
+    // known in advance. So does any tool added in a version newer than the translations. The
+    // fallback has to be the server's own words — a blank row, or a key rendered raw as
+    // `tools.desc.whatever`, would both be worse than English.
+    localStorage.setItem("chimera.lang", "pt");
+    try {
+      mockGetTools.mockResolvedValue(
+        toolsOut([
+          tool({
+            name: "acme_invoice_lookup",
+            description: "Look up an invoice by id.",
+          }),
+        ]),
+      );
+      renderWithProviders(<Tools />);
+
+      expect(
+        await screen.findByText("Look up an invoice by id."),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/tools\.desc\./)).not.toBeInTheDocument();
     } finally {
       localStorage.removeItem("chimera.lang");
     }

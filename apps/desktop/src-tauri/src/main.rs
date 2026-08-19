@@ -299,6 +299,30 @@ fn memo_path(data_dir: &Path) -> PathBuf {
     data_dir.join("last-port.txt")
 }
 
+/// Keep Windows from opening a console window for the backend.
+///
+/// The two halves of this problem are both deliberate and neither can simply be dropped. The shell
+/// is built `windows_subsystem = "windows"`, so it owns no console; the frozen sidecar is built by
+/// PyInstaller with `--console`, so it IS a console-subsystem binary — which is what keeps its
+/// stdout and stderr real, and the piped stderr above is how a backend that dies on startup gets to
+/// say why. Windows resolves that pairing by allocating a NEW console for the child, and the user
+/// gets a black terminal sitting beside their app for as long as it runs, printing the port and the
+/// cron tick at them.
+///
+/// `CREATE_NO_WINDOW` is the seam: the child stays a console program with working pipes, and no
+/// window is created for it. Running `chimera-backend.exe` by hand still opens a console, which is
+/// correct — that one was asked for.
+fn hide_console(cmd: &mut Command) {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    #[cfg(not(windows))]
+    let _ = cmd;
+}
+
 /// Launch the backend and wait until it is serving. `wanted` is the port to ask for — see
 /// [`remembered_port`] for the first launch, and the supervisor for a restart, where asking for the
 /// SAME port is what lets the already-loaded page recover without a reload.
@@ -324,11 +348,13 @@ fn start_sidecar(paths: &Paths, wanted: u16, budget: Budget) -> Result<Backend, 
     //
     // Four competing agent apps each hardened this same step, independently and in four different
     // frameworks. That is not convergent taste; it is the failure everyone met in the field.
-    let mut child = Command::new(&exe)
-        .args(["--no-open", "--port", &wanted_arg, "--emit-port-file"])
+    let mut cmd = Command::new(&exe);
+    cmd.args(["--no-open", "--port", &wanted_arg, "--emit-port-file"])
         .arg(&port_file)
         .env("CHIMERA_HOME", data_dir.join("data"))
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+    hide_console(&mut cmd);
+    let mut child = cmd
         .spawn()
         .map_err(|e| format!("failed to launch backend {exe:?}: {e}"))?;
 
@@ -1170,6 +1196,37 @@ mod tests {
         // …and the budget is a WINDOW, not a lifetime cap: a crash an hour later is not the same
         // event as a crash loop, and refusing it would strand a session that could recover.
         assert!(fuse.allows(t0 + Duration::from_secs(200)));
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn the_backend_is_spawned_without_a_console_window() {
+        // A user opened the app and got a black terminal beside it, printing the port and the cron
+        // tick. It is not decoration and it is not avoidable by dropping either half: the shell has
+        // no console (windows_subsystem = "windows") and the frozen sidecar is a console binary
+        // (PyInstaller --console, which is what keeps its piped stderr real), so Windows allocates
+        // a console for the child. CREATE_NO_WINDOW is the only thing that suppresses it.
+        //
+        // Read from the source, because std::process::Command exposes no way to read a creation
+        // flag back — there is nothing to assert on a built Command. That makes this a guard
+        // against the line being dropped, not proof that Windows honoured it; the proof is an
+        // installed build with no terminal next to it.
+        let src = include_str!("main.rs");
+        let spawn = src
+            .split("fn start_sidecar")
+            .nth(1)
+            .expect("start_sidecar is where the backend is launched");
+        let body = &spawn[..spawn.find("
+}
+").unwrap_or(spawn.len())];
+        assert!(
+            body.contains("hide_console(&mut cmd)"),
+            "start_sidecar spawns the backend without going through hide_console"
+        );
+        assert!(
+            src.contains("const CREATE_NO_WINDOW: u32 = 0x0800_0000"),
+            "hide_console no longer sets CREATE_NO_WINDOW"
+        );
     }
 
     #[test]

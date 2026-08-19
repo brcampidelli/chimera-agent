@@ -69,7 +69,9 @@ export function Dialog({
         >
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <RadixDialog.Title className="text-lg font-semibold">{title}</RadixDialog.Title>
+              <RadixDialog.Title className="text-lg font-semibold">
+                {title}
+              </RadixDialog.Title>
               {description ? (
                 <RadixDialog.Description className="mt-1 text-sm text-muted-foreground">
                   {description}
@@ -77,7 +79,9 @@ export function Dialog({
               ) : (
                 // Radix warns when Content has no Description. An explicitly empty one says "this
                 // dialog is its title" rather than leaving a warning nobody reads.
-                <RadixDialog.Description className="sr-only">{title}</RadixDialog.Description>
+                <RadixDialog.Description className="sr-only">
+                  {title}
+                </RadixDialog.Description>
               )}
             </div>
             <RadixDialog.Close
@@ -92,11 +96,16 @@ export function Dialog({
             </RadixDialog.Close>
           </div>
 
-          {/* `min-h-0` so a flex-column dialog can bound its own body: without it the content sets
-              the height, the body never scrolls, and a long list pushes the footer past the bottom
-              of the window. Inert for every dialog that is not a flex column. */}
-          <div className="mt-4 min-h-0 flex-1">{children}</div>
-          {footer && <div className="mt-5 flex justify-end gap-2">{footer}</div>}
+          {/* A flex column, so a dialog that bounds its own height can hand that bound DOWN to the
+              part meant to scroll. `flex-1` grows this body; `min-h-0` lets it shrink below its
+              content; being a flex container itself is what makes `flex-1` work on the child. A
+              plain block here breaks the chain silently: the child sizes to its content, the scroll
+              region never bounds, and the footer leaves the screen while the card still measures
+              85vh. Inert for a dialog that sets no height — the body just wraps its content. */}
+          <div className="mt-4 flex min-h-0 flex-1 flex-col">{children}</div>
+          {footer && (
+            <div className="mt-5 flex justify-end gap-2">{footer}</div>
+          )}
         </RadixDialog.Content>
       </RadixDialog.Portal>
     </RadixDialog.Root>

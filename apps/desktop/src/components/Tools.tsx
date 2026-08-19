@@ -2,7 +2,13 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Wrench, Search } from "lucide-react";
 import { getConfig, getTools, patchConfig } from "@/lib/api";
-import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
+import {
+  Badge,
+  EmptyState,
+  Panel,
+  Screen,
+  Spinner,
+} from "@/components/ui/panel";
 import { Switch } from "@/components/ui/switch";
 import { ErrorState } from "@/components/ui/async";
 import { useT, type TFunc } from "@/lib/i18n";
@@ -18,6 +24,25 @@ const TAG_TONE: Record<string, "muted" | "warn" | "bad"> = {
   write: "bad",
   exec: "bad",
 };
+
+/**
+ * What this tool does, in the reader's language.
+ *
+ * The description the API returns is the tool's SCHEMA — the exact sentence the model is shown when
+ * it decides whether to call something — so it is English, and translating it at the source would
+ * mean shipping a different agent to every locale. This screen is the other audience: someone
+ * deciding what their agent may do, who should not have to read English to answer that.
+ *
+ * So the translation lives here, keyed by tool name, and falls back to the schema text whenever
+ * there is none — which is the normal case for MCP tools, whose descriptions come from somebody
+ * else's server and cannot be known in advance. A tool added in a later version behaves the same
+ * way: it reads in English until someone translates it, never as a blank.
+ */
+function describe(tool: ToolInfo, t: TFunc): string {
+  const key = `tools.desc.${tool.name}`;
+  const translated = t(key);
+  return translated === key ? tool.description : translated;
+}
 
 /** One tool row: name (mono, bold), description (muted), capability tags + params, and the switch.
  *
@@ -53,10 +78,14 @@ function ToolRow({
             {t(`tools.tag.${tag === "side-effect" ? "sideEffect" : tag}`)}
           </Badge>
         ))}
-        {tool.untrusted_output && <Badge tone="warn">{t("tools.tag.untrusted")}</Badge>}
+        {tool.untrusted_output && (
+          <Badge tone="warn">{t("tools.tag.untrusted")}</Badge>
+        )}
       </div>
-      {tool.description && (
-        <div className="text-sm leading-snug text-muted-foreground">{tool.description}</div>
+      {describe(tool, t) && (
+        <div className="text-sm leading-snug text-muted-foreground">
+          {describe(tool, t)}
+        </div>
       )}
       {tool.params.length > 0 ? (
         <div className="flex flex-wrap items-center gap-1.5">
@@ -73,7 +102,9 @@ function ToolRow({
           ))}
         </div>
       ) : (
-        <span className="text-xs text-muted-foreground">{t("tools.noParams")}</span>
+        <span className="text-xs text-muted-foreground">
+          {t("tools.noParams")}
+        </span>
       )}
     </div>
   );
@@ -113,15 +144,22 @@ export function Tools({ embedded = false }: { embedded?: boolean } = {}) {
         ? all.filter(
             (tool) =>
               tool.name.toLowerCase().includes(term) ||
+              // Both texts, deliberately: the words on the screen must be findable, and so must the
+              // English ones, since that is what the tool's own documentation and this repo call it.
+              describe(tool, t).toLowerCase().includes(term) ||
               tool.description.toLowerCase().includes(term),
           )
         : all,
-    [all, term],
+    [all, term, t],
   );
 
   if (q.isError) {
     return (
-      <Screen title={t("tools.title")} icon={<Wrench className="h-5 w-5" />} embedded={embedded}>
+      <Screen
+        title={t("tools.title")}
+        icon={<Wrench className="h-5 w-5" />}
+        embedded={embedded}
+      >
         <Panel>
           <ErrorState error={q.error} onRetry={() => q.refetch()} />
         </Panel>
@@ -176,7 +214,9 @@ export function Tools({ embedded = false }: { embedded?: boolean } = {}) {
           the model, so a translated copy on this screen would describe an agent that does not
           exist, on the one screen whose whole job is to be an honest inventory. Saying so is
           cheaper than either lying or leaving it unexplained. */}
-      <p className="px-1 text-xs text-muted-foreground">{t("tools.langNote")}</p>
+      <p className="px-1 text-xs text-muted-foreground">
+        {t("tools.langNote")}
+      </p>
     </Screen>
   );
 }
