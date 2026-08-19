@@ -60,6 +60,26 @@ You could not choose which model answered you. The endpoint accepted one all alo
   say the descriptions stay English; it now says what is true, which is that the names do.
 ### Fixed
 
+- **The benchmark suites prove they can measure something before a model is called.** Every task
+  claims its test fails on the untouched workspace and passes once the work is done. The second half
+  was measured on every run; the first was assumed — and a task where it is false hands every arm a
+  free hit, silently, while the run completes and the numbers look plausible. The rule was already
+  written in three places in this repository and was in the execution path of none of them:
+  `grep -rniE "selftest"` over `chimera/`, `bench/` and `tests/` returned zero lines. It now runs
+  first, costs no model call, and refuses to continue on a suite it cannot vouch for. Run against
+  the real suites it found nothing — 100/100 local_lift, 25 recurring, 25 recurring_hard, 40
+  hard_fix all discriminate — which is itself a result: the learning-lift ceiling, a control that
+  has never dropped below 88%, is NOT explained by tasks that could not fail. It keeps "vacuous"
+  (the command succeeded) apart from "unrunnable" (nothing ran), because collapsing them trains
+  everyone to ignore both — and the guard shipped with that exact bug twice, once per platform: a
+  missing command exits 127 on POSIX and plain 1 on Windows, which is what a failing test looks
+  like, so an environment without pytest would have certified an apparatus that measured nothing.
+- **The A/B stopped being unfalsifiable after the fact.** `--no-skill-cards` joined the hygiene
+  flags — reading learned cards back follows `settings.skill_cards`, and the runner hands its `.env`
+  to both subprocesses, so an install with cards on would have given the BASELINE the thing the
+  experiment measures. And every recorded row now carries the Chimera version, the model and the arm
+  flags: before this a row said a task passed and nothing else, so two result files from two dates
+  were not comparable even in principle.
 - **An installed app showed the PREVIOUS release's interface.** The service worker served the
   document , so Chimera opened the last release's index.html — which names the
   last release's bundle — and only refreshed the cache for next time. Every install was therefore one
