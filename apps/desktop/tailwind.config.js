@@ -41,6 +41,9 @@ export default {
         "toggle-on": "var(--toggle-on)",
       },
       borderRadius: { chip: "1.5rem", xl2: "1.15rem" },
+      // As tall as a dialog may get before it starts pushing its own footer off the screen. Named
+      // rather than written inline: it is the same decision every scrolling dialog has to make.
+      maxHeight: { dialog: "85vh" },
       fontFamily: {
         sans: ["ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
         mono: ["ui-monospace", "SFMono-Regular", "Menlo", "Consolas", "monospace"],

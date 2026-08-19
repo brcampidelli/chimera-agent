@@ -154,6 +154,21 @@ def vision_support(model: str) -> str:
     """
     if not model:
         return "unknown"
+
+    # The provider's own answer first, when we have it. LiteLLM's table was wrong in BOTH directions
+    # on the two models a user hit in one sitting: it had never heard of `deepseek-v4-flash` (so the
+    # app read "unknown", sent the image, and OpenRouter killed the turn with `No endpoints found
+    # that support image input`), and it reports `no` for `mistral-small-3.2-24b-instruct`, which
+    # reads images perfectly well — so trusting it there withholds an image from a model that could
+    # have used it. The index the model picker fetches carries the modalities the provider publishes
+    # for every model it serves, remembered on disk; that is a fact about the model rather than a
+    # table someone has to maintain.
+    from chimera.providers.listing import known_vision
+
+    published = known_vision(model)
+    if published is not None:
+        return "yes" if published else "no"
+
     try:
         import litellm
     except ImportError:  # pragma: no cover — litellm is a hard dependency of the gateway

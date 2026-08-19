@@ -92,7 +92,10 @@ export function Dialog({
             </RadixDialog.Close>
           </div>
 
-          <div className="mt-4">{children}</div>
+          {/* `min-h-0` so a flex-column dialog can bound its own body: without it the content sets
+              the height, the body never scrolls, and a long list pushes the footer past the bottom
+              of the window. Inert for every dialog that is not a flex column. */}
+          <div className="mt-4 min-h-0 flex-1">{children}</div>
           {footer && <div className="mt-5 flex justify-end gap-2">{footer}</div>}
         </RadixDialog.Content>
       </RadixDialog.Portal>

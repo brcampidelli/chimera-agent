@@ -368,9 +368,14 @@ def test_a_fetched_listing_leaves_the_prices_on_disk(
     available_models(_Settings(["openrouter"]))
 
     cache = tmp_path / listing.PRICE_CACHE_NAME
-    assert cache.exists(), "the fetched index did not leave its prices anywhere"
+    assert cache.exists(), "the fetched index did not leave anything behind"
     saved = json.loads(cache.read_text(encoding="utf-8"))
-    assert saved["prices"]["openrouter/vendor/model"] == [0.25, 0.95]
+    kept = saved["models"]["openrouter/vendor/model"]
+    assert (kept["in"], kept["out"]) == (0.25, 0.95)
+    # Capabilities ride along, and that is the point of keeping the file at all: the provider knows
+    # which models accept images, and LiteLLM's table was wrong about that in both directions.
+    assert kept["tools"] is True
+    assert kept["vision"] is False
 
 
 def test_a_model_quoted_per_request_is_not_written_as_a_price(
@@ -397,8 +402,11 @@ def test_a_model_quoted_per_request_is_not_written_as_a_price(
     available_models(_Settings(["openrouter"]))
 
     saved = json.loads((tmp_path / listing.PRICE_CACHE_NAME).read_text(encoding="utf-8"))
-    assert "openrouter/vendor/priced" in saved["prices"]
-    assert "openrouter/vendor/variable" not in saved["prices"]
+    assert saved["models"]["openrouter/vendor/priced"]["in"] == 0.25
+    # The row is kept — its capabilities are still worth knowing — but the price stays null rather
+    # than becoming a zero, and nothing downstream may read it as one.
+    assert saved["models"]["openrouter/vendor/variable"]["in"] is None
+    assert listing.known_price("openrouter/vendor/variable") is None
 
 
 def test_the_price_is_read_back_for_that_exact_slug_only(
@@ -413,6 +421,9 @@ def test_the_price_is_read_back_for_that_exact_slug_only(
     assert listing.known_price("openrouter/vendor/model") == (0.25, 0.95)
     assert listing.known_price("openrouter/vendor/model-mini") is None
     assert listing.known_price("vendor/model") is None
+    # Same rule for the capability, which is the one that decides whether an image is sent.
+    assert listing.known_vision("openrouter/vendor/model") is False
+    assert listing.known_vision("openrouter/vendor/model-mini") is None
 
 
 def test_no_cache_is_an_absent_price_not_a_crash(

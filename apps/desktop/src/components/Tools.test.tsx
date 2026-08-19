@@ -133,4 +133,23 @@ describe("Tools", () => {
 
     expect(await screen.findByText("read_file")).toBeInTheDocument();
   });
+
+  it("keeps each description verbatim while the screen around it is translated, and says why", async () => {
+    // A tool's description and parameter names are the function schema sent to the model, not our
+    // copy about the agent. Translating them would make the one screen whose job is an honest
+    // inventory describe an agent that does not exist — so the screen explains the English instead
+    // of hiding it, and this asserts both halves: the chrome translates, the schema does not.
+    localStorage.setItem("chimera.lang", "pt");
+    try {
+      mockGetTools.mockResolvedValue(toolsOut([tool()]));
+      renderWithProviders(<Tools />);
+
+      expect(await screen.findByText("1 ferramentas")).toBeInTheDocument();
+      expect(screen.getByText("Read a file from the workspace.")).toBeInTheDocument();
+      expect(screen.getByText("path")).toBeInTheDocument();
+      expect(screen.getByText(/schema enviado ao modelo/)).toBeInTheDocument();
+    } finally {
+      localStorage.removeItem("chimera.lang");
+    }
+  });
 });
