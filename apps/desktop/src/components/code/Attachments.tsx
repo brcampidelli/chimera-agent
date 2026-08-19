@@ -37,17 +37,23 @@ import { cn } from "@/lib/utils";
 export function AttachmentTray({
   items,
   onRemove,
+  model = "",
 }: {
   items: Attachment[];
   onRemove: (id: string) => void;
+  /** The model this message will run on, or "" for the install's default. The warning is about a
+   *  specific model's capability, so it has to be asked about the one that will actually answer —
+   *  otherwise picking a vision model leaves a caveat on screen describing a different one. */
+  model?: string;
 }) {
   const t = useT();
   const hasImage = items.some((a) => a.kind === "image");
   // Asked only once an image is actually attached: it is a question about THIS message, and asking
   // it up front would put a caveat about vision on a screen where nobody had mentioned pictures.
+  // Keyed on the model, so changing the picker re-asks rather than serving the previous answer.
   const vision = useQuery({
-    queryKey: ["vision"],
-    queryFn: getVisionSupport,
+    queryKey: ["vision", model],
+    queryFn: () => getVisionSupport(model || undefined),
     enabled: hasImage,
     staleTime: 60_000,
   });

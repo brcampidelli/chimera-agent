@@ -877,7 +877,13 @@ export interface VisionSupport {
   support: "yes" | "no" | "unknown";
 }
 
-export const getVisionSupport = () => json<VisionSupport>("/api/vision");
+/** Can THIS model look at an image? `model` is the one the composer has picked; omitted asks about
+ *  the install's default, which is what a caller with no picker means.
+ *
+ *  It used to take no argument, and the moment a per-conversation picker existed that made the
+ *  warning under the paperclip describe a model the turn was not going to use. */
+export const getVisionSupport = (model?: string) =>
+  json<VisionSupport>(`/api/vision${model ? `?model=${encodeURIComponent(model)}` : ""}`);
 
 /** Whether speech can become text on this machine, and by which route.
  *

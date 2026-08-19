@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import threading
 import uuid
 from collections.abc import AsyncIterator, Callable
@@ -210,6 +211,67 @@ _MAX_PENDING_REVERTS = 8
 #: FastAPI's upload marker, hoisted out of the signatures so a call in an argument default does not
 #: trip the linter. Same object, same behaviour.
 _UPLOAD = File(...)
+
+
+#: Provider errors whose text is about the REQUEST rather than about our internals — the user can act
+#: on every one of them, and none of them names anything private. Matched loosely on purpose: a
+#: provider rewords its messages far more often than it changes what they mean.
+_ACTIONABLE = (
+    "image input",
+    "does not exist",
+    "not found",
+    "no endpoints",
+    "context length",
+    "maximum context",
+    "rate limit",
+    "quota",
+    "insufficient",
+    "credit",
+    "invalid api key",
+    "authentication",
+    "unauthorized",
+    "moderation",
+    "tool use",
+    "tool_use",
+    "function calling",
+)
+
+
+def _native_failure(exc: Exception) -> str:
+    """What to tell the user when Chimera's own loop failed.
+
+    "the coding turn failed" used to be the whole answer, on the reasoning that a native failure is
+    ours to debug. That holds for a bug in this repository and not at all for the more common case:
+    the provider refused, and said exactly why. Attaching an image to a model without vision produced
+    `No endpoints found that support image input` — fixable in four seconds — and the app rendered a
+    sentence indistinguishable from a crash.
+
+    Only the recognised classes are forwarded, and only the first line: a stack trace or an internal
+    path in the composer is noise, and the point is the one sentence that says what to change.
+    """
+    text = str(exc).strip()
+    if not text:
+        return "the coding turn failed"
+    first = text.splitlines()[0].strip()
+    if not any(marker in first.lower() for marker in _ACTIONABLE):
+        return "the coding turn failed"
+
+    # The provider's sentence, without the wrapping. LiteLLM stacks its own class names in front of
+    # the body and the body is usually JSON, so the raw string reads
+    # `litellm.NotFoundError: NotFoundError: OpenrouterException - {"error":{"message":"No endpoints
+    # found that support image input","code":404}}` — which contains the one useful clause and buries
+    # it behind four names that mean nothing to the person reading. Unwrapped when the shape is
+    # recognisable, left alone when it is not: a regex that half-matches would be worse than the
+    # noise it removes.
+    embedded = re.search(r'"message"\s*:\s*"((?:[^"\\]|\\.)*)"', first)
+    if embedded:
+        try:
+            first = json.loads(f'"{embedded.group(1)}"')
+        except ValueError:
+            first = embedded.group(1)
+
+    # Bounded: a provider that answers with a wall of JSON must not paste it into the transcript.
+    return first if len(first) <= 300 else f"{first[:297]}…"
 
 
 def resolve_posture(posture: Posture | None) -> ResolvedPosture:
@@ -491,7 +553,9 @@ def register_code_api(
         with locks_guard:
             return locks.setdefault(session_id, threading.Lock())
 
-    def build_agent(req: CodeTurnRequest, ws: Path, facts: list[str]) -> tuple[Agent, Any]:
+    def build_agent(
+        req: CodeTurnRequest, ws: Path, facts: list[str], note: str = ""
+    ) -> tuple[Agent, Any]:
         """The agent for this turn, and the ledger watching it.
 
         The ledger used to be built and thrown away, which left the turn unable to answer the one
@@ -517,6 +581,9 @@ def register_code_api(
             system_prompt += "\n\nRelevant facts from memory:\n" + "\n".join(
                 f"- {f}" for f in facts
             )
+        # Same placement, same reason: true for this turn, absent from the stored transcript.
+        if note:
+            system_prompt += f"\n\n{note}"
         agent = Agent(
             gateway,
             registry,
@@ -560,14 +627,31 @@ def register_code_api(
         # Attachments: images the model looks at, documents it reads. Resolved here rather than in
         # the request so a stale or forged id is simply skipped instead of reaching the model.
         from chimera.api.attachments import load as load_attachment
+        from chimera.api.attachments import vision_support
+
+        # What the composer already told the user, applied. The warning under the paperclip says an
+        # image "will not be seen" by a model without vision — and until now the server sent it
+        # anyway, so OpenRouter answered `No endpoints found that support image input` and the whole
+        # turn died as a generic "the coding turn failed". The interface promised a degraded turn and
+        # the system delivered no turn at all.
+        #
+        # Only for a model LiteLLM's table positively says cannot see. `unknown` still sends: a table
+        # that has not heard of a model is not evidence about the model, and refusing on that basis
+        # would break every new vision model on the day it ships. When a send does fail this way, the
+        # provider's own sentence now reaches the user — see `_native_failure`.
+        blind = vision_support(req.model or live().default_model) == "no"
 
         images: list[str] = []
+        dropped_images: list[str] = []
         doc_blocks: list[str] = []
         for ident in req.attachments:
             found = load_attachment(settings.home, ident)
             if found is None:
                 continue
             if found.kind == "image":
+                if blind:
+                    dropped_images.append(found.name)
+                    continue
                 images.append(str(found.path))
             else:
                 # Extracted at upload and fenced there. Folded into the message rather than handed
@@ -582,10 +666,26 @@ def register_code_api(
         message = req.message
         if doc_blocks:
             message = message + "\n\n" + "\n\n".join(doc_blocks)
+        # What the model is told about the image it did not get. In the SYSTEM prompt, not
+        # appended to the user's message, and that placement is the difference between a note and
+        # a defacement: `absorb` drops system messages when it stores the transcript, so this
+        # reaches the model for this turn and never becomes part of what the user said. Appended
+        # to the message it also became the conversation's TITLE in the sidebar — a row reading
+        # "what do you see in this image? [The user attached `6d2b57e5…" — because a title is the
+        # first thing the user asked, and this was pretending to be part of it.
+        #
+        # No filename either: the stored name is the attachment id, and an id in a sentence meant
+        # for a model is noise that reads like a fact.
+        note = (
+            "The user attached an image, which was NOT sent to you: this model cannot accept "
+            "images. Say so plainly rather than describing anything."
+            if dropped_images
+            else ""
+        )
 
         # Read memory BEFORE building the agent: the facts go into this turn's system prompt.
         facts, memory_layer = recall_facts(req.message, memory=memory, graph=graph)
-        agent, ledger = build_agent(req, ws, facts)
+        agent, ledger = build_agent(req, ws, facts, note)
         session = store.load(req.session_id, agent) if req.session_id else CodeSession(agent)
         session.agent = agent  # a loaded session carries messages, not the agent that made them
         # A conversation belongs to the project it STARTED in, and keeps it. Overwriting on every
@@ -763,7 +863,7 @@ def register_code_api(
                 message_out = (
                     failure_message(exc)
                     if (req.provider or "").strip()
-                    else "the coding turn failed"
+                    else _native_failure(exc)
                 )
                 emit("error", {"message": message_out})
             finally:
@@ -847,18 +947,24 @@ def register_code_api(
         )
 
     @app.get("/api/vision", dependencies=[guard], response_model=VisionOut)
-    def vision() -> VisionOut:
+    def vision(model: str | None = None) -> VisionOut:
         """Can the model that answers a turn look at an image?
 
         Asked when someone attaches one, so the answer arrives while they can still act on it. An
         image sent to a model without vision is either a provider error or — worse — silently
         ignored, and a confident answer about a picture nobody looked at is indistinguishable from
         one about a picture that was.
+
+        ``model`` is the one the composer has picked. It used to be unaskable: this always answered
+        about ``default_model``, so the moment a per-conversation picker existed the warning started
+        naming a model the turn was not going to use — and the sentence under the paperclip was about
+        somebody else's capability. Omitted still means the default, which is what a caller with no
+        picker means.
         """
         from chimera.api.attachments import vision_support
 
-        model = live().default_model
-        return VisionOut(model=model, support=vision_support(model))
+        chosen = (model or "").strip() or live().default_model
+        return VisionOut(model=chosen, support=vision_support(chosen))
 
     @app.get("/api/dictation", dependencies=[guard], response_model=DictationOut)
     def dictation() -> DictationOut:

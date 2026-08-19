@@ -1749,6 +1749,12 @@ export interface paths {
          *     image sent to a model without vision is either a provider error or — worse — silently
          *     ignored, and a confident answer about a picture nobody looked at is indistinguishable from
          *     one about a picture that was.
+         *
+         *     ``model`` is the one the composer has picked. It used to be unaskable: this always answered
+         *     about ``default_model``, so the moment a per-conversation picker existed the warning started
+         *     naming a model the turn was not going to use — and the sentence under the paperclip was about
+         *     somebody else's capability. Omitted still means the default, which is what a caller with no
+         *     picker means.
          */
         get: operations["vision_api_vision_get"];
         put?: never;
@@ -7078,7 +7084,9 @@ export interface operations {
     };
     vision_api_vision_get: {
         parameters: {
-            query?: never;
+            query?: {
+                model?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -7092,6 +7100,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VisionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
