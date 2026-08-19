@@ -10,6 +10,23 @@ You could not choose which model answered you. The endpoint accepted one all alo
 
 ### Added
 
+- **Choose who answers, who grades and who writes a fused turn.** The engine has taken `panel` /
+  `judge` / `synthesizer` per instance since it was written, and `Settings` has carried all three the
+  whole time — but nothing between the engine and a person could set them, so the only cast anyone
+  could run was whichever one shipped. That is a strange thing for a product to have no control over,
+  given that the shipped judge was once `panel[0]` verbatim and graded its own answer for as long as
+  nobody noticed. `/api/config` now reports the cast (and the engine's own kinship report) and
+  accepts the three keys; `/api/code/turn` takes an optional cast for THIS conversation, because
+  which models should argue about this question is a property of the question rather than of the
+  installation. A chosen cast becomes a fusion engine over the same gateway with a replaced config,
+  so no shared state is mutated and one conversation cannot leak its cast into another. The dialog
+  states two things a plain multi-select would not: the cost of the SHAPE — a four-model panel is six
+  calls, invisible until the receipt — and when the panel is not independent, at the moment of
+  choosing rather than after paying. Two degrees, and the second is the one no slug reveals: the
+  judge sitting on its own panel, and the judge coming from the same lab as a panelist. Neither is
+  refused, because a user with one provider key cannot avoid the overlap and a refusal they cannot
+  act on removes the feature instead of the problem. A panel of one is refused on both sides: one
+  opinion graded and rewritten is not fusion, it is three times the price for one answer.
 - **Pick the model from the composer.** `/api/code/turn` has accepted a `model` field since it
   existed and no client ever sent one, so every conversation in the app ran on
   `CHIMERA_DEFAULT_MODEL` — and changing that meant Settings, a text box, and a slug typed from
