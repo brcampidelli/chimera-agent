@@ -292,6 +292,12 @@ jobs:
   manifest:
     name: Assemble & publish latest.json
     needs: build
+    # Job-level, and that placement is the whole fix. `secrets` is not a named value inside a step's
+    # `if` — GitHub refuses to PARSE the workflow, which takes the entire file down rather than
+    # skipping one step. A step's OWN `env` is not in scope for its `if` either. A job's `env` is,
+    # so the secret is lifted here and the step below tests the copy.
+    env:
+      SITE_TOKEN: ${{ secrets.SITE_DISPATCH_TOKEN }}
     # Runs on BOTH triggers on purpose. A release publishes the manifest; a manual dispatch assembles
     # it and uploads it as an artifact instead — so the whole path (per-platform .sig -> fragment ->
     # merge -> JSON shape) is verifiable WITHOUT cutting a release. This job used to be release-only,
@@ -370,14 +376,12 @@ jobs:
       # a website that updates on the nightly instead. `continue-on-error` covers the other half —
       # the site being down does not make this release wrong.
       - name: Tell the website a release is out
-        # `secrets.…` and not `env.SITE_TOKEN`: a step's own `env` block is not in scope for its
-        # `if`, which is evaluated first — the condition would have read an empty string and skipped
-        # the step on every run, including the ones where the token is there. A guard that never
-        # fires is worse than no guard, because it looks like the feature is off rather than broken.
-        if: github.event_name == 'release' && secrets.SITE_DISPATCH_TOKEN != ''
+        # Reads the JOB's env, set above. Not `secrets.…` (unparseable in a step `if`, and it takes
+        # the whole workflow file down with it), and not the step's own `env` (not in scope for the
+        # `if`, which is evaluated first — the condition would be empty on every run).
+        if: github.event_name == 'release' && env.SITE_TOKEN != ''
         continue-on-error: true
         env:
-          SITE_TOKEN: ${{ secrets.SITE_DISPATCH_TOKEN }}
           TAG: ${{ github.event.release.tag_name }}
         run: |
           set -euo pipefail
