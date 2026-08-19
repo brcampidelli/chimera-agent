@@ -43,6 +43,16 @@ You could not choose which model answered you. The endpoint accepted one all alo
   say the descriptions stay English; it now says what is true, which is that the names do.
 ### Fixed
 
+- **An installed app showed the PREVIOUS release's interface.** The service worker served the
+  document , so Chimera opened the last release's index.html — which names the
+  last release's bundle — and only refreshed the cache for next time. Every install was therefore one
+  version behind, permanently, and nothing on screen could say so: the version in the status bar
+  comes from the API, which the worker never touches, so it read 0.48.0rc4 while the interface was
+  rc3's, with bugs rc4 had fixed still visible. It also means the two releases before this one
+  reached nobody who already had the app. The document is now fetched network-first with the cache
+  kept only as the offline net; hashed assets stay cache-first, which is always safe because their
+  name changes when their content does. Activating discards older caches and reloads the window it
+  just took over, so an update applies on the launch that installs it rather than the one after.
 - **The model dialog was never centred, and its own action sat off the screen.** The footer holds
   "make it the default", and opening the model list pushed it below the bottom edge — a button that
   disappears exactly when someone has decided to use it. Two defects, stacked, and the first one had
