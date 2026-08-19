@@ -51,6 +51,8 @@ sys.path.insert(0, str(LIFT))
 sys.path.insert(0, str(HERE.parent.parent))
 from tasks import TASKS  # noqa: E402
 
+from chimera.eval.selftest import TaskCheck, assert_discriminating  # noqa: E402
+
 _MODEL = os.environ.get("BENCH_MODEL", "openrouter/mistralai/mistral-small-3.2-24b-instruct")
 _TIMEOUT = int(os.environ.get("BENCH_TIMEOUT", "240"))
 _OUT = Path(os.environ.get("BENCH_OUT", str(HERE / "results")))
@@ -301,6 +303,22 @@ def main() -> None:
 
     root = Path(tempfile.mkdtemp(prefix="chimlearn-ws-"))
     homes_root = Path(tempfile.mkdtemp(prefix="chimlearn-home-"))
+
+    # Before a single model call: does every task's committed test actually FAIL against the buggy
+    # source it ships with? `tasks_recurring` states that requirement in prose and validates it by
+    # hand; this runs it. A task where the test already passes hands both arms a free hit, and this
+    # suite's whole difficulty is that the control has never dropped below 88% — an unfalsifiable
+    # ceiling is exactly where a vacuous task would hide.
+    assert_discriminating(
+        [
+            TaskCheck(
+                task_id=str(task["id"]),
+                setup=lambda task=task: _fresh_workspace(task, root / "_selftest"),
+                verify=f'"{sys.executable}" -m pytest -q {task["test"]}',
+            )
+            for task in SUITE
+        ]
+    )
     tampered: set[str] = set()
     accum: list[dict[str, object]] = []
     timings: list[dict[str, object]] = []

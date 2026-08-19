@@ -21,12 +21,15 @@ import shutil
 import subprocess
 import sys
 import time
+from importlib.metadata import version
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parent.parent
 sys.path.insert(0, str(HERE))
 from tasks import TASKS  # noqa: E402
+
+from chimera.eval.selftest import TaskCheck, assert_discriminating  # noqa: E402
 
 
 def _load_dotenv() -> dict[str, str]:
@@ -46,7 +49,13 @@ _DOTENV = _load_dotenv()
 
 RESULTS = HERE / "results"
 DETAILS = RESULTS / "details.jsonl"
-_HYGIENE = ["--no-remember", "--no-collect", "--no-evolve-skills"]
+# What neither arm may carry in from a previous run. `--no-skill-cards` is here for the same reason
+# as the other three and was missing: reading learned cards back is a per-run flag whose default
+# follows `settings.skill_cards`, and `_load_dotenv` below hands this process's `.env` to BOTH
+# subprocesses — so an install that turned cards on would silently give the BASELINE the thing the
+# experiment is supposed to be measuring. It is not contaminated today; it is one env var away, and
+# nothing in the recorded rows would have shown it.
+_HYGIENE = ["--no-remember", "--no-collect", "--no-evolve-skills", "--no-skill-cards"]
 # The honest product A/B, clearly labelled:
 #   baseline = the raw cheap model, ONE shot, no scaffold (no plan / no manager / 1 attempt).
 #   chimera  = the full Chimera solve loop: plan + verify-or-revert (3 attempts) + the M14 scaffolding.
@@ -131,6 +140,28 @@ def main() -> None:
     model = os.environ.get("CHIMERA_DEFAULT_MODEL", "?")
     print(f"model={model}  tasks={len(TASKS)}  arms={list(ARMS)}  (done cells: {len(done)})")
 
+    # Prove the apparatus before paying for the phenomenon. Every task claims its test fails on the
+    # untouched workspace; a task where it does not scores a hit for an arm that did nothing, and
+    # nothing downstream would ever say so. Costs no model call and aborts before the first one.
+    assert_discriminating(
+        [
+            TaskCheck(
+                task_id=str(task["id"]),
+                setup=lambda task=task: _setup_workspace(task, work_root / "_selftest"),
+                verify=f'"{_PY}" -m pytest -q {task["test"]}',
+            )
+            for task in TASKS
+        ]
+    )
+
+    # Stamped on every row below. Read once, so a run that spans an hour reports the version it
+    # STARTED with rather than whatever a mid-run upgrade left behind.
+    provenance = {
+        "chimera_version": version("chimera-agent"),
+        "model": model,
+        "hygiene": " ".join(_HYGIENE),
+    }
+
     for task in TASKS:
         for arm, flags in ARMS.items():
             if (task["id"], arm) in done:
@@ -144,6 +175,12 @@ def main() -> None:
             rec = {
                 "task": task["id"], "arm": arm, "passed": passed,
                 "solve_exit": code, "seconds": round(dt, 1),
+                # Provenance, so two files from two dates are comparable — or explicitly are not.
+                # Without it a row says a task passed and nothing else: not which Chimera, not which
+                # model, not which flags. Every number this suite has ever produced was, strictly,
+                # unfalsifiable after the fact.
+                **provenance,
+                "arm_flags": " ".join(flags),
             }
             with DETAILS.open("a", encoding="utf-8") as fh:
                 fh.write(json.dumps(rec) + "\n")
