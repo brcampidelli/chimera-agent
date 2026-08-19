@@ -148,7 +148,10 @@ def test_an_unrunnable_command_is_reported_as_broken_not_vacuous(tmp_path: Path)
     # every task "discriminate" and the suite would be certified having measured nothing.
     assert verdict.runnable is False
     assert verdict.discriminates is False
-    assert "could not run" in verdict.detail
+    # Either wording is the same verdict: caught before running (not on PATH) or after (exit 126/127,
+    # or Python saying the module is missing). Windows only ever reaches the first — see
+    # `_executable_missing`.
+    assert "not found" in verdict.detail or "could not run" in verdict.detail
 
 
 def test_a_workspace_that_cannot_be_built_is_broken_not_vacuous(tmp_path: Path) -> None:

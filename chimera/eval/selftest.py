@@ -28,6 +28,9 @@ Two failures, kept apart on purpose:
 
 from __future__ import annotations
 
+import os
+import shlex
+import shutil
 import subprocess
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
@@ -73,12 +76,40 @@ class TaskCheck:
     verify: str
 
 
+def _executable_missing(command: str) -> str:
+    """The command's own program, when it is not on PATH — else "".
+
+    Asked BEFORE running, because after running it is unanswerable: a POSIX shell reports a missing
+    command as exit 127, but `cmd.exe` reports it as exit 1 with a message in the system's language,
+    and exit 1 is exactly what a failing test looks like. A guard that cannot tell "the test failed"
+    from "nothing ran" on Windows is a guard that passes an empty apparatus, which is what this whole
+    module exists to refuse.
+    """
+    try:
+        parts = shlex.split(command, posix=os.name != "nt")
+    except ValueError:  # unbalanced quotes — let the shell report it in its own words
+        return ""
+    if not parts:
+        return ""
+    program = parts[0].strip('"')
+    return "" if shutil.which(program) else program
+
+
 def check_discriminates(check: TaskCheck, *, timeout: int = DEFAULT_TIMEOUT) -> Verdict:
     """Run one task's verify command against its untouched workspace and report what happened."""
     try:
         workspace = check.setup()
     except Exception as exc:  # a workspace that cannot be built is not a vacuous task either
         return Verdict(check.task_id, discriminates=False, runnable=False, detail=f"setup failed: {exc}")
+
+    missing = _executable_missing(check.verify)
+    if missing:
+        return Verdict(
+            check.task_id,
+            discriminates=False,
+            runnable=False,
+            detail=f"verify command not found on PATH: {missing}",
+        )
 
     try:
         done = subprocess.run(
@@ -100,11 +131,13 @@ def check_discriminates(check: TaskCheck, *, timeout: int = DEFAULT_TIMEOUT) -> 
         return Verdict(check.task_id, discriminates=False, runnable=False, detail=str(exc))
 
     # A command that never ran exits non-zero too, and non-zero is the answer this guard calls
-    # healthy — so without this, an environment with no pytest would report every task as
-    # discriminating and the guard would certify an apparatus that measured nothing. That is the
-    # exact failure it exists to prevent, one level up. 127 is "command not found", 126 is "found
-    # and not executable", and the module case is the one that actually happens: a workspace whose
-    # interpreter has no pytest.
+    # healthy — so an environment with no pytest would otherwise report every task as discriminating
+    # and certify an apparatus that measured nothing: the exact failure this exists to prevent, one
+    # level up. The exit codes below are POSIX shells (127 not found, 126 not executable) and cost
+    # nothing to keep; Windows is why they are not the only check, because `cmd` answers a missing
+    # command with plain exit 1 — indistinguishable from a failing test — and says so in the system
+    # language, which is why `_executable_missing` runs first. "No module named" comes from Python
+    # itself and is English on every platform, and it is the case that actually happens.
     if done.returncode in (126, 127) or "No module named" in (done.stderr or ""):
         return Verdict(
             check.task_id,
