@@ -141,3 +141,130 @@ def test_vision_is_asked_about_the_model_that_will_answer() -> None:
     # Omitted still means the install's default — what a caller with no picker means.
     default = client.get("/api/vision").json()
     assert default["model"] and default["model"] != asked["model"]
+
+
+# --- the capability table that was wrong in both directions ---------------------------------------
+
+
+def test_the_providers_own_answer_beats_the_static_table(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    """Both halves of the bug, in one test.
+
+    LiteLLM's table had never heard of DeepSeek V4 Flash, so the app read "unknown", sent the image
+    and OpenRouter killed the turn. The same table reports "no" for Mistral Small 3.2, which reads
+    images — so believing it there withholds an image from a model that could have used it. One
+    unknown that costs a turn, one false negative that removes a capability, from the same source.
+    """
+    import json
+
+    from chimera.api.attachments import vision_support
+    from chimera.providers import listing
+
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path))
+    listing._index_cache = None
+    (tmp_path / listing.PRICE_CACHE_NAME).write_text(
+        json.dumps(
+            {
+                "fetched_at": "2026-08-19T00:00:00+00:00",
+                "models": {
+                    "openrouter/deepseek/deepseek-v4-flash": {"vision": False, "tools": True},
+                    "openrouter/mistralai/mistral-small-3.2-24b-instruct": {"vision": True},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert vision_support("openrouter/deepseek/deepseek-v4-flash") == "no"
+    assert vision_support("openrouter/mistralai/mistral-small-3.2-24b-instruct") == "yes"
+
+
+def test_a_model_the_index_never_saw_still_falls_back(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    # A local Ollama tag, a vendor not on OpenRouter, an install that has never fetched: the answer
+    # has to come from wherever it came from before, not from an absence read as "no".
+    from chimera.api.attachments import vision_support
+    from chimera.providers import listing
+
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path / "empty"))
+    listing._index_cache = None
+
+    assert vision_support("ollama/llama3") in {"yes", "no", "unknown"}
+
+
+def test_the_remembered_index_survives_the_older_file_shape(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    """0.48.0rc2 wrote `{"prices": {slug: [in, out]}}`. Upgrading must not throw those prices away to
+    gain capabilities — the user would silently lose the receipt figures they already had."""
+    import json
+
+    from chimera.providers import listing
+
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path))
+    listing._index_cache = None
+    (tmp_path / listing.PRICE_CACHE_NAME).write_text(
+        json.dumps({"fetched_at": "x", "prices": {"openrouter/vendor/model": [0.25, 0.95]}}),
+        encoding="utf-8",
+    )
+
+    assert listing.known_price("openrouter/vendor/model") == (0.25, 0.95)
+    assert listing.known_vision("openrouter/vendor/model") is None
+
+
+# --- the picture that never left the building ----------------------------------------------------
+
+
+def test_a_plain_dict_with_images_still_becomes_a_multimodal_message() -> None:
+    """The bug that made every attached image useless, and one provider answer 500.
+
+    `Agent.run` builds this turn's user message as a LITERAL dict, because it is assembling a list
+    that also holds the history's dicts:
+
+        {"role": "user", "content": task, "images": [...]}
+
+    `_to_message_dicts` converted `Message` objects and passed dicts through untouched. So the
+    images never became `image_url` parts — the model was never shown the picture — and the key
+    `images`, carrying a local file path, travelled to the provider, which answered
+    `500 Internal Server Error`. The composer showed the attachment, the upload succeeded and the
+    vision check said yes; the request contained neither a picture nor a valid body.
+    """
+    from chimera.providers.gateway import _to_message_dicts
+
+    out = _to_message_dicts(
+        [
+            {"role": "system", "content": "be brief"},
+            {"role": "user", "content": "what is this?", "images": ["https://example.invalid/a.png"]},
+        ]
+    )
+
+    assert out[0] == {"role": "system", "content": "be brief"}
+    parts = out[1]["content"]
+    assert [p["type"] for p in parts] == ["text", "image_url"]
+    assert parts[1]["image_url"]["url"] == "https://example.invalid/a.png"
+    # And the key no provider knows must not survive the trip.
+    assert "images" not in out[1]
+
+
+def test_an_empty_images_key_is_dropped_rather_than_sent() -> None:
+    from chimera.providers.gateway import _to_message_dicts
+
+    out = _to_message_dicts([{"role": "user", "content": "hello", "images": []}])
+
+    assert out == [{"role": "user", "content": "hello"}]
+
+
+def test_a_local_path_is_encoded_rather_than_named(tmp_path: Any) -> None:
+    """A file path means nothing on the other end of an HTTP request — the bytes have to go."""
+    from chimera.providers.gateway import _to_message_dicts
+
+    png = tmp_path / "shot.png"
+    png.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 32)
+
+    out = _to_message_dicts([{"role": "user", "content": "read it", "images": [str(png)]}])
+
+    url = out[0]["content"][1]["image_url"]["url"]
+    assert url.startswith("data:image/png;base64,")
+    assert str(png) not in url

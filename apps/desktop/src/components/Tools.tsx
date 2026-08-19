@@ -171,6 +171,12 @@ export function Tools({ embedded = false }: { embedded?: boolean } = {}) {
         )}
       </Panel>
       <p className="px-1 text-xs text-muted-foreground">{t("tools.note")}</p>
+      {/* Why every row above is English even when the app is not. A tool's description and its
+          parameter names are not our copy about the agent — they ARE the function schema sent to
+          the model, so a translated copy on this screen would describe an agent that does not
+          exist, on the one screen whose whole job is to be an honest inventory. Saying so is
+          cheaper than either lying or leaving it unexplained. */}
+      <p className="px-1 text-xs text-muted-foreground">{t("tools.langNote")}</p>
     </Screen>
   );
 }

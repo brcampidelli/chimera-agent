@@ -144,6 +144,12 @@ export function ModelDialog({
   const t = useT();
   const qc = useQueryClient();
   const [query, setQuery] = useState("");
+  /** Narrow the list to models the provider says accept images.
+   *
+   *  Off by default, because most turns are text. It exists because the alternative was a dead end:
+   *  someone attaches a screenshot, the composer says this model cannot look at it, and the only way
+   *  to find one that can was to open four hundred rows and read the badges. */
+  const [seeingOnly, setSeeingOnly] = useState(false);
 
   // Fetched when the dialog first opens, not on mount: this is a round-trip to a public catalogue,
   // and paying for it before anybody asks for a model is paying for a menu most turns never open.
@@ -162,17 +168,20 @@ export function ModelDialog({
   const defaultSlug = listing.data?.default ?? "";
 
   const filtered = useMemo(() => {
+    // `=== true` and not truthiness: `null` means the source did not say, and a model we were told
+    // nothing about must not be presented as one that reads images.
+    const eligible = seeingOnly ? models.filter((m) => m.vision === true) : models;
     const needle = query.trim().toLowerCase();
-    if (!needle) return models;
+    if (!needle) return eligible;
     // Matched against the slug as well as the label: someone pasting `deepseek/deepseek-chat-v3.1`
     // from a terminal is searching with the string they already have.
-    return models.filter(
+    return eligible.filter(
       (m) =>
         m.label.toLowerCase().includes(needle) ||
         m.slug.toLowerCase().includes(needle) ||
         m.vendor.toLowerCase().includes(needle),
     );
-  }, [models, query]);
+  }, [models, query, seeingOnly]);
 
   const shown = filtered.slice(0, MAX_ROWS);
   const hidden = filtered.length - shown.length;
@@ -192,8 +201,13 @@ export function ModelDialog({
       onOpenChange={onOpenChange}
       title={t("model.pick.title")}
       description={t("model.pick.blurb")}
+      // The footer holds "Make it the default", and on a short window it was being pushed below the
+      // fold — with the list itself scrolling, so nothing hinted there was anything under it. The
+      // dialog is bounded to the viewport and the LIST is the only part that scrolls, which puts the
+      // action back on screen at every window height.
+      className="flex max-h-dialog flex-col"
     >
-      <div className="space-y-3">
+      <div className="flex min-h-0 flex-col gap-3">
         <label className="flex items-center gap-2">
           <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
           <span className="sr-only">{t("model.pick.search")}</span>
@@ -206,6 +220,19 @@ export function ModelDialog({
           />
         </label>
 
+        {/* One question the search box cannot answer: which of these can look at the picture I just
+            attached. The badge was already on every row; this turns it into a filter, because
+            reading four hundred rows for a badge is not an answer. */}
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <input
+            type="checkbox"
+            className="accent-accent"
+            checked={seeingOnly}
+            onChange={(e) => setSeeingOnly(e.target.checked)}
+          />
+          {t("model.pick.onlyVision")}
+        </label>
+
         {/* Why the list is short, when it is short. Said NEXT TO the list rather than instead of it:
             the models below are real and callable, and hiding them behind an error would answer
             "your key buys nothing", which is not what a failed fetch means. */}
@@ -216,7 +243,7 @@ export function ModelDialog({
           </p>
         ) : null}
 
-        <div className="max-h-80 space-y-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
           {/* Always first, and never filtered out by the search: it is the way back, and a way back
               you can lose by typing is not one. */}
           <Row

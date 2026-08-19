@@ -62,6 +62,8 @@ const en: Dict = {
   "tools.noParams": "no parameters",
   "tools.note":
     "The agent's registered tools (native + any that light up when a credential or dependency is present). Capability tags are derived from the tool name against the governance sets — not from running anything.",
+  "tools.langNote":
+    "Each tool's description and parameter names stay in English in every language: that exact text is the schema sent to the model, and a translated copy here would show you something the agent never reads.",
   "tools.tag.network": "network",
   "tools.tag.read": "read",
   "tools.tag.write": "write",
@@ -421,6 +423,7 @@ const en: Dict = {
   "model.pick.context": "{n}k context",
   "model.pick.noTools": "no tools",
   "model.pick.vision": "images",
+  "model.pick.onlyVision": "Only models that read images",
   "model.pick.noToolsWarning": "Cannot call tools — this turn would describe an edit instead of making it.",
   "model.pick.makeDefault": "Make it the default",
   "model.pick.makeDefaultHint": "Otherwise the pick lasts for this conversation only.",
@@ -852,6 +855,8 @@ const pt: Dict = {
   "tools.noParams": "sem parâmetros",
   "tools.note":
     "As ferramentas registradas do agente (nativas + as que se ativam quando há uma credencial ou dependência). As tags de capacidade são derivadas do nome da ferramenta contra os conjuntos de governança — não da execução de nada.",
+  "tools.langNote":
+    "A descrição e os nomes dos parâmetros de cada ferramenta ficam em inglês em todos os idiomas: esse texto exato é o schema enviado ao modelo, e uma cópia traduzida aqui mostraria algo que o agente nunca lê.",
   "tools.tag.network": "rede",
   "tools.tag.read": "leitura",
   "tools.tag.write": "escrita",
@@ -1211,6 +1216,7 @@ const pt: Dict = {
   "model.pick.context": "{n}k de contexto",
   "model.pick.noTools": "sem ferramentas",
   "model.pick.vision": "imagens",
+  "model.pick.onlyVision": "Só modelos que leem imagens",
   "model.pick.noToolsWarning": "Não chama ferramentas — este turno descreveria a edição em vez de fazê-la.",
   "model.pick.makeDefault": "Tornar padrão",
   "model.pick.makeDefaultHint": "Sem isso, a escolha vale só para esta conversa.",
@@ -1667,6 +1673,8 @@ const es: Dict = {
   "tools.noParams": "sin parámetros",
   "tools.note":
     "Las herramientas registradas del agente (nativas + las que se activan cuando hay una credencial o dependencia). Las etiquetas de capacidad se derivan del nombre de la herramienta frente a los conjuntos de gobernanza — no de ejecutar nada.",
+  "tools.langNote":
+    "La descripción y los nombres de los parámetros de cada herramienta se mantienen en inglés en todos los idiomas: ese texto exacto es el esquema que se envía al modelo, y una copia traducida aquí mostraría algo que el agente nunca lee.",
   "tools.tag.network": "red",
   "tools.tag.read": "lectura",
   "tools.tag.write": "escritura",
@@ -2001,6 +2009,7 @@ const es: Dict = {
   "model.pick.context": "{n}k de contexto",
   "model.pick.noTools": "sin herramientas",
   "model.pick.vision": "imágenes",
+  "model.pick.onlyVision": "Solo modelos que leen imágenes",
   "model.pick.noToolsWarning": "No llama herramientas: este turno describiría la edición en vez de hacerla.",
   "model.pick.makeDefault": "Hacerlo predeterminado",
   "model.pick.makeDefaultHint": "Si no, la elección vale solo para esta conversación.",
@@ -2457,6 +2466,8 @@ const fr: Dict = {
   "tools.noParams": "aucun paramètre",
   "tools.note":
     "Les outils enregistrés de l'agent (natifs + ceux qui s'activent avec une clé ou une dépendance). Les tags de capacité sont dérivés du nom de l'outil face aux ensembles de gouvernance — pas de l'exécution de quoi que ce soit.",
+  "tools.langNote":
+    "La description et les noms de paramètres de chaque outil restent en anglais dans toutes les langues : ce texte exact est le schéma envoyé au modèle, et une copie traduite ici montrerait quelque chose que l'agent ne lit jamais.",
   "tools.tag.network": "réseau",
   "tools.tag.read": "lecture",
   "tools.tag.write": "écriture",
@@ -2791,6 +2802,7 @@ const fr: Dict = {
   "model.pick.context": "{n}k de contexte",
   "model.pick.noTools": "sans outils",
   "model.pick.vision": "images",
+  "model.pick.onlyVision": "Uniquement les modèles qui lisent les images",
   "model.pick.noToolsWarning": "N'appelle pas d'outils — ce tour décrirait la modification au lieu de la faire.",
   "model.pick.makeDefault": "En faire le modèle par défaut",
   "model.pick.makeDefaultHint": "Sinon, le choix ne vaut que pour cette conversation.",
@@ -3247,6 +3259,8 @@ const de: Dict = {
   "tools.noParams": "keine Parameter",
   "tools.note":
     "Die registrierten Werkzeuge des Agenten (native + solche, die sich mit einem Schlüssel oder einer Abhängigkeit aktivieren). Fähigkeits-Tags werden aus dem Werkzeugnamen gegen die Governance-Mengen abgeleitet — nicht aus dem Ausführen von irgendetwas.",
+  "tools.langNote":
+    "Beschreibung und Parameternamen jedes Werkzeugs bleiben in allen Sprachen englisch: genau dieser Text ist das Schema, das an das Modell geht, und eine übersetzte Fassung hier würde etwas zeigen, was der Agent nie liest.",
   "tools.tag.network": "Netzwerk",
   "tools.tag.read": "Lesen",
   "tools.tag.write": "Schreiben",
@@ -3581,6 +3595,7 @@ const de: Dict = {
   "model.pick.context": "{n}k Kontext",
   "model.pick.noTools": "keine Werkzeuge",
   "model.pick.vision": "Bilder",
+  "model.pick.onlyVision": "Nur Modelle, die Bilder lesen",
   "model.pick.noToolsWarning": "Ruft keine Werkzeuge auf — dieser Zug würde die Änderung beschreiben statt sie zu machen.",
   "model.pick.makeDefault": "Als Standard setzen",
   "model.pick.makeDefaultHint": "Sonst gilt die Wahl nur für dieses Gespräch.",
@@ -4037,6 +4052,8 @@ const zh: Dict = {
   "tools.noParams": "无参数",
   "tools.note":
     "智能体已注册的工具（原生 + 在具备凭据或依赖时启用的工具）。能力标签依据工具名称与治理集合推导得出——并非通过运行任何东西。",
+  "tools.langNote":
+    "每个工具的描述和参数名在所有语言下都保持英文：这段文字正是发送给模型的 schema，在这里翻译只会让你看到智能体从未读到的内容。",
   "tools.tag.network": "网络",
   "tools.tag.read": "读取",
   "tools.tag.write": "写入",
@@ -4371,6 +4388,7 @@ const zh: Dict = {
   "model.pick.context": "{n}k 上下文",
   "model.pick.noTools": "不支持工具",
   "model.pick.vision": "图像",
+  "model.pick.onlyVision": "只看能读图的模型",
   "model.pick.noToolsWarning": "不能调用工具 — 这一轮只会描述修改，而不会真正动文件。",
   "model.pick.makeDefault": "设为默认",
   "model.pick.makeDefaultHint": "不设的话，这次选择只在本段对话有效。",
@@ -4824,6 +4842,8 @@ const ja: Dict = {
   "tools.noParams": "パラメータなし",
   "tools.note":
     "エージェントに登録されたツール（ネイティブ + 認証情報や依存関係があると有効になるもの）。能力タグはツール名をガバナンス集合と照合して導出されます — 何かを実行して得るものではありません。",
+  "tools.langNote":
+    "各ツールの説明とパラメータ名は、どの言語でも英語のままです。その文面そのものがモデルに送られるスキーマであり、ここで訳すとエージェントが決して読まないものを見せることになります。",
   "tools.tag.network": "ネットワーク",
   "tools.tag.read": "読み取り",
   "tools.tag.write": "書き込み",
@@ -5158,6 +5178,7 @@ const ja: Dict = {
   "model.pick.context": "コンテキスト {n}k",
   "model.pick.noTools": "ツール非対応",
   "model.pick.vision": "画像",
+  "model.pick.onlyVision": "画像を読めるモデルだけ",
   "model.pick.noToolsWarning": "ツールを呼べません — このターンは編集を説明するだけで、実際には変更しません。",
   "model.pick.makeDefault": "既定にする",
   "model.pick.makeDefaultHint": "しなければ、この選択はこの会話だけです。",
@@ -5586,6 +5607,8 @@ const it: Dict = {
   "tools.params": "parametri:",
   "tools.noParams": "nessun parametro",
   "tools.note": "Gli strumenti registrati dell'agente (nativi + quelli che si attivano quando una credenziale o una dipendenza è presente). Le etichette di capacità derivano dal nome dello strumento confrontato con gli insiemi di governance — non dall'esecuzione di alcunché.",
+  "tools.langNote":
+    "La descrizione e i nomi dei parametri di ogni strumento restano in inglese in tutte le lingue: quel testo esatto è lo schema inviato al modello, e una copia tradotta qui mostrerebbe qualcosa che l'agente non legge mai.",
   "tools.tag.network": "rete",
   "tools.tag.read": "lettura",
   "tools.tag.write": "scrittura",
@@ -5942,6 +5965,7 @@ const it: Dict = {
   "model.pick.context": "{n}k di contesto",
   "model.pick.noTools": "senza strumenti",
   "model.pick.vision": "immagini",
+  "model.pick.onlyVision": "Solo modelli che leggono immagini",
   "model.pick.noToolsWarning": "Non chiama strumenti — questo turno descriverebbe la modifica invece di farla.",
   "model.pick.makeDefault": "Rendilo predefinito",
   "model.pick.makeDefaultHint": "Altrimenti la scelta vale solo per questa conversazione.",
@@ -6351,6 +6375,8 @@ const pl: Dict = {
   "tools.params": "parametry:",
   "tools.noParams": "brak parametrów",
   "tools.note": "Zarejestrowane narzędzia agenta (natywne + te, które włączają się, gdy obecne są poświadczenia lub zależność). Etykiety możliwości wynikają z nazwy narzędzia zestawionej ze zbiorami governance — a nie z uruchomienia czegokolwiek.",
+  "tools.langNote":
+    "Opis i nazwy parametrów każdego narzędzia pozostają po angielsku we wszystkich językach: dokładnie ten tekst jest schematem wysyłanym do modelu, a przetłumaczona kopia pokazałaby tu coś, czego agent nigdy nie czyta.",
   "tools.tag.network": "sieć",
   "tools.tag.read": "odczyt",
   "tools.tag.write": "zapis",
@@ -6707,6 +6733,7 @@ const pl: Dict = {
   "model.pick.context": "{n}k kontekstu",
   "model.pick.noTools": "bez narzędzi",
   "model.pick.vision": "obrazy",
+  "model.pick.onlyVision": "Tylko modele, które czytają obrazy",
   "model.pick.noToolsWarning": "Nie wywołuje narzędzi — ta tura opisałaby zmianę, zamiast ją wykonać.",
   "model.pick.makeDefault": "Ustaw jako domyślny",
   "model.pick.makeDefaultHint": "Inaczej wybór obowiązuje tylko w tej rozmowie.",
@@ -7116,6 +7143,8 @@ const ru: Dict = {
   "tools.params": "параметры:",
   "tools.noParams": "без параметров",
   "tools.note": "Зарегистрированные инструменты агента (встроенные плюс те, что появляются при наличии учётных данных или зависимости). Метки возможностей выводятся из имени инструмента по спискам управления — ничего для этого не запускается.",
+  "tools.langNote":
+    "Описание и имена параметров каждого инструмента остаются на английском во всех языках: именно этот текст — схема, отправляемая модели, и переведённая копия показала бы здесь то, чего агент никогда не читает.",
   "tools.tag.network": "сеть",
   "tools.tag.read": "чтение",
   "tools.tag.write": "запись",
@@ -7472,6 +7501,7 @@ const ru: Dict = {
   "model.pick.context": "{n}k контекста",
   "model.pick.noTools": "без инструментов",
   "model.pick.vision": "изображения",
+  "model.pick.onlyVision": "Только модели, читающие изображения",
   "model.pick.noToolsWarning": "Не вызывает инструменты — этот ход опишет правку вместо того, чтобы её сделать.",
   "model.pick.makeDefault": "Сделать по умолчанию",
   "model.pick.makeDefaultHint": "Иначе выбор действует только в этом разговоре.",

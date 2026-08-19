@@ -125,7 +125,41 @@ MessageLike = Message | dict[str, Any]
 
 
 def _to_message_dicts(messages: list[MessageLike]) -> list[dict[str, Any]]:
-    return [m.as_dict() if isinstance(m, Message) else m for m in messages]
+    """Every message in the shape a provider accepts — including the ones that arrive as plain dicts.
+
+    This used to be `m.as_dict() if isinstance(m, Message) else m`, and the `else` branch is where
+    attached images went to die. `Agent.run` builds this turn's user message as a LITERAL dict —
+    `{"role": "user", "content": task, "images": [...]}` — because it is assembling a list that also
+    holds the history's dicts. A `Message` would have been converted; a dict was passed through, so:
+
+    - the images never became `image_url` parts, and the model never saw the picture; and
+    - the key `images` travelled to the provider, carrying a local file path. OpenRouter answered
+      `500 Internal Server Error`, which is what a user attaching a screenshot actually got.
+
+    Both halves were invisible in the obvious place: the composer showed the attachment, the upload
+    succeeded, the vision check said the model could see — and the request quietly contained neither
+    a picture nor a valid body. Converting here rather than at the call site is the fix that cannot
+    be forgotten by the next caller: this function is the single door to the provider.
+    """
+    out: list[dict[str, Any]] = []
+    for message in messages:
+        if isinstance(message, Message):
+            out.append(message.as_dict())
+            continue
+        images = message.get("images")
+        if not images:
+            # No images to fold in — but drop the key if it is present-and-empty, since no provider
+            # knows it and an empty list is not worth a round trip's risk.
+            out.append({k: v for k, v in message.items() if k != "images"} if "images" in message else message)
+            continue
+        out.append(
+            Message(
+                role=message.get("role", "user"),
+                content=str(message.get("content") or ""),
+                images=list(images),
+            ).as_dict()
+        )
+    return out
 
 
 class SupportsComplete(Protocol):
