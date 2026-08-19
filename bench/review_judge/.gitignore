@@ -1,0 +1,6 @@
+# The fetched diffs: 1.5 MB of GitHub's copy of other people's code, rebuildable with --fetch.
+data/diffs/
+
+# The dataset itself (1.9 MB, Apache-2.0, Alibaba-Aone/aacr-bench). Downloaded, not authored here —
+# the README says how, and the commits it pins make the download reproducible.
+data/aacr.jsonl
