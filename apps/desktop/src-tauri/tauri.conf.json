@@ -23,6 +23,11 @@
   "bundle": {
     "active": true,
     "createUpdaterArtifacts": true,
+    "windows": {
+      "nsis": {
+        "installerHooks": "installer-hooks.nsh"
+      }
+    },
     "targets": ["nsis", "dmg", "appimage", "deb"],
     "icon": [
       "icons/32x32.png",
