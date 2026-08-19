@@ -1,4 +1,10 @@
-import { createContext, useContext, useId, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useId,
+  useState,
+  type ReactNode,
+} from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, KeyRound, Loader2, Trash2 } from "lucide-react";
 import {
@@ -22,7 +28,13 @@ import { Connections } from "@/components/Connections";
 import { Governance } from "@/components/Governance";
 import { Usage } from "@/components/Usage";
 import { LANGS, useI18n, useT } from "@/lib/i18n";
-import type { AgentIdentity, AppConfig, DoctorInfo, PoolCfg, ProviderCfg } from "@/lib/types";
+import type {
+  AgentIdentity,
+  AppConfig,
+  DoctorInfo,
+  PoolCfg,
+  ProviderCfg,
+} from "@/lib/types";
 
 function Card({ title, children }: { title: string; children: ReactNode }) {
   // Named region rather than a bare section: this screen stacks eleven of them, and unnamed they
@@ -56,7 +68,11 @@ function AppliesNote({ when }: { when?: string }) {
   if (when !== "next_conversation" && when !== "next_launch") return null;
   return (
     <div className="text-xs text-warn">
-      {t(when === "next_launch" ? "settings.applies.nextLaunch" : "settings.applies.nextConversation")}
+      {t(
+        when === "next_launch"
+          ? "settings.applies.nextLaunch"
+          : "settings.applies.nextConversation",
+      )}
     </div>
   );
 }
@@ -101,7 +117,10 @@ function IdentityCard() {
   const t = useT();
   const { lang } = useI18n();
   const qc = useQueryClient();
-  const saved = useQuery({ queryKey: ["instructions"], queryFn: getInstructions });
+  const saved = useQuery({
+    queryKey: ["instructions"],
+    queryFn: getInstructions,
+  });
   const [draft, setDraft] = useState<AgentIdentity | null>(null);
 
   const mutation = useMutation({
@@ -114,14 +133,20 @@ function IdentityCard() {
     },
   });
 
-  const current = draft ?? saved.data ?? { name: "", language: "", instructions: "" };
-  const dirty = draft !== null && JSON.stringify(draft) !== JSON.stringify(saved.data);
-  const edit = (patch: Partial<AgentIdentity>) => setDraft({ ...current, ...patch });
+  const current = draft ??
+    saved.data ?? { name: "", language: "", instructions: "" };
+  const dirty =
+    draft !== null && JSON.stringify(draft) !== JSON.stringify(saved.data);
+  const edit = (patch: Partial<AgentIdentity>) =>
+    setDraft({ ...current, ...patch });
   const uiLanguage = LANGS.find((l) => l.code === lang)?.label ?? "";
 
   return (
     <Card title={t("settings.card.agent")}>
-      <Row label={t("settings.row.agentName")} hint={t("settings.hint.agentName")}>
+      <Row
+        label={t("settings.row.agentName")}
+        hint={t("settings.hint.agentName")}
+      >
         <input
           className={inputCls}
           value={current.name}
@@ -130,7 +155,10 @@ function IdentityCard() {
           onChange={(e) => edit({ name: e.target.value })}
         />
       </Row>
-      <Row label={t("settings.row.agentLanguage")} hint={t("settings.hint.agentLanguage")}>
+      <Row
+        label={t("settings.row.agentLanguage")}
+        hint={t("settings.hint.agentLanguage")}
+      >
         <input
           className={inputCls}
           value={current.language}
@@ -153,8 +181,12 @@ function IdentityCard() {
       </Row>
       <div className="flex flex-col gap-2 px-4 py-3">
         <div>
-          <div className="text-sm font-medium">{t("settings.row.agentInstructions")}</div>
-          <div className="text-xs text-muted-foreground">{t("settings.hint.agentInstructions")}</div>
+          <div className="text-sm font-medium">
+            {t("settings.row.agentInstructions")}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {t("settings.hint.agentInstructions")}
+          </div>
         </div>
         <textarea
           className="field min-h-32 w-full p-2.5 text-sm"
@@ -165,12 +197,20 @@ function IdentityCard() {
         />
         {/* Said where it is decided, not in a tooltip. Someone writing "you may run any command"
             here and then watching the agent refuse deserves to have been told in the same breath. */}
-        <p className="text-xs text-muted-foreground">{t("settings.hint.agentNoGrant")}</p>
+        <p className="text-xs text-muted-foreground">
+          {t("settings.hint.agentNoGrant")}
+        </p>
         <div className="flex items-center gap-2">
-          <Button size="sm" disabled={!dirty || mutation.isPending} onClick={() => mutation.mutate(current)}>
+          <Button
+            size="sm"
+            disabled={!dirty || mutation.isPending}
+            onClick={() => mutation.mutate(current)}
+          >
             {t("common.save")}
           </Button>
-          {dirty && <span className="text-xs text-warn">{t("settings.unsaved")}</span>}
+          {dirty && (
+            <span className="text-xs text-warn">{t("settings.unsaved")}</span>
+          )}
         </div>
       </div>
     </Card>
@@ -187,30 +227,59 @@ function IdentityCard() {
  * unset, the conversation's own posture is the only one in force. Set either and it becomes a floor
  * the request cannot raise — the same rule as the tool denylist, for the same reason.
  */
-function AutonomyCard({ c, save }: { c: AppConfig; save: (u: Record<string, string>) => void }) {
+function AutonomyCard({
+  c,
+  save,
+}: {
+  c: AppConfig;
+  save: (u: Record<string, string>) => void;
+}) {
   const t = useT();
   const [confirmingHostExec, setConfirmingHostExec] = useState(false);
 
   return (
     <Card title={t("settings.card.autonomy")}>
-      <Row label={t("settings.row.reach")} hint={t("settings.hint.reach")} env="CHIMERA_REACH">
+      <Row
+        label={t("settings.row.reach")}
+        hint={t("settings.hint.reach")}
+        env="CHIMERA_REACH"
+      >
         <Select
           value={c.autonomy.reach || "unset"}
           options={["unset", "read_only", "workspace", "workspace_shell"]}
+          render={(v) =>
+            v === "unset"
+              ? t("settings.value.unset")
+              : t(`code.posture.reach.${v}`)
+          }
           onChange={(v) => save({ CHIMERA_REACH: v === "unset" ? "" : v })}
         />
       </Row>
-      <Row label={t("settings.row.approval")} hint={t("settings.hint.approval")} env="CHIMERA_APPROVAL">
+      <Row
+        label={t("settings.row.approval")}
+        hint={t("settings.hint.approval")}
+        env="CHIMERA_APPROVAL"
+      >
         <Select
           value={c.autonomy.approval || "unset"}
           options={["unset", "always", "suspicious", "never"]}
+          render={(v) =>
+            v === "unset"
+              ? t("settings.value.unset")
+              : t(`code.posture.approval.${v}`)
+          }
           onChange={(v) => save({ CHIMERA_APPROVAL: v === "unset" ? "" : v })}
         />
       </Row>
-      <Row label={t("settings.row.hostExec")} hint={t("settings.hint.hostExec")} env="CHIMERA_HOST_EXEC">
+      <Row
+        label={t("settings.row.hostExec")}
+        hint={t("settings.hint.hostExec")}
+        env="CHIMERA_HOST_EXEC"
+      >
         <Select
           value={c.autonomy.host_exec}
           options={["ask", "deny", "allow"]}
+          render={(v) => t(`settings.value.${v}`)}
           onChange={(v) => {
             // `allow` is the only value here that removes a human from the loop on the user's own
             // machine, so it does not get to be the third entry in a silent dropdown. Everything
@@ -238,14 +307,22 @@ function AutonomyCard({ c, save }: { c: AppConfig; save: (u: Record<string, stri
             >
               {t("settings.hostExec.confirm")}
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setConfirmingHostExec(false)}>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setConfirmingHostExec(false)}
+            >
               {t("common.cancel")}
             </Button>
           </div>
         </div>
       )}
       {(c.autonomy.denied_tools ?? []).length > 0 && (
-        <Row label={t("settings.row.deniedTools")} hint={t("settings.hint.deniedTools")} env="CHIMERA_TOOL_DENYLIST">
+        <Row
+          label={t("settings.row.deniedTools")}
+          hint={t("settings.hint.deniedTools")}
+          env="CHIMERA_TOOL_DENYLIST"
+        >
           <span className="max-w-56 truncate font-mono text-xs text-muted-foreground">
             {(c.autonomy.denied_tools ?? []).join(", ")}
           </span>
@@ -278,7 +355,9 @@ function Row({
         <PinnedNote env={env} />
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <RowLabelContext.Provider value={label}>{children}</RowLabelContext.Provider>
+        <RowLabelContext.Provider value={label}>
+          {children}
+        </RowLabelContext.Provider>
       </div>
     </div>
   );
@@ -374,7 +453,11 @@ function OllamaModelPicker({
   }
   const models = data.models ?? [];
   if (models.length === 0) {
-    return <span className="max-w-72 text-xs text-muted-foreground">{t("settings.ollama.empty")}</span>;
+    return (
+      <span className="max-w-72 text-xs text-muted-foreground">
+        {t("settings.ollama.empty")}
+      </span>
+    );
   }
 
   // Selected only when the configured default IS one of these tags. A default pointing at a cloud
@@ -404,7 +487,9 @@ function LanguageSelect() {
     <select
       className={inputCls}
       value={lang}
-      onChange={(e) => setLang(e.target.value as (typeof LANGS)[number]["code"])}
+      onChange={(e) =>
+        setLang(e.target.value as (typeof LANGS)[number]["code"])
+      }
     >
       {LANGS.map((l) => (
         <option key={l.code} value={l.code}>
@@ -415,20 +500,42 @@ function LanguageSelect() {
   );
 }
 
-function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+function Toggle({
+  on,
+  onChange,
+}: {
+  on: boolean;
+  onChange: (v: boolean) => void;
+}) {
   // Was a near-copy of the one in Cron.tsx. Now the shared primitive, named from its Row — before
   // this, all six of these announced as an unlabelled "switch".
-  return <Switch checked={on} onChange={onChange} label={useContext(RowLabelContext)} />;
+  return (
+    <Switch
+      checked={on}
+      onChange={onChange}
+      label={useContext(RowLabelContext)}
+    />
+  );
 }
 
 function Select({
   value,
   options,
   onChange,
+  render,
 }: {
   value: string;
   options: string[];
   onChange: (v: string) => void;
+  /**
+   * How to WRITE an option. The value on the wire never changes — `read_only` is what the backend
+   * validates and what `CHIMERA_REACH` holds — but a dropdown reading `workspace_shell` to someone
+   * who chose Japanese is a raw enum, not a choice they were offered.
+   *
+   * Omitted on purpose where the value is a proper name: `json`, `sqlite`, `docker` are what those
+   * things are called, and translating them would invent products that do not exist.
+   */
+  render?: (v: string) => string;
 }) {
   // Named from its Row, the same way Toggle is: before this, every select on the screen — cost
   // mode, memory backend, sandbox, and now the three autonomy controls — announced as an unlabelled
@@ -442,14 +549,20 @@ function Select({
     >
       {options.map((o) => (
         <option key={o} value={o}>
-          {o}
+          {render ? render(o) : o}
         </option>
       ))}
     </select>
   );
 }
 
-function SecretField({ provider, onSave }: { provider: ProviderCfg; onSave: (v: string) => void }) {
+function SecretField({
+  provider,
+  onSave,
+}: {
+  provider: ProviderCfg;
+  onSave: (v: string) => void;
+}) {
   const t = useT();
   const [editing, setEditing] = useState(false);
   const [v, setV] = useState("");
@@ -458,10 +571,13 @@ function SecretField({ provider, onSave }: { provider: ProviderCfg; onSave: (v: 
       <>
         {provider.set ? (
           <span className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Check className="h-3.5 w-3.5 text-ok" /> {t("settings.isSet")} {provider.hint}
+            <Check className="h-3.5 w-3.5 text-ok" /> {t("settings.isSet")}{" "}
+            {provider.hint}
           </span>
         ) : (
-          <span className="text-xs text-muted-foreground">{t("settings.notSet")}</span>
+          <span className="text-xs text-muted-foreground">
+            {t("settings.notSet")}
+          </span>
         )}
         <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
           {provider.set ? t("common.replace") : t("common.set")}
@@ -504,7 +620,13 @@ function SecretField({ provider, onSave }: { provider: ProviderCfg; onSave: (v: 
  * there is no control whose value is a key — and the two things you can do are add one and delete
  * one by position. The client never holds a key it did not just type.
  */
-function PoolField({ pool, onChanged }: { pool: PoolCfg; onChanged: () => void }) {
+function PoolField({
+  pool,
+  onChanged,
+}: {
+  pool: PoolCfg;
+  onChanged: () => void;
+}) {
   const t = useT();
   const [v, setV] = useState("");
   const [error, setError] = useState("");
@@ -525,11 +647,16 @@ function PoolField({ pool, onChanged }: { pool: PoolCfg; onChanged: () => void }
   return (
     <div className="space-y-2">
       {pool.keys.length === 0 ? (
-        <p className="text-xs text-muted-foreground">{t("settings.pool.empty")}</p>
+        <p className="text-xs text-muted-foreground">
+          {t("settings.pool.empty")}
+        </p>
       ) : (
         <ul className="space-y-1">
           {pool.keys.map((k) => (
-            <li key={k.index} className="flex items-center gap-2 text-xs text-muted-foreground">
+            <li
+              key={k.index}
+              className="flex items-center gap-2 text-xs text-muted-foreground"
+            >
               <Check className="h-3.5 w-3.5 shrink-0 text-ok" />
               <span className="font-mono">{k.hint}</span>
               <button
@@ -555,7 +682,11 @@ function PoolField({ pool, onChanged }: { pool: PoolCfg; onChanged: () => void }
             setError("");
           }}
         />
-        <Button size="sm" disabled={!v.trim() || add.isPending} onClick={() => add.mutate()}>
+        <Button
+          size="sm"
+          disabled={!v.trim() || add.isPending}
+          onClick={() => add.mutate()}
+        >
           {t("settings.pool.add")}
         </Button>
       </div>
@@ -588,7 +719,8 @@ export function MessagingCard({
   const [token, setToken] = useState("");
   const invalidate = () => qc.invalidateQueries({ queryKey: ["messaging"] });
   const toggle = useMutation({
-    mutationFn: (on: boolean) => (on ? startMessaging(platform) : stopMessaging(platform)),
+    mutationFn: (on: boolean) =>
+      on ? startMessaging(platform) : stopMessaging(platform),
     onSuccess: invalidate,
   });
 
@@ -634,9 +766,15 @@ export function MessagingCard({
                 <Check className="h-3.5 w-3.5 text-ok" /> {t("settings.isSet")}
               </span>
             ) : (
-              <span className="text-xs text-muted-foreground">{t("settings.notSet")}</span>
+              <span className="text-xs text-muted-foreground">
+                {t("settings.notSet")}
+              </span>
             )}
-            <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setEditing(true)}
+            >
               {configured ? t("common.replace") : t("common.set")}
             </Button>
           </>
@@ -649,7 +787,10 @@ export function MessagingCard({
       >
         <div className="flex items-center gap-2">
           {d?.error && !running && (
-            <span className="max-w-[16rem] truncate text-xs text-bad" title={d.error}>
+            <span
+              className="max-w-[16rem] truncate text-xs text-bad"
+              title={d.error}
+            >
               {d.error}
             </span>
           )}
@@ -663,7 +804,9 @@ export function MessagingCard({
         </div>
       </Row>
       {!configured && (
-        <div className="px-4 pb-3 text-xs text-muted-foreground">{t("settings.messaging.note")}</div>
+        <div className="px-4 pb-3 text-xs text-muted-foreground">
+          {t("settings.messaging.note")}
+        </div>
       )}
     </Card>
   );
@@ -716,343 +859,463 @@ export function Settings() {
     // rows that need it are three components deep and none of them is otherwise interested in the
     // config object.
     <PinnedContext.Provider value={new Set(c.pinned ?? [])}>
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center gap-2 px-6 pt-6">
-        <KeyRound className="h-5 w-5 text-accent" />
-        <h1 className="text-lg font-semibold">{t("settings.title")}</h1>
-        {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-      </div>
-      <Tabs items={tabs} value={tab} onChange={setTab} aria-label={t("settings.title")} className="px-6" />
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <TabPanel tabsId={tabsId} value={tab}>
-          {tab === "connections" && <Connections />}
-          {tab === "usage" && <Usage embedded />}
-          {tab === "security" && <Governance embedded />}
-          {tab === "general" && (
-      <div className="mx-auto max-w-2xl space-y-6 px-6 py-6">
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex items-center gap-2 px-6 pt-6">
+          <KeyRound className="h-5 w-5 text-accent" />
+          <h1 className="text-lg font-semibold">{t("settings.title")}</h1>
+          {mutation.isPending && (
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          )}
+        </div>
+        <Tabs
+          items={tabs}
+          value={tab}
+          onChange={setTab}
+          aria-label={t("settings.title")}
+          className="px-6"
+        />
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <TabPanel tabsId={tabsId} value={tab}>
+            {tab === "connections" && <Connections />}
+            {tab === "usage" && <Usage embedded />}
+            {tab === "security" && <Governance embedded />}
+            {tab === "general" && (
+              <div className="mx-auto max-w-2xl space-y-6 px-6 py-6">
+                <Card title={t("settings.card.appearance")}>
+                  <Row
+                    label={t("settings.row.language")}
+                    hint={t("settings.hint.language")}
+                  >
+                    <LanguageSelect />
+                  </Row>
+                </Card>
 
-        <Card title={t("settings.card.appearance")}>
-          <Row label={t("settings.row.language")} hint={t("settings.hint.language")}>
-            <LanguageSelect />
-          </Row>
-        </Card>
+                <IdentityCard />
 
-        <IdentityCard />
+                <AutonomyCard c={c} save={save} />
 
-        <AutonomyCard c={c} save={save} />
+                {d && (
+                  <Card title={t("settings.card.status")}>
+                    <Row label={t("settings.row.providersWithKey")}>
+                      <span className="text-sm">
+                        {d.configured_providers.length
+                          ? d.configured_providers.join(", ")
+                          : t("settings.none")}
+                      </span>
+                    </Row>
+                    <Row
+                      label={t("settings.row.modelLadder")}
+                      hint={t("settings.hint.modelLadder")}
+                    >
+                      <span className="max-w-56 truncate font-mono text-xs">
+                        {d.tiers.weak} · {d.tiers.mid} · {d.tiers.top}
+                      </span>
+                    </Row>
+                  </Card>
+                )}
 
-        {d && (
-          <Card title={t("settings.card.status")}>
-            <Row label={t("settings.row.providersWithKey")}>
-              <span className="text-sm">
-                {d.configured_providers.length
-                  ? d.configured_providers.join(", ")
-                  : t("settings.none")}
-              </span>
-            </Row>
-            <Row label={t("settings.row.modelLadder")} hint={t("settings.hint.modelLadder")}>
-              <span className="max-w-56 truncate font-mono text-xs">
-                {d.tiers.weak} · {d.tiers.mid} · {d.tiers.top}
-              </span>
-            </Row>
-          </Card>
-        )}
-
-        <Card title={t("settings.card.model")}>
-          <Row label={t("settings.row.defaultModel")} env="CHIMERA_DEFAULT_MODEL">
-            <TextField
-              value={c.models.default}
-              placeholder="openrouter/…"
-              onSave={(v) => save({ CHIMERA_DEFAULT_MODEL: v })}
-            />
-          </Row>
-          <Row label={t("settings.row.costMode")} hint={t("settings.hint.costMode")} env="CHIMERA_COST_MODE">
-            <Select
-              value={c.models.cost_mode}
-              options={["auto", "cheap", "balanced", "premium"]}
-              onChange={(v) => save({ CHIMERA_COST_MODE: v })}
-            />
-          </Row>
-          {/* The three rungs. The Status card above SHOWS the resolved ladder and, until now, there
+                <Card title={t("settings.card.model")}>
+                  <Row
+                    label={t("settings.row.defaultModel")}
+                    env="CHIMERA_DEFAULT_MODEL"
+                  >
+                    <TextField
+                      value={c.models.default}
+                      placeholder="openrouter/…"
+                      onSave={(v) => save({ CHIMERA_DEFAULT_MODEL: v })}
+                    />
+                  </Row>
+                  <Row
+                    label={t("settings.row.costMode")}
+                    hint={t("settings.hint.costMode")}
+                    env="CHIMERA_COST_MODE"
+                  >
+                    <Select
+                      value={c.models.cost_mode}
+                      options={["auto", "cheap", "balanced", "premium"]}
+                      render={(v) => t(`settings.value.${v}`)}
+                      onChange={(v) => save({ CHIMERA_COST_MODE: v })}
+                    />
+                  </Row>
+                  {/* The three rungs. The Status card above SHOWS the resolved ladder and, until now, there
               was no way to pin any of it: someone who wanted cheap-on-easy and strong-on-hard could
               read what they were getting and not change it. Empty means "let the cost mode decide",
               which is what every install has. */}
-          <Row label={t("settings.row.weakModel")} hint={t("settings.hint.roleModels")} env="CHIMERA_WEAK_MODEL">
-            <TextField
-              value={c.models.weak}
-              placeholder={t("settings.placeholder.byCostMode")}
-              onSave={(v) => save({ CHIMERA_WEAK_MODEL: v })}
-            />
-          </Row>
-          <Row label={t("settings.row.midModel")} env="CHIMERA_MID_MODEL">
-            <TextField
-              value={c.models.mid}
-              placeholder={t("settings.placeholder.byCostMode")}
-              onSave={(v) => save({ CHIMERA_MID_MODEL: v })}
-            />
-          </Row>
-          <Row label={t("settings.row.orchestratorModel")} env="CHIMERA_ORCHESTRATOR_MODEL">
-            <TextField
-              value={c.models.orchestrator}
-              placeholder={t("settings.placeholder.byCostMode")}
-              onSave={(v) => save({ CHIMERA_ORCHESTRATOR_MODEL: v })}
-            />
-          </Row>
-          {/* What makes a fully local install reachable from the interface rather than from a file.
+                  <Row
+                    label={t("settings.row.weakModel")}
+                    hint={t("settings.hint.roleModels")}
+                    env="CHIMERA_WEAK_MODEL"
+                  >
+                    <TextField
+                      value={c.models.weak}
+                      placeholder={t("settings.placeholder.byCostMode")}
+                      onSave={(v) => save({ CHIMERA_WEAK_MODEL: v })}
+                    />
+                  </Row>
+                  <Row
+                    label={t("settings.row.midModel")}
+                    env="CHIMERA_MID_MODEL"
+                  >
+                    <TextField
+                      value={c.models.mid}
+                      placeholder={t("settings.placeholder.byCostMode")}
+                      onSave={(v) => save({ CHIMERA_MID_MODEL: v })}
+                    />
+                  </Row>
+                  <Row
+                    label={t("settings.row.orchestratorModel")}
+                    env="CHIMERA_ORCHESTRATOR_MODEL"
+                  >
+                    <TextField
+                      value={c.models.orchestrator}
+                      placeholder={t("settings.placeholder.byCostMode")}
+                      onSave={(v) => save({ CHIMERA_ORCHESTRATOR_MODEL: v })}
+                    />
+                  </Row>
+                  {/* What makes a fully local install reachable from the interface rather than from a file.
               Ollama and vLLM both speak the OpenAI protocol, so this one field is the difference
               between "supports local models" and "supports local models if you edit .env". */}
-          <Row label={t("settings.row.apiBase")} hint={t("settings.hint.apiBase")} env="CHIMERA_API_BASE">
-            <TextField
-              value={c.models.api_base ?? ""}
-              placeholder="http://localhost:11434/v1"
-              onSave={(v) => save({ CHIMERA_API_BASE: v })}
-            />
-          </Row>
-          {/* Not the same field as the one above, and the difference matters: `api_base` is sent on
+                  <Row
+                    label={t("settings.row.apiBase")}
+                    hint={t("settings.hint.apiBase")}
+                    env="CHIMERA_API_BASE"
+                  >
+                    <TextField
+                      value={c.models.api_base ?? ""}
+                      placeholder="http://localhost:11434/v1"
+                      onSave={(v) => save({ CHIMERA_API_BASE: v })}
+                    />
+                  </Row>
+                  {/* Not the same field as the one above, and the difference matters: `api_base` is sent on
               EVERY call, so pointing it at Ollama redirects the cloud providers too. This one only
               tells LiteLLM's Ollama provider where the server is, which is what someone running
               Ollama on another machine actually wants. */}
-          <Row
-            label={t("settings.row.ollamaUrl")}
-            hint={t("settings.hint.ollamaUrl")}
-            env="CHIMERA_OLLAMA_BASE_URL"
-          >
-            <TextField
-              value={c.models.ollama_base_url}
-              placeholder="http://localhost:11434"
-              onSave={(v) => save({ CHIMERA_OLLAMA_BASE_URL: v })}
-            />
-          </Row>
-          {/* Directly under the URL it asks, because the answer is only as good as that field — and
+                  <Row
+                    label={t("settings.row.ollamaUrl")}
+                    hint={t("settings.hint.ollamaUrl")}
+                    env="CHIMERA_OLLAMA_BASE_URL"
+                  >
+                    <TextField
+                      value={c.models.ollama_base_url}
+                      placeholder="http://localhost:11434"
+                      onSave={(v) => save({ CHIMERA_OLLAMA_BASE_URL: v })}
+                    />
+                  </Row>
+                  {/* Directly under the URL it asks, because the answer is only as good as that field — and
               because every model box on this screen was a memory test until this row existed. It
               writes the default model rather than a fourth model field of its own: "point this at a
               model I actually have" is the whole reason someone came here. */}
-          <Row label={t("settings.row.ollamaModels")} hint={t("settings.hint.ollamaModels")}>
-            <OllamaModelPicker
-              baseUrl={c.models.ollama_base_url}
-              current={c.models.default}
-              onPick={(slug) => save({ CHIMERA_DEFAULT_MODEL: slug })}
-            />
-          </Row>
-          {/* Directly under the Ollama URL, because it is useless without it and the pair is one
+                  <Row
+                    label={t("settings.row.ollamaModels")}
+                    hint={t("settings.hint.ollamaModels")}
+                  >
+                    <OllamaModelPicker
+                      baseUrl={c.models.ollama_base_url}
+                      current={c.models.default}
+                      onPick={(slug) => save({ CHIMERA_DEFAULT_MODEL: slug })}
+                    />
+                  </Row>
+                  {/* Directly under the Ollama URL, because it is useless without it and the pair is one
               decision. The hint carries the part nobody guesses: it must be a BASE tag. */}
-          <Row label={t("settings.row.completeModel")} hint={t("settings.hint.completeModel")} env="CHIMERA_COMPLETE_MODEL">
-            <TextField
-              value={c.models.complete_model}
-              placeholder="qwen2.5-coder:1.5b-base"
-              onSave={(v) => save({ CHIMERA_COMPLETE_MODEL: v })}
-            />
-          </Row>
-          <Row label={t("settings.row.fallbackModels")} hint={t("settings.hint.fallbackModels")} env="CHIMERA_FALLBACK_MODELS">
-            <TextField
-              value={c.models.fallback_models.join(", ")}
-              placeholder="openrouter/…, openrouter/…"
-              onSave={(v) => save({ CHIMERA_FALLBACK_MODELS: v })}
-            />
-          </Row>
-          <Row
-            label={t("settings.row.cascade")}
-            hint={t("settings.hint.cascade")}
-            applies={c.applies?.CHIMERA_CASCADE}
-            env="CHIMERA_CASCADE"
-          >
-            <Toggle on={c.models.cascade} onChange={(v) => save({ CHIMERA_CASCADE: String(v) })} />
-          </Row>
-        </Card>
+                  <Row
+                    label={t("settings.row.completeModel")}
+                    hint={t("settings.hint.completeModel")}
+                    env="CHIMERA_COMPLETE_MODEL"
+                  >
+                    <TextField
+                      value={c.models.complete_model}
+                      placeholder="qwen2.5-coder:1.5b-base"
+                      onSave={(v) => save({ CHIMERA_COMPLETE_MODEL: v })}
+                    />
+                  </Row>
+                  <Row
+                    label={t("settings.row.fallbackModels")}
+                    hint={t("settings.hint.fallbackModels")}
+                    env="CHIMERA_FALLBACK_MODELS"
+                  >
+                    <TextField
+                      value={c.models.fallback_models.join(", ")}
+                      placeholder="openrouter/…, openrouter/…"
+                      onSave={(v) => save({ CHIMERA_FALLBACK_MODELS: v })}
+                    />
+                  </Row>
+                  <Row
+                    label={t("settings.row.cascade")}
+                    hint={t("settings.hint.cascade")}
+                    applies={c.applies?.CHIMERA_CASCADE}
+                    env="CHIMERA_CASCADE"
+                  >
+                    <Toggle
+                      on={c.models.cascade}
+                      onChange={(v) => save({ CHIMERA_CASCADE: String(v) })}
+                    />
+                  </Row>
+                </Card>
 
-        <Card title={t("settings.card.apiKeys")}>
-          {c.providers.map((p) => (
-            <Row key={p.env} label={p.label} hint={p.env} env={p.env}>
-              <SecretField provider={p} onSave={(v) => save({ [p.env]: v })} />
-            </Row>
-          ))}
-        </Card>
+                <Card title={t("settings.card.apiKeys")}>
+                  {c.providers.map((p) => (
+                    <Row key={p.env} label={p.label} hint={p.env} env={p.env}>
+                      <SecretField
+                        provider={p}
+                        onSave={(v) => save({ [p.env]: v })}
+                      />
+                    </Row>
+                  ))}
+                </Card>
 
-        {/* Existed, worked, rotated round-robin with a cooldown per key — and no interface could
+                {/* Existed, worked, rotated round-robin with a cooldown per key — and no interface could
             reach it, so the whole feature was a paragraph in .env.example. */}
-        <Card title={t("settings.card.pools")}>
-          <Row label={t("settings.row.poolsIntro")} hint={t("settings.hint.pools")}>
-            <span />
-          </Row>
-          {(c.pools ?? []).map((p) => (
-            <Row key={p.provider} label={p.provider} hint={p.env} env={p.env}>
-              <PoolField
-                pool={p}
-                onChanged={() => void qc.invalidateQueries({ queryKey: ["config"] })}
-              />
-            </Row>
-          ))}
-        </Card>
+                <Card title={t("settings.card.pools")}>
+                  <Row
+                    label={t("settings.row.poolsIntro")}
+                    hint={t("settings.hint.pools")}
+                  >
+                    <span />
+                  </Row>
+                  {(c.pools ?? []).map((p) => (
+                    <Row
+                      key={p.provider}
+                      label={p.provider}
+                      hint={p.env}
+                      env={p.env}
+                    >
+                      <PoolField
+                        pool={p}
+                        onChanged={() =>
+                          void qc.invalidateQueries({ queryKey: ["config"] })
+                        }
+                      />
+                    </Row>
+                  ))}
+                </Card>
 
-        <Card title={t("settings.card.memory")}>
-          <Row label={t("settings.row.backend")} env="CHIMERA_MEMORY_BACKEND">
-            <Select
-              value={c.memory.backend}
-              options={["json", "sqlite"]}
-              onChange={(v) => save({ CHIMERA_MEMORY_BACKEND: v })}
-            />
-          </Row>
-          <Row label={t("settings.row.semantic")} hint={t("settings.hint.semantic")} env="CHIMERA_SEMANTIC_MEMORY">
-            <Toggle
-              on={c.memory.semantic}
-              onChange={(v) => save({ CHIMERA_SEMANTIC_MEMORY: String(v) })}
-            />
-          </Row>
-          {/* Directly under the switch that depends on it. Semantic recall falls back to lexical on
+                <Card title={t("settings.card.memory")}>
+                  <Row
+                    label={t("settings.row.backend")}
+                    env="CHIMERA_MEMORY_BACKEND"
+                  >
+                    <Select
+                      value={c.memory.backend}
+                      options={["json", "sqlite"]}
+                      onChange={(v) => save({ CHIMERA_MEMORY_BACKEND: v })}
+                    />
+                  </Row>
+                  <Row
+                    label={t("settings.row.semantic")}
+                    hint={t("settings.hint.semantic")}
+                    env="CHIMERA_SEMANTIC_MEMORY"
+                  >
+                    <Toggle
+                      on={c.memory.semantic}
+                      onChange={(v) =>
+                        save({ CHIMERA_SEMANTIC_MEMORY: String(v) })
+                      }
+                    />
+                  </Row>
+                  {/* Directly under the switch that depends on it. Semantic recall falls back to lexical on
               ANY embedder failure, silently — so an embed model the user's key cannot serve made the
               toggle above confirm a change it did not make. */}
-          <Row label={t("settings.row.embedModel")} hint={t("settings.hint.embedModel")} env="CHIMERA_EMBED_MODEL">
-            <TextField
-              value={c.memory.embed_model}
-              placeholder="openrouter/openai/text-embedding-3-small"
-              onSave={(v) => save({ CHIMERA_EMBED_MODEL: v })}
-            />
-          </Row>
-          <Row label={t("settings.row.autoConsolidate")} hint={t("settings.hint.autoConsolidate")} env="CHIMERA_AUTO_CONSOLIDATE">
-            <Toggle
-              on={c.memory.auto_consolidate}
-              onChange={(v) => save({ CHIMERA_AUTO_CONSOLIDATE: String(v) })}
-            />
-          </Row>
-          {/* The one that closes the loop. Skills are extracted from successful runs either way;
+                  <Row
+                    label={t("settings.row.embedModel")}
+                    hint={t("settings.hint.embedModel")}
+                    env="CHIMERA_EMBED_MODEL"
+                  >
+                    <TextField
+                      value={c.memory.embed_model}
+                      placeholder="openrouter/openai/text-embedding-3-small"
+                      onSave={(v) => save({ CHIMERA_EMBED_MODEL: v })}
+                    />
+                  </Row>
+                  <Row
+                    label={t("settings.row.autoConsolidate")}
+                    hint={t("settings.hint.autoConsolidate")}
+                    env="CHIMERA_AUTO_CONSOLIDATE"
+                  >
+                    <Toggle
+                      on={c.memory.auto_consolidate}
+                      onChange={(v) =>
+                        save({ CHIMERA_AUTO_CONSOLIDATE: String(v) })
+                      }
+                    />
+                  </Row>
+                  {/* The one that closes the loop. Skills are extracted from successful runs either way;
               without this they are never read back, so the agent learns and does not use it. */}
-          <Row label={t("settings.row.skillCards")} hint={t("settings.hint.skillCards")} env="CHIMERA_SKILL_CARDS">
-            <Toggle
-              on={c.memory.skill_cards}
-              onChange={(v) => save({ CHIMERA_SKILL_CARDS: String(v) })}
-            />
-          </Row>
-          <Row
-            label={t("settings.row.rememberChat")}
-            hint={t("settings.hint.rememberChat")}
-            applies={c.applies?.CHIMERA_CHAT_MEMORY}
-            env="CHIMERA_CHAT_MEMORY"
-          >
-            <Toggle
-              on={c.memory.remember_from_chat}
-              onChange={(v) => save({ CHIMERA_CHAT_MEMORY: String(v) })}
-            />
-          </Row>
-        </Card>
+                  <Row
+                    label={t("settings.row.skillCards")}
+                    hint={t("settings.hint.skillCards")}
+                    env="CHIMERA_SKILL_CARDS"
+                  >
+                    <Toggle
+                      on={c.memory.skill_cards}
+                      onChange={(v) => save({ CHIMERA_SKILL_CARDS: String(v) })}
+                    />
+                  </Row>
+                  <Row
+                    label={t("settings.row.rememberChat")}
+                    hint={t("settings.hint.rememberChat")}
+                    applies={c.applies?.CHIMERA_CHAT_MEMORY}
+                    env="CHIMERA_CHAT_MEMORY"
+                  >
+                    <Toggle
+                      on={c.memory.remember_from_chat}
+                      onChange={(v) => save({ CHIMERA_CHAT_MEMORY: String(v) })}
+                    />
+                  </Row>
+                </Card>
 
-        <MessagingCard save={save} />
-        <MessagingCard
-          save={save}
-          platform="telegram"
-          tokenEnv="CHIMERA_TELEGRAM_BOT_TOKEN"
-        />
+                <MessagingCard save={save} />
+                <MessagingCard
+                  save={save}
+                  platform="telegram"
+                  tokenEnv="CHIMERA_TELEGRAM_BOT_TOKEN"
+                />
 
-        <Card title={t("settings.card.cacheSandbox")}>
-          <Row label={t("settings.row.completionCache")} hint={t("settings.hint.completionCache")} env="CHIMERA_CACHE">
-            <Toggle on={c.cache.completion} onChange={(v) => save({ CHIMERA_CACHE: String(v) })} />
-          </Row>
-          <Row label={t("settings.row.promptCache")} hint={t("settings.hint.promptCache")} env="CHIMERA_PROMPT_CACHE">
-            <Toggle on={c.cache.prompt} onChange={(v) => save({ CHIMERA_PROMPT_CACHE: String(v) })} />
-          </Row>
-          <Row label={t("settings.row.sandbox")} env="CHIMERA_SANDBOX">
-            <Select
-              value={c.sandbox.mode}
-              options={["local", "docker"]}
-              onChange={(v) => save({ CHIMERA_SANDBOX: v })}
-            />
-          </Row>
-          {/* Only meaningful under the docker sandbox, so it is shown only then — a field that
+                <Card title={t("settings.card.cacheSandbox")}>
+                  <Row
+                    label={t("settings.row.completionCache")}
+                    hint={t("settings.hint.completionCache")}
+                    env="CHIMERA_CACHE"
+                  >
+                    <Toggle
+                      on={c.cache.completion}
+                      onChange={(v) => save({ CHIMERA_CACHE: String(v) })}
+                    />
+                  </Row>
+                  <Row
+                    label={t("settings.row.promptCache")}
+                    hint={t("settings.hint.promptCache")}
+                    env="CHIMERA_PROMPT_CACHE"
+                  >
+                    <Toggle
+                      on={c.cache.prompt}
+                      onChange={(v) =>
+                        save({ CHIMERA_PROMPT_CACHE: String(v) })
+                      }
+                    />
+                  </Row>
+                  <Row label={t("settings.row.sandbox")} env="CHIMERA_SANDBOX">
+                    <Select
+                      value={c.sandbox.mode}
+                      options={["local", "docker"]}
+                      render={(v) =>
+                        v === "docker" ? v : t("settings.value.local")
+                      }
+                      onChange={(v) => save({ CHIMERA_SANDBOX: v })}
+                    />
+                  </Row>
+                  {/* Only meaningful under the docker sandbox, so it is shown only then — a field that
               changes nothing is a field someone will change and then wonder about. */}
-          {c.sandbox.mode === "docker" ? (
-            <Row label={t("settings.row.sandboxImage")} env="CHIMERA_SANDBOX_IMAGE">
-              <TextField
-                value={c.sandbox.image}
-                placeholder="python:3.12-slim"
-                onSave={(v) => save({ CHIMERA_SANDBOX_IMAGE: v })}
-              />
-            </Row>
-          ) : null}
-          {/* Filed with the sandbox rows because it answers the same question they do — where does
+                  {c.sandbox.mode === "docker" ? (
+                    <Row
+                      label={t("settings.row.sandboxImage")}
+                      env="CHIMERA_SANDBOX_IMAGE"
+                    >
+                      <TextField
+                        value={c.sandbox.image}
+                        placeholder="python:3.12-slim"
+                        onSave={(v) => save({ CHIMERA_SANDBOX_IMAGE: v })}
+                      />
+                    </Row>
+                  ) : null}
+                  {/* Filed with the sandbox rows because it answers the same question they do — where does
               the agent's work happen on this machine — for the one tool that has a window.
 
               The switch is inverted on purpose. The setting is `headless`, which is the state you
               cannot see; a control has to be named for what turning it ON does, and "Headless: off"
               asks the reader to hold a negation to find out whether they will see anything. */}
-          <Row
-            label={t("settings.row.showBrowser")}
-            hint={t("settings.hint.showBrowser")}
-            applies={c.applies?.CHIMERA_BROWSER_HEADLESS}
-            env="CHIMERA_BROWSER_HEADLESS"
-          >
-            <Toggle
-              on={!(c.browser?.headless ?? true)}
-              onChange={(v) => save({ CHIMERA_BROWSER_HEADLESS: String(!v) })}
-            />
-          </Row>
-          {/* The switch the posture line names when it reports a conversation as unguarded. Off by
+                  <Row
+                    label={t("settings.row.showBrowser")}
+                    hint={t("settings.hint.showBrowser")}
+                    applies={c.applies?.CHIMERA_BROWSER_HEADLESS}
+                    env="CHIMERA_BROWSER_HEADLESS"
+                  >
+                    <Toggle
+                      on={!(c.browser?.headless ?? true)}
+                      onChange={(v) =>
+                        save({ CHIMERA_BROWSER_HEADLESS: String(!v) })
+                      }
+                    />
+                  </Row>
+                  {/* The switch the posture line names when it reports a conversation as unguarded. Off by
               default because this registry is shared with the messaging gateway: arming it silently
               would take shell away from agents someone already runs in Discord. */}
-          <Row
-            label={t("settings.row.guardChat")}
-            hint={t("settings.hint.guardChat")}
-            applies={c.applies?.CHIMERA_GUARD_CHAT}
-            env="CHIMERA_GUARD_CHAT"
-          >
-            <Toggle on={c.guard.chat} onChange={(v) => save({ CHIMERA_GUARD_CHAT: String(v) })} />
-          </Row>
-        </Card>
+                  <Row
+                    label={t("settings.row.guardChat")}
+                    hint={t("settings.hint.guardChat")}
+                    applies={c.applies?.CHIMERA_GUARD_CHAT}
+                    env="CHIMERA_GUARD_CHAT"
+                  >
+                    <Toggle
+                      on={c.guard.chat}
+                      onChange={(v) => save({ CHIMERA_GUARD_CHAT: String(v) })}
+                    />
+                  </Row>
+                </Card>
 
-        <Card title={t("settings.card.mcp")}>
-          <Row
-            label={t("settings.row.mcpAutoload")}
-            hint={t("settings.hint.mcpAutoload")}
-            applies={c.applies?.CHIMERA_MCP_AUTOLOAD}
-            env="CHIMERA_MCP_AUTOLOAD"
-          >
-            <Toggle
-              on={c.mcp.autoload}
-              onChange={(v) => save({ CHIMERA_MCP_AUTOLOAD: String(v) })}
-            />
-          </Row>
-        </Card>
+                <Card title={t("settings.card.mcp")}>
+                  <Row
+                    label={t("settings.row.mcpAutoload")}
+                    hint={t("settings.hint.mcpAutoload")}
+                    applies={c.applies?.CHIMERA_MCP_AUTOLOAD}
+                    env="CHIMERA_MCP_AUTOLOAD"
+                  >
+                    <Toggle
+                      on={c.mcp.autoload}
+                      onChange={(v) =>
+                        save({ CHIMERA_MCP_AUTOLOAD: String(v) })
+                      }
+                    />
+                  </Row>
+                </Card>
 
-        <Card title={t("settings.card.automation")}>
-          <Row
-            label={t("settings.row.appCron")}
-            hint={t("settings.hint.appCron")}
-            applies={c.applies?.CHIMERA_APP_CRON}
-            env="CHIMERA_APP_CRON"
-          >
-            <Toggle
-              on={c.automation.cron}
-              onChange={(v) => save({ CHIMERA_APP_CRON: String(v) })}
-            />
-          </Row>
-        </Card>
+                <Card title={t("settings.card.automation")}>
+                  <Row
+                    label={t("settings.row.appCron")}
+                    hint={t("settings.hint.appCron")}
+                    applies={c.applies?.CHIMERA_APP_CRON}
+                    env="CHIMERA_APP_CRON"
+                  >
+                    <Toggle
+                      on={c.automation.cron}
+                      onChange={(v) => save({ CHIMERA_APP_CRON: String(v) })}
+                    />
+                  </Row>
+                </Card>
 
-        <Card title={t("settings.card.server")}>
-          <Row label={t("settings.row.bearer")} hint={t("settings.hint.bearer")} env="CHIMERA_SERVER_TOKEN">
-            <SecretField
-              // Not a provider — SecretField's masked-write behaviour is what is being reused. The
-              // model/keys_url fields are empty because there is nothing on the other end of this
-              // token to suggest a model for or to send anyone to sign up at.
-              provider={{
-                env: "CHIMERA_SERVER_TOKEN",
-                // Not a routing name either — nothing serves models on the other end of this token.
-                name: "",
-                label: "token",
-                set: c.server.token_set,
-                hint: "",
-                llm: false,
-                model: "",
-                keys_url: "",
-              }}
-              onSave={(v) => save({ CHIMERA_SERVER_TOKEN: v })}
-            />
-          </Row>
-        </Card>
+                <Card title={t("settings.card.server")}>
+                  <Row
+                    label={t("settings.row.bearer")}
+                    hint={t("settings.hint.bearer")}
+                    env="CHIMERA_SERVER_TOKEN"
+                  >
+                    <SecretField
+                      // Not a provider — SecretField's masked-write behaviour is what is being reused. The
+                      // model/keys_url fields are empty because there is nothing on the other end of this
+                      // token to suggest a model for or to send anyone to sign up at.
+                      provider={{
+                        env: "CHIMERA_SERVER_TOKEN",
+                        // Not a routing name either — nothing serves models on the other end of this token.
+                        name: "",
+                        label: "token",
+                        set: c.server.token_set,
+                        hint: "",
+                        llm: false,
+                        model: "",
+                        keys_url: "",
+                      }}
+                      onSave={(v) => save({ CHIMERA_SERVER_TOKEN: v })}
+                    />
+                  </Row>
+                </Card>
 
-        {mutation.isError && <p className="text-sm text-bad">{t("settings.saveError")}</p>}
+                {mutation.isError && (
+                  <p className="text-sm text-bad">{t("settings.saveError")}</p>
+                )}
+              </div>
+            )}
+          </TabPanel>
+        </div>
       </div>
-          )}
-        </TabPanel>
-      </div>
-    </div>
     </PinnedContext.Provider>
   );
 }

@@ -170,27 +170,35 @@
 
 /* ── Overlays ────────────────────────────────────────────────────────────────────────────────────
    Dialog, command palette, toast. Paired with usePresence, which keeps them mounted through the
-   exit. */
+   exit.
+
+   These animate the INDIVIDUAL `scale` property rather than `transform`, and that is the whole
+   point: two of the five overlays centre themselves with `transform: translate(-50%, …)`, and an
+   animation that lands on `transform: none` with `animation-fill-mode: both` overwrites that
+   centring for as long as the element exists. The dialog was drawn with its top-left corner at the
+   middle of the window — half of it off the bottom edge, which put its footer out of reach — and
+   the command palette sat half a width to the right of centre. `scale` composes with `transform`
+   instead of replacing it, so the lift happens and the centring survives. */
 
 @keyframes overlay-in {
   from {
     opacity: 0;
-    transform: scale(0.97);
+    scale: 0.97;
   }
   to {
     opacity: 1;
-    transform: none;
+    scale: 1;
   }
 }
 
 @keyframes overlay-out {
   from {
     opacity: 1;
-    transform: none;
+    scale: 1;
   }
   to {
     opacity: 0;
-    transform: scale(0.98);
+    scale: 0.98;
   }
 }
 

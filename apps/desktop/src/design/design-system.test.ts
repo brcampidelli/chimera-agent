@@ -36,11 +36,15 @@ const sources = import.meta.glob("../**/*.{ts,tsx}", {
  * with no reduced-motion answer sailed through, which is precisely the check this file exists for.
  * A gate that cannot fail is worse than no gate, because it manufactures confidence.
  */
-function readStyles(dir: string, out: Record<string, string> = {}): Record<string, string> {
+function readStyles(
+  dir: string,
+  out: Record<string, string> = {},
+): Record<string, string> {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) readStyles(path, out);
-    else if (entry.name.endsWith(".css")) out[path] = readFileSync(path, "utf8");
+    else if (entry.name.endsWith(".css"))
+      out[path] = readFileSync(path, "utf8");
   }
   return out;
 }
@@ -57,7 +61,9 @@ function appSources(): [string, string][] {
 function classNameLiterals(): { file: string; value: string }[] {
   const out: { file: string; value: string }[] = [];
   for (const [file, text] of appSources()) {
-    for (const m of text.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\}|\{"([^"]*)"\})/g)) {
+    for (const m of text.matchAll(
+      /className=(?:"([^"]*)"|\{`([^`]*)`\}|\{"([^"]*)"\})/g,
+    )) {
       out.push({ file, value: m[1] ?? m[2] ?? m[3] ?? "" });
     }
   }
@@ -110,7 +116,9 @@ describe("colour", () => {
   it("never separates surfaces with raw white or black alpha", () => {
     // `border-white/5` is invisible on a white card. Every one of these became `--hairline`,
     // `--surface-2` or `--surface-hover`, each of which has a real light-theme value.
-    const { total, where } = countMatches(/\b(?:border|divide|ring|bg)-(?:white|black)\/\[?[\d.]+\]?/g);
+    const { total, where } = countMatches(
+      /\b(?:border|divide|ring|bg)-(?:white|black)\/\[?[\d.]+\]?/g,
+    );
     expect(total, `raw alpha separators in: ${where.join(", ")}`).toBe(0);
   });
 });
@@ -119,7 +127,9 @@ describe("motion", () => {
   it("never hard-codes a duration or an easing curve", () => {
     // Durations are --dur-1..4 and easings are --ease-*. An app where every animation picks its own
     // timing has no rhythm, and the difference is felt long before it is noticed.
-    const { total, where } = countMatches(/\b(?:duration|ease|delay|transition)-\[[^\]]+\]/g);
+    const { total, where } = countMatches(
+      /\b(?:duration|ease|delay|transition)-\[[^\]]+\]/g,
+    );
     expect(total, `raw motion values in: ${where.join(", ")}`).toBe(0);
   });
 
@@ -130,9 +140,14 @@ describe("motion", () => {
       const words = value.split(/\s+/);
       const transitions = words.filter((w) => /(^|:)transition(-|$)/.test(w));
       if (transitions.length === 0) return false;
-      return !words.some((w) => /(^|:)duration-/.test(w)) || !words.some((w) => /(^|:)ease-/.test(w));
+      return (
+        !words.some((w) => /(^|:)duration-/.test(w)) ||
+        !words.some((w) => /(^|:)ease-/.test(w))
+      );
     });
-    expect(untokened.length).toBeLessThanOrEqual(ratchet.transitionsWithoutTokens);
+    expect(untokened.length).toBeLessThanOrEqual(
+      ratchet.transitionsWithoutTokens,
+    );
   });
 
   it("is actually reading the stylesheets", () => {
@@ -145,24 +160,89 @@ describe("motion", () => {
     expect(all).toContain("@keyframes");
   });
 
+  it("never animates transform on an overlay that centres itself with one", () => {
+    // How the model dialog lost its footer, and the command palette drifted half a width to the
+    // right: `overlay-in` ended on `transform: none` with `animation-fill-mode: both`, so the fill
+    // kept overwriting the `-translate-x-1/2 -translate-y-1/2` that does the centring — for as long
+    // as the element existed, not just while it played. The dialog was then drawn with its top-left
+    // corner at the middle of the window, half of it below the bottom edge, with the action in the
+    // half nobody could reach. Animate the individual `scale` property instead: it composes with
+    // `transform` rather than replacing it.
+    const css = Object.values(styles).join("\n");
+
+    // class → the animations CSS applies to it, from rules like `.overlay { animation: name … }`.
+    const animations = new Map<string, Set<string>>();
+    for (const rule of css.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+      const name = rule[2].match(/animation:\s*([\w-]+)/)?.[1];
+      if (!name) continue;
+      for (const cls of rule[1].matchAll(/\.([\w-]+)/g)) {
+        const set = animations.get(cls[1]) ?? new Set<string>();
+        set.add(name);
+        animations.set(cls[1], set);
+      }
+    }
+
+    // A file that centres with a translate utility AND wears an animated class. Checked per FILE,
+    // not per literal: `cn()` splits one element's classes across several strings, and the dialog
+    // is exactly that shape.
+    const atRisk = new Set<string>();
+    for (const [, text] of appSources()) {
+      if (!/-translate-[xy]-1\/2/.test(text)) continue;
+      for (const [cls, names] of animations) {
+        if (new RegExp(`["' \`]${cls}[ "'\`]`).test(text))
+          names.forEach((n) => atRisk.add(n));
+      }
+    }
+
+    // Vacuity guard: this rule must be looking at something. The reduced-motion rule above ran
+    // against empty strings once and "passed" — the same mistake is cheap to make twice.
+    expect(
+      atRisk.size,
+      "no animated, self-centring element found — is this rule still wired up?",
+    ).toBeGreaterThan(0);
+
+    for (const name of atRisk) {
+      const block =
+        css.match(
+          new RegExp(String.raw`@keyframes\s+${name}\s*\{[\s\S]*?\n\}`),
+        )?.[0] ?? "";
+      expect(
+        block,
+        `keyframe "${name}" was not found in the stylesheets`,
+      ).not.toBe("");
+      expect(
+        block,
+        `keyframe "${name}" animates transform, which erases the centring translate`,
+      ).not.toMatch(new RegExp(String.raw`\btransform\s*:`));
+    }
+  });
+
   it("pairs every keyframe with a reduced-motion answer", () => {
     // The structural rule. A keyframe that nobody thought about under reduced motion is exactly the
     // one that will spin forever for the person who asked their OS for calm. If this fails, the fix
     // is to handle the animation in the reduced-motion block — not to delete the assertion.
     for (const [file, css] of Object.entries(styles)) {
-      const names = [...css.matchAll(/@keyframes\s+([\w-]+)/g)].map((m) => m[1]);
+      const names = [...css.matchAll(/@keyframes\s+([\w-]+)/g)].map(
+        (m) => m[1],
+      );
       if (names.length === 0) continue;
       const reducedBlocks = css.match(
         /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*?\n\}|\[data-motion=["']reduced["']\][\s\S]*?\n\}/g,
       );
-      expect(reducedBlocks, `${file} defines keyframes but no reduced-motion block`).toBeTruthy();
+      expect(
+        reducedBlocks,
+        `${file} defines keyframes but no reduced-motion block`,
+      ).toBeTruthy();
       const reduced = (reducedBlocks ?? []).join("\n");
       // A blanket `animation-duration: 1ms` selector covers every keyframe at once, which is the
       // recommended shape — accept it instead of demanding each name be listed.
       const blanket = /\*[^{]*\{[^}]*animation-duration:\s*1ms/.test(reduced);
       if (blanket) continue;
       for (const name of names) {
-        expect(reduced, `${file}: keyframe "${name}" has no reduced-motion handling`).toContain(name);
+        expect(
+          reduced,
+          `${file}: keyframe "${name}" has no reduced-motion handling`,
+        ).toContain(name);
       }
     }
   });
@@ -184,8 +264,9 @@ describe("the ratchet", () => {
     const { total, where } = countMatches(
       /\b(?:w|h|min-w|min-h|max-w|max-h|p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr|gap|top|left|right|bottom|z|opacity|shadow|leading|tracking)-\[[^\]]+\]/g,
     );
-    expect(total, `arbitrary utilities in: ${where.join(", ")}`).toBeLessThanOrEqual(
-      ratchet.arbitraryUtilities,
-    );
+    expect(
+      total,
+      `arbitrary utilities in: ${where.join(", ")}`,
+    ).toBeLessThanOrEqual(ratchet.arbitraryUtilities);
   });
 });

@@ -60,7 +60,11 @@ export function ModelPicker({
   // Read from the cache the dialog fills, to answer one question: can the picked model call tools?
   // `enabled: false` means this never fetches on its own — a composer nobody has touched costs no
   // request, and before the list has been opened once there is simply nothing to warn about.
-  const listing = useQuery({ queryKey: ["models", ""], queryFn: () => getModels(), enabled: false });
+  const listing = useQuery({
+    queryKey: ["models", ""],
+    queryFn: () => getModels(),
+    enabled: false,
+  });
   const chosen = listing.data?.models?.find((m) => m.slug === value);
 
   // What "default" actually resolves to. `doctor` is already fetched by the worker row beside this
@@ -94,7 +98,9 @@ export function ModelPicker({
             "flex items-center gap-1.5 rounded-chip border border-border px-2.5 py-1 text-xs",
             "transition-colors duration-1 ease-out disabled:opacity-50",
             focusRing,
-            value ? "bg-accent/20 text-accent" : "text-muted-foreground hover:text-foreground",
+            value
+              ? "bg-accent/20 text-accent"
+              : "text-muted-foreground hover:text-foreground",
           )}
         >
           <Cpu className="h-3.5 w-3.5" />
@@ -109,7 +115,13 @@ export function ModelPicker({
           </span>
         ) : null}
       </div>
-      <ModelDialog open={open} onOpenChange={setOpen} value={value} onPick={onChange} offerDefault />
+      <ModelDialog
+        open={open}
+        onOpenChange={setOpen}
+        value={value}
+        onPick={onChange}
+        offerDefault
+      />
     </>
   );
 }
@@ -170,7 +182,9 @@ export function ModelDialog({
   const filtered = useMemo(() => {
     // `=== true` and not truthiness: `null` means the source did not say, and a model we were told
     // nothing about must not be presented as one that reads images.
-    const eligible = seeingOnly ? models.filter((m) => m.vision === true) : models;
+    const eligible = seeingOnly
+      ? models.filter((m) => m.vision === true)
+      : models;
     const needle = query.trim().toLowerCase();
     if (!needle) return eligible;
     // Matched against the slug as well as the label: someone pasting `deepseek/deepseek-chat-v3.1`
@@ -207,7 +221,11 @@ export function ModelDialog({
       // action back on screen at every window height.
       className="flex max-h-dialog flex-col"
     >
-      <div className="flex min-h-0 flex-col gap-3">
+      {/* `flex-1 min-h-0`, not `h-full`: a percentage height resolves against a parent that
+          DECLARES one, and the dialog body declares `flex-1` — growth, not height — so `h-full`
+          here computes to auto and bounds nothing. Measured, not reasoned: with `h-full` the list
+          still reported scrollHeight === clientHeight === 4164px inside a 763px card. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-3">
         <label className="flex items-center gap-2">
           <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
           <span className="sr-only">{t("model.pick.search")}</span>
@@ -256,13 +274,19 @@ export function ModelDialog({
             }}
           />
           {listing.isPending ? (
-            <p className="px-2 py-3 text-xs text-muted-foreground">{t("common.loading")}</p>
+            <p className="px-2 py-3 text-xs text-muted-foreground">
+              {t("common.loading")}
+            </p>
           ) : null}
           {listing.isError ? (
-            <p className="px-2 py-3 text-xs text-bad">{t("model.pick.failed")}</p>
+            <p className="px-2 py-3 text-xs text-bad">
+              {t("model.pick.failed")}
+            </p>
           ) : null}
           {!listing.isPending && !listing.isError && filtered.length === 0 ? (
-            <p className="px-2 py-3 text-xs text-muted-foreground">{t("model.pick.empty")}</p>
+            <p className="px-2 py-3 text-xs text-muted-foreground">
+              {t("model.pick.empty")}
+            </p>
           ) : null}
           {shown.map((model) => (
             <Row
@@ -293,7 +317,9 @@ export function ModelDialog({
             <Button
               size="sm"
               variant="outline"
-              disabled={!value || value === defaultSlug || makeDefault.isPending}
+              disabled={
+                !value || value === defaultSlug || makeDefault.isPending
+              }
               onClick={() => makeDefault.mutate(value)}
             >
               {t("model.pick.makeDefault")}
@@ -339,19 +365,28 @@ function Row({
       )}
     >
       <Check
-        className={cn("mt-0.5 h-4 w-4 shrink-0", selected ? "text-accent" : "opacity-0")}
+        className={cn(
+          "mt-0.5 h-4 w-4 shrink-0",
+          selected ? "text-accent" : "opacity-0",
+        )}
         aria-hidden
       />
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-1.5">
           <span className="truncate text-sm">{label}</span>
           {recommended ? (
-            <span className="rounded-chip bg-surface-2 px-1.5 text-xs text-accent">★</span>
+            <span className="rounded-chip bg-surface-2 px-1.5 text-xs text-accent">
+              ★
+            </span>
           ) : null}
         </span>
-        <span className="block truncate font-mono text-xs text-muted-foreground">{hint}</span>
+        <span className="block truncate font-mono text-xs text-muted-foreground">
+          {hint}
+        </span>
         {badges && badges.length > 0 ? (
-          <span className="block truncate text-xs text-muted-foreground">{badges.join(" · ")}</span>
+          <span className="block truncate text-xs text-muted-foreground">
+            {badges.join(" · ")}
+          </span>
         ) : null}
       </span>
     </button>
@@ -373,7 +408,8 @@ export function badgesFor(model: ModelOption, t: TFunc): string[] {
       }),
     );
   } else badges.push(t("model.pick.priceUnknown"));
-  if (model.context_k) badges.push(t("model.pick.context", { n: model.context_k }));
+  if (model.context_k)
+    badges.push(t("model.pick.context", { n: model.context_k }));
   if (model.tools === false) badges.push(t("model.pick.noTools"));
   if (model.vision) badges.push(t("model.pick.vision"));
   return badges;
