@@ -27,9 +27,55 @@ You could not choose which model answered you. The endpoint accepted one all alo
   as "your key buys nothing". An unquoted price stays `null` — never `$0`, which is both a claim and
   a number a spend ceiling would divide by.
 - **The wizard can browse the same list** instead of asking for a slug from memory.
+- **The model list says what each model can do.** Entries carry a mark for vision and for tool
+  calling, and when the composer holds an image the dialog offers **only the ones that can see** —
+  the choice that matters at that moment, made without reading fifteen names to guess which.
 
 ### Fixed
 
+- **The attached image never reached the model, and the provider answered 500.** `Agent.run` builds
+  the turn's user message as a literal dict — `{"role": "user", "content": task, "images": [...]}` —
+  because it is assembling a list that also holds the history's dicts. The gateway converted
+  `Message` objects into multimodal parts and passed dicts through untouched, so the picture was
+  never turned into an `image_url` part and the key `images`, carrying a local file path, travelled
+  to OpenRouter, which rejected the body. Every layer above it worked and said so: the composer
+  showed the thumbnail, the upload succeeded, the vision check answered yes. The one thing that did
+  not happen was the only thing the user asked for. Dicts now become multimodal messages by the same
+  path as everything else, and local files are sent as bytes rather than as a path that means
+  nothing on the other end of an HTTP request.
+- **A model that cannot see killed the turn instead of answering it.** The composer said the image
+  "will not be seen" and the server sent it anyway, so the provider refused and the whole turn
+  failed — the interface promised a degraded answer and the system delivered none. The image is now
+  withheld before the call, and the note explaining that goes in the system prompt rather than in the
+  user's message, where it had been leaking into the conversation title.
+- **The warning under the paperclip named the wrong model.** `/api/vision` always answered about
+  `default_model`, so the moment the model became a per-conversation choice the sentence described a
+  model the turn was not going to use — worse than no warning, because it reads as authoritative.
+- **A provider's refusal reached the user as "the coding turn failed".** Every native failure
+  rendered as that one sentence, which cannot be told apart from a crash. The classes a person can
+  act on — no endpoint for image input, rate limit, bad key, context exceeded — now come through in
+  the provider's own words, bounded in length; a bug in this repository stays generic, because a
+  stack trace in the composer helps nobody.
+- **The capability table was wrong in both directions.** LiteLLM had never heard of DeepSeek V4
+  Flash, so the app read "unknown", sent the image and lost the turn; the same table reports "no" for
+  Mistral Small 3.2, which reads images perfectly well, so believing it there withheld a picture from
+  a model that could have used it. One unknown that costs a turn and one false negative that removes
+  a capability, from a single stale source. OpenRouter's own answer, remembered on disk beside the
+  prices, is now consulted first, and absence still means unknown rather than "no".
+- **Dictation never worked on the local model.** `str(kwargs.get("language", "")).strip() or None`
+  never yields `None`: the string `"None"` is five characters long, so the `or` never fires and those
+  five characters travelled to faster-whisper as a language code, which refused every call. The
+  microphone button has been broken this way for as long as it has existed.
+- **The "make it the default" button was pushed off the screen.** The model dialog grew with the list
+  inside it, so opening the models hid the footer — the one place from which the default can be
+  changed, unreachable exactly when a user had just decided to change it.
+- **Installing over a running Chimera failed on a locked DLL.** The upgrade ended in a stack of
+  `Error opening file for writing … MSVCP140.dll` dialogs, one per file, with Abort / Retry / Ignore
+  and no explanation. Windows will not overwrite a file a running process holds open, and the process
+  holding them is not the one the installer knows about: the app is `chimera-desktop.exe`, the DLLs
+  belong to `chimera-backend.exe`, the frozen Python sidecar it launches as a child, and NSIS's own
+  "close the application" step never sees it. The installer now closes both — the shell first, since
+  it would otherwise respawn the sidecar mid-install — and waits for Windows to release the handles.
 - **Six shipped model slugs no longer existed at the provider.** An audit against OpenRouter's live
   index found six of the fourteen catalogue entries withdrawn, and not the decorative six: the
   `weak` rung of every cost preset (so any role routed to the weak tier — explore, k-sample probes —
