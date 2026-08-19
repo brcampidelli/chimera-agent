@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Check, Cpu, Search } from "lucide-react";
 
-import { getModels, patchConfig } from "@/lib/api";
+import { getDoctor, getModels, patchConfig } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { focusRing } from "@/components/ui/focus";
@@ -57,15 +57,28 @@ export function ModelPicker({
   const t = useT();
   const [open, setOpen] = useState(false);
 
-  // The chosen slug's own tail rather than its label, because the label is a sentence ("DeepSeek:
-  // DeepSeek V3.1") and this is a chip in an already crowded row.
-  const buttonLabel = value ? shortName(value) : t("model.pick.default");
-
   // Read from the cache the dialog fills, to answer one question: can the picked model call tools?
   // `enabled: false` means this never fetches on its own — a composer nobody has touched costs no
   // request, and before the list has been opened once there is simply nothing to warn about.
   const listing = useQuery({ queryKey: ["models", ""], queryFn: () => getModels(), enabled: false });
   const chosen = listing.data?.models?.find((m) => m.slug === value);
+
+  // What "default" actually resolves to. `doctor` is already fetched by the worker row beside this
+  // one and by three other screens, so naming the model costs no request — and without it the chip
+  // says "default" and the user has to open the dialog to discover that the word means DeepSeek at
+  // $0.25 rather than GPT-5.5 at $5. A control that hides what it is set to is a control you have to
+  // click to read.
+  const doctor = useQuery({ queryKey: ["doctor"], queryFn: getDoctor });
+  const fallback = doctor.data?.default_model ?? "";
+
+  // The chosen slug's own tail rather than its label, because the label is a sentence ("DeepSeek:
+  // DeepSeek V3.1") and this is a chip in an already crowded row. Same for the default's name: the
+  // word plus the model, so the chip reads as a setting rather than as a category.
+  const buttonLabel = value
+    ? shortName(value)
+    : fallback
+      ? `${t("model.pick.default")} · ${shortName(fallback)}`
+      : t("model.pick.default");
 
   return (
     <>

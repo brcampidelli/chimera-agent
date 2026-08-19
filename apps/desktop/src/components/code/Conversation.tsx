@@ -862,7 +862,11 @@ export function Conversation({
           />
         ) : null}
         {controls ? <div className="pb-1">{controls}</div> : null}
-        <AttachmentTray items={attached} onRemove={(id) => setAttached((p) => p.filter((a) => a.id !== id))} />
+        <AttachmentTray
+          items={attached}
+          model={model}
+          onRemove={(id) => setAttached((p) => p.filter((a) => a.id !== id))}
+        />
         {/* Shown, never silent. A message that vanished into an invisible queue is indistinguishable
             from one that was dropped, and the user would retype it — which is two sends, not one. */}
         {queued ? (

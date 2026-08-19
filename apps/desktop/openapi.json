@@ -9212,8 +9212,26 @@
     },
     "/api/vision": {
       "get": {
-        "description": "Can the model that answers a turn look at an image?\n\nAsked when someone attaches one, so the answer arrives while they can still act on it. An\nimage sent to a model without vision is either a provider error or \u2014 worse \u2014 silently\nignored, and a confident answer about a picture nobody looked at is indistinguishable from\none about a picture that was.",
+        "description": "Can the model that answers a turn look at an image?\n\nAsked when someone attaches one, so the answer arrives while they can still act on it. An\nimage sent to a model without vision is either a provider error or \u2014 worse \u2014 silently\nignored, and a confident answer about a picture nobody looked at is indistinguishable from\none about a picture that was.\n\n``model`` is the one the composer has picked. It used to be unaskable: this always answered\nabout ``default_model``, so the moment a per-conversation picker existed the warning started\nnaming a model the turn was not going to use \u2014 and the sentence under the paperclip was about\nsomebody else's capability. Omitted still means the default, which is what a caller with no\npicker means.",
         "operationId": "vision_api_vision_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "model",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -9224,6 +9242,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Vision"

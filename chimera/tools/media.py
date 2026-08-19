@@ -243,7 +243,13 @@ class TranscribeAudioTool(Tool):
         path = resolve_in_workspace(self.workspace, rel)
         if not path.is_file():
             return f"error: audio file not found: {rel}"
-        language = str(kwargs.get("language", "")).strip() or None
+        # `str(None)` is `"None"` — a five-character string that is not empty, so `or None` never
+        # fires and the literal word travels on as a language code. faster-whisper then refuses the
+        # whole call with `'None' is not a valid language code`, and dictation in the desktop app
+        # has never worked on the local model because of it: the API layer passes `language=None`
+        # for "detect it", which is precisely the case this line converted into a wrong answer.
+        raw = kwargs.get("language")
+        language = (str(raw).strip() or None) if isinstance(raw, str) else None
         try:
             text = _transcribe_faster_whisper(str(path), language)  # local first (offline/private)
             if text is None:  # no stt extra -> hosted Whisper
