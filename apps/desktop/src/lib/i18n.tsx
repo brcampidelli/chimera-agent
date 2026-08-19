@@ -515,6 +515,30 @@ const en: Dict = {
   "model.pick.blurb":
     "Applies to this conversation. The default stays whatever Settings says, unless you make this one the default below.",
   "model.pick.search": "Search by name, vendor or slug",
+  "fusion.cast.label": "cast",
+  "fusion.cast.standing": "as configured",
+  "fusion.cast.n": "{n} models",
+  "fusion.cast.unset": "as configured",
+  "fusion.cast.hint":
+    "Choose which models answer, which one grades them, and which one writes the final answer.",
+  "fusion.cast.title": "Who fuses",
+  "fusion.cast.blurb":
+    "The panel answers independently, the judge says where they agree and where they contradict, and the synthesizer writes the answer from that. Applies to this conversation unless you make it the default.",
+  "fusion.role.panel": "Panel",
+  "fusion.role.judge": "Judge",
+  "fusion.role.synthesizer": "Synthesizer",
+  "fusion.cast.calls":
+    "{n} calls per turn: every panelist, then the judge, then the synthesizer.",
+  "fusion.cast.tooSmall":
+    "A panel needs at least two models — one answer graded and rewritten is not fusion.",
+  "fusion.cast.judgeIsPanelist":
+    "The judge is on the panel, so it will grade its own answer.",
+  "fusion.cast.sameVendor":
+    "The judge and a panelist both come from {vendor} — not the same model, but not two independent answers either.",
+  "fusion.cast.makeDefault": "Make it the default",
+  "fusion.cast.madeDefault": "Saved. New conversations start with this cast.",
+  "fusion.cast.thisChat": "Without that, the cast lasts for this conversation.",
+  "fusion.cast.reset": "Use the configured one",
   "model.pick.empty": "No model matches that search.",
   "model.pick.failed": "The model list could not be loaded.",
   "model.pick.more": "{n} more — narrow the search to see them",
@@ -1467,6 +1491,31 @@ const pt: Dict = {
   "model.pick.blurb":
     "Vale para esta conversa. O padrão continua sendo o das Configurações, a não ser que você torne este o padrão aqui embaixo.",
   "model.pick.search": "Buscar por nome, fornecedor ou slug",
+  "fusion.cast.label": "elenco",
+  "fusion.cast.standing": "o configurado",
+  "fusion.cast.n": "{n} modelos",
+  "fusion.cast.unset": "o configurado",
+  "fusion.cast.hint":
+    "Escolha quais modelos respondem, qual avalia as respostas e qual escreve a resposta final.",
+  "fusion.cast.title": "Quem funde",
+  "fusion.cast.blurb":
+    "O painel responde de forma independente, o juiz diz onde eles concordam e onde se contradizem, e o sintetizador escreve a resposta a partir disso. Vale para esta conversa, a não ser que você torne isto o padrão.",
+  "fusion.role.panel": "Painel",
+  "fusion.role.judge": "Juiz",
+  "fusion.role.synthesizer": "Sintetizador",
+  "fusion.cast.calls":
+    "{n} chamadas por turno: cada modelo do painel, depois o juiz, depois o sintetizador.",
+  "fusion.cast.tooSmall":
+    "Um painel precisa de pelo menos dois modelos — uma resposta avaliada e reescrita não é fusão.",
+  "fusion.cast.judgeIsPanelist":
+    "O juiz está no painel, então vai avaliar a própria resposta.",
+  "fusion.cast.sameVendor":
+    "O juiz e um modelo do painel vêm ambos de {vendor} — não é o mesmo modelo, mas também não são duas respostas independentes.",
+  "fusion.cast.makeDefault": "Tornar padrão",
+  "fusion.cast.madeDefault":
+    "Salvo. As próximas conversas começam com este elenco.",
+  "fusion.cast.thisChat": "Sem isso, o elenco vale só para esta conversa.",
+  "fusion.cast.reset": "Usar o configurado",
   "model.pick.empty": "Nenhum modelo corresponde a essa busca.",
   "model.pick.failed": "Não deu para carregar a lista de modelos.",
   "model.pick.more": "mais {n} — refine a busca para vê-los",
@@ -2432,6 +2481,31 @@ const es: Dict = {
   "model.pick.blurb":
     "Se aplica a esta conversación. El predeterminado sigue siendo el de Ajustes, salvo que hagas de este el predeterminado aquí abajo.",
   "model.pick.search": "Buscar por nombre, proveedor o slug",
+  "fusion.cast.label": "elenco",
+  "fusion.cast.standing": "el configurado",
+  "fusion.cast.n": "{n} modelos",
+  "fusion.cast.unset": "el configurado",
+  "fusion.cast.hint":
+    "Elige qué modelos responden, cuál los evalúa y cuál escribe la respuesta final.",
+  "fusion.cast.title": "Quién fusiona",
+  "fusion.cast.blurb":
+    "El panel responde de forma independiente, el juez dice dónde coinciden y dónde se contradicen, y el sintetizador escribe la respuesta a partir de eso. Se aplica a esta conversación, salvo que lo hagas predeterminado.",
+  "fusion.role.panel": "Panel",
+  "fusion.role.judge": "Juez",
+  "fusion.role.synthesizer": "Sintetizador",
+  "fusion.cast.calls":
+    "{n} llamadas por turno: cada modelo del panel, luego el juez, luego el sintetizador.",
+  "fusion.cast.tooSmall":
+    "Un panel necesita al menos dos modelos — una respuesta evaluada y reescrita no es fusión.",
+  "fusion.cast.judgeIsPanelist":
+    "El juez está en el panel, así que evaluará su propia respuesta.",
+  "fusion.cast.sameVendor":
+    "El juez y un modelo del panel vienen ambos de {vendor} — no es el mismo modelo, pero tampoco son dos respuestas independientes.",
+  "fusion.cast.makeDefault": "Hacerlo predeterminado",
+  "fusion.cast.madeDefault":
+    "Guardado. Las conversaciones nuevas empiezan con este elenco.",
+  "fusion.cast.thisChat": "Si no, el elenco vale solo para esta conversación.",
+  "fusion.cast.reset": "Usar el configurado",
   "model.pick.empty": "Ningún modelo coincide con esa búsqueda.",
   "model.pick.failed": "No se pudo cargar la lista de modelos.",
   "model.pick.more": "{n} más — afina la búsqueda para verlos",
@@ -3406,6 +3480,32 @@ const fr: Dict = {
   "model.pick.blurb":
     "Vaut pour cette conversation. Le modèle par défaut reste celui des Réglages, sauf si vous en faites le défaut ci-dessous.",
   "model.pick.search": "Chercher par nom, fournisseur ou slug",
+  "fusion.cast.label": "casting",
+  "fusion.cast.standing": "tel que configuré",
+  "fusion.cast.n": "{n} modèles",
+  "fusion.cast.unset": "tel que configuré",
+  "fusion.cast.hint":
+    "Choisissez quels modèles répondent, lequel les évalue et lequel écrit la réponse finale.",
+  "fusion.cast.title": "Qui fusionne",
+  "fusion.cast.blurb":
+    "Le panel répond indépendamment, le juge dit où ils s'accordent et où ils se contredisent, et le synthétiseur écrit la réponse à partir de là. Vaut pour cette conversation, sauf si vous en faites le casting par défaut.",
+  "fusion.role.panel": "Panel",
+  "fusion.role.judge": "Juge",
+  "fusion.role.synthesizer": "Synthétiseur",
+  "fusion.cast.calls":
+    "{n} appels par tour : chaque modèle du panel, puis le juge, puis le synthétiseur.",
+  "fusion.cast.tooSmall":
+    "Un panel a besoin d'au moins deux modèles — une seule réponse évaluée puis réécrite, ce n'est pas de la fusion.",
+  "fusion.cast.judgeIsPanelist":
+    "Le juge est dans le panel : il évaluera donc sa propre réponse.",
+  "fusion.cast.sameVendor":
+    "Le juge et un modèle du panel viennent tous les deux de {vendor} — pas le même modèle, mais pas deux réponses indépendantes non plus.",
+  "fusion.cast.makeDefault": "En faire le casting par défaut",
+  "fusion.cast.madeDefault":
+    "Enregistré. Les nouvelles conversations démarrent avec ce casting.",
+  "fusion.cast.thisChat":
+    "Sinon, le casting ne vaut que pour cette conversation.",
+  "fusion.cast.reset": "Utiliser celui configuré",
   "model.pick.empty": "Aucun modèle ne correspond à cette recherche.",
   "model.pick.failed": "Impossible de charger la liste des modèles.",
   "model.pick.more": "{n} de plus — affinez la recherche pour les voir",
@@ -4386,6 +4486,31 @@ const de: Dict = {
   "model.pick.blurb":
     "Gilt für dieses Gespräch. Der Standard bleibt der aus den Einstellungen, außer du machst dieses hier unten zum Standard.",
   "model.pick.search": "Nach Name, Anbieter oder Slug suchen",
+  "fusion.cast.label": "Besetzung",
+  "fusion.cast.standing": "wie konfiguriert",
+  "fusion.cast.n": "{n} Modelle",
+  "fusion.cast.unset": "wie konfiguriert",
+  "fusion.cast.hint":
+    "Wähle, welche Modelle antworten, welches sie bewertet und welches die endgültige Antwort schreibt.",
+  "fusion.cast.title": "Wer fusioniert",
+  "fusion.cast.blurb":
+    "Das Panel antwortet unabhängig, der Judge sagt, wo sie übereinstimmen und wo sie sich widersprechen, und der Synthesizer schreibt daraus die Antwort. Gilt für dieses Gespräch, außer du machst es zum Standard.",
+  "fusion.role.panel": "Panel",
+  "fusion.role.judge": "Judge",
+  "fusion.role.synthesizer": "Synthesizer",
+  "fusion.cast.calls":
+    "{n} Aufrufe pro Zug: jedes Modell im Panel, dann der Judge, dann der Synthesizer.",
+  "fusion.cast.tooSmall":
+    "Ein Panel braucht mindestens zwei Modelle — eine Antwort bewerten und umschreiben ist keine Fusion.",
+  "fusion.cast.judgeIsPanelist":
+    "Der Judge sitzt im Panel und bewertet damit seine eigene Antwort.",
+  "fusion.cast.sameVendor":
+    "Judge und ein Modell im Panel kommen beide von {vendor} — nicht dasselbe Modell, aber auch keine zwei unabhängigen Antworten.",
+  "fusion.cast.makeDefault": "Als Standard setzen",
+  "fusion.cast.madeDefault":
+    "Gespeichert. Neue Gespräche starten mit dieser Besetzung.",
+  "fusion.cast.thisChat": "Sonst gilt die Besetzung nur für dieses Gespräch.",
+  "fusion.cast.reset": "Die konfigurierte nehmen",
   "model.pick.empty": "Kein Modell passt zu dieser Suche.",
   "model.pick.failed": "Die Modellliste konnte nicht geladen werden.",
   "model.pick.more": "{n} weitere — Suche eingrenzen, um sie zu sehen",
@@ -5323,6 +5448,28 @@ const zh: Dict = {
   "model.pick.blurb":
     "只对当前这段对话生效。默认模型仍以设置页为准，除非你在下面把它设为默认。",
   "model.pick.search": "按名称、厂商或 slug 搜索",
+  "fusion.cast.label": "阵容",
+  "fusion.cast.standing": "按配置",
+  "fusion.cast.n": "{n} 个模型",
+  "fusion.cast.unset": "按配置",
+  "fusion.cast.hint": "选择哪些模型作答、哪个来评判它们、哪个写出最终答案。",
+  "fusion.cast.title": "谁来融合",
+  "fusion.cast.blurb":
+    "评审组各自独立作答，评判指出它们在哪里一致、在哪里互相矛盾，综合者据此写出答案。只对当前这段对话生效，除非你把它设为默认。",
+  "fusion.role.panel": "评审组",
+  "fusion.role.judge": "评判",
+  "fusion.role.synthesizer": "综合者",
+  "fusion.cast.calls":
+    "每轮 {n} 次调用：评审组的每个模型，然后是评判，然后是综合者。",
+  "fusion.cast.tooSmall":
+    "评审组至少要有两个模型——一份答案被评判再重写，那不是融合。",
+  "fusion.cast.judgeIsPanelist": "评判也在评审组里，所以它会评判自己的答案。",
+  "fusion.cast.sameVendor":
+    "评判和评审组里的一个模型都来自 {vendor}——不是同一个模型，但也不是两份独立的答案。",
+  "fusion.cast.makeDefault": "设为默认",
+  "fusion.cast.madeDefault": "已保存。新对话都用这个阵容开始。",
+  "fusion.cast.thisChat": "不设的话，这个阵容只在本段对话有效。",
+  "fusion.cast.reset": "用配置里的",
   "model.pick.empty": "没有模型符合该搜索。",
   "model.pick.failed": "无法加载模型列表。",
   "model.pick.more": "还有 {n} 个 — 缩小搜索范围才能看到",
@@ -6256,6 +6403,30 @@ const ja: Dict = {
   "model.pick.blurb":
     "この会話にだけ効きます。下で既定にしない限り、既定は設定画面のままです。",
   "model.pick.search": "名前・提供元・slug で検索",
+  "fusion.cast.label": "配役",
+  "fusion.cast.standing": "設定どおり",
+  "fusion.cast.n": "モデル {n} 件",
+  "fusion.cast.unset": "設定どおり",
+  "fusion.cast.hint":
+    "どのモデルが答え、どれが採点し、どれが最終的な答えを書くかを選びます。",
+  "fusion.cast.title": "誰が融合するか",
+  "fusion.cast.blurb":
+    "パネルはそれぞれ独立に答え、ジャッジはどこが一致しどこが矛盾するかを示し、統合役がそこから答えを書きます。既定にしない限り、この会話にだけ効きます。",
+  "fusion.role.panel": "パネル",
+  "fusion.role.judge": "ジャッジ",
+  "fusion.role.synthesizer": "統合役",
+  "fusion.cast.calls":
+    "1ターンあたり {n} 回の呼び出し：パネルの各モデル、次にジャッジ、次に統合役。",
+  "fusion.cast.tooSmall":
+    "パネルにはモデルが最低2つ必要です — 1つの答えを採点して書き直すのは融合ではありません。",
+  "fusion.cast.judgeIsPanelist":
+    "ジャッジがパネルに入っているので、自分の答えを自分で採点します。",
+  "fusion.cast.sameVendor":
+    "ジャッジとパネルの1モデルがどちらも {vendor} 由来です — 同じモデルではありませんが、独立した2つの答えでもありません。",
+  "fusion.cast.makeDefault": "既定にする",
+  "fusion.cast.madeDefault": "保存しました。新しい会話はこの配役で始まります。",
+  "fusion.cast.thisChat": "しなければ、この配役はこの会話だけです。",
+  "fusion.cast.reset": "設定のものを使う",
   "model.pick.empty": "その検索に合うモデルはありません。",
   "model.pick.failed": "モデル一覧を読み込めませんでした。",
   "model.pick.more": "他に {n} 件 — 検索を絞ると出ます",
@@ -7223,6 +7394,32 @@ const it: Dict = {
   "model.pick.blurb":
     "Vale per questa conversazione. Il predefinito resta quello delle Impostazioni, a meno che tu non renda predefinito questo qui sotto.",
   "model.pick.search": "Cerca per nome, fornitore o slug",
+  "fusion.cast.label": "cast",
+  "fusion.cast.standing": "come configurato",
+  "fusion.cast.n": "{n} modelli",
+  "fusion.cast.unset": "come configurato",
+  "fusion.cast.hint":
+    "Scegli quali modelli rispondono, quale li valuta e quale scrive la risposta finale.",
+  "fusion.cast.title": "Chi fonde",
+  "fusion.cast.blurb":
+    "Il panel risponde in modo indipendente, il giudice dice dove concordano e dove si contraddicono, e il sintetizzatore scrive la risposta a partire da lì. Vale per questa conversazione, a meno che tu non lo renda predefinito.",
+  "fusion.role.panel": "Panel",
+  "fusion.role.judge": "Giudice",
+  "fusion.role.synthesizer": "Sintetizzatore",
+  "fusion.cast.calls":
+    "{n} chiamate per turno: ogni modello del panel, poi il giudice, poi il sintetizzatore.",
+  "fusion.cast.tooSmall":
+    "Un panel ha bisogno di almeno due modelli — una risposta valutata e riscritta non è fusione.",
+  "fusion.cast.judgeIsPanelist":
+    "Il giudice è nel panel, quindi valuterà la propria risposta.",
+  "fusion.cast.sameVendor":
+    "Il giudice e un modello del panel vengono entrambi da {vendor} — non è lo stesso modello, ma non sono nemmeno due risposte indipendenti.",
+  "fusion.cast.makeDefault": "Rendilo predefinito",
+  "fusion.cast.madeDefault":
+    "Salvato. Le nuove conversazioni partono con questo cast.",
+  "fusion.cast.thisChat":
+    "Altrimenti il cast vale solo per questa conversazione.",
+  "fusion.cast.reset": "Usa quello configurato",
   "model.pick.empty": "Nessun modello corrisponde a questa ricerca.",
   "model.pick.failed": "Non è stato possibile caricare l'elenco dei modelli.",
   "model.pick.more": "altri {n} — restringi la ricerca per vederli",
@@ -8192,6 +8389,31 @@ const pl: Dict = {
   "model.pick.blurb":
     "Dotyczy tej rozmowy. Domyślny nadal pochodzi z Ustawień, chyba że ustawisz ten poniżej jako domyślny.",
   "model.pick.search": "Szukaj po nazwie, dostawcy lub slugu",
+  "fusion.cast.label": "obsada",
+  "fusion.cast.standing": "jak skonfigurowano",
+  "fusion.cast.n": "modele: {n}",
+  "fusion.cast.unset": "jak skonfigurowano",
+  "fusion.cast.hint":
+    "Wybierz, które modele odpowiadają, który je ocenia i który pisze końcową odpowiedź.",
+  "fusion.cast.title": "Kto łączy",
+  "fusion.cast.blurb":
+    "Panel odpowiada niezależnie, sędzia mówi, gdzie modele się zgadzają, a gdzie sobie przeczą, a syntetyzator pisze z tego odpowiedź. Dotyczy tej rozmowy, chyba że ustawisz ją jako domyślną.",
+  "fusion.role.panel": "Panel",
+  "fusion.role.judge": "Sędzia",
+  "fusion.role.synthesizer": "Syntetyzator",
+  "fusion.cast.calls":
+    "Wywołań na turę: {n} — każdy model z panelu, potem sędzia, potem syntetyzator.",
+  "fusion.cast.tooSmall":
+    "Panel potrzebuje co najmniej dwóch modeli — jedna odpowiedź oceniona i przepisana to nie fuzja.",
+  "fusion.cast.judgeIsPanelist":
+    "Sędzia jest w panelu, więc oceni własną odpowiedź.",
+  "fusion.cast.sameVendor":
+    "Sędzia i jeden z modeli w panelu pochodzą od {vendor} — to nie ten sam model, ale też nie dwie niezależne odpowiedzi.",
+  "fusion.cast.makeDefault": "Ustaw jako domyślną",
+  "fusion.cast.madeDefault":
+    "Zapisano. Nowe rozmowy zaczynają się z tą obsadą.",
+  "fusion.cast.thisChat": "Inaczej obsada obowiązuje tylko w tej rozmowie.",
+  "fusion.cast.reset": "Użyj skonfigurowanej",
   "model.pick.empty": "Żaden model nie pasuje do tego wyszukiwania.",
   "model.pick.failed": "Nie udało się wczytać listy modeli.",
   "model.pick.more": "jeszcze {n} — zawęź wyszukiwanie, aby je zobaczyć",
@@ -9161,6 +9383,31 @@ const ru: Dict = {
   "model.pick.blurb":
     "Действует в этом разговоре. По умолчанию остаётся то, что указано в настройках, если не сделать эту моделью по умолчанию ниже.",
   "model.pick.search": "Поиск по имени, поставщику или slug",
+  "fusion.cast.label": "состав",
+  "fusion.cast.standing": "как настроено",
+  "fusion.cast.n": "моделей: {n}",
+  "fusion.cast.unset": "как настроено",
+  "fusion.cast.hint":
+    "Выберите, какие модели отвечают, какая их оценивает и какая пишет итоговый ответ.",
+  "fusion.cast.title": "Кто участвует в слиянии",
+  "fusion.cast.blurb":
+    "Панель отвечает независимо, судья говорит, где модели сходятся, а где противоречат друг другу, и синтезатор пишет из этого ответ. Действует в этом разговоре, если не сделать его составом по умолчанию.",
+  "fusion.role.panel": "Панель",
+  "fusion.role.judge": "Судья",
+  "fusion.role.synthesizer": "Синтезатор",
+  "fusion.cast.calls":
+    "Вызовов за ход: {n} — каждая модель панели, затем судья, затем синтезатор.",
+  "fusion.cast.tooSmall":
+    "Панели нужно хотя бы две модели — один ответ, оценённый и переписанный, это не слияние.",
+  "fusion.cast.judgeIsPanelist":
+    "Судья входит в панель, значит будет оценивать собственный ответ.",
+  "fusion.cast.sameVendor":
+    "Судья и одна из моделей панели — обе от {vendor}. Не одна и та же модель, но и не два независимых ответа.",
+  "fusion.cast.makeDefault": "Сделать по умолчанию",
+  "fusion.cast.madeDefault":
+    "Сохранено. Новые разговоры начинаются с этим составом.",
+  "fusion.cast.thisChat": "Иначе состав действует только в этом разговоре.",
+  "fusion.cast.reset": "Использовать настроенный",
   "model.pick.empty": "Ни одна модель не подходит под этот запрос.",
   "model.pick.failed": "Не удалось загрузить список моделей.",
   "model.pick.more": "ещё {n} — уточните поиск, чтобы увидеть их",

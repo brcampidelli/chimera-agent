@@ -173,6 +173,26 @@ class CodeSeams(BaseModel):
     deciding for the user. What is NOT optional is that the turn says so, which ``done.fused`` does.
     """
 
+    fusion_panel: list[str] | None = None
+    """Which models answer this fused turn, overriding the configured panel.
+
+    ``None`` means the install's default, which is what every caller sent before this existed. The
+    override is per-conversation on purpose: "which three models should argue about THIS question"
+    is a property of the question, not of the installation. Ignored when ``fuse`` is false — a field
+    that quietly changed a non-fused turn would be a second, invisible way to pick a model.
+    """
+
+    fusion_judge: str | None = None
+    """Which model reads the panel's answers and writes the analysis. See ``fusion_panel``.
+
+    Nothing here refuses a judge that also sits on the panel. It is reported instead — ``kinship``
+    in the config, and a warning where the choice is made — because a user holding one provider key
+    cannot avoid the overlap, and a refusal they cannot act on just removes the feature.
+    """
+
+    fusion_synthesizer: str | None = None
+    """Which model writes the final answer from the judge's analysis. See ``fusion_panel``."""
+
     provider: str | None = None
     """Run this turn through an EXTERNAL coding agent instead of Chimera's own loop.
 
@@ -235,6 +255,41 @@ _ACTIONABLE = (
     "tool_use",
     "function calling",
 )
+
+
+def _cast_for_turn(backend: Any, req: CodeSeams) -> Any:
+    """The fusion engine this turn should use — the shared one, or a copy with a different cast.
+
+    The engine takes its roles from a ``FusionConfig`` it holds, so a per-turn choice is a new engine
+    over the SAME gateway rather than anything reentrant: no shared state is mutated, the swap in the
+    caller still restores the original, and an install with no override keeps the exact object it had
+    before. A panel of one is not a panel, so a single-model override is refused back to the default
+    rather than silently running fusion over one opinion.
+    """
+    panel = [m.strip() for m in (req.fusion_panel or []) if m and m.strip()]
+    judge = (req.fusion_judge or "").strip()
+    synth = (req.fusion_synthesizer or "").strip()
+    if not (panel or judge or synth):
+        return backend
+
+    config = getattr(backend, "config", None)
+    gateway = getattr(backend, "backend", None)
+    if config is None or gateway is None:  # not a FusionEngine — nothing to re-cast
+        return backend
+
+    from dataclasses import replace
+
+    from chimera.fusion.engine import FusionEngine
+
+    return FusionEngine(
+        gateway,
+        replace(
+            config,
+            panel=panel if len(panel) >= 2 else list(config.panel),
+            judge=judge or config.judge,
+            synthesizer=synth or config.synthesizer,
+        ),
+    )
 
 
 def _native_failure(exc: Exception) -> str:
@@ -771,7 +826,7 @@ def register_code_api(
                 fused = bool(req.fuse) and fuse_backend is not None
                 original_backend = getattr(agent, "backend", None) if fused else None
                 if fused:
-                    agent.backend = fuse_backend  # type: ignore[assignment]
+                    agent.backend = _cast_for_turn(fuse_backend, req)  # type: ignore[assignment]
 
                 external = (req.provider or "").strip().lower()
                 if external:

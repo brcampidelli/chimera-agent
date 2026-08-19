@@ -1,8 +1,26 @@
-import { useCallback, useEffect, useRef, useState , type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, Copy, Download, Eraser, MessageSquare, Network, Send, ShieldCheck, Square, Undo2, Wrench } from "lucide-react";
+import {
+  ArrowDown,
+  Copy,
+  Download,
+  Eraser,
+  MessageSquare,
+  Network,
+  Send,
+  ShieldCheck,
+  Square,
+  Undo2,
+  Wrench,
+} from "lucide-react";
 import {
   deleteCodeSession,
   getCodeSession,
@@ -27,6 +45,11 @@ import {
 } from "@/components/code/Attachments";
 import { BatchProposal } from "@/components/code/BatchProposal";
 import { DiffView } from "@/components/code/DiffView";
+import {
+  EMPTY_CAST,
+  FusionCast,
+  type Cast,
+} from "@/components/code/FusionCast";
 import { SpendCeiling } from "@/components/code/SpendCeiling";
 import { decompose } from "@/lib/decompose";
 import {
@@ -100,13 +123,20 @@ function Verdict({
   onFix: () => void;
   t: TFunc;
 }) {
-  if (v.state === "none") return <p className="text-xs text-warn">{t("code.chat.verdict.none")}</p>;
+  if (v.state === "none")
+    return <p className="text-xs text-warn">{t("code.chat.verdict.none")}</p>;
   const cmd = v.command ?? "";
   const args = { cmd, src: v.source };
   if (v.state === "abstained")
-    return <p className="text-xs text-warn">{t("code.chat.verdict.abstained", args)}</p>;
+    return (
+      <p className="text-xs text-warn">
+        {t("code.chat.verdict.abstained", args)}
+      </p>
+    );
   if (v.state === "passed")
-    return <p className="text-xs text-ok">{t("code.chat.verdict.passed", args)}</p>;
+    return (
+      <p className="text-xs text-ok">{t("code.chat.verdict.passed", args)}</p>
+    );
   return (
     <div className="space-y-1.5 rounded-chip border border-bad/40 p-2">
       <p className="text-xs text-bad">{t("code.chat.verdict.failed", args)}</p>
@@ -117,7 +147,11 @@ function Verdict({
       ) : null}
       {undone ? (
         <p className={cn("text-xs", undone === "ok" ? "text-ok" : "text-bad")}>
-          {t(undone === "ok" ? "code.chat.verdict.reverted" : "code.chat.verdict.revertFailed")}
+          {t(
+            undone === "ok"
+              ? "code.chat.verdict.reverted"
+              : "code.chat.verdict.revertFailed",
+          )}
         </p>
       ) : (
         <div className="flex flex-wrap gap-2">
@@ -145,7 +179,13 @@ function Verdict({
  *  the head and the tail of 400 characters — and this deliberately does not offer "full output",
  *  because there is no route on our side that has it. Promising it and then showing the same 400
  *  characters would be worse than the tooltip. */
-function ToolRow({ tool, onOpenFile }: { tool: CodeToolEvent; onOpenFile?: (p: string) => void }) {
+function ToolRow({
+  tool,
+  onOpenFile,
+}: {
+  tool: CodeToolEvent;
+  onOpenFile?: (p: string) => void;
+}) {
   const t = useT();
   const primary = String(Object.values(tool.arguments)[0] ?? "");
   const [copied, setCopied] = useState(false);
@@ -157,7 +197,9 @@ function ToolRow({ tool, onOpenFile }: { tool: CodeToolEvent; onOpenFile?: (p: s
   return (
     <div className="font-mono text-xs">
       <div className="flex items-baseline gap-2">
-        <span className={cn("shrink-0", tool.ok ? "text-ok" : "text-bad")}>{tool.ok ? "✓" : "✗"}</span>
+        <span className={cn("shrink-0", tool.ok ? "text-ok" : "text-bad")}>
+          {tool.ok ? "✓" : "✗"}
+        </span>
         <span className="shrink-0 text-foreground/80">{tool.name}</span>
         {looksLikePath && onOpenFile ? (
           <button
@@ -229,37 +271,62 @@ function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
       {/* First, ahead of every measurement, because it is what decides how to read them. */}
       {stopped ? <Badge tone="warn">{t(stopped)}</Badge> : null}
       {/* Who did the work, first — it is the fact that reframes every badge after it. */}
-      {done.external ? <Badge tone="warn">{t("code.chat.external", { agent: done.external })}</Badge> : null}
+      {done.external ? (
+        <Badge tone="warn">
+          {t("code.chat.external", { agent: done.external })}
+        </Badge>
+      ) : null}
       {/* Null, not zero: an external turn's steps happened inside somebody else's loop and it did
           not report them. Rendering "0 steps" would say it did nothing. */}
-      {done.steps !== null ? <Badge>{t("code.chat.steps", { n: done.steps })}</Badge> : null}
+      {done.steps !== null ? (
+        <Badge>{t("code.chat.steps", { n: done.steps })}</Badge>
+      ) : null}
       {done.model && !done.external ? <Badge>{done.model}</Badge> : null}
       {done.context_peak_tokens !== null && done.context_peak_tokens > 0 ? (
-        <Badge>{t("code.chat.peak", { n: done.context_peak_tokens.toLocaleString() })}</Badge>
+        <Badge>
+          {t("code.chat.peak", {
+            n: done.context_peak_tokens.toLocaleString(),
+          })}
+        </Badge>
       ) : null}
       {/* Measured inside the model calls, not divided out of the turn's duration — the tools and
           the verifier are not the model, and folding them in reports a shell command as slow
           generation. Absent (never 0) when nothing was timed. */}
       {done.tokens_per_second != null ? (
-        <Badge>{t("code.chat.speed", { n: Math.round(done.tokens_per_second) })}</Badge>
+        <Badge>
+          {t("code.chat.speed", { n: Math.round(done.tokens_per_second) })}
+        </Badge>
       ) : null}
       {/* Every permission we answered on the user's behalf, and every write the region refused.
           Both are the receipt's half of the bargain the posture note describes. */}
       {done.auto_approved?.length ? (
-        <Badge tone="warn">{t("code.chat.autoApproved", { n: done.auto_approved.length })}</Badge>
+        <Badge tone="warn">
+          {t("code.chat.autoApproved", { n: done.auto_approved.length })}
+        </Badge>
       ) : null}
       {done.refused_writes?.length ? (
-        <Badge tone="warn">{t("code.chat.refusedWrites", { n: done.refused_writes.length })}</Badge>
+        <Badge tone="warn">
+          {t("code.chat.refusedWrites", { n: done.refused_writes.length })}
+        </Badge>
       ) : null}
       <Badge tone={done.usd === null ? "warn" : undefined}>
-        {done.usd === null ? t("code.chat.unknownCost") : `$${done.usd.toFixed(4)}`}
+        {done.usd === null
+          ? t("code.chat.unknownCost")
+          : `$${done.usd.toFixed(4)}`}
       </Badge>
       {/* Only when a layer actually contributed. "0 facts" and "we did not look" render the same and
           mean different things, so the absent case says nothing rather than saying zero. */}
       {done.memory_facts_used ? (
-        <Badge>{t("code.chat.recalled", { n: done.memory_facts_used, layer: done.memory_layer ?? "" })}</Badge>
+        <Badge>
+          {t("code.chat.recalled", {
+            n: done.memory_facts_used,
+            layer: done.memory_layer ?? "",
+          })}
+        </Badge>
       ) : null}
-      {done.tainted ? <Badge tone="warn">{t("code.chat.tainted")}</Badge> : null}
+      {done.tainted ? (
+        <Badge tone="warn">{t("code.chat.tainted")}</Badge>
+      ) : null}
     </div>
   );
 }
@@ -285,7 +352,9 @@ async function notifyTurnFinished(title: string, body: string): Promise<void> {
     // Asked at the moment it is first needed, not on load: a permission prompt that appears before
     // the user has done anything is the one people deny reflexively.
     const permission =
-      Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
+      Notification.permission === "default"
+        ? await Notification.requestPermission()
+        : Notification.permission;
     if (permission !== "granted") return;
     new Notification(title, { body });
   } catch {
@@ -348,7 +417,9 @@ export function Conversation({
 }) {
   const t = useT();
   const qc = useQueryClient();
-  const [sessionId, setSessionId] = useState<string | null>(resumeSession ?? null);
+  const [sessionId, setSessionId] = useState<string | null>(
+    resumeSession ?? null,
+  );
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -390,6 +461,9 @@ export function Conversation({
 
   const [proposal, setProposal] = useState<string[] | null>(null);
   const [fuse, setFuse] = useState(false);
+  // Empty means "whatever this install is configured for", which is what every turn sent before the
+  // cast could be chosen at all. Per conversation, like the model and the ceiling beside it.
+  const [cast, setCast] = useState<Cast>(EMPTY_CAST);
   /** A dollar ceiling for each turn of this conversation, or null for none (the default, and the
    *  behaviour every earlier build had). Session-local like `provider` rather than persisted: a
    *  standing spend limit is a different promise from "cap this piece of work", and a ceiling that
@@ -424,7 +498,9 @@ export function Conversation({
   /** Mutate the turn currently streaming — always the last one, which is the only one that moves. */
   const patchLast = useCallback((fn: (e: Exchange) => Exchange) => {
     setExchanges((prev) =>
-      prev.length === 0 ? prev : [...prev.slice(0, -1), fn(prev[prev.length - 1])],
+      prev.length === 0
+        ? prev
+        : [...prev.slice(0, -1), fn(prev[prev.length - 1])],
     );
   }, []);
 
@@ -444,7 +520,9 @@ export function Conversation({
   // Send the released follow-up only once `busy` has actually gone false. Doing it inside `onDone`
   // would run before that `setBusy(false)` had landed, so `send()` would take the busy branch and
   // re-queue the very message it was releasing — a queue that never drains.
-  const sendRef = useRef<(force?: boolean, override?: string) => void>(() => {});
+  const sendRef = useRef<(force?: boolean, override?: string) => void>(
+    () => {},
+  );
   useEffect(() => {
     if (busy) return;
     const text = queuedToSendRef.current;
@@ -466,23 +544,33 @@ export function Conversation({
     let stored: TranscriptExchange[] | null = null;
     if (sessionId) {
       try {
-        stored = (await getCodeSession(sessionId)).exchanges as TranscriptExchange[];
+        stored = (await getCodeSession(sessionId))
+          .exchanges as TranscriptExchange[];
       } catch {
         // A transcript from memory is worth more than none. Say so rather than failing the export.
         setExportNote(t("code.chat.export.storedUnreachable"));
       }
     }
-    const { exchanges: rows, recovered } = reconcile(exchanges as TranscriptExchange[], stored);
-    if (recovered > 0) setExportNote(t("code.chat.export.recovered", { n: recovered }));
+    const { exchanges: rows, recovered } = reconcile(
+      exchanges as TranscriptExchange[],
+      stored,
+    );
+    if (recovered > 0)
+      setExportNote(t("code.chat.export.recovered", { n: recovered }));
 
     const exportedAt = new Date().toISOString();
-    const markdown = toMarkdown(rows, { workspace: workspace || undefined, exportedAt });
+    const markdown = toMarkdown(rows, {
+      workspace: workspace || undefined,
+      exportedAt,
+    });
     const name = transcriptFilename(exportedAt);
     try {
       // A Blob download inside the Tauri webview is the uncertain half of this item, so the failure
       // is caught rather than assumed away: if the anchor click does nothing, the text still reaches
       // the clipboard and the user is told where it went.
-      const url = URL.createObjectURL(new Blob([markdown], { type: "text/markdown" }));
+      const url = URL.createObjectURL(
+        new Blob([markdown], { type: "text/markdown" }),
+      );
       const a = document.createElement("a");
       a.href = url;
       a.download = name;
@@ -534,7 +622,10 @@ export function Conversation({
     setDraft("");
     setAttached([]);
     setBusy(true);
-    setExchanges((prev) => [...prev, { you: message, answer: "", tools: [], edits: [], done: null }]);
+    setExchanges((prev) => [
+      ...prev,
+      { you: message, answer: "", tools: [], edits: [], done: null },
+    ]);
     let touchedFiles = false;
     // Whether THIS turn's verifier failed. It decides what happens to a queued follow-up, and it
     // has to be a local rather than state: `onDone` fires in the same tick as the last `setState`,
@@ -544,7 +635,13 @@ export function Conversation({
     const controller = new AbortController();
     abortRef.current = controller;
     toolsRef.current = [];
-    publish({ status: "thinking", tools: [], report: null, busy: true, stop: abandon });
+    publish({
+      status: "thinking",
+      tools: [],
+      report: null,
+      busy: true,
+      stop: abandon,
+    });
 
     void streamCodeTurn(
       {
@@ -562,6 +659,13 @@ export function Conversation({
         posture,
         profile,
         fuse,
+        // Only with `fuse`: a cast on a turn that is not fused would be a second, invisible way to
+        // pick a model. Omitted rather than sent empty, so an unchosen role stays the install's.
+        ...(fuse && cast.panel.length ? { fusion_panel: cast.panel } : {}),
+        ...(fuse && cast.judge ? { fusion_judge: cast.judge } : {}),
+        ...(fuse && cast.synthesizer
+          ? { fusion_synthesizer: cast.synthesizer }
+          : {}),
         // "" means Chimera's own loop, and the field is omitted rather than sent empty — an empty
         // string is a value the server would have to special-case, and a caller that never heard of
         // providers must send exactly what it sent before.
@@ -579,7 +683,8 @@ export function Conversation({
         onSession: (id) => {
           // Invalidate on the FIRST turn's id, not on every turn: the sidebar lists conversations,
           // and a conversation that already exists in the list has not changed by gaining a message.
-          if (id !== sessionId) void qc.invalidateQueries({ queryKey: ["code-sessions"] });
+          if (id !== sessionId)
+            void qc.invalidateQueries({ queryKey: ["code-sessions"] });
           setSessionId(id);
         },
         onToken: (text) => {
@@ -587,8 +692,13 @@ export function Conversation({
           patchLast((e) => ({ ...e, answer: e.answer + text }));
         },
         onTool: (tool) => {
-          publish({ tools: [...toolsRef.current, { name: tool.name, ok: tool.ok }] });
-          toolsRef.current = [...toolsRef.current, { name: tool.name, ok: tool.ok }];
+          publish({
+            tools: [...toolsRef.current, { name: tool.name, ok: tool.ok }],
+          });
+          toolsRef.current = [
+            ...toolsRef.current,
+            { name: tool.name, ok: tool.ok },
+          ];
           patchLast((e) => ({ ...e, tools: [...e.tools, tool] }));
         },
         onEdit: (path, patch) => {
@@ -611,10 +721,17 @@ export function Conversation({
           // it finishes: `send` closes over this render's `maxUsd`, so the request above and this
           // line read one value that cannot change under either of them. (The control is disabled
           // while the turn runs as well, which is belt and braces rather than the mechanism.)
-          publish({ status: "done", busy: false, report: { ...done, max_usd: maxUsd } });
+          publish({
+            status: "done",
+            busy: false,
+            report: { ...done, max_usd: maxUsd },
+          });
           setBusy(false);
           if (notifyOnFinish) {
-            void notifyTurnFinished(t("code.chat.notify.title"), message.slice(0, 120));
+            void notifyTurnFinished(
+              t("code.chat.notify.title"),
+              message.slice(0, 120),
+            );
           }
           releaseQueued(verifyFailed);
           if (touchedFiles) {
@@ -635,7 +752,10 @@ export function Conversation({
           // A failure is MORE worth interrupting for than a success: the user walked away expecting
           // work to happen, and it stopped.
           if (notifyOnFinish) {
-            void notifyTurnFinished(t("code.chat.notify.failed"), message.slice(0, 120));
+            void notifyTurnFinished(
+              t("code.chat.notify.failed"),
+              message.slice(0, 120),
+            );
           }
           // A turn that errored is never a base to send the next one from — hand the text back.
           releaseQueued(true);
@@ -665,7 +785,9 @@ export function Conversation({
       // there. Saying "gone" is the honest read of both, and it is the one that does not imply the
       // files were restored.
     }
-    setExchanges((prev) => prev.map((e, j) => (j === index ? { ...e, undone: outcome } : e)));
+    setExchanges((prev) =>
+      prev.map((e, j) => (j === index ? { ...e, undone: outcome } : e)),
+    );
     if (outcome === "ok") {
       void qc.invalidateQueries({ queryKey: ["fs-file"] });
       void qc.invalidateQueries({ queryKey: ["git-status"] });
@@ -691,13 +813,19 @@ export function Conversation({
     <div className="relative flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-2 border-b border-hairline px-3 py-2 text-accent">
         <MessageSquare className="h-4 w-4" />
-        <h2 className="text-sm font-semibold text-foreground">{t("code.chat.title")}</h2>
+        <h2 className="text-sm font-semibold text-foreground">
+          {t("code.chat.title")}
+        </h2>
         {exchanges.length > 0 ? (
           <div className="ml-auto flex items-center gap-1">
             {/* A record of what an agent did to a repository should be able to leave the window it
                 happened in. Until this, the only clipboard call in the whole app copied a `pip
                 install` line. */}
-            <Button size="sm" variant="ghost" onClick={() => void exportTranscript()}>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => void exportTranscript()}
+            >
               <Download className="h-3.5 w-3.5" /> {t("code.chat.export.label")}
             </Button>
             {/* Off by default and remembered per install. An app that starts sending desktop
@@ -711,7 +839,10 @@ export function Conversation({
               onClick={() => {
                 const next = !notifyOnFinish;
                 setNotifyOnFinish(next);
-                localStorage.setItem("chimera.notifyOnFinish", next ? "1" : "0");
+                localStorage.setItem(
+                  "chimera.notifyOnFinish",
+                  next ? "1" : "0",
+                );
               }}
             >
               {t("code.chat.notify.label")}
@@ -725,111 +856,123 @@ export function Conversation({
       {/* Said out loud rather than logged. "Your export is missing four turns" is exactly the kind
           of thing that must not be discovered later, by someone reading the file. */}
       {exportNote ? (
-        <p className="border-b border-hairline px-3 py-1 text-xs text-warn">{exportNote}</p>
+        <p className="border-b border-hairline px-3 py-1 text-xs text-warn">
+          {exportNote}
+        </p>
       ) : null}
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
         {/* `role="log"` tells a screen reader this region accumulates; `aria-busy` says the agent is
             still writing. The streaming text is deliberately NOT a live region — announcing it would
             re-read the whole growing answer on every token. */}
-        <div role="log" aria-busy={busy} className="mx-auto max-w-3xl space-y-3 p-3">
-        {exchanges.length === 0 && replayed ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <BrandMark className="mb-4 h-14 w-14" glow />
-            <h2 className="text-base font-semibold">Chimera</h2>
-            <p className="mt-1 max-w-sm text-sm text-muted-foreground">{t("code.chat.empty")}</p>
-          </div>
-        ) : null}
-        {exchanges.map((e, i) => (
-          <div key={i} className="space-y-2">
-            <div className="rounded-chip bg-surface-2 px-2.5 py-1.5 text-sm text-foreground/90">
-              {e.you}
+        <div
+          role="log"
+          aria-busy={busy}
+          className="mx-auto max-w-3xl space-y-3 p-3"
+        >
+          {exchanges.length === 0 && replayed ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <BrandMark className="mb-4 h-14 w-14" glow />
+              <h2 className="text-base font-semibold">Chimera</h2>
+              <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                {t("code.chat.empty")}
+              </p>
             </div>
-            {e.tools.length > 0 ? (
-              <div className="space-y-1 rounded-chip border border-border p-2">
-                <div className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
-                  <Wrench className="h-3 w-3" /> {t("code.chat.tools")}
-                </div>
-                {e.tools.map((tool, j) => (
-                  <ToolRow key={j} tool={tool} onOpenFile={onOpenFile} />
-                ))}
+          ) : null}
+          {exchanges.map((e, i) => (
+            <div key={i} className="space-y-2">
+              <div className="rounded-chip bg-surface-2 px-2.5 py-1.5 text-sm text-foreground/90">
+                {e.you}
               </div>
-            ) : null}
-            {e.edits.map((edit, j) => (
-              <div key={j} className="space-y-1">
-                <button
-                  type="button"
-                  onClick={() => onOpenFile?.(edit.path)}
-                  className="font-mono text-xs text-accent underline decoration-dotted"
-                >
-                  {edit.path}
-                </button>
-                <DiffView patch={edit.patch} />
-              </div>
-            ))}
-            {e.answer ? (
-              // Markdown with syntax highlighting, which the chat had and this did not — a coding
-              // conversation rendering a fenced block as prose is the one formatting failure that
-              // matters here.
-              <div className="group relative">
-                <div className="md min-w-0 text-sm leading-relaxed text-foreground/90">
-                  <Markdown rehypePlugins={[rehypeHighlight]}>{e.answer}</Markdown>
+              {e.tools.length > 0 ? (
+                <div className="space-y-1 rounded-chip border border-border p-2">
+                  <div className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
+                    <Wrench className="h-3 w-3" /> {t("code.chat.tools")}
+                  </div>
+                  {e.tools.map((tool, j) => (
+                    <ToolRow key={j} tool={tool} onOpenFile={onOpenFile} />
+                  ))}
                 </div>
-                {/* Copies the exchange as MARKDOWN, not the rendered text: what the reader wants to
+              ) : null}
+              {e.edits.map((edit, j) => (
+                <div key={j} className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => onOpenFile?.(edit.path)}
+                    className="font-mono text-xs text-accent underline decoration-dotted"
+                  >
+                    {edit.path}
+                  </button>
+                  <DiffView patch={edit.patch} />
+                </div>
+              ))}
+              {e.answer ? (
+                // Markdown with syntax highlighting, which the chat had and this did not — a coding
+                // conversation rendering a fenced block as prose is the one formatting failure that
+                // matters here.
+                <div className="group relative">
+                  <div className="md min-w-0 text-sm leading-relaxed text-foreground/90">
+                    <Markdown rehypePlugins={[rehypeHighlight]}>
+                      {e.answer}
+                    </Markdown>
+                  </div>
+                  {/* Copies the exchange as MARKDOWN, not the rendered text: what the reader wants to
                     paste into an issue is the fenced code that made it worth reading, and the
                     rendered version loses exactly that. */}
-                <button
-                  type="button"
-                  aria-label={t("code.chat.copyAnswer")}
-                  title={t("code.chat.copyAnswer")}
-                  className="absolute right-0 top-0 rounded-chip p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 focus:opacity-100"
-                  onClick={() => {
-                    void navigator.clipboard?.writeText(exchangeToMarkdown(e)).catch(() => undefined);
-                  }}
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ) : null}
-            {e.failed ? (
-              <div className="space-y-1">
-                <p className="text-xs text-bad">{t("code.chat.error")}</p>
-                {/* Folded, not hidden: the headline stays one line for the common case where the
+                  <button
+                    type="button"
+                    aria-label={t("code.chat.copyAnswer")}
+                    title={t("code.chat.copyAnswer")}
+                    className="absolute right-0 top-0 rounded-chip p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 focus:opacity-100"
+                    onClick={() => {
+                      void navigator.clipboard
+                        ?.writeText(exchangeToMarkdown(e))
+                        .catch(() => undefined);
+                    }}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : null}
+              {e.failed ? (
+                <div className="space-y-1">
+                  <p className="text-xs text-bad">{t("code.chat.error")}</p>
+                  {/* Folded, not hidden: the headline stays one line for the common case where the
                     user only wants to retry, and the raw provider message is one click away for
                     the case where it says `invalid_api_key` and settles the whole question. */}
-                {e.error ? (
-                  <details className="text-xs">
-                    <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-                      {t("code.chat.errorDetail")}
-                    </summary>
-                    <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-chip bg-surface-2 p-2 font-mono text-muted-foreground">
-                      {e.error}
-                    </pre>
-                  </details>
-                ) : null}
-              </div>
-            ) : null}
-            {e.done?.fused ? (
-              // At the answer, which is the only place it lands in time. The composer warns before
-              // the click; neither warning is visible at the moment someone reads a confident
-              // description of a file that was never opened.
-              <p className="flex items-start gap-1.5 text-xs text-warn">
-                <Network className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                {t("composer.fusedAnswer")}
-              </p>
-            ) : null}
-            {e.verified ? (
-              <Verdict
-                v={e.verified}
-                undone={e.undone}
-                onUndo={() => void undo(i, e.verified?.revert_token ?? "")}
-                onFix={() => onHandOff(e.you)}
-                t={t}
-              />
-            ) : null}
-            {e.done ? <TurnReceipt done={e.done} t={t} /> : null}
-          </div>
-        ))}
+                  {e.error ? (
+                    <details className="text-xs">
+                      <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                        {t("code.chat.errorDetail")}
+                      </summary>
+                      <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-chip bg-surface-2 p-2 font-mono text-muted-foreground">
+                        {e.error}
+                      </pre>
+                    </details>
+                  ) : null}
+                </div>
+              ) : null}
+              {e.done?.fused ? (
+                // At the answer, which is the only place it lands in time. The composer warns before
+                // the click; neither warning is visible at the moment someone reads a confident
+                // description of a file that was never opened.
+                <p className="flex items-start gap-1.5 text-xs text-warn">
+                  <Network className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  {t("composer.fusedAnswer")}
+                </p>
+              ) : null}
+              {e.verified ? (
+                <Verdict
+                  v={e.verified}
+                  undone={e.undone}
+                  onUndo={() => void undo(i, e.verified?.revert_token ?? "")}
+                  onFix={() => onHandOff(e.you)}
+                  t={t}
+                />
+              ) : null}
+              {e.done ? <TurnReceipt done={e.done} t={t} /> : null}
+            </div>
+          ))}
         </div>
       </div>
       {/* Only while there is something to miss: reading back through a finished answer should not
@@ -871,7 +1014,9 @@ export function Conversation({
             from one that was dropped, and the user would retype it — which is two sends, not one. */}
         {queued ? (
           <div className="mb-1.5 flex items-start gap-2 rounded-chip border border-hairline bg-surface-2 px-2 py-1.5">
-            <span className="shrink-0 text-xs text-muted-foreground">{t("composer.queued")}</span>
+            <span className="shrink-0 text-xs text-muted-foreground">
+              {t("composer.queued")}
+            </span>
             <span className="min-w-0 flex-1 truncate text-xs">{queued}</span>
             <button
               type="button"
@@ -941,12 +1086,16 @@ export function Conversation({
             itself; a file that arrived by clipboard has no button to stand beside, and silence
             would leave someone waiting for a screenshot that was never uploaded. */}
         {uploadFailed ? (
-          <p className="text-xs text-bad">{t("code.attach.failed", { name: uploadFailed })}</p>
+          <p className="text-xs text-bad">
+            {t("code.attach.failed", { name: uploadFailed })}
+          </p>
         ) : null}
         <div className="flex flex-wrap items-center gap-2">
           <AttachButton onAdded={(a) => setAttached((prev) => [...prev, a])} />
           <DictateButton
-            onText={(text) => setDraft((prev) => (prev ? `${prev} ${text}` : text))}
+            onText={(text) =>
+              setDraft((prev) => (prev ? `${prev} ${text}` : text))
+            }
           />
           {/* Fusion is a per-turn choice, next to the box you type in — and it turns OFF the
               agent's ability to act, which the tooltip says before the click and `fusedAnswer` says
@@ -960,6 +1109,11 @@ export function Conversation({
           >
             <Network className="h-4 w-4" /> {t("composer.fuse")}
           </Button>
+          {/* Only while fusion is armed. Who plays each part is a real decision — three models, six
+              calls — and it is noise on every turn that is not fused. */}
+          {fuse ? (
+            <FusionCast value={cast} onChange={setCast} disabled={busy} />
+          ) : null}
           {/* What this turn may COST, next to what it may DO. Both are per-turn choices, and this
               one is the only limit in the app that can end a turn on its own — so it belongs where
               the decision is made rather than in a settings screen visited once. */}
@@ -969,14 +1123,23 @@ export function Conversation({
               <Square className="h-4 w-4" /> {t("code.chat.stop")}
             </Button>
           ) : (
-            <Button size="sm" disabled={!draft.trim() || busyElsewhere} onClick={() => send()}>
+            <Button
+              size="sm"
+              disabled={!draft.trim() || busyElsewhere}
+              onClick={() => send()}
+            >
               <Send className="h-4 w-4" /> {t("code.chat.send")}
             </Button>
           )}
           {/* Three warnings, at three moments, because each catches a different person: the tooltip
               before the click, this while the toggle is armed and the message is being typed, and
               the mark on the answer for whoever was not reading either. */}
-          <span className={cn("ml-auto text-xs", fuse ? "text-warn" : "text-muted-foreground")}>
+          <span
+            className={cn(
+              "ml-auto text-xs",
+              fuse ? "text-warn" : "text-muted-foreground",
+            )}
+          >
             {fuse ? t("composer.fuseOn") : t("code.chat.hint")}
           </span>
         </div>
