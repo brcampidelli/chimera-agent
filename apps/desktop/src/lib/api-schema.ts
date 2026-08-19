@@ -1957,6 +1957,12 @@ export interface components {
              * @default false
              */
             fuse: boolean;
+            /** Fusion Judge */
+            fusion_judge?: string | null;
+            /** Fusion Panel */
+            fusion_panel?: string[] | null;
+            /** Fusion Synthesizer */
+            fusion_synthesizer?: string | null;
             /**
              * Max Attempts
              * @default 3
@@ -2390,6 +2396,12 @@ export interface components {
              * @default false
              */
             fuse: boolean;
+            /** Fusion Judge */
+            fusion_judge?: string | null;
+            /** Fusion Panel */
+            fusion_panel?: string[] | null;
+            /** Fusion Synthesizer */
+            fusion_synthesizer?: string | null;
             /** Max Steps */
             max_steps?: number | null;
             /** Max Usd */
@@ -2489,6 +2501,7 @@ export interface components {
             autonomy: components["schemas"]["AutonomyCfgOut"];
             browser?: components["schemas"]["BrowserCfgOut"];
             cache: components["schemas"]["CacheCfgOut"];
+            fusion?: components["schemas"]["FusionCfgOut"];
             guard: components["schemas"]["GuardCfgOut"];
             mcp: components["schemas"]["McpCfgOut"];
             memory: components["schemas"]["MemoryCfgOut"];
@@ -2805,6 +2818,54 @@ export interface components {
             path: string;
             /** Workspace */
             workspace: string;
+        };
+        /**
+         * FusionCfgOut
+         * @description Who plays each part when a turn is fused: the panel answers, the judge grades, the
+         *     synthesizer writes. Editable, because the shipped default was the only cast anyone could run —
+         *     and a default that cannot be changed is not a choice.
+         */
+        FusionCfgOut: {
+            /**
+             * Judge
+             * @default
+             */
+            judge: string;
+            kinship?: components["schemas"]["FusionKinshipOut"];
+            /**
+             * Mode
+             * @default selective
+             */
+            mode: string;
+            /** Panel */
+            panel?: string[];
+            /**
+             * Synthesizer
+             * @default
+             */
+            synthesizer: string;
+        };
+        /**
+         * FusionKinshipOut
+         * @description How independent the judge is from the panel it grades — reported, never enforced.
+         *
+         *     Two degrees, and the second is the one a slug does not reveal: ``judge_is_panelist`` is the judge
+         *     grading its own answer, and ``judge_shares_vendor_with`` is the judge and a panelist coming from
+         *     the same lab — not the same model, and not two independent votes either.
+         */
+        FusionKinshipOut: {
+            /**
+             * Independent
+             * @default true
+             */
+            independent: boolean;
+            /**
+             * Judge Is Panelist
+             * @default false
+             */
+            judge_is_panelist: boolean;
+            /** Judge Shares Vendor With */
+            judge_shares_vendor_with?: string[];
         };
         /** GitCommitOut */
         GitCommitOut: {
@@ -3824,6 +3885,12 @@ export interface components {
              * @default false
              */
             fuse: boolean;
+            /** Fusion Judge */
+            fusion_judge?: string | null;
+            /** Fusion Panel */
+            fusion_panel?: string[] | null;
+            /** Fusion Synthesizer */
+            fusion_synthesizer?: string | null;
             /**
              * Max Attempts
              * @default 3

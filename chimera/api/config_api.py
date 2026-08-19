@@ -87,6 +87,13 @@ _EDITABLE_SETTINGS = {
     "CHIMERA_APPROVAL",
     "CHIMERA_HOST_EXEC",
     "CHIMERA_TOOL_DENYLIST",
+    # Who plays each part in a fused turn. The engine has taken these three per instance since it
+    # existed; only the wire to a user was missing, so the panel a person could actually change was
+    # whichever one shipped — including the judge, whose independence from the panel is the whole
+    # claim fusion makes.
+    "CHIMERA_FUSION_PANEL",
+    "CHIMERA_FUSION_JUDGE",
+    "CHIMERA_FUSION_SYNTHESIZER",
 }
 ALLOWED_KEYS = _SECRET_KEYS | _EDITABLE_SETTINGS
 
@@ -133,6 +140,20 @@ APPLIES_WHEN: dict[str, str] = {
     "CHIMERA_APP_CRON": NEXT_LAUNCH,
     "CHIMERA_MCP_AUTOLOAD": NEXT_LAUNCH,
 }
+
+
+def _fusion_kinship(panel: list[str], judge: str) -> dict[str, Any]:
+    """How independent the judge is from the panel it grades — the engine's own answer.
+
+    Delegated to ``FusionConfig.role_kinship`` rather than reimplemented, because the interesting
+    half of it is the one nobody reimplements: not "is the judge a panelist" (obvious) but "is the
+    judge from the same lab as one" — which is not the same model and is not a second independent
+    vote either. Two copies of that rule would drift, and the copy on screen would be the one people
+    believe.
+    """
+    from chimera.fusion.engine import FusionConfig
+
+    return dict(FusionConfig(panel=list(panel), judge=judge, synthesizer=judge).role_kinship())
 
 
 def _hint(value: str | None) -> str:
@@ -274,6 +295,18 @@ def read_config(settings: Settings) -> dict[str, Any]:
             "tiers": {"weak": ladder.weak, "mid": ladder.mid, "top": ladder.top},
             "ollama_base_url": settings.ollama_base_url,
             "complete_model": settings.complete_model,
+        },
+        # Panel -> judge -> synthesizer, and how independent the judge actually is from the panel it
+        # grades. `role_kinship` is reported rather than enforced: a user with one provider key has
+        # no way to avoid overlap, and a labelled receipt beats a refusal they cannot act on.
+        "fusion": {
+            "panel": list(settings.fusion_panel),
+            "judge": settings.fusion_judge,
+            "synthesizer": settings.fusion_synthesizer,
+            "mode": settings.fusion_mode,
+            "kinship": _fusion_kinship(
+                list(settings.fusion_panel), settings.fusion_judge
+            ),
         },
         "memory": {
             "backend": settings.memory_backend,

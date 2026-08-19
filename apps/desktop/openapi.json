@@ -288,6 +288,42 @@
             "title": "Fuse",
             "type": "boolean"
           },
+          "fusion_judge": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fusion Judge"
+          },
+          "fusion_panel": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fusion Panel"
+          },
+          "fusion_synthesizer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fusion Synthesizer"
+          },
           "max_attempts": {
             "default": 3,
             "title": "Max Attempts",
@@ -1247,6 +1283,42 @@
             "title": "Fuse",
             "type": "boolean"
           },
+          "fusion_judge": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fusion Judge"
+          },
+          "fusion_panel": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fusion Panel"
+          },
+          "fusion_synthesizer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fusion Synthesizer"
+          },
           "max_steps": {
             "anyOf": [
               {
@@ -1509,6 +1581,9 @@
           },
           "cache": {
             "$ref": "#/components/schemas/CacheCfgOut"
+          },
+          "fusion": {
+            "$ref": "#/components/schemas/FusionCfgOut"
           },
           "guard": {
             "$ref": "#/components/schemas/GuardCfgOut"
@@ -2284,6 +2359,62 @@
           "capped"
         ],
         "title": "FsTreeOut",
+        "type": "object"
+      },
+      "FusionCfgOut": {
+        "description": "Who plays each part when a turn is fused: the panel answers, the judge grades, the\nsynthesizer writes. Editable, because the shipped default was the only cast anyone could run \u2014\nand a default that cannot be changed is not a choice.",
+        "properties": {
+          "judge": {
+            "default": "",
+            "title": "Judge",
+            "type": "string"
+          },
+          "kinship": {
+            "$ref": "#/components/schemas/FusionKinshipOut"
+          },
+          "mode": {
+            "default": "selective",
+            "title": "Mode",
+            "type": "string"
+          },
+          "panel": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Panel",
+            "type": "array"
+          },
+          "synthesizer": {
+            "default": "",
+            "title": "Synthesizer",
+            "type": "string"
+          }
+        },
+        "title": "FusionCfgOut",
+        "type": "object"
+      },
+      "FusionKinshipOut": {
+        "description": "How independent the judge is from the panel it grades \u2014 reported, never enforced.\n\nTwo degrees, and the second is the one a slug does not reveal: ``judge_is_panelist`` is the judge\ngrading its own answer, and ``judge_shares_vendor_with`` is the judge and a panelist coming from\nthe same lab \u2014 not the same model, and not two independent votes either.",
+        "properties": {
+          "independent": {
+            "default": true,
+            "title": "Independent",
+            "type": "boolean"
+          },
+          "judge_is_panelist": {
+            "default": false,
+            "title": "Judge Is Panelist",
+            "type": "boolean"
+          },
+          "judge_shares_vendor_with": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Judge Shares Vendor With",
+            "type": "array"
+          }
+        },
+        "title": "FusionKinshipOut",
         "type": "object"
       },
       "GitCommitOut": {
@@ -4697,6 +4828,42 @@
             "default": false,
             "title": "Fuse",
             "type": "boolean"
+          },
+          "fusion_judge": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fusion Judge"
+          },
+          "fusion_panel": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fusion Panel"
+          },
+          "fusion_synthesizer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fusion Synthesizer"
           },
           "max_attempts": {
             "default": 3,

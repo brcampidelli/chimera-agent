@@ -230,6 +230,31 @@ class SandboxCfgOut(BaseModel):
     image: str
 
 
+class FusionKinshipOut(BaseModel):
+    """How independent the judge is from the panel it grades — reported, never enforced.
+
+    Two degrees, and the second is the one a slug does not reveal: ``judge_is_panelist`` is the judge
+    grading its own answer, and ``judge_shares_vendor_with`` is the judge and a panelist coming from
+    the same lab — not the same model, and not two independent votes either.
+    """
+
+    judge_is_panelist: bool = False
+    judge_shares_vendor_with: list[str] = Field(default_factory=list)
+    independent: bool = True
+
+
+class FusionCfgOut(BaseModel):
+    """Who plays each part when a turn is fused: the panel answers, the judge grades, the
+    synthesizer writes. Editable, because the shipped default was the only cast anyone could run —
+    and a default that cannot be changed is not a choice."""
+
+    panel: list[str] = Field(default_factory=list)
+    judge: str = ""
+    synthesizer: str = ""
+    mode: str = "selective"
+    kinship: FusionKinshipOut = Field(default_factory=FusionKinshipOut)
+
+
 class AutonomyCfgOut(BaseModel):
     """How much the agent may do — the three controls that decide it, in one place.
 
@@ -340,6 +365,7 @@ class BrowserCfgOut(BaseModel):
 
 class ConfigOut(BaseModel):
     models: ModelsCfgOut
+    fusion: FusionCfgOut = Field(default_factory=FusionCfgOut)
     memory: MemoryCfgOut
     cache: CacheCfgOut
     sandbox: SandboxCfgOut
