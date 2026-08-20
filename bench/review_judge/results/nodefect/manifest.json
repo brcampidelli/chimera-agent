@@ -1,0 +1,16 @@
+{
+  "judge_model": "openrouter/deepseek/deepseek-r1",
+  "seed": 20260819,
+  "slice": "Diff Level",
+  "per_label": 60,
+  "window_lines": 60,
+  "temperature": 0.0,
+  "arm": "nodefect",
+  "prompt_sha": "42b7326e0389",
+  "chimera_version": "0.48.0rc7",
+  "seconds": 8761.9,
+  "tokens": {
+    "prompt": 91205,
+    "completion": 185913
+  }
+}

@@ -242,24 +242,54 @@ _TAIL = (
 #: twelve of them were TRUE and not defects — praise, wording, scope — and the old footer had no way
 #: to reject those, so approving them was obligatory rather than mistaken. See
 #: PREREGISTRATION-rubric.md, written before this ran.
-_TAIL_SPLIT = (
-    "Two questions, and the second is the one that decides:\n"
-    "  1. Is the comment's premise TRUE of this diff?\n"
-    "  2. Does it report a DEFECT introduced by this diff?\n\n"
-    "Reject when any of these holds:\n"
-    "  - the code the comment describes is not in this diff;\n"
-    "  - a line of the diff contradicts its central claim;\n"
+_GROUND_NO_DEFECT = (
     "  - it asserts no defect at all — it praises the change, restates what the diff does, or "
     "expresses a preference about naming, wording, style or structure;\n"
-    "  - what it reports was already there before this diff and was not introduced by it.\n\n"
+)
+_GROUND_PRE_EXISTING = (
+    "  - what it reports was already there before this diff and was not introduced by it.\n"
+)
+_NOT_A_FINDING = (
     "A true statement is not a finding. A suggestion to add something is not evidence that its "
     "absence is a defect.\n\n"
+)
+
+_ANSWER = (
     "Answer with JSON and nothing else, with the keys in THIS order — the counterargument is written "
     "before the verdict because it has to inform it, not decorate it:\n"
     '{"strongest_counterargument": "<the best case that this comment is NOT a real defect, citing '
     'the diff; write it even when you end up approving>", "reason": "<one line>", '
     '"verdict": "approve" | "reject"}'
 )
+
+
+def _rubric(*, no_defect: bool, pre_existing: bool) -> str:
+    """The split rubric, with either extra ground switched off.
+
+    Arm C carried both and produced 60.4% recall at 38.5% false rejection — a real axis at an
+    unusable operating point, and no way to tell which ground bought the catches and which destroyed
+    the correct findings. D and E take that apart; assembling them from the same pieces is what makes
+    them comparable to C rather than to a rewrite. See PREREGISTRATION-grounds.md.
+    """
+    grounds = (
+        "  - the code the comment describes is not in this diff;\n"
+        "  - a line of the diff contradicts its central claim;\n"
+    )
+    if no_defect:
+        grounds += _GROUND_NO_DEFECT
+    if pre_existing:
+        grounds += _GROUND_PRE_EXISTING
+    return (
+        "Two questions, and the second is the one that decides:\n"
+        "  1. Is the comment's premise TRUE of this diff?\n"
+        "  2. Does it report a DEFECT introduced by this diff?\n\n"
+        "Reject when any of these holds:\n" + grounds + "\n"
+        + (_NOT_A_FINDING if no_defect else "")
+        + _ANSWER
+    )
+
+
+_TAIL_SPLIT = _rubric(no_defect=True, pre_existing=True)
 
 
 def system_prompt(arm: str) -> str:
@@ -272,6 +302,10 @@ def system_prompt(arm: str) -> str:
     """
     if arm == "split":
         return _HEAD + _STANCE["cautious"] + _TAIL_SPLIT
+    if arm == "nodefect":
+        return _HEAD + _STANCE["cautious"] + _rubric(no_defect=True, pre_existing=False)
+    if arm == "preexisting":
+        return _HEAD + _STANCE["cautious"] + _rubric(no_defect=False, pre_existing=True)
     return _HEAD + _STANCE[arm] + _TAIL
 
 
@@ -383,7 +417,7 @@ def main() -> None:
     parser.add_argument("--fetch", action="store_true", help="Cache the diffs and exit (no model calls).")
     parser.add_argument("--dry-run", action="store_true", help="Build every prompt, call nothing.")
     parser.add_argument("--limit", type=int, default=0, help="Grade only the first N items (smoke test).")
-    parser.add_argument("--arm", choices=[*sorted(_STANCE), "split"], default="cautious",
+    parser.add_argument("--arm", choices=[*sorted(_STANCE), "split", "nodefect", "preexisting"], default="cautious",
                         help="Which stance the judge is given. See PREREGISTRATION-arms.md.")
     args = parser.parse_args()
 

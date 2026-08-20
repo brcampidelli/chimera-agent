@@ -311,3 +311,97 @@ prompt until one lands under 20% is exactly the fitting this directory has refus
 **And the ceiling from the reading still stands**: ~12 of the 53 cannot be converted by any rubric —
 6 unfalsifiable, 3 needing API semantics, 3 with labels a careful reader contests. Arm C's 32 caught
 is already 78% of the 41 that are reachable at all.
+
+---
+
+# Arms D and E — which ground carries the cost
+
+Run 2026-08-20 · same judge, same 105 items, same diffs · US$ 1.05 for both, run in parallel
+
+`PREREGISTRATION-grounds.md` split arm C's rubric in half: D keeps only *asserts no defect*, E only
+*pre-existing rather than introduced here*. It predicted D at 45–60% recall / 25–40% false rejection
+and E at 5–20% / 0–8%.
+
+## Five arms
+
+| arm | extra grounds | catches bad | destroys good | rejections |
+|---|---|---:|---:|---:|
+| A cautious | — | 15.1% | 0.0% | 8 |
+| B neutral | — | 18.9% | 3.8% | 12 |
+| E pre-existing only | 1 | 35.8% | 26.9% | 33 |
+| D not-a-defect only | 1 | 54.7% | 38.5% | 49 |
+| C both | 2 | 60.4% | 38.5% | 52 |
+
+**Neither ground is adoptable**: both exceed the 20% false-rejection ceiling on their own.
+
+**The E prediction was wrong on both numbers, badly.** Predicted 5–20% recall at 0–8% false
+rejection; measured 35.8% at 26.9%. The reasoning behind that prediction — that "pre-existing" is
+objective, because a diff shows what it changed — did not survive contact.
+
+## The grounds are not independent
+
+Of the 19 incorrect comments E catches, **17 are also caught by D**. D alone reproduces C's false
+rejection exactly (20 of 52). Adding the second ground to D bought 3 more catches and cost nothing
+further.
+
+And when the reasons E gave for destroying correct findings are read: **only 4 of the 14 invoke E's
+own ground**. The rest reject for other reasons entirely — one of them by CONTRADICTION, a ground
+that already existed in arm A, where that same comment was approved.
+
+So the rubric is not a menu of rules applied case by case. Widening it moved something global.
+
+## What moved: the threshold, and — separately — the separation
+
+Rejections scale with how permissive the rubric is, almost regardless of which ground was added:
+8 → 12 → 33 → 49 → 52 as grounds go 2 → 2 → 3 → 3 → 4. That looks like a threshold shift, and a
+threshold shift alone would be worthless: any judge can trade recall for precision by lowering its
+bar, and the pilot could have had 60% recall on day one by rejecting half of everything.
+
+Youden's J (TPR − FPR) separates the two effects. Zero is chance; a pure threshold move leaves it
+flat:
+
+| arm | TPR | FPR | **J** |
+|---|---:|---:|---:|
+| A cautious | 15.1% | 0.0% | **+15.1%** |
+| B neutral | 18.9% | 3.8% | **+15.0%** |
+| E pre-existing | 35.8% | 26.9% | **+8.9%** |
+| D not-a-defect | 54.7% | 38.5% | **+16.3%** |
+| C both | 60.4% | 38.5% | **+21.9%** |
+
+Three findings, and they only appear at this level:
+
+1. **A and B are the same judge at the same separation.** J of 15.1 and 15.0 — the neutral stance
+   moved nothing at all. Arm B's inconclusive six discordant pairs now have a clean explanation.
+2. **E made the judge WORSE than doing nothing new.** J drops to 8.9. It rejects more, and the extra
+   rejections are barely better than coin-flips. An objective-sounding ground that the judge mostly
+   does not use, while rejecting more overall, is the worst of both.
+3. **C genuinely separates better** — J 21.9 against A's 15.1. The rubric change was not only a
+   threshold move; the judge really did tell the classes apart better with both grounds present. It
+   is still unusable at 38.5% false rejection, but the improvement is real and is the first evidence
+   in this directory that anything we wrote made the judge *better* rather than merely louder.
+
+## Verdict
+
+By the pre-registered rule: no ground ships. And the pre-registration named what follows —
+
+> If neither ground is adoptable, the answer is that a prompt cannot separate substantive suggestions
+> from stylistic ones at this sample size, and the next move is a different instrument, not a fifth
+> wording.
+
+**That is the finding, and this is where prompt variants stop.** Five arms, US$ 2.60, and the honest
+summary is: the judge's separation can be improved by rubric (15.1 → 21.9 J), no rubric tested puts a
+usable operating point within reach, and one ground that looked objective made things worse.
+
+## What a different instrument would mean
+
+Not a fifth wording. The candidates the data actually points at:
+
+- **Two calls instead of one.** The single call collapses "is the premise true" and "is this a
+  defect"; asking them as separate calls, with the second seeing the first's answer, is a structural
+  change rather than a rhetorical one.
+- **Calibration instead of a verdict.** A confidence score would let the operating point be chosen
+  after measuring, on the curve, rather than being baked into the wording — which is what every arm
+  here has been doing blind.
+- **A larger sample before any of it.** At n=105 with 53 incorrect comments, a 10-point difference
+  in recall is roughly the width of the confidence interval. The full slice is 1017 rows and US$ 3.66;
+  after five arms at US$ 0.5, the cheap thing has stopped being cheap relative to what it buys.
