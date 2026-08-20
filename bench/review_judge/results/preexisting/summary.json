@@ -1,0 +1,53 @@
+{
+  "n_graded": 105,
+  "n_unparsed": 0,
+  "n_dropped_no_diff": 15,
+  "bad_comments": 53,
+  "caught": 19,
+  "rejection_recall": 0.358,
+  "rejection_recall_ci": [
+    0.243,
+    0.493
+  ],
+  "good_comments": 52,
+  "wrongly_rejected": 14,
+  "false_rejection_rate": 0.269,
+  "false_rejection_ci": [
+    0.168,
+    0.403
+  ],
+  "reject_rate_overall": 0.314,
+  "approve_everything_accuracy": 0.495,
+  "verdict": "DOES NOT DISCRIMINATE",
+  "uninformative": [],
+  "by_source_model": {
+    "?": {
+      "n": 15,
+      "rejected": 4
+    },
+    "Claude-Code/Claude-4.5-Sonnet": {
+      "n": 16,
+      "rejected": 4
+    },
+    "Deepseek-V3.2": {
+      "n": 16,
+      "rejected": 4
+    },
+    "GLM-4.7": {
+      "n": 17,
+      "rejected": 5
+    },
+    "GPT-5.2": {
+      "n": 15,
+      "rejected": 5
+    },
+    "Gemini-3-Pro": {
+      "n": 12,
+      "rejected": 3
+    },
+    "Qwen-Coder-480B": {
+      "n": 14,
+      "rejected": 8
+    }
+  }
+}
