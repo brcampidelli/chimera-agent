@@ -135,3 +135,103 @@ Not more prompt variants — that road is fitting, and this arm already spent it
 the judge's stated reason for each. Reading a sample of those, and asking whether the misses share a
 shape (a kind of defect, a language, a diff too small to judge), is free and answers a question that
 another US$ 3.66 of the full slice would not.
+
+---
+
+# Reading the 41 both arms missed
+
+Three readers, independently, over the 41 incorrect comments that survived both stances — each with
+the comment, the diff, and the judge's stated reason in both arms. They were given four categories
+and told to invent more if the data called for it. Two of them did, and converged on the same two.
+
+| category | n | what it means |
+|---|---:|---|
+| **reasoning failure** | 15 | the diff contained the refutation and the judge did not use it |
+| **not a defect** | 12 | the claim is TRUE and verifiable — and it is praise, wording, scope or refactoring |
+| **unfalsifiable claim** | 6 | "consider adding error handling" — nothing to refute |
+| **external knowledge** | 3 | refuting it needs API semantics no amount of repository context supplies |
+| **questionable label** | 3 | the reader defends the comment with the diff in hand |
+| **insufficient context** | 2 | the judge genuinely could not have known |
+
+## The hypothesis that died
+
+**Context is not the bottleneck.** Two of 41 — and one reader found zero in its 14, after opening the
+FULL patch for every ambiguous case to check whether the 60-line window had hidden the evidence. It
+had not: what lay outside was either irrelevant or *supported* the comment.
+
+Diff size predicts nothing. The three shortest diffs in one batch (9 lines) contain its two crudest
+errors; another batch's misses have diffs *larger* than average (2145 chars vs 1524). Buying more
+context — the obvious next spend — would have bought almost nothing.
+
+## The bottleneck is the rubric, and the rubric is ours
+
+Both arms share this instruction, written by us:
+
+> Reject only when you can point at the reason: the code the comment describes is not in this diff,
+> or a line of the diff contradicts its central claim.
+
+There is no ground for **"true, but not a defect"** — which is 12 of the 41. Praise is perfectly
+grounded in the diff and no line contradicts it; under this rubric, approving was *obligatory*. The
+judge followed the instruction.
+
+Worse for suggestions ("add a deprecation warning", "wrap this in try/catch"): the absence of the
+suggested thing is the comment's **premise**, not its refutation, so the rejection condition cannot
+fire by construction. One justification says it outright — *"the comment suggests adding a
+deprecation warning, but the diff shows no warning logic"* — reading the absence as confirmation.
+
+**The judge is validating the premise where the header asked it to judge the conclusion.** The footer
+won, in both arms, which is a second explanation for why the two stances agreed on 47 of 53.
+
+## What is genuinely the judge
+
+Fifteen reasoning failures, and they are not subtle. A `substr(0, npos)` call flagged as a throw risk
+when the position is 0. A nil-check demanded on a pointer the same diff already dereferences two
+lines earlier. A missing space reported on a line where the space is visible. An `override` in the
+signature making "may silently fail" impossible — with the judge repeating the speculation as its
+own finding.
+
+In three cases the judge **hardened** the comment beyond what it claimed, to support approving: one
+asserts "the diff shows a comma without a space" where the diff shows the opposite. That reads as
+verdict first, reason second.
+
+The justifications localise correctly — real symbols, real line numbers, no hallucinated positions.
+But across all 82 of them (41 items × 2 arms) **not one cites a line AGAINST the comment.** In at
+least six, the justification states the disconfirming fact and approves anyway: *"remains unchanged
+in the diff"*, *"without indicating a functional defect"*, *"the diff shows no Azure-related context
+to validate this claim"*. Not a perception problem. A decision-rule problem.
+
+## The finding that limits the obvious fix
+
+One reader measured the FORM of the comments rather than their content: **81% of the CORRECT comments
+and 74% of the incorrect ones are phrased as suggestions** ("consider", "should", "please"). Form does
+not separate the classes.
+
+And the pair that makes it concrete: in n8n#15057, same file, same authoring model, two generic
+suggestions — *"consider wrapping this in a try-catch"* is labelled **correct**, *"consider optimizing
+the spread operator"* is labelled **incorrect**. The judge answered both the same way, and the same
+answer is scored as a hit once and a miss the other time.
+
+**So for the ~6 unfalsifiable items, the label is contextual human agreement, not something derivable
+from the diff.** No judge — no prompt, no model, no context budget — can get those right from what
+this bench shows it. That is a ceiling on the instrument, and it belongs in the record next to the
+15.1%.
+
+## What to change, and what it can be expected to buy
+
+Not another prompt variant chosen after the fact — that is fitting, and this directory has already
+said so twice. What the data points at, to be pre-registered before it runs:
+
+1. **Split the question in two.** "Is the premise true?" and "is this a defect?" are collapsed into
+   one, and the second is the one that matters. Add a third rejection ground: *the comment asserts no
+   defect (praise, paraphrase, preference)*, and *what it reports is pre-existing rather than
+   introduced by this diff*. Reaches the 12 "not a defect" and some of the 15.
+2. **Make the counter-evidence decisive, not optional.** A required `strongest_counterargument` field
+   written BEFORE the verdict — the judge already writes the disconfirming fact spontaneously in six
+   cases and approves regardless, so the gain is in making that sentence bind.
+3. **Record the full reason.** `ask()` truncates at 200 characters and all three readers flagged it:
+   they judged the first sentence, not the reasoning. If auditing justifications is the point, the
+   truncation removes the evidence.
+
+**Honest ceiling:** even if all three work perfectly, ~6 unfalsifiable items and 3 external-knowledge
+ones are out of reach, and 3 more have labels a careful reader would contest. That is 12 of 53 that
+nothing on our side can convert — a realistic best case near 75%, not 100%.
