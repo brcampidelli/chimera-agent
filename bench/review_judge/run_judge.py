@@ -215,12 +215,23 @@ def window(patch: str, from_line: int, to_line: int) -> str:
 
 # --- the question --------------------------------------------------------------------------------
 
-SYSTEM = (
+_HEAD = (
     "You are reviewing a code-review comment, not the code. Decide whether the comment identifies a "
     "REAL defect in the diff shown.\n\n"
-    "The two mistakes are not equally bad. Keeping a wrong comment costs a reader a few seconds. "
-    "Rejecting a correct one destroys a real finding and nobody sees it again. When your evidence "
-    "falls short, APPROVE.\n\n"
+)
+
+#: The variable under test, and the only thing that differs between the arms. Fixed in
+#: PREREGISTRATION-arms.md before arm B ran.
+_STANCE = {
+    "cautious": (
+        "The two mistakes are not equally bad. Keeping a wrong comment costs a reader a few seconds. "
+        "Rejecting a correct one destroys a real finding and nobody sees it again. When your evidence "
+        "falls short, APPROVE.\n\n"
+    ),
+    "neutral": "Judge the comment on its merits.\n\n",
+}
+
+_TAIL = (
     "Reject only when you can point at the reason: the code the comment describes is not in this "
     "diff, or a line of the diff contradicts its central claim.\n\n"
     "Answer with JSON and nothing else, with the keys in this order:\n"
@@ -228,7 +239,16 @@ SYSTEM = (
 )
 
 
-def ask(judge: Any, item: Item, model: str) -> tuple[str, str, dict[str, int]]:
+def system_prompt(arm: str) -> str:
+    """The prompt for one arm.
+
+    The stance varies; the definition of a valid rejection does not. Removing that too would move two
+    variables at once and the result would name neither.
+    """
+    return _HEAD + _STANCE[arm] + _TAIL
+
+
+def ask(judge: Any, item: Item, model: str, arm: str) -> tuple[str, str, dict[str, int]]:
     """Returns (verdict, reason, usage). `verdict` is "approve", "reject" or "unparsed"."""
     user = (
         f"File: {item.path}\n"
@@ -237,7 +257,7 @@ def ask(judge: Any, item: Item, model: str) -> tuple[str, str, dict[str, int]]:
         f"Review comment:\n{item.note}\n"
     )
     reply = judge.complete(
-        [{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}],
+        [{"role": "system", "content": system_prompt(arm)}, {"role": "user", "content": user}],
         model=model,
         temperature=0.0,
     )
@@ -332,6 +352,8 @@ def main() -> None:
     parser.add_argument("--fetch", action="store_true", help="Cache the diffs and exit (no model calls).")
     parser.add_argument("--dry-run", action="store_true", help="Build every prompt, call nothing.")
     parser.add_argument("--limit", type=int, default=0, help="Grade only the first N items (smoke test).")
+    parser.add_argument("--arm", choices=sorted(_STANCE), default="cautious",
+                        help="Which stance the judge is given. See PREREGISTRATION-arms.md.")
     args = parser.parse_args()
 
     items = sample(load_rows())
@@ -355,7 +377,7 @@ def main() -> None:
         print(f"dry run — {len(usable)} prompts built, patch chars: "
               f"min {min(sizes)} / median {sorted(sizes)[len(sizes)//2]} / max {max(sizes)}")
         print("\n--- one prompt ---")
-        print(SYSTEM[:200], "...\n")
+        print(system_prompt(args.arm)[:260], "...\n")
         print(usable[0].patch[:400])
         return
 
@@ -365,16 +387,17 @@ def main() -> None:
     settings = get_settings()
     model = os.environ.get("CHIMERA_FUSION_JUDGE") or settings.fusion_judge
     gateway = LLMGateway()
-    print(f"judge: {model}")
+    print(f"judge: {model} · arm: {args.arm}")
 
-    OUT.mkdir(parents=True, exist_ok=True)
+    out = OUT / args.arm
+    out.mkdir(parents=True, exist_ok=True)
     rows: list[dict[str, Any]] = []
     tokens = Counter()
     started = time.time()
 
     for n, item in enumerate(usable, 1):
         try:
-            verdict, reason, usage = ask(gateway, item, model)
+            verdict, reason, usage = ask(gateway, item, model, args.arm)
         except Exception as exc:  # a provider failure is not a verdict
             verdict, reason, usage = "unparsed", f"call failed: {exc}"[:200], {"prompt": 0, "completion": 0}
         tokens.update(usage)
@@ -389,19 +412,20 @@ def main() -> None:
         "per_label": PER_LABEL,
         "window_lines": WINDOW,
         "temperature": 0.0,
-        "prompt_sha": __import__("hashlib").sha256(SYSTEM.encode()).hexdigest()[:12],
+        "arm": args.arm,
+        "prompt_sha": __import__("hashlib").sha256(system_prompt(args.arm).encode()).hexdigest()[:12],
         "chimera_version": __import__("importlib.metadata", fromlist=["version"]).version("chimera-agent"),
         "seconds": round(time.time() - started, 1),
         "tokens": dict(tokens),
     }
     summary = report_results(rows, dropped)
 
-    (OUT / "details.jsonl").write_text(
+    (out / "details.jsonl").write_text(
         "\n".join(json.dumps(r, ensure_ascii=False) for r in rows) + "\n", encoding="utf-8"
     )
-    (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-    (OUT / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
-    print(f"\nwrote {OUT}/summary.json · tokens {dict(tokens)}")
+    (out / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    (out / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    print(f"\nwrote {out}/summary.json · tokens {dict(tokens)}")
 
 
 if __name__ == "__main__":

@@ -77,3 +77,61 @@ spends most of its tokens thinking). The full Diff Level slice, 1017 rows, proje
 The confirmatory run is worth doing, but not first. The cheaper question is whether the prompt's
 approve-under-uncertainty instruction is producing this number, and that is a two-arm experiment on
 this same pilot sample — pre-registered separately, with the threshold fixed before either arm runs.
+
+---
+
+# Arm B — the neutral stance, n=105 (same items, paired)
+
+Run 2026-08-19 · same judge, same sample, same diffs · US$ 0.32 · 95 minutes
+
+`PREREGISTRATION-arms.md` asked one question: was the pilot measuring the judge, or the prompt that
+told it to approve under uncertainty? Arm B removes those three sentences and changes nothing else.
+
+## Both arms
+
+| | cautious (A) | neutral (B) |
+|---|---:|---:|
+| Rejection recall | 15.1% (8/53) | **18.9% (10/53)** |
+| False rejection | 0.0% (0/52) | **3.8% (2/52)** |
+| Overall rejection rate | 7.6% | 11.4% |
+| Unparseable | 0 | 0 |
+
+## The paired comparison, which is the point
+
+| | count |
+|---|---:|
+| both arms caught it | 6 |
+| only the cautious arm | 2 |
+| only the neutral arm | 4 |
+| **neither arm caught it** | **41** |
+| discordant pairs | **6** |
+
+Difference in recall, 95% CI: **[−4.5%, +9.1%]** — includes zero.
+
+**This lands on the fourth uninformative condition, which was written down before the run: fewer
+than 10 discordant pairs means McNemar has nothing to work with.** At n=105 this comparison does not
+resolve the question, and 3.8 percentage points is not a result. Saying so is the whole reason that
+condition was fixed in advance.
+
+## What it does establish
+
+**The instruction was not the bottleneck.** Removing "when your evidence falls short, APPROVE" moved
+six items out of fifty-three, and **41 of the 53 incorrect comments survived both stances**. A prompt
+that was holding the judge back would not leave that floor untouched.
+
+So the pilot's 15.1% is a fact about the judge on this task, not an artefact of how it was asked. The
+caveat `RESULTS.md` raised is answered — in the direction that makes the original number worse, not
+better.
+
+**The trade-off appeared, in the predicted direction.** False rejection went from 0 to 2 of 52. The
+pre-registration named this exact possibility ("an instruction to weigh evidence carefully can raise
+a model's willingness to reject correct findings"). Two items is far too few to call it, but it is
+not in the direction that would have flattered the neutral arm.
+
+## What would actually resolve it
+
+Not more prompt variants — that road is fitting, and this arm already spent its one run. The floor of
+41 missed comments is where the information is: they are on disk in both `details.jsonl` files, with
+the judge's stated reason for each. Reading a sample of those, and asking whether the misses share a
+shape (a kind of defect, a language, a diff too small to judge), is free and answers a question that
+another US$ 3.66 of the full slice would not.
