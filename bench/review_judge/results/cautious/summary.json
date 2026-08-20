@@ -1,53 +1,55 @@
 {
-  "n_graded": 105,
+  "n_graded": 919,
   "n_unparsed": 0,
-  "n_dropped_no_diff": 15,
-  "bad_comments": 53,
-  "caught": 8,
-  "rejection_recall": 0.151,
+  "n_call_failed": 0,
+  "retried": 9,
+  "n_dropped_no_diff": 98,
+  "bad_comments": 235,
+  "caught": 42,
+  "rejection_recall": 0.179,
   "rejection_recall_ci": [
-    0.079,
-    0.271
+    0.135,
+    0.233
   ],
-  "good_comments": 52,
-  "wrongly_rejected": 0,
-  "false_rejection_rate": 0.0,
+  "good_comments": 684,
+  "wrongly_rejected": 51,
+  "false_rejection_rate": 0.075,
   "false_rejection_ci": [
-    0.0,
-    0.069
+    0.057,
+    0.097
   ],
-  "reject_rate_overall": 0.076,
-  "approve_everything_accuracy": 0.495,
+  "reject_rate_overall": 0.101,
+  "approve_everything_accuracy": 0.744,
   "verdict": "DOES NOT DISCRIMINATE",
   "uninformative": [],
   "by_source_model": {
     "?": {
-      "n": 15,
-      "rejected": 2
+      "n": 226,
+      "rejected": 28
     },
     "Claude-Code/Claude-4.5-Sonnet": {
-      "n": 16,
-      "rejected": 0
+      "n": 105,
+      "rejected": 11
     },
     "Deepseek-V3.2": {
-      "n": 16,
-      "rejected": 1
+      "n": 55,
+      "rejected": 8
     },
     "GLM-4.7": {
-      "n": 17,
-      "rejected": 2
+      "n": 101,
+      "rejected": 13
     },
     "GPT-5.2": {
-      "n": 15,
-      "rejected": 1
+      "n": 248,
+      "rejected": 15
     },
     "Gemini-3-Pro": {
-      "n": 12,
-      "rejected": 0
+      "n": 51,
+      "rejected": 2
     },
     "Qwen-Coder-480B": {
-      "n": 14,
-      "rejected": 2
+      "n": 133,
+      "rejected": 16
     }
   }
 }
