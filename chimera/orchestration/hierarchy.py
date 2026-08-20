@@ -478,7 +478,8 @@ class HierarchicalOrchestrator:
         #
         # Keyed by position, not by ``task_id``: the ids come from a model's JSON and nothing
         # guarantees they are distinct. A duplicate would silently drop a worker's result here.
-        units = [
+        Unit = tuple[ResultEnvelope | None, DelegationReceipt | None]
+        units: list[tuple[str, Callable[[], Unit]]] = [
             (f"{i}:{spec.task_id}", partial(self._run_one, spec, n_subtasks=n))
             for i, spec in enumerate(specs)
         ]
@@ -691,18 +692,21 @@ class HierarchicalOrchestrator:
         recall = self._recall_block(task)
         if recall:
             prompt = f"## Prior knowledge (advisory)\n{recall}\n\n{prompt}"
-        use_fusion = (
-            self.config.fuse_final and self.fusion is not None and _conflicting(envelopes)
+        fusion = (
+            self.fusion
+            if self.config.fuse_final and self.fusion is not None and _conflicting(envelopes)
+            else None
         )
+        use_fusion = fusion is not None
         # Emitted here and not before the call in run_prepared, because `fused` is only
         # decided at this point — announcing it earlier would be announcing a guess.
         self._emit(
             "synthesizing", text=f"{len(envelopes)} summaries",
             envelopes=len(envelopes), fused=use_fusion,
         )
-        if use_fusion:
+        if fusion is not None:
             _log.debug("envelopes conflict — engaging fusion for the final synthesis")
-            result = self.fusion.complete(
+            result = fusion.complete(
                 [Message(role="system", content=_SYNTH_SYSTEM),
                  Message(role="user", content=prompt)]
             )
