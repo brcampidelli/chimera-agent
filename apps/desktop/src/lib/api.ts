@@ -3,6 +3,8 @@ import type {
   AgentIdentity,
   AgentsBatch,
   AppConfig,
+  DelegationSummary,
+  HierarchyPreview,
   ConfigTest,
   CronJob,
   DoctorInfo,
@@ -1415,4 +1417,130 @@ function dispatchExec(frame: string, h: ExecStreamHandlers): void {
   else if (event === "line") h.onLine?.(payload.text as string);
   else if (event === "exit") h.onExit?.(payload.code as number);
   else if (event === "error") h.onError?.(payload.message as string);
+}
+
+// --- Orchestration (the hierarchy: plan, run, stop, ledger) ----------------------------------
+
+export interface HierarchyPreviewInput {
+  task: string;
+  max_workers?: number;
+  budget?: number | null;
+}
+
+export interface HierarchyRunInput {
+  task: string;
+  max_workers?: number;
+  budget?: number | null;
+  verifier_model?: string | null;
+  fuse?: boolean;
+  max_usd?: number | null;
+}
+
+/** One frame off the hierarchy stream. `seq` is stamped by the server under a lock and is the
+ *  only total order there is — the workers run in parallel and have none to offer. A client that
+ *  reconnects replays from the last `seq` it saw; one that sorts by arrival shows a shuffled
+ *  fan-out. `kind` is the SSE event name; `data` is that frame's payload. */
+export interface OrchFrame {
+  seq: number;
+  kind: string;
+  task_id: string;
+  text: string;
+  data: Record<string, unknown>;
+}
+
+export interface HierarchyStreamHandlers {
+  /** The run id, before any work — so a Stop control exists from the first moment. */
+  onRunId?: (id: string) => void;
+  onFrame?: (frame: OrchFrame) => void;
+  onError?: (msg: string) => void;
+}
+
+/** What the orchestrator WOULD do, without running a worker.
+ *
+ *  Not free, and the response says so: on the fan-out branch the top model really is called to
+ *  decompose the task (`decompose_spent`). The claim this supports is "no worker tokens". */
+export const previewHierarchy = (req: HierarchyPreviewInput) =>
+  json<HierarchyPreview>("/api/orchestration/preview", {
+    method: "POST",
+    body: JSON.stringify(req),
+  });
+
+/** Ask a run to stop at its next boundary. Cooperative: a model call already in flight finishes
+ *  and is charged. What it saves is every call that had not started yet. An unknown or finished
+ *  run is `{ok:false}` with a 200 — the state a stale Stop click lands in, not an error. */
+export const cancelOrchestration = (runId: string) =>
+  json<{ ok: boolean; cancelled: boolean }>(
+    `/api/orchestration/runs/${encodeURIComponent(runId)}/cancel`,
+    { method: "POST" },
+  );
+
+export const getDelegations = () =>
+  json<{ summary: DelegationSummary }>("/api/orchestration/delegations");
+
+export async function streamHierarchy(
+  req: HierarchyRunInput,
+  handlers: HierarchyStreamHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(apiUrl("/api/orchestration/hierarchy"), {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(req),
+      signal,
+    });
+  } catch (err) {
+    handlers.onError?.(err instanceof Error ? err.message : "network error");
+    return;
+  }
+  if (!res.ok || !res.body) {
+    handlers.onError?.(`HTTP ${res.status}`);
+    return;
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
+    let sep: number;
+    while ((sep = buffer.indexOf("\n\n")) !== -1) {
+      dispatchHierarchy(buffer.slice(0, sep), handlers);
+      buffer = buffer.slice(sep + 2);
+    }
+  }
+  if (buffer.trim()) dispatchHierarchy(buffer, handlers);
+}
+
+function dispatchHierarchy(frame: string, h: HierarchyStreamHandlers): void {
+  let event = "message";
+  let data = "";
+  for (const line of frame.split("\n")) {
+    if (line.startsWith("event:")) event = line.slice(6).trim();
+    // No trim on the payload: these frames carry prose (the objective, a verifier's objection,
+    // the final answer), and trimming each line is how "two words" becomes "twowords".
+    else if (line.startsWith("data:")) data += line.slice(5);
+  }
+  if (!data.trim()) return;
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse(data);
+  } catch {
+    return;
+  }
+  if (event === "error") {
+    h.onError?.(payload.message as string);
+    return;
+  }
+  if (event === "run") h.onRunId?.(payload.run_id as string);
+  const { seq, task_id: taskId, text, ...rest } = payload;
+  h.onFrame?.({
+    seq: Number(seq ?? 0),
+    kind: event,
+    task_id: String(taskId ?? ""),
+    text: String(text ?? ""),
+    data: rest,
+  });
 }

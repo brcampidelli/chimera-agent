@@ -25,6 +25,22 @@ export type CodeSessionRaw = Schemas["CodeSessionRawOut"];
 export type CronJob = Schemas["CronJobOut"];
 export type TaskCard = Schemas["TaskCardOut"];
 export type ProjectState = Schemas["ProjectStateOut"];
+/** The orchestrator's plan for a task, before any worker runs. `decompose_spent` is the honest
+ *  half: on the fan-out branch producing this plan really did cost one top-model call. */
+export type HierarchyPreview = Schemas["HierarchyPreviewOut"];
+/** Measured against the counterfactual, over the whole delegation ledger. Every saving field is
+ *  nullable and null is NOT zero: it means the receipts carry no price to compare. */
+export type DelegationSummary = Schemas["DelegationSummaryOut"];
+/** The SSE frame payloads, published by GET /api/orchestration/schema so they reach the schema
+ *  at all — an SSE route cannot declare a response model. */
+export type OrchClassified = Schemas["ClassifiedOut"];
+export type OrchDecomposed = Schemas["DecomposedOut"];
+export type OrchSubtask = Schemas["SubtaskOut"];
+export type OrchWorkerStarted = Schemas["WorkerStartedOut"];
+export type OrchWorkerVerified = Schemas["WorkerVerifiedOut"];
+export type OrchWorkerRejected = Schemas["WorkerRejectedOut"];
+export type OrchFellBack = Schemas["FellBackOut"];
+export type OrchDone = Schemas["HierarchyDoneOut"];
 export type ProviderCfg = Schemas["ProviderOut"];
 /** A provider's rotation pool. Carries hints and positions — never a key. */
 export type PoolCfg = Schemas["PoolOut"];

@@ -1291,6 +1291,121 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/orchestration/delegations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Delegations Endpoint
+         * @description What delegating has measured against its counterfactual, over the whole ledger.
+         *
+         *     Scoped to the home ledger with no path parameter. The CLI takes ``--path`` because it
+         *     already runs as the user; an arbitrary path behind an HTTP guard is a file read.
+         */
+        get: operations["delegations_endpoint_api_orchestration_delegations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orchestration/hierarchy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Hierarchy Stream
+         * @description Run a hierarchy, streamed frame by frame.
+         *
+         *     The worker thread owns the orchestrator; this coroutine owns the queue. Frames cross the
+         *     boundary through ``call_soon_threadsafe``, which is what makes the orchestrator's own sink
+         *     safe to call from N worker threads without a lock.
+         */
+        post: operations["hierarchy_stream_api_orchestration_hierarchy_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orchestration/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Endpoint
+         * @description What the orchestrator would do with this task, before any worker runs.
+         *
+         *     Honest about its own cost: on the fan-out branch ``dry_run`` really does call the top
+         *     model to decompose, so ``decompose_spent`` comes back true. The claim this endpoint
+         *     supports is "no WORKER tokens", never "free".
+         */
+        post: operations["preview_endpoint_api_orchestration_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orchestration/runs/{run_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Run
+         * @description Ask a run to stop at its next boundary.
+         *
+         *     Cooperative, and worth being precise about in the UI: the flag is read between units of
+         *     work, so a model call already in flight finishes and is charged. What it does buy is every
+         *     call that had not started — the queued workers, the verifier's re-ask, the synthesis.
+         *
+         *     An unknown or finished id is ``{ok: false}`` with a 200, never a 404: a run that already
+         *     ended is exactly the state a stale Stop click lands in.
+         */
+        post: operations["cancel_run_api_orchestration_runs__run_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orchestration/schema": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Orchestration Schema Endpoint */
+        get: operations["orchestration_schema_endpoint_api_orchestration_schema_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/plan": {
         parameters: {
             query?: never;
@@ -2295,6 +2410,19 @@ export interface components {
              */
             stream: boolean;
         };
+        /** ClassifiedOut */
+        ClassifiedOut: {
+            /**
+             * Shape
+             * @default
+             */
+            shape: string;
+            /**
+             * Sources
+             * @default 0
+             */
+            sources: number;
+        };
         /**
          * CodeExchangeOut
          * @description One question and everything the agent did answering it.
@@ -2571,6 +2699,70 @@ export interface components {
             /** Trigger */
             trigger: string;
         };
+        /** DecomposedOut */
+        DecomposedOut: {
+            /**
+             * Overhead Tokens
+             * @default 0
+             */
+            overhead_tokens: number;
+            /** Specs */
+            specs?: components["schemas"]["SubtaskOut"][];
+        };
+        /**
+         * DelegationSummaryOut
+         * @description ``summarize_delegations`` with its conditional keys made explicit as nulls.
+         *
+         *     Null is not zero here and the distinction is the point: ``usd_saving=None`` means the receipts
+         *     carry no price, while ``0.0`` would claim the hierarchy saved nothing. A display that renders
+         *     the first as ``$0.00`` invents a measurement.
+         */
+        DelegationSummaryOut: {
+            /** By Tier */
+            by_tier?: {
+                [key: string]: number;
+            };
+            /** Counterfactual N */
+            counterfactual_n?: number | null;
+            /** Counterfactual Tokens */
+            counterfactual_tokens?: number | null;
+            /** Counterfactual Usd */
+            counterfactual_usd?: number | null;
+            /**
+             * Estimated N
+             * @default 0
+             */
+            estimated_n: number;
+            /**
+             * Measured Tokens
+             * @default 0
+             */
+            measured_tokens: number;
+            /** Measured Usd */
+            measured_usd?: number | null;
+            /**
+             * N
+             * @default 0
+             */
+            n: number;
+            /** Paired Measured Tokens */
+            paired_measured_tokens?: number | null;
+            /** Paired Measured Usd */
+            paired_measured_usd?: number | null;
+            /**
+             * Priced N
+             * @default 0
+             */
+            priced_n: number;
+            /** Token Saving */
+            token_saving?: number | null;
+            /** Usd Saving */
+            usd_saving?: number | null;
+        };
+        /** DelegationsOut */
+        DelegationsOut: {
+            summary: components["schemas"]["DelegationSummaryOut"];
+        };
         /** DeletedOut */
         DeletedOut: {
             /** Deleted */
@@ -2741,6 +2933,20 @@ export interface components {
             notes: string;
             /** Writes Directly */
             writes_directly: boolean;
+        };
+        /** FellBackOut */
+        FellBackOut: {
+            /**
+             * Reason
+             * @description shape | unprofitable | decompose_failed | workers_failed
+             * @default
+             */
+            reason: string;
+            /**
+             * Shape
+             * @default
+             */
+            shape: string;
         };
         /** FileDiffOut */
         FileDiffOut: {
@@ -2996,6 +3202,140 @@ export interface components {
             sessions: number;
             /** Status */
             status: string;
+        };
+        /** HierarchyDoneOut */
+        HierarchyDoneOut: {
+            /**
+             * Answer
+             * @default
+             */
+            answer: string;
+            /**
+             * Cancelled
+             * @default false
+             */
+            cancelled: boolean;
+            /** Counterfactual Tokens */
+            counterfactual_tokens?: number | null;
+            /**
+             * Envelopes
+             * @default 0
+             */
+            envelopes: number;
+            /**
+             * Fell Back
+             * @default false
+             */
+            fell_back: boolean;
+            /**
+             * Receipts
+             * @default 0
+             */
+            receipts: number;
+            /**
+             * Shape
+             * @default
+             */
+            shape: string;
+            /** Total Tokens */
+            total_tokens?: number | null;
+        };
+        /** HierarchyPreviewIn */
+        HierarchyPreviewIn: {
+            /** Budget */
+            budget?: number | null;
+            /**
+             * Max Workers
+             * @default 4
+             */
+            max_workers: number;
+            /** Task */
+            task: string;
+        };
+        /**
+         * HierarchyPreviewOut
+         * @description The plan, with every key present rather than conditionally absent.
+         *
+         *     ``dry_run`` returns ``dict[str, object]`` whose keys depend on the branch taken. That is fine
+         *     for a console and useless for a typed client: without a concrete model here the generated
+         *     TypeScript would be ``Record<string, unknown>``, and the drift gate that exists to keep the UI
+         *     and the API in step would be guarding nothing.
+         */
+        HierarchyPreviewOut: {
+            /**
+             * Budget Per Worker
+             * @default 0
+             */
+            budget_per_worker: number;
+            /**
+             * Decompose Spent
+             * @description Whether producing this plan cost a model call. True on the fan-out path, where the top model really did decompose the task. The preview spends no WORKER tokens, which is not the same as spending nothing, and a UI that says 'free' is lying on one of the two branches.
+             * @default false
+             */
+            decompose_spent: boolean;
+            /** Estimate Margin */
+            estimate_margin: number;
+            /**
+             * Fell Back Reason
+             * @description Machine-readable: shape | unprofitable. Empty when the run would fan out.
+             * @default
+             */
+            fell_back_reason: string;
+            /** Profitable Estimate */
+            profitable_estimate: boolean;
+            /** Shape */
+            shape: string;
+            /**
+             * Sources
+             * @default 0
+             */
+            sources: number;
+            /** Subtasks */
+            subtasks?: string[];
+            /**
+             * Workers
+             * @default 0
+             */
+            workers: number;
+            /** Would Fall Back */
+            would_fall_back: boolean;
+        };
+        /**
+         * HierarchyRunIn
+         * @description What to run, and the ceilings it runs under.
+         *
+         *     This deliberately does NOT inherit ``CodeSeams``. The hierarchy's workers are tool-free —
+         *     ``_run_one`` builds a ``RoleAgent`` with no registry at all — so posture, write-region and the
+         *     tool allow/deny lists would have nothing to govern here. Advertising a governance surface that
+         *     governs nothing is worse than not offering it: a caller sets ``write_region`` on a fan-out,
+         *     reads no error, and concludes the field works. ``CrewRunIn`` will inherit it, because those
+         *     workers really do write files.
+         */
+        HierarchyRunIn: {
+            /**
+             * Budget
+             * @description Token budget per delegation.
+             */
+            budget?: number | null;
+            /**
+             * Fuse
+             * @default true
+             */
+            fuse: boolean;
+            /**
+             * Max Usd
+             * @description Ceiling for the whole run. The token budget is per delegation and says nothing about money; a fan-out spends a top-model decompose, N mid-model workers and a synthesis.
+             */
+            max_usd?: number | null;
+            /**
+             * Max Workers
+             * @default 4
+             */
+            max_workers: number;
+            /** Task */
+            task: string;
+            /** Verifier Model */
+            verifier_model?: string | null;
         };
         /** HitlOut */
         HitlOut: {
@@ -3498,6 +3838,30 @@ export interface components {
              * @enum {string}
              */
             reason: "" | "no_url" | "unreachable" | "http_error" | "not_ollama";
+        };
+        /** OrchCancelOut */
+        OrchCancelOut: {
+            /** Cancelled */
+            cancelled: boolean;
+            /** Ok */
+            ok: boolean;
+        };
+        /**
+         * OrchestrationFramesOut
+         * @description Every SSE payload this module can emit, in one shape a schema dump can see.
+         *
+         *     An SSE endpoint cannot declare a ``response_model``, so without this the frame payloads never
+         *     reach OpenAPI and the desktop app would hand-write the types — which is exactly the drift the
+         *     generated client exists to prevent. Same trick, same reason, as ``GET /api/agents/schema``.
+         */
+        OrchestrationFramesOut: {
+            classified?: components["schemas"]["ClassifiedOut"];
+            decomposed?: components["schemas"]["DecomposedOut"];
+            done?: components["schemas"]["HierarchyDoneOut"];
+            fell_back?: components["schemas"]["FellBackOut"];
+            worker_rejected?: components["schemas"]["WorkerRejectedOut"];
+            worker_started?: components["schemas"]["WorkerStartedOut"];
+            worker_verified?: components["schemas"]["WorkerVerifiedOut"];
         };
         /**
          * PausedRunOut
@@ -4051,6 +4415,29 @@ export interface components {
             /** Stats */
             stats: components["schemas"]["SkillStatOut"][];
         };
+        /** SubtaskOut */
+        SubtaskOut: {
+            /**
+             * Boundaries
+             * @default
+             */
+            boundaries: string;
+            /**
+             * Objective
+             * @default
+             */
+            objective: string;
+            /**
+             * Output Format
+             * @default
+             */
+            output_format: string;
+            /**
+             * Task Id
+             * @default
+             */
+            task_id: string;
+        };
         /** TaskCardOut */
         TaskCardOut: {
             /** Action */
@@ -4248,6 +4635,95 @@ export interface components {
             model: string;
             /** Support */
             support: string;
+        };
+        /** WorkerRejectedOut */
+        WorkerRejectedOut: {
+            /**
+             * Detail
+             * @default
+             */
+            detail: string;
+            /**
+             * Reason
+             * @description no_output | verifier | deadline
+             * @default
+             */
+            reason: string;
+            /**
+             * Stage
+             * @default
+             */
+            stage: string;
+            /**
+             * Task Id
+             * @default
+             */
+            task_id: string;
+            /**
+             * Tokens
+             * @default 0
+             */
+            tokens: number;
+        };
+        /** WorkerStartedOut */
+        WorkerStartedOut: {
+            /**
+             * Max Tokens
+             * @default 0
+             */
+            max_tokens: number;
+            /**
+             * Model
+             * @default
+             */
+            model: string;
+            /**
+             * Objective
+             * @default
+             */
+            objective: string;
+            /**
+             * Task Id
+             * @default
+             */
+            task_id: string;
+            /**
+             * Tier
+             * @default
+             */
+            tier: string;
+        };
+        /** WorkerVerifiedOut */
+        WorkerVerifiedOut: {
+            /** Evidence Refs */
+            evidence_refs?: string[];
+            /** Gaps */
+            gaps?: string[];
+            /**
+             * Reasked
+             * @default false
+             */
+            reasked: boolean;
+            /**
+             * Stage
+             * @default
+             */
+            stage: string;
+            /**
+             * Summary Chars
+             * @default 0
+             */
+            summary_chars: number;
+            /**
+             * Task Id
+             * @default
+             */
+            task_id: string;
+            /**
+             * Tokens
+             * @default 0
+             */
+            tokens: number;
         };
         /**
          * WorthReport
@@ -6398,6 +6874,143 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OllamaModelsOut"];
+                };
+            };
+        };
+    };
+    delegations_endpoint_api_orchestration_delegations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DelegationsOut"];
+                };
+            };
+        };
+    };
+    hierarchy_stream_api_orchestration_hierarchy_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HierarchyRunIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_endpoint_api_orchestration_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HierarchyPreviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HierarchyPreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_run_api_orchestration_runs__run_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrchCancelOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    orchestration_schema_endpoint_api_orchestration_schema_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrchestrationFramesOut"];
                 };
             };
         };

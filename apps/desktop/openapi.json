@@ -1073,6 +1073,22 @@
         "title": "ChatRequest",
         "type": "object"
       },
+      "ClassifiedOut": {
+        "properties": {
+          "shape": {
+            "default": "",
+            "title": "Shape",
+            "type": "string"
+          },
+          "sources": {
+            "default": 0,
+            "title": "Sources",
+            "type": "integer"
+          }
+        },
+        "title": "ClassifiedOut",
+        "type": "object"
+      },
       "CodeExchangeOut": {
         "description": "One question and everything the agent did answering it.\n\n``edits`` is always empty on a REPLAY: a diff was streamed live and never entered the message\nlist, so a resumed turn can show the tool call that wrote a file but not the coloured patch. The\nfield is here so a replayed exchange has the same shape as a live one, and the UI says which is\nwhich rather than letting the absence read as \"it changed nothing\".",
         "properties": {
@@ -1805,6 +1821,158 @@
         "title": "CronJobOut",
         "type": "object"
       },
+      "DecomposedOut": {
+        "properties": {
+          "overhead_tokens": {
+            "default": 0,
+            "title": "Overhead Tokens",
+            "type": "integer"
+          },
+          "specs": {
+            "items": {
+              "$ref": "#/components/schemas/SubtaskOut"
+            },
+            "title": "Specs",
+            "type": "array"
+          }
+        },
+        "title": "DecomposedOut",
+        "type": "object"
+      },
+      "DelegationSummaryOut": {
+        "description": "``summarize_delegations`` with its conditional keys made explicit as nulls.\n\nNull is not zero here and the distinction is the point: ``usd_saving=None`` means the receipts\ncarry no price, while ``0.0`` would claim the hierarchy saved nothing. A display that renders\nthe first as ``$0.00`` invents a measurement.",
+        "properties": {
+          "by_tier": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "By Tier",
+            "type": "object"
+          },
+          "counterfactual_n": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counterfactual N"
+          },
+          "counterfactual_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counterfactual Tokens"
+          },
+          "counterfactual_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counterfactual Usd"
+          },
+          "estimated_n": {
+            "default": 0,
+            "title": "Estimated N",
+            "type": "integer"
+          },
+          "measured_tokens": {
+            "default": 0,
+            "title": "Measured Tokens",
+            "type": "integer"
+          },
+          "measured_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measured Usd"
+          },
+          "n": {
+            "default": 0,
+            "title": "N",
+            "type": "integer"
+          },
+          "paired_measured_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paired Measured Tokens"
+          },
+          "paired_measured_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paired Measured Usd"
+          },
+          "priced_n": {
+            "default": 0,
+            "title": "Priced N",
+            "type": "integer"
+          },
+          "token_saving": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token Saving"
+          },
+          "usd_saving": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usd Saving"
+          }
+        },
+        "title": "DelegationSummaryOut",
+        "type": "object"
+      },
+      "DelegationsOut": {
+        "properties": {
+          "summary": {
+            "$ref": "#/components/schemas/DelegationSummaryOut"
+          }
+        },
+        "required": [
+          "summary"
+        ],
+        "title": "DelegationsOut",
+        "type": "object"
+      },
       "DeletedOut": {
         "properties": {
           "deleted": {
@@ -2157,6 +2325,23 @@
           "notes"
         ],
         "title": "ExternalAgentOut",
+        "type": "object"
+      },
+      "FellBackOut": {
+        "properties": {
+          "reason": {
+            "default": "",
+            "description": "shape | unprofitable | decompose_failed | workers_failed",
+            "title": "Reason",
+            "type": "string"
+          },
+          "shape": {
+            "default": "",
+            "title": "Shape",
+            "type": "string"
+          }
+        },
+        "title": "FellBackOut",
         "type": "object"
       },
       "FileDiffOut": {
@@ -2792,6 +2977,215 @@
           "sessions"
         ],
         "title": "HealthOut",
+        "type": "object"
+      },
+      "HierarchyDoneOut": {
+        "properties": {
+          "answer": {
+            "default": "",
+            "title": "Answer",
+            "type": "string"
+          },
+          "cancelled": {
+            "default": false,
+            "title": "Cancelled",
+            "type": "boolean"
+          },
+          "counterfactual_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counterfactual Tokens"
+          },
+          "envelopes": {
+            "default": 0,
+            "title": "Envelopes",
+            "type": "integer"
+          },
+          "fell_back": {
+            "default": false,
+            "title": "Fell Back",
+            "type": "boolean"
+          },
+          "receipts": {
+            "default": 0,
+            "title": "Receipts",
+            "type": "integer"
+          },
+          "shape": {
+            "default": "",
+            "title": "Shape",
+            "type": "string"
+          },
+          "total_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Tokens"
+          }
+        },
+        "title": "HierarchyDoneOut",
+        "type": "object"
+      },
+      "HierarchyPreviewIn": {
+        "properties": {
+          "budget": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget"
+          },
+          "max_workers": {
+            "default": 4,
+            "title": "Max Workers",
+            "type": "integer"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "title": "HierarchyPreviewIn",
+        "type": "object"
+      },
+      "HierarchyPreviewOut": {
+        "description": "The plan, with every key present rather than conditionally absent.\n\n``dry_run`` returns ``dict[str, object]`` whose keys depend on the branch taken. That is fine\nfor a console and useless for a typed client: without a concrete model here the generated\nTypeScript would be ``Record<string, unknown>``, and the drift gate that exists to keep the UI\nand the API in step would be guarding nothing.",
+        "properties": {
+          "budget_per_worker": {
+            "default": 0,
+            "title": "Budget Per Worker",
+            "type": "integer"
+          },
+          "decompose_spent": {
+            "default": false,
+            "description": "Whether producing this plan cost a model call. True on the fan-out path, where the top model really did decompose the task. The preview spends no WORKER tokens, which is not the same as spending nothing, and a UI that says 'free' is lying on one of the two branches.",
+            "title": "Decompose Spent",
+            "type": "boolean"
+          },
+          "estimate_margin": {
+            "title": "Estimate Margin",
+            "type": "number"
+          },
+          "fell_back_reason": {
+            "default": "",
+            "description": "Machine-readable: shape | unprofitable. Empty when the run would fan out.",
+            "title": "Fell Back Reason",
+            "type": "string"
+          },
+          "profitable_estimate": {
+            "title": "Profitable Estimate",
+            "type": "boolean"
+          },
+          "shape": {
+            "title": "Shape",
+            "type": "string"
+          },
+          "sources": {
+            "default": 0,
+            "title": "Sources",
+            "type": "integer"
+          },
+          "subtasks": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Subtasks",
+            "type": "array"
+          },
+          "workers": {
+            "default": 0,
+            "title": "Workers",
+            "type": "integer"
+          },
+          "would_fall_back": {
+            "title": "Would Fall Back",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "shape",
+          "profitable_estimate",
+          "estimate_margin",
+          "would_fall_back"
+        ],
+        "title": "HierarchyPreviewOut",
+        "type": "object"
+      },
+      "HierarchyRunIn": {
+        "description": "What to run, and the ceilings it runs under.\n\nThis deliberately does NOT inherit ``CodeSeams``. The hierarchy's workers are tool-free \u2014\n``_run_one`` builds a ``RoleAgent`` with no registry at all \u2014 so posture, write-region and the\ntool allow/deny lists would have nothing to govern here. Advertising a governance surface that\ngoverns nothing is worse than not offering it: a caller sets ``write_region`` on a fan-out,\nreads no error, and concludes the field works. ``CrewRunIn`` will inherit it, because those\nworkers really do write files.",
+        "properties": {
+          "budget": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Token budget per delegation.",
+            "title": "Budget"
+          },
+          "fuse": {
+            "default": true,
+            "title": "Fuse",
+            "type": "boolean"
+          },
+          "max_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Ceiling for the whole run. The token budget is per delegation and says nothing about money; a fan-out spends a top-model decompose, N mid-model workers and a synthesis.",
+            "title": "Max Usd"
+          },
+          "max_workers": {
+            "default": 4,
+            "title": "Max Workers",
+            "type": "integer"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          },
+          "verifier_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verifier Model"
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "title": "HierarchyRunIn",
         "type": "object"
       },
       "HitlOut": {
@@ -4026,6 +4420,52 @@
           "reachable"
         ],
         "title": "OllamaModelsOut",
+        "type": "object"
+      },
+      "OrchCancelOut": {
+        "properties": {
+          "cancelled": {
+            "title": "Cancelled",
+            "type": "boolean"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "cancelled"
+        ],
+        "title": "OrchCancelOut",
+        "type": "object"
+      },
+      "OrchestrationFramesOut": {
+        "description": "Every SSE payload this module can emit, in one shape a schema dump can see.\n\nAn SSE endpoint cannot declare a ``response_model``, so without this the frame payloads never\nreach OpenAPI and the desktop app would hand-write the types \u2014 which is exactly the drift the\ngenerated client exists to prevent. Same trick, same reason, as ``GET /api/agents/schema``.",
+        "properties": {
+          "classified": {
+            "$ref": "#/components/schemas/ClassifiedOut"
+          },
+          "decomposed": {
+            "$ref": "#/components/schemas/DecomposedOut"
+          },
+          "done": {
+            "$ref": "#/components/schemas/HierarchyDoneOut"
+          },
+          "fell_back": {
+            "$ref": "#/components/schemas/FellBackOut"
+          },
+          "worker_rejected": {
+            "$ref": "#/components/schemas/WorkerRejectedOut"
+          },
+          "worker_started": {
+            "$ref": "#/components/schemas/WorkerStartedOut"
+          },
+          "worker_verified": {
+            "$ref": "#/components/schemas/WorkerVerifiedOut"
+          }
+        },
+        "title": "OrchestrationFramesOut",
         "type": "object"
       },
       "PausedRunOut": {
@@ -5316,6 +5756,32 @@
         "title": "SkillsOut",
         "type": "object"
       },
+      "SubtaskOut": {
+        "properties": {
+          "boundaries": {
+            "default": "",
+            "title": "Boundaries",
+            "type": "string"
+          },
+          "objective": {
+            "default": "",
+            "title": "Objective",
+            "type": "string"
+          },
+          "output_format": {
+            "default": "",
+            "title": "Output Format",
+            "type": "string"
+          },
+          "task_id": {
+            "default": "",
+            "title": "Task Id",
+            "type": "string"
+          }
+        },
+        "title": "SubtaskOut",
+        "type": "object"
+      },
       "TaskCardOut": {
         "properties": {
           "action": {
@@ -5845,6 +6311,114 @@
           "support"
         ],
         "title": "VisionOut",
+        "type": "object"
+      },
+      "WorkerRejectedOut": {
+        "properties": {
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          },
+          "reason": {
+            "default": "",
+            "description": "no_output | verifier | deadline",
+            "title": "Reason",
+            "type": "string"
+          },
+          "stage": {
+            "default": "",
+            "title": "Stage",
+            "type": "string"
+          },
+          "task_id": {
+            "default": "",
+            "title": "Task Id",
+            "type": "string"
+          },
+          "tokens": {
+            "default": 0,
+            "title": "Tokens",
+            "type": "integer"
+          }
+        },
+        "title": "WorkerRejectedOut",
+        "type": "object"
+      },
+      "WorkerStartedOut": {
+        "properties": {
+          "max_tokens": {
+            "default": 0,
+            "title": "Max Tokens",
+            "type": "integer"
+          },
+          "model": {
+            "default": "",
+            "title": "Model",
+            "type": "string"
+          },
+          "objective": {
+            "default": "",
+            "title": "Objective",
+            "type": "string"
+          },
+          "task_id": {
+            "default": "",
+            "title": "Task Id",
+            "type": "string"
+          },
+          "tier": {
+            "default": "",
+            "title": "Tier",
+            "type": "string"
+          }
+        },
+        "title": "WorkerStartedOut",
+        "type": "object"
+      },
+      "WorkerVerifiedOut": {
+        "properties": {
+          "evidence_refs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "gaps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Gaps",
+            "type": "array"
+          },
+          "reasked": {
+            "default": false,
+            "title": "Reasked",
+            "type": "boolean"
+          },
+          "stage": {
+            "default": "",
+            "title": "Stage",
+            "type": "string"
+          },
+          "summary_chars": {
+            "default": 0,
+            "title": "Summary Chars",
+            "type": "integer"
+          },
+          "task_id": {
+            "default": "",
+            "title": "Task Id",
+            "type": "string"
+          },
+          "tokens": {
+            "default": 0,
+            "title": "Tokens",
+            "type": "integer"
+          }
+        },
+        "title": "WorkerVerifiedOut",
         "type": "object"
       },
       "WorthReport": {
@@ -8482,6 +9056,159 @@
           }
         },
         "summary": "Ollama Models Endpoint"
+      }
+    },
+    "/api/orchestration/delegations": {
+      "get": {
+        "description": "What delegating has measured against its counterfactual, over the whole ledger.\n\nScoped to the home ledger with no path parameter. The CLI takes ``--path`` because it\nalready runs as the user; an arbitrary path behind an HTTP guard is a file read.",
+        "operationId": "delegations_endpoint_api_orchestration_delegations_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DelegationsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Delegations Endpoint"
+      }
+    },
+    "/api/orchestration/hierarchy": {
+      "post": {
+        "description": "Run a hierarchy, streamed frame by frame.\n\nThe worker thread owns the orchestrator; this coroutine owns the queue. Frames cross the\nboundary through ``call_soon_threadsafe``, which is what makes the orchestrator's own sink\nsafe to call from N worker threads without a lock.",
+        "operationId": "hierarchy_stream_api_orchestration_hierarchy_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HierarchyRunIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Hierarchy Stream"
+      }
+    },
+    "/api/orchestration/preview": {
+      "post": {
+        "description": "What the orchestrator would do with this task, before any worker runs.\n\nHonest about its own cost: on the fan-out branch ``dry_run`` really does call the top\nmodel to decompose, so ``decompose_spent`` comes back true. The claim this endpoint\nsupports is \"no WORKER tokens\", never \"free\".",
+        "operationId": "preview_endpoint_api_orchestration_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HierarchyPreviewIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HierarchyPreviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Endpoint"
+      }
+    },
+    "/api/orchestration/runs/{run_id}/cancel": {
+      "post": {
+        "description": "Ask a run to stop at its next boundary.\n\nCooperative, and worth being precise about in the UI: the flag is read between units of\nwork, so a model call already in flight finishes and is charged. What it does buy is every\ncall that had not started \u2014 the queued workers, the verifier's re-ask, the synthesis.\n\nAn unknown or finished id is ``{ok: false}`` with a 200, never a 404: a run that already\nended is exactly the state a stale Stop click lands in.",
+        "operationId": "cancel_run_api_orchestration_runs__run_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrchCancelOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Run"
+      }
+    },
+    "/api/orchestration/schema": {
+      "get": {
+        "operationId": "orchestration_schema_endpoint_api_orchestration_schema_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrchestrationFramesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Orchestration Schema Endpoint"
       }
     },
     "/api/plan": {
