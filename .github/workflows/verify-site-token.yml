@@ -1,0 +1,78 @@
+# Does the token that tells the website about a release still work?
+#
+# The notice lives in the last step of the last job of `desktop-release.yml`, fires only on a real
+# release, and is `continue-on-error: true` — deliberately, because a release must not fail over a
+# missed notification. The cost of that choice is that the token can expire, or be scoped wrong from
+# the start, and NOTHING says so until someone notices the download page is a version behind.
+#
+# Fine-grained tokens expire. This exists so the answer costs one click instead of one release.
+name: Verify the site token
+
+on:
+  workflow_dispatch:
+    inputs:
+      notify:
+        description: "Also send a real dispatch (deploys the site). Off = permissions check only."
+        type: boolean
+        default: false
+
+permissions: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      SITE_TOKEN: ${{ secrets.SITE_DISPATCH_TOKEN }}
+    steps:
+      - name: The secret exists
+        run: |
+          set -euo pipefail
+          if [ -z "${SITE_TOKEN:-}" ]; then
+            echo "::error::SITE_DISPATCH_TOKEN is not set on this repository."
+            echo "Releases will build and publish; the website will keep updating from its own"
+            echo "nightly cron instead, which is a delay rather than a failure."
+            exit 1
+          fi
+          echo "secret is set"
+
+      - name: It can see chimera-site
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -o /tmp/repo.json -w '%{http_code}' \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $SITE_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/brcampidelli/chimera-site)
+          # 404 is what a token scoped to the wrong repository returns — GitHub does not distinguish
+          # "does not exist" from "you may not see it", so this is the shape a scoping mistake takes.
+          if [ "$code" != "200" ]; then
+            echo "::error::token cannot read chimera-site (HTTP $code). Check that it is scoped to"
+            echo "brcampidelli/chimera-site with Contents: read and write, and has not expired."
+            exit 1
+          fi
+          echo "can read chimera-site"
+
+      - name: It may actually dispatch
+        # The permission the notice needs is Contents: write, and reading proves nothing about it.
+        # Without `notify` this asks the API to reject a MALFORMED body: a 422 means the request was
+        # authorised and only then found invalid, which is exactly the fact being tested; a 403 means
+        # the token would have been refused on a real release too.
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.notify }}" = "true" ]; then
+            body='{"event_type":"chimera-release","client_payload":{"tag":"manual-verification"}}'
+          else
+            body='{}'   # no event_type — valid JSON, invalid payload
+          fi
+          code=$(curl -sS -o /tmp/out.json -w '%{http_code}' -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $SITE_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/brcampidelli/chimera-site/dispatches \
+            -d "$body")
+          case "$code" in
+            204) echo "dispatch accepted — the site is building now" ;;
+            422) echo "authorised (the empty payload was rejected on its merits, not on permission)" ;;
+            403) echo "::error::token lacks Contents: write on chimera-site (HTTP 403)"; exit 1 ;;
+            *)   echo "::error::unexpected HTTP $code"; cat /tmp/out.json; exit 1 ;;
+          esac
