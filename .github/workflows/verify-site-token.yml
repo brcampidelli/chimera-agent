@@ -21,6 +21,9 @@ permissions: {}
 jobs:
   check:
     runs-on: ubuntu-latest
+    # Three curl calls. A minute is generous; the ceiling is here because a job without one can
+    # hang for six hours on a runner, and this one exists to make an answer cheap.
+    timeout-minutes: 5
     env:
       SITE_TOKEN: ${{ secrets.SITE_DISPATCH_TOKEN }}
     steps:

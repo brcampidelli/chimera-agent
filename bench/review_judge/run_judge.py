@@ -385,6 +385,11 @@ def report_results(rows: list[dict[str, Any]], dropped: list[Item], *, report=pr
 
     graded = [r for r in rows if r["verdict"] in ("approve", "reject")]
     unparsed = [r for r in rows if r["verdict"] == "unparsed"]
+    # Kept apart from `unparsed` on purpose. Both mean "no verdict", but only one of them is
+    # evidence about the judge: an answer the parser could not read came from the model, while a
+    # call that never completed came from the network. Reporting them as one number is how a
+    # provider outage gets read as a judge that cannot follow a format.
+    failed = [r for r in rows if r["verdict"] == "call_failed"]
 
     bad = [r for r in graded if r["label"] == 0]
     good = [r for r in graded if r["label"] == 1]
@@ -405,13 +410,17 @@ def report_results(rows: list[dict[str, Any]], dropped: list[Item], *, report=pr
     )
     uninformative = []
     if graded and len(unparsed) / len(rows) > 0.10:
-        uninformative.append(f"unparsed {len(unparsed)}/{len(rows)} > 10% — the harness is what was measured")
+        uninformative.append(f"unparsed {len(unparsed)}/{len(rows)} > 10% — the judge could not hold the format")
+    if graded and len(failed) / len(rows) > 0.10:
+        uninformative.append(f"calls failed {len(failed)}/{len(rows)} > 10% after retries — the harness is what was measured")
     if graded and (reject_rate < 0.02 or reject_rate > 0.98):
         uninformative.append(f"reject rate {reject_rate:.0%} — the judge answered the same thing to everything")
 
     summary = {
         "n_graded": len(graded),
         "n_unparsed": len(unparsed),
+        "n_call_failed": len(failed),
+        "retried": sum(1 for r in rows if r.get("attempts", 1) > 1),
         "n_dropped_no_diff": len(dropped),
         "bad_comments": len(bad),
         "caught": caught,
@@ -435,7 +444,9 @@ def report_results(rows: list[dict[str, Any]], dropped: list[Item], *, report=pr
     }
 
     report("")
-    report(f"  graded {summary['n_graded']}  unparsed {summary['n_unparsed']}  dropped {summary['n_dropped_no_diff']}")
+    report(f"  graded {summary['n_graded']}  unparsed {summary['n_unparsed']}  "
+           f"call failed {summary['n_call_failed']}  retried {summary['retried']}  "
+           f"dropped {summary['n_dropped_no_diff']}")
     report(f"  rejection recall   {recall:.1%}  ({caught}/{len(bad)} bad comments caught)  CI [{lo_r:.1%}, {hi_r:.1%}]")
     report(f"  false rejection    {false_rej:.1%}  ({wrongly}/{len(good)} good comments rejected)  CI [{lo_f:.1%}, {hi_f:.1%}]")
     report(f"  reject rate        {reject_rate:.1%}   (a judge answering the same thing every time is caught here)")
@@ -499,13 +510,27 @@ def main() -> None:
     started = time.time()
 
     def grade(item: Item) -> dict[str, Any]:
-        try:
-            verdict, reason, against, usage = ask(gateway, item, model, args.arm)
-        except Exception as exc:  # a provider failure is not a verdict
-            verdict, reason, against = "unparsed", f"call failed: {exc}", ""
-            usage = {"prompt": 0, "completion": 0}
-        return {**asdict(item), "patch": "", "verdict": verdict, "reason": reason,
-                "counterargument": against, **usage}
+        # A provider timeout is not a verdict, and it is not an unparsed answer either. The first
+        # full-slice attempt ran ten calls concurrently and 639/919 rows came back as
+        # `litellm.Timeout ... 600s` with zero completion tokens; the pre-registered uninformative
+        # condition fired and the run measured the harness rather than the judge. Two changes keep
+        # that from recurring, and neither touches what is measured: retry the CALL, and keep
+        # `call_failed` distinct from `unparsed` in the row. A model that answered something the
+        # parser could not read is DATA about the judge; a call that never completed is not, and
+        # collapsing them into one bucket is what made the failure look like a judgement.
+        last: Exception | None = None
+        for attempt in range(3):
+            try:
+                verdict, reason, against, usage = ask(gateway, item, model, args.arm)
+                return {**asdict(item), "patch": "", "verdict": verdict, "reason": reason,
+                        "counterargument": against, "attempts": attempt + 1, **usage}
+            except Exception as exc:  # transport, not judgement
+                last = exc
+                if attempt < 2:
+                    time.sleep(20 * (attempt + 1))
+        return {**asdict(item), "patch": "", "verdict": "call_failed", "counterargument": "",
+                "reason": f"call failed after 3 attempts: {last}", "attempts": 3,
+                "prompt": 0, "completion": 0}
 
     # Concurrency, because the full slice is 1017 items and one call at a time is sixteen hours.
     # It changes nothing that is measured: every item is an independent call with no shared state,
