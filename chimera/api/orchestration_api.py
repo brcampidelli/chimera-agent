@@ -33,8 +33,8 @@ from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 from starlette.concurrency import run_in_threadpool
 
-from chimera.telemetry import get_logger
 from chimera.orchestration.events import OrchEvent
+from chimera.telemetry import get_logger
 
 if TYPE_CHECKING:
     from chimera.config import Settings
