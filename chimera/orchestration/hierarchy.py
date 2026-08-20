@@ -26,7 +26,7 @@ from __future__ import annotations
 import json
 import re
 import uuid
-from concurrent.futures import ThreadPoolExecutor
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
@@ -37,6 +37,7 @@ if TYPE_CHECKING:
 from chimera.orchestration.artifacts import ArtifactStore, build_envelope
 from chimera.orchestration.budget import BudgetedBackend, BudgetExceeded, EffortPolicy, TokenBudget
 from chimera.orchestration.envelope_verify import EnvelopeVerifier
+from chimera.orchestration.events import OrchEvent, OrchEventSink
 from chimera.orchestration.receipts import (
     DelegationReceipt,
     ProfitEstimate,
@@ -161,6 +162,10 @@ class HierarchyResult:
     fell_back: bool = False
     total_tokens: int | None = None
     counterfactual_tokens: int | None = None
+    cancelled: bool = False
+    """Stopped between units by ``should_stop``. The envelopes that had already verified are
+    still here; ``answer`` is empty, because synthesising them would spend the top-model call the
+    caller just asked not to spend."""
 
 
 class HierarchicalOrchestrator:
@@ -182,8 +187,23 @@ class HierarchicalOrchestrator:
         receipts_path: Path | None = None,
         config: HierarchyConfig | None = None,
         evolution: EvolutionContext | None = None,
+        on_event: OrchEventSink | None = None,
+        should_stop: Callable[[], bool] | None = None,
     ) -> None:
         self.gateway = gateway
+        # Both keyword-only with a None default, so every existing caller and test is untouched.
+        # On the constructor rather than on run(): `run_prepared`, `_dispatch` and `_run_one` all
+        # need them, and threading a pair of parameters through four private signatures is a wider
+        # blast radius than one attribute.
+        #
+        # The sink is called from N worker threads at once and this class does NOT serialise it.
+        # The production sink is an SSE bridge whose body is `loop.call_soon_threadsafe(...)`,
+        # already safe; a lock here would serialise workers around a callback whose cost the
+        # orchestrator cannot see. Sinks that need one wrap themselves in `thread_safe_sink`.
+        self.on_event = on_event
+        # Cooperative and checked BETWEEN units, never inside a call in flight. A model call that
+        # has started is already paid for, so stopping it buys nothing and loses the answer.
+        self.should_stop = should_stop
         # M19-A4: the shared flywheel, READ-and-write-telemetry only. A fan-out has no
         # verify-or-revert signal, so it reads retrieved cards + recalled facts into the top
         # model's synthesis and records the run as an experience lesson + card credit — but never
@@ -204,33 +224,61 @@ class HierarchicalOrchestrator:
         self.receipts_path = receipts_path
         self.config = config or HierarchyConfig()
 
+    # ------------------------------------------------------------------ events
+
+    def _emit(self, kind: str, *, text: str = "", task_id: str = "", **data: object) -> None:
+        """Hand one frame to the sink, and never let the sink break the run.
+
+        The swallow is not defensive habit, it is the same rule ``_recall_block`` already follows
+        two hundred lines down: progress reporting is advisory. A consumer whose queue is full or
+        whose socket just closed must not kill a worker whose tokens have already been paid for —
+        the run's job is to produce an answer, not to keep an audience.
+        """
+        if self.on_event is None:
+            return
+        try:
+            self.on_event(OrchEvent(kind, text, task_id, dict(data)))  # type: ignore[arg-type]
+        except Exception as exc:  # noqa: BLE001 -- see the docstring
+            _log.debug("event sink raised (ignored): %s", exc)
+
+    def _stopped(self) -> bool:
+        return self.should_stop is not None and self.should_stop()
+
     # ------------------------------------------------------------------ public
 
     def run(self, task: str) -> HierarchyResult:
         shape = classify_task(task)
+        # Hoisted from the profitability guard below so the frame can carry it: the source count
+        # is what decides whether that guard even applies, and a consumer showing "why this shape"
+        # without it is showing half the reason. `count_sources` is deterministic and free.
+        sources = count_sources(task)
+        self._emit("classified", text=shape, shape=shape, sources=sources)
 
         # Guard 1 — shape (Cognition rule): write/simple tasks stay single-agent.
         if shape != "parallel_read":
-            return self._fallback(task, shape, reason=f"shape={shape}")
+            return self._fallback(task, shape, reason=f"shape={shape}", code="shape")
 
         # Guard 2 — global profitability: don't delegate when inline is cheaper.
         # EXCEPTION: 2+ distinct sources is the measured guaranteed-gain region — the
         # (D-1)/D sweep proves isolation wins there — so the crude blank-context estimate
         # is not allowed to veto it.
-        sources = count_sources(task)
         if sources < 2:
             probe = TaskSpec(task_id="probe", objective=task)
             estimate = estimate_profitability(
                 probe, orchestrator_context_chars=len(task) * 8 + 24_000
             )
             if not estimate.profitable:
-                return self._fallback(task, shape, reason="unprofitable estimate")
+                return self._fallback(
+                    task, shape, reason="unprofitable estimate", code="unprofitable"
+                )
         else:
             _log.debug("%d distinct sources -> guaranteed-gain region, skipping profit veto", sources)
 
         specs, decompose_tokens, decompose_estimated = self._decompose_metered(task)
         if not specs:
-            return self._fallback(task, shape, reason="decomposition failed")
+            return self._fallback(
+                task, shape, reason="decomposition failed", code="decompose_failed"
+            )
         return self.run_prepared(
             task, specs, shape=shape,
             overhead_tokens=decompose_tokens, overhead_estimated=decompose_estimated,
@@ -247,9 +295,41 @@ class HierarchicalOrchestrator:
     ) -> HierarchyResult:
         """Run with a caller-supplied decomposition (recipes know their own split —
         no top-model decompose call is spent, hence ``overhead_tokens=0`` by default)."""
+        # Emitted here rather than in run() so the recipe path gets it too: `brief` calls
+        # run_prepared directly with a decomposition it already had, and a consumer watching that
+        # run should see the same frame as one watching a model-decomposed one.
+        self._emit(
+            "decomposed",
+            text=f"{len(specs)} subtasks",
+            specs=[
+                {
+                    "task_id": spec.task_id,
+                    "objective": spec.objective,
+                    "output_format": spec.output_format,
+                    "boundaries": spec.boundaries,
+                }
+                for spec in specs
+            ],
+            overhead_tokens=overhead_tokens,
+        )
         envelopes, receipts = self._dispatch(specs)
+        # Ordered before the empty check, not after it, and a test caught why: cancelling makes
+        # every worker return nothing, so an emptiness check that runs first sees "all delegations
+        # failed" and routes a CANCELLED run into the single-agent fallback — a whole top-model
+        # call, which is the one cost stopping exists to avoid.
+        if self._stopped():
+            # Before synthesis for the same reason. The verified envelopes are returned as they
+            # stand: a consumer that streamed them already has every summary this run produced.
+            return self._finish(
+                HierarchyResult(
+                    answer="", shape=shape, envelopes=envelopes, receipts=receipts, cancelled=True,
+                    total_tokens=sum(r.total_tokens for r in receipts) or None,
+                )
+            )
         if not envelopes:
-            return self._fallback(task, shape, reason="all delegations failed")
+            return self._fallback(
+                task, shape, reason="all delegations failed", code="workers_failed"
+            )
 
         answer, synth_tokens, synth_estimated = self._synthesize(task, envelopes)
         self._record_outcome(task, answer)
@@ -263,14 +343,16 @@ class HierarchicalOrchestrator:
         all_receipts = receipts + overhead
         measured = sum(r.total_tokens for r in all_receipts)
         counterfactual = sum(r.counterfactual_tokens or 0 for r in receipts) or None
-        return HierarchyResult(
-            answer=answer,
-            shape=shape,
-            envelopes=envelopes,
-            receipts=all_receipts,
-            fell_back=False,
-            total_tokens=measured,
-            counterfactual_tokens=counterfactual,
+        return self._finish(
+            HierarchyResult(
+                answer=answer,
+                shape=shape,
+                envelopes=envelopes,
+                receipts=all_receipts,
+                fell_back=False,
+                total_tokens=measured,
+                counterfactual_tokens=counterfactual,
+            )
         )
 
     def _overhead_receipts(
@@ -380,12 +462,45 @@ class HierarchicalOrchestrator:
         """Parallel budgeted workers; each raw output -> envelope -> verifier -> receipt."""
         from functools import partial
 
+        from chimera.concurrency import run_all_with_deadline
+        from chimera.orchestration.isolation import _batch_deadline
+
         # The aggregate inline counterfactual loads the orchestrator context ONCE for the whole task,
         # not once per subtask — so each receipt's counterfactual charges only a 1/D share of it, or
         # summing D rows would over-count the context (D-1)x and inflate the reported saving.
         n = max(1, len(specs))
-        with ThreadPoolExecutor(max_workers=self.config.max_workers) as pool:
-            results = list(pool.map(partial(self._run_one, n_subtasks=n), specs))
+        # Under a deadline, because this was the last fan-out in the package running without one.
+        # ``pool.map`` waits forever, and _batch_deadline's own docstring records what that costs
+        # once a live consumer is attached: a worker that never returns holds the batch open, the
+        # SSE stream never closes, and the ``finally`` that sweeps the cancel registration never
+        # runs — so the run leaks for the life of the process. One deadline for the whole batch,
+        # never one per worker: N slow workers must not cost N x timeout.
+        #
+        # Keyed by position, not by ``task_id``: the ids come from a model's JSON and nothing
+        # guarantees they are distinct. A duplicate would silently drop a worker's result here.
+        units = [
+            (f"{i}:{spec.task_id}", partial(self._run_one, spec, n_subtasks=n))
+            for i, spec in enumerate(specs)
+        ]
+        outcomes = run_all_with_deadline(
+            units, max_workers=self.config.max_workers, timeout=_batch_deadline(None)
+        )
+        results: list[tuple[ResultEnvelope | None, DelegationReceipt | None]] = []
+        for i, spec in enumerate(specs):
+            outcome = outcomes[f"{i}:{spec.task_id}"]
+            if outcome.timed_out:
+                # Abandoned, not cancelled — the thread runs on and its result is discarded. Said
+                # out loud rather than counted as a silent failure, because a subtask missing from
+                # the synthesis for a reason nobody logged is the hardest kind of gap to notice.
+                _log.warning("worker %s overran the batch deadline and was abandoned", spec.task_id)
+                self._emit("worker_rejected", task_id=spec.task_id,
+                           text="overran the batch deadline", reason="deadline")
+                results.append((None, None))
+            elif outcome.error is not None:
+                _log.warning("worker %s raised: %s", spec.task_id, outcome.error)
+                results.append((None, None))
+            else:
+                results.append(outcome.value or (None, None))
         envelopes = [env for env, _ in results if env is not None]
         receipts = [rec for _, rec in results if rec is not None]
         if self.receipts_path is not None:
@@ -396,12 +511,30 @@ class HierarchicalOrchestrator:
     def _run_one(
         self, spec: TaskSpec, *, n_subtasks: int = 1
     ) -> tuple[ResultEnvelope | None, DelegationReceipt | None]:
+        # Checked here, before the first model call, because this is where cancelling pays. With
+        # max_workers below the number of subtasks the queued ones have not started yet: stopping
+        # here is the difference between abandoning one call in flight and never making the rest.
+        if self._stopped():
+            return None, None
         # Per-subtask gate: a trivially small spec is cheaper answered inline by the
         # trusted top model than delegated through the worker+verify machinery.
-        if (
+        inline = bool(
             self.config.inline_below_spec_tokens
             and estimate_tokens(spec.render()) < self.config.inline_below_spec_tokens
-        ):
+        )
+        # One emission for both paths, with the tier that will actually run it. Reporting every
+        # subtask as a mid-tier worker would misprice the run in the consumer's own display, since
+        # an inline subtask is answered by the top model and charged as such.
+        self._emit(
+            "worker_started",
+            text=spec.objective,
+            task_id=spec.task_id,
+            objective=spec.objective,
+            tier="top" if inline else "mid",
+            model=self.top_model if inline else self.mid_model,
+            max_tokens=spec.effort.max_tokens,
+        )
+        if inline:
             return self._run_inline_subtask(spec, n_subtasks=n_subtasks)
         budget = TokenBudget(spec.effort.max_tokens)
         backend = BudgetedBackend(self.gateway, budget, mode="hard")
@@ -432,10 +565,16 @@ class HierarchicalOrchestrator:
         # verification. If the bounded re-ask also fails, the envelope is dropped
         # (audited via the receipt) rather than folded in as an unverified claim.
         verified = False
+        reasked = False
+        outcome = None
         if raw.strip():
             outcome = self.verifier.verify(spec, envelope)
             verified = outcome.passed
-            if not verified:
+            if not verified and self._stopped():
+                # The re-ask is a whole second model call — the single largest thing a cancel
+                # mid-dispatch can still avoid paying for.
+                _log.debug("cancelled before the re-ask for %s", spec.task_id)
+            elif not verified:
                 # One bounded re-ask with the verifier's objection folded in.
                 try:
                     raw2 = worker.act(
@@ -449,6 +588,7 @@ class HierarchicalOrchestrator:
                     if self.verifier.verify(spec, candidate, force_spot=True).passed:
                         envelope = candidate
                         verified = True
+                        reasked = True
                 except Exception as exc:  # noqa: BLE001 -- re-ask is best-effort
                     _log.debug("re-ask for %s failed: %s", spec.task_id, exc)
         # The budget already sums prompt+completion per call; the receipt keeps the
@@ -468,7 +608,38 @@ class HierarchicalOrchestrator:
             cache_write_tokens=budget.cache_write or None,
         )
         if not verified:
+            # Two different failures, kept apart. "The worker produced nothing" is a budget or a
+            # provider fault; "the verifier refused it" is a judgement with a stage and a reason.
+            # Collapsing them into one message is how a provider outage gets read as a model that
+            # cannot follow a contract.
+            if outcome is None:
+                self._emit(
+                    "worker_rejected", text="no output", task_id=spec.task_id,
+                    reason="no_output",
+                    detail="worker produced no output (budget or provider error)",
+                    tokens=budget.spent,
+                )
+            else:
+                self._emit(
+                    "worker_rejected", text=outcome.stage, task_id=spec.task_id,
+                    reason="verifier", stage=outcome.stage, detail=outcome.detail,
+                    tokens=budget.spent,
+                )
             return None, receipt
+        self._emit(
+            "worker_verified",
+            text=f"verified ({outcome.stage if outcome else 'inline'})",
+            task_id=spec.task_id,
+            stage=outcome.stage if outcome else "",
+            reasked=reasked,
+            tokens=budget.spent,
+            # The summary's SIZE, not the summary. This is a progress frame; the envelope carries
+            # the text, and a fan-out of eight 8k summaries down a live channel is a firehose the
+            # consumer then has to defend itself against.
+            summary_chars=len(envelope.summary or ""),
+            evidence_refs=list(envelope.evidence_refs or []),
+            gaps=list(envelope.gaps or []),
+        )
         return envelope, receipt
 
     def _run_inline_subtask(
@@ -520,7 +691,16 @@ class HierarchicalOrchestrator:
         recall = self._recall_block(task)
         if recall:
             prompt = f"## Prior knowledge (advisory)\n{recall}\n\n{prompt}"
-        if self.config.fuse_final and self.fusion is not None and _conflicting(envelopes):
+        use_fusion = (
+            self.config.fuse_final and self.fusion is not None and _conflicting(envelopes)
+        )
+        # Emitted here and not before the call in run_prepared, because `fused` is only
+        # decided at this point — announcing it earlier would be announcing a guess.
+        self._emit(
+            "synthesizing", text=f"{len(envelopes)} summaries",
+            envelopes=len(envelopes), fused=use_fusion,
+        )
+        if use_fusion:
             _log.debug("envelopes conflict — engaging fusion for the final synthesis")
             result = self.fusion.complete(
                 [Message(role="system", content=_SYNTH_SYSTEM),
@@ -535,13 +715,23 @@ class HierarchicalOrchestrator:
         tokens, estimated = _result_tokens(result, prompt + (result.content or ""))
         return result.content, tokens, estimated
 
-    def _fallback(self, task: str, shape: TaskShape, *, reason: str) -> HierarchyResult:
+    def _fallback(
+        self, task: str, shape: TaskShape, *, reason: str, code: str = "shape"
+    ) -> HierarchyResult:
         """Single-agent path (top model, one shot) — the always-correct default.
 
         The decision itself is audited: a receipt row records the fallback with
         the counterfactual so `chimera delegations` shows why nothing was saved.
+
+        ``code`` is ``reason`` in a form a consumer can branch on. ``reason`` is prose written for
+        a log line and it has already changed shape once; a UI matching on its text would be a UI
+        that breaks when someone rewords a debug message. The four values are ``shape``,
+        ``unprofitable``, ``decompose_failed`` and ``workers_failed``.
         """
         _log.debug("falling back to single-agent path (%s)", reason)
+        # Emitted from the single site every fallback passes through, so no route out of the
+        # hierarchy can forget to say it happened.
+        self._emit("fell_back", text=reason, shape=shape, reason=code)
         result = self.gateway.complete(
             [Message(role="user", content=task)], model=self.top_model
         )
@@ -561,13 +751,33 @@ class HierarchicalOrchestrator:
         if self.receipts_path is not None:
             append_delegation(self.receipts_path, receipt)
         self._record_outcome(task, result.content)
-        return HierarchyResult(
-            answer=result.content,
-            shape=shape,
-            receipts=[receipt],
-            fell_back=True,
-            total_tokens=tokens,
+        return self._finish(
+            HierarchyResult(
+                answer=result.content,
+                shape=shape,
+                receipts=[receipt],
+                fell_back=True,
+                total_tokens=tokens,
+            )
         )
+
+    def _finish(self, result: HierarchyResult) -> HierarchyResult:
+        """The one place a run ends, so ``done`` cannot be missed on a path someone adds later."""
+        self._emit(
+            "done",
+            text="fell back" if result.fell_back else "synthesised",
+            shape=result.shape,
+            fell_back=result.fell_back,
+            cancelled=result.cancelled,
+            envelopes=len(result.envelopes),
+            receipts=len(result.receipts),
+            total_tokens=result.total_tokens,
+            counterfactual_tokens=result.counterfactual_tokens,
+            # The answer travels on `done` and nowhere else: it is the one frame a consumer that
+            # missed the stream still needs in full.
+            answer=result.answer,
+        )
+        return result
 
     def _recall_block(self, task: str) -> str:
         """Advisory prior-knowledge for the top model (M19-A4 read half): retrieved skill cards +

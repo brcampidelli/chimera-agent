@@ -1,14 +1,24 @@
 import { useId, useState } from "react";
 import { ListChecks } from "lucide-react";
 
+import { Orchestration } from "@/components/orchestration/Orchestration";
 import { Runs } from "@/components/Runs";
 import { GitPanel } from "@/components/code/GitPanel";
 import { WorthPanel } from "@/components/code/WorthPanel";
 import { Tabs, TabPanel } from "@/components/ui/tabs";
 import { useT } from "@/lib/i18n";
+import { useRoute } from "@/lib/router";
 import { readWorkspace } from "@/lib/workspace";
 
-type Tab = "run" | "git" | "worth";
+type Tab = "run" | "git" | "worth" | "orchestration";
+
+/** The tab named in the URL, if any. Read straight from the hash rather than through `useRoute`
+ *  so the FIRST render already has it: a deep link that resolved one render late would show the
+ *  Runs tab and then jump, which reads as a bug even though it settles correctly. */
+function readTab(): string {
+  const query = window.location.hash.split("?")[1] ?? "";
+  return new URLSearchParams(query).get("tab") ?? "";
+}
 
 /**
  * The agent working on its own.
@@ -31,7 +41,10 @@ type Tab = "run" | "git" | "worth";
 export function Work() {
   const t = useT();
   const id = useId();
-  const [tab, setTab] = useState<Tab>("run");
+  const [tab, setTab] = useState<Tab>(() => (readTab() === "orchestration" ? "orchestration" : "run"));
+  // Only to leave: the fallback note on a write-shaped task offers the screen that IS for writing
+  // work, and a suggestion you have to act on yourself is a suggestion with a step missing.
+  const { navigate, setParams } = useRoute();
   // Read on mount, and this screen remounts on every navigation, so choosing a root in Code and
   // coming back here shows the new one. Deliberately not lifted into a provider: the value already
   // survives in storage, and a provider would be a second source of truth for the same string.
@@ -41,7 +54,15 @@ export function Work() {
     { value: "run" as const, label: t("nav.runs") },
     { value: "git" as const, label: t("code.git.title") },
     { value: "worth" as const, label: t("code.worth.title") },
+    { value: "orchestration" as const, label: t("nav.orchestration") },
   ];
+
+  // `setParams` and not `navigate`: switching a tab replaces rather than pushes, so the back
+  // button still leaves this screen instead of walking back through four tabs first.
+  function choose(next: Tab) {
+    setTab(next);
+    setParams(next === "run" ? {} : { tab: next });
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -49,7 +70,7 @@ export function Work() {
         <ListChecks className="h-5 w-5" />
         <h1 className="text-lg font-semibold text-foreground">{t("nav.work")}</h1>
       </div>
-      <Tabs items={items} value={tab} onChange={setTab} aria-label={t("nav.work")} className="px-6" />
+      <Tabs items={items} value={tab} onChange={choose} aria-label={t("nav.work")} className="px-6" />
       <div className="min-h-0 flex-1 overflow-y-auto">
         <TabPanel tabsId={id} value={tab}>
           {tab === "run" ? (
@@ -71,9 +92,13 @@ export function Work() {
               )}
               <GitPanel workspace={workspace} />
             </div>
-          ) : (
+          ) : tab === "worth" ? (
             <div className="mx-auto max-w-5xl px-6 py-4">
               <WorthPanel workspace={workspace} />
+            </div>
+          ) : (
+            <div className="mx-auto max-w-5xl px-6 py-4">
+              <Orchestration workspace={workspace} onOpenCode={() => navigate("code")} />
             </div>
           )}
         </TabPanel>

@@ -1500,6 +1500,7 @@ def build_api_app(
 
     from chimera.api.features import register_features
     from chimera.api.openai_compat import register_openai_compat
+    from chimera.api.orchestration_api import register_orchestration_api
 
     # `workspace` is where a dispatched Kanban card works when the request names none.
     register_features(app, guard, workspace=workspace)
@@ -1517,6 +1518,13 @@ def build_api_app(
         memory=memory,
         graph=graph,
         fuse_backend=fuse_backend,
+    )
+    # /api/orchestration/* — the hierarchical orchestrator's plan, run, cancel and ledger.
+    # Registered unconditionally: `schema_dump` builds the app through this function, so a route
+    # behind a flag or a try-import would be present at runtime and absent from the schema, and
+    # the drift gate would pass while the generated client was missing half the surface.
+    register_orchestration_api(
+        app, guard, workspace, settings, live_settings=live_settings
     )
     # /v1/chat/completions — any OpenAI client or LLM benchmark harness can drive the agent loop.
     register_openai_compat(app, guard, manager)

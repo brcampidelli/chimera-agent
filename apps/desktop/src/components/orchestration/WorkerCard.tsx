@@ -1,0 +1,110 @@
+import { Check, Loader2, Minus, X } from "lucide-react";
+
+import { Badge } from "@/components/ui/panel";
+import { useT } from "@/lib/i18n";
+import type { WorkerState } from "@/lib/orchestration-run";
+import { cn } from "@/lib/utils";
+
+/**
+ * One subtask, as a card.
+ *
+ * The colour rail down the left edge is the one idea worth borrowing from open-maestri, whose
+ * canvas ropes go grey → green → red as agents talk. There the rope carries meaning (it is the
+ * permission graph); here the states are the same four and a 2px border is the whole cost.
+ *
+ * This is close to `AgentCard` on the batch board and is deliberately not merged with it. The
+ * payloads have nothing in common beyond being rectangles — one holds attempts, a diff and a verify
+ * command, this holds a verification stage and an envelope's size — and a component with a union of
+ * both props would be harder to read than two files.
+ */
+const rails: Record<WorkerState["status"], string> = {
+  queued: "bg-muted",
+  running: "bg-accent",
+  verified: "bg-ok",
+  rejected: "bg-bad",
+};
+
+export function WorkerCard({ worker }: { worker: WorkerState }) {
+  const t = useT();
+
+  const icon =
+    worker.status === "running" ? (
+      <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
+    ) : worker.status === "verified" ? (
+      <Check className="h-3.5 w-3.5 text-ok" />
+    ) : worker.status === "rejected" ? (
+      <X className="h-3.5 w-3.5 text-bad" />
+    ) : (
+      <Minus className="h-3.5 w-3.5 text-muted-foreground" />
+    );
+
+  return (
+    <article className="surface relative overflow-hidden pl-4">
+      <span
+        aria-hidden
+        className={cn(
+          "absolute inset-y-0 left-0 w-0.5 transition-colors duration-200 ease-out",
+          rails[worker.status],
+        )}
+      />
+      <div className="space-y-2 p-3">
+        <div className="flex items-start gap-2">
+          <span className="mt-0.5 shrink-0">{icon}</span>
+          <p className="min-w-0 flex-1 text-sm text-foreground">
+            {worker.objective || worker.taskId}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge
+            tone={
+              worker.status === "verified"
+                ? "ok"
+                : worker.status === "rejected"
+                  ? "bad"
+                  : worker.status === "running"
+                    ? "accent"
+                    : "muted"
+            }
+          >
+            {t(`orch.worker.${worker.status}`)}
+          </Badge>
+          {/* Which tier answered it. A subtask small enough to run inline is handled by the top
+              model and charged as such; showing every card as a mid-tier worker would misprice
+              the run in the only place the user can see it. */}
+          {worker.tier ? <Badge>{t(`orch.worker.tier.${worker.tier}`)}</Badge> : null}
+          {worker.status === "verified" && worker.stage ? <Badge>{worker.stage}</Badge> : null}
+          {worker.reasked ? <Badge tone="warn">{t("orch.worker.reasked")}</Badge> : null}
+          {worker.tokens > 0 ? (
+            <span className="text-xs tabular-nums text-muted-foreground">
+              {t("orch.worker.tokens", { n: worker.tokens })}
+            </span>
+          ) : null}
+        </div>
+
+        {worker.status === "rejected" ? (
+          <div className="space-y-1">
+            <p className="text-xs text-bad">
+              {worker.reason === "no_output"
+                ? t("orch.worker.noOutput")
+                : worker.reason === "deadline"
+                  ? t("orch.worker.deadline")
+                  : worker.detail}
+            </p>
+            {/* The line that keeps the answer honest. Without it a user watches four workers,
+                reads an answer built from three, and has no way to know one was dropped. */}
+            <p className="text-xs text-muted-foreground">{t("orch.worker.discarded")}</p>
+          </div>
+        ) : null}
+
+        {worker.status === "verified" && worker.gaps.length > 0 ? (
+          <ul className="space-y-0.5 text-xs text-warn-foreground">
+            {worker.gaps.map((gap) => (
+              <li key={gap}>{gap}</li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+    </article>
+  );
+}
