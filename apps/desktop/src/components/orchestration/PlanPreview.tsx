@@ -65,8 +65,13 @@ export function PlanPreview({
       </p>
 
       <div className="mt-3">
+        {/* No count on the button. The number is on the line above it, and a label carrying a
+            figure has to agree with it — which `t()` cannot do: it interpolates and nothing more,
+            so "1 trabalhadores" was what a single-worker plan actually rendered. Moving every
+            count into a "label: n" position fixes it in all ten languages at once, including the
+            two with three plural forms that a naive one/other split would still get wrong. */}
         <Button size="sm" onClick={onRun} disabled={running}>
-          {t("orch.plan.run", { n: plan.workers })}
+          {t("orch.plan.run")}
         </Button>
       </div>
     </div>

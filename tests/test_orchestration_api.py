@@ -213,3 +213,87 @@ def test_the_frame_shapes_are_published_for_the_generated_client(
     }
     assert shape["done"]["answer"] == ""
     assert shape["decomposed"]["specs"] == []
+
+def test_the_plan_that_was_approved_is_the_plan_that_runs(
+    app_and_backend: tuple[TestClient, FakeBackend],
+) -> None:
+    client, backend = app_and_backend
+
+    plan = client.post("/api/orchestration/preview", json={"task": _READ_TASK}).json()
+    assert plan["plan_id"], "a fan-out plan must be keepable, or approving it means nothing"
+    decomposes_after_preview = sum(
+        1 for call in backend.calls if "Split the user's task" in call["system"]
+    )
+
+    frames = _read_sse(
+        client.post(
+            "/api/orchestration/hierarchy",
+            json={"task": _READ_TASK, "plan_id": plan["plan_id"]},
+        ).text
+    )
+
+    published = [
+        spec["objective"]
+        for kind, payload in frames
+        if kind == "decomposed"
+        for spec in payload["specs"]
+    ]
+    # Same objectives, and NO second decompose call. Decomposition runs at a non-zero temperature,
+    # so asking twice is how a preview promises one worker and the run delivers three.
+    assert published == plan["subtasks"]
+    total_decomposes = sum(
+        1 for call in backend.calls if "Split the user's task" in call["system"]
+    )
+    assert total_decomposes == decomposes_after_preview
+
+
+def test_an_expired_plan_decomposes_again_instead_of_failing(
+    app_and_backend: tuple[TestClient, FakeBackend],
+) -> None:
+    client, _ = app_and_backend
+
+    frames = _read_sse(
+        client.post(
+            "/api/orchestration/hierarchy",
+            json={"task": _READ_TASK, "plan_id": "a-plan-this-process-never-had"},
+        ).text
+    )
+    kinds = [kind for kind, _ in frames]
+
+    # A restart loses the plan store. That must cost a model call, never an error: the run still
+    # produces an answer, exactly as it did before plans were kept at all.
+    assert "error" not in kinds
+    assert kinds[-1] == "done"
+    assert kinds.count("worker_started") == 2
+
+def test_workers_can_open_files_but_never_change_them(
+    app_and_backend: tuple[TestClient, FakeBackend],
+) -> None:
+    """The fix for a fan-out that described a file it had never opened.
+
+    Asked about a 16-line module with two functions, the tool-free version produced a confident
+    account of a class with cupons and stock control — and all three workers passed verification,
+    because the verifier checks a summary against what the worker WROTE, never against the world.
+
+    What must not come with the fix is write access: N workers in one folder with no worktree
+    between them is the collision `IsolatedCrew` exists to prevent.
+    """
+    from chimera.api.orchestration_api import _WORKER_TOOLS
+
+    assert "read_file" in _WORKER_TOOLS, "a worker that cannot read still has to answer"
+    forbidden = {
+        "write_file", "edit_file", "apply_patch",       # N workers, one folder, no worktree
+        "run_shell", "execute_code", "code_interpreter",  # arbitrary effects
+        "http_get", "browser", "crawl", "scrape",       # untrusted content, per-worker ledgers
+    }
+    assert not forbidden & set(_WORKER_TOOLS)
+
+
+def test_a_worker_is_told_not_to_describe_what_it_has_not_opened(
+    app_and_backend: tuple[TestClient, FakeBackend],
+) -> None:
+    from chimera.orchestration.hierarchy import WORKER_SYSTEM
+
+    # A tool the model does not know it should reach for is a tool it will answer around.
+    assert "READ IT" in WORKER_SYSTEM
+    assert "Never describe a file you have not opened" in WORKER_SYSTEM

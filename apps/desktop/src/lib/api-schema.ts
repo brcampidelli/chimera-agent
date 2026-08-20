@@ -1351,9 +1351,12 @@ export interface paths {
          * Preview Endpoint
          * @description What the orchestrator would do with this task, before any worker runs.
          *
-         *     Honest about its own cost: on the fan-out branch ``dry_run`` really does call the top
-         *     model to decompose, so ``decompose_spent`` comes back true. The claim this endpoint
-         *     supports is "no WORKER tokens", never "free".
+         *     Honest about its own cost: on the fan-out branch this really does call the top model to
+         *     decompose, so ``decompose_spent`` comes back true. The claim is "no WORKER tokens".
+         *
+         *     The decomposition is KEPT, under ``plan_id``. Handing that id to the run makes it execute
+         *     this split instead of asking for another one — the plan shown is the plan that runs, and
+         *     the second decompose call is not paid for twice.
          */
         post: operations["preview_endpoint_api_orchestration_preview_post"];
         delete?: never;
@@ -3251,6 +3254,8 @@ export interface components {
             max_workers: number;
             /** Task */
             task: string;
+            /** Workspace */
+            workspace?: string | null;
         };
         /**
          * HierarchyPreviewOut
@@ -3281,6 +3286,12 @@ export interface components {
              * @default
              */
             fell_back_reason: string;
+            /**
+             * Plan Id
+             * @description Hand this back on the run to execute THIS decomposition. Empty on the fallback branch, where there is no decomposition to keep.
+             * @default
+             */
+            plan_id: string;
             /** Profitable Estimate */
             profitable_estimate: boolean;
             /** Shape */
@@ -3332,10 +3343,21 @@ export interface components {
              * @default 4
              */
             max_workers: number;
+            /**
+             * Plan Id
+             * @description A plan id from /preview. Given one, the run executes that decomposition rather than producing a new one — so the plan a person approved is the plan that runs. An unknown or expired id decomposes afresh rather than failing.
+             * @default
+             */
+            plan_id: string;
             /** Task */
             task: string;
             /** Verifier Model */
             verifier_model?: string | null;
+            /**
+             * Workspace
+             * @description Which folder the workers read. Absent, they read the app's own workspace — which, on a screen that inherits its project from the Code tab, would be a different folder than the one on screen, and nothing would say so.
+             */
+            workspace?: string | null;
         };
         /** HitlOut */
         HitlOut: {

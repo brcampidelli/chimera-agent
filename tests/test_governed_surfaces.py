@@ -338,6 +338,9 @@ def test_the_gate_does_not_demand_a_refactor_of_the_attended_commands() -> None:
         # to catch — cheap to drop while refactoring, and invisible once dropped.
         ("api:run", "api/app.py"),
         ("api:turn", "api/code_api.py"),
+        # The hierarchy's workers. Read-only and not request-configurable, but still assembled
+        # through the governed path — an audit line has to be able to name this entry point too.
+        ("api:hierarchy", "api/orchestration_api.py"),
     ],
 )
 def test_each_named_surface_is_declared(surface: str, module: str) -> None:

@@ -1,5 +1,7 @@
+import { Loader2 } from "lucide-react";
+
 import { useT } from "@/lib/i18n";
-import type { OrchestrationState } from "@/lib/orchestration-run";
+import { isRunning, type OrchestrationState } from "@/lib/orchestration-run";
 import { cn } from "@/lib/utils";
 
 const ORDER = ["classified", "decomposed", "working", "synthesizing", "done"] as const;
@@ -14,6 +16,11 @@ const ORDER = ["classified", "decomposed", "working", "synthesizing", "done"] as
 export function RunStepper({ state }: { state: OrchestrationState }) {
   const t = useT();
   const reached = ORDER.indexOf(state.stage as (typeof ORDER)[number]);
+  // A spinner on the stage that is working, because the gaps between frames are long. Decomposing
+  // is one top-model call and took ninety seconds on a loaded provider — ninety seconds in which
+  // a lit chip and a dead screen look exactly alike. There is no percentage to show and inventing
+  // one would be worse; what the display owes is the difference between "waiting" and "stopped".
+  const working = isRunning(state);
 
   return (
     <ol className="flex flex-wrap items-center gap-1.5" role="status" aria-live="polite">
@@ -33,9 +40,14 @@ export function RunStepper({ state }: { state: OrchestrationState }) {
             )}
             aria-current={current ? "step" : undefined}
           >
-            {stage === "working" && state.workers.length > 0
-              ? t("orch.stage.workingN", { n: state.workers.length })
-              : t(`orch.stage.${stage}`)}
+            <span className="inline-flex items-center gap-1">
+              {current && working ? (
+                <Loader2 aria-hidden className="h-3 w-3 animate-spin" />
+              ) : null}
+              {stage === "working" && state.workers.length > 0
+                ? t("orch.stage.workingN", { n: state.workers.length })
+                : t(`orch.stage.${stage}`)}
+            </span>
           </li>
         );
       })}

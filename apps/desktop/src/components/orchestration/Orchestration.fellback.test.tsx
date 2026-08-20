@@ -27,6 +27,7 @@ function plan(over: Partial<HierarchyPreview> = {}): HierarchyPreview {
     workers: 0,
     budget_per_worker: 0,
     sources: 0,
+    plan_id: "",
     decompose_spent: false,
     ...over,
   };
