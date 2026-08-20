@@ -1423,12 +1423,20 @@ function dispatchExec(frame: string, h: ExecStreamHandlers): void {
 
 export interface HierarchyPreviewInput {
   task: string;
+  workspace?: string | null;
   max_workers?: number;
   budget?: number | null;
 }
 
 export interface HierarchyRunInput {
   task: string;
+  /** The folder the workers read. Without it they read the app's own workspace — a different
+   *  folder than the one this screen shows, with nothing saying so. */
+  workspace?: string | null;
+  /** A plan id from `previewHierarchy`. With one, the run executes THAT decomposition instead of
+   *  producing a new one — decomposition runs at a non-zero temperature, so asking twice is how a
+   *  preview promises one worker and the run delivers three. */
+  plan_id?: string;
   max_workers?: number;
   budget?: number | null;
   verifier_model?: string | null;

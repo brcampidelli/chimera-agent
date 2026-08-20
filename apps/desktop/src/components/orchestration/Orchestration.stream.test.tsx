@@ -33,6 +33,7 @@ const FAN_OUT_PLAN: HierarchyPreview = {
   workers: 2,
   budget_per_worker: 8000,
   sources: 2,
+  plan_id: "plan_1",
   decompose_spent: true,
 };
 
@@ -70,8 +71,8 @@ async function startRun() {
   renderWithProviders(<Orchestration workspace="/repo" onOpenCode={vi.fn()} />);
   await user.type(screen.getByLabelText(/task/i), "Compare doc A and doc B and list the risks");
   await user.click(screen.getByRole("button", { name: /see the plan/i }));
-  await waitFor(() => expect(screen.getByRole("button", { name: /run with 2/i })).toBeInTheDocument());
-  await user.click(screen.getByRole("button", { name: /run with 2/i }));
+  await waitFor(() => expect(screen.getByRole("button", { name: /run the plan/i })).toBeInTheDocument());
+  await user.click(screen.getByRole("button", { name: /run the plan/i }));
   await waitFor(() => expect(mockStream).toHaveBeenCalled());
   return { user, handlers: () => captured };
 }
@@ -84,6 +85,18 @@ function send(handlers: HierarchyStreamHandlers, ...frames: OrchFrame[]) {
 
 describe("watching a fan-out", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("runs the plan it showed, by id", async () => {
+    await startRun();
+
+    // Without the id the backend decomposes again, at a non-zero temperature — which is how a
+    // preview promising one worker delivered three. Approving a plan has to mean something.
+    expect(mockStream).toHaveBeenCalledWith(
+      expect.objectContaining({ plan_id: "plan_1" }),
+      expect.anything(),
+      expect.anything(),
+    );
+  });
 
   it("shows one card per subtask as soon as the split lands", async () => {
     await startRun();

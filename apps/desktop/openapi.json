@@ -3058,6 +3058,17 @@
           "task": {
             "title": "Task",
             "type": "string"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
           }
         },
         "required": [
@@ -3088,6 +3099,12 @@
             "default": "",
             "description": "Machine-readable: shape | unprofitable. Empty when the run would fan out.",
             "title": "Fell Back Reason",
+            "type": "string"
+          },
+          "plan_id": {
+            "default": "",
+            "description": "Hand this back on the run to execute THIS decomposition. Empty on the fallback branch, where there is no decomposition to keep.",
+            "title": "Plan Id",
             "type": "string"
           },
           "profitable_estimate": {
@@ -3166,6 +3183,12 @@
             "title": "Max Workers",
             "type": "integer"
           },
+          "plan_id": {
+            "default": "",
+            "description": "A plan id from /preview. Given one, the run executes that decomposition rather than producing a new one \u2014 so the plan a person approved is the plan that runs. An unknown or expired id decomposes afresh rather than failing.",
+            "title": "Plan Id",
+            "type": "string"
+          },
           "task": {
             "title": "Task",
             "type": "string"
@@ -3180,6 +3203,18 @@
               }
             ],
             "title": "Verifier Model"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Which folder the workers read. Absent, they read the app's own workspace \u2014 which, on a screen that inherits its project from the Code tab, would be a different folder than the one on screen, and nothing would say so.",
+            "title": "Workspace"
           }
         },
         "required": [
@@ -9116,7 +9151,7 @@
     },
     "/api/orchestration/preview": {
       "post": {
-        "description": "What the orchestrator would do with this task, before any worker runs.\n\nHonest about its own cost: on the fan-out branch ``dry_run`` really does call the top\nmodel to decompose, so ``decompose_spent`` comes back true. The claim this endpoint\nsupports is \"no WORKER tokens\", never \"free\".",
+        "description": "What the orchestrator would do with this task, before any worker runs.\n\nHonest about its own cost: on the fan-out branch this really does call the top model to\ndecompose, so ``decompose_spent`` comes back true. The claim is \"no WORKER tokens\".\n\nThe decomposition is KEPT, under ``plan_id``. Handing that id to the run makes it execute\nthis split instead of asking for another one \u2014 the plan shown is the plan that runs, and\nthe second decompose call is not paid for twice.",
         "operationId": "preview_endpoint_api_orchestration_preview_post",
         "requestBody": {
           "content": {

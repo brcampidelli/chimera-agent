@@ -43,7 +43,7 @@ export function Orchestration({
     // decompose call takes long enough for someone to read it and act on it.
     setPlan(null);
     try {
-      setPlan(await previewHierarchy({ task }));
+      setPlan(await previewHierarchy({ task, workspace }));
     } catch (err) {
       setPlan(null);
       setError(err instanceof Error ? err.message : String(err));
@@ -98,7 +98,11 @@ export function Orchestration({
           plan={plan}
           running={planning}
           onOpenCode={onOpenCode}
-          onRun={() => setRun({ at: Date.now(), request: { task } })}
+          // The id travels with the run, so what executes is the split shown above rather than a
+          // fresh one. Without it the approval on this screen would be approval of nothing.
+          onRun={() =>
+            setRun({ at: Date.now(), request: { task, workspace, plan_id: plan.plan_id } })
+          }
         />
       ) : null}
 

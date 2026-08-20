@@ -29,7 +29,7 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from chimera.evolution.context import EvolutionContext
@@ -63,6 +63,13 @@ WORKER_SYSTEM = (
     "specification with an objective, an expected output format, and boundaries. "
     "Do exactly that task — nothing beyond the boundaries. Be concise and factual. "
     "Lead with your findings; do not repeat the task or the context back. "
+    # Added after a fan-out asked about a 16-line module and produced a confident description of
+    # a class that did not exist. The workers had no tools then; now that they can be given read
+    # tools, the instruction has to say that guessing is not an option — a model asked about a
+    # named file will otherwise answer from what such a file usually contains.
+    "If the task names a file and you have a tool that can read it, READ IT. Never describe a "
+    "file you have not opened: if you cannot open it, say so and report nothing about its "
+    "contents. "
     "If you could not verify something, say so under a final 'Gaps' heading."
 )
 
@@ -98,7 +105,20 @@ _MULTIPART = re.compile(r"\b(and|e|,|;)\b", re.IGNORECASE)
 # ALL D docs every turn while scoped workers read one each, so the token saving is
 # (D-1)/D — measured 49.9% / 66.7% / 74.8% / 79.9% at D=2..5 on deepseek. Below D=2
 # there is nothing to isolate and fan-out only adds overhead (bench/hierarchy: +47%).
-_FILE_REF = re.compile(r"\b[\w-]+\.(?:md|txt|pdf|csv|tsv|json|ya?ml|docx?|html?|log|rst|ipynb)\b", re.I)
+# Source extensions, including CODE. The original list was documents only — md, txt, pdf,
+# csv, json, yaml and friends — which was right while the only caller was `brief`, a research
+# recipe over articles. It became wrong the moment a desktop screen put this in front of a
+# project: "analyse carrinho.py and test_carrinho.py" names two distinct sources, scored zero,
+# and so never reached the measured guaranteed-gain region in the one domain the product is
+# for. A file is a file; what makes two of them worth isolating is that there are two, not
+# what they are written in.
+_FILE_REF = re.compile(
+    r"\b[\w-]+\.(?:"
+    r"md|txt|pdf|csv|tsv|json|ya?ml|docx?|html?|log|rst|ipynb|toml|ini|cfg|xml|sql"
+    r"|py|pyi|ts|tsx|js|jsx|mjs|cjs|rs|go|java|kt|rb|php|cs|swift|c|h|cpp|hpp|cc|sh|ps1"
+    r")\b",
+    re.I,
+)
 _DOC_REF = re.compile(r"\b(?:doc(?:ument)?|file|source|report|section|chapter)\s+[A-Z0-9][\w-]*", re.I)
 _URL_REF = re.compile(r"https?://\S+")
 
@@ -154,6 +174,30 @@ class HierarchyConfig:
 
 
 @dataclass
+class TaskPlan:
+    """What the orchestrator would do with a task, decided once and reusable.
+
+    ``specs`` is the point: a caller can hand these straight to :meth:`run_prepared` and get the
+    plan it was shown, instead of a second decomposition that may split the task differently.
+    """
+
+    shape: TaskShape
+    specs: list[TaskSpec] = field(default_factory=list)
+    profitable: bool = False
+    margin: float = 0.0
+    workers: int = 0
+    budget_per_worker: int = 0
+    decompose_spent: bool = False
+    """Whether producing this plan cost a model call. False on the fallback branch, where the
+    classifier and the estimate are both arithmetic — so "no worker tokens" and "nothing at all"
+    are different claims and a display can tell them apart."""
+
+    @property
+    def would_fall_back(self) -> bool:
+        return self.shape != "parallel_read"
+
+
+@dataclass
 class HierarchyResult:
     answer: str
     shape: TaskShape
@@ -189,6 +233,7 @@ class HierarchicalOrchestrator:
         evolution: EvolutionContext | None = None,
         on_event: OrchEventSink | None = None,
         should_stop: Callable[[], bool] | None = None,
+        worker_tools: Callable[[], Any] | None = None,
     ) -> None:
         self.gateway = gateway
         # Both keyword-only with a None default, so every existing caller and test is untouched.
@@ -204,6 +249,20 @@ class HierarchicalOrchestrator:
         # Cooperative and checked BETWEEN units, never inside a call in flight. A model call that
         # has started is already paid for, so stopping it buys nothing and loses the answer.
         self.should_stop = should_stop
+        # A factory for the workers' tool registry, or None to keep them tool-free.
+        #
+        # Tool-free was the original design and it was right for the original caller: `brief`
+        # hands a worker the text it must summarise, so a worker with no tools cannot wander. It
+        # became wrong the moment a screen put this in front of a PROJECT, because the natural
+        # request there is "analyse carrinho.py" — and a worker that cannot open the file answers
+        # anyway. Measured, not reasoned: asked about a 16-line module with two functions, the
+        # fan-out described a class with cupons and stock control, and all three workers passed
+        # verification, because the verifier checks that a summary is faithful to what the worker
+        # WROTE, never that what the worker wrote is true.
+        #
+        # A factory rather than a registry so each worker gets its own instance — a registry can
+        # carry per-run state, and sharing one across a thread pool is how that state gets mixed.
+        self.worker_tools = worker_tools
         # M19-A4: the shared flywheel, READ-and-write-telemetry only. A fan-out has no
         # verify-or-revert signal, so it reads retrieved cards + recalled facts into the top
         # model's synthesis and records the run as an experience lesson + card credit — but never
@@ -379,21 +438,45 @@ class HierarchicalOrchestrator:
                 append_delegation(self.receipts_path, receipt)
         return out
 
-    def dry_run(self, task: str) -> dict[str, object]:
-        """Classification + decomposition + profitability estimate — zero worker spend."""
+    def plan(self, task: str) -> TaskPlan:
+        """Everything a caller needs to decide, INCLUDING the subtasks themselves.
+
+        Split out of :meth:`dry_run` because throwing the specs away was a real defect, not a
+        tidiness question. A preview decomposed, showed the objectives, dropped the specs — and
+        the run then decomposed AGAIN. Decomposition is a model call at a non-zero temperature,
+        so the second one returns a different split: a screen could promise one worker and deliver
+        three. The plan a person approves has to be the plan that runs.
+        """
         shape = classify_task(task)
-        out: dict[str, object] = {"shape": shape}
         probe = TaskSpec(task_id="probe", objective=task)
         estimate = estimate_profitability(
             probe, orchestrator_context_chars=len(task) * 8 + 24_000
         )
-        out["profitable_estimate"] = estimate.profitable
-        out["estimate_margin"] = estimate.margin
-        if shape == "parallel_read":
-            specs = self.decompose(task)
-            out["subtasks"] = [s.objective for s in specs]
-            out["workers"] = self.config.effort.workers_for(shape, len(specs))
-            out["budget_per_worker"] = self.config.effort.budget_for(shape)
+        if shape != "parallel_read":
+            return TaskPlan(shape=shape, profitable=estimate.profitable, margin=estimate.margin)
+        specs = self.decompose(task)
+        return TaskPlan(
+            shape=shape,
+            specs=specs,
+            profitable=estimate.profitable,
+            margin=estimate.margin,
+            workers=self.config.effort.workers_for(shape, len(specs)),
+            budget_per_worker=self.config.effort.budget_for(shape),
+            decompose_spent=True,
+        )
+
+    def dry_run(self, task: str) -> dict[str, object]:
+        """Classification + decomposition + profitability estimate — zero worker spend."""
+        plan = self.plan(task)
+        out: dict[str, object] = {
+            "shape": plan.shape,
+            "profitable_estimate": plan.profitable,
+            "estimate_margin": plan.margin,
+        }
+        if plan.shape == "parallel_read":
+            out["subtasks"] = [s.objective for s in plan.specs]
+            out["workers"] = plan.workers
+            out["budget_per_worker"] = plan.budget_per_worker
         else:
             out["would_fall_back"] = True
         return out
@@ -542,6 +625,7 @@ class HierarchicalOrchestrator:
         worker = RoleAgent(
             Role("worker", WORKER_SYSTEM, model=self.mid_model),
             backend,
+            tools=self.worker_tools() if self.worker_tools is not None else None,
             max_steps=spec.effort.max_steps,
         )
         # Recorded on the receipt for audit; the ENFORCING gate is the whole-task one

@@ -49,6 +49,35 @@ _orch_cancels: dict[str, threading.Event] = {}
 #: from asking for a pool far larger than the subtasks a decomposition will ever produce.
 _MAX_WORKERS = 8
 
+#: What a hierarchy worker may do: open things, and nothing else.
+#:
+#: Not configurable by the request, deliberately. Two of the three families left out would each
+#: break something this design depends on. WRITE tools would put N parallel workers in one folder
+#: with no worktree between them — the failure `IsolatedCrew` exists to prevent, and the one the
+#: prior art this screen was modelled on never solved. NETWORK tools would pull untrusted content
+#: into a fan-out whose taint ledger is per-worker, so what one worker read could reach the
+#: synthesis through another's summary.
+#:
+#: Read-heavy is not a limitation of the hierarchy, it is the thing the hierarchy measured a win
+#: on: the (D-1)/D saving comes from each worker seeing ONE source instead of every worker seeing
+#: all of them. Tools make that sharper — a worker now fetches its own source rather than being
+#: handed every document up front.
+_WORKER_TOOLS = ("read_file", "read_document", "list_dir", "glob", "grep", "map")
+
+#: Plans the preview produced, keyed by the id it handed back. A run that names one executes THAT
+#: decomposition instead of asking the model for a second one.
+#:
+#: This exists because the two calls were independent and the model runs at a non-zero temperature:
+#: a preview could show one subtask and the run then split the same task into three. Approving a
+#: plan has to mean something. It also saves the second decompose call, so the honest fix is the
+#: cheaper one.
+#:
+#: In memory and bounded. A plan is a handful of strings, it is worth nothing after its run, and a
+#: restart losing it is harmless — an unknown id falls back to decomposing, which is exactly what
+#: happened before this existed.
+_plans: dict[str, Any] = {}
+_MAX_PLANS = 32
+
 
 # ---------------------------------------------------------------------------------------------
 # request bodies
@@ -57,6 +86,7 @@ _MAX_WORKERS = 8
 
 class HierarchyPreviewIn(BaseModel):
     task: str
+    workspace: str | None = None
     max_workers: int = 4
     budget: int | None = None
 
@@ -73,6 +103,22 @@ class HierarchyRunIn(BaseModel):
     """
 
     task: str
+    workspace: str | None = Field(
+        default=None,
+        description=(
+            "Which folder the workers read. Absent, they read the app's own workspace — which, "
+            "on a screen that inherits its project from the Code tab, would be a different "
+            "folder than the one on screen, and nothing would say so."
+        ),
+    )
+    plan_id: str = Field(
+        default="",
+        description=(
+            "A plan id from /preview. Given one, the run executes that decomposition rather than "
+            "producing a new one — so the plan a person approved is the plan that runs. An "
+            "unknown or expired id decomposes afresh rather than failing."
+        ),
+    )
     max_workers: int = 4
     budget: int | None = Field(default=None, description="Token budget per delegation.")
     verifier_model: str | None = None
@@ -117,6 +163,13 @@ class HierarchyPreviewOut(BaseModel):
     workers: int = 0
     budget_per_worker: int = 0
     sources: int = 0
+    plan_id: str = Field(
+        default="",
+        description=(
+            "Hand this back on the run to execute THIS decomposition. Empty on the fallback "
+            "branch, where there is no decomposition to keep."
+        ),
+    )
     decompose_spent: bool = Field(
         default=False,
         description=(
@@ -239,23 +292,38 @@ class OrchestrationFramesOut(BaseModel):
 # ---------------------------------------------------------------------------------------------
 
 
-def _preview_dict(plan: dict[str, Any], *, sources: int, spent: bool) -> dict[str, Any]:
-    """Fill in the keys ``dry_run`` leaves out, so the response has one shape on every branch."""
-    fell_back = bool(plan.get("would_fall_back"))
+def _remember(plan: Any) -> str:
+    """Keep a decomposition so the run can execute the plan that was shown, and bound the store."""
+    if not plan.specs:
+        return ""
+    plan_id = uuid.uuid4().hex
+    _plans[plan_id] = plan
+    # Oldest out first. dicts keep insertion order, so this is the plan least likely to still be
+    # sitting in front of somebody.
+    while len(_plans) > _MAX_PLANS:
+        _plans.pop(next(iter(_plans)))
+    return plan_id
+
+
+def _preview_dict(plan: Any, *, sources: int, plan_id: str) -> dict[str, Any]:
+    """One response shape on every branch, whichever way the plan went."""
     reason = ""
-    if fell_back:
-        reason = "shape" if plan.get("shape") != "parallel_read" else "unprofitable"
+    if plan.would_fall_back:
+        reason = "shape"
+    elif not plan.specs:
+        reason = "unprofitable"
     return {
-        "shape": str(plan.get("shape", "")),
-        "profitable_estimate": bool(plan.get("profitable_estimate", False)),
-        "estimate_margin": float(plan.get("estimate_margin", 0.0) or 0.0),
-        "would_fall_back": fell_back,
+        "shape": plan.shape,
+        "profitable_estimate": plan.profitable,
+        "estimate_margin": plan.margin,
+        "would_fall_back": plan.would_fall_back,
         "fell_back_reason": reason,
-        "subtasks": list(plan.get("subtasks", []) or []),
-        "workers": int(plan.get("workers", 0) or 0),
-        "budget_per_worker": int(plan.get("budget_per_worker", 0) or 0),
+        "subtasks": [spec.objective for spec in plan.specs],
+        "workers": plan.workers,
+        "budget_per_worker": plan.budget_per_worker,
         "sources": sources,
-        "decompose_spent": spent,
+        "plan_id": plan_id,
+        "decompose_spent": plan.decompose_spent,
     }
 
 
@@ -276,6 +344,27 @@ def register_orchestration_api(
     """
     read_settings = live_settings or (lambda: settings)
 
+    def _worker_tools(gateway: Any, ws: Path) -> Any:
+        """A read-only registry for one worker, built through the governed path.
+
+        Via ``assemble_registry`` rather than ``default_registry``: the AST gate in
+        `test_governed_surfaces` exists because an HTTP surface that builds its own registry
+        skips the trust kernel and the taint ledger, and this is an HTTP surface.
+
+        The seams are fixed here rather than taken from the request. `HierarchyRunIn` still does
+        not inherit `CodeSeams`, and the reason has inverted rather than disappeared: it used to be
+        that there was nothing to govern, and now it is that the one safe configuration is the only
+        one on offer. A caller who could set `allow_tools` could hand `write_file` to eight
+        concurrent workers pointed at the same folder.
+        """
+        from chimera.api.code_api import CodeSeams, assemble_registry
+
+        seams = CodeSeams(allow_tools=list(_WORKER_TOOLS))
+        registry, _ledger = assemble_registry(
+            seams, ws, read_settings(), gateway, steps=6, surface="api:hierarchy"
+        )
+        return registry
+
     def _build(req: HierarchyRunIn | HierarchyPreviewIn, **extra: Any) -> Any:
         from chimera.evolution import build_evolution_context
         from chimera.fusion import FusionEngine
@@ -287,6 +376,9 @@ def register_orchestration_api(
         live = read_settings()
         ladder = live.tier_ladder()
         gateway = backend_factory() if backend_factory is not None else LLMGateway()
+        # The request's folder, or the app's. Resolved once, here, so the preview and the run
+        # cannot end up rooted differently.
+        ws = Path(req.workspace).expanduser().resolve() if req.workspace else workspace
         fuse = getattr(req, "fuse", True)
         return HierarchicalOrchestrator(
             gateway,
@@ -309,6 +401,9 @@ def register_orchestration_api(
                 live, gateway, None, home=live.home,
                 evolve_skills=False, include_memory=True,
             ),
+            # A factory, so every worker gets its own registry and its own ledger rather than
+            # sharing one across a thread pool.
+            worker_tools=lambda: _worker_tools(gateway, ws),
             **extra,
         )
 
@@ -320,22 +415,23 @@ def register_orchestration_api(
     async def preview_endpoint(req: HierarchyPreviewIn) -> dict[str, Any]:
         """What the orchestrator would do with this task, before any worker runs.
 
-        Honest about its own cost: on the fan-out branch ``dry_run`` really does call the top
-        model to decompose, so ``decompose_spent`` comes back true. The claim this endpoint
-        supports is "no WORKER tokens", never "free".
+        Honest about its own cost: on the fan-out branch this really does call the top model to
+        decompose, so ``decompose_spent`` comes back true. The claim is "no WORKER tokens".
+
+        The decomposition is KEPT, under ``plan_id``. Handing that id to the run makes it execute
+        this split instead of asking for another one — the plan shown is the plan that runs, and
+        the second decompose call is not paid for twice.
         """
         if not req.task.strip():
             raise HTTPException(status_code=400, detail="no task")
-        from chimera.orchestration.hierarchy import classify_task, count_sources
+        from chimera.orchestration.hierarchy import count_sources
 
         orchestrator = _build(req)
         # Off the event loop: on the fan-out branch this makes a model call, and a coroutine that
         # blocks the loop stalls every other request the desktop app has in flight.
-        plan = await run_in_threadpool(orchestrator.dry_run, req.task)
+        plan = await run_in_threadpool(orchestrator.plan, req.task)
         return _preview_dict(
-            plan,
-            sources=count_sources(req.task),
-            spent=classify_task(req.task) == "parallel_read",
+            plan, sources=count_sources(req.task), plan_id=_remember(plan)
         )
 
     @app.get(
@@ -385,7 +481,16 @@ def register_orchestration_api(
         def work() -> None:
             try:
                 orchestrator = _build(req, on_event=on_event, should_stop=stop.is_set)
-                orchestrator.run(req.task)
+                approved = _plans.pop(req.plan_id, None) if req.plan_id else None
+                if approved is not None and approved.specs:
+                    # The decomposition a person looked at and said yes to. Popped rather than
+                    # read: a plan is consumed by its run, and leaving it behind would let a
+                    # second run silently reuse a split that was approved for the first.
+                    orchestrator.run_prepared(req.task, approved.specs, shape=approved.shape)
+                else:
+                    # No id, or an id this process no longer has — decompose afresh. That is
+                    # exactly the old behaviour, so a restart costs a model call, never an error.
+                    orchestrator.run(req.task)
             except Exception as exc:  # noqa: BLE001 -- surfaced to the client as an error frame
                 _log.warning("hierarchy run failed: %s", exc)
                 emit("error", {"message": "the run failed"})
