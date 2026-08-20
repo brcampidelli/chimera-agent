@@ -84,7 +84,12 @@ _DECOMPOSE_SYSTEM = (
 _SYNTH_SYSTEM = (
     "You are the lead orchestrator. Below are verified summaries from your sub-workers. "
     "Synthesize ONE final answer to the user's task from them. Resolve overlaps, note "
-    "real contradictions honestly, and do not invent findings absent from the summaries."
+    "real contradictions honestly, and do not invent findings absent from the summaries. "
+    # The workers answer each other; this answers a person. Without the instruction the language
+    # came out of whatever the summaries happened to be in — the same Portuguese question got a
+    # Portuguese answer on one run and an English one on the next, in an app whose entire
+    # interface is translated into ten languages.
+    "Answer in the SAME LANGUAGE the user's task is written in."
 )
 
 # Write/edit intent markers -> sequential_write (multi-agent parallelism loses here).
@@ -262,6 +267,16 @@ class HierarchicalOrchestrator:
         #
         # A factory rather than a registry so each worker gets its own instance — a registry can
         # carry per-run state, and sharing one across a thread pool is how that state gets mixed.
+        #
+        # ⚠️ TOOLS MOVE THE BREAK-EVEN POINT, and by how much is not yet measured. The (D-1)/D
+        # sweep quoted above `count_sources` was run with TOOL-FREE workers handed their documents
+        # in the prompt; a worker that fetches its own source also pays for a tool loop and for the
+        # tool schemas in every turn. First measurement of the new shape: two small Python files,
+        # 8072 tokens measured against an 8000-token inline counterfactual — the fan-out lost.
+        # Context isolation still holds for LARGE sources, where one worker reading one document
+        # beats one agent re-sending all of them, but the crossover is now somewhere above
+        # "two files of twenty lines" and nobody has found it. bench/hierarchy_sweep needs a
+        # tool-enabled arm before this saving is quoted again.
         self.worker_tools = worker_tools
         # M19-A4: the shared flywheel, READ-and-write-telemetry only. A fan-out has no
         # verify-or-revert signal, so it reads retrieved cards + recalled facts into the top
