@@ -23,6 +23,7 @@ import subprocess
 import sys
 import time
 from collections import Counter, defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -66,6 +67,7 @@ class Item:
     source_model: str
     language: str
     patch: str = ""
+    in_pilot: bool = False  # was this row in the 105 that arm C was designed against?
 
 
 # --- the sample ----------------------------------------------------------------------------------
@@ -124,6 +126,38 @@ def sample(rows: list[dict[str, Any]]) -> list[Item]:
             )
         )
     return items
+
+
+def everything(rows: list[dict[str, Any]]) -> list[Item]:
+    """Every row of the slice, in dataset order, with the pilot's 105 marked.
+
+    The mark is the point of this function. Arm C's rubric was written after reading the misses from
+    the pilot draw, so its numbers on those items are in-sample and its numbers on the rest are not —
+    and a run that could not tell them apart would report a fitted result as a replication.
+    """
+    pilot = {(i.repo, i.pr, i.path, i.from_line, i.note[:60]) for i in sample(rows)}
+    out = []
+    for row in rows:
+        if row.get("context") != SLICE:
+            continue
+        owner_repo, _, pr = str(row["pr_url"]).partition("/pull/")
+        item = Item(
+            row_id=int(row.get("__index__", 0)),
+            repo=owner_repo.replace("https://github.com/", ""),
+            pr=int(pr),
+            base=str(row["pr_source_commit"]),
+            head=str(row["pr_target_commit"]),
+            path=str(row["path"]),
+            from_line=int(row["from_line"]),
+            to_line=int(row["to_line"]),
+            note=str(row["note"]),
+            label=int(row["label"]),
+            source_model=str(row.get("source_model") or "?"),
+            language=str(row.get("project_main_language") or "?"),
+        )
+        item.in_pilot = (item.repo, item.pr, item.path, item.from_line, item.note[:60]) in pilot
+        out.append(item)
+    return out
 
 
 # --- the diffs -----------------------------------------------------------------------------------
@@ -417,11 +451,16 @@ def main() -> None:
     parser.add_argument("--fetch", action="store_true", help="Cache the diffs and exit (no model calls).")
     parser.add_argument("--dry-run", action="store_true", help="Build every prompt, call nothing.")
     parser.add_argument("--limit", type=int, default=0, help="Grade only the first N items (smoke test).")
+    parser.add_argument("--full", action="store_true",
+                        help="Every row of the slice, not the balanced pilot draw. See PREREGISTRATION-full.md.")
+    parser.add_argument("--workers", type=int, default=1,
+                        help="Calls in flight. Independent per item; the output order is the sample order regardless.")
     parser.add_argument("--arm", choices=[*sorted(_STANCE), "split", "nodefect", "preexisting"], default="cautious",
                         help="Which stance the judge is given. See PREREGISTRATION-arms.md.")
     args = parser.parse_args()
 
-    items = sample(load_rows())
+    rows_in = load_rows()
+    items = everything(rows_in) if args.full else sample(rows_in)
     print(f"sample: {len(items)} items ({sum(1 for i in items if i.label == 1)} correct, "
           f"{sum(1 for i in items if i.label == 0)} incorrect) from the {SLICE} slice, seed {SEED}")
 
@@ -456,21 +495,37 @@ def main() -> None:
 
     out = OUT / args.arm
     out.mkdir(parents=True, exist_ok=True)
-    rows: list[dict[str, Any]] = []
     tokens = Counter()
     started = time.time()
 
-    for n, item in enumerate(usable, 1):
+    def grade(item: Item) -> dict[str, Any]:
         try:
             verdict, reason, against, usage = ask(gateway, item, model, args.arm)
         except Exception as exc:  # a provider failure is not a verdict
             verdict, reason, against = "unparsed", f"call failed: {exc}", ""
             usage = {"prompt": 0, "completion": 0}
-        tokens.update(usage)
-        rows.append({**asdict(item), "patch": "", "verdict": verdict, "reason": reason,
-                     "counterargument": against, **usage})
-        mark = "ok " if (verdict == "reject") == (item.label == 0) else "MISS"
-        print(f"  {n:>3}/{len(usable)} {mark} label={item.label} verdict={verdict:<8} {item.repo}#{item.pr}")
+        return {**asdict(item), "patch": "", "verdict": verdict, "reason": reason,
+                "counterargument": against, **usage}
+
+    # Concurrency, because the full slice is 1017 items and one call at a time is sixteen hours.
+    # It changes nothing that is measured: every item is an independent call with no shared state,
+    # and `results` is indexed by position so the file comes out in the sample's fixed order however
+    # the replies arrive. The seed, the sample, the prompts and the parser are untouched.
+    results: list[dict[str, Any] | None] = [None] * len(usable)
+    done_count = 0
+    with ThreadPoolExecutor(max_workers=args.workers) as pool:
+        futures = {pool.submit(grade, item): i for i, item in enumerate(usable)}
+        for future in as_completed(futures):
+            i = futures[future]
+            row = future.result()
+            results[i] = row
+            tokens.update({"prompt": row["prompt"], "completion": row["completion"]})
+            done_count += 1
+            mark = "ok " if (row["verdict"] == "reject") == (row["label"] == 0) else "MISS"
+            print(f"  {done_count:>4}/{len(usable)} {mark} label={row['label']} "
+                  f"verdict={row['verdict']:<8} {row['repo']}#{row['pr']}", flush=True)
+
+    rows: list[dict[str, Any]] = [r for r in results if r is not None]
 
     manifest = {
         "judge_model": model,
