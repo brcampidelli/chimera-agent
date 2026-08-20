@@ -167,6 +167,15 @@ export default function App() {
   // editor are two different AppShell slots, so their common state has to sit above both. Same
   // stored value the chat screen uses — one app, one current project.
   const [editWorkspace, setEditWorkspace] = useState(readWorkspace);
+  // Re-read on the way in, because "one app, one current project" was a promise this file made
+  // and did not keep. The initialiser runs once, when the app starts; the chat screen writes the
+  // stored value whenever you switch projects and re-reads it on every navigation, since its
+  // subtree is re-keyed. This one is not, so choosing a project in Code and opening the editor
+  // showed the folder you had open when the app launched — with nothing on screen saying the two
+  // disagreed, and no way back short of restarting.
+  useEffect(() => {
+    if (view === "edit") setEditWorkspace(readWorkspace());
+  }, [view]);
   const editPath = route.params.get("file");
   const openInEditor = (file: string | null) =>
     view === "edit" && file !== null

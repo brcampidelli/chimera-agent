@@ -13,6 +13,7 @@ import {
   Copy,
   Download,
   Eraser,
+  Loader2,
   MessageSquare,
   Network,
   Send,
@@ -96,6 +97,9 @@ interface Exchange {
   verified?: CodeVerified;
   /** Set once the offered undo was taken (or refused by the server) — the offer is single-use. */
   undone?: "ok" | "gone";
+  /** Stopped by the Stop button. Distinct from `failed`: nothing went wrong, the user changed
+   *  their mind — and distinct from a finished turn, which has a `done`. */
+  abandoned?: boolean;
 }
 
 /** What happened to the files after the turn finished writing them.
@@ -774,6 +778,16 @@ export function Conversation({
     abortRef.current = null;
     publish({ status: "idle", busy: false });
     setBusy(false);
+    // Say so on the turn itself. Aborting the fetch means no `done` frame ever arrives, so the
+    // receipt — which already knows the word "cancelled" — is never drawn, and the question sat
+    // there with no answer and no explanation, looking exactly like a turn that silently failed.
+    // Only the last one, and only if it never landed: a turn that finished while the click was in
+    // flight has its answer, and marking that abandoned would be a lie about work already paid for.
+    setExchanges((prev) =>
+      prev.map((e, i) =>
+        i === prev.length - 1 && !e.done && !e.failed ? { ...e, abandoned: true } : e,
+      ),
+    );
   }
 
   async function undo(index: number, token: string) {
@@ -906,6 +920,18 @@ export function Conversation({
                   <DiffView patch={edit.patch} />
                 </div>
               ))}
+              {/* Working, with nothing yet to show for it.
+                  Under fusion the backend emits no token frames at all — deliberately, since the
+                  panel has no single stream to forward and a fabricated cursor would be a lie told
+                  in motion. The cost of that honesty was a screen where a fifteen-minute turn and
+                  a dead one were pixel-identical: the question, and below it nothing. This says
+                  which of the two it is, and under fusion says why the text is not arriving. */}
+              {busy && i === exchanges.length - 1 && !e.answer && !e.done && !e.failed ? (
+                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  {fuse ? t("code.chat.workingFused") : t("code.chat.working")}
+                </p>
+              ) : null}
               {e.answer ? (
                 // Markdown with syntax highlighting, which the chat had and this did not — a coding
                 // conversation rendering a fenced block as prose is the one formatting failure that
@@ -933,6 +959,11 @@ export function Conversation({
                     <Copy className="h-3.5 w-3.5" />
                   </button>
                 </div>
+              ) : null}
+              {e.abandoned ? (
+                // Muted, not `bad`: stopping is a decision, not a failure, and the tone is what
+                // tells those two apart before any word is read.
+                <p className="text-xs text-muted-foreground">{t("code.chat.abandoned")}</p>
               ) : null}
               {e.failed ? (
                 <div className="space-y-1">
