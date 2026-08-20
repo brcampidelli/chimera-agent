@@ -235,3 +235,79 @@ said so twice. What the data points at, to be pre-registered before it runs:
 **Honest ceiling:** even if all three work perfectly, ~6 unfalsifiable items and 3 external-knowledge
 ones are out of reach, and 3 more have labels a careful reader would contest. That is 12 of 53 that
 nothing on our side can convert — a realistic best case near 75%, not 100%.
+
+---
+
+# Arm C — the rubric change, n=105 (same items, paired against A)
+
+Run 2026-08-20 · same judge, same sample, same diffs · US$ 0.52 · ~110 minutes
+
+`PREREGISTRATION-rubric.md` predicted 40–55% rejection recall and named one risk: that 81% of the
+CORRECT comments in this slice are also phrased as suggestions, so a judge newly licensed to reject
+preferences would be handed a rule that fits four fifths of the good ones too.
+
+## The result
+
+| | arm A (cautious) | arm C (split rubric) | paired |
+|---|---:|---:|---|
+| Rejection recall | 15.1% (8/53) | **60.4% (32/53)** | **+45.3 pp**, CI [+30.5, +48.4], significant |
+| False rejection | 0.0% (0/52) | **38.5% (20/52)** | **+38.5 pp**, CI [+26.1, +38.5], significant |
+| Overall rejection rate | 7.6% | 49.5% | |
+
+Discordant pairs: 26 on the recall comparison (25 caught only by C, 1 only by A) and 20 on false
+rejection. This comparison resolves, which arm B's six pairs did not.
+
+**Net: +24 bad findings caught, −20 good findings destroyed.**
+
+## Verdict, by the rule fixed in advance
+
+**False rejection above 20% at any recall is a trade-off, not a gain. Both numbers are reported and
+neither is an improvement.** The rubric in arm C does not ship.
+
+The automatic label printed by the runner says "DOES NOT DISCRIMINATE", but that is the FIRST
+pre-registration's rule (recall ≥ 60% *and* false rejection ≤ 20%) applied mechanically. The accurate
+reading is different and worth stating plainly: the judge discriminated a great deal more, at a price
+that was forbidden before the run.
+
+## What it establishes, in both directions
+
+**The reading's diagnosis was right.** The rubric was the bottleneck. Twenty-four of the 41 comments
+that survived both earlier stances were caught the moment the judge was allowed to say "true, but not
+a defect". A prompt-shaped explanation for a 15.1% floor is now evidence rather than a hypothesis.
+
+**And the naive fix does not work.** Nearly one correct finding is destroyed per extra false positive
+caught. The pre-registered risk was not a formality — it happened, in the shape and roughly the
+proportion it was written down in.
+
+**The prediction was wrong, high.** 40–55% predicted, 60.4% measured. The reading underestimated how
+much the rubric was holding back, and said nothing about the magnitude of the cost — only its
+direction. Recorded here because `PREREGISTRATION-rubric.md` is committed and timestamped, which is
+what makes the error checkable rather than deniable.
+
+## What the three arms say together
+
+| | recall | false rejection |
+|---|---:|---:|
+| A — cautious | 15.1% | 0.0% |
+| B — neutral | 18.9% | 3.8% |
+| C — split rubric | 60.4% | 38.5% |
+
+The axis is real and it is steep. What A and B measured was not the judge's ceiling; what C measured
+is not a usable operating point. Somewhere between the two rubrics there is a boundary that separates
+"praise and paraphrase" from "a suggestion that happens to be a real finding" — and this bench now
+has the instrument to find it, plus the labelled sample to check it against.
+
+## Next, and it needs its own pre-registration
+
+C changed two things at once: it added a ground for *asserts no defect* AND a ground for
+*pre-existing rather than introduced here*. The second is objective — a diff shows what it changed —
+while the first is where the false rejections almost certainly come from, because a suggestion about
+naming and a suggestion about a real bug look identical in form.
+
+Splitting those two grounds into separate arms is the obvious next experiment, cheap at US$ 0.5 an
+arm. It must be pre-registered before it runs: at three arms deep, the temptation to keep varying the
+prompt until one lands under 20% is exactly the fitting this directory has refused twice.
+
+**And the ceiling from the reading still stands**: ~12 of the 53 cannot be converted by any rubric —
+6 unfalsifiable, 3 needing API semantics, 3 with labels a careful reader contests. Arm C's 32 caught
+is already 78% of the 41 that are reachable at all.

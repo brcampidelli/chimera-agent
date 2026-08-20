@@ -238,18 +238,45 @@ _TAIL = (
     '{"reason": "<one line, the evidence>", "verdict": "approve" | "reject"}'
 )
 
+#: Arm C's rubric. Two grounds added, both from reading the 41 comments arms A and B both approved:
+#: twelve of them were TRUE and not defects — praise, wording, scope — and the old footer had no way
+#: to reject those, so approving them was obligatory rather than mistaken. See
+#: PREREGISTRATION-rubric.md, written before this ran.
+_TAIL_SPLIT = (
+    "Two questions, and the second is the one that decides:\n"
+    "  1. Is the comment's premise TRUE of this diff?\n"
+    "  2. Does it report a DEFECT introduced by this diff?\n\n"
+    "Reject when any of these holds:\n"
+    "  - the code the comment describes is not in this diff;\n"
+    "  - a line of the diff contradicts its central claim;\n"
+    "  - it asserts no defect at all — it praises the change, restates what the diff does, or "
+    "expresses a preference about naming, wording, style or structure;\n"
+    "  - what it reports was already there before this diff and was not introduced by it.\n\n"
+    "A true statement is not a finding. A suggestion to add something is not evidence that its "
+    "absence is a defect.\n\n"
+    "Answer with JSON and nothing else, with the keys in THIS order — the counterargument is written "
+    "before the verdict because it has to inform it, not decorate it:\n"
+    '{"strongest_counterargument": "<the best case that this comment is NOT a real defect, citing '
+    'the diff; write it even when you end up approving>", "reason": "<one line>", '
+    '"verdict": "approve" | "reject"}'
+)
+
 
 def system_prompt(arm: str) -> str:
     """The prompt for one arm.
 
-    The stance varies; the definition of a valid rejection does not. Removing that too would move two
-    variables at once and the result would name neither.
+    Arms A and B differ only in stance and share `_TAIL`; arm C keeps A's stance and replaces the
+    rubric, because the reading of what A and B both missed put the blame there rather than on the
+    model. One variable per arm — a rule this file has kept since arm B, and the reason its result
+    could be read at all.
     """
+    if arm == "split":
+        return _HEAD + _STANCE["cautious"] + _TAIL_SPLIT
     return _HEAD + _STANCE[arm] + _TAIL
 
 
-def ask(judge: Any, item: Item, model: str, arm: str) -> tuple[str, str, dict[str, int]]:
-    """Returns (verdict, reason, usage). `verdict` is "approve", "reject" or "unparsed"."""
+def ask(judge: Any, item: Item, model: str, arm: str) -> tuple[str, str, str, dict[str, int]]:
+    """Returns (verdict, reason, counterargument, usage). `verdict` is approve/reject/unparsed."""
     user = (
         f"File: {item.path}\n"
         f"The comment is attached to lines {item.from_line}-{item.to_line} of the new file.\n\n"
@@ -267,15 +294,19 @@ def ask(judge: Any, item: Item, model: str, arm: str) -> tuple[str, str, dict[st
         "completion": int(getattr(reply, "completion_tokens", 0) or 0),
     }
 
+    # The whole answer is kept. It used to be cut at 200 characters, and all three readers of the
+    # first two arms said the same thing: they had judged a first sentence, not a chain of reasoning.
+    # The truncation cost nothing at the provider and removed the only evidence an audit could use.
     match = re.search(r'"verdict"\s*:\s*"(approve|reject)"', text, re.I)
     if match:
         reason = re.search(r'"reason"\s*:\s*"([^"]*)"', text)
-        return match.group(1).lower(), (reason.group(1) if reason else "")[:200], usage
+        against = re.search(r'"strongest_counterargument"\s*:\s*"([^"]*)"', text)
+        return match.group(1).lower(), (reason.group(1) if reason else text), (against.group(1) if against else ""), usage
     # A bare word is accepted too — the parser's job is to read the model, not to fail it on syntax.
     bare = re.search(r"\b(approve|reject)\b", text, re.I)
     if bare:
-        return bare.group(1).lower(), text[:200], usage
-    return "unparsed", text[:200], usage
+        return bare.group(1).lower(), text, "", usage
+    return "unparsed", text, "", usage
 
 
 # --- the report ----------------------------------------------------------------------------------
@@ -352,7 +383,7 @@ def main() -> None:
     parser.add_argument("--fetch", action="store_true", help="Cache the diffs and exit (no model calls).")
     parser.add_argument("--dry-run", action="store_true", help="Build every prompt, call nothing.")
     parser.add_argument("--limit", type=int, default=0, help="Grade only the first N items (smoke test).")
-    parser.add_argument("--arm", choices=sorted(_STANCE), default="cautious",
+    parser.add_argument("--arm", choices=[*sorted(_STANCE), "split"], default="cautious",
                         help="Which stance the judge is given. See PREREGISTRATION-arms.md.")
     args = parser.parse_args()
 
@@ -397,11 +428,13 @@ def main() -> None:
 
     for n, item in enumerate(usable, 1):
         try:
-            verdict, reason, usage = ask(gateway, item, model, args.arm)
+            verdict, reason, against, usage = ask(gateway, item, model, args.arm)
         except Exception as exc:  # a provider failure is not a verdict
-            verdict, reason, usage = "unparsed", f"call failed: {exc}"[:200], {"prompt": 0, "completion": 0}
+            verdict, reason, against = "unparsed", f"call failed: {exc}", ""
+            usage = {"prompt": 0, "completion": 0}
         tokens.update(usage)
-        rows.append({**asdict(item), "patch": "", "verdict": verdict, "reason": reason, **usage})
+        rows.append({**asdict(item), "patch": "", "verdict": verdict, "reason": reason,
+                     "counterargument": against, **usage})
         mark = "ok " if (verdict == "reject") == (item.label == 0) else "MISS"
         print(f"  {n:>3}/{len(usable)} {mark} label={item.label} verdict={verdict:<8} {item.repo}#{item.pr}")
 
