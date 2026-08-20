@@ -5,11 +5,12 @@
   "per_label": 60,
   "window_lines": 60,
   "temperature": 0.0,
+  "arm": "cautious",
   "prompt_sha": "60a2749ed8c9",
-  "chimera_version": "0.48.0rc7",
-  "seconds": 6027.0,
+  "chimera_version": "0.48.0rc9",
+  "seconds": 29868.1,
   "tokens": {
-    "prompt": 75960,
-    "completion": 130030
+    "prompt": 652817,
+    "completion": 1046518
   }
 }
