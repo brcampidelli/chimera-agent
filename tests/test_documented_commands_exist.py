@@ -93,3 +93,71 @@ def test_the_snapshot_is_the_shape_this_test_assumes(command: str) -> None:
     # in the wrong direction.
     assert "--guard" in commands["agent"] and "--guard" in commands["solve"]
     assert "--guard" not in commands["run"]
+
+
+# --- environment variables ------------------------------------------------------------------------
+
+def _settings_aliases() -> set[str]:
+    """Every `CHIMERA_*` name `Settings` actually reads, from the model itself."""
+    from chimera.config import Settings
+
+    names: set[str] = set()
+    for name, field in Settings.model_fields.items():
+        alias = field.validation_alias
+        names.add(str(alias) if isinstance(alias, str) else name.upper())
+    return {n for n in names if n.startswith("CHIMERA_")}
+
+
+def _direct_env_reads() -> set[str]:
+    """`CHIMERA_*` names read straight from the environment, bypassing `Settings`.
+
+    A few genuinely belong outside the settings model — `CHIMERA_BROWSER_AUTO_INSTALL` gates a
+    one-off install inside the browser tool, far from anything a `Settings` field would describe.
+    Discovered by scanning rather than listed by hand, so adding one does not silently need this
+    file edited, and deleting one does not leave a permanent exemption behind.
+    """
+    reader = re.compile(r"(?:os\.environ(?:\.get)?|os\.getenv)\(\s*[\"'](CHIMERA_[A-Z0-9_]+)")
+    names: set[str] = set()
+    for path in (ROOT / "chimera").rglob("*.py"):
+        names.update(reader.findall(path.read_text(encoding="utf-8")))
+    return names
+
+
+def _env_claims() -> list[tuple[Path, int, str]]:
+    """`CHIMERA_X=...` in the docs, the error messages and the app's own strings."""
+    assignment = re.compile(r"\b(CHIMERA_[A-Z0-9_]+)\s*=")
+    found: list[tuple[Path, int, str]] = []
+    for path in _sources():
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+            for name in assignment.findall(line):
+                found.append((path, lineno, name))
+    for module in ("providers/gateway.py", "config.py", "cli/main.py"):
+        path = ROOT / "chimera" / module
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+            # Only inside a string: `CHIMERA_X = ...` as CODE is a different thing entirely.
+            if '"' not in line and "'" not in line:
+                continue
+            for name in assignment.findall(line):
+                found.append((path, lineno, name))
+    return found
+
+
+def test_every_env_var_the_docs_tell_you_to_set_is_one_settings_reads() -> None:
+    """`CHIMERA_MODEL` was in eighteen places, including the keyless error, and read by nothing.
+
+    `Settings` sets `extra="ignore"`, so the variable is accepted, ignored, and never complained
+    about. A user following the first error message they ever see sets it, runs the command again,
+    and gets the same error — with no way to tell that the instruction was the problem.
+    """
+    real = _settings_aliases() | _direct_env_reads()
+    wrong = sorted({
+        f"{path.relative_to(ROOT)}:{lineno}: {name} — Settings does not read it"
+        for path, lineno, name in _env_claims()
+        if name not in real
+    })
+    assert not wrong, "\n".join(["variables the docs tell you to set and nothing reads:", *wrong])
+
+
+def test_the_env_probe_finds_something_at_all() -> None:
+    claims = _env_claims()
+    assert len(claims) > 10, f"only {len(claims)} env assignments found — is the pattern stale?"
