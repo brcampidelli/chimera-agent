@@ -206,20 +206,32 @@ class MemoryManager:
         gives cross-session personalization without the user re-stating preferences. Empty
         string when no persona facts are stored.
         """
+        facts = self.profile_facts(max_items=max_items)
+        if not facts:
+            return ""
+        listed = '\n'.join(f"- {fact}" for fact in facts)
+        return f"What you know about the user:\n{listed}"
+
+    def profile_facts(self, *, max_items: int = 12) -> list[str]:
+        """The persona facts themselves, highest-value first — no preamble.
+
+        Split out from :meth:`profile` because the two have different readers. `profile` is a
+        system-prompt block whose first line is an instruction TO A MODEL, and the Profile screen
+        rendered that whole block verbatim — so an English sentence addressed to the agent showed
+        up under an already-translated panel heading, in an app translated into ten languages.
+        """
         from chimera.memory.value import rank
 
         personas = self.store.by_kind("persona")
         if not personas:
-            return ""
-        top = [item for _, item in rank(personas)][:max_items]
+            return []
         # Surface trust provenance on recall: a fact learned from untrusted content must
         # not read as verified — the model is told, in-line, which facts to weigh less.
-        facts = "\n".join(
-            f"- {item.content}"
+        return [
+            item.content
             + (" [unverified: learned from untrusted content]" if item.provenance == "tainted" else "")
-            for item in top
-        )
-        return f"What you know about the user:\n{facts}"
+            for _, item in rank(personas)[:max_items]
+        ]
 
     def search(
         self, query: str, *, k: int = 5, on_layer: Callable[[str], None] | None = None

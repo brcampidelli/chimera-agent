@@ -275,3 +275,57 @@ def test_models_endpoint_lists_the_catalog() -> None:
     ids = [m["id"] for m in body["data"]]
     assert ids[0] == "chimera"
     assert any(i.startswith("chimera/openrouter/") for i in ids)
+
+
+def _events(body: str) -> list[dict[str, Any]]:
+    return [
+        json.loads(line[len("data: ") :])
+        for line in body.splitlines()
+        if line.startswith("data: ") and line != "data: [DONE]"
+    ]
+
+
+def _stream(run_turn: Any) -> str:
+    client, _ = _client(run_turn)
+    return client.post(
+        "/v1/chat/completions",
+        json={"model": "m", "stream": True, "messages": [{"role": "user", "content": "hi"}]},
+    ).text
+
+
+def test_a_failed_streamed_turn_is_not_reported_as_a_finished_one() -> None:
+    """`finish_reason: "stop"` with an empty delta is a SUCCESSFUL turn that produced nothing.
+
+    No client can tell that from a model that legitimately answered with an empty string, so a
+    failed turn was billed, logged and retried as if it had worked.
+    """
+
+    def boom(_session: Any, _message: str) -> Any:
+        raise RuntimeError("the loop died")
+
+    events = _events(_stream(boom))
+
+    assert events, "the stream must say something"
+    # OpenAI's own shape for a mid-flight failure, which is what the SDKs raise on.
+    assert "error" in events[-1], events
+    # And no finish_reason at all: stop / length / tool_calls / content_filter are the only ones,
+    # and none of them means "the server failed".
+    assert not any("choices" in e for e in events)
+
+
+def test_the_stream_error_says_nothing_about_our_internals() -> None:
+    def boom(_session: Any, _message: str) -> Any:
+        raise RuntimeError("TraceStore at /home/secret/path exploded")
+
+    body = _stream(boom)
+
+    assert "/home/secret/path" not in body and "TraceStore" not in body
+    assert body.rstrip().endswith("[DONE]")
+
+
+def test_a_successful_stream_still_finishes_with_stop() -> None:
+    """Or the tests above would pass against a version that had stopped reporting completion."""
+    events = _events(_stream(lambda _s, msg: _report(answer=f"echo:{msg}")))
+
+    assert any(e.get("choices", [{}])[0].get("finish_reason") == "stop" for e in events)
+    assert not any("error" in e for e in events)

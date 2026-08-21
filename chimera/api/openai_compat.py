@@ -190,6 +190,16 @@ def build_completion(report: TurnReport, *, model: str, completion_id: str, crea
     }
 
 
+def _error_event(message: str) -> str:
+    """A mid-stream failure, in the shape OpenAI's own streams use and the SDKs raise on.
+
+    No internals: the same discipline as the non-streaming path, which returns a 500 with a fixed
+    sentence. A caller learns that the turn failed, not how our loop is built.
+    """
+    payload = {"error": {"message": message, "type": "server_error", "code": None}}
+    return f"data: {json.dumps(payload)}\n\n"
+
+
 def _chunk(completion_id: str, created: int, model: str, delta: dict[str, Any], finish: str | None) -> str:
     payload = {
         "id": completion_id,
@@ -260,7 +270,16 @@ def register_openai_compat(
                 report = turn_fn(session, message)
             except Exception as exc:  # noqa: BLE001
                 _log.warning("openai-compat stream turn failed: %s", exc)
-                yield _chunk(completion_id, created, req.model, {}, "stop")
+                # NOT `finish_reason: "stop"` with an empty delta. That is a successful turn that
+                # produced nothing, and no client can tell it from a model that legitimately
+                # answered with an empty string — so a failed turn was billed, logged and retried
+                # as if it had worked. OpenAI's own streams signal a mid-flight failure with an
+                # `error` object, which is what the SDKs raise on, so that is what this emits.
+                #
+                # No terminal chunk after it: a `finish_reason` here would have to be one of
+                # stop / length / tool_calls / content_filter, and none of them means "the
+                # server failed". Picking any would be the same lie in a different word.
+                yield _error_event("the agent turn failed")
                 yield "data: [DONE]\n\n"
                 return
             model = report.model or req.model
