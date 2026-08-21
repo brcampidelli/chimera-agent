@@ -295,7 +295,7 @@ const en: Dict = {
   "settings.hint.fallbackModels": "tried in order when the primary errors",
   "settings.row.autoConsolidate": "Tidy memory",
   "settings.hint.autoConsolidate":
-    "merge near-duplicate facts at the end of a session",
+    "after a fact is saved, merge near-duplicates once memory outgrows its budget",
   "settings.row.skillCards": "Use what it learned",
   "settings.hint.skillCards":
     "a learned skill is read back when it matches the task — off, the agent writes skills it never reads",
@@ -313,7 +313,7 @@ const en: Dict = {
   "settings.hint.embedModel": "what makes semantic recall work at all",
   "settings.row.rememberChat": "Remember from chat",
   "settings.hint.rememberChat":
-    'an explicit "remember that…" saves a durable fact',
+    "an explicit \"remember that…\" in a conversation saves a durable fact",
   "settings.card.messaging": "Messaging",
   "settings.row.botToken": "{platform} bot token",
   "settings.hint.botToken": "so the agent can reach you on {platform}",
@@ -351,7 +351,7 @@ const en: Dict = {
   "memory.layers.semanticOff":
     "Semantic embeddings layer is off (opt-in) — these are per-kind fact counts, not a vector index.",
   "memory.layers.empty":
-    'Memory fills from a manual "Add Fact", from the CLI (solve / consolidation) sharing this home, or — with "Remember from chat" on in Settings — from an explicit "remember that…" in a conversation.',
+    "Memory fills from a manual \"Add Fact\", from the CLI (solve / consolidation) sharing this home, or — with \"Remember from chat\" on in Settings — from an explicit \"remember that…\" in a conversation.",
   "skills.title": "Skills",
   "catalog.title": "Skills you can install",
   "catalog.subtitle": "{n} available · {installed} installed here",
@@ -747,6 +747,8 @@ const en: Dict = {
   "code.chat.unknownCost": "price unknown",
   "code.chat.recalled": "{n} recalled ({layer})",
   "code.chat.tainted": "read untrusted content",
+  "code.chat.remembered": "saved to memory",
+  "code.chat.rememberedTidied": "saved to memory · {n} merged",
   "code.chat.verdict.passed": "Checked with `{{cmd}}` ({{src}}): passed.",
   "code.batch.proposal":
     "This reads as {n} separate jobs. Run them at the same time, each in its own git worktree?",
@@ -1407,7 +1409,7 @@ const pt: Dict = {
   "settings.hint.fallbackModels": "tentados em ordem quando o primário falha",
   "settings.row.autoConsolidate": "Arrumar a memória",
   "settings.hint.autoConsolidate":
-    "funde fatos quase duplicados ao fim de uma sessão",
+    "depois de guardar um fato, funde quase duplicados quando a memória passa do orçamento",
   "settings.row.skillCards": "Usar o que aprendeu",
   "settings.hint.skillCards":
     "uma skill aprendida volta a ser lida quando casa com a tarefa — desligado, o agente escreve skills que nunca lê",
@@ -1425,7 +1427,7 @@ const pt: Dict = {
   "settings.hint.embedModel": "é ele que faz o recall semântico funcionar",
   "settings.row.rememberChat": "Lembrar do chat",
   "settings.hint.rememberChat":
-    'um "lembre que…" explícito grava um fato duradouro',
+    "um \"lembre que…\" explícito numa conversa guarda um fato durável",
   "settings.card.messaging": "Mensageria",
   "settings.row.botToken": "Token do bot do {platform}",
   "settings.hint.botToken": "para o agente te alcançar no {platform}",
@@ -1464,7 +1466,7 @@ const pt: Dict = {
   "memory.layers.semanticOff":
     "Camada de embeddings semânticos desativada (opt-in) — os números são por tipo de fato, não um índice vetorial.",
   "memory.layers.empty":
-    'A memória é preenchida por um "Adicionar um fato" manual, pela CLI (solve / consolidação) que compartilha este home, ou — com "Lembrar do chat" ativo nas Configurações — por um "lembre que…" explícito numa conversa.',
+    "A memória se enche por um \"Adicionar fato\" manual, pela CLI (solve / consolidação) compartilhando este home, ou — com \"Lembrar do chat\" ligado em Configurações — por um \"lembre que…\" explícito numa conversa.",
   "skills.title": "Habilidades",
   "catalog.title": "Habilidades que você pode instalar",
   "catalog.subtitle": "{n} disponíveis · {installed} instaladas aqui",
@@ -1866,6 +1868,8 @@ const pt: Dict = {
   "code.chat.unknownCost": "preço desconhecido",
   "code.chat.recalled": "{n} lembrados ({layer})",
   "code.chat.tainted": "leu conteúdo não confiável",
+  "code.chat.remembered": "guardado na memória",
+  "code.chat.rememberedTidied": "guardado na memória · {n} fundidos",
   "code.chat.verdict.passed": "Verificado com `{{cmd}}` ({{src}}): passou.",
   "code.batch.proposal":
     "Isto se lê como {n} trabalhos separados. Rodar ao mesmo tempo, cada um no seu worktree do git?",
@@ -2298,7 +2302,7 @@ const es: Dict = {
     "No ha vuelto por sí solo. Cierra Chimera y ábrelo otra vez: lo último que dijo el backend queda en un informe dentro de la carpeta de datos de la aplicación.",
   "settings.row.rememberChat": "Recordar desde el chat",
   "settings.hint.rememberChat":
-    'un "recuerda que…" explícito guarda un hecho duradero',
+    "un \"recuerda que…\" explícito en una conversación guarda un dato duradero",
   "settings.card.messaging": "Mensajería",
   "settings.row.botToken": "Token del bot de {platform}",
   "settings.hint.botToken":
@@ -2560,7 +2564,7 @@ const es: Dict = {
     "se prueban en orden cuando el principal falla",
   "settings.row.autoConsolidate": "Ordenar la memoria",
   "settings.hint.autoConsolidate":
-    "fusiona hechos casi duplicados al final de una sesión",
+    "tras guardar un dato, fusiona casi duplicados cuando la memoria supera su presupuesto",
   "settings.row.skillCards": "Usar lo aprendido",
   "settings.hint.skillCards":
     "una habilidad aprendida se relee cuando encaja con la tarea — apagado, el agente escribe habilidades que nunca lee",
@@ -2607,7 +2611,7 @@ const es: Dict = {
   "memory.layers.semanticOff":
     "La capa de embeddings semánticos está desactivada (opcional) — son recuentos por tipo de hecho, no un índice vectorial.",
   "memory.layers.empty":
-    'La memoria se llena con un "Añadir un hecho" manual o desde la CLI (solve / consolidación) que comparten este home — el chat de escritorio en sí no escribe memoria duradera.',
+    "La memoria se llena con un \"Añadir dato\" manual, desde la CLI (solve / consolidación) que comparte este home, o —con \"Recordar del chat\" activado en Ajustes— con un \"recuerda que…\" explícito en una conversación.",
   "skills.title": "Habilidades",
   "catalog.title": "Habilidades que puedes instalar",
   "catalog.subtitle": "{n} disponibles · {installed} instaladas aquí",
@@ -2997,6 +3001,8 @@ const es: Dict = {
   "code.chat.unknownCost": "precio desconocido",
   "code.chat.recalled": "{n} recordados ({layer})",
   "code.chat.tainted": "leyó contenido no confiable",
+  "code.chat.remembered": "guardado en la memoria",
+  "code.chat.rememberedTidied": "guardado en la memoria · {n} fusionados",
   "code.chat.verdict.passed": "Comprobado con `{{cmd}}` ({{src}}): pasó.",
   "code.batch.proposal":
     "Esto se lee como {n} trabajos separados. ¿Ejecutarlos a la vez, cada uno en su propio worktree de git?",
@@ -3433,7 +3439,7 @@ const fr: Dict = {
     "Il n'est pas revenu tout seul. Fermez Chimera puis rouvrez-le — ce que le backend a dit en dernier est consigné dans un rapport, dans le dossier de données de l'application.",
   "settings.row.rememberChat": "Mémoriser depuis le chat",
   "settings.hint.rememberChat":
-    "un « retiens que… » explicite enregistre un fait durable",
+    "un « retiens que… » explicite dans une conversation enregistre un fait durable",
   "settings.card.messaging": "Messagerie",
   "settings.row.botToken": "Jeton du bot {platform}",
   "settings.hint.botToken":
@@ -3698,7 +3704,7 @@ const fr: Dict = {
     "essayés dans l'ordre quand le principal échoue",
   "settings.row.autoConsolidate": "Ranger la mémoire",
   "settings.hint.autoConsolidate":
-    "fusionne les faits quasi identiques en fin de session",
+    "après l'enregistrement d'un fait, fusionne les quasi-doublons dès que la mémoire dépasse son budget",
   "settings.row.skillCards": "Utiliser ce qu'il a appris",
   "settings.hint.skillCards":
     "une compétence apprise est relue quand elle correspond à la tâche — désactivé, l'agent écrit des compétences qu'il ne lit jamais",
@@ -3746,7 +3752,7 @@ const fr: Dict = {
   "memory.layers.semanticOff":
     "La couche d'embeddings sémantiques est désactivée (optionnelle) — ce sont des comptes par type de fait, pas un index vectoriel.",
   "memory.layers.empty":
-    "La mémoire se remplit via un « Ajouter un fait » manuel ou depuis la CLI (solve / consolidation) qui partagent ce home — le chat de bureau lui-même n'écrit pas de mémoire durable.",
+    "La mémoire se remplit par un « Ajouter un fait » manuel, par la CLI (solve / consolidation) partageant ce dossier, ou — avec « Retenir depuis le chat » activé dans les Réglages — par un « retiens que… » explicite dans une conversation.",
   "skills.title": "Compétences",
   "catalog.title": "Compétences que vous pouvez installer",
   "catalog.subtitle": "{n} disponibles · {installed} installées ici",
@@ -4142,6 +4148,8 @@ const fr: Dict = {
   "code.chat.unknownCost": "prix inconnu",
   "code.chat.recalled": "{n} rappelés ({layer})",
   "code.chat.tainted": "a lu du contenu non fiable",
+  "code.chat.remembered": "gardé en mémoire",
+  "code.chat.rememberedTidied": "gardé en mémoire · {n} fusionnés",
   "code.chat.verdict.passed": "Vérifié avec `{{cmd}}` ({{src}}) : réussi.",
   "code.batch.proposal":
     "Cela se lit comme {n} travaux distincts. Les lancer en même temps, chacun dans son propre worktree git ?",
@@ -4581,7 +4589,7 @@ const de: Dict = {
     "Es ist nicht von selbst zurückgekommen. Schließen Sie Chimera und öffnen Sie es erneut — was das Backend zuletzt gesagt hat, steht in einem Bericht im Datenordner der App.",
   "settings.row.rememberChat": "Aus dem Chat merken",
   "settings.hint.rememberChat":
-    'ein ausdrückliches "merk dir, dass…" speichert einen dauerhaften Fakt',
+    "ein ausdrückliches „merke dir, dass …“ im Gespräch speichert einen dauerhaften Fakt",
   "settings.card.messaging": "Messaging",
   "settings.row.botToken": "{platform}-Bot-Token",
   "settings.hint.botToken":
@@ -4845,7 +4853,7 @@ const de: Dict = {
     "der Reihe nach versucht, wenn das primäre fehlschlägt",
   "settings.row.autoConsolidate": "Gedächtnis aufräumen",
   "settings.hint.autoConsolidate":
-    "führt fast doppelte Fakten am Sitzungsende zusammen",
+    "nach dem Speichern eines Fakts Beinahe-Duplikate zusammenführen, sobald das Gedächtnis sein Budget übersteigt",
   "settings.row.skillCards": "Gelerntes nutzen",
   "settings.hint.skillCards":
     "eine gelernte Fähigkeit wird wieder gelesen, wenn sie zur Aufgabe passt — aus schreibt der Agent Fähigkeiten, die er nie liest",
@@ -4893,7 +4901,7 @@ const de: Dict = {
   "memory.layers.semanticOff":
     "Die semantische Embedding-Ebene ist aus (optional) — dies sind Faktenzahlen pro Typ, kein Vektorindex.",
   "memory.layers.empty":
-    "Der Speicher füllt sich über ein manuelles „Fakt hinzufügen“ oder über die CLI (solve / Konsolidierung), die dasselbe Home teilen — der Desktop-Chat selbst schreibt keinen dauerhaften Speicher.",
+    "Das Gedächtnis füllt sich durch ein manuelles „Fakt hinzufügen“, über die CLI (solve / Konsolidierung) im selben Home oder — mit aktiviertem „Aus dem Chat merken“ in den Einstellungen — durch ein ausdrückliches „merke dir, dass …“ im Gespräch.",
   "skills.title": "Fähigkeiten",
   "catalog.title": "Fähigkeiten zum Installieren",
   "catalog.subtitle": "{n} verfügbar · {installed} hier installiert",
@@ -5286,6 +5294,8 @@ const de: Dict = {
   "code.chat.unknownCost": "Preis unbekannt",
   "code.chat.recalled": "{n} erinnert ({layer})",
   "code.chat.tainted": "las nicht vertrauenswürdige Inhalte",
+  "code.chat.remembered": "im Gedächtnis gespeichert",
+  "code.chat.rememberedTidied": "im Gedächtnis gespeichert · {n} zusammengeführt",
   "code.chat.verdict.passed": "Geprüft mit `{{cmd}}` ({{src}}): bestanden.",
   "code.batch.proposal":
     "Das liest sich wie {n} getrennte Aufgaben. Gleichzeitig ausführen, jede in ihrem eigenen Git-Worktree?",
@@ -5723,7 +5733,8 @@ const zh: Dict = {
   "app.backendStillDown":
     "它没有自行恢复。请关闭 Chimera 再重新打开——后端最后说的话会写入应用数据文件夹里的一份报告。",
   "settings.row.rememberChat": "从聊天中记住",
-  "settings.hint.rememberChat": "明确说出“记住……”会保存一条持久事实",
+  "settings.hint.rememberChat":
+    "在对话里明确说“记住……”会保存一条长期记忆",
   "settings.card.messaging": "消息平台",
   "settings.row.botToken": "{platform} 机器人令牌",
   "settings.hint.botToken": "这样智能体就能在 {platform} 上找到你",
@@ -5962,7 +5973,8 @@ const zh: Dict = {
   "settings.row.fallbackModels": "备用模型",
   "settings.hint.fallbackModels": "主模型出错时按顺序尝试",
   "settings.row.autoConsolidate": "整理记忆",
-  "settings.hint.autoConsolidate": "会话结束时合并近乎重复的事实",
+  "settings.hint.autoConsolidate":
+    "保存一条记忆后，若记忆超出预算就合并近似重复项",
   "settings.row.skillCards": "用上学到的东西",
   "settings.hint.skillCards":
     "学到的技能在与任务匹配时会被重新读取——关闭时，智能体只写技能、从不回读",
@@ -6007,7 +6019,7 @@ const zh: Dict = {
   "memory.layers.semanticOff":
     "语义嵌入层已关闭（需手动开启）——这些是按类型统计的事实数量，而非向量索引。",
   "memory.layers.empty":
-    "记忆通过手动“添加事实”或共享同一 home 的 CLI（solve／整合）填充——桌面聊天本身不会写入持久记忆。",
+    "记忆可以来自手动“添加事实”、来自共用同一 home 的命令行（solve / 合并），或者在设置里打开“从对话中记忆”后，来自对话里明确的“记住……”。",
   "skills.title": "技能",
   "catalog.title": "可以安装的技能",
   "catalog.subtitle": "{n} 个可用 · 本机已安装 {installed} 个",
@@ -6371,6 +6383,8 @@ const zh: Dict = {
   "code.chat.unknownCost": "价格未知",
   "code.chat.recalled": "回忆 {n} 条（{layer}）",
   "code.chat.tainted": "读取了不可信内容",
+  "code.chat.remembered": "已存入记忆",
+  "code.chat.rememberedTidied": "已存入记忆 · 合并 {n} 条",
   "code.chat.verdict.passed": "用 `{{cmd}}`（{{src}}）检查：通过。",
   "code.batch.proposal":
     "这看起来是 {n} 件独立的活。要同时跑吗？每件各用一个 git worktree。",
@@ -6789,7 +6803,7 @@ const ja: Dict = {
     "自力では戻りませんでした。Chimera を閉じて開き直してください。バックエンドが最後に残した言葉は、アプリのデータフォルダー内のレポートに書かれています。",
   "settings.row.rememberChat": "チャットから記憶する",
   "settings.hint.rememberChat":
-    "明示的な「〜を覚えて」で永続的な事実を保存します",
+    "会話のなかで明示的に「覚えておいて…」と言うと永続的な事実として保存します",
   "settings.card.messaging": "メッセージング",
   "settings.row.botToken": "{platform} ボットトークン",
   "settings.hint.botToken":
@@ -7048,7 +7062,7 @@ const ja: Dict = {
   "settings.hint.fallbackModels": "主モデルが失敗したら順に試します",
   "settings.row.autoConsolidate": "記憶を整理",
   "settings.hint.autoConsolidate":
-    "セッション終了時にほぼ重複した事実をまとめます",
+    "事実を保存したあと、記憶が予算を超えたら重複に近いものを統合します",
   "settings.row.skillCards": "学んだことを使う",
   "settings.hint.skillCards":
     "学習したスキルはタスクに合えば読み戻されます — オフだと、書くだけで一度も読みません",
@@ -7094,7 +7108,7 @@ const ja: Dict = {
   "memory.layers.semanticOff":
     "セマンティック埋め込みレイヤーは無効です（オプトイン）— これは種類別の事実数であり、ベクトルインデックスではありません。",
   "memory.layers.empty":
-    "メモリは手動の「事実を追加」または同じ home を共有する CLI（solve／統合）から満たされます — デスクトップのチャット自体は永続的なメモリを書き込みません。",
+    "記憶は手動の「事実を追加」、同じ home を共有する CLI（solve / 統合）、または設定で「会話から記憶する」を有効にしたうえでの会話中の明示的な「覚えておいて…」から増えます。",
   "skills.title": "スキル",
   "catalog.title": "インストールできるスキル",
   "catalog.subtitle": "{n} 件が利用可能 · このマシンに {installed} 件",
@@ -7481,6 +7495,8 @@ const ja: Dict = {
   "code.chat.unknownCost": "価格不明",
   "code.chat.recalled": "{n} 件を想起（{layer}）",
   "code.chat.tainted": "信頼できない内容を読みました",
+  "code.chat.remembered": "記憶に保存しました",
+  "code.chat.rememberedTidied": "記憶に保存しました · {n} 件を統合",
   "code.chat.verdict.passed": "`{{cmd}}`（{{src}}）で検証：合格。",
   "code.batch.proposal":
     "これは {n} 件の別々の仕事に読めます。それぞれ自前の git worktree で同時に走らせますか？",
@@ -8152,7 +8168,7 @@ const it: Dict = {
     "provati in ordine quando il primario fallisce",
   "settings.row.autoConsolidate": "Riordina la memoria",
   "settings.hint.autoConsolidate":
-    "unisce fatti quasi duplicati a fine sessione",
+    "dopo aver salvato un fatto, unisce i quasi-duplicati quando la memoria supera il suo budget",
   "settings.row.skillCards": "Usa ciò che ha imparato",
   "settings.hint.skillCards":
     "una skill appresa viene riletta quando combacia con il compito — spento, l'agente scrive skill che non legge mai",
@@ -8170,7 +8186,7 @@ const it: Dict = {
   "settings.hint.embedModel": "è ciò che fa funzionare il richiamo semantico",
   "settings.row.rememberChat": "Ricorda dalla chat",
   "settings.hint.rememberChat":
-    'un esplicito "ricorda che…" salva un fatto duraturo',
+    "un \"ricorda che…\" esplicito in una conversazione salva un fatto duraturo",
   "settings.card.messaging": "Messaggistica",
   "settings.row.botToken": "Token del bot {platform}",
   "settings.hint.botToken": "così l'agente può raggiungerti su {platform}",
@@ -8210,7 +8226,7 @@ const it: Dict = {
   "memory.layers.semanticOff":
     "Il livello degli embedding semantici è spento (opt-in) — questi sono conteggi di fatti per tipo, non un indice vettoriale.",
   "memory.layers.empty":
-    'La memoria si riempie da un "Aggiungi fatto" manuale, dalla CLI (solve / consolidamento) che condivide questa home, oppure — con "Ricorda dalla chat" attivo nelle Impostazioni — da un esplicito "ricorda che…" in una conversazione.',
+    "La memoria si riempie con un \"Aggiungi fatto\" manuale, dalla CLI (solve / consolidamento) che condivide questa home, oppure — con \"Ricorda dalla chat\" attivo nelle Impostazioni — da un \"ricorda che…\" esplicito in una conversazione.",
   "skills.title": "Skill",
   "catalog.title": "Abilità che puoi installare",
   "catalog.subtitle": "{n} disponibili · {installed} installate qui",
@@ -8616,6 +8632,8 @@ const it: Dict = {
   "code.chat.unknownCost": "prezzo sconosciuto",
   "code.chat.recalled": "{n} richiamati ({layer})",
   "code.chat.tainted": "ha letto contenuti non attendibili",
+  "code.chat.remembered": "salvato in memoria",
+  "code.chat.rememberedTidied": "salvato in memoria · {n} uniti",
   "code.chat.verdict.passed": "Verificato con `{{cmd}}` ({{src}}): passato.",
   "code.batch.proposal":
     "Questo si legge come {n} lavori separati. Eseguirli insieme, ciascuno nel proprio worktree git?",
@@ -9290,7 +9308,7 @@ const pl: Dict = {
   "settings.hint.fallbackModels": "próbowane po kolei, gdy główny zawiedzie",
   "settings.row.autoConsolidate": "Uporządkuj pamięć",
   "settings.hint.autoConsolidate":
-    "scala niemal identyczne fakty na koniec sesji",
+    "po zapisaniu faktu scala niemal duplikaty, gdy pamięć przekroczy swój budżet",
   "settings.row.skillCards": "Korzystaj z tego, czego się nauczył",
   "settings.hint.skillCards":
     "wyuczona umiejętność jest odczytywana, gdy pasuje do zadania — wyłączone, agent pisze umiejętności, których nigdy nie czyta",
@@ -9309,7 +9327,7 @@ const pl: Dict = {
     "to od niego zależy, czy wyszukiwanie semantyczne działa",
   "settings.row.rememberChat": "Zapamiętuj z czatu",
   "settings.hint.rememberChat":
-    'wyraźne „zapamiętaj, że…" zapisuje trwały fakt',
+    "wyraźne „zapamiętaj, że…” w rozmowie zapisuje trwały fakt",
   "settings.card.messaging": "Komunikatory",
   "settings.row.botToken": "Token bota {platform}",
   "settings.hint.botToken":
@@ -9349,7 +9367,7 @@ const pl: Dict = {
   "memory.layers.semanticOff":
     "Warstwa embeddingów semantycznych jest wyłączona (opcjonalna) — to są liczby faktów według rodzaju, a nie indeks wektorowy.",
   "memory.layers.empty":
-    'Pamięć zapełnia się z ręcznego „Dodaj fakt", z CLI (solve / konsolidacja) dzielącego ten sam katalog domowy, albo — przy włączonym „Zapamiętuj z czatu" w Ustawieniach — z wyraźnego „zapamiętaj, że…" w rozmowie.',
+    "Pamięć zapełnia się przez ręczne „Dodaj fakt”, przez CLI (solve / konsolidacja) w tym samym katalogu domowym albo — przy włączonym „Zapamiętuj z czatu” w Ustawieniach — przez wyraźne „zapamiętaj, że…” w rozmowie.",
   "skills.title": "Umiejętności",
   "catalog.title": "Umiejętności, które możesz zainstalować",
   "catalog.subtitle": "{n} dostępnych · {installed} zainstalowanych tutaj",
@@ -9750,6 +9768,8 @@ const pl: Dict = {
   "code.chat.unknownCost": "cena nieznana",
   "code.chat.recalled": "{n} przypomnianych ({layer})",
   "code.chat.tainted": "przeczytał niezaufaną treść",
+  "code.chat.remembered": "zapisane w pamięci",
+  "code.chat.rememberedTidied": "zapisane w pamięci · scalono {n}",
   "code.chat.verdict.passed": "Sprawdzone przez `{{cmd}}` ({{src}}): zdane.",
   "code.batch.proposal":
     "To czyta się jak {n} osobnych zadań. Uruchomić je naraz, każde w swoim worktree gita?",
@@ -10425,7 +10445,7 @@ const ru: Dict = {
     "пробуются по порядку, когда основная даёт ошибку",
   "settings.row.autoConsolidate": "Прибирать память",
   "settings.hint.autoConsolidate":
-    "объединять почти одинаковые факты в конце сессии",
+    "после сохранения факта объединяет почти-дубликаты, когда память выходит за бюджет",
   "settings.row.skillCards": "Использовать усвоенное",
   "settings.hint.skillCards":
     "усвоенный навык считывается обратно, когда подходит к задаче — при выключенном агент пишет навыки, которые никогда не читает",
@@ -10444,7 +10464,7 @@ const ru: Dict = {
   "settings.hint.embedModel": "то, без чего смысловой поиск вообще не работает",
   "settings.row.rememberChat": "Запоминать из чата",
   "settings.hint.rememberChat":
-    "явное «запомни, что…» сохраняет долговременный факт",
+    "явное «запомни, что…» в разговоре сохраняет долговременный факт",
   "settings.card.messaging": "Мессенджеры",
   "settings.row.botToken": "Токен бота {platform}",
   "settings.hint.botToken": "чтобы агент мог связаться с вами в {platform}",
@@ -10482,7 +10502,7 @@ const ru: Dict = {
   "memory.layers.semanticOff":
     "Слой смысловых векторов выключен (включается по желанию) — это количество фактов по видам, а не векторный индекс.",
   "memory.layers.empty":
-    "Память наполняется вручную через «Добавить факт», из командной строки (solve / консолидация), использующей тот же каталог, или — при включённом «Запоминать из чата» в настройках — из явного «запомни, что…» в разговоре.",
+    "Память наполняется вручную через «Добавить факт», из CLI (solve / консолидация) с тем же домашним каталогом или — при включённом «Запоминать из чата» в настройках — из явного «запомни, что…» в разговоре.",
   "skills.title": "Навыки",
   "catalog.title": "Навыки, которые можно установить",
   "catalog.subtitle": "{n} доступно · {installed} установлено здесь",
@@ -10885,6 +10905,8 @@ const ru: Dict = {
   "code.chat.unknownCost": "цена неизвестна",
   "code.chat.recalled": "вспомнено: {n} ({layer})",
   "code.chat.tainted": "прочитано недоверенное содержимое",
+  "code.chat.remembered": "сохранено в память",
+  "code.chat.rememberedTidied": "сохранено в память · объединено: {n}",
   "code.chat.verdict.passed":
     "Проверено командой `{{cmd}}` ({{src}}): пройдено.",
   "code.batch.proposal":

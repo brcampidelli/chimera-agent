@@ -851,6 +851,13 @@ export interface CodeTurnDone {
    *  Never guessed: a layer that returned nothing is not named. */
   memory_facts_used?: number;
   memory_layer?: string | null;
+  /** The durable fact this turn SAVED, from an explicit "remember that…" the user typed, or null.
+   *  Reported rather than silent: a fact saved without a word changes every future conversation,
+   *  and the person who caused it never saw it happen. */
+  memory_saved?: string | null;
+  /** Redundant facts merged away after that write, when "Tidy memory" is on. Zero while memory is
+   *  under its budget — which is most of the time, and costs no model call to establish. */
+  memory_consolidated?: number;
   /** This turn went through the fusion panel and therefore could NOT use tools — it answered from
    *  the prompt alone. Zero tool calls is the same number a turn that needed none reports, so
    *  without this flag the two are indistinguishable. */

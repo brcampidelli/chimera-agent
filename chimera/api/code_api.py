@@ -602,6 +602,56 @@ def _log_usage(payload: dict[str, Any], session_id: str, settings: Settings) -> 
         _log.debug("usage logging skipped: %s", exc)
 
 
+def _remember_and_tidy(message: str, memory: Any, settings: Settings) -> tuple[str | None, int]:
+    """Honour an explicit "remember that…" from the user's own message, then tidy if asked.
+
+    Two Settings toggles fired nothing from the app before this. "Remember from chat" was real and
+    correctly gated — but reachable only from ``/api/chat/stream``, and the desktop's ``streamChat``
+    has no callers: every conversation in the app goes through ``/api/code/turn``. "Tidy memory" was
+    read only inside the CLI REPL's own loop, so it did nothing unless the same person also ran
+    ``chimera chat`` against the same home.
+
+    They belong together and they belong here. Memory only grows when something is written, so the
+    moment after a write is exactly when tidying is worth checking — and ``autoconsolidate`` returns
+    0 without calling a model while memory is under budget, so the check is free until it is not.
+    That also keeps ``features.py``'s rule intact: the token-spending path stays off the read-only
+    feature routes and lives on the streaming turn, like every other call that can cost money.
+
+    Best-effort throughout: neither toggle may take a turn down. The answer is the product.
+    """
+    if not getattr(settings, "remember_from_chat", False) or memory is None:
+        return None, 0
+    write = getattr(memory, "remember", None)
+    if not callable(write):
+        return None, 0
+    try:
+        from chimera.memory.capture import parse_remember_request
+
+        fact = parse_remember_request(message)
+        if fact is None:
+            return None, 0
+        write(fact, source="chat")  # deduped by the manager; provenance is clean — the user typed it
+    except Exception as exc:  # noqa: BLE001 -- see the docstring
+        _log.debug("remember-from-chat skipped: %s", exc)
+        return None, 0
+
+    if not getattr(settings, "auto_consolidate", False):
+        return fact, 0
+    try:
+        from chimera.memory.consolidate import model_summarizer
+        from chimera.providers import LLMGateway
+
+        removed = int(
+            memory.autoconsolidate(
+                model_summarizer(LLMGateway()), max_items=settings.memory_budget
+            )
+        )
+    except Exception as exc:  # noqa: BLE001 -- see the docstring
+        _log.debug("auto-consolidate skipped: %s", exc)
+        return fact, 0
+    return fact, removed
+
+
 def register_code_api(
     app: FastAPI,
     guard: params.Depends,
@@ -615,12 +665,22 @@ def register_code_api(
 ) -> None:
     """Mount ``POST /api/code/turn`` — a conversational coding turn, streamed.
 
-    ``memory``/``graph`` are READ from, never written to. Reading is safe in a way writing is not: a
+    ``memory``/``graph`` are READ from, and written to in exactly ONE case: an explicit
+    "remember that…" in the message the USER typed.
+
+    The asymmetry that made this one-way is about what the AGENT or the WORKSPACE produced. A
     recalled fact learned from untrusted content carries its ``[unverified]`` label into the prompt
     and the admission gate still rejects injection patterns, so the worst case is a wasted line of
-    context. Writing is the opposite — with the workspace trusted by default, a poisoned README would
-    enter memory looking clean, and a memory item has no project scope, so it would be recalled into
-    every other project too. That asymmetry is the whole reason this is one-way.
+    context. Writing derived text is the opposite — with the workspace trusted by default, a poisoned
+    README would enter memory looking clean, and a memory item has no project scope, so it would be
+    recalled into every other project too.
+
+    None of that describes the user's own sentence. ``parse_remember_request`` reads the typed
+    message and nothing else, anchored to the start so an incidental "I can't remember where I put
+    my keys" is not a command; it never touches tool output, the answer, or a file. Keeping this
+    write out was not a decision anyone made about it — it was the general rule catching a case it
+    does not cover, and the cost was that the toggle in Settings did nothing from the app at all
+    while the empty Memory screen advertised it as the way to fill memory.
     """
     from chimera.core.code_session import CodeSession, CodeSessionStore
     from chimera.core.events import tool as tool_event
@@ -838,6 +898,11 @@ def register_code_api(
                     fill up is worse than an absent one: it reports zero spend as a fact.
                     """
                     _log_usage(payload, session_id, live())
+                    # Here rather than in either branch: both go through this function, and an
+                    # external agent's turn is still a turn the user typed "remember that…" into.
+                    saved, tidied = _remember_and_tidy(req.message, memory, live())
+                    payload["memory_saved"] = saved
+                    payload["memory_consolidated"] = tidied
                     if edited:
                         from chimera.api.app import resolve_verify
                         from chimera.core.verify import CommandVerifier
