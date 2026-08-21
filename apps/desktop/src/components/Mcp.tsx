@@ -234,7 +234,7 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
   }
   if (servers.isLoading || !servers.data) {
     return (
-      <Screen title={t("mcp.title")} icon={<Plug className="h-5 w-5" />}>
+      <Screen title={t("mcp.title")} icon={<Plug className="h-5 w-5" />} embedded={embedded}>
         <Panel>
           <Spinner />
         </Panel>
@@ -243,7 +243,7 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
   }
 
   return (
-    <Screen title={t("mcp.title")} icon={<Plug className="h-5 w-5" />}>
+    <Screen title={t("mcp.title")} icon={<Plug className="h-5 w-5" />} embedded={embedded}>
       {autoloadOff && (
         <div className="rounded-xl2 bg-surface-2 px-4 py-2.5 text-xs text-muted-foreground ring-1 ring-hairline">
           {t("mcp.autoloadOff")}

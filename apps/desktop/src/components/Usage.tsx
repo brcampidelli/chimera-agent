@@ -141,7 +141,7 @@ export function Usage({ embedded = false }: { embedded?: boolean } = {}) {
   }
   if (q.isLoading) {
     return (
-      <Screen title={t("usage.title")} icon={<BarChart3 className="h-5 w-5" />}>
+      <Screen title={t("usage.title")} icon={<BarChart3 className="h-5 w-5" />} embedded={embedded}>
         <Panel>
           <Spinner />
         </Panel>
@@ -154,7 +154,7 @@ export function Usage({ embedded = false }: { embedded?: boolean } = {}) {
 
   if (!data || !totals || totals.turns === 0) {
     return (
-      <Screen title={t("usage.title")} icon={<BarChart3 className="h-5 w-5" />}>
+      <Screen title={t("usage.title")} icon={<BarChart3 className="h-5 w-5" />} embedded={embedded}>
         <Panel>
           <EmptyState text={t("usage.empty")} />
         </Panel>
@@ -173,7 +173,7 @@ export function Usage({ embedded = false }: { embedded?: boolean } = {}) {
   const sessions: SessionRow[] = data.by_session;
 
   return (
-    <Screen title={t("usage.title")} icon={<BarChart3 className="h-5 w-5" />}>
+    <Screen title={t("usage.title")} icon={<BarChart3 className="h-5 w-5" />} embedded={embedded}>
       <Panel title={t("usage.totals")}>
         <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-3">
           <Tile label={t("usage.turns")} value={num(totals.turns)} />

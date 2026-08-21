@@ -168,7 +168,7 @@ export function Tools({ embedded = false }: { embedded?: boolean } = {}) {
   }
   if (q.isLoading || !q.data) {
     return (
-      <Screen title={t("tools.title")} icon={<Wrench className="h-5 w-5" />}>
+      <Screen title={t("tools.title")} icon={<Wrench className="h-5 w-5" />} embedded={embedded}>
         <Panel>
           <Spinner />
         </Panel>
@@ -177,7 +177,7 @@ export function Tools({ embedded = false }: { embedded?: boolean } = {}) {
   }
 
   return (
-    <Screen title={t("tools.title")} icon={<Wrench className="h-5 w-5" />}>
+    <Screen title={t("tools.title")} icon={<Wrench className="h-5 w-5" />} embedded={embedded}>
       <Panel
         title={t("tools.count", { n: q.data.count })}
         action={
