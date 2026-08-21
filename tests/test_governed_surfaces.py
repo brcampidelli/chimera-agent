@@ -161,7 +161,9 @@ EXEMPT: dict[str, str] = {
         "tests/test_governance_on_the_api_path.py, because an exemption is prose and prose "
         "goes stale"
     ),
-    "chimera/kanban/lanes.py:run": "restrict_registry from the card's own role (fail-closed)",
+    "chimera/kanban/lanes.py:AgentLane.run": (
+        "restrict_registry from the card's own role (fail-closed)"
+    ),
     # --- not an agent surface at all ---
     "chimera/api/app.py:build_api_app.tools_endpoint": "lists tool schemas; nothing is invoked",
     "chimera/cli/main.py:tools": "prints the tool table",
@@ -201,7 +203,13 @@ def _bare_registry_calls(tree: ast.Module, module: str) -> list[tuple[str, int]]
     found: list[tuple[str, int]] = []
 
     def walk(node: ast.AST, chain: list[str]) -> None:
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+        # ClassDef belongs in the chain, and leaving it out was not cosmetic. `lanes.py` holds
+        # three classes with a method called `run`; without the class name all three collapsed
+        # onto the key `chimera/kanban/lanes.py:run`, so the single exemption written for
+        # `AgentLane.run` — which really does restrict the registry — silently covered
+        # `SolveLane.run`, which builds a bare one. A gate whose key cannot tell two call sites
+        # apart exempts the wrong one and stays green about it.
+        if isinstance(node, ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef):
             chain = [*chain, node.name]
         if (
             isinstance(node, ast.Call)
