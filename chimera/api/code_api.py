@@ -399,6 +399,7 @@ def assemble_registry(
     *,
     steps: int,
     surface: str = "api",
+    shared: Any = None,
 ) -> tuple[ToolRegistry, Any]:
     """Build the tool registry for a coding turn, and the taint ledger watching it.
 
@@ -460,7 +461,12 @@ def assemble_registry(
         registry.register(
             ExploreRepositoryTool(gateway, ws, model=explore_model, max_turns=steps)
         )
-    ledger = TaintLedger()
+    # `shared` binds several workers to ONE ledger. Independent tasks must not share it — that
+    # would block a worker for something a sibling read — but workers collaborating on a single
+    # task and merging into a single workspace must, because untrusted content one of them read
+    # can reach the others through the merge. It is the same distinction the CLI already draws
+    # between `solve-batch` (independent, own ledgers) and `crew-isolated` (shared).
+    ledger = TaintLedger(shared=shared) if shared is not None else TaintLedger()
     # A posture that asks to be told about suspicious input also arms taint-adaptive narrowing;
     # without one the env default (CHIMERA_TAINT_NARROW) still decides, as it always did.
     narrow = (

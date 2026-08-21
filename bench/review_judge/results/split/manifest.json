@@ -7,10 +7,10 @@
   "temperature": 0.0,
   "arm": "split",
   "prompt_sha": "c98d2e30d2b9",
-  "chimera_version": "0.48.0rc7",
-  "seconds": 8460.0,
+  "chimera_version": "0.48.0rc9",
+  "seconds": 42297.7,
   "tokens": {
-    "prompt": 93092,
-    "completion": 182990
+    "prompt": 802594,
+    "completion": 1663330
   }
 }

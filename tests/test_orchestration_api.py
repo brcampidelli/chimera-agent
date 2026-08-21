@@ -202,15 +202,10 @@ def test_the_frame_shapes_are_published_for_the_generated_client(
 
     # An SSE route cannot declare a response_model, so this is how the payload types reach the
     # schema at all. Empty and side-effect-free: a shape sample, never fabricated results.
-    assert set(shape) == {
-        "classified",
-        "decomposed",
-        "worker_started",
-        "worker_verified",
-        "worker_rejected",
-        "fell_back",
-        "done",
-    }
+    assert {
+        "classified", "decomposed", "worker_started", "worker_verified", "worker_rejected",
+        "fell_back", "done",
+    } <= set(shape)
     assert shape["done"]["answer"] == ""
     assert shape["decomposed"]["specs"] == []
 
@@ -297,3 +292,173 @@ def test_a_worker_is_told_not_to_describe_what_it_has_not_opened(
     # A tool the model does not know it should reach for is a tool it will answer around.
     assert "READ IT" in WORKER_SYSTEM
     assert "Never describe a file you have not opened" in WORKER_SYSTEM
+
+
+# --- the crew: N roles, one task, one worktree each ------------------------------------------
+
+
+def _crew(client: TestClient, **over: Any) -> list[tuple[str, dict[str, Any]]]:
+    body = {
+        "task": "corrija o bug do desconto",
+        "workers": [
+            {"name": "cauteloso", "instruction": "Faça a menor mudança possível."},
+            {"name": "direto", "instruction": "Reescreva a função inteira se for mais claro."},
+        ],
+        **over,
+    }
+    return _read_sse(client.post("/api/orchestration/crew", json=body).text)
+
+
+def test_a_crew_reports_every_worker_by_name(
+    app_and_backend: tuple[TestClient, FakeBackend], tmp_path: Path
+) -> None:
+    client, _ = app_and_backend
+
+    frames = _crew(client, workspace=str(tmp_path))
+    kinds = [kind for kind, _ in frames]
+
+    assert kinds[0] == "run"
+    started = {p["task_id"] for k, p in frames if k == "crew_worker_started"}
+    # The role name is the routing key. Two cards, named for the two roles.
+    assert started == {"cauteloso", "direto"}
+    assert kinds[-1] in {"crew_done", "error"}
+
+
+def test_each_worker_says_which_checkout_it_writes_in(
+    app_and_backend: tuple[TestClient, FakeBackend], tmp_path: Path
+) -> None:
+    """In a git repository, one worktree each — and the frame names it.
+
+    Which checkout produced which change used to be invisible: `run_isolated` creates them, uses
+    them and removes them without ever saying their names, so a person watching parallel edits
+    could not go look at one afterwards.
+    """
+    import subprocess
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    for args in (["init", "-q"], ["config", "user.email", "t@t"], ["config", "user.name", "t"]):
+        subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
+    (repo / "a.txt").write_text("x", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-qm", "x"], cwd=repo, check=True, capture_output=True)
+
+    frames = _crew(client := app_and_backend[0], workspace=str(repo))
+    started = [p for k, p in frames if k == "crew_worker_started"]
+    done = next((p for k, p in frames if k == "crew_done"), {})
+
+    assert all(p["workspace"] for p in started)
+    assert len({p["workspace"] for p in started}) == len(started), "one checkout each, not shared"
+    assert done.get("is_repo") is True
+    del client
+
+
+def test_outside_a_repository_it_says_the_workers_shared_one_folder(
+    app_and_backend: tuple[TestClient, FakeBackend], tmp_path: Path
+) -> None:
+    """No git, no isolation — and the run has to admit it rather than imply worktrees.
+
+    This is the case where "each worker in its own checkout" stops being true: they all edit the
+    same directory, and a file two of them touch cannot even be detected as a conflict.
+    """
+    client, _ = app_and_backend
+
+    frames = _crew(client, workspace=str(tmp_path))
+    done = next((p for k, p in frames if k == "crew_done"), {})
+    started = [p for k, p in frames if k == "crew_worker_started"]
+
+    assert done.get("is_repo") is False
+    # And the frames do not pretend otherwise: the shared folder is reported as what it is.
+    assert len({p["workspace"] for p in started}) == 1
+
+
+def test_two_workers_with_the_same_name_are_refused(
+    app_and_backend: tuple[TestClient, FakeBackend],
+) -> None:
+    client, _ = app_and_backend
+
+    response = client.post(
+        "/api/orchestration/crew",
+        json={
+            "task": "x",
+            "workers": [
+                {"name": "revisor", "instruction": "a"},
+                {"name": "revisor", "instruction": "b"},
+            ],
+        },
+    )
+
+    # Distinct names are not tidiness: the name IS the frame's routing key, so two of them would
+    # collapse into one card reporting both workers' results as if they were one.
+    assert response.status_code == 400
+
+
+def test_a_crew_needs_workers(app_and_backend: tuple[TestClient, FakeBackend]) -> None:
+    client, _ = app_and_backend
+    assert client.post("/api/orchestration/crew", json={"task": "x", "workers": []}).status_code == 400
+
+
+def test_the_crew_frame_shapes_are_published(
+    app_and_backend: tuple[TestClient, FakeBackend],
+) -> None:
+    client, _ = app_and_backend
+
+    shape = client.get("/api/orchestration/schema").json()
+
+    for frame in ("crew_worker_started", "crew_worker_verified", "crew_worker_rejected",
+                  "conflict", "crew_done"):
+        assert frame in shape, f"{frame} must reach OpenAPI — an SSE route declares no response model"
+    # The honesty flag the screen needs when the folder is not a repository.
+    assert shape["crew_done"]["is_repo"] is False
+
+
+def test_the_crew_governs_what_its_workers_may_touch(
+    app_and_backend: tuple[TestClient, FakeBackend],
+) -> None:
+    from chimera.api.code_api import CodeSeams
+    from chimera.api.orchestration_api import CrewRunIn
+
+    # `HierarchyRunIn` declined to inherit CodeSeams and said in its docstring that CrewRunIn
+    # would, "because those workers really do write files". This is that promise, as a test.
+    assert issubclass(CrewRunIn, CodeSeams)
+    assert "write_region" in CrewRunIn.model_fields
+
+
+def test_a_folder_that_is_not_there_is_refused_by_name(
+    app_and_backend: tuple[TestClient, FakeBackend],
+) -> None:
+    client, _ = app_and_backend
+
+    response = client.post(
+        "/api/orchestration/crew",
+        json={
+            "task": "implemente o desconto",
+            "verify": "pytest -q",
+            "workspace": r"C:\Users\alguem\pasta-que-nao-existe",
+            "workers": [
+                {"name": "conservador", "instruction": "a"},
+                {"name": "direto", "instruction": "b"},
+            ],
+        },
+    )
+
+    # `Path.resolve()` validates nothing: a path this OS cannot parse becomes a plausible absolute
+    # path glued onto the process directory. The crew then ran against a folder that was never
+    # there and reported every worker as "your check failed" — pointing at code no one had read.
+    assert response.status_code == 400
+    assert "pasta-que-nao-existe" in response.json()["detail"]
+
+
+def test_the_hierarchy_refuses_the_same_missing_folder(
+    app_and_backend: tuple[TestClient, FakeBackend],
+) -> None:
+    client, _ = app_and_backend
+
+    response = client.post(
+        "/api/orchestration/hierarchy",
+        json={"task": "compare os arquivos", "workspace": "/nao/existe/em/lugar/nenhum"},
+    )
+
+    # Same check on both doors. The hierarchy's workers only read, so a missing folder shows up as
+    # workers who found nothing rather than as an error — quieter, and just as wrong.
+    assert response.status_code == 400

@@ -1291,6 +1291,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/orchestration/crew": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Crew Stream
+         * @description Run N roles against ONE task, each in its own worktree, and merge what passes.
+         *
+         *     The other half of this screen. The hierarchy splits a task between workers who only read;
+         *     a crew hands the SAME task to several workers who write, in separate checkouts, and lets a
+         *     command decide which of them lands. That is the shape of work `classify_task` sends down
+         *     the single-agent path today — anything with write intent — which in a coding tool is most
+         *     of what anyone types.
+         */
+        post: operations["crew_stream_api_orchestration_crew_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/orchestration/delegations": {
         parameters: {
             query?: never;
@@ -2660,6 +2686,192 @@ export interface components {
             /** Model */
             model?: string | null;
         };
+        /** ConflictOut */
+        ConflictOut: {
+            /**
+             * Path
+             * @description A file two workers both changed. NEITHER version was merged.
+             * @default
+             */
+            path: string;
+        };
+        /** CrewDoneOut */
+        CrewDoneOut: {
+            /**
+             * Answer
+             * @default
+             */
+            answer: string;
+            /** Conflicts */
+            conflicts?: string[];
+            /** Failed */
+            failed?: string[];
+            /**
+             * Is Repo
+             * @description False means the workers shared one folder because this is not a git repository — no isolation, and conflicts undetectable. The screen has to be able to say so.
+             * @default false
+             */
+            is_repo: boolean;
+            /**
+             * Merged
+             * @default 0
+             */
+            merged: number;
+            /** Rejected */
+            rejected?: string[];
+        };
+        /**
+         * CrewRunIn
+         * @description A crew: N roles, one task, one worktree each, and a check that decides who lands.
+         *
+         *     Inherits `CodeSeams` — the promise `HierarchyRunIn` made when it declined to. These workers
+         *     write files, so posture, write region and the tool lists have something real to govern here.
+         *
+         *     On `verify`: without it, every worker that does not crash is merged, and since they all attack
+         *     the same task they tend to touch the same files — where one-file-one-owner then means NOBODY
+         *     lands. A crew without a check is a crew that usually produces nothing, so the screen treats
+         *     this field as the point rather than as an option.
+         */
+        CrewRunIn: {
+            /** Allow Tools */
+            allow_tools?: string[] | null;
+            /** Attachments */
+            attachments?: string[];
+            /** Context Budget */
+            context_budget?: number | null;
+            /** Deny Tools */
+            deny_tools?: string[] | null;
+            /**
+             * Explorer
+             * @default false
+             */
+            explorer: boolean;
+            /**
+             * Fuse
+             * @default false
+             */
+            fuse: boolean;
+            /** Fusion Judge */
+            fusion_judge?: string | null;
+            /** Fusion Panel */
+            fusion_panel?: string[] | null;
+            /** Fusion Synthesizer */
+            fusion_synthesizer?: string | null;
+            /** Max Steps */
+            max_steps?: number | null;
+            /** Max Usd */
+            max_usd?: number | null;
+            /**
+             * Max Workers
+             * @default 4
+             */
+            max_workers: number;
+            posture?: components["schemas"]["Posture"] | null;
+            /** Profile */
+            profile?: ("economy" | "balanced" | "max") | null;
+            /** Provider */
+            provider?: string | null;
+            /** Provider Command */
+            provider_command?: string | null;
+            /**
+             * Repo Map
+             * @default false
+             */
+            repo_map: boolean;
+            roles?: components["schemas"]["RoleModels"] | null;
+            /**
+             * Synthesize
+             * @description Fold the merged workers' answers into one report. Costs a top-model call.
+             * @default false
+             */
+            synthesize: boolean;
+            /** Task */
+            task: string;
+            /**
+             * Verify
+             * @description Shell command run in each worker's own worktree; exit 0 merges it. Without one, every worker that did not crash merges — and workers that touched the same file all lose to the conflict rule.
+             */
+            verify?: string | null;
+            /** Workers */
+            workers: components["schemas"]["CrewWorkerIn"][];
+            /** Workspace */
+            workspace?: string | null;
+            /** Write Region */
+            write_region?: string[] | null;
+        };
+        /**
+         * CrewWorkerIn
+         * @description One member of the crew: a name and what it is told to do.
+         *
+         *     The name is what the run is reported by — it becomes the `task_id` on every frame — so it has
+         *     to be distinct and readable. The instruction is the whole difference between workers: they all
+         *     receive the SAME task, and the role is what makes three attempts at it three different attempts
+         *     rather than one attempt run three times.
+         */
+        CrewWorkerIn: {
+            /** Instruction */
+            instruction: string;
+            /** Name */
+            name: string;
+        };
+        /** CrewWorkerRejectedOut */
+        CrewWorkerRejectedOut: {
+            /**
+             * Detail
+             * @description What the failing check printed.
+             * @default
+             */
+            detail: string;
+            /**
+             * Reason
+             * @description verify | cancelled
+             * @default
+             */
+            reason: string;
+            /**
+             * Task Id
+             * @default
+             */
+            task_id: string;
+        };
+        /** CrewWorkerStartedOut */
+        CrewWorkerStartedOut: {
+            /**
+             * Instruction
+             * @default
+             */
+            instruction: string;
+            /**
+             * Task Id
+             * @default
+             */
+            task_id: string;
+            /**
+             * Workspace
+             * @description The worktree this worker writes in — its own checkout.
+             * @default
+             */
+            workspace: string;
+        };
+        /** CrewWorkerVerifiedOut */
+        CrewWorkerVerifiedOut: {
+            /**
+             * Answer Chars
+             * @default 0
+             */
+            answer_chars: number;
+            /**
+             * Task Id
+             * @default
+             */
+            task_id: string;
+            /**
+             * Verified By
+             * @description The check that passed. Empty when the run had no check at all.
+             * @default
+             */
+            verified_by: string;
+        };
         /**
          * CronCreateIn
          * @description Create a scheduled job from the UI (the CLI's `chimera cron add`, over HTTP).
@@ -3878,6 +4090,11 @@ export interface components {
          */
         OrchestrationFramesOut: {
             classified?: components["schemas"]["ClassifiedOut"];
+            conflict?: components["schemas"]["ConflictOut"];
+            crew_done?: components["schemas"]["CrewDoneOut"];
+            crew_worker_rejected?: components["schemas"]["CrewWorkerRejectedOut"];
+            crew_worker_started?: components["schemas"]["CrewWorkerStartedOut"];
+            crew_worker_verified?: components["schemas"]["CrewWorkerVerifiedOut"];
             decomposed?: components["schemas"]["DecomposedOut"];
             done?: components["schemas"]["HierarchyDoneOut"];
             fell_back?: components["schemas"]["FellBackOut"];
@@ -6896,6 +7113,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OllamaModelsOut"];
+                };
+            };
+        };
+    };
+    crew_stream_api_orchestration_crew_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CrewRunIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

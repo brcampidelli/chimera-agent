@@ -1703,6 +1703,395 @@
         "title": "ConfigTestRequest",
         "type": "object"
       },
+      "ConflictOut": {
+        "properties": {
+          "path": {
+            "default": "",
+            "description": "A file two workers both changed. NEITHER version was merged.",
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "title": "ConflictOut",
+        "type": "object"
+      },
+      "CrewDoneOut": {
+        "properties": {
+          "answer": {
+            "default": "",
+            "title": "Answer",
+            "type": "string"
+          },
+          "conflicts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Conflicts",
+            "type": "array"
+          },
+          "failed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Failed",
+            "type": "array"
+          },
+          "is_repo": {
+            "default": false,
+            "description": "False means the workers shared one folder because this is not a git repository \u2014 no isolation, and conflicts undetectable. The screen has to be able to say so.",
+            "title": "Is Repo",
+            "type": "boolean"
+          },
+          "merged": {
+            "default": 0,
+            "title": "Merged",
+            "type": "integer"
+          },
+          "rejected": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Rejected",
+            "type": "array"
+          }
+        },
+        "title": "CrewDoneOut",
+        "type": "object"
+      },
+      "CrewRunIn": {
+        "description": "A crew: N roles, one task, one worktree each, and a check that decides who lands.\n\nInherits `CodeSeams` \u2014 the promise `HierarchyRunIn` made when it declined to. These workers\nwrite files, so posture, write region and the tool lists have something real to govern here.\n\nOn `verify`: without it, every worker that does not crash is merged, and since they all attack\nthe same task they tend to touch the same files \u2014 where one-file-one-owner then means NOBODY\nlands. A crew without a check is a crew that usually produces nothing, so the screen treats\nthis field as the point rather than as an option.",
+        "properties": {
+          "allow_tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allow Tools"
+          },
+          "attachments": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Attachments",
+            "type": "array"
+          },
+          "context_budget": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Budget"
+          },
+          "deny_tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deny Tools"
+          },
+          "explorer": {
+            "default": false,
+            "title": "Explorer",
+            "type": "boolean"
+          },
+          "fuse": {
+            "default": false,
+            "title": "Fuse",
+            "type": "boolean"
+          },
+          "fusion_judge": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fusion Judge"
+          },
+          "fusion_panel": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fusion Panel"
+          },
+          "fusion_synthesizer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fusion Synthesizer"
+          },
+          "max_steps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Steps"
+          },
+          "max_usd": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Usd"
+          },
+          "max_workers": {
+            "default": 4,
+            "title": "Max Workers",
+            "type": "integer"
+          },
+          "posture": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Posture"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "enum": [
+                  "economy",
+                  "balanced",
+                  "max"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "provider_command": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Command"
+          },
+          "repo_map": {
+            "default": false,
+            "title": "Repo Map",
+            "type": "boolean"
+          },
+          "roles": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleModels"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "synthesize": {
+            "default": false,
+            "description": "Fold the merged workers' answers into one report. Costs a top-model call.",
+            "title": "Synthesize",
+            "type": "boolean"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          },
+          "verify": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Shell command run in each worker's own worktree; exit 0 merges it. Without one, every worker that did not crash merges \u2014 and workers that touched the same file all lose to the conflict rule.",
+            "title": "Verify"
+          },
+          "workers": {
+            "items": {
+              "$ref": "#/components/schemas/CrewWorkerIn"
+            },
+            "title": "Workers",
+            "type": "array"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          },
+          "write_region": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Write Region"
+          }
+        },
+        "required": [
+          "task",
+          "workers"
+        ],
+        "title": "CrewRunIn",
+        "type": "object"
+      },
+      "CrewWorkerIn": {
+        "description": "One member of the crew: a name and what it is told to do.\n\nThe name is what the run is reported by \u2014 it becomes the `task_id` on every frame \u2014 so it has\nto be distinct and readable. The instruction is the whole difference between workers: they all\nreceive the SAME task, and the role is what makes three attempts at it three different attempts\nrather than one attempt run three times.",
+        "properties": {
+          "instruction": {
+            "title": "Instruction",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "instruction"
+        ],
+        "title": "CrewWorkerIn",
+        "type": "object"
+      },
+      "CrewWorkerRejectedOut": {
+        "properties": {
+          "detail": {
+            "default": "",
+            "description": "What the failing check printed.",
+            "title": "Detail",
+            "type": "string"
+          },
+          "reason": {
+            "default": "",
+            "description": "verify | cancelled",
+            "title": "Reason",
+            "type": "string"
+          },
+          "task_id": {
+            "default": "",
+            "title": "Task Id",
+            "type": "string"
+          }
+        },
+        "title": "CrewWorkerRejectedOut",
+        "type": "object"
+      },
+      "CrewWorkerStartedOut": {
+        "properties": {
+          "instruction": {
+            "default": "",
+            "title": "Instruction",
+            "type": "string"
+          },
+          "task_id": {
+            "default": "",
+            "title": "Task Id",
+            "type": "string"
+          },
+          "workspace": {
+            "default": "",
+            "description": "The worktree this worker writes in \u2014 its own checkout.",
+            "title": "Workspace",
+            "type": "string"
+          }
+        },
+        "title": "CrewWorkerStartedOut",
+        "type": "object"
+      },
+      "CrewWorkerVerifiedOut": {
+        "properties": {
+          "answer_chars": {
+            "default": 0,
+            "title": "Answer Chars",
+            "type": "integer"
+          },
+          "task_id": {
+            "default": "",
+            "title": "Task Id",
+            "type": "string"
+          },
+          "verified_by": {
+            "default": "",
+            "description": "The check that passed. Empty when the run had no check at all.",
+            "title": "Verified By",
+            "type": "string"
+          }
+        },
+        "title": "CrewWorkerVerifiedOut",
+        "type": "object"
+      },
       "CronCreateIn": {
         "description": "Create a scheduled job from the UI (the CLI's `chimera cron add`, over HTTP).",
         "properties": {
@@ -4480,6 +4869,21 @@
         "properties": {
           "classified": {
             "$ref": "#/components/schemas/ClassifiedOut"
+          },
+          "conflict": {
+            "$ref": "#/components/schemas/ConflictOut"
+          },
+          "crew_done": {
+            "$ref": "#/components/schemas/CrewDoneOut"
+          },
+          "crew_worker_rejected": {
+            "$ref": "#/components/schemas/CrewWorkerRejectedOut"
+          },
+          "crew_worker_started": {
+            "$ref": "#/components/schemas/CrewWorkerStartedOut"
+          },
+          "crew_worker_verified": {
+            "$ref": "#/components/schemas/CrewWorkerVerifiedOut"
           },
           "decomposed": {
             "$ref": "#/components/schemas/DecomposedOut"
@@ -9091,6 +9495,43 @@
           }
         },
         "summary": "Ollama Models Endpoint"
+      }
+    },
+    "/api/orchestration/crew": {
+      "post": {
+        "description": "Run N roles against ONE task, each in its own worktree, and merge what passes.\n\nThe other half of this screen. The hierarchy splits a task between workers who only read;\na crew hands the SAME task to several workers who write, in separate checkouts, and lets a\ncommand decide which of them lands. That is the shape of work `classify_task` sends down\nthe single-agent path today \u2014 anything with write intent \u2014 which in a coding tool is most\nof what anyone types.",
+        "operationId": "crew_stream_api_orchestration_crew_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrewRunIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Crew Stream"
       }
     },
     "/api/orchestration/delegations": {

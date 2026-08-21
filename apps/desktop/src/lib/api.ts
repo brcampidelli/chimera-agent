@@ -1552,3 +1552,59 @@ function dispatchHierarchy(frame: string, h: HierarchyStreamHandlers): void {
     data: rest,
   });
 }
+
+// --- Orchestration · the crew (N roles, one task, one worktree each) --------------------------
+
+export interface CrewWorkerInput {
+  name: string;
+  instruction: string;
+}
+
+export interface CrewRunInput {
+  task: string;
+  workers: CrewWorkerInput[];
+  workspace?: string | null;
+  /** Shell command run in each worker's own checkout; exit 0 merges it. Without one, every
+   *  worker that did not crash merges — and workers that touched the same file all lose to the
+   *  conflict rule, so a crew with no check usually lands nothing. */
+  verify?: string | null;
+  max_workers?: number;
+  synthesize?: boolean;
+}
+
+export async function streamCrew(
+  req: CrewRunInput,
+  handlers: HierarchyStreamHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(apiUrl("/api/orchestration/crew"), {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(req),
+      signal,
+    });
+  } catch (err) {
+    handlers.onError?.(err instanceof Error ? err.message : "network error");
+    return;
+  }
+  if (!res.ok || !res.body) {
+    handlers.onError?.(`HTTP ${res.status}`);
+    return;
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
+    let sep: number;
+    while ((sep = buffer.indexOf("\n\n")) !== -1) {
+      dispatchHierarchy(buffer.slice(0, sep), handlers);
+      buffer = buffer.slice(sep + 2);
+    }
+  }
+  if (buffer.trim()) dispatchHierarchy(buffer, handlers);
+}

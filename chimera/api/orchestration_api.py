@@ -33,6 +33,7 @@ from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 from starlette.concurrency import run_in_threadpool
 
+from chimera.api.code_api import CodeSeams
 from chimera.orchestration.events import OrchEvent
 from chimera.telemetry import get_logger
 
@@ -129,6 +130,49 @@ class HierarchyRunIn(BaseModel):
             "Ceiling for the whole run. The token budget is per delegation and says nothing about "
             "money; a fan-out spends a top-model decompose, N mid-model workers and a synthesis."
         ),
+    )
+
+
+class CrewWorkerIn(BaseModel):
+    """One member of the crew: a name and what it is told to do.
+
+    The name is what the run is reported by — it becomes the `task_id` on every frame — so it has
+    to be distinct and readable. The instruction is the whole difference between workers: they all
+    receive the SAME task, and the role is what makes three attempts at it three different attempts
+    rather than one attempt run three times.
+    """
+
+    name: str
+    instruction: str
+
+
+class CrewRunIn(CodeSeams):
+    """A crew: N roles, one task, one worktree each, and a check that decides who lands.
+
+    Inherits `CodeSeams` — the promise `HierarchyRunIn` made when it declined to. These workers
+    write files, so posture, write region and the tool lists have something real to govern here.
+
+    On `verify`: without it, every worker that does not crash is merged, and since they all attack
+    the same task they tend to touch the same files — where one-file-one-owner then means NOBODY
+    lands. A crew without a check is a crew that usually produces nothing, so the screen treats
+    this field as the point rather than as an option.
+    """
+
+    task: str
+    workers: list[CrewWorkerIn]
+    workspace: str | None = None
+    verify: str | None = Field(
+        default=None,
+        description=(
+            "Shell command run in each worker's own worktree; exit 0 merges it. Without one, "
+            "every worker that did not crash merges — and workers that touched the same file all "
+            "lose to the conflict rule."
+        ),
+    )
+    max_workers: int = 4
+    synthesize: bool = Field(
+        default=False,
+        description="Fold the merged workers' answers into one report. Costs a top-model call.",
     )
 
 
@@ -272,6 +316,50 @@ class HierarchyDoneOut(BaseModel):
     answer: str = ""
 
 
+class CrewWorkerStartedOut(BaseModel):
+    task_id: str = ""
+    workspace: str = Field(
+        default="", description="The worktree this worker writes in — its own checkout."
+    )
+    instruction: str = ""
+
+
+class CrewWorkerVerifiedOut(BaseModel):
+    task_id: str = ""
+    verified_by: str = Field(
+        default="", description="The check that passed. Empty when the run had no check at all."
+    )
+    answer_chars: int = 0
+
+
+class CrewWorkerRejectedOut(BaseModel):
+    task_id: str = ""
+    reason: str = Field(default="", description="verify | cancelled")
+    detail: str = Field(default="", description="What the failing check printed.")
+
+
+class ConflictOut(BaseModel):
+    path: str = Field(
+        default="",
+        description="A file two workers both changed. NEITHER version was merged.",
+    )
+
+
+class CrewDoneOut(BaseModel):
+    merged: int = 0
+    conflicts: list[str] = Field(default_factory=list)
+    failed: list[str] = Field(default_factory=list)
+    rejected: list[str] = Field(default_factory=list)
+    answer: str = ""
+    is_repo: bool = Field(
+        default=False,
+        description=(
+            "False means the workers shared one folder because this is not a git repository — "
+            "no isolation, and conflicts undetectable. The screen has to be able to say so."
+        ),
+    )
+
+
 class OrchestrationFramesOut(BaseModel):
     """Every SSE payload this module can emit, in one shape a schema dump can see.
 
@@ -287,9 +375,33 @@ class OrchestrationFramesOut(BaseModel):
     worker_rejected: WorkerRejectedOut = Field(default_factory=WorkerRejectedOut)
     fell_back: FellBackOut = Field(default_factory=FellBackOut)
     done: HierarchyDoneOut = Field(default_factory=HierarchyDoneOut)
+    crew_worker_started: CrewWorkerStartedOut = Field(default_factory=CrewWorkerStartedOut)
+    crew_worker_verified: CrewWorkerVerifiedOut = Field(default_factory=CrewWorkerVerifiedOut)
+    crew_worker_rejected: CrewWorkerRejectedOut = Field(default_factory=CrewWorkerRejectedOut)
+    conflict: ConflictOut = Field(default_factory=ConflictOut)
+    crew_done: CrewDoneOut = Field(default_factory=CrewDoneOut)
 
 
 # ---------------------------------------------------------------------------------------------
+
+
+def _resolve_workspace(requested: str | None, fallback: Path) -> Path:
+    """The folder a run works in, or a 400 saying which one was not there.
+
+    `Path.resolve()` does not check anything: given a path this OS cannot parse it produces a
+    plausible-looking absolute path by joining it to the process directory. A Windows path handed
+    to a Linux backend became
+    a path like `/opt/chimera/` with the Windows path glued onto the end, so the crew ran
+    against a directory that did not exist, and every
+    worker was reported as "your check failed" — sending someone to look for a bug in code that
+    was never read. Fail here, naming the path, instead of three layers down wearing a disguise.
+    """
+    if not requested:
+        return fallback
+    candidate = Path(requested).expanduser()
+    if not candidate.is_dir():
+        raise HTTPException(status_code=400, detail=f"workspace not found: {requested}")
+    return candidate.resolve()
 
 
 def _remember(plan: Any) -> str:
@@ -378,7 +490,7 @@ def register_orchestration_api(
         gateway = backend_factory() if backend_factory is not None else LLMGateway()
         # The request's folder, or the app's. Resolved once, here, so the preview and the run
         # cannot end up rooted differently.
-        ws = Path(req.workspace).expanduser().resolve() if req.workspace else workspace
+        ws = _resolve_workspace(req.workspace, workspace)
         fuse = getattr(req, "fuse", True)
         return HierarchicalOrchestrator(
             gateway,
@@ -452,6 +564,10 @@ def register_orchestration_api(
         """
         if not req.task.strip():
             raise HTTPException(status_code=400, detail="no task")
+        # Checked HERE, before the stream opens, and not where `_build` needs it: once the SSE
+        # response has been handed back the status code is already 200, and a missing folder can
+        # only arrive as an error frame — a failure dressed as a run that started.
+        _resolve_workspace(req.workspace, workspace)
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue[tuple[str, Any] | None] = asyncio.Queue()
         run_id = uuid.uuid4().hex
@@ -494,6 +610,113 @@ def register_orchestration_api(
             except Exception as exc:  # noqa: BLE001 -- surfaced to the client as an error frame
                 _log.warning("hierarchy run failed: %s", exc)
                 emit("error", {"message": "the run failed"})
+            finally:
+                _orch_cancels.pop(run_id, None)
+                loop.call_soon_threadsafe(queue.put_nowait, None)
+
+        threading.Thread(target=work, daemon=True).start()
+
+        async def events() -> Any:
+            while True:
+                item = await queue.get()
+                if item is None:
+                    break
+                event, payload = item
+                yield {"event": event, "data": json.dumps(payload)}
+
+        return EventSourceResponse(events())
+
+
+    @app.post("/api/orchestration/crew", dependencies=[guard])
+    async def crew_stream(req: CrewRunIn) -> EventSourceResponse:
+        """Run N roles against ONE task, each in its own worktree, and merge what passes.
+
+        The other half of this screen. The hierarchy splits a task between workers who only read;
+        a crew hands the SAME task to several workers who write, in separate checkouts, and lets a
+        command decide which of them lands. That is the shape of work `classify_task` sends down
+        the single-agent path today — anything with write intent — which in a coding tool is most
+        of what anyone types.
+        """
+        if not req.task.strip():
+            raise HTTPException(status_code=400, detail="no task")
+        if not req.workers:
+            raise HTTPException(status_code=400, detail="no workers")
+        if len(req.workers) > _MAX_WORKERS:
+            raise HTTPException(status_code=400, detail=f"too many workers (max {_MAX_WORKERS})")
+        names = [w.name.strip() for w in req.workers]
+        if len(set(names)) != len(names) or not all(names):
+            # The name IS the routing key on every frame. Two workers called the same thing would
+            # collapse into one card and report each other's results.
+            raise HTTPException(status_code=400, detail="worker names must be distinct and non-empty")
+
+        ws = _resolve_workspace(req.workspace, workspace)
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue[tuple[str, Any] | None] = asyncio.Queue()
+        run_id = uuid.uuid4().hex
+        stop = threading.Event()
+        _orch_cancels[run_id] = stop
+
+        seq = 0
+        seq_lock = threading.Lock()
+
+        def emit(event: str, payload: dict[str, Any]) -> None:
+            nonlocal seq
+            with seq_lock:
+                seq += 1
+                numbered = {**payload, "seq": seq}
+            loop.call_soon_threadsafe(queue.put_nowait, (event, numbered))
+
+        emit("run", {"run_id": run_id, "task": req.task, "workspace": str(ws)})
+
+        def on_event(event: OrchEvent) -> None:
+            # Prefixed, because a crew worker and a hierarchy worker are not the same object and a
+            # consumer must not have to guess which one a frame describes.
+            name: str = event.kind
+            if name.startswith("worker_") or name == "done":
+                name = f"crew_{name}"
+            emit(name, {"task_id": event.task_id, "text": event.text, **event.data})
+
+        def work() -> None:
+            try:
+                from chimera.api.code_api import assemble_registry
+                from chimera.governance.ledger import SharedTaint
+                from chimera.orchestration.crew import IsolatedCrew, IsolatedWorker
+                from chimera.orchestration.roles import Role
+                from chimera.providers import LLMGateway
+
+                live = read_settings()
+                gateway = backend_factory() if backend_factory is not None else LLMGateway()
+                # ONE shared taint ledger for the whole crew, unlike `solve-batch`, which gives each
+                # task its own. These workers collaborate on a single task and merge into a single
+                # workspace, so untrusted content one of them read can reach the others through the
+                # merge — the same distinction the CLI already draws between the two commands.
+                shared = SharedTaint()
+
+                def tools_for(worker_ws: Path) -> Any:
+                    registry, _ledger = assemble_registry(
+                        req, worker_ws, live, gateway,
+                        steps=req.max_steps or 6, surface="api:crew", shared=shared,
+                    )
+                    return registry
+
+                crew = IsolatedCrew(
+                    gateway,
+                    [
+                        IsolatedWorker(
+                            role=Role(w.name, w.instruction, model=live.tier_ladder().mid),
+                            tools=tools_for,
+                            max_steps=req.max_steps or 6,
+                        )
+                        for w in req.workers
+                    ],
+                    max_workers=max(1, min(_MAX_WORKERS, req.max_workers)),
+                    on_event=on_event,
+                    should_stop=stop.is_set,
+                )
+                crew.run(req.task, ws, verify=req.verify, timeout=live.batch_timeout)
+            except Exception as exc:  # noqa: BLE001 -- surfaced to the client as an error frame
+                _log.warning("crew run failed: %s", exc)
+                emit("error", {"message": "the crew failed"})
             finally:
                 _orch_cancels.pop(run_id, None)
                 loop.call_soon_threadsafe(queue.put_nowait, None)

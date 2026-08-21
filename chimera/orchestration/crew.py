@@ -19,9 +19,12 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
+from chimera.core.worktree import is_git_repo
 from chimera.memory.manager import MemoryManager
 from chimera.orchestration.comms import AgentMessage, consolidate, render
+from chimera.orchestration.events import OrchEvent, OrchEventSink
 from chimera.orchestration.isolation import run_isolated
 from chimera.orchestration.roles import Role, RoleAgent
 from chimera.providers.gateway import SupportsComplete
@@ -172,11 +175,36 @@ class IsolatedCrew:
         *,
         supervisor: RoleAgent | None = None,
         max_workers: int = 4,
+        on_event: OrchEventSink | None = None,
+        should_stop: Callable[[], bool] | None = None,
     ) -> None:
         self.backend = backend
         self.workers = workers
         self.supervisor = supervisor
         self.max_workers = max_workers
+        # Same seam, same contract, same reasons as the hierarchy's — see
+        # `chimera.orchestration.events`. Until now this class emitted nothing at all, which was
+        # fine while its only caller was a CLI printing at the end and is not fine behind a
+        # screen: a crew's workers take minutes each, and a run that reports only its final
+        # tally is a run nobody can watch.
+        #
+        # The sink is called from the worker threads `run_isolated` spawns, so it must be
+        # thread-safe; the SSE bridge is, and `thread_safe_sink` exists for the ones that are not.
+        self.on_event = on_event
+        # Checked before a worker starts and before its verify command runs. A crew worker that
+        # stops is NOT merged — `succeeded=lambda o: o.verified` sees an unverified outcome — so
+        # cancelling discards that worker's worktree rather than landing half an edit.
+        self.should_stop = should_stop
+
+    def _emit(self, kind: str, *, text: str = "", task_id: str = "", **data: Any) -> None:
+        """Advisory, and never fatal: a consumer that went away must not fail a worker whose
+        tokens are already spent."""
+        if self.on_event is None:
+            return
+        try:
+            self.on_event(OrchEvent(kind, text, task_id, dict(data)))  # type: ignore[arg-type]
+        except Exception as exc:  # noqa: BLE001 -- see the docstring
+            _log.debug("crew event sink raised (ignored): %s", exc)
 
     def run(
         self,
@@ -196,19 +224,54 @@ class IsolatedCrew:
 
         def make_unit(worker: IsolatedWorker) -> Callable[[Path], WorkerOutcome]:
             def run_worker(ws: Path) -> WorkerOutcome:
-                agent = RoleAgent(
-                    worker.role,
-                    worker.backend or self.backend,
-                    tools=worker.tools(ws),
-                    max_steps=worker.max_steps,
+                name = worker.role.name
+                if self.should_stop is not None and self.should_stop():
+                    # Unverified, so `succeeded` is False and this worker's worktree is discarded
+                    # rather than merged. Stopping must not land half an edit.
+                    self._emit("worker_rejected", task_id=name, reason="cancelled",
+                               text="cancelled before it started")
+                    return WorkerOutcome(answer="", verified=False)
+                self._emit(
+                    "worker_started", task_id=name, text=worker.role.name,
+                    # The branch this worker writes on. `run_isolated` names it, and until now it
+                    # was invisible: a user watching parallel edits could not tell which checkout
+                    # produced which change, or go look at one afterwards.
+                    workspace=str(ws), instruction=worker.role.system_prompt[:400],
                 )
-                answer = agent.act(task)
-                if verify:
-                    from chimera.core.verify import CommandVerifier
+                answer = agent_answer = ""
+                try:
+                    agent = RoleAgent(
+                        worker.role,
+                        worker.backend or self.backend,
+                        tools=worker.tools(ws),
+                        max_steps=worker.max_steps,
+                    )
+                    answer = agent_answer = agent.act(task)
+                except Exception as exc:  # noqa: BLE001 -- one worker crashing is its own failure
+                    self._emit("worker_failed", task_id=name, text=str(exc)[:300])
+                    raise
+                if not verify:
+                    # No verify command: every worker that did not crash merges, subject to the
+                    # one-file-one-owner conflict rule. Said out loud because it is the case where
+                    # two workers editing the same file BOTH lose.
+                    self._emit("worker_verified", task_id=name, verified_by="", answer_chars=len(answer))
+                    return WorkerOutcome(answer=answer, verified=True)
+                if self.should_stop is not None and self.should_stop():
+                    self._emit("worker_rejected", task_id=name, reason="cancelled",
+                               text="cancelled before its check ran")
+                    return WorkerOutcome(answer=agent_answer, verified=False)
+                from chimera.core.verify import CommandVerifier
 
-                    passed = CommandVerifier(verify, ws).verify().passed
-                    return WorkerOutcome(answer=answer, verified=passed)
-                return WorkerOutcome(answer=answer, verified=True)
+                outcome = CommandVerifier(verify, ws).verify()
+                if outcome.passed:
+                    self._emit("worker_verified", task_id=name, verified_by=verify,
+                               answer_chars=len(answer))
+                else:
+                    # The output is what tells you WHY it was thrown away, and a crew whose
+                    # workers all fail the same check is a crew whose check is wrong.
+                    self._emit("worker_rejected", task_id=name, reason="verify",
+                               text=verify, detail=(outcome.output or "")[:2000])
+                return WorkerOutcome(answer=answer, verified=outcome.passed)
 
             return run_worker
 
@@ -241,8 +304,28 @@ class IsolatedCrew:
             failures=failures,
             rejected=rejected,
         )
+        # One frame per contested file, not one lump. A conflict is a file two workers both
+        # changed and NEITHER landed — the thing a person has to go look at by name.
+        for path in batch.conflicts:
+            self._emit("conflict", text=path, path=path)
         if self.supervisor is not None:
+            self._emit("synthesizing", text=f"{len(transcript)} merged")
             crew_result.summary = self._synthesize(task, crew_result)
+        self._emit(
+            "done",
+            text=f"{batch.merged} merged",
+            merged=batch.merged,
+            conflicts=list(batch.conflicts),
+            failed=sorted(failures),
+            rejected=sorted(rejected),
+            answer=crew_result.summary,
+            # False means the workers ran IN PLACE, sharing one folder, because this is not a git
+            # repository. Everything above about isolation stops being true, and the screen has to
+            # be able to say so — the same honesty `/api/agents` already ships as `is_repo`.
+            # Asked of the workspace rather than read off the batch, which is what `/api/agents`
+            # does too: `run_isolated` reports what it produced, not whether it was able to isolate.
+            is_repo=is_git_repo(Path(workspace)),
+        )
         return crew_result
 
     def _synthesize(self, task: str, result: IsolatedCrewResult) -> str:

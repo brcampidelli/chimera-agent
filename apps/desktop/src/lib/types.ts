@@ -41,6 +41,13 @@ export type OrchWorkerVerified = Schemas["WorkerVerifiedOut"];
 export type OrchWorkerRejected = Schemas["WorkerRejectedOut"];
 export type OrchFellBack = Schemas["FellBackOut"];
 export type OrchDone = Schemas["HierarchyDoneOut"];
+/** The crew's frames. Prefixed on the wire because a crew worker and a hierarchy worker are not
+ *  the same object: this one writes files, in a checkout of its own, and a command decides
+ *  whether what it wrote lands. */
+export type CrewWorkerStarted = Schemas["CrewWorkerStartedOut"];
+export type CrewWorkerVerified = Schemas["CrewWorkerVerifiedOut"];
+export type CrewWorkerRejected = Schemas["CrewWorkerRejectedOut"];
+export type CrewDone = Schemas["CrewDoneOut"];
 export type ProviderCfg = Schemas["ProviderOut"];
 /** A provider's rotation pool. Carries hints and positions — never a key. */
 export type PoolCfg = Schemas["PoolOut"];
