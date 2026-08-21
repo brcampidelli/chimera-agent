@@ -177,9 +177,13 @@ class IsolatedCrew:
         max_workers: int = 4,
         on_event: OrchEventSink | None = None,
         should_stop: Callable[[], bool] | None = None,
+        identity: str = "",
     ) -> None:
         self.backend = backend
         self.workers = workers
+        # The owner's rendered instructions, handed to every worker. Keyword-only with an empty
+        # default so no existing caller changes.
+        self.identity = identity
         self.supervisor = supervisor
         self.max_workers = max_workers
         # Same seam, same contract, same reasons as the hierarchy's — see
@@ -245,6 +249,10 @@ class IsolatedCrew:
                         worker.backend or self.backend,
                         tools=worker.tools(ws),
                         max_steps=worker.max_steps,
+                        identity=self.identity,
+                        # The worktree, not the original: a worker reads the conventions of the
+                        # checkout it is actually editing.
+                        project_root=ws,
                     )
                     answer = agent_answer = agent.act(task)
                 except Exception as exc:  # noqa: BLE001 -- one worker crashing is its own failure

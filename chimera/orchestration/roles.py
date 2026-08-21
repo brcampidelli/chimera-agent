@@ -13,6 +13,7 @@ mix talkers and doers transparently.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from chimera.providers.gateway import Message, SupportsComplete
 from chimera.tools.registry import ToolRegistry
@@ -53,11 +54,22 @@ class RoleAgent:
         *,
         tools: ToolRegistry | None = None,
         max_steps: int = 6,
+        identity: str = "",
+        project_root: Path | None = None,
     ) -> None:
         self.role = role
         self.backend = backend
         self.tools = tools
         self.max_steps = max_steps
+        # A crew worker's answer lands in front of the user, so the owner's instructions apply to
+        # it exactly as they do to the coding agent. This built `AgentConfig` without them, and
+        # since the same rendered block carries the "always answer in {language}" line, an owner
+        # who set the app to Portuguese got English out of the crew.
+        self.identity = identity
+        # And the project's own conventions, for the same reason: `project_root` is what makes an
+        # agent read AGENTS.md, and a crew worker editing a repo was the one worker in the stack
+        # not reading it.
+        self.project_root = project_root
 
     @property
     def name(self) -> str:
@@ -82,12 +94,19 @@ class RoleAgent:
                     max_steps=self.max_steps,
                     temperature=temperature,
                     system_prompt=self.role.system_prompt,
+                    instructions=self.identity,
+                    project_root=self.project_root,
                 ),
             )
             return agent.run(user).answer
+        system = self.role.system_prompt
+        if self.identity:
+            # In front of the role, matching the agent loop's own order: the role is the more
+            # specific instruction and reads closer to the task.
+            system = f"{self.identity}\n\n{system}"
         return self.backend.complete(
             [
-                Message(role="system", content=self.role.system_prompt),
+                Message(role="system", content=system),
                 Message(role="user", content=user),
             ],
             model=self.role.model,

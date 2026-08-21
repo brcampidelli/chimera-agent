@@ -48,7 +48,7 @@ from chimera.orchestration.receipts import (
 )
 from chimera.orchestration.roles import Role, RoleAgent
 from chimera.orchestration.spec import EffortBudget, ResultEnvelope, TaskSpec
-from chimera.providers.gateway import CompletionResult, Message, SupportsComplete
+from chimera.providers.gateway import CompletionResult, Message, MessageLike, SupportsComplete
 from chimera.telemetry import get_logger
 
 _log = get_logger("orchestration.hierarchy")
@@ -239,8 +239,22 @@ class HierarchicalOrchestrator:
         on_event: OrchEventSink | None = None,
         should_stop: Callable[[], bool] | None = None,
         worker_tools: Callable[[], Any] | None = None,
+        identity: str = "",
     ) -> None:
         self.gateway = gateway
+        # The owner's rendered instructions. Keyword-only with an empty default, so every existing
+        # caller and test is untouched.
+        #
+        # It reaches the two stages that answer a PERSON — the synthesizer and the single-agent
+        # fallback — and deliberately not the decomposer or the sub-workers. The decomposer must
+        # emit only a JSON array, and "always answer in Portuguese" against "reply with ONLY a JSON
+        # array" is a conflict, not a preference. The workers answer the synthesizer rather than
+        # the user, and `WORKER_SYSTEM` already dictates their form; the owner's line about how to
+        # answer would fight it, on N calls per run, for text nobody reads directly.
+        #
+        # Without this, an owner who set the app to Portuguese got English out of this screen: the
+        # same `render()` that carries the persona carries the "always answer in {language}" line.
+        self.identity = identity
         # Both keyword-only with a None default, so every existing caller and test is untouched.
         # On the constructor rather than on run(): `run_prepared`, `_dispatch` and `_run_one` all
         # need them, and threading a pair of parameters through four private signatures is a wider
@@ -803,15 +817,16 @@ class HierarchicalOrchestrator:
             "synthesizing", text=f"{len(envelopes)} summaries",
             envelopes=len(envelopes), fused=use_fusion,
         )
+        synth_system = self._owned(_SYNTH_SYSTEM)
         if fusion is not None:
             _log.debug("envelopes conflict — engaging fusion for the final synthesis")
             result = fusion.complete(
-                [Message(role="system", content=_SYNTH_SYSTEM),
+                [Message(role="system", content=synth_system),
                  Message(role="user", content=prompt)]
             )
         else:
             result = self.gateway.complete(
-                [Message(role="system", content=_SYNTH_SYSTEM),
+                [Message(role="system", content=synth_system),
                  Message(role="user", content=prompt)],
                 model=self.top_model,
             )
@@ -835,9 +850,12 @@ class HierarchicalOrchestrator:
         # Emitted from the single site every fallback passes through, so no route out of the
         # hierarchy can forget to say it happened.
         self._emit("fell_back", text=reason, shape=shape, reason=code)
-        result = self.gateway.complete(
-            [Message(role="user", content=task)], model=self.top_model
-        )
+        # This path answers the user directly, so the owner's instructions belong here even more
+        # plainly than at synthesis — and it was sending no system message at all.
+        messages: list[MessageLike] = [Message(role="user", content=task)]
+        if self.identity:
+            messages.insert(0, Message(role="system", content=self.identity))
+        result = self.gateway.complete(messages, model=self.top_model)
         tokens = (result.prompt_tokens or 0) + (result.completion_tokens or 0)
         estimated = tokens == 0
         if estimated:
@@ -921,6 +939,14 @@ class HierarchicalOrchestrator:
         accrues telemetry only (the honest gate)."""
         if self.evolution is not None:
             self.evolution.record_external(task, answer, success=bool(answer and answer.strip()))
+
+    def _owned(self, system: str) -> str:
+        """``system`` with the owner's instructions in front of it, or unchanged when there are none.
+
+        In front rather than appended: the stage prompt is the more specific instruction, and the
+        convention everywhere else in the stack is that the closer-to-the-task text comes last.
+        """
+        return f"{self.identity}\n\n{system}" if self.identity else system
 
     def _complete_top(self, system: str, user: str) -> CompletionResult:
         return self.gateway.complete(

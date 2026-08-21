@@ -480,6 +480,26 @@ def _preview_dict(plan: Any, *, sources: int, plan_id: str) -> dict[str, Any]:
     }
 
 
+def _owner_instructions(home: object) -> str:
+    """The owner's rendered instructions, or "" if they set none or the file cannot be read.
+
+    Every other surface that answers a person loads these — Code, Runs, chat, the bots. This one
+    did not, and because the same rendered block carries the "always answer in {language}" line,
+    an owner running the app in Portuguese got English out of the Orchestration tab.
+
+    Best-effort by design: a malformed identity file must not take an orchestration run down.
+    """
+    from pathlib import Path as _Path
+
+    try:
+        from chimera.core.instructions import load as load_identity
+        from chimera.core.instructions import render as render_identity
+
+        return render_identity(load_identity(_Path(str(home))))
+    except Exception:  # noqa: BLE001 -- see the docstring
+        return ""
+
+
 def register_orchestration_api(
     app: FastAPI,
     guard: params.Depends,
@@ -550,6 +570,7 @@ def register_orchestration_api(
                 fuse_final=fuse,
                 effort=EffortPolicy(complex_budget=req.budget or live.delegation_budget),
             ),
+            identity=_owner_instructions(live.home),
             evolution=build_evolution_context(
                 live, gateway, None, home=live.home,
                 evolve_skills=False, include_memory=True,
@@ -753,6 +774,7 @@ def register_orchestration_api(
                     max_workers=max(1, min(_MAX_WORKERS, req.max_workers)),
                     on_event=on_event,
                     should_stop=stop.is_set,
+                    identity=_owner_instructions(live.home),
                 )
                 crew.run(req.task, ws, verify=req.verify, timeout=live.batch_timeout)
             except Exception as exc:  # noqa: BLE001 -- surfaced to the client as an error frame
