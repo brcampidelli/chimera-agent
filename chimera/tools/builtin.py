@@ -6,6 +6,7 @@ on. Higher-level, *learned* procedures live in :mod:`chimera.skills`.
 
 from __future__ import annotations
 
+from contextlib import suppress
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -43,6 +44,29 @@ class EchoTool(Tool):
 
     def run(self, **kwargs: Any) -> str:
         return str(kwargs.get("text", ""))
+
+
+#: Tools this registry only sometimes contains — a credential, an optional package, or an
+#: installed skill bundle decides. Declared here because two guards in the suite pin the set of
+#: tools against the set of translated descriptions, and those guards are exact mirrors: with no
+#: notion of "sometimes", a conditional tool fails one of them on every machine where its
+#: condition differs from CI's. Naming them is what lets both guards stay strict about the tools
+#: that are always here.
+OPTIONAL_TOOLS: frozenset[str] = frozenset({
+    # Key-gated.
+    "web_search",
+    "generate_image",
+    "text_to_speech",
+    "transcribe_audio",
+    "send_email",
+    "read_email",
+    "calendar_events",
+    # Present only when a skill bundle is switched on — see `chimera.skills.aliases`.
+    "web_extract",
+    "search_files",
+    "read_text",
+    "skill_view",
+})
 
 
 def default_registry(
@@ -118,6 +142,17 @@ def default_registry(
     registry.register(ExtractTool())
     registry.register(MapTool())
     registry.register(CrawlTool())
+
+    # The catalogued skills' vocabulary, when any of them is switched on. Same shape as the
+    # key-gated tools below — a condition that is met, not a flag: a machine with no installed
+    # skill bundles gets exactly the registry it got before, and one with an active bundle also
+    # answers to the names that bundle's instructions use. See `chimera.skills.aliases`.
+    with suppress(Exception):  # a skills directory that cannot be read is not a broken registry
+        from chimera.skills.aliases import install_into
+        from chimera.skills.bundles import active, bundles_root
+
+        if active(settings.home):
+            install_into(registry, bundles_root=bundles_root(settings.home))
 
     # Key-gated optional tools light up when their credential is set.
     if settings.tavily_api_key:

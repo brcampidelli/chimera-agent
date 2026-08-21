@@ -1124,6 +1124,14 @@
             "title": "License",
             "type": "string"
           },
+          "missing_tools": {
+            "description": "Tool names this skill's text calls that nothing here provides. MEASURED from the body, unlike `portability` which is a judgement \u2014 a mention is not always a dependency, so this informs rather than decides.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Tools",
+            "type": "array"
+          },
           "name": {
             "default": "",
             "title": "Name",

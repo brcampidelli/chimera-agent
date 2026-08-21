@@ -103,6 +103,16 @@ function Row({ entry }: { entry: CatalogEntry }) {
               : t(`catalog.reason.${rating}`, { detail: entry.note })}
           </p>
         ) : null}
+        {/* Measured from the skill's own text, and said before the download rather than found
+            after it. Separate from the verdict above on purpose: that one is a judgement about
+            whether the skill works here, and this is a fact about what it calls. A skill can be
+            perfectly usable and still mention a tool we lack in an optional branch. */}
+        {entry.missing_tools && entry.missing_tools.length > 0 ? (
+          <p className="text-xs text-muted-foreground">
+            {t("catalog.mentions")}{" "}
+            <span className="font-mono">{entry.missing_tools.join(", ")}</span>
+          </p>
+        ) : null}
         {entry.author ? (
           // Several of these are ports of somebody else's work and say so upstream. Carrying the
           // field means the credit reaches a reader instead of stopping at the repository.

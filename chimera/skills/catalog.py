@@ -75,6 +75,11 @@ class CatalogEntry:
     topic: str = ""
     #: Said out loud when the portability rating alone would not be enough to decide.
     note: str = ""
+    #: MEASURED, unlike `portability`: the tool names this skill's text calls that we answer to
+    #: under another name, and the ones nothing here provides. Kept apart from the verdict on
+    #: purpose — whether a mention blocks a skill is a judgement, and these are facts.
+    uses: tuple[str, ...] = ()
+    missing: tuple[str, ...] = ()
     #: Whoever the upstream credits. Several of these are ports of other people's work and say so
     #: here; carrying the field means the attribution reaches a reader instead of stopping at the
     #: repository it was copied from.
@@ -118,6 +123,8 @@ def _load() -> tuple[CatalogEntry, ...]:
                     topic=str(item.get("topic") or ""),
                     note=str(item.get("note") or ""),
                     author=str(item.get("author") or ""),
+                    uses=tuple(str(u) for u in item.get("uses") or ()),
+                    missing=tuple(str(m) for m in item.get("missing") or ()),
                 )
             )
         except (KeyError, ValueError):

@@ -20,7 +20,7 @@ import re
 from pathlib import Path
 
 from chimera.api.tools_api import list_tools
-from chimera.tools.builtin import default_registry
+from chimera.tools.builtin import OPTIONAL_TOOLS, default_registry
 
 I18N = Path(__file__).resolve().parents[1] / "apps" / "desktop" / "src" / "lib" / "i18n.tsx"
 
@@ -82,4 +82,30 @@ def test_no_dictionary_describes_a_tool_that_does_not_exist() -> None:
     source = I18N.read_text(encoding="utf-8")
     described = {m.group(1) for m in re.finditer(r'"tools\.desc\.([a-z0-9_]+)"', source)}
     real = {t["name"] for t in list_tools(default_registry())}
-    assert not (described - real), f"described but not registered: {sorted(described - real)}"
+    # Minus the ones that are only sometimes here. This guard and the one above are exact mirrors,
+    # so without this a conditional tool fails one of them on every machine whose credentials or
+    # installed skills differ from CI's — which is also why none of the key-gated tools had a
+    # description at all: describing one was impossible without turning this red.
+    stray = described - real - OPTIONAL_TOOLS
+    assert not stray, f"described but not registered: {sorted(stray)}"
+
+
+def test_the_exemption_list_still_names_tools_that_exist() -> None:
+    """`OPTIONAL_TOOLS` weakens the mirror guard above, so it has to stay honest.
+
+    Its failure mode is quiet: a tool is deleted, its description stays in ten dictionaries, and the
+    exemption keeps the guard green forever — which is precisely the silent-false-sentence problem
+    this file was written to stop, reintroduced through the door built to let conditional tools in.
+    """
+    root = Path(__file__).resolve().parents[1] / "chimera"
+    sources = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in [*(root / "tools").rglob("*.py"), root / "skills" / "aliases.py"]
+    )
+
+    orphans = [name for name in sorted(OPTIONAL_TOOLS) if f'"{name}"' not in sources]
+
+    assert not orphans, (
+        f"these are exempted from the registry check but nothing defines them any more: {orphans}. "
+        "Remove them from OPTIONAL_TOOLS and delete their tools.desc.* entries."
+    )

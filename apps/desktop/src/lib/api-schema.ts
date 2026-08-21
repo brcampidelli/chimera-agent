@@ -2617,6 +2617,11 @@ export interface components {
              */
             license: string;
             /**
+             * Missing Tools
+             * @description Tool names this skill's text calls that nothing here provides. MEASURED from the body, unlike `portability` which is a judgement — a mention is not always a dependency, so this informs rather than decides.
+             */
+            missing_tools?: string[];
+            /**
              * Name
              * @default
              */

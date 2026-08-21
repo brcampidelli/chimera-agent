@@ -196,6 +196,14 @@ class CatalogEntryOut(BaseModel):
     note: str = ""
     author: str = ""
     homepage: str = ""
+    missing_tools: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Tool names this skill's text calls that nothing here provides. MEASURED from the "
+            "body, unlike `portability` which is a judgement — a mention is not always a "
+            "dependency, so this informs rather than decides."
+        ),
+    )
     #: What is on this machine already: "" when not installed, else pending/active/inactive.
     installed: str = ""
 
@@ -316,6 +324,7 @@ def register_features(
                 note=e.note,
                 author=e.author,
                 homepage=e.homepage,
+                missing_tools=list(e.missing),
                 installed=here.get(e.name, ""),
             ).model_dump()
             for e in CATALOG
