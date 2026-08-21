@@ -109,3 +109,45 @@ def test_the_exemption_list_still_names_tools_that_exist() -> None:
         f"these are exempted from the registry check but nothing defines them any more: {orphans}. "
         "Remove them from OPTIONAL_TOOLS and delete their tools.desc.* entries."
     )
+
+
+def test_the_optional_tools_english_is_pinned_too() -> None:
+    """The word-for-word check above only sees REGISTERED tools, which is the wrong half here.
+
+    A key-gated tool is absent on this machine, so a typo in its English description — or a schema
+    edited in Python with the dictionary left behind — sails past every other assertion in this
+    file and surfaces for the first user who sets that credential. Which is the same blind spot
+    `OPTIONAL_TOOLS` was introduced to close for PRESENCE, reappearing for CONTENT.
+
+    So these are read off the classes rather than off the registry: a description is a fact about
+    the tool, not about whether this machine happens to have its API key.
+    """
+    from chimera.tools.calendar import CalendarEventsTool
+    from chimera.tools.email import ReadEmailTool, SendEmailTool
+    from chimera.tools.media import ImageGenTool, TextToSpeechTool, TranscribeAudioTool
+    from chimera.tools.web import WebSearchTool
+
+    keyed = [
+        WebSearchTool,
+        ImageGenTool,
+        TextToSpeechTool,
+        TranscribeAudioTool,
+        SendEmailTool,
+        ReadEmailTool,
+        CalendarEventsTool,
+    ]
+    keys = _english_dict()
+
+    drifted = [
+        (cls.name, cls.description, keys.get(f"tools.desc.{cls.name}"))
+        for cls in keyed
+        if keys.get(f"tools.desc.{cls.name}") != cls.description
+    ]
+
+    assert not drifted, (
+        "the English text must be the schema itself — update `en` first, then the other nine: "
+        + "; ".join(f"{name}: schema={schema!r} shown={shown!r}" for name, schema, shown in drifted)
+    )
+    # And every one of them is exempted from the registry check, or the pinning above is the only
+    # thing holding them and the other guard would go red the moment a credential is set.
+    assert {cls.name for cls in keyed} <= OPTIONAL_TOOLS
