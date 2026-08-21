@@ -52,8 +52,10 @@ function CrewWorkerCard({ worker }: { worker: CrewWorkerState }) {
           <span className="text-sm font-medium text-foreground">{label}</span>
           <Badge
             tone={
-              worker.status === "verified" ? "ok" : worker.status === "running" ? "accent"
-                : worker.status === "queued" ? "muted" : "bad"
+              worker.status === "verified"
+                ? worker.abstained ? "warn" : "ok"
+                : worker.status === "running" ? "accent"
+                  : worker.status === "queued" ? "muted" : "bad"
             }
           >
             {t(`crew.status.${worker.status}`)}
@@ -70,6 +72,25 @@ function CrewWorkerCard({ worker }: { worker: CrewWorkerState }) {
             <FolderGit2 className="mt-0.5 h-3 w-3 shrink-0" />
             <span className="min-w-0 break-all">{worker.workspace}</span>
           </p>
+        ) : null}
+
+        {/* A merge with nothing behind it. The crew is justified entirely by "N attempts, the
+            test picks the winner", so a run where the test never executed has to say so — the card
+            used to read "verified by pytest -q" for a pytest that is not installed. */}
+        {worker.status === "verified" && worker.abstained ? (
+          <div className="space-y-1">
+            <p className="text-xs text-warn-foreground">{t("crew.verified.abstained")}</p>
+            {worker.detail ? (
+              <details className="text-xs">
+                <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                  {t("crew.rejected.output")}
+                </summary>
+                <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-chip bg-surface-2 p-2 font-mono text-muted-foreground">
+                  {worker.detail}
+                </pre>
+              </details>
+            ) : null}
+          </div>
         ) : null}
 
         {worker.status === "rejected" ? (

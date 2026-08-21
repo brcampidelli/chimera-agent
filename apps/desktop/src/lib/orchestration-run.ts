@@ -266,8 +266,14 @@ export interface CrewWorkerState {
   /** The checkout this worker writes in. Empty until it starts. */
   workspace: string;
   instruction: string;
-  /** The check that passed, or the one that refused it. */
+  /** The check that passed, or the one that refused it. Empty when there was none, and empty when
+   *  there WAS one that reached no verdict — see `abstained`. */
   verify: string;
+  /** The check ran and decided nothing: pytest collected no tests (exit 5), or the binary is not
+   *  installed (exit 127). This worker merged, as it would with no check configured, and nothing
+   *  may say a check approved it. Kept apart from `verify` because "approved by pytest" and
+   *  "pytest is not installed here" send a reader to two different places. */
+  abstained: boolean;
   /** What the failing check printed — the only thing that says WHY this was discarded. */
   detail: string;
   reason: string;
@@ -322,6 +328,7 @@ function patchCrewWorker(
     workspace: "",
     instruction: "",
     verify: "",
+    abstained: false,
     detail: "",
     reason: "",
     answerChars: 0,
@@ -364,8 +371,14 @@ export function applyCrewFrame(state: CrewState, frame: OrchFrame): CrewState {
         ...state,
         seq,
         workers: patchCrewWorker(state.workers, frame.task_id, {
+          // "verified" is the merge decision. `abstained` is whether anything actually decided it:
+          // pytest that collected nothing, or a binary that is not installed, comes back
+          // `passed=True` so the work is not punished for our inability to check it — and reading
+          // only that turned a command which DOES NOT EXIST into an approval.
           status: "verified",
           verify: str(data.verified_by),
+          abstained: data.abstained === true,
+          detail: str(data.detail),
           answerChars: num(data.answer_chars),
         }),
       };

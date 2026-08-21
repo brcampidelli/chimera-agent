@@ -179,3 +179,89 @@ def test_a_worker_that_actually_landed_says_so(tmp_path: Path) -> None:
     produced = {e.task_id: e.data for e in seen if e.kind == "worker_produced"}
     assert produced["a"]["landed"] is True and produced["a"]["files"] == ["a.txt"]
     assert produced["a"]["lost"] == []
+
+
+def _events(crew_kwargs: dict[str, Any], tmp_path: Path, **run_kwargs: Any) -> list[Any]:
+    seen: list[Any] = []
+    crew = IsolatedCrew(
+        WritingBackend("_", "_"),
+        [_worker("solo", "out/solo.txt", "good")],
+        on_event=seen.append,
+        **crew_kwargs,
+    )
+    crew.run("go", tmp_path, **run_kwargs)
+    return seen
+
+
+def test_a_check_that_reached_no_verdict_does_not_get_reported_as_an_approval(
+    tmp_path: Path,
+) -> None:
+    """`pytest` that DOES NOT EXIST used to approve a worker.
+
+    `VerificationResult` sets `passed=True` for exit 5 (collected nothing) and exit 127 (no such
+    command), on purpose: the work is not punished for our inability to check it. `crew.py` read
+    only `passed`, so an abstention arrived as a pass and the card said "verified by pytest -q".
+
+    The crew's entire justification is "N attempts, the test picks the winner". A test that never
+    ran picking the winner is that justification with the middle removed.
+    """
+    _init_repo(tmp_path)
+    # Exit 127 is the shell saying the command is not there — the abstaining case, not a failure.
+    events = _events({}, tmp_path, verify="python -c \"import sys; sys.exit(127)\"")
+
+    verified = [e for e in events if e.kind == "worker_verified"]
+    assert len(verified) == 1
+    assert verified[0].data.get("abstained") is True
+    # And it must not name the command as the thing that approved it.
+    assert not verified[0].data.get("verified_by")
+
+
+def test_an_abstention_still_merges_because_that_is_what_no_check_means(tmp_path: Path) -> None:
+    """Not punishing the work is the point of abstaining; the autonomous loop already does this.
+
+    Refusing to merge would be claiming the work is bad, which we did not establish either.
+    """
+    _init_repo(tmp_path)
+    crew = IsolatedCrew(WritingBackend("_", "_"), [_worker("solo", "out/solo.txt", "good")])
+
+    res = crew.run("go", tmp_path, verify="python -c \"import sys; sys.exit(127)\"")
+
+    assert (tmp_path / "out" / "solo.txt").exists()
+    assert not res.rejected
+
+
+def test_a_real_pass_still_names_the_command_that_gave_it(tmp_path: Path) -> None:
+    """Or the test above would pass against a version that never named a command at all."""
+    _init_repo(tmp_path)
+    events = _events({}, tmp_path, verify="python -c \"import sys; sys.exit(0)\"")
+
+    verified = [e for e in events if e.kind == "worker_verified"]
+    assert verified[0].data.get("verified_by")
+    assert not verified[0].data.get("abstained")
+
+
+def test_stop_is_honoured_by_a_crew_with_no_check_configured(tmp_path: Path) -> None:
+    """The configuration the form presents as valid, and the one Stop used to be ignored in.
+
+    There were exactly two stop checks and the no-verify early return sat BETWEEN them, so leaving
+    "The check" empty and pressing Stop mid-work returned `verified=True` and merged — while the
+    button's own tooltip promised that a worker which stops is discarded and nothing half-written
+    lands.
+    """
+    _init_repo(tmp_path)
+    # Stops only AFTER the worker has done its work, which is the window the early return skipped.
+    calls: list[int] = []
+
+    def stop_after_the_work() -> bool:
+        calls.append(1)
+        return len(calls) > 1
+
+    crew = IsolatedCrew(
+        WritingBackend("_", "_"),
+        [_worker("solo", "out/solo.txt", "good")],
+        should_stop=stop_after_the_work,
+    )
+    res = crew.run("go", tmp_path)  # no verify — the case that had no second check
+
+    assert not (tmp_path / "out" / "solo.txt").exists(), "a stopped worker must not land its edit"
+    assert "solo" in res.rejected

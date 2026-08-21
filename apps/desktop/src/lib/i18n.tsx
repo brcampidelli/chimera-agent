@@ -1146,6 +1146,8 @@ const en: Dict = {
   "crew.rejected.couldNotRun": "`{command}` could not run here — the command or the folder, not your code.",
   "crew.rejected.cancelled": "Stopped before it finished.",
   "crew.rejected.output": "what the check printed",
+  "crew.verified.abstained":
+    "The check ran and reached no verdict — it found nothing to run, or is not installed here. This merged as if you had set no check at all; nothing approved it.",
   "crew.rejected.discarded": "Its changes were thrown away — nothing from this worker reached your files.",
   "crew.conflicts.title": "contested files: {n}",
   "crew.conflicts.explain": "Two workers changed each of these, so NEITHER version was kept. The files are as they were.",
@@ -2284,6 +2286,8 @@ const pt: Dict = {
   "crew.rejected.couldNotRun": "`{command}` não pôde rodar aqui — o problema é o comando ou a pasta, não o seu código.",
   "crew.rejected.cancelled": "Parado antes de terminar.",
   "crew.rejected.output": "o que a verificação imprimiu",
+  "crew.verified.abstained":
+    "A checagem rodou e não chegou a veredito — não achou o que rodar, ou não está instalada aqui. Isto entrou como se você não tivesse posto checagem nenhuma; nada aprovou.",
   "crew.rejected.discarded": "As mudanças dele foram jogadas fora — nada deste trabalhador chegou aos seus arquivos.",
   "crew.conflicts.title": "arquivos disputados: {n}",
   "crew.conflicts.explain": "Dois trabalhadores mudaram cada um destes, então NENHUMA versão foi mantida. Os arquivos estão como estavam.",
@@ -3432,6 +3436,8 @@ const es: Dict = {
   "crew.rejected.couldNotRun": "`{command}` no pudo ejecutarse aquí — es el comando o la carpeta, no tu código.",
   "crew.rejected.cancelled": "Detenido antes de terminar.",
   "crew.rejected.output": "lo que imprimió la comprobación",
+  "crew.verified.abstained":
+    "La comprobación se ejecutó y no llegó a un veredicto: no encontró qué ejecutar, o no está instalada aquí. Esto se fusionó como si no hubieras puesto ninguna comprobación; nada lo aprobó.",
   "crew.rejected.discarded": "Sus cambios se descartaron — nada de este trabajador llegó a tus archivos.",
   "crew.conflicts.title": "archivos en disputa: {n}",
   "crew.conflicts.explain": "Dos trabajadores cambiaron cada uno de estos, así que NINGUNA versión se guardó. Los archivos están como estaban.",
@@ -4593,6 +4599,8 @@ const fr: Dict = {
   "crew.rejected.couldNotRun": "`{command}` n'a pas pu s'exécuter ici — c'est la commande ou le dossier, pas votre code.",
   "crew.rejected.cancelled": "Arrêté avant la fin.",
   "crew.rejected.output": "ce qu'a affiché la vérification",
+  "crew.verified.abstained":
+    "La vérification s'est lancée sans rendre de verdict — elle n'a rien trouvé à exécuter, ou n'est pas installée ici. Ceci a été fusionné comme si vous n'aviez mis aucune vérification ; rien ne l'a approuvé.",
   "crew.rejected.discarded": "Ses modifications ont été jetées — rien de ce travailleur n'a atteint vos fichiers.",
   "crew.conflicts.title": "fichiers disputés : {n}",
   "crew.conflicts.explain": "Deux travailleurs ont modifié chacun de ces fichiers, donc AUCUNE version n'a été gardée. Ils sont restés tels quels.",
@@ -5751,6 +5759,8 @@ const de: Dict = {
   "crew.rejected.couldNotRun": "`{command}` konnte hier nicht laufen — es liegt am Befehl oder am Ordner, nicht an Ihrem Code.",
   "crew.rejected.cancelled": "Vor dem Ende gestoppt.",
   "crew.rejected.output": "was die Prüfung ausgab",
+  "crew.verified.abstained":
+    "Die Prüfung lief und kam zu keinem Urteil — sie fand nichts auszuführen oder ist hier nicht installiert. Das wurde zusammengeführt, als hätten Sie gar keine Prüfung gesetzt; nichts hat es freigegeben.",
   "crew.rejected.discarded": "Seine Änderungen wurden verworfen — nichts von diesem Worker hat Ihre Dateien erreicht.",
   "crew.conflicts.title": "umstrittene Dateien: {n}",
   "crew.conflicts.explain": "Zwei Worker haben jede dieser Dateien geändert, also wurde KEINE Version behalten. Die Dateien sind unverändert.",
@@ -6828,6 +6838,8 @@ const zh: Dict = {
   "crew.rejected.couldNotRun": "`{command}` 在这里无法运行——问题出在命令或文件夹，不是你的代码。",
   "crew.rejected.cancelled": "在完成前被停止。",
   "crew.rejected.output": "校验输出了什么",
+  "crew.verified.abstained":
+    "检查跑了，但没有给出结论 —— 它没找到可运行的东西，或者这里根本没装。这次合并等同于你没有设置任何检查；没有任何东西批准过它。",
   "crew.rejected.discarded": "它的改动被丢弃了——这个工作者的内容没有进入你的文件。",
   "crew.conflicts.title": "冲突文件：{n}",
   "crew.conflicts.explain": "这些文件都被两个工作者改动过，因此两个版本都没有保留。文件保持原样。",
@@ -7967,6 +7979,8 @@ const ja: Dict = {
   "crew.rejected.couldNotRun": "`{command}` はここで実行できませんでした。原因はコマンドかフォルダで、コードではありません。",
   "crew.rejected.cancelled": "完了前に停止されました。",
   "crew.rejected.output": "チェックの出力",
+  "crew.verified.abstained":
+    "チェックは走りましたが判定に至りませんでした — 実行するものが見つからないか、ここには入っていません。これはチェックを設定しなかった場合と同じように取り込まれました。承認したものは何もありません。",
   "crew.rejected.discarded": "その変更は破棄されました。このワーカーのものは一切ファイルに入っていません。",
   "crew.conflicts.title": "競合したファイル: {n}",
   "crew.conflicts.explain": "これらはいずれも二人のワーカーが変更したため、どちらの版も採用されていません。ファイルは元のままです。",
@@ -9120,6 +9134,8 @@ const it: Dict = {
   "crew.rejected.couldNotRun": "`{command}` non ha potuto essere eseguito qui — è il comando o la cartella, non il tuo codice.",
   "crew.rejected.cancelled": "Fermato prima di finire.",
   "crew.rejected.output": "cosa ha stampato la verifica",
+  "crew.verified.abstained":
+    "Il controllo è partito e non ha dato un verdetto: non ha trovato nulla da eseguire, oppure qui non è installato. Questo è stato unito come se non avessi impostato alcun controllo; nulla lo ha approvato.",
   "crew.rejected.discarded": "Le sue modifiche sono state scartate — nulla di questo lavoratore è arrivato ai tuoi file.",
   "crew.conflicts.title": "file contesi: {n}",
   "crew.conflicts.explain": "Due lavoratori hanno modificato ciascuno di questi, quindi NESSUNA versione è stata tenuta. I file sono come erano.",
@@ -10265,6 +10281,8 @@ const pl: Dict = {
   "crew.rejected.couldNotRun": "`{command}` nie mogło się tu uruchomić — chodzi o polecenie lub folder, nie o twój kod.",
   "crew.rejected.cancelled": "Zatrzymany przed końcem.",
   "crew.rejected.output": "co wypisało sprawdzenie",
+  "crew.verified.abstained":
+    "Sprawdzenie uruchomiło się i nie wydało werdyktu — nie znalazło nic do uruchomienia albo nie jest tu zainstalowane. Scalono to tak, jakbyś nie ustawił żadnego sprawdzenia; nic tego nie zatwierdziło.",
   "crew.rejected.discarded": "Jego zmiany odrzucono — nic od tego pracownika nie trafiło do twoich plików.",
   "crew.conflicts.title": "sporne pliki: {n}",
   "crew.conflicts.explain": "Każdy z tych plików zmieniło dwóch pracowników, więc NIE zachowano żadnej wersji. Pliki są jak były.",
@@ -11416,6 +11434,8 @@ const ru: Dict = {
   "crew.rejected.couldNotRun": "`{command}` не смогла запуститься здесь — дело в команде или папке, а не в вашем коде.",
   "crew.rejected.cancelled": "Остановлен до завершения.",
   "crew.rejected.output": "что вывела проверка",
+  "crew.verified.abstained":
+    "Проверка запустилась и не вынесла вердикта — ей нечего было запускать, либо она здесь не установлена. Это слилось так, как если бы вы вообще не задали проверку; ничто её не одобрило.",
   "crew.rejected.discarded": "Его правки отброшены — ничего от этого работника не попало в ваши файлы.",
   "crew.conflicts.title": "спорные файлы: {n}",
   "crew.conflicts.explain": "Каждый из этих файлов изменили двое, поэтому НИ ОДНА версия не сохранена. Файлы остались прежними.",

@@ -140,6 +140,11 @@ class WorkerOutcome:
 
     answer: str
     verified: bool = True
+    #: The check ran and reached NO verdict — pytest collecting nothing (exit 5), a missing binary
+    #: (exit 127, or `program_missing` on Windows). Separate from ``verified`` because the two
+    #: answer different questions: this worker merges, as it would with no check configured, and
+    #: nobody may say a check approved it.
+    abstained: bool = False
 
 
 @dataclass
@@ -258,19 +263,38 @@ class IsolatedCrew:
                 except Exception as exc:  # noqa: BLE001 -- one worker crashing is its own failure
                     self._emit("worker_failed", task_id=name, text=str(exc)[:300])
                     raise
+                # BEFORE the no-verify branch, not after it. There were exactly two stop checks
+                # and the early return sat between them, so a crew run with the check left empty —
+                # a configuration the form presents as valid — ignored Stop entirely: the worker
+                # came back `verified=True` and MERGED, while the button's tooltip promised that a
+                # worker which stops is discarded and nothing half-written lands.
+                if self.should_stop is not None and self.should_stop():
+                    self._emit("worker_rejected", task_id=name, reason="cancelled",
+                               text="cancelled after it finished, before anything landed")
+                    return WorkerOutcome(answer=agent_answer, verified=False)
                 if not verify:
                     # No verify command: every worker that did not crash merges, subject to the
                     # one-file-one-owner conflict rule. Said out loud because it is the case where
                     # two workers editing the same file BOTH lose.
                     self._emit("worker_verified", task_id=name, verified_by="", answer_chars=len(answer))
                     return WorkerOutcome(answer=answer, verified=True)
-                if self.should_stop is not None and self.should_stop():
-                    self._emit("worker_rejected", task_id=name, reason="cancelled",
-                               text="cancelled before its check ran")
-                    return WorkerOutcome(answer=agent_answer, verified=False)
                 from chimera.core.verify import CommandVerifier
 
                 outcome = CommandVerifier(verify, ws).verify()
+                if outcome.abstained:
+                    # The check reached no verdict: pytest collected nothing, or the binary is not
+                    # there. `VerificationResult` sets `passed=True` in that case so the work is not
+                    # punished for our inability to check it — and reading only `passed` turned a
+                    # `pytest` that DOES NOT EXIST into an approval. The whole crew is justified by
+                    # "N attempts, the test picks the winner"; a test that never ran picking the
+                    # winner is that justification with the middle removed.
+                    #
+                    # It still merges, because that is what "as if no check were configured" means
+                    # and it is what the autonomous loop already does with an abstention. What
+                    # changes is that nothing claims a check approved it.
+                    self._emit("worker_verified", task_id=name, verified_by="", abstained=True,
+                               answer_chars=len(answer), detail=(outcome.output or "")[:2000])
+                    return WorkerOutcome(answer=answer, verified=True, abstained=True)
                 if outcome.passed:
                     self._emit("worker_verified", task_id=name, verified_by=verify,
                                answer_chars=len(answer))
