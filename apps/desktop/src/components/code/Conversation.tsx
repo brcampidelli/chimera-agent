@@ -264,7 +264,13 @@ const STOP_REASONS: Record<string, string> = {
   cancelled: "code.chat.stopped.cancelled",
 };
 
-function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
+/** The badges under a finished turn.
+ *
+ *  Exported for its own test rather than reached through `Conversation`: every badge here encodes a
+ *  distinction that is invisible if it renders wrong — "0 facts recalled" against "we did not look",
+ *  a saved memory against none, an unknown cost against a free one. Those are exactly the claims
+ *  this file exists to keep honest, so they are worth asserting directly. */
+export function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
   // `stopped_reason` arrives on every `done` frame and, outside types and mocks, nothing read it.
   // So a turn that hit the step ceiling and stopped mid-task was pixel-for-pixel identical to one
   // that finished the work — the receipt drew nine badges and not the one that says whether to
@@ -326,6 +332,16 @@ function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
             n: done.memory_facts_used,
             layer: done.memory_layer ?? "",
           })}
+        </Badge>
+      ) : null}
+      {/* A durable fact was written. Shown because it outlives this conversation: it will be
+          recalled into every future one, and a change with that reach should not happen in
+          silence. The fact itself is in the title, not the badge — memory can hold a paragraph. */}
+      {done.memory_saved ? (
+        <Badge tone="ok" title={done.memory_saved}>
+          {done.memory_consolidated
+            ? t("code.chat.rememberedTidied", { n: done.memory_consolidated })
+            : t("code.chat.remembered")}
         </Badge>
       ) : null}
       {done.tainted ? (

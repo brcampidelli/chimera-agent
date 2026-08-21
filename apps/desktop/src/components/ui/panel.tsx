@@ -55,9 +55,23 @@ const tones: Record<Tone, string> = {
   accent: "bg-accent/15 text-accent ring-1 ring-accent/25",
 };
 
-export function Badge({ tone = "muted", children }: { tone?: Tone; children: ReactNode }) {
+export function Badge({
+  tone = "muted",
+  title,
+  children,
+}: {
+  tone?: Tone;
+  /** The long form of what the badge names — a saved fact, a full model slug. A badge is a chip and
+   *  the thing it stands for is often a sentence; without this the only way to read it is to go and
+   *  find it somewhere else. */
+  title?: string;
+  children: ReactNode;
+}) {
   return (
-    <span className={cn("rounded-chip px-2 py-0.5 text-xs font-medium", tones[tone])}>
+    <span
+      className={cn("rounded-chip px-2 py-0.5 text-xs font-medium", tones[tone])}
+      title={title}
+    >
       {children}
     </span>
   );
