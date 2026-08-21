@@ -12,6 +12,7 @@ reimplemented, because a second copy of that registry order is one waiting to dr
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -287,7 +288,12 @@ def test_a_project_with_no_verify_command_says_so_rather_than_staying_quiet(
     # check. Silence here reads as approval.
     client, _ = _editing_client(tmp_path, monkeypatch)
     verdict = _verdict(client.post("/api/code/turn", json={"message": "edit a.py"}))
-    assert verdict == {"command": None, "source": "none", "state": "none"}
+    assert verdict["command"] is None and verdict["source"] == "none"
+    assert verdict["state"] == "none"
+    # And the undo is still on the table. This is the case where it matters most — a project with
+    # no test command never reaches the "failed" branch, so under the old rule the snapshot was
+    # taken on every editing turn and thrown away on every editing turn.
+    assert verdict["revert_token"]
 
 
 def test_a_failing_verification_offers_an_undo_and_does_not_take_it(
@@ -306,6 +312,63 @@ def test_a_failing_verification_offers_an_undo_and_does_not_take_it(
 
     assert client.post(f"/api/code/revert/{verdict['revert_token']}").json()["ok"] is True
     assert not (ws / "a.py").exists()  # the snapshot predates the file
+
+
+def test_a_passing_verification_still_offers_the_undo(tmp_path: Path, monkeypatch: Any) -> None:
+    """A pass is not consent.
+
+    The Posture note promises outright: "What is guaranteed is the snapshot and the undo, not the
+    limits." The token was minted only when `state == "failed"`, so three of the four verdicts —
+    passed, abstained, and no command at all — took a snapshot and let it die with the request.
+
+    The check answers "does this still build". The button answers "do I want this", and only the
+    person reading the diff can.
+    """
+    client, ws = _editing_client(tmp_path, monkeypatch)
+    (ws / "tests").mkdir()
+    (ws / "tests" / "test_it.py").write_text(
+        "def test_it():\n    assert True\n", encoding="utf-8"
+    )
+
+    verdict = _verdict(client.post("/api/code/turn", json={"message": "edit a.py"}))
+
+    assert verdict["state"] == "passed"
+    assert verdict["revert_token"]
+    assert client.post(f"/api/code/revert/{verdict['revert_token']}").json()["ok"] is True
+    assert not (ws / "a.py").exists()
+
+
+def test_a_turn_that_edited_nothing_offers_no_undo(tmp_path: Path, monkeypatch: Any) -> None:
+    """Or the tests above would pass against a version that handed out a token on every turn.
+
+    A conversation that answered a question has nothing to undo, and an undo button over it would
+    invite someone to roll back a snapshot of work they did by hand.
+    """
+    from chimera.api import build_api_app
+
+    class _Answering(_ScriptedAgent):
+        """Same shape, but it never calls `on_edit` — a question, not a change."""
+
+        def run(self, task: str, **kw: Any) -> AgentResult:
+            kw.pop("on_edit", None)
+            return super().run(task, on_edit=None, **kw)
+
+    ws = tmp_path / "ws"
+    ws.mkdir(exist_ok=True)
+    import chimera.core
+
+    monkeypatch.setattr(chimera.core, "Agent", lambda *_a, **_k: _Answering(), raising=True)
+    client = TestClient(
+        build_api_app(
+            lambda: ChatSession(_ScriptedAgent()),
+            workspace=ws,
+            settings=Settings(CHIMERA_HOME=str(tmp_path / "home")),
+        )
+    )
+
+    frames = _frames(client.post("/api/code/turn", json={"message": "what does this do?"}))
+
+    assert not [payload for event, payload in frames if event == "verified"]
 
 
 def test_a_revert_token_is_single_use(tmp_path: Path, monkeypatch: Any) -> None:
@@ -466,3 +529,35 @@ def test_an_unpriced_turn_is_counted_but_never_priced_at_zero(
     # "unpriced" is the truth, and the summary keeps them apart.
     assert totals["usd"] == 0.0
     assert totals["unpriced_turns"] == 1
+
+
+def test_a_revert_says_whether_it_actually_removed_what_the_turn_created(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    """Inside a git repository, an undo puts content back and deletes nothing.
+
+    That is deliberate — a path bug once let a revert wipe a repo, so the delete-new pass refuses to
+    run anywhere inside one. But the screen said "Edits undone." over files that were still on
+    disk, which is the one sentence a reader acts on without checking.
+    """
+    client, ws = _editing_client(tmp_path, monkeypatch)
+    subprocess.run(["git", "init"], cwd=ws, capture_output=True, check=True)
+
+    token = _verdict(client.post("/api/code/turn", json={"message": "edit a.py"}))["revert_token"]
+    result = client.post(f"/api/code/revert/{token}").json()
+
+    assert result["ok"] is True
+    assert result["left_new_files"] is True
+    # And the created file really is still there, which is what makes the flag worth sending.
+    assert (ws / "a.py").exists()
+
+
+def test_outside_a_repo_the_undo_is_complete_and_says_so(tmp_path: Path, monkeypatch: Any) -> None:
+    """Or the test above would pass against a version that always hedged."""
+    client, ws = _editing_client(tmp_path, monkeypatch)
+
+    token = _verdict(client.post("/api/code/turn", json={"message": "edit a.py"}))["revert_token"]
+    result = client.post(f"/api/code/revert/{token}").json()
+
+    assert result["left_new_files"] is False
+    assert not (ws / "a.py").exists()

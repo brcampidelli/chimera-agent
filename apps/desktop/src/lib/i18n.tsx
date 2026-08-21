@@ -527,7 +527,7 @@ const en: Dict = {
     "Pause for my approval if the run reads untrusted content",
   "runs.pausedTitle": "Waiting for you",
   "runs.pausedNote":
-    "This run read untrusted content and stopped before finalizing. Nothing is saved until you decide.",
+    "This run read untrusted content and stopped before finalizing. Nothing is written to memory, no skill is learned and no receipt is filed until you decide — but the files the run already wrote are on disk.",
   "runs.pausedAnswer": "What it would finalize",
   "runs.accept": "Accept",
   "runs.editAnswer": "Accept an edited answer",
@@ -762,6 +762,8 @@ const en: Dict = {
     "Nothing checked these edits — this project has no verification command.",
   "code.chat.verdict.revert": "Undo these edits",
   "code.chat.verdict.reverted": "Edits undone.",
+  "code.chat.verdict.revertedPartly":
+    "Edits undone. Files this turn created are still there — inside a git repository nothing is deleted on an undo, so remove them yourself if you want them gone.",
   "code.chat.verdict.revertFailed": "Could not undo — that snapshot is gone.",
   "code.chat.verdict.fix": "Let the agent try to fix it",
   "code.posture.title": "Reach & approval",
@@ -1661,7 +1663,7 @@ const pt: Dict = {
     "Pausar para minha aprovação se a execução ler conteúdo não confiável",
   "runs.pausedTitle": "Esperando por você",
   "runs.pausedNote":
-    "Esta execução leu conteúdo não confiável e parou antes de finalizar. Nada é salvo até você decidir.",
+    "Esta execução leu conteúdo não confiável e parou antes de finalizar. Nada vai para a memória, nenhuma skill é aprendida e nenhum recibo é registrado até você decidir — mas os arquivos que a execução já escreveu estão em disco.",
   "runs.pausedAnswer": "O que ela finalizaria",
   "runs.accept": "Aceitar",
   "runs.editAnswer": "Aceitar uma resposta editada",
@@ -1899,6 +1901,8 @@ const pt: Dict = {
     "Nada verificou estas edições — este projeto não tem comando de verificação.",
   "code.chat.verdict.revert": "Desfazer estas edições",
   "code.chat.verdict.reverted": "Edições desfeitas.",
+  "code.chat.verdict.revertedPartly":
+    "Edições desfeitas. Os arquivos que este turno criou continuam aí — dentro de um repositório git nada é apagado ao desfazer, então remova você mesmo se quiser.",
   "code.chat.verdict.revertFailed":
     "Não deu para desfazer — aquele instantâneo já não existe.",
   "code.chat.verdict.fix": "Deixar o agente tentar corrigir",
@@ -2809,7 +2813,7 @@ const es: Dict = {
     "Pausar para mi aprobación si la ejecución lee contenido no confiable",
   "runs.pausedTitle": "Esperándote",
   "runs.pausedNote":
-    "Esta ejecución leyó contenido no confiable y se detuvo antes de finalizar. Nada se guarda hasta que decidas.",
+    "Esta ejecución leyó contenido no fiable y se detuvo antes de finalizar. Nada se escribe en la memoria, no se aprende ninguna habilidad y no se archiva ningún recibo hasta que decidas, pero los archivos que la ejecución ya escribió están en disco.",
   "runs.pausedAnswer": "Lo que finalizaría",
   "runs.accept": "Aceptar",
   "runs.editAnswer": "Aceptar una respuesta editada",
@@ -3047,6 +3051,8 @@ const es: Dict = {
     "Nada comprobó estas ediciones: este proyecto no tiene comando de verificación.",
   "code.chat.verdict.revert": "Deshacer estas ediciones",
   "code.chat.verdict.reverted": "Ediciones deshechas.",
+  "code.chat.verdict.revertedPartly":
+    "Ediciones deshechas. Los archivos que este turno creó siguen ahí: dentro de un repositorio git no se borra nada al deshacer, así que elimínalos tú si los quieres fuera.",
   "code.chat.verdict.revertFailed":
     "No se pudo deshacer: esa instantánea ya no existe.",
   "code.chat.verdict.fix": "Dejar que el agente intente arreglarlo",
@@ -3966,7 +3972,7 @@ const fr: Dict = {
     "Mettre en pause pour mon approbation si l'exécution lit du contenu non fiable",
   "runs.pausedTitle": "En attente de vous",
   "runs.pausedNote":
-    "Cette exécution a lu du contenu non fiable et s'est arrêtée avant de finaliser. Rien n'est enregistré tant que vous n'avez pas décidé.",
+    "Cette exécution a lu du contenu non fiable et s'est arrêtée avant de finaliser. Rien n'est écrit en mémoire, aucune compétence n'est apprise et aucun reçu n'est enregistré avant votre décision — mais les fichiers déjà écrits sont sur le disque.",
   "runs.pausedAnswer": "Ce qu'elle finaliserait",
   "runs.accept": "Accepter",
   "runs.editAnswer": "Accepter une réponse modifiée",
@@ -4209,6 +4215,8 @@ const fr: Dict = {
     "Rien n'a vérifié ces modifications — ce projet n'a pas de commande de vérification.",
   "code.chat.verdict.revert": "Annuler ces modifications",
   "code.chat.verdict.reverted": "Modifications annulées.",
+  "code.chat.verdict.revertedPartly":
+    "Modifications annulées. Les fichiers créés par ce tour sont toujours là — dans un dépôt git, rien n'est supprimé lors d'une annulation ; retirez-les vous-même si vous le souhaitez.",
   "code.chat.verdict.revertFailed":
     "Impossible d'annuler — cet instantané n'existe plus.",
   "code.chat.verdict.fix": "Laisser l'agent essayer de corriger",
@@ -5129,7 +5137,7 @@ const de: Dict = {
     "Für meine Freigabe pausieren, wenn der Lauf nicht vertrauenswürdige Inhalte liest",
   "runs.pausedTitle": "Wartet auf dich",
   "runs.pausedNote":
-    "Dieser Lauf hat nicht vertrauenswürdige Inhalte gelesen und vor dem Abschluss angehalten. Bis zu deiner Entscheidung wird nichts gespeichert.",
+    "Dieser Lauf hat nicht vertrauenswürdige Inhalte gelesen und vor dem Abschluss angehalten. Nichts wird ins Gedächtnis geschrieben, keine Fähigkeit gelernt und kein Beleg abgelegt, bis Sie entscheiden — die Dateien, die der Lauf bereits geschrieben hat, liegen aber auf der Platte.",
   "runs.pausedAnswer": "Was er abschließen würde",
   "runs.accept": "Annehmen",
   "runs.editAnswer": "Bearbeitete Antwort annehmen",
@@ -5371,6 +5379,8 @@ const de: Dict = {
     "Nichts hat diese Änderungen geprüft — dieses Projekt hat keinen Prüfbefehl.",
   "code.chat.verdict.revert": "Diese Änderungen zurücknehmen",
   "code.chat.verdict.reverted": "Änderungen zurückgenommen.",
+  "code.chat.verdict.revertedPartly":
+    "Änderungen zurückgenommen. Dateien, die dieser Zug angelegt hat, sind noch da — in einem Git-Repository wird beim Rückgängigmachen nichts gelöscht; entfernen Sie sie selbst, wenn Sie sie loswerden wollen.",
   "code.chat.verdict.revertFailed":
     "Zurücknehmen nicht möglich — dieser Schnappschuss ist weg.",
   "code.chat.verdict.fix": "Den Agenten es reparieren lassen",
@@ -6253,7 +6263,7 @@ const zh: Dict = {
   "runs.pauseOnTaint": "若运行读取了不可信内容，暂停并等待我批准",
   "runs.pausedTitle": "等待你的决定",
   "runs.pausedNote":
-    "本次运行读取了不可信内容，已在完成前停止。在你决定之前不会保存任何内容。",
+    "这次运行读到了不可信的内容，在收尾之前停住了。在你做出决定之前，不会写入记忆、不会学到技能、也不会归档任何凭据 —— 但这次运行已经写下的文件就在磁盘上。",
   "runs.pausedAnswer": "它将要提交的结果",
   "runs.accept": "接受",
   "runs.editAnswer": "接受修改后的回答",
@@ -6473,6 +6483,8 @@ const zh: Dict = {
     "没有任何东西检查过这些改动——这个项目没有验证命令。",
   "code.chat.verdict.revert": "撤销这些改动",
   "code.chat.verdict.reverted": "改动已撤销。",
+  "code.chat.verdict.revertedPartly":
+    "改动已撤销。这一轮新建的文件仍然在 —— 在 git 仓库里撤销不会删除任何东西，想清掉请自己删。",
   "code.chat.verdict.revertFailed": "无法撤销——那份快照已经没有了。",
   "code.chat.verdict.fix": "让智能体试着修好",
   "code.posture.title": "触及范围与批准",
@@ -7365,7 +7377,7 @@ const ja: Dict = {
   "runs.pauseOnTaint": "信頼できない内容を読んだ場合は承認のために一時停止する",
   "runs.pausedTitle": "あなたの判断待ち",
   "runs.pausedNote":
-    "この実行は信頼できない内容を読み、確定する前に停止しました。判断するまで何も保存されません。",
+    "この実行は信頼できない内容を読み、仕上げの前で止まりました。あなたが決めるまで、記憶には何も書かれず、スキルも学ばれず、レシートも残りません — ただし実行がすでに書いたファイルはディスク上にあります。",
   "runs.pausedAnswer": "確定される内容",
   "runs.accept": "承認",
   "runs.editAnswer": "修正した回答を承認",
@@ -7601,6 +7613,8 @@ const ja: Dict = {
     "この編集は何にも検証されていません — このプロジェクトに検証コマンドがありません。",
   "code.chat.verdict.revert": "この編集を取り消す",
   "code.chat.verdict.reverted": "編集を取り消しました。",
+  "code.chat.verdict.revertedPartly":
+    "編集を取り消しました。このターンが作成したファイルはそのまま残っています — git リポジトリの中では取り消しで何も削除しないので、消したい場合はご自分でどうぞ。",
   "code.chat.verdict.revertFailed":
     "取り消せません — そのスナップショットはもうありません。",
   "code.chat.verdict.fix": "エージェントに直させる",
@@ -8514,7 +8528,7 @@ const it: Dict = {
     "Metti in pausa per la mia approvazione se l'esecuzione legge contenuti non fidati",
   "runs.pausedTitle": "In attesa di te",
   "runs.pausedNote":
-    "Questa esecuzione ha letto contenuti non fidati e si è fermata prima di finalizzare. Nulla viene salvato finché non decidi.",
+    "Questa esecuzione ha letto contenuto non affidabile e si è fermata prima di finalizzare. Nulla viene scritto in memoria, nessuna abilità viene appresa e nessuna ricevuta viene archiviata finché non decidi — ma i file che l'esecuzione ha già scritto sono su disco.",
   "runs.pausedAnswer": "Cosa finalizzerebbe",
   "runs.accept": "Accetta",
   "runs.editAnswer": "Accetta una risposta modificata",
@@ -8753,6 +8767,8 @@ const it: Dict = {
     "Nulla ha verificato queste modifiche — questo progetto non ha un comando di verifica.",
   "code.chat.verdict.revert": "Annulla queste modifiche",
   "code.chat.verdict.reverted": "Modifiche annullate.",
+  "code.chat.verdict.revertedPartly":
+    "Modifiche annullate. I file creati da questo turno sono ancora lì: dentro un repository git nulla viene cancellato con un annulla, quindi rimuovili tu se li vuoi via.",
   "code.chat.verdict.revertFailed":
     "Non è stato possibile annullare — quello snapshot non c'è più.",
   "code.chat.verdict.fix": "Lascia che l'agente provi a correggere",
@@ -9666,7 +9682,7 @@ const pl: Dict = {
     "Wstrzymaj do mojej zgody, jeśli przebieg przeczyta niezaufaną treść",
   "runs.pausedTitle": "Czeka na ciebie",
   "runs.pausedNote":
-    "Ten przebieg przeczytał niezaufaną treść i zatrzymał się przed zatwierdzeniem. Nic nie zostanie zapisane, dopóki nie zdecydujesz.",
+    "Ten przebieg przeczytał niezaufaną treść i zatrzymał się przed sfinalizowaniem. Nic nie trafia do pamięci, żadna umiejętność nie jest uczona i żaden rachunek nie jest zapisywany, dopóki nie zdecydujesz — ale pliki, które przebieg już zapisał, są na dysku.",
   "runs.pausedAnswer": "Co by zatwierdził",
   "runs.accept": "Akceptuj",
   "runs.editAnswer": "Akceptuj poprawioną odpowiedź",
@@ -9904,6 +9920,8 @@ const pl: Dict = {
     "Nic nie sprawdziło tych zmian — ten projekt nie ma polecenia weryfikującego.",
   "code.chat.verdict.revert": "Cofnij te zmiany",
   "code.chat.verdict.reverted": "Zmiany cofnięte.",
+  "code.chat.verdict.revertedPartly":
+    "Zmiany cofnięte. Pliki utworzone w tej turze nadal tam są — w repozytorium git cofnięcie niczego nie usuwa, więc skasuj je sam, jeśli mają zniknąć.",
   "code.chat.verdict.revertFailed":
     "Nie udało się cofnąć — tamtego zrzutu już nie ma.",
   "code.chat.verdict.fix": "Niech agent spróbuje to naprawić",
@@ -10819,7 +10837,7 @@ const ru: Dict = {
     "Приостановить и спросить меня, если запуск прочитает недоверенное содержимое",
   "runs.pausedTitle": "Ждёт вас",
   "runs.pausedNote":
-    "Этот запуск прочитал недоверенное содержимое и остановился, не завершив работу. Ничего не сохраняется, пока вы не решите.",
+    "Этот запуск прочитал недоверенное содержимое и остановился, не завершившись. Пока вы не решите, ничего не пишется в память, навык не выучивается и квитанция не заводится — но файлы, которые запуск уже записал, лежат на диске.",
   "runs.pausedAnswer": "Что он собирается зафиксировать",
   "runs.accept": "Принять",
   "runs.editAnswer": "Принять изменённый ответ",
@@ -11058,6 +11076,8 @@ const ru: Dict = {
     "Эти правки никто не проверил — в проекте нет команды проверки.",
   "code.chat.verdict.revert": "Отменить эти правки",
   "code.chat.verdict.reverted": "Правки отменены.",
+  "code.chat.verdict.revertedPartly":
+    "Правки отменены. Файлы, созданные этим ходом, остались — внутри git-репозитория отмена ничего не удаляет, так что уберите их сами, если они не нужны.",
   "code.chat.verdict.revertFailed":
     "Не удалось отменить — этого снимка больше нет.",
   "code.chat.verdict.fix": "Дать агенту попробовать это починить",

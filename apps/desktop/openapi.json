@@ -7502,7 +7502,7 @@
     },
     "/api/code/revert/{token}": {
       "post": {
-        "description": "Undo an editing turn whose verification failed, if the user takes the offer.\n\nA token is single-use and dies with the process. An unknown one is ``{ok: false}`` rather\nthan a 404 \u2014 that is the state a second click hits, and a stale offer is not an error.",
+        "description": "Undo an editing turn, if the user takes the offer.\n\nAny editing turn, not only one whose verification failed. A check answers \"does this still\nbuild\"; the button answers \"do I want this\", and only the person reading the diff can.\n\nA token is single-use and dies with the process. An unknown one is ``{ok: false}`` rather\nthan a 404 \u2014 that is the state a second click hits, and a stale offer is not an error.",
         "operationId": "revert_turn_api_code_revert__token__post",
         "parameters": [
           {

@@ -184,7 +184,10 @@ export interface paths {
         put?: never;
         /**
          * Revert Turn
-         * @description Undo an editing turn whose verification failed, if the user takes the offer.
+         * @description Undo an editing turn, if the user takes the offer.
+         *
+         *     Any editing turn, not only one whose verification failed. A check answers "does this still
+         *     build"; the button answers "do I want this", and only the person reading the diff can.
          *
          *     A token is single-use and dies with the process. An unknown one is ``{ok: false}`` rather
          *     than a 404 — that is the state a second click hits, and a stale offer is not an error.

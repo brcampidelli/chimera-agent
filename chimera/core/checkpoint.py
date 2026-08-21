@@ -88,6 +88,23 @@ class WorkspaceGuard:
                 break
         return snap
 
+    def _skip_reasons(self, snapshot: FileSnapshot) -> tuple[bool, bool]:
+        """(truncated, in_git_repo) — the two conditions that disable the delete-new pass."""
+        return (
+            len(snapshot.present) >= self.max_files,
+            any((parent / ".git").exists() for parent in (self.workspace, *self.workspace.parents)),
+        )
+
+    def deletes_new_files(self, snapshot: FileSnapshot) -> bool:
+        """Would a restore remove files created since ``snapshot``?
+
+        Asked by callers that TELL somebody the turn was undone. It usually will not — a workspace
+        inside a git repository never runs the delete pass, which is most workspaces a person opens
+        in the app — and "Edits undone." over surviving new files is a report of something that did
+        not happen. The behaviour is deliberate and stays; only the claim about it changes.
+        """
+        return not any(self._skip_reasons(snapshot))
+
     def restore(self, snapshot: FileSnapshot) -> int:
         """Restore the workspace to ``snapshot``. Returns the number of changes."""
         changes = 0
@@ -104,10 +121,7 @@ class WorkspaceGuard:
         #     untracked work and — if the snapshot predates them — committed files, so a revert could
         #     wipe the repo. It has (bench harness, 2026-07-17). Refuse to delete anywhere inside a repo,
         #     unconditionally — checking ancestors too, not just the immediate directory.
-        truncated = len(snapshot.present) >= self.max_files
-        in_git_repo = any(
-            (parent / ".git").exists() for parent in (self.workspace, *self.workspace.parents)
-        )
+        truncated, in_git_repo = self._skip_reasons(snapshot)
         if truncated:
             _log.warning(
                 "snapshot truncated at %d files; skipping delete-new pass on restore to avoid "

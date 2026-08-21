@@ -76,6 +76,90 @@ describe("Code — the verdict on what a turn wrote", () => {
     await screen.findByText(/Edits undone/i);
   });
 
+  it("offers the undo on a turn that PASSED, because a pass is not consent", async () => {
+    // The token used to be minted only for `state === "failed"`, so three of the four verdicts —
+    // passed, abstained, and no command at all — took a snapshot and let it die with the request.
+    // Meanwhile the Posture note promised outright: "What is guaranteed is the snapshot and the
+    // undo, not the limits."
+    //
+    // The check answers "does this still build". The button answers "do I want this", and only the
+    // person reading the diff can.
+    vi.mocked(revertCodeTurn).mockResolvedValue({ ok: true, restored: 1 });
+    const user = await turnWith({
+      command: "python -m pytest -q",
+      source: "inferred:tests/",
+      state: "passed",
+      revert_token: "tok",
+    });
+
+    await user.click(await screen.findByRole("button", { name: /Undo these edits/i }));
+    await waitFor(() => expect(revertCodeTurn).toHaveBeenCalledWith("tok"));
+  });
+
+  it("offers the undo when there was no command to check with at all", async () => {
+    // The case where it matters most: a project with no test command never reaches the failed
+    // branch, so under the old rule the snapshot was taken and dropped on EVERY editing turn.
+    vi.mocked(revertCodeTurn).mockResolvedValue({ ok: true, restored: 2 });
+    const user = await turnWith({
+      command: null,
+      source: "none",
+      state: "none",
+      revert_token: "tok",
+    });
+
+    await screen.findByText(/no verification command/i);
+    await user.click(screen.getByRole("button", { name: /Undo these edits/i }));
+    await waitFor(() => expect(revertCodeTurn).toHaveBeenCalledWith("tok"));
+  });
+
+  it("offers no undo on a turn that wrote nothing", async () => {
+    // Or the two tests above would pass against a version that showed the button unconditionally,
+    // inviting someone to roll back a snapshot of work they did by hand.
+    await turnWith({ command: "python -m pytest -q", source: "inferred:tests/", state: "passed" });
+
+    await screen.findByText(/passed/i);
+    expect(screen.queryByRole("button", { name: /Undo these edits/i })).not.toBeInTheDocument();
+  });
+
+  it("does not call new files removed when they are still there", async () => {
+    // Inside a git repository the delete-new pass is skipped unconditionally — deliberately, after
+    // a path bug once let a revert wipe a repo — so a turn that CREATED a file leaves it behind.
+    // "Edits undone." over that describes a state the workspace is not in, and it is the one
+    // sentence a reader would act on without checking.
+    vi.mocked(revertCodeTurn).mockResolvedValue({
+      ok: true,
+      restored: 1,
+      left_new_files: true,
+    });
+    const user = await turnWith({
+      command: "python -m pytest -q",
+      source: "inferred:tests/",
+      state: "failed",
+      revert_token: "tok",
+    });
+
+    await user.click(await screen.findByRole("button", { name: /Undo these edits/i }));
+    await screen.findByText(/files this turn created are still there/i);
+  });
+
+  it("still says plainly undone when it really was", async () => {
+    // Or the test above would pass against a version that had started hedging on every undo.
+    vi.mocked(revertCodeTurn).mockResolvedValue({
+      ok: true,
+      restored: 1,
+      left_new_files: false,
+    });
+    const user = await turnWith({
+      command: "python -m pytest -q",
+      source: "inferred:tests/",
+      state: "failed",
+      revert_token: "tok",
+    });
+
+    await user.click(await screen.findByRole("button", { name: /Undo these edits/i }));
+    await screen.findByText(/^Edits undone\.$/i);
+  });
+
   it("reports a refused undo as edits still present, not as success", async () => {
     // The failure mode this guards is the worst kind of lie the screen could tell: saying the files
     // were restored when they were not.

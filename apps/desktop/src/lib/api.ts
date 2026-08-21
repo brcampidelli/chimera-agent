@@ -977,8 +977,17 @@ export async function transcribe(audio: Blob): Promise<Transcript> {
 
 /** Undo the edits of a turn whose verification failed. Single-use: the token is consumed by the
  *  server, so a second press cannot restore a snapshot the user has since typed on top of. */
-export async function revertCodeTurn(token: string): Promise<{ ok: boolean; restored: number }> {
-  return json<{ ok: boolean; restored: number }>(`/api/code/revert/${token}`, { method: "POST" });
+export async function revertCodeTurn(
+  token: string,
+): Promise<{ ok: boolean; restored: number; left_new_files?: boolean }> {
+  // `left_new_files`: the restore put the captured content back but did NOT remove files the turn
+  // created. Inside a git repository that pass is skipped unconditionally — deliberately, after a
+  // path bug once let a revert wipe a repo — which is most workspaces someone opens in this app.
+  // Optional so an older server, which sends neither field, is not read as `false`.
+  return json<{ ok: boolean; restored: number; left_new_files?: boolean }>(
+    `/api/code/revert/${token}`,
+    { method: "POST" },
+  );
 }
 
 /** Send one turn of a coding conversation and stream it. Mirrors {@link streamRun}: the SSE lives

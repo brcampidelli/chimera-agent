@@ -96,7 +96,7 @@ interface Exchange {
   /** The verdict on what this turn WROTE. Absent when the turn wrote nothing. */
   verified?: CodeVerified;
   /** Set once the offered undo was taken (or refused by the server) — the offer is single-use. */
-  undone?: "ok" | "gone";
+  undone?: "ok" | "partial" | "gone";
   /** Stopped by the Stop button. Distinct from `failed`: nothing went wrong, the user changed
    *  their mind — and distinct from a finished turn, which has a `done`. */
   abandoned?: boolean;
@@ -122,25 +122,59 @@ function Verdict({
   t,
 }: {
   v: CodeVerified;
-  undone?: "ok" | "gone";
+  undone?: "ok" | "partial" | "gone";
   onUndo: () => void;
   onFix: () => void;
   t: TFunc;
 }) {
-  if (v.state === "none")
-    return <p className="text-xs text-warn">{t("code.chat.verdict.none")}</p>;
   const cmd = v.command ?? "";
   const args = { cmd, src: v.source };
-  if (v.state === "abstained")
-    return (
-      <p className="text-xs text-warn">
-        {t("code.chat.verdict.abstained", args)}
+  // The undo offer belongs to "this turn edited files", not to "the check disliked them". It used
+  // to render only inside the failed branch, so a turn that passed, abstained, or ran in a project
+  // with no test command at all — which for many projects is every turn — had its snapshot taken
+  // and then dropped. A check answers "does this still build"; the button answers "do I want this",
+  // and only the person reading the diff can.
+  const undo =
+    undone ? (
+      <p
+        className={cn(
+          "text-xs",
+          undone === "ok" ? "text-ok" : undone === "partial" ? "text-warn" : "text-bad",
+        )}
+      >
+        {t(
+          undone === "ok"
+            ? "code.chat.verdict.reverted"
+            : undone === "partial"
+              ? "code.chat.verdict.revertedPartly"
+              : "code.chat.verdict.revertFailed",
+        )}
       </p>
-    );
-  if (v.state === "passed")
+    ) : v.revert_token ? (
+      <Button size="sm" variant="ghost" onClick={onUndo}>
+        <Undo2 className="h-3.5 w-3.5" /> {t("code.chat.verdict.revert")}
+      </Button>
+    ) : null;
+
+  if (v.state !== "failed")
     return (
-      <p className="text-xs text-ok">{t("code.chat.verdict.passed", args)}</p>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <p
+          className={cn(
+            "text-xs",
+            v.state === "passed" ? "text-ok" : "text-warn",
+          )}
+        >
+          {v.state === "none"
+            ? t("code.chat.verdict.none")
+            : v.state === "abstained"
+              ? t("code.chat.verdict.abstained", args)
+              : t("code.chat.verdict.passed", args)}
+        </p>
+        {undo}
+      </div>
     );
+
   return (
     <div className="space-y-1.5 rounded-chip border border-bad/40 p-2">
       <p className="text-xs text-bad">{t("code.chat.verdict.failed", args)}</p>
@@ -150,20 +184,10 @@ function Verdict({
         </pre>
       ) : null}
       {undone ? (
-        <p className={cn("text-xs", undone === "ok" ? "text-ok" : "text-bad")}>
-          {t(
-            undone === "ok"
-              ? "code.chat.verdict.reverted"
-              : "code.chat.verdict.revertFailed",
-          )}
-        </p>
+        undo
       ) : (
         <div className="flex flex-wrap gap-2">
-          {v.revert_token ? (
-            <Button size="sm" variant="ghost" onClick={onUndo}>
-              <Undo2 className="h-3.5 w-3.5" /> {t("code.chat.verdict.revert")}
-            </Button>
-          ) : null}
+          {undo}
           <Button size="sm" variant="ghost" onClick={onFix}>
             <ShieldCheck className="h-3.5 w-3.5" /> {t("code.chat.verdict.fix")}
           </Button>
@@ -807,9 +831,14 @@ export function Conversation({
   }
 
   async function undo(index: number, token: string) {
-    let outcome: "ok" | "gone" = "gone";
+    // Three outcomes, not two. "partial" is a restore that put the captured content back and left
+    // the files this turn CREATED where they are — which is what happens inside a git repository,
+    // and therefore what happens in most projects someone opens here. Reporting that as "Edits
+    // undone." describes a state the workspace is not in.
+    let outcome: "ok" | "partial" | "gone" = "gone";
     try {
-      outcome = (await revertCodeTurn(token)).ok ? "ok" : "gone";
+      const result = await revertCodeTurn(token);
+      outcome = !result.ok ? "gone" : result.left_new_files ? "partial" : "ok";
     } catch {
       // A failed call and a refused token mean the same thing to the user: the edits are still
       // there. Saying "gone" is the honest read of both, and it is the one that does not imply the
@@ -818,7 +847,7 @@ export function Conversation({
     setExchanges((prev) =>
       prev.map((e, j) => (j === index ? { ...e, undone: outcome } : e)),
     );
-    if (outcome === "ok") {
+    if (outcome !== "gone") {
       void qc.invalidateQueries({ queryKey: ["fs-file"] });
       void qc.invalidateQueries({ queryKey: ["git-status"] });
       onEdited();
