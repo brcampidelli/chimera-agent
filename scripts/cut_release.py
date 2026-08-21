@@ -21,7 +21,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -54,9 +56,15 @@ class Stop(SystemExit):
         super().__init__(f"\n  {message}\n")
 
 
-def run(*args: str, capture: bool = True) -> str:
+def run(*args: str, capture: bool = True, env: dict[str, str] | None = None) -> str:
     result = subprocess.run(
-        args, cwd=ROOT, capture_output=capture, text=True, check=False, encoding="utf-8"
+        args,
+        cwd=ROOT,
+        capture_output=capture,
+        text=True,
+        check=False,
+        encoding="utf-8",
+        env={**os.environ, **env} if env else None,
     )
     if result.returncode != 0:
         detail = (result.stderr or result.stdout or "").strip()
@@ -214,12 +222,53 @@ def check_only_expected_files_changed(version: str) -> list[str]:
     return changed
 
 
+def preflight() -> None:
+    """Everything this needs, checked before anything is written.
+
+    `gh` is not optional here — the pull request is the whole point, and `main` is protected so
+    there is no fallback path. Checking late means bumping six files, regenerating three snapshots
+    and only then finding out the release cannot be opened. Which is what happened the first time
+    this ran under WSL, where `gh` is simply not installed.
+    """
+    if shutil.which("gh") is None:
+        raise Stop(
+            "`gh` is not on PATH. This opens the pull request with it, and `main` is protected, "
+            "so there is no way to finish without it.\n"
+            "  If you are in WSL and gh is installed on the Windows side, run this from there."
+        )
+    if subprocess.run(["gh", "auth", "status"], capture_output=True, check=False).returncode != 0:
+        raise Stop("`gh` is installed but not logged in. Run `gh auth login` first.")
+
+
+def push_branch(branch: str) -> None:
+    """Push using gh's own credential helper, and never wait on a prompt.
+
+    Git on a machine with no credential helper does not fail — it BLOCKS, asking for a username on
+    a stdin nobody is watching, and a release script that hangs looks like a slow release. Two
+    changes: `gh auth git-credential` lends the token this script is already authenticated with
+    (passed as a helper, so it never appears in a command line or a process list), and
+    `GIT_TERMINAL_PROMPT=0` turns anything still unauthenticated into an error you can read.
+    """
+    run(
+        "git",
+        "-c",
+        "credential.helper=",  # drop whatever is configured, so the next one is the only one
+        "-c",
+        "credential.helper=!gh auth git-credential",
+        "push",
+        "-u",
+        "origin",
+        branch,
+        env={"GIT_TERMINAL_PROMPT": "0"},
+    )
+
+
 def open_pull_request(version: str, changed: list[str]) -> str:
     branch = f"release/{version}"
     run("git", "checkout", "-b", branch)
     run("git", "add", *changed)
     run("git", "commit", "-m", f"chore(release): {version}")
-    run("git", "push", "-u", "origin", branch)
+    push_branch(branch)
 
     body = (
         f"Version bump to `{version}` (`{semver(version)}` for the desktop shell).\n\n"
@@ -262,6 +311,7 @@ def main() -> None:
 
     version = args.version.strip()
     semver(version)  # validate before touching anything
+    preflight()
     check_clean_and_on_main()
 
     previous = current_version()

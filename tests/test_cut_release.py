@@ -138,3 +138,38 @@ def test_scratch_files_do_not_block_a_release(monkeypatch) -> None:
     assert "--untracked-files=no" in status, (
         "the guard must ignore untracked files, or it refuses on every real checkout"
     )
+
+
+def test_the_push_lends_gh_its_credentials_and_never_waits_on_a_prompt(monkeypatch) -> None:
+    """Git without a credential helper does not fail — it BLOCKS.
+
+    It asks for a username on a stdin nobody is watching, and a release script that hangs looks
+    like a slow release. That is exactly how the first two real cuts ended: the commit was made,
+    the push sat there, and the branch had to be pushed by hand from another shell.
+    """
+    calls: list[tuple[tuple[str, ...], dict]] = []
+
+    def fake_run(*args: str, capture: bool = True, env: dict | None = None) -> str:
+        calls.append((args, {"env": env}))
+        return ""
+
+    monkeypatch.setattr(cut_release, "run", fake_run)
+    cut_release.push_branch("release/0.48.0rc10")
+
+    args, extra = calls[0]
+    # Passed as a helper, so the token is never a command-line argument or a line in `ps`.
+    assert "credential.helper=!gh auth git-credential" in args
+    # And anything still unauthenticated becomes an error you can read instead of a wait.
+    assert extra["env"] == {"GIT_TERMINAL_PROMPT": "0"}
+    assert args[-1] == "release/0.48.0rc10"
+
+
+def test_it_checks_for_gh_before_writing_anything(monkeypatch) -> None:
+    monkeypatch.setattr(cut_release.shutil, "which", lambda _name: None)
+
+    with pytest.raises(SystemExit) as refused:
+        cut_release.preflight()
+
+    # Checking late means bumping six files and regenerating three snapshots before finding out
+    # the release cannot be opened at all — which is what the first WSL run did.
+    assert "gh" in str(refused.value)
