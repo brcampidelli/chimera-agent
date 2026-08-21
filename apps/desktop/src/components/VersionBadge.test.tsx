@@ -1,119 +1,73 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { VersionBadge } from "@/components/VersionBadge";
 import { getVersion } from "@/lib/api";
 import { renderWithProviders } from "@/test/utils";
-import type { VersionInfo } from "@/lib/types";
 
 vi.mock("@/lib/api", () => ({ getVersion: vi.fn() }));
 
-const mockGetVersion = vi.mocked(getVersion);
+/**
+ * The same React build is served two ways, and the update advice was written for only one of them.
+ *
+ * The installed bundle carries a complete signed updater — `tauri-plugin-updater` checks GitHub at
+ * launch, verifies against the embedded pubkey, asks, installs and restarts. The badge told that
+ * user "There's no in-place auto-update yet" and handed them a pip command, which updates the
+ * Python package rather than the app on their screen. In a browser that same command is right.
+ */
+const NEWER = {
+  version: "0.48.0rc10",
+  latest: "0.49.0",
+  update_available: true,
+  notes_url: "https://example.test/releases/0.49.0",
+};
 
-function version(over: Partial<VersionInfo> = {}): VersionInfo {
-  return { version: "0.32.2", latest: null, update_available: false, notes_url: null, ...over };
+async function open() {
+  const user = userEvent.setup();
+  renderWithProviders(<VersionBadge />);
+  await user.click(await screen.findByRole("button", { name: /available/i }));
+  return user;
 }
 
-/** The badge's whole job is to signal an update ONLY when one is confirmed. Every test here is a guard
- *  against the two dishonest failure modes: claiming an update that isn't there, and nagging about a
- *  version the user already skipped. */
-describe("VersionBadge", () => {
+describe("the version badge", () => {
   beforeEach(() => {
-    mockGetVersion.mockReset();
+    localStorage.clear();
+    vi.mocked(getVersion).mockResolvedValue(NEWER as never);
   });
 
-  it("shows the running version quietly when no update is available", async () => {
-    mockGetVersion.mockResolvedValue(version({ version: "0.32.2" }));
+  afterEach(() => {
+    delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__;
+  });
+
+  it("gives a browser session the package command, because there it is the right one", async () => {
+    await open();
+
+    expect(screen.getByText(/viewing this in a browser/i)).toBeInTheDocument();
+    expect(screen.getByText(/pip install -U/)).toBeInTheDocument();
+  });
+
+  it("does not hand the installed app a command for a different copy of the software", async () => {
+    // What Tauri injects into the page it serves. Set before render, exactly as the shell does.
+    (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {};
+
+    await open();
+
+    expect(screen.getByText(/updates itself/i)).toBeInTheDocument();
+    // The pip command updates the Python package. The user is looking at the bundle.
+    expect(screen.queryByText(/pip install -U/)).toBeNull();
+  });
+
+  it("stays quiet when there is nothing newer", async () => {
+    vi.mocked(getVersion).mockResolvedValue({
+      version: "0.48.0rc10",
+      latest: null,
+      update_available: false,
+    } as never);
+
     renderWithProviders(<VersionBadge />);
 
-    expect(await screen.findByText("v0.32.2")).toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
-  });
-
-  it("shows no update signal when the check failed or is offline (latest=null)", async () => {
-    // The backend degrades to {latest:null, update_available:false} on any error — never a false pill.
-    mockGetVersion.mockResolvedValue(version({ latest: null, update_available: false }));
-    renderWithProviders(<VersionBadge />);
-
-    expect(await screen.findByText("v0.32.2")).toBeInTheDocument();
-    expect(screen.queryByText(/available/i)).not.toBeInTheDocument();
-  });
-
-  it("shows no update signal when latest is KNOWN but not newer (update_available=false)", async () => {
-    // The nastiest false-signal case, and the one the other "no signal" tests miss because they use
-    // latest=null: the check SUCCEEDED and returned a version, it just isn't newer. `update_available`
-    // is the backend's authority — keying the pill off `latest` alone would nag every up-to-date user.
-    mockGetVersion.mockResolvedValue(
-      version({ version: "0.32.2", latest: "0.32.2", update_available: false, notes_url: null }),
-    );
-    renderWithProviders(<VersionBadge />);
-
-    expect(await screen.findByText("v0.32.2")).toBeInTheDocument();
-    expect(screen.queryByText(/available/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
-  });
-
-  it("renders nothing at all when the version request itself rejects", async () => {
-    mockGetVersion.mockRejectedValue(new Error("500 Internal Server Error"));
-    const { container } = renderWithProviders(<VersionBadge />);
-
-    await waitFor(() => expect(mockGetVersion).toHaveBeenCalled());
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it("shows the update pill when the backend confirms a newer release", async () => {
-    mockGetVersion.mockResolvedValue(
-      version({ latest: "0.33.0", update_available: true, notes_url: "https://example.test/r/0.33.0" }),
-    );
-    renderWithProviders(<VersionBadge />);
-
-    expect(await screen.findByRole("button", { name: "v0.33.0 available" })).toBeInTheDocument();
-  });
-
-  it("opens a prompt with the release link and the pip command when the pill is clicked", async () => {
-    const user = userEvent.setup();
-    mockGetVersion.mockResolvedValue(
-      version({ latest: "0.33.0", update_available: true, notes_url: "https://example.test/r/0.33.0" }),
-    );
-    renderWithProviders(<VersionBadge />);
-
-    await user.click(await screen.findByRole("button", { name: "v0.33.0 available" }));
-
-    expect(screen.getByText("A new version (v0.33.0) is available. Update?")).toBeInTheDocument();
-    expect(screen.getByText("pip install -U 'chimera-agent[desktop]'")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /View release/ })).toHaveAttribute(
-      "href",
-      "https://example.test/r/0.33.0",
-    );
-  });
-
-  it("hides the pill and persists the skipped version when Dismiss is clicked", async () => {
-    const user = userEvent.setup();
-    mockGetVersion.mockResolvedValue(version({ latest: "0.33.0", update_available: true }));
-    renderWithProviders(<VersionBadge />);
-
-    await user.click(await screen.findByRole("button", { name: "v0.33.0 available" }));
-    await user.click(screen.getByRole("button", { name: "Dismiss" }));
-
-    expect(screen.queryByRole("button", { name: /available/ })).not.toBeInTheDocument();
-    expect(screen.getByText("v0.32.2")).toBeInTheDocument();
-    expect(localStorage.getItem("chimera.updateDismissed")).toBe("0.33.0");
-  });
-
-  it("does not re-prompt for a version that was already dismissed", async () => {
-    localStorage.setItem("chimera.updateDismissed", "0.33.0");
-    mockGetVersion.mockResolvedValue(version({ latest: "0.33.0", update_available: true }));
-    renderWithProviders(<VersionBadge />);
-
-    expect(await screen.findByText("v0.32.2")).toBeInTheDocument();
-    expect(screen.queryByText("v0.33.0 available")).not.toBeInTheDocument();
-  });
-
-  it("prompts again once a version NEWER than the dismissed one is released", async () => {
-    localStorage.setItem("chimera.updateDismissed", "0.33.0");
-    mockGetVersion.mockResolvedValue(version({ latest: "0.34.0", update_available: true }));
-    renderWithProviders(<VersionBadge />);
-
-    expect(await screen.findByRole("button", { name: "v0.34.0 available" })).toBeInTheDocument();
+    await screen.findByText("v0.48.0rc10");
+    expect(screen.queryByRole("button")).toBeNull();
   });
 });

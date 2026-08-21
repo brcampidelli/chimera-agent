@@ -3,19 +3,28 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowUpCircle, Check, Copy, ExternalLink } from "lucide-react";
 import { getVersion } from "@/lib/api";
 import { useT } from "@/lib/i18n";
+import { isNativeShell } from "@/lib/shell";
 import { cn } from "@/lib/utils";
 
-// We link to the release and show the pip command — we deliberately do NOT auto-install in place. The
-// Tauri in-place updater is future work (see CHANGELOG); until then updating is a one-line pip command.
+// The pip command is right for a BROWSER session (`chimera app`), where the thing to update really
+// is the Python package. It is wrong inside the installed bundle, which ships a complete signed
+// updater — `tauri-plugin-updater` checks at launch, verifies against the embedded pubkey, asks,
+// installs and restarts — and where this command would update a package the user is not running.
+// The comment that used to sit here called that updater "future work"; it shipped.
 const PIP_CMD = "pip install -U 'chimera-agent[desktop]'";
 // Persist which version the user chose to skip, so we don't nag every launch for a version they passed on.
 const DISMISS_KEY = "chimera.updateDismissed";
 
 /** A low-key version indicator in the app chrome (bottom corner). When GitHub confirms a strictly-newer
  *  release it turns into a clickable accent pill — "v{latest} available" — opening a small dismissible
- *  prompt with the release link and the pip command (no in-place install; that's the Tauri updater,
- *  future work). Honest by construction: the backend only reports `update_available` when a newer
- *  release is CONFIRMED, so offline / any error just shows the quiet current version. */
+ *  prompt with the release link and, in a browser session, the pip command.
+ *
+ *  Inside the installed bundle it says what actually happens there instead: the native updater already
+ *  offered this release at launch, and it installs in place. Handing that user a pip command was
+ *  pointing them at a different copy of the software from the one on their screen.
+ *
+ *  Honest by construction: the backend only reports `update_available` when a newer release is
+ *  CONFIRMED, so offline / any error just shows the quiet current version. */
 export function VersionBadge() {
   const t = useT();
   const { data } = useQuery({
@@ -29,6 +38,7 @@ export function VersionBadge() {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [dismissed, setDismissed] = useState<string | null>(() => localStorage.getItem(DISMISS_KEY));
+  const native = isNativeShell();
 
   if (!data) return null;
 
@@ -63,17 +73,21 @@ export function VersionBadge() {
       {open && (
         <div className="surface absolute bottom-full right-0 mb-2 w-72 space-y-3 p-3 text-sm shadow-elev">
           <p className="text-foreground">{t("update.prompt", { latest })}</p>
-          <p className="text-xs text-muted-foreground">{t("update.howto")}</p>
-          <div className="flex items-center justify-between gap-2 rounded-chip bg-surface-2 px-2 py-1.5 ring-1 ring-hairline">
-            <code className="truncate font-mono text-xs text-muted-foreground">{PIP_CMD}</code>
-            <button
-              onClick={copy}
-              title={copied ? t("update.copied") : t("update.copy")}
-              className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
-            >
-              {copied ? <Check className="h-3.5 w-3.5 text-ok" /> : <Copy className="h-3.5 w-3.5" />}
-            </button>
-          </div>
+          <p className="text-xs text-muted-foreground">
+            {native ? t("update.howtoNative") : t("update.howto")}
+          </p>
+          {native ? null : (
+            <div className="flex items-center justify-between gap-2 rounded-chip bg-surface-2 px-2 py-1.5 ring-1 ring-hairline">
+              <code className="truncate font-mono text-xs text-muted-foreground">{PIP_CMD}</code>
+              <button
+                onClick={copy}
+                title={copied ? t("update.copied") : t("update.copy")}
+                className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {copied ? <Check className="h-3.5 w-3.5 text-ok" /> : <Copy className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+          )}
           <div className="flex items-center justify-between">
             {data.notes_url ? (
               <a
