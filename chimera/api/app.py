@@ -1027,6 +1027,10 @@ def build_api_app(
                     max_workers=max_workers,
                     timeout=live_settings().batch_timeout,
                 )
+                # On the Cost screen too. This endpoint runs N full agent loops with tools and
+                # wrote nothing to the usage log, so the one screen that answers "what has this
+                # cost me" reported a number that left out every batch the user had ever run.
+                _record_batch_spend(live_settings().home, batch_id, batch)
                 emit("batch_done", _agents_batch_dict(req, ws, batch))
             except Exception as exc:  # noqa: BLE001 — surfaced to the client as an error event
                 _log.warning("agents batch failed: %s", exc)
@@ -1940,6 +1944,37 @@ def _append_usage(report: Any, session_id: str, settings: Settings) -> None:
         append_usage(settings.home / "usage.jsonl", record)
     except Exception as exc:  # noqa: BLE001 — usage logging is best-effort, never fatal to a turn
         _log.debug("usage logging skipped: %s", exc)
+
+
+def _record_batch_spend(home: Path, batch_id: str, batch: Any) -> None:
+    """Put an agents batch on the Cost screen — every task, summed, under one session id.
+
+    Per batch rather than per task: the Cost screen groups by session, and N rows for one click
+    would read as N separate pieces of work the user did not do.
+    """
+    from chimera.api.usage import record_spend
+
+    # `.value` is the AgentResult; the IsolatedResult around it carries only the unit's fate.
+    # A task that crashed has `value is None` and no accounting to contribute.
+    results = [
+        r.value for r in (getattr(batch, "results", None) or []) if getattr(r, "value", None)
+    ]
+    priced = [r.usd for r in results if getattr(r, "usd", None) is not None]
+    if not results:
+        return
+    record_spend(
+        home,
+        session_id=f"agents:{batch_id}",
+        model=str(getattr(results[0], "model", "") or ""),
+        prompt_tokens=sum(int(getattr(r, "prompt_tokens", 0) or 0) for r in results),
+        completion_tokens=sum(int(getattr(r, "completion_tokens", 0) or 0) for r in results),
+        cache_read_tokens=sum(int(getattr(r, "cache_read_tokens", 0) or 0) for r in results),
+        cache_write_tokens=sum(int(getattr(r, "cache_write_tokens", 0) or 0) for r in results),
+        # None when ANY task could not be priced. A partial sum shown as the total is the failure
+        # this accounting exists to avoid.
+        usd=round(sum(priced), 6) if len(priced) == len(results) else None,
+        tools=sum(len(getattr(r, "tool_names", ()) or ()) for r in results),
+    )
 
 
 def _report_dict(report: Any, session_id: str, *, fused: bool = False) -> dict[str, Any]:

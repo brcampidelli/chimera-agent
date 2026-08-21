@@ -4,8 +4,13 @@ import { Loader2, Square } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cancelOrchestration, streamHierarchy, type HierarchyRunInput } from "@/lib/api";
-import { useT } from "@/lib/i18n";
-import { applyFrame, EMPTY_RUN, isRunning } from "@/lib/orchestration-run";
+import { useT, type TFunc } from "@/lib/i18n";
+import {
+  applyFrame,
+  EMPTY_RUN,
+  isRunning,
+  type OrchestrationState,
+} from "@/lib/orchestration-run";
 
 import { FellBackNote } from "./FellBackNote";
 import { RunStepper } from "./RunStepper";
@@ -113,8 +118,16 @@ export function HierarchyRun({
         </p>
       ) : null}
 
+      {/* A stopped run has a bill. The server sends `total_tokens` on cancel, the reducer stores
+          it, and it used to live only inside the `state.answer` branch — which is empty on
+          cancel, so the number arrived and was never rendered. The sentence above it said
+          "nothing was spent", while the Stop button's own tooltip two lines up said the
+          opposite and said it correctly. */}
       {state.cancelled ? (
-        <p className="text-sm text-muted-foreground">{t("orch.cancelled")}</p>
+        <section className="surface p-4">
+          <p className="text-sm text-muted-foreground">{t("orch.cancelled")}</p>
+          <Totals totals={state.totals} t={t} />
+        </section>
       ) : null}
 
       {state.answer ? (
@@ -122,19 +135,25 @@ export function HierarchyRun({
           <div className="prose-chimera text-sm">
             <Markdown>{state.answer}</Markdown>
           </div>
-          {state.totals ? (
-            <p className="mt-3 border-t border-hairline pt-3 text-xs tabular-nums text-muted-foreground">
-              {t("orch.tokens", { n: state.totals.tokens ?? 0 })}
-              {/* Only when there IS one. A counterfactual is an ESTIMATE of what one inline agent
-                  would have spent, and the word matters: printing a saving without it would read
-                  as a measurement of two runs that never both happened. */}
-              {state.totals.counterfactual
-                ? ` · ${t("orch.counterfactual", { n: state.totals.counterfactual })}`
-                : ""}
-            </p>
-          ) : null}
+          <Totals totals={state.totals} t={t} />
         </section>
       ) : null}
     </div>
+  );
+}
+
+/** What the run cost, under the answer or under the notice that there will not be one. */
+function Totals({ totals, t }: { totals: OrchestrationState["totals"]; t: TFunc }) {
+  if (!totals) return null;
+  return (
+    <p className="mt-3 border-t border-hairline pt-3 text-xs tabular-nums text-muted-foreground">
+      {t("orch.tokens", { n: totals.tokens ?? 0 })}
+      {/* Only when there IS one. A counterfactual is an ESTIMATE of what one inline agent would
+          have spent, and the word matters: printing a saving without it would read as a
+          measurement of two runs that never both happened. */}
+      {totals.counterfactual
+        ? ` · ${t("orch.counterfactual", { n: totals.counterfactual })}`
+        : ""}
+    </p>
   );
 }

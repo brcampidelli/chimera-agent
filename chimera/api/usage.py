@@ -42,6 +42,52 @@ def append_usage(path: Path, record: UsageRecord) -> None:
         handle.write(record.model_dump_json() + "\n")
 
 
+def record_spend(
+    home: Path,
+    *,
+    session_id: str,
+    model: str = "",
+    prompt_tokens: int | None = 0,
+    completion_tokens: int | None = 0,
+    cache_read_tokens: int | None = 0,
+    cache_write_tokens: int | None = 0,
+    usd: float | None = None,
+    tools: int = 0,
+    route_kind: str | None = None,
+) -> None:
+    """Log one spending call from anywhere, best-effort.
+
+    The Cost screen reads this file and reports what it finds as *the* spend. It was written by two
+    paths out of the many that call models — and one of those two, ``/api/chat/stream``, is a route
+    no screen in the app calls. So the dashboard reported one path's spending as the whole bill,
+    which is worse than an absent dashboard: an absent one is not consulted, and this one answered
+    a question with a number that was confidently too low.
+
+    Best-effort in the same way every other logging call here is: failing to record what a run cost
+    must never be the reason the run fails. The answer is the product.
+    """
+    from datetime import UTC, datetime
+
+    try:
+        append_usage(
+            Path(home) / "usage.jsonl",
+            UsageRecord(
+                ts=datetime.now(UTC).isoformat(),
+                session_id=session_id,
+                model=model or "",
+                prompt_tokens=prompt_tokens or 0,
+                completion_tokens=completion_tokens or 0,
+                cache_read_tokens=cache_read_tokens or 0,
+                cache_write_tokens=cache_write_tokens or 0,
+                usd=usd,
+                tools=tools,
+                route_kind=route_kind,
+            ),
+        )
+    except Exception as exc:  # noqa: BLE001 -- see the docstring
+        _log.debug("usage logging skipped: %s", exc)
+
+
 def load_usage(path: Path) -> list[UsageRecord]:
     """Load persisted usage records; malformed lines are skipped."""
     path = Path(path)
