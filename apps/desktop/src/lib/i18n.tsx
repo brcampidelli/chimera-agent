@@ -91,7 +91,7 @@ const en: Dict = {
   "tools.desc.http_get":
     "Fetch a URL with an HTTP GET and return status + body text.",
   "tools.desc.execute_code":
-    "Run a Python 3 code snippet in the sandbox and return its stdout/stderr.",
+    "Run a Python 3 code snippet and return its stdout/stderr. It runs in whatever sandbox is configured, which by default is THIS machine — not an isolated one.",
   "tools.desc.code_interpreter":
     "Run Python in a persistent session — variables and imports persist across calls. Pass reset=true to clear the session. Runs in-process (not sandboxed).",
   "tools.desc.read_document":
@@ -1216,7 +1216,7 @@ const pt: Dict = {
   "tools.desc.http_get":
     "Busca uma URL com um HTTP GET e devolve o status + o texto do corpo.",
   "tools.desc.execute_code":
-    "Roda um trecho de código Python 3 no sandbox e devolve o stdout/stderr.",
+    "Roda um trecho de código Python 3 e devolve stdout/stderr. Executa no sandbox que estiver configurado, que por padrão é ESTA máquina — não uma isolada.",
   "tools.desc.code_interpreter":
     "Roda Python numa sessão persistente — variáveis e imports sobrevivem entre as chamadas. Passe reset=true para limpar a sessão. Roda no próprio processo (sem sandbox).",
   "tools.desc.read_document":
@@ -2385,7 +2385,7 @@ const es: Dict = {
   "tools.desc.http_get":
     "Pide una URL con un HTTP GET y devuelve el estado + el texto del cuerpo.",
   "tools.desc.execute_code":
-    "Ejecuta un fragmento de código Python 3 en el sandbox y devuelve su stdout/stderr.",
+    "Ejecuta un fragmento de código Python 3 y devuelve su stdout/stderr. Corre en el sandbox que esté configurado, que por defecto es ESTA máquina, no una aislada.",
   "tools.desc.code_interpreter":
     "Ejecuta Python en una sesión persistente — las variables y los imports sobreviven entre llamadas. Pasa reset=true para limpiar la sesión. Se ejecuta en el propio proceso (sin sandbox).",
   "tools.desc.read_document":
@@ -3534,7 +3534,7 @@ const fr: Dict = {
   "tools.desc.http_get":
     "Récupère une URL par un HTTP GET et renvoie le statut + le texte du corps.",
   "tools.desc.execute_code":
-    "Exécute un extrait de code Python 3 dans le sandbox et renvoie ses stdout/stderr.",
+    "Exécute un extrait de code Python 3 et renvoie sa sortie standard et d'erreur. Il tourne dans le bac à sable configuré, qui par défaut est CETTE machine — pas une machine isolée.",
   "tools.desc.code_interpreter":
     "Exécute du Python dans une session persistante — les variables et les imports survivent d'un appel à l'autre. Passez reset=true pour vider la session. S'exécute dans le processus (pas de sandbox).",
   "tools.desc.read_document":
@@ -4693,7 +4693,7 @@ const de: Dict = {
   "tools.desc.http_get":
     "Ruft eine URL per HTTP GET ab und gibt Status + Body-Text zurück.",
   "tools.desc.execute_code":
-    "Führt in der Sandbox einen Code-Schnipsel in Python 3 aus und gibt dessen stdout/stderr zurück.",
+    "Führt ein Python-3-Codestück aus und gibt stdout/stderr zurück. Es läuft in der konfigurierten Sandbox, und das ist standardmäßig DIESER Rechner — kein isolierter.",
   "tools.desc.code_interpreter":
     "Führt Python in einer dauerhaften Sitzung aus — Variablen und Importe überdauern die einzelnen Aufrufe. Mit reset=true wird die Sitzung geleert. Läuft im Prozess (nicht in einer Sandbox).",
   "tools.desc.read_document":
@@ -5842,7 +5842,7 @@ const zh: Dict = {
     "在工作区目录中运行一条 shell 命令并返回其输出。谨慎使用：它可以修改系统。",
   "tools.desc.http_get": "用 HTTP GET 抓取一个 URL，返回状态码和正文文本。",
   "tools.desc.execute_code":
-    "在沙箱中运行一段 Python 3 代码，返回它的 stdout/stderr。",
+    "运行一段 Python 3 代码并返回它的 stdout/stderr。它在所配置的沙箱里运行，而默认的沙箱就是这台机器本身 —— 不是隔离环境。",
   "tools.desc.code_interpreter":
     "在持久会话中运行 Python——变量和 import 会在多次调用之间保留。传 reset=true 可以清空会话。在进程内运行（没有沙箱）。",
   "tools.desc.read_document":
@@ -6927,7 +6927,7 @@ const ja: Dict = {
   "tools.desc.http_get":
     "URL を HTTP GET で取得し、ステータスと本文テキストを返します。",
   "tools.desc.execute_code":
-    "Python 3 のコード片をサンドボックスで実行し、その stdout/stderr を返します。",
+    "Python 3 のコード片を実行し、stdout/stderr を返します。設定されたサンドボックスで動きますが、既定ではそれはこのマシン自身であり、隔離環境ではありません。",
   "tools.desc.code_interpreter":
     "永続セッションで Python を実行します — 変数と import は呼び出しをまたいで残ります。reset=true を渡すとセッションを消去できます。プロセス内で動きます（サンドボックスではありません）。",
   "tools.desc.read_document":
@@ -8031,7 +8031,7 @@ const it: Dict = {
   "tools.desc.http_get":
     "Richiede una URL con un HTTP GET e restituisce lo stato + il testo del corpo.",
   "tools.desc.execute_code":
-    "Esegue uno snippet di codice Python 3 nella sandbox e ne restituisce stdout/stderr.",
+    "Esegue uno spezzone di codice Python 3 e restituisce stdout/stderr. Gira nella sandbox configurata, che per impostazione predefinita è QUESTA macchina, non una isolata.",
   "tools.desc.code_interpreter":
     "Esegue Python in una sessione persistente — variabili e import sopravvivono tra una chiamata e l'altra. Passa reset=true per svuotare la sessione. Gira nel processo stesso (senza sandbox).",
   "tools.desc.read_document":
@@ -9183,7 +9183,7 @@ const pl: Dict = {
   "tools.desc.http_get":
     "Pobiera URL przez HTTP GET i zwraca status + tekst treści.",
   "tools.desc.execute_code":
-    "Uruchamia fragment kodu Python 3 w sandboxie i zwraca jego stdout/stderr.",
+    "Uruchamia fragment kodu Python 3 i zwraca stdout/stderr. Działa w skonfigurowanej piaskownicy, którą domyślnie jest TA maszyna — nie odizolowana.",
   "tools.desc.code_interpreter":
     "Uruchamia Pythona w trwałej sesji — zmienne i importy przeżywają kolejne wywołania. reset=true czyści sesję. Działa w tym samym procesie (bez sandboxa).",
   "tools.desc.read_document":
@@ -10327,7 +10327,7 @@ const ru: Dict = {
   "tools.desc.http_get":
     "Запрашивает URL через HTTP GET и возвращает статус и текст тела ответа.",
   "tools.desc.execute_code":
-    "Выполняет фрагмент кода на Python 3 в песочнице и возвращает его stdout/stderr.",
+    "Выполняет фрагмент кода на Python 3 и возвращает stdout/stderr. Работает в той песочнице, которая настроена, а по умолчанию это САМА эта машина — не изолированная.",
   "tools.desc.code_interpreter":
     "Выполняет Python в постоянной сессии — переменные и импорты сохраняются между вызовами. Передайте reset=true, чтобы очистить сессию. Работает внутри процесса (без песочницы).",
   "tools.desc.read_document":
