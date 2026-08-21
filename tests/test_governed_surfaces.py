@@ -341,6 +341,10 @@ def test_the_gate_does_not_demand_a_refactor_of_the_attended_commands() -> None:
         # The hierarchy's workers. Read-only and not request-configurable, but still assembled
         # through the governed path — an audit line has to be able to name this entry point too.
         ("api:hierarchy", "api/orchestration_api.py"),
+        # The crew's workers WRITE, each in its own worktree, under one shared taint ledger. Its
+        # own label rather than reusing the hierarchy's: an audit reading these counts has to be
+        # able to tell a read-only fan-out from a team editing files.
+        ("api:crew", "api/orchestration_api.py"),
     ],
 )
 def test_each_named_surface_is_declared(surface: str, module: str) -> None:
