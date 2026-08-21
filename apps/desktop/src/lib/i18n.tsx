@@ -1001,7 +1001,7 @@ const en: Dict = {
   "mcp.autoloadOff":
     "Autoload is off — configured servers are saved but not loaded into the agent. Turn on MCP autoload in Settings (needs a restart) to make their tools callable. Test proves a server is live either way.",
   "mcp.note":
-    "MCP tool output is untrusted — it's fenced and taint-tracked by governance. Test performs a real stdio connect; the connected badge appears only after it succeeds.",
+    "MCP tool output is untrusted, so it always arrives fenced as data — never as instructions. Taint-tracking is on top of that and needs “Guard the chat” in Settings. Test performs a real stdio connect; the connected badge appears only after it succeeds.",
   "mcp.namePlaceholder": "name (e.g. github)",
   "mcp.commandPlaceholder": "command (e.g. npx)",
   "mcp.argsPlaceholder":
@@ -2127,7 +2127,7 @@ const pt: Dict = {
   "mcp.autoloadOff":
     "O autoload está desligado — os servidores configurados são salvos, mas não carregados no agente. Ative o autoload de MCP nas Configurações (requer reinício) para tornar as ferramentas chamáveis. O Testar prova que um servidor está ativo de qualquer forma.",
   "mcp.note":
-    "A saída das ferramentas MCP é não confiável — é isolada e rastreada por taint pela governança. O Testar faz uma conexão stdio real; o selo de conectado só aparece após o sucesso.",
+    "A saída das ferramentas MCP não é confiável, então chega sempre cercada como dado — nunca como instrução. O rastreio de taint vem por cima disso e depende de “Guardar o chat” em Configurações. O Testar faz uma conexão stdio real; o selo de conectado só aparece após o sucesso.",
   "mcp.namePlaceholder": "nome (ex: github)",
   "mcp.commandPlaceholder": "comando (ex: npx)",
   "mcp.argsPlaceholder":
@@ -3264,7 +3264,7 @@ const es: Dict = {
   "mcp.autoloadOff":
     "El autoload está desactivado — los servidores configurados se guardan pero no se cargan en el agente. Activa el autoload de MCP en Ajustes (requiere reinicio) para que sus herramientas sean invocables. Probar demuestra que un servidor está activo en cualquier caso.",
   "mcp.note":
-    "La salida de las herramientas MCP no es de confianza — está aislada y rastreada por taint por la gobernanza. Probar hace una conexión stdio real; la insignia de conectado solo aparece tras el éxito.",
+    "La salida de las herramientas MCP no es de fiar, así que siempre llega acotada como dato — nunca como instrucción. El rastreo de taint va encima de eso y necesita “Proteger el chat” en Ajustes. Probar hace una conexión stdio real; el distintivo de conectado solo aparece tras lograrlo.",
   "mcp.namePlaceholder": "nombre (p. ej. github)",
   "mcp.commandPlaceholder": "comando (p. ej. npx)",
   "mcp.argsPlaceholder":
@@ -4412,7 +4412,7 @@ const fr: Dict = {
   "mcp.autoloadOff":
     "L'autoload est désactivé — les serveurs configurés sont enregistrés mais pas chargés dans l'agent. Activez l'autoload MCP dans les Paramètres (nécessite un redémarrage) pour rendre leurs outils appelables. Tester prouve qu'un serveur est actif dans tous les cas.",
   "mcp.note":
-    "La sortie des outils MCP n'est pas fiable — elle est cloisonnée et suivie par taint par la gouvernance. Tester effectue une vraie connexion stdio ; le badge connecté n'apparaît qu'après succès.",
+    "La sortie des outils MCP n'est pas fiable : elle arrive donc toujours cloisonnée comme donnée — jamais comme instruction. Le suivi de contamination vient par-dessus et exige « Protéger le chat » dans les Réglages. Tester effectue une vraie connexion stdio ; le badge connecté n'apparaît qu'en cas de succès.",
   "mcp.namePlaceholder": "nom (ex. github)",
   "mcp.commandPlaceholder": "commande (ex. npx)",
   "mcp.argsPlaceholder":
@@ -5561,7 +5561,7 @@ const de: Dict = {
   "mcp.autoloadOff":
     "Autoload ist aus — konfigurierte Server werden gespeichert, aber nicht in den Agenten geladen. Aktiviere MCP-Autoload in den Einstellungen (Neustart nötig), damit ihre Tools aufrufbar werden. Testen beweist ohnehin, dass ein Server live ist.",
   "mcp.note":
-    "Die Ausgabe von MCP-Tools ist nicht vertrauenswürdig — sie wird von der Governance eingezäunt und taint-verfolgt. Testen führt einen echten stdio-Verbindungsaufbau durch; das Verbunden-Abzeichen erscheint erst nach Erfolg.",
+    "Die Ausgabe von MCP-Werkzeugen ist nicht vertrauenswürdig und kommt deshalb immer als Daten eingezäunt an — nie als Anweisung. Die Taint-Verfolgung kommt obendrauf und braucht „Chat absichern“ in den Einstellungen. Testen stellt eine echte stdio-Verbindung her; das Verbunden-Abzeichen erscheint erst danach.",
   "mcp.namePlaceholder": "Name (z. B. github)",
   "mcp.commandPlaceholder": "Befehl (z. B. npx)",
   "mcp.argsPlaceholder":
@@ -6629,7 +6629,7 @@ const zh: Dict = {
   "mcp.autoloadOff":
     "自动加载已关闭 — 已配置的服务器会保存但不会加载到智能体中。在设置中开启 MCP 自动加载（需重启）以使其工具可调用。无论如何，测试都能证明服务器是否在线。",
   "mcp.note":
-    "MCP 工具的输出不可信 — 会被治理层隔离并进行污点追踪。测试会执行真实的 stdio 连接；仅在成功后才显示已连接标记。",
+    "MCP 工具的输出不可信，因此总是以数据的形式被围栏包住送达 —— 绝不作为指令。污点追踪在这之上，需要在设置里打开“守护对话”。测试会真正建立一次 stdio 连接；连接标记只在成功之后出现。",
   "mcp.namePlaceholder": "名称（例如 github）",
   "mcp.commandPlaceholder": "命令（例如 npx）",
   "mcp.argsPlaceholder":
@@ -7755,7 +7755,7 @@ const ja: Dict = {
   "mcp.autoloadOff":
     "オートロードはオフです — 設定済みサーバーは保存されますが、エージェントには読み込まれません。設定で MCP オートロードを有効にする（再起動が必要）とツールが呼び出し可能になります。テストはいずれにせよサーバーが稼働中か証明します。",
   "mcp.note":
-    "MCP ツールの出力は信頼できません — ガバナンスにより隔離・汚染追跡されます。テストは実際の stdio 接続を行い、接続済みバッジは成功後にのみ表示されます。",
+    "MCP ツールの出力は信頼できないため、つねにデータとして囲って渡されます — 指示としては決して扱いません。汚染追跡はその上に載るもので、設定の「チャットを守る」が必要です。テストは実際に stdio 接続を行い、接続済みの印は成功したあとにだけ表示されます。",
   "mcp.namePlaceholder": "名前（例: github）",
   "mcp.commandPlaceholder": "コマンド（例: npx）",
   "mcp.argsPlaceholder":
@@ -8898,7 +8898,7 @@ const it: Dict = {
   "mcp.autoloadOff":
     "Il caricamento automatico è spento — i server configurati sono salvati ma non caricati nell'agente. Attiva l'autoload MCP nelle Impostazioni (richiede un riavvio) per rendere i loro strumenti chiamabili. La prova dimostra comunque che un server è attivo.",
   "mcp.note":
-    'L\'output degli strumenti MCP non è fidato — è recintato e tracciato per contaminazione dalla governance. La prova esegue una vera connessione stdio; il badge "connesso" compare solo dopo che è riuscita.',
+    "L'output degli strumenti MCP non è affidabile, quindi arriva sempre recintato come dato — mai come istruzione. Il tracciamento del taint sta sopra a questo e richiede “Proteggi la chat” nelle Impostazioni. Il Test esegue una vera connessione stdio; il badge connesso appare solo dopo il successo.",
   "mcp.namePlaceholder": "nome (es. github)",
   "mcp.commandPlaceholder": "comando (es. npx)",
   "mcp.argsPlaceholder":
@@ -10031,7 +10031,7 @@ const pl: Dict = {
   "mcp.autoloadOff":
     "Automatyczne ładowanie jest wyłączone — skonfigurowane serwery są zapisane, ale nie wczytane do agenta. Włącz autoload MCP w Ustawieniach (wymaga restartu), żeby ich narzędzia dało się wywoływać. Test i tak dowodzi, że serwer żyje.",
   "mcp.note":
-    'Wyjście narzędzi MCP jest niezaufane — governance je ogradza i śledzi skażenie. Test wykonuje prawdziwe połączenie stdio; plakietka „połączony" pojawia się dopiero po jego powodzeniu.',
+    "Wyjście narzędzi MCP nie jest zaufane, więc zawsze trafia ogrodzone jako dane — nigdy jako instrukcja. Śledzenie skażenia jest ponad tym i wymaga „Chroń czat” w Ustawieniach. Test wykonuje prawdziwe połączenie stdio; plakietka połączenia pojawia się dopiero po powodzeniu.",
   "mcp.namePlaceholder": "nazwa (np. github)",
   "mcp.commandPlaceholder": "polecenie (np. npx)",
   "mcp.argsPlaceholder":
@@ -11171,7 +11171,7 @@ const ru: Dict = {
   "mcp.autoloadOff":
     "Автозагрузка выключена — настроенные серверы сохранены, но в агента не загружаются. Включите автозагрузку MCP в настройках (нужен перезапуск), чтобы их инструменты стали вызываемыми. Проверка в любом случае доказывает, что сервер жив.",
   "mcp.note":
-    "Вывод инструментов MCP недоверенный — он обособляется и отслеживается управлением как заражённый. Проверка выполняет настоящее подключение через stdio; отметка «подключён» появляется только после успеха.",
+    "Вывод инструментов MCP не заслуживает доверия, поэтому он всегда приходит огороженным как данные — никогда как инструкции. Отслеживание заражения идёт сверху и требует «Защищать чат» в настройках. «Проверить» выполняет настоящее stdio-подключение; отметка о связи появляется только после успеха.",
   "mcp.namePlaceholder": "имя (например, github)",
   "mcp.commandPlaceholder": "команда (например, npx)",
   "mcp.argsPlaceholder":
