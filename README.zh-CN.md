@@ -289,13 +289,13 @@ pip install 'chimera-agent[full]'     # 下面所有非 GPU 功能，一条命�
 | **一支专家智能体团队** | — | `chimera crew "你的任务" --mode supervisor` |
 | **把整个项目做到完成**（危险步骤前会暂停征询你） | — | `chimera project start spec.yaml -w .` |
 | **看图片**（视觉） | 密钥：Gemini 或 OpenAI | `chimera run --image photo.jpg "这是什么？" --model gemini/gemini-2.0-flash` |
-| **听音频**（语音 → 文字） | `[stt]` + ffmpeg | `chimera run "转写 meeting.mp3"` |
+| **听音频**（语音 → 文字） | `[stt]` + ffmpeg | `chimera agent "转写 meeting.mp3"` |
 | **说话**（文字 → 语音） | 密钥：ElevenLabs 或 OpenAI | 让任意任务“把这段读出来存到 speech.mp3” |
-| **读文档**（PDF、Word、Excel → 文字） | `[documents]` | `chimera run "总结 report.pdf"` |
-| **下载视频/音频**（YouTube 等 1000+ 网站） | `[media-dl]` + ffmpeg | `chimera run "下载 <url> 的音频"` |
-| **分析数据并画图** | `[data,viz]` | `chimera run "加载 sales.csv 并画月度收入图"` |
-| **网络搜索** | 密钥：Tavily | `chimera run "上网搜：最新的 Python 版本"` |
-| **读取并抓取真实网页**（真实浏览器） | — | `chimera run "打开 example.com 并告诉我标题"` |
+| **读文档**（PDF、Word、Excel → 文字） | `[documents]` | `chimera agent "总结 report.pdf"` |
+| **下载视频/音频**（YouTube 等 1000+ 网站） | `[media-dl]` + ffmpeg | `chimera agent "下载 <url> 的音频"` |
+| **分析数据并画图** | `[data,viz]` | `chimera agent "加载 sales.csv 并画月度收入图"` |
+| **网络搜索** | 密钥：Tavily | `chimera agent "上网搜：最新的 Python 版本"` |
+| **读取并抓取真实网页**（真实浏览器） | — | `chimera agent "打开 example.com 并告诉我标题"` |
 | **长期记忆** | — | `chimera memory add "..."` · `chimera memory search "..."` |
 | **自动学会可复用技能** | — | 在 `chimera solve` 过程中发生；用 `chimera skills-stats` 查看（`chimera skills` 列出内置的） |
 | **使用一张精选技能卡**（共 23 张，9 种语言） | — | `chimera skills-import skills/verify-before-claiming` |

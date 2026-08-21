@@ -18,7 +18,7 @@ dessus :
 ```bash
 ollama pull llama3.1                     # or qwen2.5, mistral, phi3, …
 export CHIMERA_MODEL=ollama/llama3.1     # the `ollama/` prefix = local, keyless
-chimera run "Summarise this file in 3 bullets" -w .
+chimera agent "Summarise this file in 3 bullets" -w .
 ```
 
 C'est tout — pas de `OPENROUTER_API_KEY`, pas de cloud. La barrière d'identifiants reconnaît
@@ -155,8 +155,8 @@ Deux outils intégrés transforment n'importe quelle page en données propres, p
   sélecteur n'a pas remplis.
 
 ```bash
-uv run chimera run "scrape https://news.ycombinator.com and summarize the top 5 stories"
-uv run chimera run "extract the fields title, price, availability from https://example.com/product --taint"
+uv run chimera agent "scrape https://news.ycombinator.com and summarize the top 5 stories"
+uv run chimera agent "extract the fields title, price, availability from https://example.com/product --taint"
 ```
 
 Pour des sites entiers, il y a deux verbes supplémentaires :
@@ -172,7 +172,7 @@ Pour des sites entiers, il y a deux verbes supplémentaires :
   suivant (`resume=true` par défaut).
 
 ```bash
-uv run chimera run "map https://docs.example.com then crawl the /guide section (max 20 pages) and summarize it"
+uv run chimera agent "map https://docs.example.com then crawl the /guide section (max 20 pages) and summarize it"
 ```
 
 Tout est clôturé comme donnée et contamine le run (c'est du contenu web non fiable), donc
@@ -189,7 +189,7 @@ pas) : l'outil `transcribe_audio` utilise le **faster-whisper** local si vous in
 
 ```bash
 uv sync --extra stt      # optional: local, offline transcription (heavier — downloads a model)
-uv run chimera run "transcribe meeting.m4a and give me 5 bullet-point action items"
+uv run chimera agent "transcribe meeting.m4a and give me 5 bullet-point action items"
 ```
 
 > Une note sur le périmètre, dans l'esprit honnête de ce projet : Chimera est un **agent**, pas
@@ -210,7 +210,7 @@ pytube). Opt-in ; l'extraction audio nécessite aussi `ffmpeg` dans le PATH :
 
 ```bash
 uv sync --extra media-dl
-uv run chimera run "download the audio of https://youtu.be/… then transcribe it and summarize"
+uv run chimera agent "download the audio of https://youtu.be/… then transcribe it and summarize"
 ```
 
 Se combine naturellement avec `transcribe_audio` ci-dessus : télécharger → transcrire →
@@ -225,7 +225,7 @@ explorer → modéliser → évaluer) que l'agent exécute ensuite.
 
 ```bash
 uv sync --extra data     # pandas + scikit-learn for the generated code
-uv run chimera run "use the data_analysis skill: predict churn from customers.csv and report accuracy"
+uv run chimera agent "use the data_analysis skill: predict churn from customers.csv and report accuracy"
 ```
 
 ## Génération d'images (hébergée ou entièrement locale)
@@ -238,7 +238,7 @@ clé OpenAI n'est présente.
 
 ```bash
 uv sync --extra imagegen-local     # pulls torch + diffusers; downloads multi-GB weights on first use
-CHIMERA_IMAGE_BACKEND=local uv run chimera run "generate an image of a fox in a snowy forest"
+CHIMERA_IMAGE_BACKEND=local uv run chimera agent "generate an image of a fox in a snowy forest"
 ```
 
 > Même périmètre honnête que ci-dessus : Chimera *exécute* un modèle de diffusion ici ; il n'en
@@ -262,7 +262,7 @@ workspace intégrées.
 
 ```bash
 uv sync --extra viz     # matplotlib + seaborn + plotly for the generated code
-uv run chimera run "use data_visualization: line chart of revenue.csv over time, save revenue.png"
+uv run chimera agent "use data_visualization: line chart of revenue.csv over time, save revenue.png"
 ```
 
 **2. L'outil `render_chart` — une spec Vega-Lite sûre et déclarative.** Une spec Vega-Lite est
@@ -273,7 +273,7 @@ HTML ne nécessite aucun extra** (elle embarque la spec + le CDN Vega) ; le PNG/
 l'extra optionnel `viz-vega` (`vl-convert-python`).
 
 ```bash
-uv run chimera run "build a Vega-Lite bar chart of {A:5,B:8,C:3} and render_chart it to chart.html"
+uv run chimera agent "build a Vega-Lite bar chart of {A:5,B:8,C:3} and render_chart it to chart.html"
 uv sync --extra viz-vega   # optional: static PNG/SVG rendering (heavy — Rust+V8 binary)
 ```
 

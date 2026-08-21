@@ -13,7 +13,7 @@ source_sha256: f08c31cf980c0d86795fe456d5f9ed6871b58325c9e429e93f48c71b6e998356
 ```bash
 ollama pull llama3.1                     # or qwen2.5, mistral, phi3, …
 export CHIMERA_MODEL=ollama/llama3.1     # the `ollama/` prefix = local, keyless
-chimera run "Summarise this file in 3 bullets" -w .
+chimera agent "Summarise this file in 3 bullets" -w .
 ```
 
 それだけです — `OPENROUTER_API_KEY` もクラウドも不要です。認証情報ゲートは `ollama/…`(および `ollama_chat/…`)をローカルランタイムとして認識し、通過させます。Ollamaを別の場所で実行している場合は、`CHIMERA_OLLAMA_BASE_URL=http://host:11434` を設定してください(デフォルトは `http://localhost:11434`)。
@@ -99,8 +99,8 @@ uv run chimera solve "Research 'on-device small language models 2026': web_searc
 - **`extract`** — 特定のフィールドを**検証済みJSON**として、安全に取り出します。`url`(または `content`)と `fields` のリスト(例: `["title", "price", "author"]`)を与えると、*それらのフィールドだけ*を返します。重要なのは、これがChimeraの**検疫リーダー**を通じてページを読むことです — 出力がスキーマ検証された、ツールを持たないモデルです — そのため、**ページに隠された指示がエージェントを乗っ取ることはできません**。これはFirecrawl/ScrapeGraphAIが与えてくれない安全保証です: 悪意のあるページが最悪でも返せるのは間違った値であり、新たな指示ではありません。大きなページはチャンク化されマージされ、すべてのフィールドが埋まった時点で早期に停止してコストを抑えます。**既知のページテンプレート**については、`selectors`(フィールド → CSS、例: `{"price": ".price", "link": "a.more::attr(href)"}`)を渡せば、それらのフィールドは**決定論的に抽出されます — 無料でLLM不要**。安全なLLMは、セレクターが埋めなかったフィールドにのみ使われます。
 
 ```bash
-uv run chimera run "scrape https://news.ycombinator.com and summarize the top 5 stories"
-uv run chimera run "extract the fields title, price, availability from https://example.com/product --taint"
+uv run chimera agent "scrape https://news.ycombinator.com and summarize the top 5 stories"
+uv run chimera agent "extract the fields title, price, availability from https://example.com/product --taint"
 ```
 
 サイト全体については、さらに2つの動詞があります。
@@ -109,7 +109,7 @@ uv run chimera run "extract the fields title, price, availability from https://e
 - **`crawl`** — シードURLからリンクを辿り、各ページのクリーンなMarkdownを返します。`limit` と `max_depth` によって制限され、デフォルトでは同一ドメインのみで、**robots.txtに準拠**します(`Disallow` と `Crawl-delay` に従います)。`include`/`exclude` はURLのglobパターンです。長いクロールは**再開可能**です: フロンティアはページごとにディスクへチェックポイントされるため、ページNで中断されたクロールは次回の実行でN+1から続行されます(デフォルトで `resume=true`)。
 
 ```bash
-uv run chimera run "map https://docs.example.com then crawl the /guide section (max 20 pages) and summarize it"
+uv run chimera agent "map https://docs.example.com then crawl the /guide section (max 20 pages) and summarize it"
 ```
 
 すべてはデータフェンスされ、実行を汚染します(信頼できないウェブコンテンツのため)。そのため `solve --taint --guard` がそれに対して行動する安全な方法です。オプションのFirecrawlフォールバックは、組み込みエンジンがページを取得できず、かつキーが設定されている場合*のみ*使われます — Chimeraはウェブの大部分を、外部サービスなしに自力でスクレイピングします。
@@ -120,7 +120,7 @@ Chimeraは音声をテキストに変換できます — 画像生成やテキ�
 
 ```bash
 uv sync --extra stt      # optional: local, offline transcription (heavier — downloads a model)
-uv run chimera run "transcribe meeting.m4a and give me 5 bullet-point action items"
+uv run chimera agent "transcribe meeting.m4a and give me 5 bullet-point action items"
 ```
 
 > このプロジェクトの正直な精神に則ったスコープについての注記: Chimeraは**エージェント**であり、モデルではありません。APIを呼ぶかコードサンドボックスでライブラリを実行することで、音声からテキストへの変換、画像生成、コンピュータビジョン、古典的なMLを*使う*ことはできますが、Whisper、Stable Diffusion、PyTorch、OpenCVを*再実装*することはしません(そして分別を持ってそうすることもできません)。データサイエンス/MLについては、`execute_code` サンドボックスがすでに、エージェントがscikit-learn、pandas、OpenCVなどに対してPythonを書いて実行することを可能にしています。オーケストレーションはエージェントを増強します。再実装は遅いコピーを生むだけです。
@@ -131,7 +131,7 @@ uv run chimera run "transcribe meeting.m4a and give me 5 bullet-point action ite
 
 ```bash
 uv sync --extra media-dl
-uv run chimera run "download the audio of https://youtu.be/… then transcribe it and summarize"
+uv run chimera agent "download the audio of https://youtu.be/… then transcribe it and summarize"
 ```
 
 上記の `transcribe_audio` と自然に組み合わさります: ダウンロード → 文字起こし → 要約、すべて1回の実行で。
@@ -142,7 +142,7 @@ Chimeraはscikit-learnを再実装しません — `execute_code` サンドボ�
 
 ```bash
 uv sync --extra data     # pandas + scikit-learn for the generated code
-uv run chimera run "use the data_analysis skill: predict churn from customers.csv and report accuracy"
+uv run chimera agent "use the data_analysis skill: predict churn from customers.csv and report accuracy"
 ```
 
 ## 画像生成(ホスト型または完全ローカル)
@@ -151,7 +151,7 @@ uv run chimera run "use the data_analysis skill: predict churn from customers.cs
 
 ```bash
 uv sync --extra imagegen-local     # pulls torch + diffusers; downloads multi-GB weights on first use
-CHIMERA_IMAGE_BACKEND=local uv run chimera run "generate an image of a fox in a snowy forest"
+CHIMERA_IMAGE_BACKEND=local uv run chimera agent "generate an image of a fox in a snowy forest"
 ```
 
 > 上記と同じ正直なスコープです: Chimeraはここで拡散モデルを*実行します*が、訓練はしません。動画生成(CogVideoなど)は意図的に組み込まれ**ていません** — それはヘビー級の訓練済みモデルであり、エージェントがベースに抱えるべきものではありません。必要な場合はホスト型APIを利用してください。コンピュータビジョン(OpenCV)は専用のツールを必要としません — エージェントはすでにコードサンドボックスで `import cv2` を行えます。
@@ -164,13 +164,13 @@ CHIMERA_IMAGE_BACKEND=local uv run chimera run "generate an image of a fox in a 
 
 ```bash
 uv sync --extra viz     # matplotlib + seaborn + plotly for the generated code
-uv run chimera run "use data_visualization: line chart of revenue.csv over time, save revenue.png"
+uv run chimera agent "use data_visualization: line chart of revenue.csv over time, save revenue.png"
 ```
 
 **2. `render_chart` ツール — 安全で宣言的なVega-Liteの仕様。** Vega-Liteの仕様は**コードではなく、不活性なJSONデータ**です: 検査可能で、スキーマ形状を持ち、再レンダリング可能です — Vega-Liteがカバーする標準的なチャート(棒/線/散布図/ヒストグラム/ヒートマップ/ファセット表示など)については、生成されたコードを実行するよりも強力なガバナンスの物語です。**HTML出力はエクストラ不要**です(仕様+Vega CDNを埋め込みます)。PNG/SVGはオプションの `viz-vega` エクストラ(`vl-convert-python`)を使います。
 
 ```bash
-uv run chimera run "build a Vega-Lite bar chart of {A:5,B:8,C:3} and render_chart it to chart.html"
+uv run chimera agent "build a Vega-Lite bar chart of {A:5,B:8,C:3} and render_chart it to chart.html"
 uv sync --extra viz-vega   # optional: static PNG/SVG rendering (heavy — Rust+V8 binary)
 ```
 

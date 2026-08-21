@@ -322,13 +322,13 @@ pip install 'chimera-agent[full]'     # все возможности ниже, 
 | **Команда агентов-специалистов** | — | `chimera crew "your task" --mode supervisor` |
 | **Довести целый проект до конца** (спрашивает перед рискованными шагами) | — | `chimera project start spec.yaml -w .` |
 | **Видеть изображения** (зрение) | key: Gemini или OpenAI | `chimera run --image photo.jpg "what's in this?" --model gemini/gemini-2.0-flash` |
-| **Слышать звук** (речь → текст) | `[stt]` + ffmpeg | `chimera run "transcribe meeting.mp3"` |
+| **Слышать звук** (речь → текст) | `[stt]` + ffmpeg | `chimera agent "transcribe meeting.mp3"` |
 | **Говорить** (текст → речь) | key: ElevenLabs или OpenAI | попросите любую задачу «прочитать это вслух в speech.mp3» |
-| **Читать документы** (PDF, Word, Excel → текст) | `[documents]` | `chimera run "summarize report.pdf"` |
-| **Скачивать видео и звук** (YouTube и 1000+ сайтов) | `[media-dl]` + ffmpeg | `chimera run "download the audio of <url>"` |
-| **Анализировать данные и строить графики** | `[data,viz]` | `chimera run "load sales.csv and chart monthly revenue"` |
-| **Искать в вебе** | key: Tavily | `chimera run "search the web: the latest Python version"` |
-| **Читать и собирать настоящие веб-страницы** (настоящий браузер) | — | `chimera run "open example.com and tell me the heading"` |
+| **Читать документы** (PDF, Word, Excel → текст) | `[documents]` | `chimera agent "summarize report.pdf"` |
+| **Скачивать видео и звук** (YouTube и 1000+ сайтов) | `[media-dl]` + ffmpeg | `chimera agent "download the audio of <url>"` |
+| **Анализировать данные и строить графики** | `[data,viz]` | `chimera agent "load sales.csv and chart monthly revenue"` |
+| **Искать в вебе** | key: Tavily | `chimera agent "search the web: the latest Python version"` |
+| **Читать и собирать настоящие веб-страницы** (настоящий браузер) | — | `chimera agent "open example.com and tell me the heading"` |
 | **Долговременная память** | — | `chimera memory add "..."` · `chimera memory search "..."` |
 | **Автоматически усваивать переиспользуемые навыки** | — | происходит во время `chimera solve`; список — командой `chimera skills-stats` (`chimera skills` показывает встроенные) |
 | **Взять отобранную карточку навыка** (их 23, на 9 языках) | — | `chimera skills-import skills/verify-before-claiming` |

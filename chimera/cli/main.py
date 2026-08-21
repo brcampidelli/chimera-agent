@@ -6384,5 +6384,73 @@ def meta(
     console.print(table)
 
 
+@app.command("find")
+def find_command(
+    query: str = typer.Argument(..., help="What you are looking for, in words."),
+    path: str = typer.Option(".", "--path", help="Repository to search."),
+    k: int = typer.Option(8, "--k", help="How many results."),
+    reindex: bool = typer.Option(False, "--reindex", help="Rebuild the index before searching."),
+) -> None:
+    """Search a repository by what code DOES, not by the string it contains.
+
+    `chimera/rag/` has been in the tree since 0.44.0 — symbol-level chunking over Python's AST, one
+    SQLite file with an FTS5 index, RRF fusion — measured, documented, and reachable from nothing.
+    A library with no entrance is a library nobody has. This is the entrance.
+
+    Keyword retrieval only, and that is stated rather than glossed: the semantic half needs an
+    embedder, none is wired, and the pre-registered baseline in `bench/rag/` says exactly what the
+    keyword half is worth on this repository — recall@10 of 0.4925 over 400 probes. Half the
+    answers are not in the top ten. Printing that beside the results is the difference between a
+    tool you can calibrate and one you learn to distrust.
+    """
+    from chimera.rag import ChunkStore, default_index_path, walk
+
+    root = Path(path).expanduser().resolve()
+    if not root.is_dir():
+        console.print(f"[red]{root} is not a directory[/red]")
+        raise typer.Exit(code=1)
+
+    index = default_index_path(get_settings().home, root)
+    store = ChunkStore(index)
+    try:
+        if reindex or store.stats()["chunks"] == 0:
+            with console.status("indexing..."):
+                n = store.replace_all(walk(root))
+            console.print(f"[dim]indexed {n} chunks from {root}[/dim]")
+        hits = store.search_keyword(query, k=k)
+        stats = store.stats()
+    finally:
+        store.close()
+
+    if not hits:
+        # Named, because "no results" from a stale index and "no results" from a repository that
+        # really does not contain this are different problems with the same empty screen.
+        console.print(
+            f"[dim]nothing matched in {stats['chunks']} chunks from {stats['files']} files. "
+            f"If the code moved since the index was built, try --reindex.[/dim]"
+        )
+        return
+
+    table = Table(title=repr(query), show_header=True, title_style="bold")
+    table.add_column("where", style="cyan", no_wrap=True)
+    table.add_column("what")
+    table.add_column("score", justify="right")
+    for hit in hits:
+        chunk = hit.chunk
+        table.add_row(
+            f"{chunk.path}:{chunk.start_line}",
+            chunk.symbol or f"[dim]{chunk.kind}[/dim]",
+            f"{hit.score:.3f}",
+        )
+    console.print(table)
+    # The number, every time. Measured on this repository, pre-registered before any embedder
+    # existed so it could not be chosen after seeing what looked good.
+    console.print(
+        "[dim]keyword retrieval only (no embedder wired). Measured on this repository: "
+        "recall@10 of 0.4925 over 400 probes — about half of what you look for is NOT in the "
+        "top ten.[/dim]"
+    )
+
+
 if __name__ == "__main__":
     app()

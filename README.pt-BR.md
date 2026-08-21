@@ -313,13 +313,13 @@ Prefere instalação enxuta? Mantenha `pip install chimera-agent` e adicione só
 | **Um time de agentes especialistas** | — | `chimera crew "sua tarefa" --mode supervisor` |
 | **Tocar um projeto inteiro até o fim** (pausa antes de passos arriscados) | — | `chimera project start spec.yaml -w .` |
 | **Ver imagens** (visão) | chave: Gemini ou OpenAI | `chimera run --image foto.jpg "o que há aqui?" --model gemini/gemini-2.0-flash` |
-| **Ouvir áudio** (fala → texto) | `[stt]` + ffmpeg | `chimera run "transcreva reuniao.mp3"` |
+| **Ouvir áudio** (fala → texto) | `[stt]` + ffmpeg | `chimera agent "transcreva reuniao.mp3"` |
 | **Falar** (texto → fala) | chave: ElevenLabs ou OpenAI | peça a qualquer tarefa "leia isto em voz alta para speech.mp3" |
-| **Ler documentos** (PDF, Word, Excel → texto) | `[documents]` | `chimera run "resuma relatorio.pdf"` |
-| **Baixar vídeo/áudio** (YouTube + 1000+ sites) | `[media-dl]` + ffmpeg | `chimera run "baixe o áudio de <url>"` |
-| **Analisar dados e fazer gráficos** | `[data,viz]` | `chimera run "carregue vendas.csv e faça um gráfico da receita mensal"` |
-| **Buscar na web** | chave: Tavily | `chimera run "busque na web: a versão mais recente do Python"` |
-| **Ler e raspar páginas web reais** (um navegador de verdade) | — | `chimera run "abra example.com e me diga o título"` |
+| **Ler documentos** (PDF, Word, Excel → texto) | `[documents]` | `chimera agent "resuma relatorio.pdf"` |
+| **Baixar vídeo/áudio** (YouTube + 1000+ sites) | `[media-dl]` + ffmpeg | `chimera agent "baixe o áudio de <url>"` |
+| **Analisar dados e fazer gráficos** | `[data,viz]` | `chimera agent "carregue vendas.csv e faça um gráfico da receita mensal"` |
+| **Buscar na web** | chave: Tavily | `chimera agent "busque na web: a versão mais recente do Python"` |
+| **Ler e raspar páginas web reais** (um navegador de verdade) | — | `chimera agent "abra example.com e me diga o título"` |
 | **Memória de longo prazo** | — | `chimera memory add "..."` · `chimera memory search "..."` |
 | **Aprender skills reutilizáveis sozinho** | — | acontece durante o `chimera solve`; liste com `chimera skills-stats` (o `chimera skills` lista as embutidas) |
 | **Usar um skill card curado** (são 23, em 9 idiomas) | — | `chimera skills-import skills/verify-before-claiming` |

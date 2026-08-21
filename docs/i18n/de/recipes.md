@@ -18,7 +18,7 @@ verweisen:
 ```bash
 ollama pull llama3.1                     # or qwen2.5, mistral, phi3, …
 export CHIMERA_MODEL=ollama/llama3.1     # the `ollama/` prefix = local, keyless
-chimera run "Summarise this file in 3 bullets" -w .
+chimera agent "Summarise this file in 3 bullets" -w .
 ```
 
 Das war's — kein `OPENROUTER_API_KEY`, keine Cloud. Das Credential-Gate erkennt `ollama/…` (und
@@ -155,8 +155,8 @@ nötig:
   genutzt wird, die ein Selektor nicht gefüllt hat.
 
 ```bash
-uv run chimera run "scrape https://news.ycombinator.com and summarize the top 5 stories"
-uv run chimera run "extract the fields title, price, availability from https://example.com/product --taint"
+uv run chimera agent "scrape https://news.ycombinator.com and summarize the top 5 stories"
+uv run chimera agent "extract the fields title, price, availability from https://example.com/product --taint"
 ```
 
 Für ganze Websites gibt es zwei weitere Verben:
@@ -172,7 +172,7 @@ Für ganze Websites gibt es zwei weitere Verben:
   ab N+1 weitermacht (`resume=true` standardmäßig).
 
 ```bash
-uv run chimera run "map https://docs.example.com then crawl the /guide section (max 20 pages) and summarize it"
+uv run chimera agent "map https://docs.example.com then crawl the /guide section (max 20 pages) and summarize it"
 ```
 
 Alles ist data-fenced und kontaminiert den Lauf (es ist nicht vertrauenswürdiger Webinhalt),
@@ -190,7 +190,7 @@ OpenAI-Key):
 
 ```bash
 uv sync --extra stt      # optional: local, offline transcription (heavier — downloads a model)
-uv run chimera run "transcribe meeting.m4a and give me 5 bullet-point action items"
+uv run chimera agent "transcribe meeting.m4a and give me 5 bullet-point action items"
 ```
 
 > Eine Anmerkung zum Umfang, im ehrlichen Geist dieses Projekts: Chimera ist ein **Agent**, kein
@@ -211,7 +211,7 @@ Opt-in; Audio-Extraktion braucht außerdem `ffmpeg` im PATH:
 
 ```bash
 uv sync --extra media-dl
-uv run chimera run "download the audio of https://youtu.be/… then transcribe it and summarize"
+uv run chimera agent "download the audio of https://youtu.be/… then transcribe it and summarize"
 ```
 
 Passt natürlich zu `transcribe_audio` von oben: herunterladen → transkribieren →
@@ -227,7 +227,7 @@ ausführt.
 
 ```bash
 uv sync --extra data     # pandas + scikit-learn for the generated code
-uv run chimera run "use the data_analysis skill: predict churn from customers.csv and report accuracy"
+uv run chimera agent "use the data_analysis skill: predict churn from customers.csv and report accuracy"
 ```
 
 ## Bildgenerierung (gehostet oder vollständig lokal)
@@ -240,7 +240,7 @@ OpenAI-Key vorhanden ist.
 
 ```bash
 uv sync --extra imagegen-local     # pulls torch + diffusers; downloads multi-GB weights on first use
-CHIMERA_IMAGE_BACKEND=local uv run chimera run "generate an image of a fox in a snowy forest"
+CHIMERA_IMAGE_BACKEND=local uv run chimera agent "generate an image of a fox in a snowy forest"
 ```
 
 > Derselbe ehrliche Umfang wie oben: Chimera *führt* hier ein Diffusionsmodell *aus*; es
@@ -262,7 +262,7 @@ Speichern-im-Workspace-Disziplin eingebacken.
 
 ```bash
 uv sync --extra viz     # matplotlib + seaborn + plotly for the generated code
-uv run chimera run "use data_visualization: line chart of revenue.csv over time, save revenue.png"
+uv run chimera agent "use data_visualization: line chart of revenue.csv over time, save revenue.png"
 ```
 
 **2. Das `render_chart`-Tool — eine sichere, deklarative Vega-Lite-Spec.** Eine Vega-Lite-Spec
@@ -273,7 +273,7 @@ braucht kein Extra** (bettet die Spec + das Vega-CDN ein); PNG/SVG nutzen das op
 `viz-vega`-Extra (`vl-convert-python`).
 
 ```bash
-uv run chimera run "build a Vega-Lite bar chart of {A:5,B:8,C:3} and render_chart it to chart.html"
+uv run chimera agent "build a Vega-Lite bar chart of {A:5,B:8,C:3} and render_chart it to chart.html"
 uv sync --extra viz-vega   # optional: static PNG/SVG rendering (heavy — Rust+V8 binary)
 ```
 

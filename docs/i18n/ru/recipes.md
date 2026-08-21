@@ -17,7 +17,7 @@ source_sha256: f08c31cf980c0d86795fe456d5f9ed6871b58325c9e429e93f48c71b6e998356
 ```bash
 ollama pull llama3.1                     # or qwen2.5, mistral, phi3, …
 export CHIMERA_MODEL=ollama/llama3.1     # the `ollama/` prefix = local, keyless
-chimera run "Summarise this file in 3 bullets" -w .
+chimera agent "Summarise this file in 3 bullets" -w .
 ```
 
 Вот и всё — ни `OPENROUTER_API_KEY`, ни облака. Проверка учётных данных распознаёт `ollama/…` (и
@@ -147,8 +147,8 @@ uv run chimera solve "Research 'on-device small language models 2026': web_searc
   которые селектор не заполнил.
 
 ```bash
-uv run chimera run "scrape https://news.ycombinator.com and summarize the top 5 stories"
-uv run chimera run "extract the fields title, price, availability from https://example.com/product --taint"
+uv run chimera agent "scrape https://news.ycombinator.com and summarize the top 5 stories"
+uv run chimera agent "extract the fields title, price, availability from https://example.com/product --taint"
 ```
 
 Для целых сайтов есть ещё два действия:
@@ -163,7 +163,7 @@ uv run chimera run "extract the fields title, price, availability from https://e
   странице N, при следующем запуске продолжится с N+1 (`resume=true` по умолчанию).
 
 ```bash
-uv run chimera run "map https://docs.example.com then crawl the /guide section (max 20 pages) and summarize it"
+uv run chimera agent "map https://docs.example.com then crawl the /guide section (max 20 pages) and summarize it"
 ```
 
 Всё обособляется как данные и заражает запуск (это недоверенное содержимое из веба), поэтому
@@ -180,7 +180,7 @@ Chimera умеет превращать речь в текст — это сим
 
 ```bash
 uv sync --extra stt      # optional: local, offline transcription (heavier — downloads a model)
-uv run chimera run "transcribe meeting.m4a and give me 5 bullet-point action items"
+uv run chimera agent "transcribe meeting.m4a and give me 5 bullet-point action items"
 ```
 
 > Замечание об охвате, в честном духе этого проекта: Chimera — **агент**, а не модель. Она может
@@ -200,7 +200,7 @@ pytube). Включается по желанию; для извлечения �
 
 ```bash
 uv sync --extra media-dl
-uv run chimera run "download the audio of https://youtu.be/… then transcribe it and summarize"
+uv run chimera agent "download the audio of https://youtu.be/… then transcribe it and summarize"
 ```
 
 Естественно сочетается с `transcribe_audio` выше: скачать → расшифровать → изложить, всё за один
@@ -215,7 +215,7 @@ Chimera не переписывает scikit-learn — она **пишет пр�
 
 ```bash
 uv sync --extra data     # pandas + scikit-learn for the generated code
-uv run chimera run "use the data_analysis skill: predict churn from customers.csv and report accuracy"
+uv run chimera agent "use the data_analysis skill: predict churn from customers.csv and report accuracy"
 ```
 
 ## Генерация изображений (в облаке или полностью локально)
@@ -228,7 +228,7 @@ OpenAI.
 
 ```bash
 uv sync --extra imagegen-local     # pulls torch + diffusers; downloads multi-GB weights on first use
-CHIMERA_IMAGE_BACKEND=local uv run chimera run "generate an image of a fox in a snowy forest"
+CHIMERA_IMAGE_BACKEND=local uv run chimera agent "generate an image of a fox in a snowy forest"
 ```
 
 > Тот же честный охват, что и выше: здесь Chimera *запускает* диффузионную модель, но не обучает её.
@@ -249,7 +249,7 @@ matplotlib и seaborn (статичный PNG или SVG) либо на plotly (
 
 ```bash
 uv sync --extra viz     # matplotlib + seaborn + plotly for the generated code
-uv run chimera run "use data_visualization: line chart of revenue.csv over time, save revenue.png"
+uv run chimera agent "use data_visualization: line chart of revenue.csv over time, save revenue.png"
 ```
 
 **2. Инструмент `render_chart` — безопасная декларативная спецификация Vega-Lite.** Спецификация
@@ -260,7 +260,7 @@ Vega-Lite — это **инертные данные JSON, а не код**: и�
 Vega); PNG и SVG используют необязательное дополнение `viz-vega` (`vl-convert-python`).
 
 ```bash
-uv run chimera run "build a Vega-Lite bar chart of {A:5,B:8,C:3} and render_chart it to chart.html"
+uv run chimera agent "build a Vega-Lite bar chart of {A:5,B:8,C:3} and render_chart it to chart.html"
 uv sync --extra viz-vega   # optional: static PNG/SVG rendering (heavy — Rust+V8 binary)
 ```
 
