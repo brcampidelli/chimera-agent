@@ -2,10 +2,12 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { previewHierarchy, type HierarchyRunInput } from "@/lib/api";
+import { previewHierarchy, type CrewRunInput, type HierarchyRunInput } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import type { HierarchyPreview } from "@/lib/types";
 
+import { CrewForm } from "./CrewForm";
+import { CrewRun } from "./CrewRun";
 import { HierarchyRun } from "./HierarchyRun";
 import { PlanPreview } from "./PlanPreview";
 
@@ -32,12 +34,20 @@ export function Orchestration({
   // A confirmed run, keyed by when it was confirmed: handing HierarchyRun a new key makes a new
   // run a new component instead of a re-run of the last one.
   const [run, setRun] = useState<{ at: number; request: HierarchyRunInput } | null>(null);
+  // Two states, not one: the form is open (you are choosing the crew) or a crew is running.
+  // Collapsing them would make the form vanish the instant Run is pressed, taking the roles you
+  // just wrote with it — and that is exactly the state you want back when the check turns out
+  // to be the thing that was wrong.
+  const [crewOpen, setCrewOpen] = useState(false);
+  const [crew, setCrew] = useState<{ at: number; request: CrewRunInput } | null>(null);
 
   async function seePlan() {
     if (!task.trim()) return;
     setPlanning(true);
     setError("");
     setRun(null);
+    setCrew(null);
+    setCrewOpen(false);
     // Cleared before the request, not after it. Leaving the previous plan up while a new one
     // loads shows a decomposition for the PREVIOUS task next to the current text — and the
     // decompose call takes long enough for someone to read it and act on it.
@@ -93,11 +103,12 @@ export function Orchestration({
         {error ? <p className="text-xs text-bad">{error}</p> : null}
       </div>
 
-      {plan && !run ? (
+      {plan && !run && !crew ? (
         <PlanPreview
           plan={plan}
           running={planning}
           onOpenCode={onOpenCode}
+          onCrew={() => setCrewOpen(true)}
           // The id travels with the run, so what executes is the split shown above rather than a
           // fresh one. Without it the approval on this screen would be approval of nothing.
           onRun={() =>
@@ -106,7 +117,20 @@ export function Orchestration({
         />
       ) : null}
 
+      {crewOpen && !crew ? (
+        <CrewForm
+          running={planning}
+          onRun={(workers, verify) =>
+            setCrew({
+              at: Date.now(),
+              request: { task, workspace, workers, verify: verify || null },
+            })
+          }
+        />
+      ) : null}
+
       {run ? <HierarchyRun key={run.at} request={run.request} onOpenCode={onOpenCode} /> : null}
+      {crew ? <CrewRun key={crew.at} request={crew.request} /> : null}
     </div>
   );
 }

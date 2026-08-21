@@ -385,6 +385,25 @@ class OrchestrationFramesOut(BaseModel):
 # ---------------------------------------------------------------------------------------------
 
 
+def _resolve_workspace(requested: str | None, fallback: Path) -> Path:
+    """The folder a run works in, or a 400 saying which one was not there.
+
+    `Path.resolve()` does not check anything: given a path this OS cannot parse it produces a
+    plausible-looking absolute path by joining it to the process directory. A Windows path handed
+    to a Linux backend became
+    a path like `/opt/chimera/` with the Windows path glued onto the end, so the crew ran
+    against a directory that did not exist, and every
+    worker was reported as "your check failed" — sending someone to look for a bug in code that
+    was never read. Fail here, naming the path, instead of three layers down wearing a disguise.
+    """
+    if not requested:
+        return fallback
+    candidate = Path(requested).expanduser()
+    if not candidate.is_dir():
+        raise HTTPException(status_code=400, detail=f"workspace not found: {requested}")
+    return candidate.resolve()
+
+
 def _remember(plan: Any) -> str:
     """Keep a decomposition so the run can execute the plan that was shown, and bound the store."""
     if not plan.specs:
@@ -471,7 +490,7 @@ def register_orchestration_api(
         gateway = backend_factory() if backend_factory is not None else LLMGateway()
         # The request's folder, or the app's. Resolved once, here, so the preview and the run
         # cannot end up rooted differently.
-        ws = Path(req.workspace).expanduser().resolve() if req.workspace else workspace
+        ws = _resolve_workspace(req.workspace, workspace)
         fuse = getattr(req, "fuse", True)
         return HierarchicalOrchestrator(
             gateway,
@@ -545,6 +564,10 @@ def register_orchestration_api(
         """
         if not req.task.strip():
             raise HTTPException(status_code=400, detail="no task")
+        # Checked HERE, before the stream opens, and not where `_build` needs it: once the SSE
+        # response has been handed back the status code is already 200, and a missing folder can
+        # only arrive as an error frame — a failure dressed as a run that started.
+        _resolve_workspace(req.workspace, workspace)
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue[tuple[str, Any] | None] = asyncio.Queue()
         run_id = uuid.uuid4().hex
@@ -626,7 +649,7 @@ def register_orchestration_api(
             # collapse into one card and report each other's results.
             raise HTTPException(status_code=400, detail="worker names must be distinct and non-empty")
 
-        ws = Path(req.workspace).expanduser().resolve() if req.workspace else workspace
+        ws = _resolve_workspace(req.workspace, workspace)
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue[tuple[str, Any] | None] = asyncio.Queue()
         run_id = uuid.uuid4().hex

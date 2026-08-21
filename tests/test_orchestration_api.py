@@ -415,10 +415,50 @@ def test_the_crew_frame_shapes_are_published(
 def test_the_crew_governs_what_its_workers_may_touch(
     app_and_backend: tuple[TestClient, FakeBackend],
 ) -> None:
-    from chimera.api.orchestration_api import CrewRunIn
     from chimera.api.code_api import CodeSeams
+    from chimera.api.orchestration_api import CrewRunIn
 
     # `HierarchyRunIn` declined to inherit CodeSeams and said in its docstring that CrewRunIn
     # would, "because those workers really do write files". This is that promise, as a test.
     assert issubclass(CrewRunIn, CodeSeams)
     assert "write_region" in CrewRunIn.model_fields
+
+
+def test_a_folder_that_is_not_there_is_refused_by_name(
+    app_and_backend: tuple[TestClient, FakeBackend],
+) -> None:
+    client, _ = app_and_backend
+
+    response = client.post(
+        "/api/orchestration/crew",
+        json={
+            "task": "implemente o desconto",
+            "verify": "pytest -q",
+            "workspace": r"C:\Users\alguem\pasta-que-nao-existe",
+            "workers": [
+                {"name": "conservador", "instruction": "a"},
+                {"name": "direto", "instruction": "b"},
+            ],
+        },
+    )
+
+    # `Path.resolve()` validates nothing: a path this OS cannot parse becomes a plausible absolute
+    # path glued onto the process directory. The crew then ran against a folder that was never
+    # there and reported every worker as "your check failed" — pointing at code no one had read.
+    assert response.status_code == 400
+    assert "pasta-que-nao-existe" in response.json()["detail"]
+
+
+def test_the_hierarchy_refuses_the_same_missing_folder(
+    app_and_backend: tuple[TestClient, FakeBackend],
+) -> None:
+    client, _ = app_and_backend
+
+    response = client.post(
+        "/api/orchestration/hierarchy",
+        json={"task": "compare os arquivos", "workspace": "/nao/existe/em/lugar/nenhum"},
+    )
+
+    # Same check on both doors. The hierarchy's workers only read, so a missing folder shows up as
+    # workers who found nothing rather than as an error — quieter, and just as wrong.
+    assert response.status_code == 400

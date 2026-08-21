@@ -24,6 +24,7 @@ export function FellBackNote({
   reason,
   onRun,
   onOpenCode,
+  onCrew,
   running,
 }: {
   shape: string;
@@ -31,6 +32,9 @@ export function FellBackNote({
   /** Absent once the run is under way — by then it is a report, not an offer. */
   onRun?: () => void;
   onOpenCode?: () => void;
+  /** Offered for write-shaped work only. The hierarchy is right to refuse this task; a crew is
+   *  the shape that fits it — same task, several attempts, a check decides which one lands. */
+  onCrew?: () => void;
   running?: boolean;
 }) {
   const t = useT();
@@ -56,8 +60,22 @@ export function FellBackNote({
       <p className="mt-2 text-sm text-muted-foreground">{why}</p>
       {onRun || onOpenCode ? (
         <div className="mt-3 flex flex-wrap gap-2">
+          {/* First, because it is the answer to what was actually asked. A task that edits files
+              is not a task the hierarchy should run — but it IS a task a crew is built for, and
+              until this button existed the screen's reply to the commonest request was a note
+              pointing somewhere else. */}
+          {onCrew && shape === "sequential_write" ? (
+            <Button size="sm" onClick={onCrew} disabled={running}>
+              {t("orch.fellback.buildCrew")}
+            </Button>
+          ) : null}
           {onRun ? (
-            <Button size="sm" onClick={onRun} disabled={running}>
+            <Button
+              size="sm"
+              variant={onCrew && shape === "sequential_write" ? "outline" : "primary"}
+              onClick={onRun}
+              disabled={running}
+            >
               {t("orch.fellback.runSingle")}
             </Button>
           ) : null}

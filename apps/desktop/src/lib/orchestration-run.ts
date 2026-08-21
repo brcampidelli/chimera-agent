@@ -244,3 +244,161 @@ export function isRunning(state: OrchestrationState): boolean {
 export function countByStatus(state: OrchestrationState, status: WorkerStatus): number {
   return state.workers.filter((w) => w.status === status).length;
 }
+
+// --- The crew ---------------------------------------------------------------------------------
+//
+// A second reducer rather than a branch inside the first one. The two runs answer different
+// questions: a hierarchy asks "what do these sources say", and its output is one synthesised
+// answer; a crew asks "which of these attempts survives a check", and its output is a set of
+// files that landed and a set that did not. Folding them together would mean a state shape where
+// half the fields are always null, and a card that has to ask which kind of run it belongs to.
+
+export type CrewWorkerStatus = "queued" | "running" | "verified" | "rejected" | "failed";
+
+export interface CrewWorkerState {
+  name: string;
+  status: CrewWorkerStatus;
+  /** The checkout this worker writes in. Empty until it starts. */
+  workspace: string;
+  instruction: string;
+  /** The check that passed, or the one that refused it. */
+  verify: string;
+  /** What the failing check printed — the only thing that says WHY this was discarded. */
+  detail: string;
+  reason: string;
+  answerChars: number;
+}
+
+export interface CrewState {
+  runId: string | null;
+  seq: number;
+  stage: "idle" | "working" | "synthesizing" | "done" | "error";
+  workers: CrewWorkerState[];
+  merged: number;
+  /** Files two workers both changed. NEITHER version landed. */
+  conflicts: string[];
+  answer: string | null;
+  /** False = no git repository, so the workers shared one folder and nothing was isolated. */
+  isRepo: boolean | null;
+  error: string | null;
+}
+
+export const EMPTY_CREW: CrewState = {
+  runId: null,
+  seq: 0,
+  stage: "idle",
+  workers: [],
+  merged: 0,
+  conflicts: [],
+  answer: null,
+  isRepo: null,
+  error: null,
+};
+
+function patchCrewWorker(
+  workers: CrewWorkerState[],
+  name: string,
+  patch: Partial<CrewWorkerState>,
+): CrewWorkerState[] {
+  const index = workers.findIndex((w) => w.name === name);
+  const blank: CrewWorkerState = {
+    name,
+    status: "queued",
+    workspace: "",
+    instruction: "",
+    verify: "",
+    detail: "",
+    reason: "",
+    answerChars: 0,
+  };
+  if (index === -1) return [...workers, { ...blank, ...patch }];
+  const next = workers.slice();
+  next[index] = { ...next[index], ...patch };
+  return next;
+}
+
+/** Fold one crew frame in. Same idempotence rule as `applyFrame`: a frame already applied is
+ *  ignored, so replay after a reload goes through this exact function. */
+export function applyCrewFrame(state: CrewState, frame: OrchFrame): CrewState {
+  if (frame.seq !== 0 && frame.seq <= state.seq) return state;
+  const seq = frame.seq || state.seq;
+  const data = frame.data ?? {};
+
+  switch (frame.kind) {
+    case "run":
+      return { ...state, seq, runId: str(data.run_id) || state.runId, stage: "working" };
+
+    case "crew_worker_started":
+      return {
+        ...state,
+        seq,
+        stage: "working",
+        workers: patchCrewWorker(state.workers, frame.task_id, {
+          status: "running",
+          workspace: str(data.workspace),
+          instruction: str(data.instruction),
+        }),
+      };
+
+    case "crew_worker_verified":
+      return {
+        ...state,
+        seq,
+        workers: patchCrewWorker(state.workers, frame.task_id, {
+          status: "verified",
+          verify: str(data.verified_by),
+          answerChars: num(data.answer_chars),
+        }),
+      };
+
+    case "crew_worker_rejected":
+      return {
+        ...state,
+        seq,
+        workers: patchCrewWorker(state.workers, frame.task_id, {
+          status: "rejected",
+          reason: str(data.reason),
+          verify: frame.text,
+          detail: str(data.detail),
+        }),
+      };
+
+    case "crew_worker_failed":
+      return {
+        ...state,
+        seq,
+        workers: patchCrewWorker(state.workers, frame.task_id, {
+          status: "failed",
+          detail: frame.text,
+        }),
+      };
+
+    case "conflict":
+      // Accumulated, not replaced: one frame per contested file.
+      return { ...state, seq, conflicts: [...state.conflicts, str(data.path)] };
+
+    case "synthesizing":
+      return { ...state, seq, stage: "synthesizing" };
+
+    case "crew_done":
+      return {
+        ...state,
+        seq,
+        stage: "done",
+        merged: num(data.merged),
+        conflicts: strings(data.conflicts).length ? strings(data.conflicts) : state.conflicts,
+        answer: str(data.answer) || null,
+        isRepo: data.is_repo === true,
+      };
+
+    case "error":
+      return { ...state, seq, stage: "error", error: str(data.message) || "the crew failed" };
+
+    default:
+      return { ...state, seq };
+  }
+}
+
+export function isCrewRunning(state: CrewState): boolean {
+  return state.runId !== null && state.stage !== "done" && state.stage !== "error";
+}

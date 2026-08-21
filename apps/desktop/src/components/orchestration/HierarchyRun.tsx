@@ -38,8 +38,13 @@ export function HierarchyRun({
         // reducer keeps one source of truth. Two copies of the same value is how the Stop button
         // ended up enabled off one of them while `isRunning` was deciding off the other.
         onFrame: dispatch,
-        onError: (message) =>
-          dispatch({ seq: 0, kind: "error", task_id: "", text: "", data: { message } }),
+        onError: (message) => {
+          // An abort is this component's own cleanup, not a failure: leaving the screen tears
+          // down the fetch, and "signal is aborted without reason" was reaching the user as
+          // though the run had broken.
+          if (/abort/i.test(message)) return;
+          dispatch({ seq: 0, kind: "error", task_id: "", text: "", data: { message } });
+        },
       },
       controller.signal,
     );

@@ -17,11 +17,13 @@ export function PlanPreview({
   plan,
   onRun,
   onOpenCode,
+  onCrew,
   running,
 }: {
   plan: HierarchyPreview;
   onRun: () => void;
   onOpenCode: () => void;
+  onCrew: () => void;
   running: boolean;
 }) {
   const t = useT();
@@ -33,6 +35,7 @@ export function PlanPreview({
         reason={plan.fell_back_reason}
         onRun={onRun}
         onOpenCode={onOpenCode}
+        onCrew={onCrew}
         running={running}
       />
     );
