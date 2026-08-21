@@ -1025,8 +1025,10 @@ const en: Dict = {
   "settings.hint.mcpAutoload": "load configured servers at app start",
   "update.available": "v{latest} available",
   "update.prompt": "A new version (v{latest}) is available. Update?",
+  "update.howtoNative":
+    "This app updates itself: it offers each new release at launch, verifies the signature, installs and restarts. Reopen it to be asked again, or read the release notes first.",
   "update.howto":
-    "There's no in-place auto-update yet — update with the command below, or read the release notes.",
+    "You are viewing this in a browser, so update the package: run the command below, or read the release notes.",
   "update.copy": "Copy",
   "update.copied": "Copied",
   "update.viewRelease": "View release",
@@ -2169,8 +2171,10 @@ const pt: Dict = {
     "carrega os servidores configurados ao iniciar o app",
   "update.available": "v{latest} disponível",
   "update.prompt": "Uma nova versão (v{latest}) está disponível. Atualizar?",
+  "update.howtoNative":
+    "Este aplicativo se atualiza sozinho: ele oferece cada versão nova ao abrir, confere a assinatura, instala e reinicia. Feche e abra de novo para ser perguntado outra vez, ou leia as notas da versão antes.",
   "update.howto":
-    "Ainda não há atualização automática no lugar — atualize com o comando abaixo, ou leia as notas da versão.",
+    "Você está vendo isto num navegador, então atualize o pacote: rode o comando abaixo, ou leia as notas da versão.",
   "update.copy": "Copiar",
   "update.copied": "Copiado",
   "update.viewRelease": "Ver versão",
@@ -3323,8 +3327,10 @@ const es: Dict = {
     "carga los servidores configurados al iniciar la app",
   "update.available": "v{latest} disponible",
   "update.prompt": "Hay una nueva versión (v{latest}) disponible. ¿Actualizar?",
+  "update.howtoNative":
+    "Esta app se actualiza sola: ofrece cada versión nueva al abrirse, verifica la firma, instala y reinicia. Ábrela de nuevo para que te lo vuelva a preguntar, o lee antes las notas de la versión.",
   "update.howto":
-    "Aún no hay actualización automática en el sitio — actualiza con el comando de abajo, o lee las notas de la versión.",
+    "Estás viendo esto en un navegador, así que actualiza el paquete: ejecuta el comando de abajo, o lee las notas de la versión.",
   "update.copy": "Copiar",
   "update.copied": "Copiado",
   "update.viewRelease": "Ver versión",
@@ -4489,8 +4495,10 @@ const fr: Dict = {
   "update.available": "v{latest} disponible",
   "update.prompt":
     "Une nouvelle version (v{latest}) est disponible. Mettre à jour ?",
+  "update.howtoNative":
+    "Cette application se met à jour elle-même : elle propose chaque nouvelle version au lancement, vérifie la signature, installe et redémarre. Rouvrez-la pour qu'elle vous le redemande, ou lisez d'abord les notes de version.",
   "update.howto":
-    "Pas encore de mise à jour automatique sur place — mettez à jour avec la commande ci-dessous, ou lisez les notes de version.",
+    "Vous consultez ceci dans un navigateur : mettez donc le paquet à jour avec la commande ci-dessous, ou lisez les notes de version.",
   "update.copy": "Copier",
   "update.copied": "Copié",
   "update.viewRelease": "Voir la version",
@@ -5654,8 +5662,10 @@ const de: Dict = {
   "update.available": "v{latest} verfügbar",
   "update.prompt":
     "Eine neue Version (v{latest}) ist verfügbar. Aktualisieren?",
+  "update.howtoNative":
+    "Diese App aktualisiert sich selbst: Sie bietet jede neue Version beim Start an, prüft die Signatur, installiert und startet neu. Erneut öffnen, um wieder gefragt zu werden — oder vorher die Release-Notes lesen.",
   "update.howto":
-    "Es gibt noch kein automatisches In-Place-Update — aktualisiere mit dem Befehl unten oder lies die Release-Notes.",
+    "Sie sehen dies im Browser — aktualisieren Sie also das Paket: mit dem Befehl unten, oder lesen Sie die Release-Notes.",
   "update.copy": "Kopieren",
   "update.copied": "Kopiert",
   "update.viewRelease": "Release ansehen",
@@ -6738,7 +6748,10 @@ const zh: Dict = {
   "settings.hint.mcpAutoload": "在应用启动时加载已配置的服务器",
   "update.available": "v{latest} 可用",
   "update.prompt": "有新版本（v{latest}）可用。要更新吗？",
-  "update.howto": "暂无原地自动更新——请使用下方命令更新，或查看发行说明。",
+  "update.howtoNative":
+    "这个应用会自己更新：每次启动时提议新版本，校验签名，安装并重启。重新打开它就会再问一次，或者先读发布说明。",
+  "update.howto":
+    "你是在浏览器里看这个的，所以请更新包：运行下面的命令，或者去读发布说明。",
   "update.copy": "复制",
   "update.copied": "已复制",
   "update.viewRelease": "查看发行版",
@@ -7882,8 +7895,10 @@ const ja: Dict = {
   "update.available": "v{latest} が利用可能",
   "update.prompt":
     "新しいバージョン（v{latest}）が利用可能です。更新しますか？",
+  "update.howtoNative":
+    "このアプリは自分で更新します。起動時に新しいリリースを提案し、署名を確かめ、インストールして再起動します。もう一度尋ねてほしければ開き直してください。先にリリースノートを読むこともできます。",
   "update.howto":
-    "その場での自動更新はまだありません——下のコマンドで更新するか、リリースノートをご覧ください。",
+    "これはブラウザで見ています。パッケージを更新してください — 下のコマンドを実行するか、リリースノートをご覧ください。",
   "update.copy": "コピー",
   "update.copied": "コピーしました",
   "update.viewRelease": "リリースを見る",
@@ -9041,8 +9056,10 @@ const it: Dict = {
   "settings.hint.mcpAutoload": "carica i server configurati all'avvio dell'app",
   "update.available": "v{latest} disponibile",
   "update.prompt": "È disponibile una nuova versione (v{latest}). Aggiornare?",
+  "update.howtoNative":
+    "Questa app si aggiorna da sola: propone ogni nuova versione all'avvio, verifica la firma, installa e riavvia. Riaprila per essere richiesto, oppure leggi prima le note di rilascio.",
   "update.howto":
-    "Non c'è ancora un aggiornamento automatico sul posto — aggiorna con il comando qui sotto, o leggi le note di rilascio.",
+    "Stai guardando questo in un browser, quindi aggiorna il pacchetto: esegui il comando qui sotto, oppure leggi le note di rilascio.",
   "update.copy": "Copia",
   "update.copied": "Copiato",
   "update.viewRelease": "Vedi la release",
@@ -10192,8 +10209,10 @@ const pl: Dict = {
     "wczytuj skonfigurowane serwery przy starcie aplikacji",
   "update.available": "dostępna v{latest}",
   "update.prompt": "Dostępna jest nowa wersja (v{latest}). Zaktualizować?",
+  "update.howtoNative":
+    "Ta aplikacja aktualizuje się sama: przy starcie proponuje każde nowe wydanie, sprawdza podpis, instaluje i restartuje. Otwórz ją ponownie, żeby zapytała jeszcze raz, albo najpierw przeczytaj informacje o wydaniu.",
   "update.howto":
-    "Nie ma jeszcze automatycznej aktualizacji w miejscu — zaktualizuj poleceniem poniżej albo przeczytaj informacje o wydaniu.",
+    "Oglądasz to w przeglądarce, więc zaktualizuj pakiet: uruchom polecenie poniżej albo przeczytaj informacje o wydaniu.",
   "update.copy": "Kopiuj",
   "update.copied": "Skopiowano",
   "update.viewRelease": "Zobacz wydanie",
@@ -11349,8 +11368,10 @@ const ru: Dict = {
     "загружать настроенные серверы при запуске приложения",
   "update.available": "доступна v{latest}",
   "update.prompt": "Доступна новая версия (v{latest}). Обновить?",
+  "update.howtoNative":
+    "Это приложение обновляется само: при запуске предлагает каждый новый выпуск, проверяет подпись, устанавливает и перезапускается. Откройте его заново, чтобы вопрос появился снова, или сначала прочитайте примечания к выпуску.",
   "update.howto":
-    "Автообновления на месте пока нет — обновитесь командой ниже или прочитайте примечания к выпуску.",
+    "Вы смотрите это в браузере, значит обновлять нужно пакет: выполните команду ниже или прочитайте примечания к выпуску.",
   "update.copy": "Копировать",
   "update.copied": "Скопировано",
   "update.viewRelease": "Открыть выпуск",
