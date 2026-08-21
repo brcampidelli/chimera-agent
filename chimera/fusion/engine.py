@@ -15,8 +15,10 @@ tool-calling — fusion is for hard reasoning/synthesis; tool turns stay single-
 from __future__ import annotations
 
 import difflib
-from collections.abc import Iterable
+import threading
+from collections.abc import Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -257,12 +259,47 @@ class FusionEngine:
 
     def __init__(self, backend: SupportsComplete, config: FusionConfig | None = None) -> None:
         self.backend = backend
+        # Pinned when the caller supplied one, and that is load-bearing: `_cast_for_turn` overlays
+        # the request's own cast, `fusion_for_role` builds a role's panel, and a bench comparing two
+        # casts is asking for exactly this. Everything else re-reads at the start of a run.
+        self._pinned = config
         self.config = config or FusionConfig.from_settings()
+        # Guards the re-read below. The app hands ONE engine to every surface, so two fused turns
+        # can be inside `run` at once.
+        self._lock = threading.Lock()
+        self._in_flight = 0
+
+    @contextmanager
+    def _current_cast(self) -> Iterator[None]:
+        """Hold the cast steady for one run, and pick up an edited one between runs.
+
+        The app builds ONE engine at boot (`cli/main.py`) and keeps it for the life of the process,
+        and `FusionConfig` is a plain dataclass with no lazy re-read. So `CHIMERA_FUSION_PANEL`,
+        `_JUDGE` and `_SYNTHESIZER` landed in `.env`, the Fusion screen confirmed "New conversations
+        start with this cast", and every fused turn until the next relaunch still used the launch
+        cast. The confirmation is what turned it into a lie.
+
+        Re-read only when nothing else is running, because `self.config` is read fourteen times
+        across a run: a save landing mid-run would otherwise change the panel between the probe and
+        the rest of it, and a turn assembled from two different casts is a worse answer than one
+        assembled from a slightly stale one. A run that starts during another simply keeps the cast
+        already in force and picks up the new one next time.
+        """
+        with self._lock:
+            if self._pinned is None and self._in_flight == 0:
+                self.config = FusionConfig.from_settings()
+            self._in_flight += 1
+        try:
+            yield
+        finally:
+            with self._lock:
+                self._in_flight -= 1
 
     def run(self, messages: list[MessageLike]) -> FusionTrace:
-        if self.config.mode == "selective" and len(self.config.panel) >= 2:
-            return self._run_selective(messages)
-        return self._run_full(messages)
+        with self._current_cast():
+            if self.config.mode == "selective" and len(self.config.panel) >= 2:
+                return self._run_selective(messages)
+            return self._run_full(messages)
 
     def _run_full(self, messages: list[MessageLike]) -> FusionTrace:
         _log.debug("fusion engaged: %d-model panel -> judge -> synthesizer", len(self.config.panel))

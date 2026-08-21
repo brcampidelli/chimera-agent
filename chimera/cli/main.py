@@ -1741,7 +1741,17 @@ def desktop_app(
     static_dir = dist if (dist / "index.html").exists() else None
     api = build_api_app(
         factory,
-        settings=settings,
+        # NOT `settings=settings`. Passing one means "use THIS, frozen" — which is what a test or a
+        # bench comparing two configurations asks for, and the opposite of what the app needs. The
+        # object here IS `get_settings()`, so passing it changed nothing except to freeze
+        # `live_settings()` at launch: every row the Settings screen writes through
+        # `PATCH /api/config` — the reach floor, the deployment denylist, the vision model — kept
+        # returning the boot value while the screen said "saved". `live_settings()`'s own docstring
+        # states the rule this broke: "Saving a setting that silently does nothing is worse than not
+        # offering it, because the confirmation is what turns it into a lie."
+        #
+        # `home` stays fixed regardless: `build_api_app` binds it once from `get_settings()` and the
+        # data directory must not move under an open session.
         static_dir=static_dir,
         fuse_backend=fuse_backend,
         workspace=workspace_path,

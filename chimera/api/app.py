@@ -1250,13 +1250,18 @@ def build_api_app(
         from chimera.complete.inline import complete_inline
         from chimera.complete.outcomes import record_shown
 
+        # `live_settings()`, like the endpoint two hundred lines up that lists the models this one
+        # would run. Both rows are edited on the same Settings card, neither passes `applies`, and
+        # the tested contract is that silence means "next call" — so reading the mount-time closure
+        # here made the two rows disagree about their own scope while looking identical.
+        now = live_settings()
         found = await complete_inline(
             req.prefix,
             req.suffix,
-            base_url=settings.ollama_base_url,
-            model=settings.complete_model,
+            base_url=now.ollama_base_url,
+            model=now.complete_model,
             key=req.key,
-            budget_ms=settings.complete_budget_ms,
+            budget_ms=now.complete_budget_ms,
         )
         ident = ""
         if found.text:
