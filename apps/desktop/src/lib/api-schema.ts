@@ -1418,6 +1418,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/orchestration/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Orch Runs Endpoint
+         * @description The runs whose transcripts are still on disk, newest first.
+         *
+         *     A fan-out costs a top-model decompose, N workers and a synthesis. Until these were persisted,
+         *     closing the app threw the answer away and kept the bill — the cost was recorded and the
+         *     product was not.
+         */
+        get: operations["orch_runs_endpoint_api_orchestration_runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orchestration/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Orch Run Frames Endpoint
+         * @description Everything after ``since``, so a reload replays only what it is missing.
+         *
+         *     The frames go through the SAME reducer the live stream feeds, and that reducer ignores a
+         *     `seq` it has already applied — which is what makes replay-then-live and live-only converge
+         *     on one state instead of two.
+         */
+        get: operations["orch_run_frames_endpoint_api_orchestration_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/orchestration/runs/{run_id}/cancel": {
         parameters: {
             query?: never;
@@ -4401,6 +4449,43 @@ export interface components {
             cancelled: boolean;
             /** Ok */
             ok: boolean;
+        };
+        /**
+         * OrchFramesOut
+         * @description A run's transcript from ``since`` onward, in the order its single writer stamped.
+         */
+        OrchFramesOut: {
+            /** Frames */
+            frames: {
+                [key: string]: unknown;
+            }[];
+            /** Run Id */
+            run_id: string;
+            /** Seq */
+            seq: number;
+        };
+        /**
+         * OrchRunSummaryOut
+         * @description One past run, as much as can be known without reading its whole transcript.
+         */
+        OrchRunSummaryOut: {
+            /** Done */
+            done: boolean;
+            /** Frames */
+            frames: number;
+            /** Kind */
+            kind: string;
+            /** Run Id */
+            run_id: string;
+            /** Started */
+            started: number;
+            /** Task */
+            task: string;
+        };
+        /** OrchRunsOut */
+        OrchRunsOut: {
+            /** Runs */
+            runs: components["schemas"]["OrchRunSummaryOut"][];
         };
         /**
          * OrchestrationFramesOut
@@ -7566,6 +7651,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HierarchyPreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    orch_runs_endpoint_api_orchestration_runs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrchRunsOut"];
+                };
+            };
+        };
+    };
+    orch_run_frames_endpoint_api_orchestration_runs__run_id__get: {
+        parameters: {
+            query?: {
+                since?: number;
+            };
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrchFramesOut"];
                 };
             };
             /** @description Validation Error */

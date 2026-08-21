@@ -1,14 +1,20 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { previewHierarchy, type CrewRunInput, type HierarchyRunInput } from "@/lib/api";
+import {
+  previewHierarchy,
+  type CrewRunInput,
+  type HierarchyRunInput,
+  type OrchFrame,
+} from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import type { HierarchyPreview } from "@/lib/types";
 
 import { CrewForm } from "./CrewForm";
 import { CrewRun } from "./CrewRun";
 import { HierarchyRun } from "./HierarchyRun";
+import { forgetRun, resumeFrames } from "./resume";
 import { PlanPreview } from "./PlanPreview";
 
 /**
@@ -39,7 +45,19 @@ export function Orchestration({
   // just wrote with it — and that is exactly the state you want back when the check turns out
   // to be the thing that was wrong.
   const [crewOpen, setCrewOpen] = useState(false);
+  // The last run this browser started, read back from the server's transcript. A fan-out costs a
+  // top-model decompose, N workers and a synthesis, and until these were persisted, closing the tab
+  // threw the answer away and kept the bill.
+  const [resumed, setResumed] = useState<OrchFrame[] | null>(null);
   const [crew, setCrew] = useState<{ at: number; request: CrewRunInput } | null>(null);
+
+  useEffect(() => {
+    // Once, on mount. A run started in THIS session is already on screen; this is for the one that
+    // was not — the tab that was closed, the reload, the connection that dropped.
+    void resumeFrames().then(({ frames }) => {
+      if (frames.length > 0) setResumed(frames);
+    });
+  }, []);
 
   async function seePlan() {
     if (!task.trim()) return;
@@ -48,6 +66,10 @@ export function Orchestration({
     setRun(null);
     setCrew(null);
     setCrewOpen(false);
+    // Asking for a new plan is saying the old run is done with. Leaving it on screen under a fresh
+    // plan would put two runs in one column with nothing saying which is which.
+    setResumed(null);
+    forgetRun();
     // Cleared before the request, not after it. Leaving the previous plan up while a new one
     // loads shows a decomposition for the PREVIOUS task next to the current text — and the
     // decompose call takes long enough for someone to read it and act on it.
@@ -130,6 +152,11 @@ export function Orchestration({
       ) : null}
 
       {run ? <HierarchyRun key={run.at} request={run.request} onOpenCode={onOpenCode} /> : null}
+      {/* Only when nothing is running here: a live run is the thing on screen, and a replayed one
+          beside it would be two answers to one question. */}
+      {!run && !crew && resumed ? (
+        <HierarchyRun key="resumed" resume={resumed} onOpenCode={onOpenCode} />
+      ) : null}
       {crew ? <CrewRun key={crew.at} request={crew.request} /> : null}
     </div>
   );

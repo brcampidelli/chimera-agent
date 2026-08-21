@@ -34,6 +34,7 @@ from sse_starlette.sse import EventSourceResponse
 from starlette.concurrency import run_in_threadpool
 
 from chimera.api.code_api import CodeSeams
+from chimera.orchestration import runlog
 from chimera.orchestration.events import OrchEvent
 from chimera.telemetry import get_logger
 
@@ -392,6 +393,34 @@ class ApproachOut(BaseModel):
     )
 
 
+class OrchRunSummaryOut(BaseModel):
+    """One past run, as much as can be known without reading its whole transcript."""
+
+    run_id: str
+    task: str
+    kind: str  # "hierarchy" | "crew"
+    started: float  # epoch seconds, from the transcript's own mtime
+    frames: int
+    done: bool
+    """Read from the LAST frames, not from the file merely ending. A run killed with the process
+    leaves a transcript that stops, and calling that finished would turn a crash into a completed
+    run in the one list built to find them again."""
+
+
+class OrchRunsOut(BaseModel):
+    runs: list[OrchRunSummaryOut]  # newest first
+
+
+class OrchFramesOut(BaseModel):
+    """A run's transcript from ``since`` onward, in the order its single writer stamped."""
+
+    run_id: str
+    frames: list[dict[str, Any]]
+    #: The highest `seq` in `frames`, or the `since` that was asked for when there are none. A
+    #: client stores this and asks again from it, which is what makes a second replay cheap.
+    seq: int
+
+
 class ApproachesOut(BaseModel):
     approaches: list[ApproachOut] = Field(default_factory=list)
     default: list[str] = Field(
@@ -676,6 +705,12 @@ def register_orchestration_api(
             with seq_lock:
                 seq += 1
                 numbered = {**payload, "seq": seq}
+            # To disk BEFORE the queue. A fan-out costs a top-model decompose, N workers and a
+            # synthesis, and until this every frame of that existed only in an SSE stream: close the
+            # app, reload the page or lose the connection, and the answer was gone while the bill
+            # stayed. Written under the same lock that stamped `seq`, so the file is in the order
+            # the numbers claim.
+            runlog.append(read_settings().home, run_id, event, numbered)
             loop.call_soon_threadsafe(queue.put_nowait, (event, numbered))
 
         # Sent before any work, so a Stop control can target this run from the first moment.
@@ -761,6 +796,7 @@ def register_orchestration_api(
             with seq_lock:
                 seq += 1
                 numbered = {**payload, "seq": seq}
+            runlog.append(read_settings().home, run_id, event, numbered)
             loop.call_soon_threadsafe(queue.put_nowait, (event, numbered))
 
         emit("run", {"run_id": run_id, "task": req.task, "workspace": str(ws)})
@@ -852,6 +888,32 @@ def register_orchestration_api(
         fresh = not stop.is_set()
         stop.set()
         return {"ok": True, "cancelled": fresh}
+
+    @app.get("/api/orchestration/runs", dependencies=[guard], response_model=OrchRunsOut)
+    def orch_runs_endpoint() -> dict[str, Any]:
+        """The runs whose transcripts are still on disk, newest first.
+
+        A fan-out costs a top-model decompose, N workers and a synthesis. Until these were persisted,
+        closing the app threw the answer away and kept the bill — the cost was recorded and the
+        product was not.
+        """
+        home = Path(read_settings().home)
+        runlog.prune(home)
+        return {"runs": [OrchRunSummaryOut(**vars(s)).model_dump() for s in runlog.recent(home)]}
+
+    @app.get(
+        "/api/orchestration/runs/{run_id}", dependencies=[guard], response_model=OrchFramesOut
+    )
+    def orch_run_frames_endpoint(run_id: str, since: int = 0) -> dict[str, Any]:
+        """Everything after ``since``, so a reload replays only what it is missing.
+
+        The frames go through the SAME reducer the live stream feeds, and that reducer ignores a
+        `seq` it has already applied — which is what makes replay-then-live and live-only converge
+        on one state instead of two.
+        """
+        frames = runlog.frames(Path(read_settings().home), run_id, since=since)
+        highest = max((int(f.get("seq") or 0) for f in frames), default=since)
+        return {"run_id": run_id, "frames": frames, "seq": highest}
 
     @app.get(
         "/api/orchestration/approaches", dependencies=[guard], response_model=ApproachesOut

@@ -1548,6 +1548,34 @@ export const cancelOrchestration = (runId: string) =>
     { method: "POST" },
   );
 
+/** A past orchestration run's transcript from `since` onward.
+ *
+ *  A fan-out costs a top-model decompose, N workers and a synthesis, and until these were persisted
+ *  the whole thing existed only in an SSE stream: closing the tab threw the answer away and kept the
+ *  bill. The frames go through the SAME reducer the live stream feeds — `applyFrame` ignores a `seq`
+ *  it has already applied — so replaying and then continuing lands on the state a client that never
+ *  disconnected would have. */
+export const getOrchestrationFrames = (runId: string, since = 0) =>
+  json<{ run_id: string; frames: OrchFrame[]; seq: number }>(
+    `/api/orchestration/runs/${encodeURIComponent(runId)}?since=${since}`,
+  );
+
+/** The runs still on disk, newest first. */
+export const getOrchestrationRuns = () =>
+  json<{
+    runs: {
+      run_id: string;
+      task: string;
+      kind: string;
+      started: number;
+      frames: number;
+      /** From the LAST frames, not from the file merely ending: a run killed with the process
+       *  leaves a transcript that stops, and calling that finished would turn a crash into a
+       *  completed run in the one list built to find them again. */
+      done: boolean;
+    }[];
+  }>("/api/orchestration/runs");
+
 export const getDelegations = () =>
   json<{ summary: DelegationSummary }>("/api/orchestration/delegations");
 

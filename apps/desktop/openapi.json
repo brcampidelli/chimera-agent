@@ -5121,6 +5121,89 @@
         "title": "OrchCancelOut",
         "type": "object"
       },
+      "OrchFramesOut": {
+        "description": "A run's transcript from ``since`` onward, in the order its single writer stamped.",
+        "properties": {
+          "frames": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Frames",
+            "type": "array"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "run_id",
+          "frames",
+          "seq"
+        ],
+        "title": "OrchFramesOut",
+        "type": "object"
+      },
+      "OrchRunSummaryOut": {
+        "description": "One past run, as much as can be known without reading its whole transcript.",
+        "properties": {
+          "done": {
+            "title": "Done",
+            "type": "boolean"
+          },
+          "frames": {
+            "title": "Frames",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "started": {
+            "title": "Started",
+            "type": "number"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "task",
+          "kind",
+          "started",
+          "frames",
+          "done"
+        ],
+        "title": "OrchRunSummaryOut",
+        "type": "object"
+      },
+      "OrchRunsOut": {
+        "properties": {
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/OrchRunSummaryOut"
+            },
+            "title": "Runs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "runs"
+        ],
+        "title": "OrchRunsOut",
+        "type": "object"
+      },
       "OrchestrationFramesOut": {
         "description": "Every SSE payload this module can emit, in one shape a schema dump can see.\n\nAn SSE endpoint cannot declare a ``response_model``, so without this the frame payloads never\nreach OpenAPI and the desktop app would hand-write the types \u2014 which is exactly the drift the\ngenerated client exists to prevent. Same trick, same reason, as ``GET /api/agents/schema``.",
         "properties": {
@@ -9906,6 +9989,75 @@
           }
         },
         "summary": "Preview Endpoint"
+      }
+    },
+    "/api/orchestration/runs": {
+      "get": {
+        "description": "The runs whose transcripts are still on disk, newest first.\n\nA fan-out costs a top-model decompose, N workers and a synthesis. Until these were persisted,\nclosing the app threw the answer away and kept the bill \u2014 the cost was recorded and the\nproduct was not.",
+        "operationId": "orch_runs_endpoint_api_orchestration_runs_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrchRunsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Orch Runs Endpoint"
+      }
+    },
+    "/api/orchestration/runs/{run_id}": {
+      "get": {
+        "description": "Everything after ``since``, so a reload replays only what it is missing.\n\nThe frames go through the SAME reducer the live stream feeds, and that reducer ignores a\n`seq` it has already applied \u2014 which is what makes replay-then-live and live-only converge\non one state instead of two.",
+        "operationId": "orch_run_frames_endpoint_api_orchestration_runs__run_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "title": "Since",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrchFramesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Orch Run Frames Endpoint"
       }
     },
     "/api/orchestration/runs/{run_id}/cancel": {
