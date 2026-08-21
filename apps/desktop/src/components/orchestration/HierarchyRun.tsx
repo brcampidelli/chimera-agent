@@ -1,9 +1,7 @@
-import { useEffect, useReducer, useState } from "react";
+import { useEffect, useReducer } from "react";
 import Markdown from "react-markdown";
-import { Loader2, Square } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { cancelOrchestration, streamHierarchy, type HierarchyRunInput } from "@/lib/api";
+import { streamHierarchy, type HierarchyRunInput } from "@/lib/api";
 import { useT, type TFunc } from "@/lib/i18n";
 import {
   applyFrame,
@@ -13,6 +11,8 @@ import {
 } from "@/lib/orchestration-run";
 
 import { FellBackNote } from "./FellBackNote";
+import { StopButton } from "./StopButton";
+import { useStop } from "./use-stop";
 import { RunStepper } from "./RunStepper";
 import { WorkerCard } from "./WorkerCard";
 
@@ -32,7 +32,6 @@ export function HierarchyRun({
 }) {
   const t = useT();
   const [state, dispatch] = useReducer(applyFrame, EMPTY_RUN);
-  const [stopping, setStopping] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -59,34 +58,15 @@ export function HierarchyRun({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function stop() {
-    const id = state.runId;
-    if (!id) return;
-    setStopping(true);
-    try {
-      await cancelOrchestration(id);
-    } catch {
-      // The stream is the source of truth about whether it stopped, not this response.
-    }
-  }
-
   const running = isRunning(state);
+  const stop = useStop(state.runId ?? "", running);
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <RunStepper state={state} />
         {running ? (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => void stop()}
-            disabled={stopping || !state.runId}
-            title={t("orch.stopHint")}
-          >
-            {stopping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4" />}
-            {stopping ? t("orch.stopping") : t("orch.stop")}
-          </Button>
+          <StopButton stop={stop} disabled={!state.runId} hint={t("orch.stopHint")} />
         ) : null}
       </div>
 
