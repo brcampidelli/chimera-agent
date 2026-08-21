@@ -660,6 +660,57 @@ def _remember_and_tidy(message: str, memory: Any, settings: Settings) -> tuple[s
     return fact, removed
 
 
+#: The memory manager built here for a store the app did NOT boot with, keyed by the settings that
+#: decide which store that is. Cached because the entity graph derived from it walks every stored
+#: memory, and rebuilding that per turn would put a growing cost on every question.
+_switched_memory: tuple[tuple[str, str, bool], Any, Any] | None = None
+_memory_lock = threading.Lock()
+
+
+def _live_memory(settings: Settings, boot: Any, boot_graph: Any, boot_key: Any) -> tuple[Any, Any]:
+    """The memory store this turn should read, and the entity graph over it.
+
+    `chimera app` builds ONE manager at boot and hands the same object to every conversational
+    surface. The Memory screen builds a fresh one per request, from live settings. So switching
+    `CHIMERA_MEMORY_BACKEND` from json to sqlite left that screen showing the new store — usually
+    empty — while every coding turn kept recalling from the old one. Two screens, two stores, one
+    app, and nothing on either saying so.
+
+    The boot pair is returned unchanged while the settings still describe the store it was built
+    from, so an install that changes nothing keeps the exact objects it had. `None` stays `None`:
+    that is `--no-memory`, a launch decision with no store to switch to.
+    """
+    global _switched_memory
+
+    if boot is None:
+        return None, None
+    key = (str(settings.home), settings.memory_backend, bool(settings.semantic_memory))
+    if key == boot_key:
+        return boot, boot_graph
+    with _memory_lock:
+        if _switched_memory is not None and _switched_memory[0] == key:
+            return _switched_memory[1], _switched_memory[2]
+        from chimera.evolution.wiring import build_memory_manager
+
+        manager = build_memory_manager(settings)
+        graph = None
+        try:
+            from chimera.memory import build_graph
+
+            graph = build_graph(
+                [i.content for i in manager.store.all() if i.provenance == "clean"]
+            )
+        except Exception as exc:  # noqa: BLE001 -- the graph is an optimisation, not the memory
+            _log.debug("entity graph skipped for the switched store: %s", exc)
+        _switched_memory = (key, manager, graph)
+        return manager, graph
+
+
+def memory_key(settings: Settings) -> tuple[str, str, bool]:
+    """What decides WHICH store a memory manager is. Used to tell a boot one from a stale one."""
+    return (str(settings.home), settings.memory_backend, bool(settings.semantic_memory))
+
+
 def _card_retriever(settings: Settings, gateway: Any) -> Any:
     """The learned-skill retriever, or None when the owner has the feature off or it cannot build.
 
@@ -724,6 +775,10 @@ def register_code_api(
     from chimera.core.instructions import load as load_identity
     from chimera.core.instructions import render as render_identity
     from chimera.interface.session import recall_facts
+
+    # What the injected `memory` IS, so a later turn can tell "the owner changed the backend" from
+    # "nothing changed". Resolved once, from the same settings the app built that manager with.
+    boot_memory_key = memory_key(settings)
 
     # `settings` is the snapshot taken when the routes were mounted. It is the right thing for
     # `home` — the data directory must not move under an open conversation — and the wrong thing for
@@ -883,7 +938,9 @@ def register_code_api(
         )
 
         # Read memory BEFORE building the agent: the facts go into this turn's system prompt.
-        facts, memory_layer = recall_facts(req.message, memory=memory, graph=graph)
+        # The store the SETTINGS describe, which is not always the one the app booted with.
+        turn_memory, turn_graph = _live_memory(live(), memory, graph, boot_memory_key)
+        facts, memory_layer = recall_facts(req.message, memory=turn_memory, graph=turn_graph)
         agent, ledger = build_agent(req, ws, facts, note)
         session = store.load(req.session_id, agent) if req.session_id else CodeSession(agent)
         session.agent = agent  # a loaded session carries messages, not the agent that made them
@@ -947,7 +1004,7 @@ def register_code_api(
                     _log_usage(payload, session_id, live())
                     # Here rather than in either branch: both go through this function, and an
                     # external agent's turn is still a turn the user typed "remember that…" into.
-                    saved, tidied = _remember_and_tidy(req.message, memory, live())
+                    saved, tidied = _remember_and_tidy(req.message, turn_memory, live())
                     payload["memory_saved"] = saved
                     payload["memory_consolidated"] = tidied
                     if edited:
