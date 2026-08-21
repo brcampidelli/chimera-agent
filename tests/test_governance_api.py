@@ -47,12 +47,16 @@ def test_read_audit_newest_first(tmp_path: Path) -> None:
     ]
     path.write_text("\n".join(json.dumps(entry) for entry in lines) + "\n", encoding="utf-8")
 
-    events = read_audit(path)
+    events, _chain = read_audit(path)
     assert [e["seq"] for e in events] == [2, 1, 0]  # newest (highest seq) first
 
 
 def test_read_audit_missing_file_is_empty(tmp_path: Path) -> None:
-    assert read_audit(tmp_path / "nope.jsonl") == []
+    events, chain = read_audit(tmp_path / "nope.jsonl")
+    assert events == []
+    # An absent log is not a broken one. `ok: False` here would put a tamper warning
+    # on the screen of every fresh install.
+    assert chain["ok"] is True and chain["checked"] == 0
 
 
 def test_read_audit_respects_limit(tmp_path: Path) -> None:
@@ -61,5 +65,46 @@ def test_read_audit_respects_limit(tmp_path: Path) -> None:
         "\n".join(json.dumps({"seq": i, "type": "decision"}) for i in range(10)) + "\n",
         encoding="utf-8",
     )
-    events = read_audit(path, limit=3)
+    events, _chain = read_audit(path, limit=3)
     assert [e["seq"] for e in events] == [9, 8, 7]  # newest 3
+
+
+def test_a_tampered_entry_is_reported_as_a_broken_chain(tmp_path: Path) -> None:
+    """The property every write pays for, that nothing ever asked about.
+
+    Each entry carries the digest of the one before it. `AuditLog.verify` has always been able to
+    walk that chain and no code, no CLI command and no screen ever called it — so the log detected
+    tampering the way an unread smoke alarm detects fire.
+    """
+    import json
+
+    from chimera.governance.audit import AuditLog
+
+    path = tmp_path / "audit.jsonl"
+    log = AuditLog(path)
+    log.record("taint_narrowed", {"tool": "write_file"})
+    log.record("escalated", {"tool": "run_shell"})
+
+    _events, clean = read_audit(path)
+    assert clean["ok"] is True and clean["checked"] == 2
+
+    # Edit a line in place, exactly as someone covering their tracks would: the entry still parses,
+    # still has a plausible seq, and now says something else.
+    lines = path.read_text(encoding="utf-8").splitlines()
+    first = json.loads(lines[0])
+    first["tool"] = "something_harmless"
+    lines[0] = json.dumps(first)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    _events, broken = read_audit(path)
+    assert broken["ok"] is False
+    assert broken["broken_at"] == 0
+    assert "digest" in broken["reason"]
+
+
+def test_an_empty_log_is_not_a_broken_one(tmp_path: Path) -> None:
+    """`ok: False` on a fresh install would put a tamper warning on every new user's screen."""
+    _events, chain = read_audit(tmp_path / "audit.jsonl")
+
+    assert chain["ok"] is True
+    assert chain["checked"] == 0 and chain["broken_at"] is None

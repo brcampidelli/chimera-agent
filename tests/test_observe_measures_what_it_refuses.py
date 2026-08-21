@@ -95,7 +95,7 @@ def _assemble(tmp_path: pathlib.Path, **kw: Any) -> Any:
 
 
 def _audit_types(tmp_path: pathlib.Path) -> list[str]:
-    return [str(e.get("type", "")) for e in read_audit(tmp_path / "home" / "audit.jsonl")]
+    return [str(e.get("type", "")) for e in read_audit(tmp_path / "home" / "audit.jsonl")[0]]
 
 
 # --- the count -----------------------------------------------------------------------------------
@@ -206,7 +206,7 @@ def test_the_mode_is_written_where_the_screen_can_read_it(
 
     lines = [
         _audit_event(e)
-        for e in read_audit(tmp_path / "home" / "audit.jsonl")
+        for e in read_audit(tmp_path / "home" / "audit.jsonl")[0]
         if e.get("type") == "governance_mode"
     ]
 
@@ -229,7 +229,7 @@ def test_the_mode_line_is_not_a_verdict_line(tmp_path: pathlib.Path) -> None:
     registry = _assemble(tmp_path, CHIMERA_GOVERNANCE="observe")
     registry.get("run_shell").run(command=BLOCKED_COMMAND)
 
-    entries = read_audit(tmp_path / "home" / "audit.jsonl")
+    entries, _chain = read_audit(tmp_path / "home" / "audit.jsonl")
     verdicts = [e for e in entries if e.get("type") == "governance"]
     modes = [e for e in entries if e.get("type") == "governance_mode"]
 

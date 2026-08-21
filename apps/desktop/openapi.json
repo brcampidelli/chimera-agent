@@ -648,6 +648,47 @@
         "title": "AttemptReceiptOut",
         "type": "object"
       },
+      "AuditChainOut": {
+        "description": "Whether the log's own tamper-evidence holds. Reported because nothing used to ask.",
+        "properties": {
+          "broken_at": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Broken At"
+          },
+          "checked": {
+            "title": "Checked",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "unchained": {
+            "title": "Unchained",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "checked",
+          "unchained",
+          "broken_at",
+          "reason"
+        ],
+        "title": "AuditChainOut",
+        "type": "object"
+      },
       "AuditEventOut": {
         "properties": {
           "seq": {
@@ -3461,6 +3502,9 @@
       },
       "GovernanceAuditOut": {
         "properties": {
+          "chain": {
+            "$ref": "#/components/schemas/AuditChainOut"
+          },
           "count": {
             "title": "Count",
             "type": "integer"
@@ -3480,7 +3524,8 @@
         "required": [
           "events",
           "count",
-          "populated"
+          "populated",
+          "chain"
         ],
         "title": "GovernanceAuditOut",
         "type": "object"

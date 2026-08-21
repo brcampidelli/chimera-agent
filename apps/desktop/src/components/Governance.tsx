@@ -176,6 +176,29 @@ function AuditPanel({ data, t }: { data: GovernanceAudit; t: TFunc }) {
   }
   return (
     <Panel title={t("governance.audit.title")}>
+      {/* Every entry carries the digest of the one before it. That cost is paid on every write for
+          a property — this log has not been edited — and until the chain was actually walked, the
+          log detected tampering the way an unread smoke alarm detects fire. Reported here whether
+          it holds or not: a check whose result is only shown when it fails is a check the reader
+          cannot tell apart from one that never ran. */}
+      <div className="flex items-center gap-2 px-4 py-2.5">
+        <Badge tone={data.chain.ok ? "ok" : "bad"}>
+          {data.chain.ok ? t("governance.audit.intact") : t("governance.audit.broken")}
+        </Badge>
+        <span className="min-w-0 flex-1 text-xs text-muted-foreground">
+          {data.chain.ok
+            ? t("governance.audit.chainOk", { n: data.chain.checked })
+            : t("governance.audit.chainBroken", {
+                n: (data.chain.broken_at ?? 0) + 1,
+                reason: data.chain.reason,
+              })}
+          {/* Entries older than the chain cannot be verified either way. Said out loud rather than
+              folded into the pass, because "we could not check these" is not "these are fine". */}
+          {data.chain.unchained
+            ? " " + t("governance.audit.unchained", { n: data.chain.unchained })
+            : ""}
+        </span>
+      </div>
       {data.events.map((e: AuditEvent) => (
         <div key={e.seq} className="flex items-center gap-3 px-4 py-2.5">
           <span className="shrink-0 font-mono text-xs text-muted-foreground">

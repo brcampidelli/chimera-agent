@@ -1703,8 +1703,13 @@ def desktop_app(
             # with the messaging gateway and /v1/chat/completions, so arming it by default would take
             # shell away from agents that already run.
             from chimera.api.posture import guard_chat_registry
+            from chimera.governance.audit import AuditLog
 
-            registry, _chat_ledger = guard_chat_registry(registry)
+            # The same file the coding turn writes and the Governance screen reads. One log, or the
+            # screen shows a partial history while claiming to show the whole one.
+            registry, _chat_ledger = guard_chat_registry(
+                registry, audit=AuditLog(live.home / "audit.jsonl")
+            )
         runner = Agent(
             session_backend(),
             registry,

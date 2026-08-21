@@ -237,7 +237,7 @@ def describe(
     )
 
 
-def guard_chat_registry(registry: Any) -> tuple[Any, Any]:
+def guard_chat_registry(registry: Any, *, audit: Any = None) -> tuple[Any, Any]:
     """Apply the coding turn's protections to the CHAT registry — deny by posture, then the ledger.
 
     The chat and the coding turn talk to the same agent over the same base tools, and until this
@@ -262,4 +262,18 @@ def guard_chat_registry(registry: Any) -> tuple[Any, Any]:
     if resolved.deny_tools:
         registry = restrict_registry(registry, allow=None, deny=resolved.deny_tools)
     ledger = TaintLedger()
-    return ledger_registry(registry, ledger, narrow_on_taint=resolved.narrow_on_taint), ledger
+    # The audit log, which this was the ONE `ledger_registry` caller not passing. Both siblings do
+    # — `code_api` and `governed_profile` — and every write inside `LedgeredTool` is guarded by
+    # `if self.audit is not None`, so omitting it meant this guard recorded nothing at all.
+    #
+    # The consequence was not a missing log line, it was a false statement: the Governance screen's
+    # empty state says "the app records an entry whenever a defence fires", so turning this guard on
+    # and having it narrow or refuse a call left the screen reporting that nothing had been narrowed.
+    # That is the exact reassurance the sentence was written to prevent.
+    #
+    # Not passing `audit` from `restrict_registry` above, for the reason `code_api` gives at the
+    # same spot: the posture excludes the exec tools on every turn, so that would append an
+    # identical entry per turn and bury the rare events someone opens this log to find.
+    return ledger_registry(
+        registry, ledger, narrow_on_taint=resolved.narrow_on_taint, audit=audit
+    ), ledger

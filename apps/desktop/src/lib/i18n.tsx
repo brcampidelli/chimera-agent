@@ -935,6 +935,16 @@ const en: Dict = {
   "governance.injection.note":
     "Measures defense-in-depth of an already-injected agent (synthetic corpus, no model) — not the model's susceptibility to being injected.",
   "governance.audit.title": "Audit log",
+  "governance.audit.intact":
+    "chain intact",
+  "governance.audit.broken":
+    "chain broken",
+  "governance.audit.chainOk":
+    "{n} entries verified against the digest of the one before — nothing here was edited after it was written.",
+  "governance.audit.chainBroken":
+    "Entry {n} does not match the chain ({reason}). Treat everything from there on as unverified — the log can no longer vouch for itself.",
+  "governance.audit.unchained":
+    "{n} older entries predate the chain and cannot be checked either way.",
   "governance.injection.disarmed":
     "Switched OFF in this install (CHIMERA_TAINT_NARROW=0) — the defended column below describes a configuration you are not running.",
   "governance.injection.kernel":
@@ -2058,6 +2068,16 @@ const pt: Dict = {
   "governance.injection.note":
     "Mede defesa-em-profundidade de um agente já injetado (corpus sintético, sem modelo) — não a suscetibilidade do modelo a ser injetado.",
   "governance.audit.title": "Registro de auditoria",
+  "governance.audit.intact":
+    "cadeia íntegra",
+  "governance.audit.broken":
+    "cadeia rompida",
+  "governance.audit.chainOk":
+    "{n} entradas conferidas contra o resumo da anterior — nada aqui foi editado depois de escrito.",
+  "governance.audit.chainBroken":
+    "A entrada {n} não bate com a cadeia ({reason}). Trate tudo dali em diante como não verificado — o registro deixou de poder responder por si.",
+  "governance.audit.unchained":
+    "{n} entradas antigas são anteriores à cadeia e não dá para conferir nem num sentido nem no outro.",
   "governance.injection.disarmed":
     "Desligada nesta instalação (CHIMERA_TAINT_NARROW=0) — a coluna com defesa abaixo descreve uma configuração que você não está usando.",
   "governance.injection.kernel":
@@ -3192,6 +3212,16 @@ const es: Dict = {
   "governance.injection.note":
     "Mide la defensa en profundidad de un agente ya inyectado (corpus sintético, sin modelo) — no la susceptibilidad del modelo a ser inyectado.",
   "governance.audit.title": "Registro de auditoría",
+  "governance.audit.intact":
+    "cadena íntegra",
+  "governance.audit.broken":
+    "cadena rota",
+  "governance.audit.chainOk":
+    "{n} entradas verificadas contra el resumen de la anterior: nada de esto se editó después de escribirse.",
+  "governance.audit.chainBroken":
+    "La entrada {n} no coincide con la cadena ({reason}). Trata todo lo posterior como no verificado: el registro ya no puede responder por sí mismo.",
+  "governance.audit.unchained":
+    "{n} entradas antiguas son anteriores a la cadena y no pueden comprobarse en ningún sentido.",
   "governance.injection.disarmed":
     "Desactivada en esta instalación (CHIMERA_TAINT_NARROW=0) — la columna con defensa de abajo describe una configuración que no estás usando.",
   "governance.injection.kernel":
@@ -4338,6 +4368,16 @@ const fr: Dict = {
   "governance.injection.note":
     "Mesure la défense en profondeur d'un agent déjà injecté (corpus synthétique, sans modèle) — pas la susceptibilité du modèle à être injecté.",
   "governance.audit.title": "Journal d'audit",
+  "governance.audit.intact":
+    "chaîne intacte",
+  "governance.audit.broken":
+    "chaîne rompue",
+  "governance.audit.chainOk":
+    "{n} entrées vérifiées contre l'empreinte de la précédente — rien ici n'a été modifié après coup.",
+  "governance.audit.chainBroken":
+    "L'entrée {n} ne correspond pas à la chaîne ({reason}). Considérez tout ce qui suit comme non vérifié — le journal ne peut plus répondre de lui-même.",
+  "governance.audit.unchained":
+    "{n} entrées anciennes précèdent la chaîne et ne peuvent être vérifiées ni dans un sens ni dans l'autre.",
   "governance.injection.disarmed":
     "Désactivée sur cette installation (CHIMERA_TAINT_NARROW=0) — la colonne défendue ci-dessous décrit une configuration que vous n'utilisez pas.",
   "governance.injection.kernel":
@@ -5483,6 +5523,16 @@ const de: Dict = {
   "governance.injection.note":
     "Misst die tiefengestaffelte Abwehr eines bereits injizierten Agenten (synthetischer Korpus, kein Modell) — nicht die Anfälligkeit des Modells, injiziert zu werden.",
   "governance.audit.title": "Audit-Protokoll",
+  "governance.audit.intact":
+    "Kette intakt",
+  "governance.audit.broken":
+    "Kette gebrochen",
+  "governance.audit.chainOk":
+    "{n} Einträge gegen den Digest des vorherigen geprüft — nichts hiervon wurde nachträglich geändert.",
+  "governance.audit.chainBroken":
+    "Eintrag {n} passt nicht zur Kette ({reason}). Alles ab dort gilt als ungeprüft — das Protokoll kann nicht mehr für sich selbst bürgen.",
+  "governance.audit.unchained":
+    "{n} ältere Einträge stammen aus der Zeit vor der Kette und lassen sich weder bestätigen noch widerlegen.",
   "governance.injection.disarmed":
     "In dieser Installation AUS (CHIMERA_TAINT_NARROW=0) — die Spalte „mit Abwehr“ unten beschreibt eine Konfiguration, die du nicht fährst.",
   "governance.injection.kernel":
@@ -6551,6 +6601,16 @@ const zh: Dict = {
   "governance.injection.note":
     "衡量已被注入的智能体的纵深防御（合成语料，无模型）——并非模型被注入的易感性。",
   "governance.audit.title": "审计日志",
+  "governance.audit.intact":
+    "链条完整",
+  "governance.audit.broken":
+    "链条断裂",
+  "governance.audit.chainOk":
+    "已按前一条的摘要校验 {n} 条记录 —— 这里没有任何一条在写入后被改动过。",
+  "governance.audit.chainBroken":
+    "第 {n} 条与链条不符（{reason}）。从那里往后的内容都应视为未经验证 —— 这份日志已无法为自己作证。",
+  "governance.audit.unchained":
+    "有 {n} 条更早的记录先于链条存在，无法从任一方向核对。",
   "governance.injection.disarmed":
     "本安装中已关闭（CHIMERA_TAINT_NARROW=0）——下方“有防御”一列描述的并不是你正在运行的配置。",
   "governance.injection.kernel":
@@ -7673,6 +7733,16 @@ const ja: Dict = {
   "governance.injection.note":
     "すでに注入されたエージェントの多層防御を測定します（合成コーパス、モデルなし）— モデルが注入されやすさそのものではありません。",
   "governance.audit.title": "監査ログ",
+  "governance.audit.intact":
+    "連鎖は無傷",
+  "governance.audit.broken":
+    "連鎖が壊れています",
+  "governance.audit.chainOk":
+    "{n} 件を直前のダイジェストと照合しました — 書き込まれたあとに手が入ったものはありません。",
+  "governance.audit.chainBroken":
+    "{n} 件目が連鎖と一致しません（{reason}）。そこから先はすべて未検証として扱ってください — この記録はもう自分を保証できません。",
+  "governance.audit.unchained":
+    "連鎖より前の古い記録が {n} 件あり、どちらとも確かめられません。",
   "governance.injection.disarmed":
     "このインストールではオフです（CHIMERA_TAINT_NARROW=0）——下の「防御あり」の列は、あなたが動かしていない構成を示しています。",
   "governance.injection.kernel":
@@ -8813,6 +8883,16 @@ const it: Dict = {
   "governance.injection.note":
     "Misura la difesa in profondità di un agente già iniettato (corpus sintetico, nessun modello) — non la suscettibilità del modello a essere iniettato.",
   "governance.audit.title": "Registro di audit",
+  "governance.audit.intact":
+    "catena integra",
+  "governance.audit.broken":
+    "catena spezzata",
+  "governance.audit.chainOk":
+    "{n} voci verificate contro il digest della precedente: nulla qui è stato modificato dopo la scrittura.",
+  "governance.audit.chainBroken":
+    "La voce {n} non corrisponde alla catena ({reason}). Considera tutto ciò che segue come non verificato: il registro non può più garantire per sé.",
+  "governance.audit.unchained":
+    "{n} voci più vecchie precedono la catena e non possono essere verificate in alcun senso.",
   "governance.injection.disarmed":
     "Disattivata in questa installazione (CHIMERA_TAINT_NARROW=0) — la colonna con difesa qui sotto descrive una configurazione che non stai usando.",
   "governance.injection.kernel":
@@ -9945,6 +10025,16 @@ const pl: Dict = {
   "governance.injection.note":
     "Mierzy obronę w głąb agenta już zainfekowanego (korpus syntetyczny, bez modelu) — a nie podatność modelu na zainfekowanie.",
   "governance.audit.title": "Dziennik audytu",
+  "governance.audit.intact":
+    "łańcuch nienaruszony",
+  "governance.audit.broken":
+    "łańcuch przerwany",
+  "governance.audit.chainOk":
+    "Zweryfikowano {n} wpisów wobec skrótu poprzedniego — nic tutaj nie zostało zmienione po zapisaniu.",
+  "governance.audit.chainBroken":
+    "Wpis {n} nie zgadza się z łańcuchem ({reason}). Wszystko od tego miejsca traktuj jako niezweryfikowane — dziennik nie ręczy już za siebie.",
+  "governance.audit.unchained":
+    "{n} starszych wpisów pochodzi sprzed łańcucha i nie da się ich sprawdzić w żadną stronę.",
   "governance.injection.disarmed":
     "Wyłączone w tej instalacji (CHIMERA_TAINT_NARROW=0) — kolumna z obroną poniżej opisuje konfigurację, której nie używasz.",
   "governance.injection.kernel":
@@ -11083,6 +11173,16 @@ const ru: Dict = {
   "governance.injection.note":
     "Измеряет глубину защиты уже внедрённого агента (синтетический корпус, без модели) — а не подверженность самой модели внедрению.",
   "governance.audit.title": "Журнал аудита",
+  "governance.audit.intact":
+    "цепочка цела",
+  "governance.audit.broken":
+    "цепочка нарушена",
+  "governance.audit.chainOk":
+    "Проверено записей: {n} — каждая против отпечатка предыдущей. Ничего здесь не правили после записи.",
+  "governance.audit.chainBroken":
+    "Запись {n} не сходится с цепочкой ({reason}). Всё после неё считайте непроверенным — журнал больше не ручается за себя.",
+  "governance.audit.unchained":
+    "{n} более старых записей появились до цепочки — подтвердить или опровергнуть их нельзя.",
   "governance.injection.disarmed":
     "В этой установке ВЫКЛЮЧЕНО (CHIMERA_TAINT_NARROW=0) — столбец «с защитой» ниже описывает конфигурацию, которая у вас не работает.",
   "governance.injection.kernel":
