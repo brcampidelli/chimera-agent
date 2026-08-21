@@ -127,7 +127,16 @@ class CapabilityEvent:
     """One recorded capability use in a run (the replayable unit)."""
 
     seq: int
-    kind: str  # fetch | read | write | exec | env | escalation
+    kind: str  # fetch | read | write | exec | send | escalation
+    """What the agent did. There is no ``env`` kind, and there was one for a while with no producer.
+
+    Nothing ever called ``record_env``, and nothing ever would have: the two real channels by which
+    an environment variable reaches an agent are already covered by kinds that fire. Reading a
+    dotfile is a ``read``, and ``.env`` is in ``_SELF_EXEC_NAMES``, so it is a read the ledger treats
+    as self-modifying; running a command that inherits the process environment is an ``exec``. A
+    third kind listed here and never emitted describes a category the ledger appears to watch and
+    does not, which is the failure this whole file exists to avoid.
+    """
     ref: str  # url / path / command / var — the subject of the action
     tainted: bool = False
     detail: str = ""
@@ -205,9 +214,6 @@ class TaintLedger:
         exists to catch passed clean.
         """
         return self._add("send", (target or tool).strip() or tool)
-
-    def record_env(self, var: str) -> CapabilityEvent:
-        return self._add("env", (var or "").strip())
 
     def record_escalation(self, tool: str, assessment: SequenceAssessment) -> CapabilityEvent:
         return self._add(

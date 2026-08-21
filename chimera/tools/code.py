@@ -75,7 +75,15 @@ class CodeInterpreterTool(Tool):
 
 class ExecuteCodeTool(Tool):
     name = "execute_code"
-    description = "Run a Python 3 code snippet in the sandbox and return its stdout/stderr."
+    # "in the sandbox" read as "isolated from your machine", and the default sandbox is `local`,
+    # whose own `is_isolated()` returns False and whose module docstring says outright that it is
+    # not isolated. Read beside `code_interpreter`, which says "(not sandboxed)", the omission
+    # implied the opposite of the truth. This is also the sentence the MODEL is shown before it
+    # decides to call the tool, so it is the right place to say whose machine this runs on.
+    description = (
+        "Run a Python 3 code snippet and return its stdout/stderr. It runs in whatever sandbox is "
+        "configured, which by default is THIS machine — not an isolated one."
+    )
     parameters = {
         "type": "object",
         "properties": {

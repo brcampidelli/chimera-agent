@@ -467,13 +467,21 @@ def assemble_registry(
     # can reach the others through the merge. It is the same distinction the CLI already draws
     # between `solve-batch` (independent, own ledgers) and `crew-isolated` (shared).
     ledger = TaintLedger(shared=shared) if shared is not None else TaintLedger()
-    # A posture that asks to be told about suspicious input also arms taint-adaptive narrowing;
-    # without one the env default (CHIMERA_TAINT_NARROW) still decides, as it always did.
+    # A UNION, exactly like the denial list twelve lines up, and for the reason that block already
+    # gives: a floor is not a default. A default is what a request gets when it sends nothing, so any
+    # client can step around it by sending something.
+    #
+    # This read `settings.taint_narrow` only in the branch where the request sent NO posture. So an
+    # owner with CHIMERA_TAINT_NARROW=1 and no CHIMERA_APPROVAL had it silently disarmed by any
+    # request that sent a posture — `deployment_posture(...).narrow_on_taint` derives from
+    # `approval`, not from `taint_narrow`, so nothing downstream put it back. Meanwhile the
+    # Governance screen reports `"armed": bool(settings.taint_narrow)`, which stayed true: the app
+    # said the defence was on while requests were turning it off.
     narrow = (
-        resolve_posture(seams.posture).narrow_on_taint
-        if seams.posture is not None
-        else settings.taint_narrow
-    ) or deployment_posture(settings).narrow_on_taint
+        (resolve_posture(seams.posture).narrow_on_taint if seams.posture is not None else False)
+        or settings.taint_narrow
+        or deployment_posture(settings).narrow_on_taint
+    )
     # The audit trail starts here, and only here. `LedgeredTool` records the three things worth a
     # permanent line — a dangerous tool narrowed after untrusted input, a call escalated for review,
     # a side effect suppressed as a duplicate — and each is rare by construction.
