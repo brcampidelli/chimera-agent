@@ -5,6 +5,7 @@ import { Check, GitBranch, Loader2 } from "lucide-react";
 import { getGitDiff, getGitStatus, gitCommit } from "@/lib/api";
 import type { GitFile } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/ui/async";
 import { DiffView } from "@/components/code/DiffView";
 import { GitInitButton } from "@/components/code/GitInitButton";
 import { useT } from "@/lib/i18n";
@@ -173,6 +174,14 @@ export function GitPanel({ workspace }: { workspace: string }) {
         <div className="flex justify-center py-4 text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
         </div>
+      ) : statusQ.isError ? (
+        // A failed request used to fall through to the branch below, because `status` is undefined
+        // on error and `!status?.is_repo` is then true. So "we could not ask" rendered as "this is
+        // not a git repository", under a button offering to `git init` a folder that may well
+        // already be one. Two different problems, one screen, and the wrong fix on offer.
+        <div className="px-4 py-3">
+          <ErrorState error={statusQ.error} onRetry={() => void statusQ.refetch()} />
+        </div>
       ) : !status?.is_repo ? (
         <div className="flex flex-col items-start gap-2 px-4 py-3">
           <p className="text-xs text-muted-foreground">{t("code.git.notRepo")}</p>
@@ -219,6 +228,10 @@ export function GitPanel({ workspace }: { workspace: string }) {
         <div className="px-4 pb-3">
           {diffQ.isLoading ? (
             <div className="py-2 text-xs text-muted-foreground">…</div>
+          ) : diffQ.isError ? (
+            // "No diff" and "we could not fetch the diff" are different sentences. The first sends
+            // you looking for why your edit did not register.
+            <ErrorState error={diffQ.error} onRetry={() => void diffQ.refetch()} />
           ) : diffQ.data?.patch ? (
             <DiffView patch={diffQ.data.patch} />
           ) : (
