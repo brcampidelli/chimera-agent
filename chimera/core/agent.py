@@ -175,12 +175,23 @@ class _UsageTally:
     completion: int = 0
     cache_read: int = 0
     cache_write: int = 0
+    # Priced per call, at whatever model actually answered — a failover, a cascade hop or a fusion
+    # panel all reply on models the caller never named. Summing tokens and pricing the total at the
+    # REQUESTED model produced a plausible-looking figure for calls that never happened.
+    usd: float = 0.0
+    unpriced: str | None = None
 
     def add(self, result: CompletionResult) -> None:
+        from chimera.orchestration.receipts import price_completion
+
         self.prompt += result.prompt_tokens or 0
         self.completion += result.completion_tokens or 0
         self.cache_read += result.cache_read_tokens or 0
         self.cache_write += result.cache_write_tokens or 0
+        cost = price_completion(result)
+        self.usd += cost.usd
+        if cost.unpriced is not None and self.unpriced is None:
+            self.unpriced = cost.unpriced
 
 
 @dataclass
@@ -586,11 +597,7 @@ class Agent:
         if spend is not None:
             # The model that ANSWERED: a cascade or a failover can reply on a different one, and
             # charging the requested model invents a price for a call that never happened.
-            spend.record(
-                str(getattr(result, "model", "") or self.config.model or ""),
-                result.prompt_tokens,
-                result.completion_tokens,
-            )
+            spend.record_result(result)
         return result
 
     def _result(
@@ -607,9 +614,8 @@ class Agent:
         steplog: StepLog | None = None,
         task: str = "",
     ) -> AgentResult:
-        """Assemble the final result, pricing the summed tokens at the model's list rate."""
+        """Assemble the final result from the per-call costs the tally already accumulated."""
         from chimera.obs import record_llm_metrics
-        from chimera.orchestration.receipts import price_delegation
 
         log = steplog if steplog is not None else StepLog()
         run_id = ""
@@ -621,7 +627,10 @@ class Agent:
             except OSError as exc:  # pragma: no cover - disk-shaped failure
                 _log.debug("could not write trace to %s: %s", self.config.trace_path, exc)
 
-        usd = price_delegation(self.config.model or model, usage.prompt, usage.completion)
+        # The sum of what each call cost at the model that answered it, not the run's tokens priced
+        # at the model that was asked. `None` when any call could not be priced: a partial total
+        # presented as a whole is the failure this whole path exists to avoid.
+        usd = None if usage.unpriced is not None else round(usage.usd, 6)
         record_llm_metrics(
             model=model, prompt_tokens=usage.prompt, completion_tokens=usage.completion, usd=usd
         )

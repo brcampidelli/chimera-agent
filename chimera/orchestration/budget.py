@@ -99,6 +99,23 @@ class SpendBudget:
             return
         self._spent += usd
 
+    def record_result(self, result: object) -> None:
+        """Charge one completed call by its STAGES when it has them, else by the model that answered.
+
+        A fused turn answers as ``model="fusion"`` — a label no price table resolves — so every such
+        turn was charged $0.00 and the cap never fired on the most expensive call the app makes.
+        Stages are priced at their own models' rates, which is what the receipt code has always done
+        for display and what the ceiling never did for enforcement.
+        """
+        from chimera.orchestration.receipts import price_completion
+
+        cost = price_completion(result)
+        if cost.unpriced is not None and self._unpriced_model is None:
+            self._unpriced_model = cost.unpriced
+        # Added even when part is unknown: the priced stages really were spent, and a floor with the
+        # gap named beats a zero. `blocked()` refuses the next call either way.
+        self._spent += cost.usd
+
 
 class TokenBudget:
     """A mutable token allowance for one delegation.
