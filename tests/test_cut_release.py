@@ -55,7 +55,20 @@ def test_the_bump_hits_the_version_line_and_nothing_else(tmp_path: Path, monkeyp
     cargo = tmp_path / "Cargo.toml"
     cargo.write_text('[package]\nname = "chimera"\nversion = "0.48.0-rc.9"\n', encoding="utf-8")
     tauri = tmp_path / "tauri.conf.json"
-    tauri.write_text(json.dumps({"version": "0.48.0-rc.9", "productName": "Chimera"}), encoding="utf-8")
+    # Pretty-printed with a compact array in it, like the real file. The shape matters: the first
+    # real release cut re-dumped this through `json.dumps` and expanded the array onto five lines,
+    # so a commit promising to change one number arrived with eleven lines of noise.
+    tauri.write_text(
+        """\n{
+  "productName": "Chimera",
+  "version": "0.48.0-rc.9",
+  "bundle": {
+    "targets": ["nsis", "dmg", "appimage", "deb"]
+  }
+}
+""",
+        encoding="utf-8",
+    )
 
     monkeypatch.setattr(cut_release, "PYPROJECT", pyproject)
     monkeypatch.setattr(cut_release, "CARGO", cargo)
@@ -72,8 +85,12 @@ def test_the_bump_hits_the_version_line_and_nothing_else(tmp_path: Path, monkeyp
 
     # And the desktop shell gets the OTHER spelling, which is the whole point.
     assert 'version = "0.48.0-rc.10"' in cargo.read_text(encoding="utf-8")
-    assert json.loads(tauri.read_text(encoding="utf-8"))["version"] == "0.48.0-rc.10"
-    assert json.loads(tauri.read_text(encoding="utf-8"))["productName"] == "Chimera"
+    after = tauri.read_text(encoding="utf-8")
+    assert json.loads(after)["version"] == "0.48.0-rc.10"
+    assert json.loads(after)["productName"] == "Chimera"
+    # And nothing else moved. A release commit that reformats a config file it was only supposed
+    # to bump has broken the promise the six-file check exists to make.
+    assert '"targets": ["nsis", "dmg", "appimage", "deb"]' in after
 
 
 def test_a_stale_install_stops_the_release_rather_than_stamping_the_old_version(monkeypatch) -> None:

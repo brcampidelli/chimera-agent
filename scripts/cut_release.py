@@ -127,9 +127,21 @@ def write_versions(version: str) -> None:
         raise Stop("could not find the version line in Cargo.toml")
     CARGO.write_text(text, encoding="utf-8")
 
-    data = json.loads(TAURI.read_text(encoding="utf-8"))
-    data["version"] = tauri_version
-    TAURI.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    # Substituted on the line, not parsed and re-dumped. `json.dumps` normalises formatting it
+    # was never asked to touch: the first real cut with this expanded a compact
+    # `"targets": ["nsis", "dmg", ...]` onto five lines, so a commit that promises to change one
+    # version number arrived with eleven lines of noise around it.
+    text = TAURI.read_text(encoding="utf-8")
+    text, count = re.subn(
+        r'^(\s*"version"\s*:\s*)"[^"]*"',
+        rf'\g<1>"{tauri_version}"',
+        text,
+        count=1,
+        flags=re.M,
+    )
+    if count != 1:
+        raise Stop("could not find the version line in tauri.conf.json")
+    TAURI.write_text(text, encoding="utf-8")
 
 
 def refresh_install() -> None:
@@ -273,7 +285,12 @@ def main() -> None:
         # putting a branch on the remote to prove it.
         print("  would commit:\n    " + "\n    ".join(changed), file=sys.stderr)
         run("git", "checkout", "--", ".")
-        print("  dry run — tree restored, nothing pushed", file=sys.stderr)
+        # The install too, not just the tree. Verifying the snapshot stamping means really
+        # refreshing the metadata, and a dry run that left the environment reporting a version
+        # the repository does not have is not dry — it made the next `pytest` fail on a
+        # snapshot that was perfectly correct.
+        refresh_install()
+        print("  dry run - tree and install restored, nothing pushed", file=sys.stderr)
         return
 
     url = open_pull_request(version, changed)
