@@ -178,7 +178,16 @@ export function Skills({ embedded = false }: { embedded?: boolean } = {}) {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="truncate font-mono text-sm">{s.name}</span>
-                  <Badge tone={statusTone(s.status)}>{s.status}</Badge>
+                  <Badge tone={statusTone(s.status)}>
+                  {/* Translated, not echoed. The backend's value is an identifier; a badge is
+                      read by a person, and an interface that ships in ten languages was showing
+                      "active" and "retired" in all of them. Unknown states fall back to the raw
+                      value rather than to an empty badge — a new state from a newer backend
+                      should look odd, not invisible. */}
+                  {t(`skills.status.${s.status}`) === `skills.status.${s.status}`
+                    ? s.status
+                    : t(`skills.status.${s.status}`)}
+                </Badge>
                   {s.provenance === "tainted" && <Badge tone="warn">tainted</Badge>}
                   {candidates.has(s.name) && <Badge tone="bad">retire?</Badge>}
                 </div>

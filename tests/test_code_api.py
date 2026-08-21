@@ -427,3 +427,42 @@ def test_a_fused_coding_turn_declares_that_it_touched_nothing(
         if e == "done"
     )
     assert plain["fused"] is False  # or the marking would mean nothing
+
+
+def test_a_coding_turn_reaches_the_cost_dashboard(tmp_path: Path, patched: Any) -> None:
+    """The Cost and usage tab must fill up when you use the app.
+
+    It did not. `_append_usage` was called from exactly one place — `POST /api/chat` — and NO
+    screen in the desktop app calls that route: the Code tab talks to `/api/code/turn`. So the
+    dashboard read a log nothing wrote and told someone who had been working all day to "talk to
+    it a bit and come back". A dashboard that cannot fill up is worse than an absent one, because
+    it reports zero spend as a fact.
+    """
+    client = _client(tmp_path, patched)
+
+    client.post("/api/code/turn", json={"message": "oi"})
+
+    usage = client.get("/api/usage").json()
+    # The turn is the assertion. The scripted agent reports no token counts, and demanding some
+    # would test the fixture rather than the wiring — the wiring is that a coding turn is logged
+    # AT ALL, which it was not.
+    assert usage["totals"]["turns"] == 1, "a coding turn is a turn"
+    assert usage["by_model"], "and it says which model answered"
+
+    # And it accumulates, rather than overwriting.
+    client.post("/api/code/turn", json={"message": "de novo"})
+    assert client.get("/api/usage").json()["totals"]["turns"] == 2
+
+
+def test_an_unpriced_turn_is_counted_but_never_priced_at_zero(
+    tmp_path: Path, patched: Any
+) -> None:
+    client = _client(tmp_path, patched)
+
+    client.post("/api/code/turn", json={"message": "oi"})
+    totals = client.get("/api/usage").json()["totals"]
+
+    # The scripted agent reports no price. Zero would be a number someone could budget against;
+    # "unpriced" is the truth, and the summary keeps them apart.
+    assert totals["usd"] == 0.0
+    assert totals["unpriced_turns"] == 1

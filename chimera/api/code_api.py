@@ -565,6 +565,37 @@ class CodeTurnRequest(CodeSeams):
     tools for that, and a server-side read would put a stale copy in the prompt."""
 
 
+def _log_usage(payload: dict[str, Any], session_id: str, settings: Settings) -> None:
+    """Append one coding turn to the usage log.
+
+    Best-effort in the same way `_append_usage` is: a failure to record what a turn cost must
+    never break the turn that already happened. `usd` stays None when the price is unknown —
+    the summary counts unpriced turns separately, and a guessed zero would launder that away.
+    """
+    from datetime import UTC, datetime
+
+    from chimera.api.usage import UsageRecord, append_usage
+
+    try:
+        route = payload.get("route_meta") or {}
+        append_usage(
+            Path(settings.home) / "usage.jsonl",
+            UsageRecord(
+                ts=datetime.now(UTC).isoformat(),
+                session_id=session_id,
+                model=str(payload.get("model") or ""),
+                prompt_tokens=int(payload.get("prompt_tokens") or 0),
+                completion_tokens=int(payload.get("completion_tokens") or 0),
+                usd=payload.get("usd"),
+                tools=len(payload.get("tool_names") or []),
+                memory_facts=int(payload.get("memory_facts_used") or 0),
+                route_kind=route.get("kind") if isinstance(route, dict) else None,
+            ),
+        )
+    except Exception as exc:  # noqa: BLE001 — logging what a turn cost is never worth losing it
+        _log.debug("usage logging skipped: %s", exc)
+
+
 def register_code_api(
     app: FastAPI,
     guard: params.Depends,
@@ -792,7 +823,15 @@ def register_code_api(
                     Shared by both branches on purpose. The verifier, the revert offer and the
                     receipt are what this endpoint IS; an external worker that skipped them would be
                     a second, weaker product wearing the same screen.
+
+                    It is also where usage is logged, for the same reason: every path out of a turn
+                    goes through here. Until now `_append_usage` was called from exactly one place,
+                    `POST /api/chat` — and NO screen in the app calls that route. So the Cost and
+                    usage tab read a log nothing wrote, and answered "talk to it a bit and come
+                    back" to someone who had been talking to it all day. A dashboard that cannot
+                    fill up is worse than an absent one: it reports zero spend as a fact.
                     """
+                    _log_usage(payload, session_id, live())
                     if edited:
                         from chimera.api.app import resolve_verify
                         from chimera.core.verify import CommandVerifier
