@@ -23,6 +23,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor, TimeoutError, as_completed
+from contextlib import suppress
 from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
@@ -157,7 +158,15 @@ def _collect(
         )
     value = cast("T", slot.value)
     ok = bool(succeeded(value))
-    changed = tree.changed_paths() if (tree is not None and ok) else []
+    # Collected for the REJECTED units too, though only the successful ones are merged. What a
+    # unit wrote is the only account of what it tried, and a unit that was thrown away is exactly
+    # the one a caller wants that account for — the worktree is about to be removed, so this is
+    # the last moment it can be asked. Guarded because a unit that crashed may have left the tree
+    # in a state git refuses to read, and a report is never worth failing a batch over.
+    changed: list[str] = []
+    if tree is not None:
+        with suppress(Exception):
+            changed = tree.changed_paths()
     return IsolatedResult(slot.name, ok=ok, value=value, changed_paths=changed)
 
 

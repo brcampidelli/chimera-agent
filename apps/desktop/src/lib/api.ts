@@ -77,9 +77,36 @@ function authHeadersNoContentType(): HeadersInit {
   return bearer ? { Authorization: `Bearer ${bearer}` } : {};
 }
 
+/** The reason a request was refused, when the server gave one.
+ *
+ *  Every refusal in this app used to reach the screen as "400 Bad Request" — the status line,
+ *  never the sentence. So a backend that answers `workspace not found: C:\...` with the path in
+ *  it, precisely so a person can see WHICH folder was missing, was answering into a wall.
+ *
+ *  FastAPI's `detail` is a string for a raised HTTPException and a list of objects for a schema
+ *  rejection; only the first is a sentence written for a human, so only the first is used. */
+async function refusal(res: Response): Promise<string> {
+  const fallback = `${res.status} ${res.statusText}`;
+  try {
+    const body = (await res.json()) as { detail?: unknown };
+    const detail = body?.detail;
+    if (typeof detail === "string" && detail.trim()) return detail.slice(0, 400);
+  } catch {
+    // Not JSON at all — a proxy page, an empty body, a connection cut mid-response. The status
+    // line is all there is, and it is better than an exception thrown while reporting one.
+  }
+  return fallback;
+}
+
+/** The same, for the streaming surfaces, which also fail when a 200 arrives with no body. */
+async function streamRefusal(res: Response): Promise<string> {
+  if (!res.ok) return refusal(res);
+  return "the server accepted the request and sent nothing";
+}
+
 async function json<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(apiUrl(path), { ...init, headers: authHeaders(init?.headers) });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  if (!res.ok) throw new Error(await refusal(res));
   return (await res.json()) as T;
 }
 
@@ -167,7 +194,9 @@ export async function getFsImage(
   const res = await fetch(apiUrl(`/api/fs/image?${params.toString()}`), {
     headers: authHeadersNoContentType(),
   });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  // Same reason as `json`: an image that could not be read has a server-side reason, and "400
+  // Bad Request" is not it.
+  if (!res.ok) throw new Error(await refusal(res));
   return res.blob();
 }
 
@@ -453,7 +482,7 @@ export async function streamKanbanRun(
     return;
   }
   if (!res.ok || !res.body) {
-    handlers.onError?.(`HTTP ${res.status}`);
+    handlers.onError?.(await streamRefusal(res));
     return;
   }
   const reader = res.body.getReader();
@@ -537,7 +566,7 @@ export async function streamChat(
     return;
   }
   if (!res.ok || !res.body) {
-    handlers.onError?.(`HTTP ${res.status}`);
+    handlers.onError?.(await streamRefusal(res));
     return;
   }
   const reader = res.body.getReader();
@@ -681,7 +710,7 @@ export async function streamRun(
     return;
   }
   if (!res.ok || !res.body) {
-    handlers.onError?.(`HTTP ${res.status}`);
+    handlers.onError?.(await streamRefusal(res));
     return;
   }
   const reader = res.body.getReader();
@@ -865,7 +894,7 @@ export async function uploadAttachment(file: File): Promise<Attachment> {
     headers: authHeadersNoContentType(),
     body,
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) throw new Error(await refusal(res));
   return (await res.json()) as Attachment;
 }
 
@@ -914,7 +943,7 @@ export async function transcribe(audio: Blob): Promise<Transcript> {
     headers: authHeadersNoContentType(),
     body,
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) throw new Error(await refusal(res));
   return (await res.json()) as Transcript;
 }
 
@@ -947,7 +976,7 @@ export async function streamCodeTurn(
     return;
   }
   if (!res.ok || !res.body) {
-    handlers.onError?.(`HTTP ${res.status}`);
+    handlers.onError?.(await streamRefusal(res));
     return;
   }
   const reader = res.body.getReader();
@@ -1281,7 +1310,7 @@ export async function streamAgents(
     return;
   }
   if (!res.ok || !res.body) {
-    handlers.onError?.(`HTTP ${res.status}`);
+    handlers.onError?.(await streamRefusal(res));
     return;
   }
   const reader = res.body.getReader();
@@ -1368,7 +1397,7 @@ export async function streamExec(
     return;
   }
   if (!res.ok || !res.body) {
-    handlers.onError?.(`HTTP ${res.status}`);
+    handlers.onError?.(await streamRefusal(res));
     return;
   }
   const reader = res.body.getReader();
@@ -1485,6 +1514,14 @@ export const cancelOrchestration = (runId: string) =>
 export const getDelegations = () =>
   json<{ summary: DelegationSummary }>("/api/orchestration/delegations");
 
+/** The ready-made ways of attacking a task a crew can be assembled from.
+ *
+ *  Fetched rather than bundled, because `instruction` is the system prompt that will actually be
+ *  sent: it lives with the rest of the backend's prompts, and changing one must not require
+ *  shipping a desktop build. */
+export const getApproaches = () =>
+  json<{ approaches: CrewApproach[]; default: string[] }>("/api/orchestration/approaches");
+
 export async function streamHierarchy(
   req: HierarchyRunInput,
   handlers: HierarchyStreamHandlers,
@@ -1503,7 +1540,7 @@ export async function streamHierarchy(
     return;
   }
   if (!res.ok || !res.body) {
-    handlers.onError?.(`HTTP ${res.status}`);
+    handlers.onError?.(await streamRefusal(res));
     return;
   }
   const reader = res.body.getReader();
@@ -1560,6 +1597,15 @@ export interface CrewWorkerInput {
   instruction: string;
 }
 
+/** One ready-made way of attacking a task.
+ *
+ *  `instruction` is untranslated on purpose — it is the prompt that gets sent, and the screen
+ *  shows what is sent. The label and the one-line description are translated, keyed by `id`. */
+export interface CrewApproach {
+  id: string;
+  instruction: string;
+}
+
 export interface CrewRunInput {
   task: string;
   workers: CrewWorkerInput[];
@@ -1590,7 +1636,7 @@ export async function streamCrew(
     return;
   }
   if (!res.ok || !res.body) {
-    handlers.onError?.(`HTTP ${res.status}`);
+    handlers.onError?.(await streamRefusal(res));
     return;
   }
   const reader = res.body.getReader();

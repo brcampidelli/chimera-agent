@@ -470,6 +470,44 @@
         "title": "AgentsRequest",
         "type": "object"
       },
+      "ApproachOut": {
+        "properties": {
+          "id": {
+            "default": "",
+            "title": "Id",
+            "type": "string"
+          },
+          "instruction": {
+            "default": "",
+            "description": "The system prompt this approach sends, verbatim. Untranslated on purpose: a translated prompt is a different prompt, and the screen shows what is actually sent.",
+            "title": "Instruction",
+            "type": "string"
+          }
+        },
+        "title": "ApproachOut",
+        "type": "object"
+      },
+      "ApproachesOut": {
+        "properties": {
+          "approaches": {
+            "items": {
+              "$ref": "#/components/schemas/ApproachOut"
+            },
+            "title": "Approaches",
+            "type": "array"
+          },
+          "default": {
+            "description": "The ids a fresh crew starts with \u2014 the widest pair in the catalogue.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Default",
+            "type": "array"
+          }
+        },
+        "title": "ApproachesOut",
+        "type": "object"
+      },
       "ApproveBody": {
         "properties": {
           "card": {
@@ -2023,6 +2061,45 @@
           "instruction"
         ],
         "title": "CrewWorkerIn",
+        "type": "object"
+      },
+      "CrewWorkerProducedOut": {
+        "properties": {
+          "answer": {
+            "default": "",
+            "description": "The worker's own report, truncated.",
+            "title": "Answer",
+            "type": "string"
+          },
+          "files": {
+            "description": "The files this worker wrote that actually reached the workspace.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "landed": {
+            "default": false,
+            "description": "Whether these files were merged. False means the work existed and was thrown away.",
+            "title": "Landed",
+            "type": "boolean"
+          },
+          "lost": {
+            "description": "The files it wrote that did NOT \u2014 discarded by the check, or contested by another worker. Reported because a discarded attempt leaves nothing else behind: the worktree is removed when the run ends.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Lost",
+            "type": "array"
+          },
+          "task_id": {
+            "default": "",
+            "title": "Task Id",
+            "type": "string"
+          }
+        },
+        "title": "CrewWorkerProducedOut",
         "type": "object"
       },
       "CrewWorkerRejectedOut": {
@@ -4875,6 +4952,9 @@
           },
           "crew_done": {
             "$ref": "#/components/schemas/CrewDoneOut"
+          },
+          "crew_worker_produced": {
+            "$ref": "#/components/schemas/CrewWorkerProducedOut"
           },
           "crew_worker_rejected": {
             "$ref": "#/components/schemas/CrewWorkerRejectedOut"
@@ -9495,6 +9575,25 @@
           }
         },
         "summary": "Ollama Models Endpoint"
+      }
+    },
+    "/api/orchestration/approaches": {
+      "get": {
+        "description": "The ready-made ways of attacking a task that a crew can be built from.\n\nServed rather than hard-coded in the app because the instruction is a model prompt: it\nbelongs with the rest of the repo's prompts, where the CLI can reach it too, and where\nchanging it does not mean shipping a new desktop build.",
+        "operationId": "approaches_endpoint_api_orchestration_approaches_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApproachesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Approaches Endpoint"
       }
     },
     "/api/orchestration/crew": {

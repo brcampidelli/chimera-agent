@@ -241,3 +241,57 @@ def test_a_timed_out_unit_leaves_no_process_behind() -> None:
     assert len(multiprocessing.active_children()) <= before, (
         "a timed-out unit left its worker process running — the interpreter will hang at exit"
     )
+
+
+def test_a_rejected_unit_still_reports_what_it_wrote(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+
+    batch = run_isolated(
+        tmp_path,
+        [("kept", _writer("kept.txt", "yes")), ("thrown", _writer("thrown.txt", "no"))],
+        succeeded=lambda value: value == "yes",
+    )
+
+    by_name = {result.name: result for result in batch.results}
+    # The one that landed, unchanged.
+    assert by_name["kept"].ok and by_name["kept"].changed_paths == ["kept.txt"]
+    # And the one that did not. Its worktree is removed the moment this returns, so if the file
+    # list is not collected here it does not exist anywhere afterwards — a discarded attempt
+    # would leave no account of itself beyond the fact that it happened.
+    assert not by_name["thrown"].ok
+    assert by_name["thrown"].changed_paths == ["thrown.txt"]
+    # Reporting is not merging: the rejected file must still be nowhere near the workspace.
+    assert not (tmp_path / "thrown.txt").exists()
+    assert batch.merged == 1
+
+
+def test_a_bytecode_cache_is_not_a_contested_file(tmp_path: Path) -> None:
+    """Two workers whose *checks* wrote `__pycache__` are not two workers fighting over a file.
+
+    `copy_back_to` already refused to copy these, but the conflict set was computed from the same
+    unfiltered list — so running pytest inside two worktrees produced phantom conflicts, and a
+    person was shown compiled bytecode listed next to the real file they had lost.
+    """
+    _init_repo(tmp_path)
+
+    def writer_with_cache(name: str, content: str):  # noqa: ANN202 — returns a unit fn
+        def run(ws: Path) -> str:
+            (ws / name).write_text(content, encoding="utf-8")
+            cache = ws / "__pycache__"
+            cache.mkdir(exist_ok=True)
+            (cache / "mod.cpython-313.pyc").write_bytes(b"\x00" + content.encode())
+            return content
+
+        return run
+
+    batch = run_isolated(
+        tmp_path,
+        [("a", writer_with_cache("a.py", "AAA")), ("b", writer_with_cache("b.py", "BBB"))],
+    )
+
+    # Both wrote a cache; neither was competing with the other over anything.
+    assert batch.conflicts == []
+    assert batch.merged == 2
+    for result in batch.results:
+        assert all("__pycache__" not in path for path in result.changed_paths), result.changed_paths
+    assert not (tmp_path / "__pycache__").exists()

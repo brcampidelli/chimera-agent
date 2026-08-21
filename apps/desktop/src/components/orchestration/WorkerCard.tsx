@@ -97,12 +97,28 @@ export function WorkerCard({ worker }: { worker: WorkerState }) {
           </div>
         ) : null}
 
+        {/* Titled, because unlabelled these were a list of yellow lines with no way to tell
+            whether they described the task, the answer, or something that went wrong. They are
+            the worker's own account of what it could not reach — which is what makes them worth
+            reading beside an answer built on top of them. */}
         {worker.status === "verified" && worker.gaps.length > 0 ? (
-          <ul className="space-y-0.5 text-xs text-warn-foreground">
-            {worker.gaps.map((gap) => (
-              <li key={gap}>{gap}</li>
-            ))}
-          </ul>
+          <div className="space-y-0.5">
+            <p className="text-xs text-muted-foreground">{t("orch.worker.gaps")}</p>
+            <ul className="space-y-0.5 text-xs text-warn-foreground">
+              {worker.gaps.map((gap) => (
+                <li key={gap}>{gap}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {/* A ref exists only when the output did not FIT the cap, so this line is really saying
+            that the summary the synthesis read is a slice, and here is where the rest of it is.
+            The path is a real file, which is what makes it worth printing rather than a hash. */}
+        {worker.evidenceRefs.length > 0 ? (
+          <p className="break-all font-mono text-xs text-muted-foreground">
+            {t("orch.worker.evidence", { refs: worker.evidenceRefs.join(", ") })}
+          </p>
         ) : null}
       </div>
     </article>

@@ -1291,6 +1291,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/orchestration/approaches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Approaches Endpoint
+         * @description The ready-made ways of attacking a task that a crew can be built from.
+         *
+         *     Served rather than hard-coded in the app because the instruction is a model prompt: it
+         *     belongs with the rest of the repo's prompts, where the CLI can reach it too, and where
+         *     changing it does not mean shipping a new desktop build.
+         */
+        get: operations["approaches_endpoint_api_orchestration_approaches_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/orchestration/crew": {
         parameters: {
             query?: never;
@@ -2143,6 +2167,30 @@ export interface components {
             /** Write Region */
             write_region?: string[] | null;
         };
+        /** ApproachOut */
+        ApproachOut: {
+            /**
+             * Id
+             * @default
+             */
+            id: string;
+            /**
+             * Instruction
+             * @description The system prompt this approach sends, verbatim. Untranslated on purpose: a translated prompt is a different prompt, and the screen shows what is actually sent.
+             * @default
+             */
+            instruction: string;
+        };
+        /** ApproachesOut */
+        ApproachesOut: {
+            /** Approaches */
+            approaches?: components["schemas"]["ApproachOut"][];
+            /**
+             * Default
+             * @description The ids a fresh crew starts with — the widest pair in the catalogue.
+             */
+            default?: string[];
+        };
         /** ApproveBody */
         ApproveBody: {
             /** Card */
@@ -2813,6 +2861,36 @@ export interface components {
             instruction: string;
             /** Name */
             name: string;
+        };
+        /** CrewWorkerProducedOut */
+        CrewWorkerProducedOut: {
+            /**
+             * Answer
+             * @description The worker's own report, truncated.
+             * @default
+             */
+            answer: string;
+            /**
+             * Files
+             * @description The files this worker wrote that actually reached the workspace.
+             */
+            files?: string[];
+            /**
+             * Landed
+             * @description Whether these files were merged. False means the work existed and was thrown away.
+             * @default false
+             */
+            landed: boolean;
+            /**
+             * Lost
+             * @description The files it wrote that did NOT — discarded by the check, or contested by another worker. Reported because a discarded attempt leaves nothing else behind: the worktree is removed when the run ends.
+             */
+            lost?: string[];
+            /**
+             * Task Id
+             * @default
+             */
+            task_id: string;
         };
         /** CrewWorkerRejectedOut */
         CrewWorkerRejectedOut: {
@@ -4092,6 +4170,7 @@ export interface components {
             classified?: components["schemas"]["ClassifiedOut"];
             conflict?: components["schemas"]["ConflictOut"];
             crew_done?: components["schemas"]["CrewDoneOut"];
+            crew_worker_produced?: components["schemas"]["CrewWorkerProducedOut"];
             crew_worker_rejected?: components["schemas"]["CrewWorkerRejectedOut"];
             crew_worker_started?: components["schemas"]["CrewWorkerStartedOut"];
             crew_worker_verified?: components["schemas"]["CrewWorkerVerifiedOut"];
@@ -7113,6 +7192,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OllamaModelsOut"];
+                };
+            };
+        };
+    };
+    approaches_endpoint_api_orchestration_approaches_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApproachesOut"];
                 };
             };
         };
