@@ -102,3 +102,57 @@ def test_dispatch_respects_limit(tmp_path: Path) -> None:
     outcomes = dispatch(board, {"solve": FakeRunner(True)}, limit=2)
     assert len(outcomes) == 2
     assert len(board.cards("backlog")) == 1
+
+
+def test_the_solve_lane_runs_under_the_owners_governance(tmp_path: Path, monkeypatch) -> None:
+    """A card in the `solve` lane is an autonomous loop nobody is watching — so it is governed.
+
+    It was not. `SolveLane.run` built a bare registry, which handed a card shell, file writes, code
+    execution and network outside any allowlist, denylist, trust kernel or taint ledger — reachable
+    from the Tasks screen, and the structural gate reported green because three classes in that file
+    have a method called `run` and its key carried only the function name. This test asks the
+    question a user would: I denied a tool; is it gone here too?
+    """
+    import chimera.core as core
+    import chimera.evolution as evolution
+    import chimera.providers as providers
+    from chimera.config import get_settings
+    from chimera.kanban.lanes import SolveLane
+
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("CHIMERA_TOOL_DENYLIST", "run_shell,execute_code")
+    get_settings.cache_clear()
+    monkeypatch.setattr(providers, "LLMGateway", lambda *a, **k: object())
+
+    seen: dict[str, object] = {}
+
+    class _Agent:
+        def __init__(self, _gateway, registry, _config):
+            seen["registry"] = registry
+
+    class _Auto:
+        def __init__(self, *_a, **_k) -> None:
+            pass
+
+        def run(self, _task: str):
+            return LaneResult(success=True, answer="done")
+
+    monkeypatch.setattr(core, "Agent", _Agent)
+    monkeypatch.setattr(core, "AutonomousAgent", _Auto)
+    monkeypatch.setattr(core, "Planner", lambda *a, **k: None)
+    monkeypatch.setattr(core, "Manager", lambda *a, **k: None)
+    monkeypatch.setattr(evolution, "build_evolution_context", lambda *a, **k: _Evo())
+
+    result = SolveLane(workspace=tmp_path).run(KanbanCard(id="c1", title="x", action="do"))
+
+    assert result.success is True
+    names = {t.name for t in seen["registry"].tools()}  # type: ignore[attr-defined]
+    assert "run_shell" not in names and "execute_code" not in names
+    # And something is still there — a test that passes because the registry came back empty would
+    # pass just as well against a lane that had stopped working at all.
+    assert "read_file" in names
+
+
+class _Evo:
+    def apply_to(self) -> dict[str, object]:
+        return {}

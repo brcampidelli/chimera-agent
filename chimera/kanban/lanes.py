@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from chimera.kanban.dispatch import LaneResult
 from chimera.kanban.models import KanbanCard
@@ -26,6 +26,22 @@ from chimera.kanban.models import KanbanCard
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from chimera.core.registry import AgentDef
     from chimera.kanban.dispatch import LaneRunner
+
+
+def _refusals(approvals: Any) -> str:
+    """A line naming what governance refused, or "" when it refused nothing.
+
+    Read defensively: this runs on an unattended path, and a lane that crashed while reporting what
+    it had been denied would be worse than one that reported nothing at all.
+    """
+    try:
+        denied = [e for e in approvals.entries() if getattr(e, "decision", "") == "deny"]
+    except Exception:  # noqa: BLE001 -- see the docstring
+        return ""
+    if not denied:
+        return ""
+    names = sorted({str(getattr(e, "tool", "") or "?") for e in denied})
+    return f"[governance refused {len(denied)} call(s): {', '.join(names)}]"
 
 
 class SolveLane:
@@ -60,14 +76,32 @@ class SolveLane:
         )
         from chimera.core.verify import CommandVerifier
         from chimera.evolution import build_evolution_context
+        from chimera.governance.profile import governed_profile
         from chimera.providers import LLMGateway
         from chimera.tools import default_registry
 
         gateway = LLMGateway()
         settings = get_settings()
+        # Through the deployment's governance, like every other autonomous surface. It was not, and
+        # the build gate that exists to make this structural reported green anyway: three classes in
+        # this file have a method called `run`, the gate's key carried only function names, and so
+        # the single exemption written for `AgentLane.run` — which really does restrict its registry
+        # — silently covered this line too. A card in the `solve` lane therefore ran a full
+        # autonomous loop with shell, file writes, code execution and network, outside any
+        # allowlist, denylist, trust kernel or taint ledger, reachable from the Tasks screen. An
+        # owner's `CHIMERA_TOOL_DENYLIST` did not reach it.
+        #
+        # Its own surface name, not the CLI's: the audit log has to be able to say which entrance a
+        # run came through, and a board dispatch is not a person typing `chimera solve`.
+        registry, approvals = governed_profile(
+            default_registry(self.workspace),
+            settings=settings,
+            home=settings.home,
+            surface="kanban-solve",
+        )
         worker = Agent(
             gateway,
-            default_registry(self.workspace),
+            registry,
             # The card's workspace, in both arguments: it roots the tools and it carries the
             # project's conventions. A lane is an autonomous path, so nobody is there to
             # restate them.
@@ -90,7 +124,13 @@ class SolveLane:
             config=AutonomousConfig(max_attempts=self.max_attempts),
         )
         result = auto.run(card.action)
-        return LaneResult(success=result.success, answer=result.answer)
+        # The refusals travel with the answer. `governed_profile` says in its own docstring
+        # that a caller who throws the approvals away cannot tell "the job did its work" from
+        # "the job was not allowed to" — and on a board nobody is watching, that difference is
+        # the whole report.
+        refused = _refusals(approvals)
+        answer = result.answer + ("\n\n" + refused if refused else "")
+        return LaneResult(success=result.success, answer=answer)
 
 
 class CrewLane:
