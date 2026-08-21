@@ -92,10 +92,10 @@ UNDERSTATED: dict[str, list[str]] = {
     "huggingface-hub": ["the hf CLI", "HF_TOKEN"],
     "weights-and-biases": ["wandb", "WANDB_API_KEY"],
     "gif-search": ["curl", "jq", "a free TENOR_API_KEY"],
-    "xurl": ["the xurl binary", "an X developer account"],
+    "xurl": ["an X developer account"],
     "ascii-video": ["ffmpeg", "numpy", "scipy", "pillow"],
     "blogwatcher": ["blogwatcher-cli"],
-    "songsee": ["songsee (go install)"],
+    "songsee": ["go (to install it)"],
     "youtube-content": ["youtube-transcript-api"],
     "excalidraw": ["cryptography (only to upload)"],
     "design-md": ["node", "npx"],
@@ -248,6 +248,31 @@ def skill_md(path: str) -> tuple[dict[str, Any], str]:
     return (parsed if isinstance(parsed, dict) else {}), text
 
 
+def _people(value: Any) -> str:
+    """One or several credited authors, as a sentence rather than as a Python repr."""
+    if isinstance(value, (list, tuple)):
+        return ", ".join(str(v).strip() for v in value if str(v).strip())
+    return str(value or "").strip()
+
+
+def _dedupe(requires: list[str]) -> list[str]:
+    """Drop a corrected requirement that names a binary the frontmatter already declared.
+
+    `songsee` declares `songsee` and the corrections table adds `songsee (go install)`, so the card
+    read "Precisa de: songsee, songsee (go install)" — the same thing twice, one of them looking
+    like a second dependency. The parenthetical is the more useful of the two, so it wins.
+    """
+    out: list[str] = []
+    for item in requires:
+        base = item.split(" (")[0].strip()
+        existing = next((i for i, kept in enumerate(out) if kept.split(" (")[0].strip() == base), None)
+        if existing is None:
+            out.append(item)
+        elif len(item) > len(out[existing]):
+            out[existing] = item
+    return out
+
+
 def classify(name: str, meta: dict[str, Any], body: str) -> tuple[str, list[str], str, list[str], list[str]]:
     """(portability, requires, note, uses, missing) — derived, with two curated corrections.
 
@@ -272,6 +297,8 @@ def classify(name: str, meta: dict[str, Any], body: str) -> tuple[str, list[str]
     # Measured, and kept apart from the verdict: `uses` is what we can answer to under another
     # name, `missing` is what nothing here provides. Both are facts about the text. Whether a
     # mention blocks the skill is not, and that is the line this function refuses to blur.
+    requires = _dedupe(requires)
+
     vocabulary = foreign_names(body)
     uses, missing = translated_names(vocabulary), missing_names(vocabulary)
 
@@ -322,7 +349,10 @@ def main() -> None:
                 # one a person browsing will recognise.
                 "topic": directory.split("/")[1] if directory.count("/") >= 2 else "",
                 "note": note,
-                "author": str(meta.get("author") or ""),
+                # Joined, not str()'d. One skill's frontmatter declares `author` as a YAML list,
+                # and `str(["a", "b"])` is a Python repr — which is exactly what reached the card:
+                # `['kshitijk4poor', 'alt-glitch', 'purzbeats']`, brackets and quotes and all.
+                "author": _people(meta.get("author")),
                 "tags": [str(t) for t in (hermes.get("tags") or [])],
                 # What it calls that we answer to under another name, and what it calls that
                 # nothing here provides. Shown before the install, not discovered after it.

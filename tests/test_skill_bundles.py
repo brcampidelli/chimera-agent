@@ -283,3 +283,38 @@ def test_bundle_context_never_breaks_a_run(monkeypatch: pytest.MonkeyPatch) -> N
     # directory that could not be listed must cost the block, never the run — the same discipline
     # the retrieval path beside it already follows.
     assert Agent._bundle_context(object()) == ""  # type: ignore[arg-type]
+
+
+def test_no_entry_renders_a_python_repr_at_a_person() -> None:
+    """One skill's frontmatter declares `author` as a YAML list.
+
+    `str(["a", "b"])` is a Python repr, and it went to the screen intact: a card in the shipped
+    app read `de ['kshitijk4poor', 'alt-glitch', 'purzbeats']`, brackets and quotes and all.
+    """
+    for entry in CATALOG:
+        for field, value in (("author", entry.author), ("note", entry.note),
+                             ("description", entry.description)):
+            assert not value.startswith(("[", "{")), f"{entry.name}.{field} = {value!r}"
+
+
+def test_a_requirement_is_not_listed_twice_under_two_names() -> None:
+    # `songsee` declared `songsee` and the corrections table added `songsee (go install)`, so the
+    # card asked for the same binary twice and the second one read like a separate dependency.
+    for entry in CATALOG:
+        bases = [r.split(" (")[0].strip().lower() for r in entry.requires]
+        assert len(set(bases)) == len(bases), f"{entry.name} requires {entry.requires}"
+
+
+def test_the_os_badge_does_not_contradict_the_line_under_it() -> None:
+    """The badge used to say "one operating system only" and count.
+
+    Two skills run on Linux AND macOS, so that badge sat directly above "Runs only on Linux,
+    macOS". A label that can disagree with its own detail is worse than a vaguer one that cannot,
+    so the badge stopped counting — this pins the DATA that made counting wrong.
+    """
+    multi = [e for e in CATALOG if e.portability is Portability.OS_LOCKED and "," in e.note]
+    assert multi, "no multi-platform entry left — did the data change, or the classifier?"
+    # The note names them; the badge must not claim a number.
+    from chimera.skills import catalog as catalog_module
+
+    assert catalog_module.Portability.OS_LOCKED.value == "os_locked"

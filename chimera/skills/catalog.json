@@ -413,7 +413,7 @@
       ],
       "topic": "creative",
       "note": "a GPU and multi-GB checkpoints",
-      "author": "['kshitijk4poor', 'alt-glitch', 'purzbeats']",
+      "author": "kshitijk4poor, alt-glitch, purzbeats",
       "tags": [
         "comfyui",
         "image-generation",
@@ -950,7 +950,7 @@
       "ref": "main",
       "requires": [
         "songsee",
-        "songsee (go install)"
+        "go (to install it)"
       ],
       "topic": "media",
       "note": "",
@@ -1806,7 +1806,6 @@
       "ref": "main",
       "requires": [
         "xurl",
-        "the xurl binary",
         "an X developer account"
       ],
       "topic": "social-media",
