@@ -65,14 +65,53 @@ describe("ProviderPicker", () => {
     expect(screen.getByRole("button", { name: "Chimera" })).toBeInTheDocument();
   });
 
-  it("shows an agent it cannot run, disabled, beside one it can", async () => {
-    // "Gemini needs npm i -g" is useful information standing next to a Claude Code you can press.
+  it("shows an agent it cannot run, unusable but reachable, beside one it can", async () => {
+    // "Gemini needs npm i -g" is useful information standing next to a Claude Code you can press —
+    // and it was only useful to a pointer. The reason lives in a tooltip, and a `disabled` button
+    // takes no focus, so nobody navigating by keyboard could ever land on it to hear why the
+    // option was greyed out. `aria-disabled` says the same thing to assistive tech while leaving
+    // the button in the tab order.
     vi.mocked(getDoctor).mockResolvedValue(
       doctor([CLAUDE, { ...CLAUDE, key: "gemini", label: "Gemini CLI", available: false }]) as never,
     );
     picker();
     expect(await screen.findByRole("button", { name: "Claude Code" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Gemini CLI" })).toBeDisabled();
+
+    const missing = screen.getByRole("button", { name: "Gemini CLI" });
+    expect(missing).toHaveAttribute("aria-disabled", "true");
+    // Still named for what it is: the reason belongs in the description, not in the name.
+    expect(missing).not.toHaveAttribute("disabled");
+  });
+
+  it("does not switch to an agent that is not installed, however it is pressed", async () => {
+    const onChange = vi.fn();
+    // With an installed agent beside it — on its own the picker hides entirely, which is the
+    // component refusing to offer a choice that has only one impossible option.
+    vi.mocked(getDoctor).mockResolvedValue(
+      doctor([CLAUDE, { ...CLAUDE, key: "gemini", label: "Gemini CLI", available: false }]) as never,
+    );
+    picker({ onChange });
+
+    await userEvent.click(await screen.findByRole("button", { name: "Gemini CLI" }));
+
+    // Reachable is not the same as usable. Leaving it in the tab order must not make it work.
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("says which worker is selected, not only which one is coloured", async () => {
+    vi.mocked(getDoctor).mockResolvedValue(doctor([CLAUDE]) as never);
+    picker({ value: "claude" });
+
+    // The choice used to be communicated by a background colour and nothing else, so a screen
+    // reader heard three buttons and no answer to "which one is active".
+    expect(await screen.findByRole("button", { name: "Claude Code" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Chimera" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
   });
 
   it("disappears entirely when nothing here can run", async () => {
