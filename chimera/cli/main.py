@@ -1778,6 +1778,8 @@ def _start_cron_daemon(
 
     from chimera.api.usage import UsageRecord, append_usage, spent_today
     from chimera.core import Agent, AgentConfig
+    from chimera.core.instructions import load as load_identity
+    from chimera.core.instructions import render as render_identity
     from chimera.orchestration.budget import BudgetExceeded
     from chimera.scheduler import CronDaemon, CronJob, Scheduler, make_agent_dispatch
     from chimera.tools import default_registry
@@ -1827,6 +1829,12 @@ def _start_cron_daemon(
                 # LEAST able to be told the conventions any other way — nobody is at a terminal to
                 # restate them — and it was the one reading none.
                 project_root=workspace,
+                # And the owner's own instructions, which every other surface that answers a
+                # person already loads. A cron job reports to a person too — into Discord, into a
+                # log, into the app — and this was the second surface answering in English to an
+                # owner who had configured Portuguese, because the same rendered block carries the
+                # "always answer in {language}" line.
+                instructions=render_identity(load_identity(settings.home)),
                 # The path that runs the most was the one with no step-level record at all. Without
                 # it there is no success-versus-context curve, no replay of a job that went wrong,
                 # and no reliability bench for the 24/7 loop — every one of those reads this file.
