@@ -45,7 +45,7 @@ class MCPTool(Tool):
 
     #: Output comes from a remote MCP server — the most untrusted content in the system. The name is
     #: chosen by the server, so it won't be in the static FETCH_TOOLS set; this marker tells
-    #: ``LedgeredTool`` to fence + taint-track it regardless of name.
+    #: ``LedgeredTool`` to taint-track it regardless of name.
     untrusted_output = True
 
     def __init__(
@@ -62,7 +62,34 @@ class MCPTool(Tool):
         self._caller = caller
 
     def run(self, **kwargs: Any) -> str:
-        return self._caller(self._remote_name, kwargs)
+        """Call the remote tool and hand back its output as DATA, never as instructions.
+
+        Fenced here, in the tool, exactly as ``scrape``/``crawl``/``extract`` do — and for a
+        stronger reason than any of them, since this content comes from a server we did not write
+        and did not audit.
+
+        It was fenced only inside ``LedgeredTool``, which is reached only when ``guard_chat`` is on,
+        and ``guard_chat`` defaults to False. So in every default configuration the output of a
+        remote MCP server reached the model raw: no fence, no defanging of chat-template tokens,
+        while the MCP screen stated the opposite as a property of the app. The ``untrusted_output``
+        marker was doing half its job — the half that needs a ledger — and nothing at all on the
+        surfaces that have no ledger, which is the surfaces MCP tools actually live on.
+
+        The defanging runs BEFORE the fence, same order and same reason as the ledger's: content
+        that can emit a chat-template token could otherwise spoof a system turn and step out of the
+        data region rather than merely sitting inside it.
+
+        Under ``guard_chat`` this is fenced again by the ledger. That is what already happens to
+        every native web tool, and it is safe: ``fence`` neutralises any marker in what it wraps, so
+        the outer fence holds. Skipping the second one by INSPECTING the string would not be safe —
+        text that merely starts and ends with the markers can still carry a live instruction between
+        two fenced blocks.
+        """
+        from chimera.governance.ledger_tool import fence
+        from chimera.governance.sanitize import sanitize_untrusted
+
+        result = self._caller(self._remote_name, kwargs)
+        return fence(sanitize_untrusted(result)) if result.strip() else result
 
 
 class MCPConnector(Connector):
