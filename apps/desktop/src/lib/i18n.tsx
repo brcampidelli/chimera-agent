@@ -388,7 +388,6 @@ const en: Dict = {
   "skills.status.retired": "retired",
   "skills.learned": "Learned skills",
   "skills.retire": "Retire",
-  "skills.active": "active",
   "skills.stats": "{uses} uses · {wins} wins",
   "cron.title": "Schedule",
   "cron.jobs": "Scheduled jobs",
@@ -457,9 +456,6 @@ const en: Dict = {
   "skills.stage.ship": "Ship",
   "skills.stageNone": "No stage",
   "nav.fusion": "Fusion",
-  "fusion.title": "Fusion & Cascade",
-  "fusion.empty":
-    "The last turn used a single model. Turn on Fusion, or enable Cascade in Settings, to see how an answer gets composed — panel, judge, and synthesis.",
   "fusion.panelEmpty": "Fusion ran but reported no panel members.",
   "fusion.panel": "Panel",
   "fusion.judge": "Judge",
@@ -665,8 +661,6 @@ const en: Dict = {
   "code.picker.useThis": "Use this folder",
   "code.picker.cancel": "Cancel",
   "code.picker.browse": "Choose folder",
-  "code.chat.resumed":
-    "Continuing an earlier conversation. The agent has its history; the turns above are not shown yet.",
   "code.sessions.empty": "No conversations yet.",
   "code.sessions.defaultProject": "Default project",
   "code.sessions.untitled": "Untitled",
@@ -675,9 +669,6 @@ const en: Dict = {
   "code.sessions.jsonOne": "Show the JSON for {name}",
   "code.sessions.jsonBytes": "{n} bytes on disk",
   "code.open": "Open",
-  "code.treeError": "Couldn't read that folder.",
-  "code.treeEmpty": "This folder is empty.",
-  "code.treeCapped": "Long listing truncated — some entries are hidden.",
   "code.noFile": "no file open",
   "code.viewerHint": "Pick a file from the tree to view it here.",
   "code.truncated": "truncated",
@@ -711,7 +702,6 @@ const en: Dict = {
   "code.dictate.failed": "Could not transcribe",
   "code.chat.stop": "Stop",
   "code.chat.jumpToLatest": "Latest",
-  "code.chat.sending": "Working…",
   "code.chat.hint": "↵ to send · ⇧↵ for a new line",
   "code.chat.clear": "Clear",
   "code.chat.export.label": "export",
@@ -822,14 +812,7 @@ const en: Dict = {
     "Fewer than {n} runs in every group — read these as anecdotes, not as a result.",
   "code.worth.notAnExperiment":
     "These are runs you happened to make: different tasks, different days, no randomisation. They are a record, not an experiment, and they are deliberately not ranked. The comparison that could support a verdict is the pre-registered A/B in bench/role_routing.",
-  "code.maxAttempts": "Max attempts",
-  "code.planning": "planning…",
-  "code.verifying": "verifying…",
   "code.noDiff": "This run changed nothing on disk.",
-  "code.safetyNote":
-    "The agent edits this workspace and runs your verify command here — the same capability as `chimera solve` in a terminal (localhost, bearer-guarded).",
-  "code.phase2note":
-    "Phase 2: the viewer is editable (opt-in) with an atomic, newline-preserving, size-capped save, and the command runner streams each command as a fresh subprocess — combined output, not an interactive terminal.",
   "code.edit": "Edit",
   "code.save": "Save",
   "code.discard": "Discard",
@@ -839,15 +822,6 @@ const en: Dict = {
     "Couldn't save — is the bearer token required, or the file too large?",
   "code.noUndo":
     "No undo after save (unless this folder is a git repo you commit).",
-  "code.cmdRunner": "Command runner",
-  "code.cmdPlaceholder": "a command to run in this workspace — e.g. npm test",
-  "code.cwd": "cwd (optional, relative to the workspace)",
-  "code.cmdRun": "Run command",
-  "code.exit": "exit",
-  "code.freshProcNote":
-    "Each command is a fresh subprocess — cwd and env don't persist between commands (no cd/export state).",
-  "code.execSecurityNote":
-    "Runs commands in your workspace on the host (or the configured sandbox); localhost + bearer-guarded. Not an interactive terminal.",
   "code.git.title": "Git",
   "code.git.branch": "branch",
   "code.git.notRepo":
@@ -865,33 +839,10 @@ const en: Dict = {
   "code.git.commitError": "Commit failed.",
   "code.git.gitNote":
     "Commit stages the explicitly selected paths (never `git add -A`). Discard uses git to revert the run's git-visible changes — it doesn't touch files git ignores or can't track.",
-  "code.planTitle": "Plan",
-  "code.planNote":
-    "Preview only — this makes no edits. Approve or edit the plan before any file changes.",
-  "code.planEmpty": "The planner returned no steps.",
-  "code.planError": "Couldn't preview the plan.",
-  "code.planEditPlaceholder": "edit the plan before running (optional)",
-  "code.runWithPlan": "Run with this plan",
-  "code.runPlain": "Run without a plan",
-  "code.modelPlaceholder": "default model",
-  "code.mode.single": "single",
-  "code.mode.fuse": "fuse",
-  "code.mode.cascade": "cascade",
-  "code.verify.title": "Verify in browser",
-  "code.verify.note":
-    "Capture a full-page screenshot of a URL — an honest snapshot of whatever it renders (not a claim the agent verified anything).",
-  "code.verify.urlPlaceholder": "http://localhost:5173",
-  "code.verify.capture": "Capture",
-  "code.verify.capturing": "Capturing…",
-  "code.verify.failed": "Couldn't capture a screenshot.",
-  "code.verify.caption": "Screenshot of",
-  "code.verify.alt": "Screenshot of the URL you gave",
   "agents.title": "Agent Manager",
   "agents.safetyNote":
     "Runs several coding tasks in parallel, each isolated in its own git worktree, then reports each task's result and any cross-task conflicts. Same capability as `chimera solve-batch` (localhost, bearer-guarded).",
   "agents.workspace": "Workspace",
-  "agents.workspacePlaceholder":
-    "folder path — a git repo to isolate (optional; defaults to the app's workspace)",
   "agents.running": "Running…",
   "agents.stop": "Stop",
   "agents.stopAll": "Stop all",
@@ -1518,7 +1469,6 @@ const pt: Dict = {
   "skills.status.retired": "aposentada",
   "skills.learned": "Habilidades aprendidas",
   "skills.retire": "Aposentar",
-  "skills.active": "ativa",
   "skills.stats": "{uses} usos · {wins} acertos",
   "cron.title": "Agenda",
   "cron.jobs": "Tarefas agendadas",
@@ -1590,9 +1540,6 @@ const pt: Dict = {
   "skills.stage.ship": "Publicar",
   "skills.stageNone": "Sem etapa",
   "nav.fusion": "Fusão",
-  "fusion.title": "Fusão e Cascata",
-  "fusion.empty":
-    "O último turno usou um único modelo. Ative a Fusão, ou a Cascata nas Configurações, para ver como uma resposta é composta — painel, juiz e síntese.",
   "fusion.panelEmpty": "A fusão rodou mas não reportou membros do painel.",
   "fusion.panel": "Painel",
   "fusion.judge": "Juiz",
@@ -1800,8 +1747,6 @@ const pt: Dict = {
   "code.picker.useThis": "Usar esta pasta",
   "code.picker.cancel": "Cancelar",
   "code.picker.browse": "Escolher pasta",
-  "code.chat.resumed":
-    "Continuando uma conversa anterior. O agente tem o histórico; os turnos acima ainda não são exibidos.",
   "code.sessions.empty": "Nenhuma conversa ainda.",
   "code.sessions.defaultProject": "Projeto padrão",
   "code.sessions.untitled": "Sem título",
@@ -1810,10 +1755,6 @@ const pt: Dict = {
   "code.sessions.jsonOne": "Mostrar o JSON de {name}",
   "code.sessions.jsonBytes": "{n} bytes em disco",
   "code.open": "Abrir",
-  "code.treeError": "Não foi possível ler essa pasta.",
-  "code.treeEmpty": "Esta pasta está vazia.",
-  "code.treeCapped":
-    "Listagem longa truncada — algumas entradas estão ocultas.",
   "code.noFile": "nenhum arquivo aberto",
   "code.viewerHint": "Escolha um arquivo na árvore para vê-lo aqui.",
   "code.truncated": "truncado",
@@ -1847,7 +1788,6 @@ const pt: Dict = {
   "code.dictate.failed": "Não deu para transcrever",
   "code.chat.stop": "Parar",
   "code.chat.jumpToLatest": "Mais recentes",
-  "code.chat.sending": "Trabalhando…",
   "code.chat.hint": "↵ para enviar · ⇧↵ para nova linha",
   "code.chat.clear": "Limpar",
   "code.chat.export.label": "exportar",
@@ -1961,14 +1901,7 @@ const pt: Dict = {
     "Menos de {n} execuções em todos os grupos — leia isto como anedota, não como resultado.",
   "code.worth.notAnExperiment":
     "São execuções que você por acaso fez: tarefas diferentes, dias diferentes, sem randomização. É um registro, não um experimento, e de propósito não há ranking. A comparação que poderia sustentar um veredito é o A/B pré-registrado em bench/role_routing.",
-  "code.maxAttempts": "Máx. tentativas",
-  "code.planning": "planejando…",
-  "code.verifying": "verificando…",
   "code.noDiff": "Esta execução não alterou nada em disco.",
-  "code.safetyNote":
-    "O agente edita este workspace e roda seu comando de verificação aqui — a mesma capacidade do `chimera solve` num terminal (localhost, protegido por token).",
-  "code.phase2note":
-    "Fase 2: o visualizador é editável (opt-in) com salvamento atômico, que preserva o fim de linha e com limite de tamanho, e o executor de comandos transmite cada comando como um subprocesso novo — saída combinada, não um terminal interativo.",
   "code.edit": "Editar",
   "code.save": "Salvar",
   "code.discard": "Descartar",
@@ -1978,16 +1911,6 @@ const pt: Dict = {
     "Não foi possível salvar — o token bearer é exigido, ou o arquivo é grande demais?",
   "code.noUndo":
     "Sem desfazer após salvar (a menos que esta pasta seja um repositório git que você commita).",
-  "code.cmdRunner": "Executor de comandos",
-  "code.cmdPlaceholder":
-    "um comando para rodar neste workspace — ex.: npm test",
-  "code.cwd": "cwd (opcional, relativo ao workspace)",
-  "code.cmdRun": "Executar comando",
-  "code.exit": "saída",
-  "code.freshProcNote":
-    "Cada comando é um subprocesso novo — cwd e env não persistem entre comandos (sem estado de cd/export).",
-  "code.execSecurityNote":
-    "Roda comandos no seu workspace no host (ou no sandbox configurado); localhost + protegido por token. Não é um terminal interativo.",
   "code.git.title": "Git",
   "code.git.branch": "branch",
   "code.git.notRepo":
@@ -2005,33 +1928,10 @@ const pt: Dict = {
   "code.git.commitError": "Falha no commit.",
   "code.git.gitNote":
     "O commit prepara apenas os caminhos selecionados (nunca `git add -A`). O descarte usa o git para reverter as mudanças visíveis ao git desta execução — não toca em arquivos que o git ignora ou não rastreia.",
-  "code.planTitle": "Plano",
-  "code.planNote":
-    "Apenas prévia — isto não faz edições. Aprove ou edite o plano antes de qualquer alteração de arquivo.",
-  "code.planEmpty": "O planejador não retornou passos.",
-  "code.planError": "Não foi possível prever o plano.",
-  "code.planEditPlaceholder": "edite o plano antes de executar (opcional)",
-  "code.runWithPlan": "Executar com este plano",
-  "code.runPlain": "Executar sem plano",
-  "code.modelPlaceholder": "modelo padrão",
-  "code.mode.single": "único",
-  "code.mode.fuse": "fusão",
-  "code.mode.cascade": "cascata",
-  "code.verify.title": "Verificar no navegador",
-  "code.verify.note":
-    "Capture uma captura de tela de página inteira de uma URL — um instantâneo honesto do que ela renderiza (não uma alegação de que o agente verificou algo).",
-  "code.verify.urlPlaceholder": "http://localhost:5173",
-  "code.verify.capture": "Capturar",
-  "code.verify.capturing": "Capturando…",
-  "code.verify.failed": "Não foi possível capturar a tela.",
-  "code.verify.caption": "Captura de tela de",
-  "code.verify.alt": "Captura de tela da URL que você forneceu",
   "agents.title": "Gerenciador de Agentes",
   "agents.safetyNote":
     "Executa várias tarefas de código em paralelo, cada uma isolada em seu próprio git worktree, e reporta o resultado de cada tarefa e quaisquer conflitos entre elas. Mesma capacidade do `chimera solve-batch` (localhost, protegido por bearer).",
   "agents.workspace": "Workspace",
-  "agents.workspacePlaceholder":
-    "caminho da pasta — um repositório git para isolar (opcional; padrão: o workspace do app)",
   "agents.running": "Executando…",
   "agents.stop": "Parar",
   "agents.stopAll": "Parar todas",
@@ -2678,7 +2578,6 @@ const es: Dict = {
   "skills.status.retired": "retirada",
   "skills.learned": "Habilidades aprendidas",
   "skills.retire": "Retirar",
-  "skills.active": "activa",
   "skills.stats": "{uses} usos · {wins} aciertos",
   "cron.title": "Agenda",
   "cron.jobs": "Tareas programadas",
@@ -2737,9 +2636,6 @@ const es: Dict = {
   "skills.stage.ship": "Publicar",
   "skills.stageNone": "Sin etapa",
   "nav.fusion": "Fusión",
-  "fusion.title": "Fusión y Cascada",
-  "fusion.empty":
-    "El último turno usó un solo modelo. Activa la Fusión, o la Cascada en Ajustes, para ver cómo se compone una respuesta — panel, juez y síntesis.",
   "fusion.panelEmpty":
     "La fusión se ejecutó pero no informó miembros del panel.",
   "fusion.panel": "Panel",
@@ -2949,8 +2845,6 @@ const es: Dict = {
   "code.picker.useThis": "Usar esta carpeta",
   "code.picker.cancel": "Cancelar",
   "code.picker.browse": "Elegir carpeta",
-  "code.chat.resumed":
-    "Continuando una conversación anterior. El agente tiene el historial; los turnos anteriores aún no se muestran.",
   "code.sessions.empty": "Aún no hay conversaciones.",
   "code.sessions.defaultProject": "Proyecto predeterminado",
   "code.sessions.untitled": "Sin título",
@@ -2959,9 +2853,6 @@ const es: Dict = {
   "code.sessions.jsonOne": "Mostrar el JSON de {name}",
   "code.sessions.jsonBytes": "{n} bytes en disco",
   "code.open": "Abrir",
-  "code.treeError": "No se pudo leer esa carpeta.",
-  "code.treeEmpty": "Esta carpeta está vacía.",
-  "code.treeCapped": "Listado largo truncado — algunas entradas están ocultas.",
   "code.noFile": "ningún archivo abierto",
   "code.viewerHint": "Elige un archivo del árbol para verlo aquí.",
   "code.truncated": "truncado",
@@ -2995,7 +2886,6 @@ const es: Dict = {
   "code.dictate.failed": "No se pudo transcribir",
   "code.chat.stop": "Detener",
   "code.chat.jumpToLatest": "Lo más reciente",
-  "code.chat.sending": "Trabajando…",
   "code.chat.hint": "↵ para enviar · ⇧↵ para nueva línea",
   "code.chat.clear": "Limpiar",
   "code.chat.export.label": "exportar",
@@ -3111,14 +3001,7 @@ const es: Dict = {
     "Menos de {n} ejecuciones en todos los grupos — léelo como anécdota, no como resultado.",
   "code.worth.notAnExperiment":
     "Son ejecuciones que hiciste por casualidad: tareas distintas, días distintos, sin aleatorización. Es un registro, no un experimento, y a propósito no hay ranking. La comparación que podría sostener un veredicto es el A/B pre-registrado en bench/role_routing.",
-  "code.maxAttempts": "Máx. intentos",
-  "code.planning": "planificando…",
-  "code.verifying": "verificando…",
   "code.noDiff": "Esta ejecución no cambió nada en disco.",
-  "code.safetyNote":
-    "El agente edita este workspace y ejecuta tu comando de verificación aquí — la misma capacidad que `chimera solve` en una terminal (localhost, protegido por token).",
-  "code.phase2note":
-    "Fase 2: el visor es editable (opcional) con guardado atómico, que conserva el fin de línea y con límite de tamaño, y el ejecutor de comandos transmite cada comando como un subproceso nuevo — salida combinada, no un terminal interactivo.",
   "code.edit": "Editar",
   "code.save": "Guardar",
   "code.discard": "Descartar",
@@ -3128,16 +3011,6 @@ const es: Dict = {
     "No se pudo guardar — ¿se requiere el token bearer, o el archivo es demasiado grande?",
   "code.noUndo":
     "Sin deshacer tras guardar (a menos que esta carpeta sea un repositorio git que confirmes).",
-  "code.cmdRunner": "Ejecutor de comandos",
-  "code.cmdPlaceholder":
-    "un comando para ejecutar en este workspace — p. ej. npm test",
-  "code.cwd": "cwd (opcional, relativo al workspace)",
-  "code.cmdRun": "Ejecutar comando",
-  "code.exit": "salida",
-  "code.freshProcNote":
-    "Cada comando es un subproceso nuevo — cwd y env no persisten entre comandos (sin estado de cd/export).",
-  "code.execSecurityNote":
-    "Ejecuta comandos en tu workspace en el host (o el sandbox configurado); localhost + protegido por token. No es un terminal interactivo.",
   "code.git.title": "Git",
   "code.git.branch": "rama",
   "code.git.notRepo":
@@ -3155,33 +3028,10 @@ const es: Dict = {
   "code.git.commitError": "Falló la confirmación.",
   "code.git.gitNote":
     "El commit prepara solo las rutas seleccionadas (nunca `git add -A`). El descarte usa git para revertir los cambios visibles a git de esta ejecución — no toca archivos que git ignora o no puede rastrear.",
-  "code.planTitle": "Plan",
-  "code.planNote":
-    "Solo vista previa — no hace ediciones. Aprueba o edita el plan antes de cualquier cambio de archivo.",
-  "code.planEmpty": "El planificador no devolvió pasos.",
-  "code.planError": "No se pudo previsualizar el plan.",
-  "code.planEditPlaceholder": "edita el plan antes de ejecutar (opcional)",
-  "code.runWithPlan": "Ejecutar con este plan",
-  "code.runPlain": "Ejecutar sin plan",
-  "code.modelPlaceholder": "modelo por defecto",
-  "code.mode.single": "único",
-  "code.mode.fuse": "fusión",
-  "code.mode.cascade": "cascada",
-  "code.verify.title": "Verificar en el navegador",
-  "code.verify.note":
-    "Captura una captura de pantalla de página completa de una URL — una instantánea honesta de lo que renderiza (no una afirmación de que el agente verificó algo).",
-  "code.verify.urlPlaceholder": "http://localhost:5173",
-  "code.verify.capture": "Capturar",
-  "code.verify.capturing": "Capturando…",
-  "code.verify.failed": "No se pudo capturar la pantalla.",
-  "code.verify.caption": "Captura de pantalla de",
-  "code.verify.alt": "Captura de pantalla de la URL que diste",
   "agents.title": "Gestor de Agentes",
   "agents.safetyNote":
     "Ejecuta varias tareas de código en paralelo, cada una aislada en su propio git worktree, y reporta el resultado de cada tarea y los conflictos entre ellas. Misma capacidad que `chimera solve-batch` (localhost, protegido por bearer).",
   "agents.workspace": "Workspace",
-  "agents.workspacePlaceholder":
-    "ruta de carpeta — un repositorio git para aislar (opcional; por defecto: el workspace de la app)",
   "agents.running": "Ejecutando…",
   "agents.stop": "Detener",
   "agents.stopAll": "Detener todas",
@@ -3834,7 +3684,6 @@ const fr: Dict = {
   "skills.status.retired": "retirée",
   "skills.learned": "Compétences apprises",
   "skills.retire": "Retirer",
-  "skills.active": "active",
   "skills.stats": "{uses} usages · {wins} réussites",
   "cron.title": "Planning",
   "cron.jobs": "Tâches planifiées",
@@ -3894,9 +3743,6 @@ const fr: Dict = {
   "skills.stage.ship": "Livrer",
   "skills.stageNone": "Sans étape",
   "nav.fusion": "Fusion",
-  "fusion.title": "Fusion et Cascade",
-  "fusion.empty":
-    "Le dernier tour a utilisé un seul modèle. Activez la Fusion, ou la Cascade dans les Paramètres, pour voir comment une réponse est composée — panel, juge et synthèse.",
   "fusion.panelEmpty":
     "La fusion s'est exécutée mais n'a signalé aucun membre du panel.",
   "fusion.panel": "Panel",
@@ -4109,8 +3955,6 @@ const fr: Dict = {
   "code.picker.useThis": "Utiliser ce dossier",
   "code.picker.cancel": "Annuler",
   "code.picker.browse": "Choisir un dossier",
-  "code.chat.resumed":
-    "Reprise d'une conversation. L'agent a son historique ; les tours précédents ne sont pas encore affichés.",
   "code.sessions.empty": "Aucune conversation pour l'instant.",
   "code.sessions.defaultProject": "Projet par défaut",
   "code.sessions.untitled": "Sans titre",
@@ -4119,9 +3963,6 @@ const fr: Dict = {
   "code.sessions.jsonOne": "Afficher le JSON de {name}",
   "code.sessions.jsonBytes": "{n} octets sur le disque",
   "code.open": "Ouvrir",
-  "code.treeError": "Impossible de lire ce dossier.",
-  "code.treeEmpty": "Ce dossier est vide.",
-  "code.treeCapped": "Longue liste tronquée — certaines entrées sont masquées.",
   "code.noFile": "aucun fichier ouvert",
   "code.viewerHint":
     "Choisissez un fichier dans l'arborescence pour l'afficher ici.",
@@ -4157,7 +3998,6 @@ const fr: Dict = {
   "code.dictate.failed": "Transcription impossible",
   "code.chat.stop": "Arrêter",
   "code.chat.jumpToLatest": "Plus récent",
-  "code.chat.sending": "En cours…",
   "code.chat.hint": "↵ pour envoyer · ⇧↵ pour une nouvelle ligne",
   "code.chat.clear": "Effacer",
   "code.chat.export.label": "exporter",
@@ -4274,14 +4114,7 @@ const fr: Dict = {
     "Moins de {n} exécutions dans chaque groupe — à lire comme des anecdotes, pas comme un résultat.",
   "code.worth.notAnExperiment":
     "Ce sont des exécutions que vous avez faites au fil de l'eau : tâches différentes, jours différents, aucune randomisation. C'est un relevé, pas une expérience, et il n'y a délibérément aucun classement. La comparaison qui pourrait trancher est l'A/B pré-enregistré dans bench/role_routing.",
-  "code.maxAttempts": "Tentatives max",
-  "code.planning": "planification…",
-  "code.verifying": "vérification…",
   "code.noDiff": "Cette exécution n'a rien changé sur le disque.",
-  "code.safetyNote":
-    "L'agent modifie ce workspace et exécute votre commande de vérification ici — la même capacité que `chimera solve` dans un terminal (localhost, protégé par token).",
-  "code.phase2note":
-    "Phase 2 : la visionneuse est modifiable (optionnel) avec une sauvegarde atomique, préservant les fins de ligne et plafonnée en taille, et l'exécuteur de commandes diffuse chaque commande comme un sous-processus neuf — sortie combinée, pas un terminal interactif.",
   "code.edit": "Modifier",
   "code.save": "Enregistrer",
   "code.discard": "Annuler",
@@ -4291,16 +4124,6 @@ const fr: Dict = {
     "Impossible d'enregistrer — le token bearer est-il requis, ou le fichier est-il trop volumineux ?",
   "code.noUndo":
     "Pas d'annulation après l'enregistrement (sauf si ce dossier est un dépôt git que vous validez).",
-  "code.cmdRunner": "Exécuteur de commandes",
-  "code.cmdPlaceholder":
-    "une commande à exécuter dans ce workspace — ex. npm test",
-  "code.cwd": "cwd (optionnel, relatif au workspace)",
-  "code.cmdRun": "Exécuter la commande",
-  "code.exit": "code",
-  "code.freshProcNote":
-    "Chaque commande est un sous-processus neuf — cwd et env ne persistent pas entre les commandes (pas d'état cd/export).",
-  "code.execSecurityNote":
-    "Exécute des commandes dans votre workspace sur l'hôte (ou le sandbox configuré) ; localhost + protégé par token. Pas un terminal interactif.",
   "code.git.title": "Git",
   "code.git.branch": "branche",
   "code.git.notRepo":
@@ -4318,33 +4141,10 @@ const fr: Dict = {
   "code.git.commitError": "Échec du commit.",
   "code.git.gitNote":
     "Le commit indexe uniquement les chemins sélectionnés (jamais `git add -A`). L'annulation utilise git pour revenir sur les modifications visibles par git de cette exécution — elle ne touche pas les fichiers que git ignore ou ne peut pas suivre.",
-  "code.planTitle": "Plan",
-  "code.planNote":
-    "Aperçu uniquement — aucune modification. Approuvez ou modifiez le plan avant tout changement de fichier.",
-  "code.planEmpty": "Le planificateur n'a renvoyé aucune étape.",
-  "code.planError": "Impossible d'afficher l'aperçu du plan.",
-  "code.planEditPlaceholder": "modifiez le plan avant d'exécuter (facultatif)",
-  "code.runWithPlan": "Exécuter avec ce plan",
-  "code.runPlain": "Exécuter sans plan",
-  "code.modelPlaceholder": "modèle par défaut",
-  "code.mode.single": "unique",
-  "code.mode.fuse": "fusion",
-  "code.mode.cascade": "cascade",
-  "code.verify.title": "Vérifier dans le navigateur",
-  "code.verify.note":
-    "Capturez une capture d'écran pleine page d'une URL — un instantané honnête de ce qu'elle affiche (pas une affirmation que l'agent a vérifié quoi que ce soit).",
-  "code.verify.urlPlaceholder": "http://localhost:5173",
-  "code.verify.capture": "Capturer",
-  "code.verify.capturing": "Capture…",
-  "code.verify.failed": "Impossible de capturer une capture d'écran.",
-  "code.verify.caption": "Capture d'écran de",
-  "code.verify.alt": "Capture d'écran de l'URL que vous avez fournie",
   "agents.title": "Gestionnaire d'agents",
   "agents.safetyNote":
     "Exécute plusieurs tâches de code en parallèle, chacune isolée dans son propre git worktree, puis rapporte le résultat de chaque tâche et les conflits entre elles. Même capacité que `chimera solve-batch` (localhost, protégé par bearer).",
   "agents.workspace": "Espace de travail",
-  "agents.workspacePlaceholder":
-    "chemin du dossier — un dépôt git à isoler (optionnel ; par défaut : l'espace de travail de l'app)",
   "agents.running": "En cours…",
   "agents.stop": "Arrêter",
   "agents.stopAll": "Tout arrêter",
@@ -4998,7 +4798,6 @@ const de: Dict = {
   "skills.status.retired": "stillgelegt",
   "skills.learned": "Erlernte Fähigkeiten",
   "skills.retire": "Zurückziehen",
-  "skills.active": "aktiv",
   "skills.stats": "{uses} Nutzungen · {wins} Erfolge",
   "cron.title": "Zeitplan",
   "cron.jobs": "Geplante Jobs",
@@ -5058,9 +4857,6 @@ const de: Dict = {
   "skills.stage.ship": "Ausliefern",
   "skills.stageNone": "Ohne Phase",
   "nav.fusion": "Fusion",
-  "fusion.title": "Fusion & Kaskade",
-  "fusion.empty":
-    "Die letzte Runde nutzte ein einzelnes Modell. Aktiviere Fusion oder Kaskade in den Einstellungen, um zu sehen, wie eine Antwort entsteht — Panel, Judge und Synthese.",
   "fusion.panelEmpty": "Die Fusion lief, meldete aber keine Panel-Mitglieder.",
   "fusion.panel": "Panel",
   "fusion.judge": "Judge",
@@ -5271,8 +5067,6 @@ const de: Dict = {
   "code.picker.useThis": "Diesen Ordner verwenden",
   "code.picker.cancel": "Abbrechen",
   "code.picker.browse": "Ordner wählen",
-  "code.chat.resumed":
-    "Eine frühere Unterhaltung wird fortgesetzt. Der Agent hat den Verlauf; die vorherigen Züge werden noch nicht angezeigt.",
   "code.sessions.empty": "Noch keine Unterhaltungen.",
   "code.sessions.defaultProject": "Standardprojekt",
   "code.sessions.untitled": "Ohne Titel",
@@ -5281,9 +5075,6 @@ const de: Dict = {
   "code.sessions.jsonOne": "JSON von {name} anzeigen",
   "code.sessions.jsonBytes": "{n} Bytes auf der Festplatte",
   "code.open": "Öffnen",
-  "code.treeError": "Dieser Ordner konnte nicht gelesen werden.",
-  "code.treeEmpty": "Dieser Ordner ist leer.",
-  "code.treeCapped": "Lange Liste gekürzt — einige Einträge sind ausgeblendet.",
   "code.noFile": "keine Datei geöffnet",
   "code.viewerHint": "Wähle eine Datei im Baum, um sie hier anzuzeigen.",
   "code.truncated": "gekürzt",
@@ -5318,7 +5109,6 @@ const de: Dict = {
   "code.dictate.failed": "Konnte nicht transkribiert werden",
   "code.chat.stop": "Stopp",
   "code.chat.jumpToLatest": "Neuestes",
-  "code.chat.sending": "Arbeitet…",
   "code.chat.hint": "↵ zum Senden · ⇧↵ für eine neue Zeile",
   "code.chat.clear": "Leeren",
   "code.chat.export.label": "exportieren",
@@ -5436,14 +5226,7 @@ const de: Dict = {
     "Weniger als {n} Läufe in jeder Gruppe — lies das als Anekdote, nicht als Ergebnis.",
   "code.worth.notAnExperiment":
     "Das sind Läufe, die du zufällig gemacht hast: andere Aufgaben, andere Tage, keine Randomisierung. Es ist eine Aufzeichnung, kein Experiment, und bewusst ohne Rangfolge. Der Vergleich, der ein Urteil tragen könnte, ist das vorregistrierte A/B in bench/role_routing.",
-  "code.maxAttempts": "Max. Versuche",
-  "code.planning": "plane…",
-  "code.verifying": "verifiziere…",
   "code.noDiff": "Dieser Lauf hat auf der Festplatte nichts geändert.",
-  "code.safetyNote":
-    "Der Agent bearbeitet diesen Workspace und führt hier deinen Verifikationsbefehl aus — dieselbe Fähigkeit wie `chimera solve` im Terminal (localhost, per Token geschützt).",
-  "code.phase2note":
-    "Phase 2: die Ansicht ist bearbeitbar (opt-in) mit atomarem, zeilenenden-erhaltendem und größenbegrenztem Speichern, und der Befehls-Runner streamt jeden Befehl als frischen Subprozess — kombinierte Ausgabe, kein interaktives Terminal.",
   "code.edit": "Bearbeiten",
   "code.save": "Speichern",
   "code.discard": "Verwerfen",
@@ -5453,16 +5236,6 @@ const de: Dict = {
     "Konnte nicht speichern — ist der Bearer-Token erforderlich, oder ist die Datei zu groß?",
   "code.noUndo":
     "Kein Rückgängig nach dem Speichern (außer dieser Ordner ist ein Git-Repo, das du committest).",
-  "code.cmdRunner": "Befehls-Runner",
-  "code.cmdPlaceholder":
-    "ein Befehl, der in diesem Workspace läuft — z. B. npm test",
-  "code.cwd": "cwd (optional, relativ zum Workspace)",
-  "code.cmdRun": "Befehl ausführen",
-  "code.exit": "Exit",
-  "code.freshProcNote":
-    "Jeder Befehl ist ein frischer Subprozess — cwd und env bleiben zwischen Befehlen nicht erhalten (kein cd/export-Zustand).",
-  "code.execSecurityNote":
-    "Führt Befehle in deinem Workspace auf dem Host (oder dem konfigurierten Sandbox) aus; localhost + per Token geschützt. Kein interaktives Terminal.",
   "code.git.title": "Git",
   "code.git.branch": "Branch",
   "code.git.notRepo":
@@ -5480,33 +5253,10 @@ const de: Dict = {
   "code.git.commitError": "Commit fehlgeschlagen.",
   "code.git.gitNote":
     "Der Commit stellt nur die ausgewählten Pfade bereit (niemals `git add -A`). Verwerfen nutzt git, um die git-sichtbaren Änderungen dieses Laufs zurückzunehmen — es rührt Dateien nicht an, die git ignoriert oder nicht verfolgen kann.",
-  "code.planTitle": "Plan",
-  "code.planNote":
-    "Nur Vorschau — es werden keine Änderungen vorgenommen. Bestätigen oder bearbeiten Sie den Plan vor jeder Dateiänderung.",
-  "code.planEmpty": "Der Planer hat keine Schritte geliefert.",
-  "code.planError": "Plan-Vorschau nicht möglich.",
-  "code.planEditPlaceholder": "Plan vor der Ausführung bearbeiten (optional)",
-  "code.runWithPlan": "Mit diesem Plan ausführen",
-  "code.runPlain": "Ohne Plan ausführen",
-  "code.modelPlaceholder": "Standardmodell",
-  "code.mode.single": "einzeln",
-  "code.mode.fuse": "Fusion",
-  "code.mode.cascade": "Kaskade",
-  "code.verify.title": "Im Browser prüfen",
-  "code.verify.note":
-    "Erstelle einen ganzseitigen Screenshot einer URL — eine ehrliche Momentaufnahme dessen, was sie darstellt (keine Behauptung, dass der Agent etwas verifiziert hat).",
-  "code.verify.urlPlaceholder": "http://localhost:5173",
-  "code.verify.capture": "Aufnehmen",
-  "code.verify.capturing": "Nehme auf…",
-  "code.verify.failed": "Screenshot konnte nicht erstellt werden.",
-  "code.verify.caption": "Screenshot von",
-  "code.verify.alt": "Screenshot der von dir angegebenen URL",
   "agents.title": "Agenten-Manager",
   "agents.safetyNote":
     "Führt mehrere Coding-Aufgaben parallel aus, jede isoliert in ihrem eigenen Git-Worktree, und meldet das Ergebnis jeder Aufgabe sowie aufgabenübergreifende Konflikte. Gleiche Fähigkeit wie `chimera solve-batch` (localhost, Bearer-geschützt).",
   "agents.workspace": "Arbeitsbereich",
-  "agents.workspacePlaceholder":
-    "Ordnerpfad — ein Git-Repo zum Isolieren (optional; Standard: der Arbeitsbereich der App)",
   "agents.running": "Läuft…",
   "agents.stop": "Stoppen",
   "agents.stopAll": "Alle stoppen",
@@ -6131,7 +5881,6 @@ const zh: Dict = {
   "skills.status.retired": "已停用",
   "skills.learned": "已学技能",
   "skills.retire": "停用",
-  "skills.active": "启用",
   "skills.stats": "{uses} 次使用 · {wins} 次成功",
   "cron.title": "计划",
   "cron.jobs": "计划任务",
@@ -6186,9 +5935,6 @@ const zh: Dict = {
   "skills.stage.ship": "发布",
   "skills.stageNone": "未分阶段",
   "nav.fusion": "融合",
-  "fusion.title": "融合与级联",
-  "fusion.empty":
-    "上一轮使用了单一模型。开启融合，或在设置中启用级联，即可查看答案是如何组成的——评审组、评判和综合。",
   "fusion.panelEmpty": "融合已执行，但未报告任何面板成员。",
   "fusion.panel": "评审组",
   "fusion.judge": "评判",
@@ -6383,8 +6129,6 @@ const zh: Dict = {
   "code.picker.useThis": "使用此文件夹",
   "code.picker.cancel": "取消",
   "code.picker.browse": "选择文件夹",
-  "code.chat.resumed":
-    "正在继续之前的对话。智能体拥有历史记录；之前的轮次尚未显示。",
   "code.sessions.empty": "还没有对话。",
   "code.sessions.defaultProject": "默认项目",
   "code.sessions.untitled": "无标题",
@@ -6393,9 +6137,6 @@ const zh: Dict = {
   "code.sessions.jsonOne": "显示 {name} 的 JSON",
   "code.sessions.jsonBytes": "磁盘上 {n} 字节",
   "code.open": "打开",
-  "code.treeError": "无法读取该文件夹。",
-  "code.treeEmpty": "此文件夹为空。",
-  "code.treeCapped": "列表过长已截断 —— 部分条目已隐藏。",
   "code.noFile": "未打开文件",
   "code.viewerHint": "从文件树中选择一个文件在此查看。",
   "code.truncated": "已截断",
@@ -6427,7 +6168,6 @@ const zh: Dict = {
   "code.dictate.failed": "无法转写",
   "code.chat.stop": "停止",
   "code.chat.jumpToLatest": "最新",
-  "code.chat.sending": "处理中……",
   "code.chat.hint": "↵ 发送 · ⇧↵ 换行",
   "code.chat.clear": "清空",
   "code.chat.export.label": "导出",
@@ -6529,14 +6269,7 @@ const zh: Dict = {
   "code.worth.tooFew": "每个分组都不足 {n} 次运行——请当作轶事，而不是结论。",
   "code.worth.notAnExperiment":
     "这些是你碰巧跑过的运行：任务不同、日子不同、没有随机化。它是记录，不是实验，而且刻意不排名。能支撑结论的比较是 bench/role_routing 里那份预注册的 A/B。",
-  "code.maxAttempts": "最大尝试次数",
-  "code.planning": "规划中…",
-  "code.verifying": "验证中…",
   "code.noDiff": "本次运行未在磁盘上更改任何内容。",
-  "code.safetyNote":
-    "智能体会编辑此工作区并在此运行你的验证命令 —— 与在终端中运行 `chimera solve` 的能力相同（本地回环，受 bearer 令牌保护）。",
-  "code.phase2note":
-    "第二阶段：查看器可编辑（可选），保存是原子的、保留行尾并有大小上限；命令执行器将每条命令作为全新子进程流式输出 —— 合并输出，而非交互式终端。",
   "code.edit": "编辑",
   "code.save": "保存",
   "code.discard": "放弃",
@@ -6544,15 +6277,6 @@ const zh: Dict = {
   "code.saved": "已保存。",
   "code.saveError": "无法保存 —— 是否需要 bearer 令牌，或文件过大？",
   "code.noUndo": "保存后无法撤销（除非此文件夹是你提交的 git 仓库）。",
-  "code.cmdRunner": "命令执行器",
-  "code.cmdPlaceholder": "在此工作区运行的命令 —— 例如 npm test",
-  "code.cwd": "cwd（可选，相对于工作区）",
-  "code.cmdRun": "运行命令",
-  "code.exit": "退出码",
-  "code.freshProcNote":
-    "每条命令都是全新子进程 —— cwd 和 env 不会在命令间保留（无 cd/export 状态）。",
-  "code.execSecurityNote":
-    "在主机上你的工作区中运行命令（或配置的沙箱）；本地回环 + 受 bearer 令牌保护。不是交互式终端。",
   "code.git.title": "Git",
   "code.git.branch": "分支",
   "code.git.notRepo":
@@ -6570,32 +6294,10 @@ const zh: Dict = {
   "code.git.commitError": "提交失败。",
   "code.git.gitNote":
     "提交只暂存明确选择的路径（绝不使用 `git add -A`）。放弃使用 git 还原本次运行中 git 可见的更改 — 不会触及 git 忽略或无法跟踪的文件。",
-  "code.planTitle": "计划",
-  "code.planNote": "仅预览 — 不做任何修改。在任何文件更改前批准或编辑计划。",
-  "code.planEmpty": "规划器未返回任何步骤。",
-  "code.planError": "无法预览计划。",
-  "code.planEditPlaceholder": "运行前编辑计划（可选）",
-  "code.runWithPlan": "按此计划运行",
-  "code.runPlain": "不使用计划运行",
-  "code.modelPlaceholder": "默认模型",
-  "code.mode.single": "单一",
-  "code.mode.fuse": "融合",
-  "code.mode.cascade": "级联",
-  "code.verify.title": "在浏览器中验证",
-  "code.verify.note":
-    "捕获某个 URL 的整页截图——它所渲染内容的诚实快照（并非声称智能体验证了任何东西）。",
-  "code.verify.urlPlaceholder": "http://localhost:5173",
-  "code.verify.capture": "截图",
-  "code.verify.capturing": "截图中…",
-  "code.verify.failed": "无法捕获截图。",
-  "code.verify.caption": "截图来自",
-  "code.verify.alt": "你提供的 URL 的截图",
   "agents.title": "智能体管理器",
   "agents.safetyNote":
     "并行运行多个编码任务，每个任务隔离在自己的 git worktree 中，然后报告每个任务的结果及任务间的冲突。与 `chimera solve-batch` 能力相同（本地、bearer 保护）。",
   "agents.workspace": "工作区",
-  "agents.workspacePlaceholder":
-    "文件夹路径 — 用于隔离的 git 仓库（可选；默认为应用的工作区）",
   "agents.running": "运行中…",
   "agents.stop": "停止",
   "agents.stopAll": "全部停止",
@@ -7235,7 +6937,6 @@ const ja: Dict = {
   "skills.status.retired": "廃止",
   "skills.learned": "習得したスキル",
   "skills.retire": "引退",
-  "skills.active": "有効",
   "skills.stats": "{uses} 回使用 · {wins} 回成功",
   "cron.title": "スケジュール",
   "cron.jobs": "予定されたジョブ",
@@ -7294,9 +6995,6 @@ const ja: Dict = {
   "skills.stage.ship": "リリース",
   "skills.stageNone": "ステージなし",
   "nav.fusion": "フュージョン",
-  "fusion.title": "フュージョンとカスケード",
-  "fusion.empty":
-    "前回のターンは単一モデルを使用しました。フュージョンを有効にするか、設定でカスケードを有効にすると、回答がどう構成されるか（パネル・ジャッジ・統合）が見えます。",
   "fusion.panelEmpty":
     "融合は実行されましたが、パネルのメンバーが報告されませんでした。",
   "fusion.panel": "パネル",
@@ -7502,8 +7200,6 @@ const ja: Dict = {
   "code.picker.useThis": "このフォルダを使う",
   "code.picker.cancel": "キャンセル",
   "code.picker.browse": "フォルダを選ぶ",
-  "code.chat.resumed":
-    "以前の会話を継続しています。エージェントは履歴を保持していますが、過去のやり取りはまだ表示されません。",
   "code.sessions.empty": "まだ会話はありません。",
   "code.sessions.defaultProject": "既定のプロジェクト",
   "code.sessions.untitled": "無題",
@@ -7512,9 +7208,6 @@ const ja: Dict = {
   "code.sessions.jsonOne": "{name} の JSON を表示",
   "code.sessions.jsonBytes": "ディスク上 {n} バイト",
   "code.open": "開く",
-  "code.treeError": "そのフォルダを読み取れませんでした。",
-  "code.treeEmpty": "このフォルダは空です。",
-  "code.treeCapped": "長いリストを切り詰めました —— 一部の項目は非表示です。",
   "code.noFile": "開いているファイルなし",
   "code.viewerHint": "ツリーからファイルを選ぶとここに表示されます。",
   "code.truncated": "切り詰め",
@@ -7549,7 +7242,6 @@ const ja: Dict = {
   "code.dictate.failed": "文字起こしできませんでした",
   "code.chat.stop": "停止",
   "code.chat.jumpToLatest": "最新",
-  "code.chat.sending": "処理中…",
   "code.chat.hint": "↵ で送信 · ⇧↵ で改行",
   "code.chat.clear": "クリア",
   "code.chat.export.label": "エクスポート",
@@ -7665,14 +7357,7 @@ const ja: Dict = {
     "どのグループも {n} 回未満です — 結果ではなく逸話として読んでください。",
   "code.worth.notAnExperiment":
     "これはたまたま行った実行です。タスクも日も異なり、無作為化もありません。実験ではなく記録であり、意図的に順位付けしていません。判断を支えられる比較は bench/role_routing の事前登録 A/B です。",
-  "code.maxAttempts": "最大試行回数",
-  "code.planning": "計画中…",
-  "code.verifying": "検証中…",
   "code.noDiff": "この実行はディスク上を何も変更しませんでした。",
-  "code.safetyNote":
-    "エージェントはこのワークスペースを編集し、ここであなたの検証コマンドを実行します —— ターミナルでの `chimera solve` と同じ機能です（localhost、bearer で保護）。",
-  "code.phase2note":
-    "フェーズ2：ビューアは編集可能（オプトイン）で、保存はアトミックかつ改行を保持しサイズ上限あり。コマンドランナーは各コマンドを新しいサブプロセスとしてストリーム表示します —— 結合出力であり、対話型ターミナルではありません。",
   "code.edit": "編集",
   "code.save": "保存",
   "code.discard": "破棄",
@@ -7682,15 +7367,6 @@ const ja: Dict = {
     "保存できませんでした —— bearer トークンが必要か、ファイルが大きすぎませんか？",
   "code.noUndo":
     "保存後は元に戻せません（このフォルダがあなたがコミットする git リポジトリでない限り）。",
-  "code.cmdRunner": "コマンドランナー",
-  "code.cmdPlaceholder": "このワークスペースで実行するコマンド —— 例: npm test",
-  "code.cwd": "cwd（任意、ワークスペースからの相対）",
-  "code.cmdRun": "コマンドを実行",
-  "code.exit": "終了コード",
-  "code.freshProcNote":
-    "各コマンドは新しいサブプロセスです —— cwd と env はコマンド間で保持されません（cd/export の状態なし）。",
-  "code.execSecurityNote":
-    "ホスト上のあなたのワークスペース（または設定されたサンドボックス）でコマンドを実行します。localhost + bearer 保護。対話型ターミナルではありません。",
   "code.git.title": "Git",
   "code.git.branch": "ブランチ",
   "code.git.notRepo":
@@ -7708,33 +7384,10 @@ const ja: Dict = {
   "code.git.commitError": "コミットに失敗しました。",
   "code.git.gitNote":
     "コミットは明示的に選択したパスのみをステージします（`git add -A` は使いません）。破棄は git を使ってこの実行の git で見える変更を元に戻します — git が無視する/追跡できないファイルには触れません。",
-  "code.planTitle": "プラン",
-  "code.planNote":
-    "プレビューのみ — 編集は行いません。ファイル変更の前にプランを承認または編集してください。",
-  "code.planEmpty": "プランナーはステップを返しませんでした。",
-  "code.planError": "プランをプレビューできませんでした。",
-  "code.planEditPlaceholder": "実行前にプランを編集（任意）",
-  "code.runWithPlan": "このプランで実行",
-  "code.runPlain": "プランなしで実行",
-  "code.modelPlaceholder": "デフォルトモデル",
-  "code.mode.single": "単一",
-  "code.mode.fuse": "フュージョン",
-  "code.mode.cascade": "カスケード",
-  "code.verify.title": "ブラウザで検証",
-  "code.verify.note":
-    "URL のフルページのスクリーンショットを撮影します — 表示内容の正直なスナップショットです（エージェントが検証したという主張ではありません）。",
-  "code.verify.urlPlaceholder": "http://localhost:5173",
-  "code.verify.capture": "撮影",
-  "code.verify.capturing": "撮影中…",
-  "code.verify.failed": "スクリーンショットを撮影できませんでした。",
-  "code.verify.caption": "スクリーンショット:",
-  "code.verify.alt": "指定した URL のスクリーンショット",
   "agents.title": "エージェントマネージャー",
   "agents.safetyNote":
     "複数のコーディングタスクを並列に実行し、それぞれを独自の git worktree に分離して、各タスクの結果とタスク間の競合を報告します。`chimera solve-batch` と同じ機能（localhost、bearer 保護）。",
   "agents.workspace": "ワークスペース",
-  "agents.workspacePlaceholder":
-    "フォルダのパス — 分離する git リポジトリ（任意；既定はアプリのワークスペース）",
   "agents.running": "実行中…",
   "agents.stop": "停止",
   "agents.stopAll": "すべて停止",
@@ -8368,7 +8021,6 @@ const it: Dict = {
   "skills.status.retired": "ritirata",
   "skills.learned": "Skill apprese",
   "skills.retire": "Ritira",
-  "skills.active": "attiva",
   "skills.stats": "{uses} usi · {wins} successi",
   "cron.title": "Pianificazione",
   "cron.jobs": "Lavori pianificati",
@@ -8442,9 +8094,6 @@ const it: Dict = {
   "skills.stage.ship": "Rilasciare",
   "skills.stageNone": "Senza fase",
   "nav.fusion": "Fusione",
-  "fusion.title": "Fusione e cascata",
-  "fusion.empty":
-    "L'ultimo turno ha usato un solo modello. Attiva la Fusione, o abilita la Cascata nelle Impostazioni, per vedere come viene composta una risposta — panel, giudice e sintesi.",
   "fusion.panelEmpty":
     "La fusione è stata eseguita ma non ha riportato membri del panel.",
   "fusion.panel": "Panel",
@@ -8655,8 +8304,6 @@ const it: Dict = {
   "code.picker.useThis": "Usa questa cartella",
   "code.picker.cancel": "Annulla",
   "code.picker.browse": "Scegli cartella",
-  "code.chat.resumed":
-    "Ripresa di una conversazione precedente. L'agente ha la cronologia; i turni precedenti non sono ancora mostrati.",
   "code.sessions.empty": "Ancora nessuna conversazione.",
   "code.sessions.defaultProject": "Progetto predefinito",
   "code.sessions.untitled": "Senza titolo",
@@ -8665,9 +8312,6 @@ const it: Dict = {
   "code.sessions.jsonOne": "Mostra il JSON di {name}",
   "code.sessions.jsonBytes": "{n} byte su disco",
   "code.open": "Apri",
-  "code.treeError": "Non è stato possibile leggere quella cartella.",
-  "code.treeEmpty": "Questa cartella è vuota.",
-  "code.treeCapped": "Elenco lungo troncato — alcune voci sono nascoste.",
   "code.noFile": "nessun file aperto",
   "code.viewerHint": "Scegli un file dall'albero per vederlo qui.",
   "code.truncated": "troncato",
@@ -8701,7 +8345,6 @@ const it: Dict = {
   "code.dictate.failed": "Impossibile trascrivere",
   "code.chat.stop": "Ferma",
   "code.chat.jumpToLatest": "Più recenti",
-  "code.chat.sending": "In corso…",
   "code.chat.hint": "↵ per inviare · ⇧↵ per andare a capo",
   "code.chat.clear": "Pulisci",
   "code.chat.export.label": "esporta",
@@ -8818,14 +8461,7 @@ const it: Dict = {
     "Meno di {n} esecuzioni in ogni gruppo — leggilo come aneddoto, non come risultato.",
   "code.worth.notAnExperiment":
     "Sono esecuzioni che ti è capitato di fare: attività diverse, giorni diversi, nessuna randomizzazione. È un registro, non un esperimento, e di proposito non è ordinato per merito. Il confronto che potrebbe reggere un verdetto è l'A/B pre-registrato in bench/role_routing.",
-  "code.maxAttempts": "Tentativi max",
-  "code.planning": "pianificazione…",
-  "code.verifying": "verifica…",
   "code.noDiff": "Questa esecuzione non ha cambiato nulla su disco.",
-  "code.safetyNote":
-    "L'agente modifica questo workspace ed esegue qui il tuo comando di verifica — la stessa capacità di `chimera solve` in un terminale (localhost, protetto da bearer).",
-  "code.phase2note":
-    "Fase 2: il visualizzatore è modificabile (opt-in) con un salvataggio atomico, che preserva i fine riga e con limite di dimensione, e l'esecutore di comandi trasmette ogni comando come sottoprocesso nuovo — output combinato, non un terminale interattivo.",
   "code.edit": "Modifica",
   "code.save": "Salva",
   "code.discard": "Scarta",
@@ -8835,16 +8471,6 @@ const it: Dict = {
     "Non è stato possibile salvare — serve il token bearer, o il file è troppo grande?",
   "code.noUndo":
     "Nessun annullamento dopo il salvataggio (a meno che questa cartella sia un repo git in cui fai commit).",
-  "code.cmdRunner": "Esecutore di comandi",
-  "code.cmdPlaceholder":
-    "un comando da eseguire in questo workspace — es. npm test",
-  "code.cwd": "cwd (facoltativo, relativo al workspace)",
-  "code.cmdRun": "Esegui comando",
-  "code.exit": "uscita",
-  "code.freshProcNote":
-    "Ogni comando è un sottoprocesso nuovo — cwd e variabili d'ambiente non persistono tra i comandi (nessuno stato di cd/export).",
-  "code.execSecurityNote":
-    "Esegue comandi nel tuo workspace sull'host (o nella sandbox configurata); localhost + protetto da bearer. Non è un terminale interattivo.",
   "code.git.title": "Git",
   "code.git.branch": "ramo",
   "code.git.notRepo":
@@ -8862,34 +8488,10 @@ const it: Dict = {
   "code.git.commitError": "Commit fallito.",
   "code.git.gitNote":
     "Il commit mette in stage solo i percorsi selezionati esplicitamente (mai `git add -A`). Lo scarto usa git per annullare le modifiche visibili a git dell'esecuzione — non tocca i file che git ignora o non può tracciare.",
-  "code.planTitle": "Piano",
-  "code.planNote":
-    "Solo anteprima — non fa alcuna modifica. Approva o modifica il piano prima di qualsiasi cambiamento ai file.",
-  "code.planEmpty": "Il pianificatore non ha restituito passi.",
-  "code.planError": "Non è stato possibile generare l'anteprima del piano.",
-  "code.planEditPlaceholder":
-    "modifica il piano prima di eseguire (facoltativo)",
-  "code.runWithPlan": "Esegui con questo piano",
-  "code.runPlain": "Esegui senza piano",
-  "code.modelPlaceholder": "modello predefinito",
-  "code.mode.single": "singolo",
-  "code.mode.fuse": "fusione",
-  "code.mode.cascade": "cascata",
-  "code.verify.title": "Verifica nel browser",
-  "code.verify.note":
-    "Cattura uno screenshot a pagina intera di un URL — un'istantanea onesta di ciò che rende (non l'affermazione che l'agente abbia verificato qualcosa).",
-  "code.verify.urlPlaceholder": "http://localhost:5173",
-  "code.verify.capture": "Cattura",
-  "code.verify.capturing": "Cattura in corso…",
-  "code.verify.failed": "Non è stato possibile catturare lo screenshot.",
-  "code.verify.caption": "Screenshot di",
-  "code.verify.alt": "Screenshot dell'URL che hai indicato",
   "agents.title": "Gestore agenti",
   "agents.safetyNote":
     "Esegue più compiti di codice in parallelo, ognuno isolato nel proprio worktree git, poi riporta il risultato di ciascuno e gli eventuali conflitti incrociati. Stessa capacità di `chimera solve-batch` (localhost, protetto da bearer).",
   "agents.workspace": "Workspace",
-  "agents.workspacePlaceholder":
-    "percorso della cartella — un repo git da isolare (facoltativo; predefinito quello dell'app)",
   "agents.running": "In esecuzione…",
   "agents.stop": "Ferma",
   "agents.stopAll": "Ferma tutti",
@@ -9524,7 +9126,6 @@ const pl: Dict = {
   "skills.status.retired": "wycofana",
   "skills.learned": "Wyuczone umiejętności",
   "skills.retire": "Wycofaj",
-  "skills.active": "aktywna",
   "skills.stats": "użycia: {uses} · sukcesy: {wins}",
   "cron.title": "Harmonogram",
   "cron.jobs": "Zaplanowane zadania",
@@ -9595,9 +9196,6 @@ const pl: Dict = {
   "skills.stage.ship": "Wydanie",
   "skills.stageNone": "Bez etapu",
   "nav.fusion": "Fuzja",
-  "fusion.title": "Fuzja i kaskada",
-  "fusion.empty":
-    "Ostatnia tura użyła jednego modelu. Włącz Fuzję albo Kaskadę w Ustawieniach, by zobaczyć, jak powstaje odpowiedź — panel, sędzia i synteza.",
   "fusion.panelEmpty": "Fuzja się wykonała, ale nie zgłosiła członków panelu.",
   "fusion.panel": "Panel",
   "fusion.judge": "Sędzia",
@@ -9806,8 +9404,6 @@ const pl: Dict = {
   "code.picker.useThis": "Użyj tego folderu",
   "code.picker.cancel": "Anuluj",
   "code.picker.browse": "Wybierz folder",
-  "code.chat.resumed":
-    "Kontynuacja wcześniejszej rozmowy. Agent ma historię; poprzednie tury nie są jeszcze pokazywane.",
   "code.sessions.empty": "Brak rozmów.",
   "code.sessions.defaultProject": "Projekt domyślny",
   "code.sessions.untitled": "Bez tytułu",
@@ -9816,9 +9412,6 @@ const pl: Dict = {
   "code.sessions.jsonOne": "Pokaż JSON dla {name}",
   "code.sessions.jsonBytes": "{n} bajtów na dysku",
   "code.open": "Otwórz",
-  "code.treeError": "Nie udało się odczytać tego folderu.",
-  "code.treeEmpty": "Ten folder jest pusty.",
-  "code.treeCapped": "Długa lista przycięta — część pozycji jest ukryta.",
   "code.noFile": "brak otwartego pliku",
   "code.viewerHint": "Wybierz plik z drzewa, żeby zobaczyć go tutaj.",
   "code.truncated": "przycięte",
@@ -9852,7 +9445,6 @@ const pl: Dict = {
   "code.dictate.failed": "Nie udało się przepisać",
   "code.chat.stop": "Zatrzymaj",
   "code.chat.jumpToLatest": "Najnowsze",
-  "code.chat.sending": "Pracuję…",
   "code.chat.hint": "↵ wysyła · ⇧↵ nowa linia",
   "code.chat.clear": "Wyczyść",
   "code.chat.export.label": "eksportuj",
@@ -9968,14 +9560,7 @@ const pl: Dict = {
     "Mniej niż {n} uruchomień w każdej grupie — czytaj to jako anegdotę, nie jako wynik.",
   "code.worth.notAnExperiment":
     "To uruchomienia, które akurat wykonałeś: inne zadania, inne dni, brak randomizacji. To zapis, a nie eksperyment, i celowo bez rankingu. Porównaniem, które mogłoby uzasadnić werdykt, jest pre-rejestrowany A/B w bench/role_routing.",
-  "code.maxAttempts": "Maks. prób",
-  "code.planning": "planowanie…",
-  "code.verifying": "weryfikacja…",
   "code.noDiff": "Ten przebieg niczego nie zmienił na dysku.",
-  "code.safetyNote":
-    "Agent edytuje ten workspace i uruchamia tu twoje polecenie weryfikacji — ta sama możliwość co `chimera solve` w terminalu (localhost, chronione tokenem bearer).",
-  "code.phase2note":
-    "Faza 2: podgląd jest edytowalny (opcjonalnie) z atomicznym zapisem zachowującym znaki końca linii i z limitem rozmiaru, a wykonawca poleceń strumieniuje każde polecenie jako świeży podproces — wyjście połączone, nie interaktywny terminal.",
   "code.edit": "Edytuj",
   "code.save": "Zapisz",
   "code.discard": "Odrzuć",
@@ -9985,16 +9570,6 @@ const pl: Dict = {
     "Nie udało się zapisać — czy wymagany jest token bearer, albo plik jest za duży?",
   "code.noUndo":
     "Po zapisie nie ma cofnięcia (chyba że ten folder to repozytorium git, w którym commitujesz).",
-  "code.cmdRunner": "Wykonawca poleceń",
-  "code.cmdPlaceholder":
-    "polecenie do uruchomienia w tym workspace — np. npm test",
-  "code.cwd": "cwd (opcjonalnie, względem workspace'u)",
-  "code.cmdRun": "Uruchom polecenie",
-  "code.exit": "wyjście",
-  "code.freshProcNote":
-    "Każde polecenie to świeży podproces — cwd i zmienne środowiskowe nie utrzymują się między poleceniami (brak stanu cd/export).",
-  "code.execSecurityNote":
-    "Uruchamia polecenia w twoim workspace na hoście (albo w skonfigurowanym sandboxie); localhost + ochrona tokenem bearer. To nie jest interaktywny terminal.",
   "code.git.title": "Git",
   "code.git.branch": "gałąź",
   "code.git.notRepo":
@@ -10012,33 +9587,10 @@ const pl: Dict = {
   "code.git.commitError": "Commit nie powiódł się.",
   "code.git.gitNote":
     "Commit dodaje do poczekalni wyłącznie jawnie wybrane ścieżki (nigdy `git add -A`). Odrzucenie używa gita, by cofnąć widoczne dla gita zmiany przebiegu — nie rusza plików, które git ignoruje albo których nie potrafi śledzić.",
-  "code.planTitle": "Plan",
-  "code.planNote":
-    "Tylko podgląd — nie wprowadza żadnych zmian. Zatwierdź albo popraw plan przed jakąkolwiek zmianą plików.",
-  "code.planEmpty": "Planer nie zwrócił żadnych kroków.",
-  "code.planError": "Nie udało się podejrzeć planu.",
-  "code.planEditPlaceholder": "popraw plan przed uruchomieniem (opcjonalnie)",
-  "code.runWithPlan": "Uruchom z tym planem",
-  "code.runPlain": "Uruchom bez planu",
-  "code.modelPlaceholder": "model domyślny",
-  "code.mode.single": "pojedynczy",
-  "code.mode.fuse": "fuzja",
-  "code.mode.cascade": "kaskada",
-  "code.verify.title": "Zweryfikuj w przeglądarce",
-  "code.verify.note":
-    "Zrób zrzut całej strony spod adresu URL — uczciwą migawkę tego, co się wyrenderuje (a nie twierdzenie, że agent cokolwiek zweryfikował).",
-  "code.verify.urlPlaceholder": "http://localhost:5173",
-  "code.verify.capture": "Zrób zrzut",
-  "code.verify.capturing": "Robię zrzut…",
-  "code.verify.failed": "Nie udało się zrobić zrzutu.",
-  "code.verify.caption": "Zrzut ekranu",
-  "code.verify.alt": "Zrzut ekranu podanego przez ciebie adresu URL",
   "agents.title": "Menedżer agentów",
   "agents.safetyNote":
     "Uruchamia kilka zadań kodowania równolegle, każde odizolowane we własnym worktree gita, a potem raportuje wynik każdego zadania i ewentualne konflikty między nimi. Ta sama możliwość co `chimera solve-batch` (localhost, chronione tokenem bearer).",
   "agents.workspace": "Workspace",
-  "agents.workspacePlaceholder":
-    "ścieżka folderu — repozytorium git do odizolowania (opcjonalnie; domyślnie to z aplikacji)",
   "agents.running": "Trwa…",
   "agents.stop": "Zatrzymaj",
   "agents.stopAll": "Zatrzymaj wszystkie",
@@ -10674,7 +10226,6 @@ const ru: Dict = {
   "skills.status.retired": "выведен",
   "skills.learned": "Усвоенные навыки",
   "skills.retire": "Вывести из обращения",
-  "skills.active": "активен",
   "skills.stats": "использований: {uses} · удач: {wins}",
   "cron.title": "Расписание",
   "cron.jobs": "Задания по расписанию",
@@ -10746,9 +10297,6 @@ const ru: Dict = {
   "skills.stage.ship": "Выпуск",
   "skills.stageNone": "Без этапа",
   "nav.fusion": "Слияние",
-  "fusion.title": "Слияние и каскад",
-  "fusion.empty":
-    "Последний ход использовал одну модель. Включите слияние или каскад в настройках, чтобы увидеть, как складывается ответ — панель, судья и синтез.",
   "fusion.panelEmpty":
     "Слияние отработало, но не сообщило об участниках панели.",
   "fusion.panel": "Панель",
@@ -10958,8 +10506,6 @@ const ru: Dict = {
   "code.picker.useThis": "Использовать эту папку",
   "code.picker.cancel": "Отмена",
   "code.picker.browse": "Выбрать папку",
-  "code.chat.resumed":
-    "Продолжение прежнего разговора. У агента есть его история; ходы выше пока не показаны.",
   "code.sessions.empty": "Разговоров пока нет.",
   "code.sessions.defaultProject": "Проект по умолчанию",
   "code.sessions.untitled": "Без названия",
@@ -10968,9 +10514,6 @@ const ru: Dict = {
   "code.sessions.jsonOne": "Показать JSON для {name}",
   "code.sessions.jsonBytes": "{n} байт на диске",
   "code.open": "Открыть",
-  "code.treeError": "Не удалось прочитать эту папку.",
-  "code.treeEmpty": "Эта папка пуста.",
-  "code.treeCapped": "Длинный список обрезан — часть записей скрыта.",
   "code.noFile": "файл не открыт",
   "code.viewerHint": "Выберите файл в дереве, чтобы посмотреть его здесь.",
   "code.truncated": "обрезано",
@@ -11004,7 +10547,6 @@ const ru: Dict = {
   "code.dictate.failed": "Не удалось расшифровать",
   "code.chat.stop": "Остановить",
   "code.chat.jumpToLatest": "К последнему",
-  "code.chat.sending": "Работает…",
   "code.chat.hint": "↵ — отправить · ⇧↵ — новая строка",
   "code.chat.clear": "Очистить",
   "code.chat.export.label": "экспорт",
@@ -11123,14 +10665,7 @@ const ru: Dict = {
     "Во всех группах меньше {n} запусков — читайте это как отдельные случаи, а не как результат.",
   "code.worth.notAnExperiment":
     "Это запуски, которые вы просто сделали: разные задачи, разные дни, никакой случайной выборки. Это запись, а не эксперимент, и она намеренно не ранжирована. Сравнение, способное подкрепить вывод, — заранее объявленный A/B в bench/role_routing.",
-  "code.maxAttempts": "Максимум попыток",
-  "code.planning": "планирует…",
-  "code.verifying": "проверяет…",
   "code.noDiff": "Этот запуск ничего не изменил на диске.",
-  "code.safetyNote":
-    "Агент правит эту рабочую папку и выполняет здесь вашу команду проверки — те же полномочия, что и у `chimera solve` в терминале (localhost, с защитой токеном).",
-  "code.phase2note":
-    "Этап 2: просмотр файла стал редактируемым (по желанию) — сохранение атомарное, с сохранением переводов строк и ограничением размера, — а исполнитель команд передаёт каждую команду как новый подпроцесс: общий вывод, а не интерактивный терминал.",
   "code.edit": "Изменить",
   "code.save": "Сохранить",
   "code.discard": "Отбросить",
@@ -11140,16 +10675,6 @@ const ru: Dict = {
     "Не удалось сохранить — не требуется ли токен доступа, или файл слишком велик?",
   "code.noUndo":
     "После сохранения отмены нет (если только эта папка не репозиторий git, куда вы делаете коммиты).",
-  "code.cmdRunner": "Исполнитель команд",
-  "code.cmdPlaceholder":
-    "команда для выполнения в этой рабочей папке — например, npm test",
-  "code.cwd": "рабочий каталог (необязательно, относительно рабочей папки)",
-  "code.cmdRun": "Выполнить команду",
-  "code.exit": "код выхода",
-  "code.freshProcNote":
-    "Каждая команда — это новый подпроцесс: рабочий каталог и переменные окружения между командами не сохраняются (никакого состояния от cd или export).",
-  "code.execSecurityNote":
-    "Выполняет команды в вашей рабочей папке на этой машине (или в настроенной песочнице); localhost, с защитой токеном. Это не интерактивный терминал.",
   "code.git.title": "Git",
   "code.git.branch": "ветка",
   "code.git.notRepo":
@@ -11167,33 +10692,10 @@ const ru: Dict = {
   "code.git.commitError": "Коммит не удался.",
   "code.git.gitNote":
     "Коммит добавляет в индекс только явно выбранные пути (никогда `git add -A`). «Отбросить» использует git, чтобы откатить видимые для git изменения запуска — файлов, которые git игнорирует или не отслеживает, это не касается.",
-  "code.planTitle": "План",
-  "code.planNote":
-    "Только предпросмотр — правок здесь не делается. Утвердите или измените план до любых изменений файлов.",
-  "code.planEmpty": "Планировщик не вернул ни одного шага.",
-  "code.planError": "Не удалось показать план.",
-  "code.planEditPlaceholder": "измените план перед запуском (необязательно)",
-  "code.runWithPlan": "Запустить с этим планом",
-  "code.runPlain": "Запустить без плана",
-  "code.modelPlaceholder": "модель по умолчанию",
-  "code.mode.single": "одна модель",
-  "code.mode.fuse": "слияние",
-  "code.mode.cascade": "каскад",
-  "code.verify.title": "Проверить в браузере",
-  "code.verify.note":
-    "Снимок всей страницы по адресу — честный снимок того, что она отрисовала (а не утверждение, что агент что-то проверил).",
-  "code.verify.urlPlaceholder": "http://localhost:5173",
-  "code.verify.capture": "Снять",
-  "code.verify.capturing": "Снимает…",
-  "code.verify.failed": "Не удалось сделать снимок.",
-  "code.verify.caption": "Снимок страницы",
-  "code.verify.alt": "Снимок страницы по указанному вами адресу",
   "agents.title": "Менеджер агентов",
   "agents.safetyNote":
     "Выполняет несколько задач по коду параллельно, каждую изолированно в своём рабочем дереве git, затем сообщает результат каждой задачи и все столкновения между ними. Те же полномочия, что и у `chimera solve-batch` (localhost, с защитой токеном).",
   "agents.workspace": "Рабочая папка",
-  "agents.workspacePlaceholder":
-    "путь к папке — репозиторий git для изоляции (необязательно; по умолчанию рабочая папка приложения)",
   "agents.running": "Выполняется…",
   "agents.stop": "Остановить",
   "agents.stopAll": "Остановить все",
