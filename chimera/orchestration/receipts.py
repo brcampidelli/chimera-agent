@@ -79,6 +79,76 @@ def price_delegation(
     return round(pt / 1_000_000 * price.input_per_m + ct / 1_000_000 * price.output_per_m, 6)
 
 
+def _price_one(model: str, prompt: object, completion: object) -> float | None:
+    """One call/stage at its model's rate. None when the price — or the usage — is unknown.
+
+    A priced model that reported NO usage costs an *unknown* amount, not zero. That rule already
+    lives in :func:`chimera.fusion.receipts.price_stage`; it is restated here because this is the
+    path the spend cap consults, and a missing number that masquerades as $0.00 is exactly how a
+    ceiling stops being one.
+    """
+    if not model:
+        return None
+    if prompt is None and completion is None and resolve_price(model) is not None:
+        return None
+    pt = prompt if isinstance(prompt, int) else None
+    ct = completion if isinstance(completion, int) else None
+    return price_delegation(model, pt, ct)
+
+
+def _stages_of(result: object) -> list[dict[str, object]]:
+    """The per-stage breakdown a fused call carries in ``route_meta``, or [] for a plain call."""
+    meta = getattr(result, "route_meta", None)
+    if not isinstance(meta, dict):
+        return []
+    stages = meta.get("stages")
+    if not isinstance(stages, list):
+        return []
+    return [s for s in stages if isinstance(s, dict) and s.get("model")]
+
+
+@dataclass(frozen=True)
+class CompletionCost:
+    """What one completed call cost, plus the first model whose price could not be resolved."""
+
+    usd: float
+    unpriced: str | None
+
+
+def price_completion(result: object) -> CompletionCost:
+    """Price one completed call — by its STAGES when it reports them, else by the model that answered.
+
+    A fused turn answers as ``model="fusion"``. That is a label, not a model: no price resolves for
+    it, so a turn that really made N+2 calls across three different models was charged $0.00, and
+    the ceiling sitting in the same composer row as the Fuse button never saw the most expensive
+    thing the app can do. The per-stage breakdown was already in ``route_meta`` and already had a
+    pricer — :func:`chimera.fusion.receipts.price_stage` — that nothing called.
+
+    ``usd`` is what could be priced and ``unpriced`` names the first stage that could not, so a
+    partly-known total is reported as a floor with the gap named, never as a complete figure.
+    """
+    unpriced: str | None = None
+    stages = _stages_of(result)
+    if stages:
+        total = 0.0
+        for stage in stages:
+            model = str(stage.get("model") or "")
+            usd = _price_one(model, stage.get("prompt_tokens"), stage.get("completion_tokens"))
+            if usd is None:
+                unpriced = unpriced or (model or "(unnamed model)")
+                continue
+            total += usd
+        return CompletionCost(round(total, 6), unpriced)
+
+    model = str(getattr(result, "model", "") or "")
+    usd = _price_one(
+        model, getattr(result, "prompt_tokens", None), getattr(result, "completion_tokens", None)
+    )
+    if usd is None:
+        return CompletionCost(0.0, model or "(unnamed model)")
+    return CompletionCost(usd, None)
+
+
 @dataclass(frozen=True)
 class ProfitEstimate:
     """The pre-delegation gate's arithmetic, kept explicit for audit."""

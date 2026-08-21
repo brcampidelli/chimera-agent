@@ -381,19 +381,27 @@ def pricing_capability(settings: Settings) -> dict[str, object]:
     """
     from chimera.fusion.receipts import resolve_price
 
+    # Every model that could ANSWER a turn on this machine, not just the one it would ask. The Fuse
+    # button sits in the same composer row as the ceiling and always works, so a panel member with
+    # no list price is exactly as capable of making the total unknowable as the default model is —
+    # and probing only the default reported "priced" for the most expensive turn the app can run.
     model = settings.default_model
-    priced = resolve_price(model) is not None
+    cast = [m for m in (*settings.fusion_panel, settings.fusion_judge, settings.fusion_synthesizer) if m]
+    unpriced = [m for m in dict.fromkeys([model, *cast]) if m and resolve_price(m) is None]
+    priced = not unpriced
+    named = ", ".join(unpriced)
     return {
         "key": "spend_cap",
         "label": "Spend cap (dollar ceiling)",
         "available": priced,
-        "probed": True,  # the price table either resolves this model or it does not
+        "probed": True,  # the price table either resolves these models or it does not
         "detail": model,
         "hint": (
             ""
             if priced
-            else f"no list price known for {model}: a spend cap would stop on its first call. "
-            "Register one with chimera.fusion.receipts.set_price, or cap a priced model."
+            else f"no list price known for {named}: a spend cap would stop on the first call that "
+            "reaches one. Register a price with chimera.fusion.receipts.set_price, or run with "
+            "models that have one."
         ),
     }
 

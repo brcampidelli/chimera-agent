@@ -215,3 +215,104 @@ def test_the_partial_answer_survives_the_stop() -> None:
 
     assert result.transcript
     assert result.prompt_tokens > 0
+
+
+# --- the fused turn, which the ceiling could not see at all ---------------------------------------
+
+
+def _fused(*stages: tuple[str, str, int, int], total_prompt: int, total_completion: int) -> _Result:
+    """A completion shaped like the one `FusionEngine.complete` returns.
+
+    The label is the whole problem: it answers as `model="fusion"`, and `"fusion"` is not a model —
+    no price table resolves it, and everything downstream priced it as if it were one.
+    """
+    result = _Result("fused answer", "fusion", total_prompt, total_completion)
+    result.route_meta = {
+        "stages": [
+            {"stage": s, "model": m, "prompt_tokens": p, "completion_tokens": c}
+            for s, m, p, c in stages
+        ]
+    }
+    return result
+
+
+def test_a_fused_turn_is_charged_by_its_stages_not_by_its_label() -> None:
+    """The regression that mattered: the app's most expensive turn cost the ceiling $0.00.
+
+    A fused turn makes N panel calls plus a judge plus a synthesizer, then returns ONE result
+    labelled `fusion`. `resolve_price("fusion")` is None — verified: no exact entry, no substring
+    hit, and it is not a local model — so the whole turn was skipped and `_spent` stayed at zero
+    while the ceiling sat in the same composer row as the button that started it.
+    """
+    budget = SpendBudget(max_usd=10.0)
+    priced = "openrouter/deepseek/deepseek-chat"
+
+    budget.record_result(
+        _fused(
+            ("panel", priced, 1000, 1000),
+            ("panel", priced, 1000, 1000),
+            ("judge", priced, 500, 200),
+            ("synth", priced, 800, 400),
+            total_prompt=3300,
+            total_completion=2600,
+        )
+    )
+
+    assert budget.unpriced_model is None, "every stage here has a list price"
+    assert budget.spent > 0, "a fused turn costs money and the ceiling must see it"
+    # And it equals the sum of the stages at their own rates — not the total tokens at one rate,
+    # which is the other wrong number the same turn used to produce.
+    from chimera.orchestration.receipts import price_delegation
+
+    expected = sum(
+        price_delegation(priced, p, c) or 0.0
+        for p, c in ((1000, 1000), (1000, 1000), (500, 200), (800, 400))
+    )
+    assert budget.spent == pytest.approx(expected)
+
+
+def test_a_fused_turn_with_one_unpriced_stage_reports_a_floor_and_names_the_gap() -> None:
+    budget = SpendBudget(max_usd=10.0)
+
+    budget.record_result(
+        _fused(
+            ("panel", "openrouter/deepseek/deepseek-chat", 1000, 1000),
+            ("panel", "some-model-nobody-priced", 1000, 1000),
+            ("synth", "openrouter/deepseek/deepseek-chat", 800, 400),
+            total_prompt=2800,
+            total_completion=2400,
+        )
+    )
+
+    # Named, so the fix is actionable — "the price of fusion is unknown" pointed at a model the
+    # user never chose and could not register.
+    assert budget.unpriced_model == "some-model-nobody-priced"
+    assert "unknown" in (budget.blocked() or "")
+    # The priced stages really were spent. Reporting them as a floor beats reporting zero.
+    assert budget.spent > 0
+
+
+def test_a_priced_model_that_reported_no_usage_costs_an_unknown_amount_not_zero() -> None:
+    """The rule `price_stage` already stated, restated on the path the ceiling consults.
+
+    Otherwise a provider that omits usage makes every call free, and the cap never fires — the same
+    failure as the label, arriving by a different door.
+    """
+    budget = SpendBudget(max_usd=10.0)
+    result = _Result("hi", "openrouter/deepseek/deepseek-chat")
+    result.prompt_tokens = None
+    result.completion_tokens = None
+
+    budget.record_result(result)
+
+    assert budget.unpriced_model == "openrouter/deepseek/deepseek-chat"
+    assert budget.spent == 0.0
+
+
+def test_a_plain_call_still_charges_the_model_that_answered() -> None:
+    budget = SpendBudget(max_usd=10.0)
+
+    budget.record_result(_Result("hi", "openrouter/deepseek/deepseek-chat", 1000, 1000))
+
+    assert budget.unpriced_model is None
+    assert budget.spent > 0
