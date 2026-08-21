@@ -256,7 +256,11 @@ def register_features(
     def memory_profile() -> dict[str, Any]:
         mgr = _memory_manager()
         return {
-            "profile": mgr.profile(),
+            # The FACTS, not the prompt block. `profile()` opens with "What you know about the
+            # user:" — an instruction addressed to a model — and the screen was rendering that
+            # verbatim under an already-translated panel heading, in an app translated into ten
+            # languages. The screen supplies its own heading; this supplies what goes under it.
+            "profile": '\n'.join(mgr.profile_facts()),
             "persona": [_item_dict(it) for it in mgr.store.by_kind("persona")],
         }
 
