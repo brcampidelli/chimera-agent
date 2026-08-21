@@ -1004,6 +1004,67 @@
         "title": "BrowserCfgOut",
         "type": "object"
       },
+      "BundleOut": {
+        "properties": {
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "installed_at": {
+            "default": "",
+            "title": "Installed At",
+            "type": "string"
+          },
+          "license": {
+            "default": "",
+            "title": "License",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "ref": {
+            "default": "",
+            "title": "Ref",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "default": "",
+            "description": "pending | active | inactive | unknown",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "BundleOut",
+        "type": "object"
+      },
+      "BundleStatusIn": {
+        "properties": {
+          "status": {
+            "default": "active",
+            "description": "active | inactive",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "BundleStatusIn",
+        "type": "object"
+      },
       "CacheCfgOut": {
         "properties": {
           "completion": {
@@ -1033,6 +1094,72 @@
           "ok"
         ],
         "title": "CancelOut",
+        "type": "object"
+      },
+      "CatalogEntryOut": {
+        "description": "One installable skill, and everything a person needs before deciding to download it.",
+        "properties": {
+          "author": {
+            "default": "",
+            "title": "Author",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "homepage": {
+            "default": "",
+            "title": "Homepage",
+            "type": "string"
+          },
+          "installed": {
+            "default": "",
+            "title": "Installed",
+            "type": "string"
+          },
+          "license": {
+            "default": "",
+            "title": "License",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "permissive": {
+            "default": false,
+            "description": "Whether the licence is one that needs no further reading before use.",
+            "title": "Permissive",
+            "type": "boolean"
+          },
+          "portability": {
+            "default": "",
+            "description": "native | needs_setup | needs_service | needs_heavy | os_locked | needs_adaptation \u2014 these were written for another agent, and most do not transfer unchanged.",
+            "title": "Portability",
+            "type": "string"
+          },
+          "requires": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Requires",
+            "type": "array"
+          },
+          "topic": {
+            "default": "",
+            "title": "Topic",
+            "type": "string"
+          }
+        },
+        "title": "CatalogEntryOut",
         "type": "object"
       },
       "ChatCompletionRequest": {
@@ -10403,6 +10530,192 @@
           }
         },
         "summary": "List Skills"
+      }
+    },
+    "/api/skills/bundles": {
+      "get": {
+        "description": "What is installed on this machine, read from the disk rather than from an index.",
+        "operationId": "list_bundles_api_skills_bundles_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BundleOut"
+                  },
+                  "title": "Response List Bundles Api Skills Bundles Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Bundles"
+      }
+    },
+    "/api/skills/bundles/{name}": {
+      "delete": {
+        "description": "Delete an installed bundle and its files.",
+        "operationId": "delete_bundle_api_skills_bundles__name__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetiredOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Bundle"
+      }
+    },
+    "/api/skills/bundles/{name}/status": {
+      "post": {
+        "description": "Switch an installed bundle on or off, keeping it on disk either way.",
+        "operationId": "set_bundle_status_api_skills_bundles__name__status_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BundleStatusIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BundleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Bundle Status"
+      }
+    },
+    "/api/skills/catalog": {
+      "get": {
+        "description": "The installable skills, with what each one needs said next to its name.\n\nNot vendored and not fetched here: this is the curated pointer list, and the licence and\nportability travel with every row because a flat list of eighty names would advertise\neighty working features and deliver rather fewer.",
+        "operationId": "list_catalog_api_skills_catalog_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CatalogEntryOut"
+                  },
+                  "title": "Response List Catalog Api Skills Catalog Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Catalog"
+      }
+    },
+    "/api/skills/catalog/{name}/install": {
+      "post": {
+        "description": "Download one skill from its source repository. Runs nothing, and enables nothing.\n\nThe bundle lands `pending`: its files are on disk and no part of it reaches a prompt until\nsomebody switches it on. These are instructions written by a stranger, and an instruction\nin the system prompt has the standing of one the owner wrote \u2014 so downloading is not\nconsenting, and it is a separate click.",
+        "operationId": "install_bundle_api_skills_catalog__name__install_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "force",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Force",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BundleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Install Bundle"
       }
     },
     "/api/skills/library": {

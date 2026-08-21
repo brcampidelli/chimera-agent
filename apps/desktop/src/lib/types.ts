@@ -19,6 +19,10 @@ export type SkillStat = Schemas["SkillStatOut"];
 /** One curated skill card that ships in the box, as opposed to a `SkillStat`, which is one the
  *  agent distilled from the user's own runs. `body` is empty in the list and filled on detail. */
 export type LibraryCard = Schemas["LibraryCardOut"];
+/** An installable skill from the wider ecosystem — a pointer, not something we ship. */
+export type CatalogEntry = Schemas["CatalogEntryOut"];
+/** One installed on this machine: a directory of somebody else's instructions and scripts. */
+export type SkillBundle = Schemas["BundleOut"];
 /** A stored coding conversation's file, unparsed — the one view in which a damaged session
  *  looks damaged rather than empty. */
 export type CodeSessionRaw = Schemas["CodeSessionRawOut"];

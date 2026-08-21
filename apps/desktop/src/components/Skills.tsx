@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
 import { Dialog } from "@/components/ui/dialog";
 import { ErrorState } from "@/components/ui/async";
+import { SkillCatalog } from "@/components/SkillCatalog";
 import { useT } from "@/lib/i18n";
 import type { LibraryCard, SkillStat } from "@/lib/types";
 
@@ -218,6 +219,7 @@ export function Skills({ embedded = false }: { embedded?: boolean } = {}) {
         {t("skills.libraryBlurb")}
       </p>
       <Library />
+      <SkillCatalog />
     </Screen>
   );
 }

@@ -1,0 +1,55 @@
+Chimera Agent
+Copyright 2026 Bruno Campidelli
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+--------------------------------------------------------------------------------
+Skill catalogue
+--------------------------------------------------------------------------------
+
+`chimera skills-catalog` lists skills that are NOT distributed with this project.
+No third-party skill is vendored here. The catalogue in
+`chimera/skills/catalog.json` holds pointers — repository, path, licence — and
+`chimera skills-install` fetches from the source at the user's request, so what
+lands on a user's disk arrives from its author under its author's terms.
+
+The catalogue is derived from, and pinned to:
+
+    NousResearch/hermes-agent, `skills/**`
+    https://github.com/NousResearch/hermes-agent
+    MIT License, Copyright (c) 2025 Nous Research
+
+Every one of the 82 skills in that tree declares `license: MIT` in its own
+frontmatter. Several are adaptations of other people's work and credit it in
+their `author` field; those chains, as recorded upstream, are:
+
+    obra/superpowers — Jesse Vincent — MIT
+        test-driven-development, systematic-debugging, requesting-code-review,
+        and the writing guidance in `plan`
+    gsd-build/get-shit-done — MIT
+        spike, sketch
+    JimLiu/baoyu-skills — Jim Liu (宝玉) — MIT
+        baoyu-infographic
+    xdevplatform/xurl, f-trycua — MIT
+        xurl, computer-use
+
+Deliberately NOT in the catalogue, and worth writing down so nobody adds it
+later by accident:
+
+  * `anthropics/skills` — that repository has no top-level licence and licenses
+    per skill. Its `docx`, `pdf`, `pptx` and `xlsx` skills are source-available
+    rather than open source: their LICENSE.txt reserves all rights and forbids
+    retaining copies outside Anthropic's services, copying, derivative works and
+    redistribution. Those four names COLLIDE with MIT skills of the same name in
+    the tree above, so a catalogue that resolved skills by short name could pick
+    the wrong one and never look wrong. This one resolves by repository and full
+    path, always.
+
+  * The upstream `skills/index-cache/` directory, which indexes other
+    publishers' catalogues — including the one above — and `optional-skills/`,
+    whose licences have not been read.
+
+Two skills orchestrate copyleft software without embedding it, which is a
+runtime obligation for whoever runs them rather than a distribution one here:
+`comfyui` drives ComfyUI (GPL-3.0), and `p5js` produces pages that embed p5.js
+(LGPL-2.1).

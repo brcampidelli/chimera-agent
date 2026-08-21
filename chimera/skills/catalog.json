@@ -1,0 +1,1826 @@
+{
+  "source": {
+    "repo": "NousResearch/hermes-agent",
+    "ref": "main",
+    "root": "skills/"
+  },
+  "generated_by": "scripts/refresh_skill_catalog.py",
+  "skills": [
+    {
+      "name": "apple-notes",
+      "description": "Manage Apple Notes via memo CLI: create, search, edit.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/apple/apple-notes",
+      "license": "MIT",
+      "portability": "os_locked",
+      "ref": "main",
+      "requires": [
+        "memo"
+      ],
+      "topic": "apple",
+      "note": "macOS",
+      "author": "Hermes Agent",
+      "tags": [
+        "Notes",
+        "Apple",
+        "macOS",
+        "note-taking"
+      ]
+    },
+    {
+      "name": "apple-reminders",
+      "description": "Apple Reminders via remindctl: add, list, complete.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/apple/apple-reminders",
+      "license": "MIT",
+      "portability": "os_locked",
+      "ref": "main",
+      "requires": [
+        "remindctl"
+      ],
+      "topic": "apple",
+      "note": "macOS",
+      "author": "Hermes Agent",
+      "tags": [
+        "Reminders",
+        "tasks",
+        "todo",
+        "macOS",
+        "Apple"
+      ]
+    },
+    {
+      "name": "findmy",
+      "description": "Track Apple devices/AirTags via FindMy.app on macOS.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/apple/findmy",
+      "license": "MIT",
+      "portability": "needs_adaptation",
+      "ref": "main",
+      "requires": [],
+      "topic": "apple",
+      "note": "a vision tool the agent must provide",
+      "author": "Hermes Agent",
+      "tags": [
+        "FindMy",
+        "AirTag",
+        "location",
+        "tracking",
+        "macOS",
+        "Apple"
+      ]
+    },
+    {
+      "name": "imessage",
+      "description": "Send and receive iMessages/SMS via the imsg CLI on macOS.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/apple/imessage",
+      "license": "MIT",
+      "portability": "os_locked",
+      "ref": "main",
+      "requires": [
+        "imsg"
+      ],
+      "topic": "apple",
+      "note": "macOS",
+      "author": "Hermes Agent",
+      "tags": [
+        "iMessage",
+        "SMS",
+        "messaging",
+        "macOS",
+        "Apple"
+      ]
+    },
+    {
+      "name": "claude-code",
+      "description": "Delegate coding to Claude Code CLI (features, PRs).",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/autonomous-ai-agents/claude-code",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "autonomous-ai-agents",
+      "note": "",
+      "author": "Hermes Agent + Teknium",
+      "tags": [
+        "Coding-Agent",
+        "Claude",
+        "Anthropic",
+        "Code-Review",
+        "Refactoring",
+        "PTY",
+        "Automation"
+      ]
+    },
+    {
+      "name": "codex",
+      "description": "Delegate coding to OpenAI Codex CLI (features, PRs).",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/autonomous-ai-agents/codex",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "autonomous-ai-agents",
+      "note": "",
+      "author": "Hermes Agent",
+      "tags": [
+        "Coding-Agent",
+        "Codex",
+        "OpenAI",
+        "Code-Review",
+        "Refactoring"
+      ]
+    },
+    {
+      "name": "computer-use",
+      "description": "Drive the desktop in the background without stealing focus.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/autonomous-ai-agents/computer-use",
+      "license": "MIT",
+      "portability": "needs_service",
+      "ref": "main",
+      "requires": [],
+      "topic": "autonomous-ai-agents",
+      "note": "the cua-driver desktop driver",
+      "author": "Francesco Bonacci (f-trycua), Hermes Agent",
+      "tags": [
+        "computer-use",
+        "desktop",
+        "automation",
+        "gui",
+        "cross-platform"
+      ]
+    },
+    {
+      "name": "hermes-agent",
+      "description": "Use, configure, theme, extend, and orchestrate Hermes Agent.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/autonomous-ai-agents/hermes-agent",
+      "license": "MIT",
+      "portability": "needs_adaptation",
+      "ref": "main",
+      "requires": [],
+      "topic": "autonomous-ai-agents",
+      "note": "the upstream agent itself",
+      "author": "Hermes Agent + Teknium",
+      "tags": [
+        "hermes",
+        "setup",
+        "configuration",
+        "multi-agent",
+        "spawning",
+        "cli",
+        "gateway",
+        "bots",
+        "bot-mode",
+        "features",
+        "themes",
+        "skins",
+        "desktop-plugins",
+        "tui-widgets",
+        "petdex",
+        "development"
+      ]
+    },
+    {
+      "name": "merge-reconciler",
+      "description": "Neutral third-party resolution of agent merge conflicts.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/autonomous-ai-agents/merge-reconciler",
+      "license": "MIT",
+      "portability": "needs_adaptation",
+      "ref": "main",
+      "requires": [],
+      "topic": "autonomous-ai-agents",
+      "note": "the upstream Kanban CLI",
+      "author": "Hermes Agent",
+      "tags": [
+        "Multi-Agent",
+        "Git",
+        "Merge-Conflict",
+        "Kanban",
+        "Arbitration"
+      ]
+    },
+    {
+      "name": "opencode",
+      "description": "Delegate coding to OpenCode CLI (features, PR review).",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/autonomous-ai-agents/opencode",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "autonomous-ai-agents",
+      "note": "",
+      "author": "Hermes Agent",
+      "tags": [
+        "Coding-Agent",
+        "OpenCode",
+        "Autonomous",
+        "Refactoring",
+        "Code-Review"
+      ]
+    },
+    {
+      "name": "architecture-diagram",
+      "description": "Dark-themed SVG architecture/cloud/infra diagrams as HTML.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/creative/architecture-diagram",
+      "license": "MIT",
+      "portability": "needs_adaptation",
+      "ref": "main",
+      "requires": [],
+      "topic": "creative",
+      "note": "the upstream agent's own preview tool",
+      "author": "Cocoon AI (hello@cocoon-ai.com), ported by Hermes Agent",
+      "tags": [
+        "architecture",
+        "diagrams",
+        "SVG",
+        "HTML",
+        "visualization",
+        "infrastructure",
+        "cloud"
+      ]
+    },
+    {
+      "name": "ascii-art",
+      "description": "ASCII art: pyfiglet, cowsay, boxes, image-to-ascii.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/creative/ascii-art",
+      "license": "MIT",
+      "portability": "needs_setup",
+      "ref": "main",
+      "requires": [
+        "pyfiglet",
+        "cowsay",
+        "boxes",
+        "toilet",
+        "ascii-image-converter",
+        "jp2a",
+        "curl"
+      ],
+      "topic": "creative",
+      "note": "",
+      "author": "0xbyt4, Hermes Agent",
+      "tags": [
+        "ASCII",
+        "Art",
+        "Banners",
+        "Creative",
+        "Unicode",
+        "Text-Art",
+        "pyfiglet",
+        "figlet",
+        "cowsay",
+        "boxes"
+      ]
+    },
+    {
+      "name": "ascii-video",
+      "description": "ASCII video: convert video/audio to colored ASCII MP4/GIF.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/creative/ascii-video",
+      "license": "MIT",
+      "portability": "needs_setup",
+      "ref": "main",
+      "requires": [
+        "ffmpeg",
+        "numpy",
+        "scipy",
+        "pillow"
+      ],
+      "topic": "creative",
+      "note": "",
+      "author": "SHL0MS, Hermes Agent",
+      "tags": [
+        "ASCII",
+        "Video",
+        "FFmpeg",
+        "Terminal-Art"
+      ]
+    },
+    {
+      "name": "baoyu-infographic",
+      "description": "Infographics: 21 layouts x 21 styles (信息图, 可视化).",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/creative/baoyu-infographic",
+      "license": "MIT",
+      "portability": "needs_adaptation",
+      "ref": "main",
+      "requires": [],
+      "topic": "creative",
+      "note": "an image-generation tool the agent must provide",
+      "author": "宝玉 (JimLiu)",
+      "tags": [
+        "infographic",
+        "visual-summary",
+        "creative",
+        "image-generation"
+      ]
+    },
+    {
+      "name": "claude-design",
+      "description": "Design one-off HTML artifacts (landing, deck, prototype).",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/creative/claude-design",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "creative",
+      "note": "",
+      "author": "BadTechBandit",
+      "tags": [
+        "design",
+        "html",
+        "prototype",
+        "ux",
+        "ui",
+        "creative",
+        "artifact",
+        "deck",
+        "motion",
+        "design-system"
+      ]
+    },
+    {
+      "name": "comfyui",
+      "description": "Generate images, video, and audio via diffusion workflows.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/creative/comfyui",
+      "license": "MIT",
+      "portability": "needs_heavy",
+      "ref": "main",
+      "requires": [
+        "python"
+      ],
+      "topic": "creative",
+      "note": "a GPU and multi-GB checkpoints",
+      "author": "['kshitijk4poor', 'alt-glitch', 'purzbeats']",
+      "tags": [
+        "comfyui",
+        "image-generation",
+        "stable-diffusion",
+        "flux",
+        "sd3",
+        "wan-video",
+        "hunyuan-video",
+        "creative",
+        "generative-ai",
+        "video-generation"
+      ]
+    },
+    {
+      "name": "design-md",
+      "description": "Author/validate/export Google's DESIGN.md token spec files.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/creative/design-md",
+      "license": "MIT",
+      "portability": "needs_setup",
+      "ref": "main",
+      "requires": [
+        "node",
+        "npx"
+      ],
+      "topic": "creative",
+      "note": "",
+      "author": "Hermes Agent",
+      "tags": [
+        "design",
+        "design-system",
+        "tokens",
+        "ui",
+        "accessibility",
+        "wcag",
+        "tailwind",
+        "dtcg",
+        "google"
+      ]
+    },
+    {
+      "name": "excalidraw",
+      "description": "Hand-drawn Excalidraw JSON diagrams (arch, flow, seq).",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/creative/excalidraw",
+      "license": "MIT",
+      "portability": "needs_setup",
+      "ref": "main",
+      "requires": [
+        "cryptography (only to upload)"
+      ],
+      "topic": "creative",
+      "note": "",
+      "author": "Hermes Agent",
+      "tags": [
+        "Excalidraw",
+        "Diagrams",
+        "Flowcharts",
+        "Architecture",
+        "Visualization",
+        "JSON"
+      ]
+    },
+    {
+      "name": "humanizer",
+      "description": "Humanize text: strip AI-isms and add real voice.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/creative/humanizer",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "creative",
+      "note": "",
+      "author": "Siqi Chen (@blader, https://github.com/blader/humanizer), ported by Hermes Agent",
+      "tags": [
+        "writing",
+        "editing",
+        "humanize",
+        "anti-ai-slop",
+        "voice",
+        "prose",
+        "text"
+      ]
+    },
+    {
+      "name": "manim-video",
+      "description": "Manim CE animations: 3Blue1Brown math/algo videos.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/creative/manim-video",
+      "license": "MIT",
+      "portability": "needs_heavy",
+      "ref": "main",
+      "requires": [],
+      "topic": "creative",
+      "note": "a full LaTeX distribution + ffmpeg (several GB)",
+      "author": "SHL0MS, Hermes Agent",
+      "tags": [
+        "Manim",
+        "Animation",
+        "Math",
+        "Video"
+      ]
+    },
+    {
+      "name": "p5js",
+      "description": "p5.js sketches: gen art, shaders, interactive, 3D.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/creative/p5js",
+      "license": "MIT",
+      "portability": "needs_setup",
+      "ref": "main",
+      "requires": [
+        "node + puppeteer + ffmpeg (only to export video)"
+      ],
+      "topic": "creative",
+      "note": "",
+      "author": "SHL0MS, Hermes Agent",
+      "tags": [
+        "creative-coding",
+        "generative-art",
+        "p5js",
+        "canvas",
+        "interactive",
+        "visualization",
+        "webgl",
+        "shaders",
+        "animation"
+      ]
+    },
+    {
+      "name": "popular-web-designs",
+      "description": "54 real design systems (Stripe, Linear, Vercel) as HTML/CSS.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/creative/popular-web-designs",
+      "license": "MIT",
+      "portability": "needs_adaptation",
+      "ref": "main",
+      "requires": [],
+      "topic": "creative",
+      "note": "the upstream agent's browser and screenshot tools",
+      "author": "Hermes Agent + Teknium (design systems sourced from VoltAgent/awesome-design-md)",
+      "tags": []
+    },
+    {
+      "name": "pretext",
+      "description": "Build creative browser demos with DOM-free text layout.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/creative/pretext",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "creative",
+      "note": "",
+      "author": "Hermes Agent",
+      "tags": [
+        "creative-coding",
+        "typography",
+        "pretext",
+        "ascii-art",
+        "canvas",
+        "generative",
+        "text-layout",
+        "kinetic-typography"
+      ]
+    },
+    {
+      "name": "sketch",
+      "description": "Throwaway HTML mockups: 2-3 design variants to compare.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/creative/sketch",
+      "license": "MIT",
+      "portability": "needs_adaptation",
+      "ref": "main",
+      "requires": [],
+      "topic": "creative",
+      "note": "the upstream agent's browser and screenshot tools",
+      "author": "Hermes Agent (adapted from gsd-build/get-shit-done)",
+      "tags": [
+        "sketch",
+        "mockup",
+        "design",
+        "ui",
+        "prototype",
+        "html",
+        "variants",
+        "exploration",
+        "wireframe",
+        "comparison"
+      ]
+    },
+    {
+      "name": "songwriting-and-ai-music",
+      "description": "Songwriting craft and Suno AI music prompts.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/creative/songwriting-and-ai-music",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "creative",
+      "note": "",
+      "author": "Teknium (teknium1), Hermes Agent",
+      "tags": []
+    },
+    {
+      "name": "touchdesigner-mcp",
+      "description": "Control TouchDesigner via twozero MCP.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/creative/touchdesigner-mcp",
+      "license": "MIT",
+      "portability": "needs_service",
+      "ref": "main",
+      "requires": [],
+      "topic": "creative",
+      "note": "TouchDesigner with its MCP server",
+      "author": "kshitijk4poor",
+      "tags": [
+        "TouchDesigner",
+        "MCP",
+        "twozero",
+        "creative-coding",
+        "real-time-visuals",
+        "generative-art",
+        "audio-reactive",
+        "VJ",
+        "installation",
+        "GLSL"
+      ]
+    },
+    {
+      "name": "sdlc-review",
+      "description": "Review Kanban handoffs and route verified outcomes.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/devops/sdlc-review",
+      "license": "MIT",
+      "portability": "needs_adaptation",
+      "ref": "main",
+      "requires": [],
+      "topic": "devops",
+      "note": "the upstream Kanban toolset",
+      "author": "Jakub Wolniewicz (@frizikk) + Hermes Agent",
+      "tags": [
+        "kanban",
+        "review",
+        "quality",
+        "verification"
+      ]
+    },
+    {
+      "name": "email-inbox-triage",
+      "description": "Triage an inbox: prioritize threads, draft replies safely.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/email/email-inbox-triage",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "email",
+      "note": "",
+      "author": "Ben Barclay (benbarclay), Hermes Agent",
+      "tags": [
+        "Email",
+        "Inbox",
+        "Triage",
+        "Replies",
+        "Productivity"
+      ]
+    },
+    {
+      "name": "himalaya",
+      "description": "Himalaya CLI: IMAP/SMTP email from terminal.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/email/himalaya",
+      "license": "MIT",
+      "portability": "needs_setup",
+      "ref": "main",
+      "requires": [
+        "himalaya"
+      ],
+      "topic": "email",
+      "note": "",
+      "author": "community",
+      "tags": [
+        "Email",
+        "IMAP",
+        "SMTP",
+        "CLI",
+        "Communication"
+      ]
+    },
+    {
+      "name": "codebase-inspection",
+      "description": "Inspect codebases w/ pygount: LOC, languages, ratios.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/github/codebase-inspection",
+      "license": "MIT",
+      "portability": "needs_setup",
+      "ref": "main",
+      "requires": [
+        "pygount"
+      ],
+      "topic": "github",
+      "note": "",
+      "author": "Hermes Agent",
+      "tags": [
+        "LOC",
+        "Code Analysis",
+        "pygount",
+        "Codebase",
+        "Metrics",
+        "Repository"
+      ]
+    },
+    {
+      "name": "github-auth",
+      "description": "GitHub auth setup: HTTPS tokens, SSH keys, gh CLI login.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/github/github-auth",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "github",
+      "note": "",
+      "author": "Hermes Agent",
+      "tags": [
+        "GitHub",
+        "Authentication",
+        "Git",
+        "gh-cli",
+        "SSH",
+        "Setup"
+      ]
+    },
+    {
+      "name": "github-code-review",
+      "description": "Review PRs: diffs, inline comments via gh or REST.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/github/github-code-review",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "github",
+      "note": "",
+      "author": "Hermes Agent",
+      "tags": [
+        "GitHub",
+        "Code-Review",
+        "Pull-Requests",
+        "Git",
+        "Quality"
+      ]
+    },
+    {
+      "name": "github-issue-to-pr",
+      "description": "Carry a GitHub issue to a verified PR with honest CI state.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/github/github-issue-to-pr",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "github",
+      "note": "",
+      "author": "Ben Barclay (benbarclay), Hermes Agent",
+      "tags": [
+        "GitHub",
+        "Issues",
+        "Coding",
+        "Pull-Requests",
+        "CI"
+      ]
+    },
+    {
+      "name": "github-issues",
+      "description": "Create, triage, label, assign GitHub issues via gh or REST.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/github/github-issues",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "github",
+      "note": "",
+      "author": "Hermes Agent",
+      "tags": [
+        "GitHub",
+        "Issues",
+        "Project-Management",
+        "Bug-Tracking",
+        "Triage"
+      ]
+    },
+    {
+      "name": "github-pr-workflow",
+      "description": "GitHub PR lifecycle: branch, commit, open, CI, merge.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/github/github-pr-workflow",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "github",
+      "note": "",
+      "author": "Hermes Agent",
+      "tags": [
+        "GitHub",
+        "Pull-Requests",
+        "CI/CD",
+        "Git",
+        "Automation",
+        "Merge"
+      ]
+    },
+    {
+      "name": "github-repo-management",
+      "description": "Clone/create/fork repos; manage remotes, releases.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/github/github-repo-management",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "github",
+      "note": "",
+      "author": "Hermes Agent",
+      "tags": [
+        "GitHub",
+        "Repositories",
+        "Git",
+        "Releases",
+        "Secrets",
+        "Configuration"
+      ]
+    },
+    {
+      "name": "gif-search",
+      "description": "Search/download GIFs from Tenor via curl + jq.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/media/gif-search",
+      "license": "MIT",
+      "portability": "needs_setup",
+      "ref": "main",
+      "requires": [
+        "curl",
+        "jq",
+        "a free TENOR_API_KEY"
+      ],
+      "topic": "media",
+      "note": "",
+      "author": "Hermes Agent",
+      "tags": [
+        "GIF",
+        "Media",
+        "Search",
+        "Tenor",
+        "API"
+      ]
+    },
+    {
+      "name": "songsee",
+      "description": "Audio spectrograms/features (mel, chroma, MFCC) via CLI.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/media/songsee",
+      "license": "MIT",
+      "portability": "needs_setup",
+      "ref": "main",
+      "requires": [
+        "songsee",
+        "songsee (go install)"
+      ],
+      "topic": "media",
+      "note": "",
+      "author": "community",
+      "tags": [
+        "Audio",
+        "Visualization",
+        "Spectrogram",
+        "Music",
+        "Analysis"
+      ]
+    },
+    {
+      "name": "youtube-content",
+      "description": "YouTube transcripts to summaries, threads, blogs.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/media/youtube-content",
+      "license": "MIT",
+      "portability": "needs_setup",
+      "ref": "main",
+      "requires": [
+        "youtube-transcript-api"
+      ],
+      "topic": "media",
+      "note": "",
+      "author": "Teknium (teknium1), Hermes Agent",
+      "tags": [
+        "YouTube",
+        "Video",
+        "Transcripts",
+        "Media"
+      ]
+    },
+    {
+      "name": "evaluating-llms-harness",
+      "description": "lm-eval-harness: benchmark LLMs (MMLU, GSM8K, etc.).",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/mlops/evaluation/evaluating-llms-harness",
+      "license": "MIT",
+      "portability": "needs_heavy",
+      "ref": "main",
+      "requires": [],
+      "topic": "mlops",
+      "note": "CUDA and ~16GB VRAM for a 7B model",
+      "author": "Orchestra Research",
+      "tags": [
+        "Evaluation",
+        "LM Evaluation Harness",
+        "Benchmarking",
+        "MMLU",
+        "HumanEval",
+        "GSM8K",
+        "EleutherAI",
+        "Model Quality",
+        "Academic Benchmarks",
+        "Industry Standard"
+      ]
+    },
+    {
+      "name": "weights-and-biases",
+      "description": "W&B: log ML experiments, sweeps, model registry, dashboards.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/mlops/evaluation/weights-and-biases",
+      "license": "MIT",
+      "portability": "needs_setup",
+      "ref": "main",
+      "requires": [
+        "wandb",
+        "WANDB_API_KEY"
+      ],
+      "topic": "mlops",
+      "note": "",
+      "author": "Orchestra Research",
+      "tags": [
+        "MLOps",
+        "Weights And Biases",
+        "WandB",
+        "Experiment Tracking",
+        "Hyperparameter Tuning",
+        "Model Registry",
+        "Collaboration",
+        "Real-Time Visualization",
+        "PyTorch",
+        "TensorFlow",
+        "HuggingFace"
+      ]
+    },
+    {
+      "name": "huggingface-hub",
+      "description": "HuggingFace hf CLI: search/download/upload models, datasets.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/mlops/huggingface-hub",
+      "license": "MIT",
+      "portability": "needs_setup",
+      "ref": "main",
+      "requires": [
+        "the hf CLI",
+        "HF_TOKEN"
+      ],
+      "topic": "mlops",
+      "note": "",
+      "author": "Hugging Face",
+      "tags": []
+    },
+    {
+      "name": "llama-cpp",
+      "description": "llama.cpp local GGUF inference + HF Hub model discovery.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/mlops/inference/llama-cpp",
+      "license": "MIT",
+      "portability": "needs_heavy",
+      "ref": "main",
+      "requires": [],
+      "topic": "mlops",
+      "note": "compiled binaries and GGUF weights",
+      "author": "Orchestra Research",
+      "tags": [
+        "llama.cpp",
+        "GGUF",
+        "Quantization",
+        "Hugging Face Hub",
+        "CPU Inference",
+        "Apple Silicon",
+        "Edge Deployment",
+        "AMD GPUs",
+        "Intel GPUs",
+        "NVIDIA",
+        "URL-first"
+      ]
+    },
+    {
+      "name": "serving-llms-vllm",
+      "description": "vLLM: high-throughput LLM serving, OpenAI API, quantization.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/mlops/inference/serving-llms-vllm",
+      "license": "MIT",
+      "portability": "needs_heavy",
+      "ref": "main",
+      "requires": [],
+      "topic": "mlops",
+      "note": "a datacentre GPU (24-80GB VRAM)",
+      "author": "Orchestra Research",
+      "tags": [
+        "vLLM",
+        "Inference Serving",
+        "PagedAttention",
+        "Continuous Batching",
+        "High Throughput",
+        "Production",
+        "OpenAI API",
+        "Quantization",
+        "Tensor Parallelism"
+      ]
+    },
+    {
+      "name": "obsidian",
+      "description": "Read, search, create, and edit notes in the Obsidian vault.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/note-taking/obsidian",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "note-taking",
+      "note": "",
+      "author": "Teknium (teknium1), Hermes Agent",
+      "tags": [
+        "Obsidian",
+        "Notes",
+        "Markdown",
+        "Vault"
+      ]
+    },
+    {
+      "name": "airtable",
+      "description": "Airtable REST API via curl. Records CRUD, filters, upserts.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/productivity/airtable",
+      "license": "MIT",
+      "portability": "needs_setup",
+      "ref": "main",
+      "requires": [
+        "curl",
+        "an AIRTABLE_API_KEY scoped to the base"
+      ],
+      "topic": "productivity",
+      "note": "",
+      "author": "community",
+      "tags": [
+        "Airtable",
+        "Productivity",
+        "Database",
+        "API"
+      ]
+    },
+    {
+      "name": "box",
+      "description": "Box manages cloud files, sharing, search, and metadata.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/productivity/box",
+      "license": "MIT",
+      "portability": "needs_setup",
+      "ref": "main",
+      "requires": [
+        "box",
+        "@box/cli (node)",
+        "interactive browser OAuth"
+      ],
+      "topic": "productivity",
+      "note": "",
+      "author": "Chris Kim (iskysun96), Hermes Agent",
+      "tags": [
+        "Box",
+        "Productivity",
+        "Cloud Storage",
+        "Collaboration",
+        "Metadata",
+        "Content Extraction",
+        "CLI",
+        "SDK"
+      ]
+    },
+    {
+      "name": "document-to-action-items",
+      "description": "Extract cited obligations, deadlines, tasks from documents.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/productivity/document-to-action-items",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "productivity",
+      "note": "",
+      "author": "Ben Barclay (benbarclay), Hermes Agent",
+      "tags": [
+        "Documents",
+        "OCR",
+        "Action-Items",
+        "Deadlines",
+        "Extraction"
+      ]
+    },
+    {
+      "name": "docx",
+      "description": "Create, read, edit, template, and review Word .docx files.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/productivity/docx",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "productivity",
+      "note": "",
+      "author": "Nous Research",
+      "tags": [
+        "word",
+        "docx",
+        "documents",
+        "office",
+        "templates",
+        "revisions",
+        "comments"
+      ]
+    },
+    {
+      "name": "google-workspace",
+      "description": "Gmail, Calendar, Drive, Docs, Sheets via gws CLI or Python.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/productivity/google-workspace",
+      "license": "MIT",
+      "portability": "needs_setup",
+      "ref": "main",
+      "requires": [
+        "google-api-python-client",
+        "an OAuth client from Google Cloud Console"
+      ],
+      "topic": "productivity",
+      "note": "",
+      "author": "Nous Research",
+      "tags": [
+        "Google",
+        "Gmail",
+        "Calendar",
+        "Drive",
+        "Sheets",
+        "Docs",
+        "Contacts",
+        "Email",
+        "OAuth"
+      ]
+    },
+    {
+      "name": "maps",
+      "description": "Geocode, POIs, routes, timezones via OpenStreetMap/OSRM.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/productivity/maps",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "productivity",
+      "note": "",
+      "author": "Mibayy",
+      "tags": [
+        "maps",
+        "geocoding",
+        "places",
+        "routing",
+        "distance",
+        "directions",
+        "nearby",
+        "location",
+        "openstreetmap",
+        "nominatim",
+        "overpass",
+        "osrm"
+      ]
+    },
+    {
+      "name": "meeting-action-items",
+      "description": "Turn meeting notes into cited decisions, owners, tickets.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/productivity/meeting-action-items",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "productivity",
+      "note": "",
+      "author": "Ben Barclay (benbarclay), Hermes Agent",
+      "tags": [
+        "Meetings",
+        "Action-Items",
+        "Follow-Up",
+        "Productivity"
+      ]
+    },
+    {
+      "name": "nano-pdf",
+      "description": "Edit text in existing PDFs via natural-language prompts.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/productivity/nano-pdf",
+      "license": "MIT",
+      "portability": "needs_setup",
+      "ref": "main",
+      "requires": [
+        "nano-pdf",
+        "a Gemini API key",
+        "poppler",
+        "tesseract"
+      ],
+      "topic": "productivity",
+      "note": "",
+      "author": "community",
+      "tags": [
+        "PDF",
+        "Documents",
+        "Editing",
+        "NLP",
+        "Productivity"
+      ]
+    },
+    {
+      "name": "notion",
+      "description": "Notion API + ntn CLI: pages, databases, markdown, Workers.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/productivity/notion",
+      "license": "MIT",
+      "portability": "needs_setup",
+      "ref": "main",
+      "requires": [
+        "a NOTION_API_KEY"
+      ],
+      "topic": "productivity",
+      "note": "",
+      "author": "community",
+      "tags": [
+        "Notion",
+        "Productivity",
+        "Notes",
+        "Database",
+        "API",
+        "CLI",
+        "Workers"
+      ]
+    },
+    {
+      "name": "ocr-and-documents",
+      "description": "Extract text from PDFs/scans (pymupdf, marker-pdf).",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/productivity/ocr-and-documents",
+      "license": "MIT",
+      "portability": "needs_adaptation",
+      "ref": "main",
+      "requires": [
+        "pymupdf",
+        "marker-pdf (optional, ~2.5GB of models)"
+      ],
+      "topic": "productivity",
+      "note": "the upstream page-extraction and vision tools",
+      "author": "Hermes Agent",
+      "tags": [
+        "PDF",
+        "Documents",
+        "Research",
+        "Arxiv",
+        "Text-Extraction",
+        "OCR"
+      ]
+    },
+    {
+      "name": "pdf",
+      "description": "Create, read, merge, fill, and secure PDF files.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/productivity/pdf",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "productivity",
+      "note": "",
+      "author": "Nous Research",
+      "tags": [
+        "pdf",
+        "documents",
+        "forms",
+        "reportlab",
+        "pypdf",
+        "pdfplumber"
+      ]
+    },
+    {
+      "name": "powerpoint",
+      "description": "Create, read, edit .pptx decks with python-pptx.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/productivity/powerpoint",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "productivity",
+      "note": "",
+      "author": "Nous Research",
+      "tags": [
+        "pptx",
+        "powerpoint",
+        "presentations",
+        "slides",
+        "office",
+        "python-pptx"
+      ]
+    },
+    {
+      "name": "product-price-monitor",
+      "description": "Watch product, flight, or listing prices; alert on target.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/productivity/product-price-monitor",
+      "license": "MIT",
+      "portability": "needs_adaptation",
+      "ref": "main",
+      "requires": [],
+      "topic": "productivity",
+      "note": "the upstream agent's cron tool",
+      "author": "Ben Barclay (benbarclay), Hermes Agent",
+      "tags": [
+        "Prices",
+        "Availability",
+        "Shopping",
+        "Travel",
+        "Alerts"
+      ]
+    },
+    {
+      "name": "session-librarian",
+      "description": "Organize sessions by prompt: find, rename, archive, prune.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/productivity/session-librarian",
+      "license": "MIT",
+      "portability": "needs_adaptation",
+      "ref": "main",
+      "requires": [],
+      "topic": "productivity",
+      "note": "the upstream agent's session store",
+      "author": "Hermes Agent + Teknium",
+      "tags": [
+        "Sessions",
+        "Organization",
+        "Cleanup",
+        "Library",
+        "Productivity"
+      ]
+    },
+    {
+      "name": "teams-meeting-pipeline",
+      "description": "Teams meeting summaries, job replay, Graph subscriptions.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/productivity/teams-meeting-pipeline",
+      "license": "MIT",
+      "portability": "needs_adaptation",
+      "ref": "main",
+      "requires": [
+        "hermes"
+      ],
+      "topic": "productivity",
+      "note": "the upstream agent's own CLI",
+      "author": "Hermes Agent + Teknium",
+      "tags": [
+        "Teams",
+        "Microsoft Graph",
+        "Meetings",
+        "Productivity",
+        "Operations"
+      ]
+    },
+    {
+      "name": "weekly-review-planning",
+      "description": "Weekly reset: commitments, stalled work, next-week plan.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/productivity/weekly-review-planning",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "productivity",
+      "note": "",
+      "author": "Ben Barclay (benbarclay), Hermes Agent",
+      "tags": [
+        "Weekly-Review",
+        "Planning",
+        "Tasks",
+        "Calendar",
+        "Productivity"
+      ]
+    },
+    {
+      "name": "xlsx",
+      "description": "Create, read, edit Excel .xlsx workbooks and CSVs.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/productivity/xlsx",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "productivity",
+      "note": "",
+      "author": "Nous Research",
+      "tags": [
+        "excel",
+        "spreadsheet",
+        "xlsx",
+        "csv",
+        "openpyxl",
+        "productivity"
+      ]
+    },
+    {
+      "name": "arxiv",
+      "description": "Search arXiv papers by keyword, author, category, or ID.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/research/arxiv",
+      "license": "MIT",
+      "portability": "needs_adaptation",
+      "ref": "main",
+      "requires": [],
+      "topic": "research",
+      "note": "the upstream page-extraction tool",
+      "author": "Hermes Agent",
+      "tags": [
+        "Research",
+        "Arxiv",
+        "Papers",
+        "Academic",
+        "Science",
+        "API"
+      ]
+    },
+    {
+      "name": "blocked-page-recovery",
+      "description": "Recover blocked/paywalled/WAF'd pages via fallbacks.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/research/blocked-page-recovery",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "research",
+      "note": "",
+      "author": "Hermes Agent",
+      "tags": [
+        "Research",
+        "Archives",
+        "Wayback",
+        "Paywall",
+        "WAF",
+        "Fallback"
+      ]
+    },
+    {
+      "name": "blogwatcher",
+      "description": "Monitor blogs and RSS/Atom feeds via blogwatcher-cli tool.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/research/blogwatcher",
+      "license": "MIT",
+      "portability": "needs_heavy",
+      "ref": "main",
+      "requires": [
+        "blogwatcher-cli"
+      ],
+      "topic": "research",
+      "note": "its compiled Go binary",
+      "author": "JulienTant (fork of Hyaxia/blogwatcher)",
+      "tags": [
+        "RSS",
+        "Blogs",
+        "Feed-Reader",
+        "Monitoring"
+      ]
+    },
+    {
+      "name": "competitor-news-monitor",
+      "description": "Watch named companies for material news; cited digests.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/research/competitor-news-monitor",
+      "license": "MIT",
+      "portability": "needs_adaptation",
+      "ref": "main",
+      "requires": [],
+      "topic": "research",
+      "note": "the upstream agent's cron tool",
+      "author": "Ben Barclay (benbarclay), Hermes Agent",
+      "tags": [
+        "Competitors",
+        "News",
+        "Market-Research",
+        "Monitoring"
+      ]
+    },
+    {
+      "name": "grounded-citations",
+      "description": "Ground answers and documents in cited, verifiable sources.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/research/grounded-citations",
+      "license": "MIT",
+      "portability": "needs_adaptation",
+      "ref": "main",
+      "requires": [],
+      "topic": "research",
+      "note": "the upstream agent's home directory",
+      "author": "Hermes Agent + Teknium",
+      "tags": [
+        "Research",
+        "Citations",
+        "Grounding",
+        "Sources",
+        "Web",
+        "Reports"
+      ]
+    },
+    {
+      "name": "llm-wiki",
+      "description": "Karpathy's LLM Wiki: build/query interlinked markdown KB.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/research/llm-wiki",
+      "license": "MIT",
+      "portability": "needs_adaptation",
+      "ref": "main",
+      "requires": [],
+      "topic": "research",
+      "note": "the upstream agent's home directory",
+      "author": "Hermes Agent",
+      "tags": [
+        "wiki",
+        "knowledge-base",
+        "research",
+        "notes",
+        "markdown",
+        "rag-alternative"
+      ]
+    },
+    {
+      "name": "research-paper-writing",
+      "description": "Write ML papers for NeurIPS/ICML/ICLR: design→submit.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/research/research-paper-writing",
+      "license": "MIT",
+      "portability": "needs_heavy",
+      "ref": "main",
+      "requires": [],
+      "topic": "research",
+      "note": "full LaTeX, 8 Python packages and an Exa MCP server",
+      "author": "Orchestra Research",
+      "tags": [
+        "Research",
+        "Paper Writing",
+        "Experiments",
+        "ML",
+        "AI",
+        "NeurIPS",
+        "ICML",
+        "ICLR",
+        "ACL",
+        "AAAI",
+        "COLM",
+        "LaTeX",
+        "Citations",
+        "Statistical Analysis"
+      ]
+    },
+    {
+      "name": "openhue",
+      "description": "Control Philips Hue lights, scenes, rooms via OpenHue CLI.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/smart-home/openhue",
+      "license": "MIT",
+      "portability": "needs_service",
+      "ref": "main",
+      "requires": [
+        "openhue"
+      ],
+      "topic": "smart-home",
+      "note": "a Philips Hue bridge on the network",
+      "author": "community",
+      "tags": [
+        "Smart-Home",
+        "Hue",
+        "Lights",
+        "IoT",
+        "Automation"
+      ]
+    },
+    {
+      "name": "xurl",
+      "description": "X/Twitter via xurl CLI: raw post search, posting, DM, media.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/social-media/xurl",
+      "license": "MIT",
+      "portability": "os_locked",
+      "ref": "main",
+      "requires": [
+        "xurl",
+        "the xurl binary",
+        "an X developer account"
+      ],
+      "topic": "social-media",
+      "note": "Linux, macOS",
+      "author": "xdevplatform + openclaw + Hermes Agent",
+      "tags": [
+        "twitter",
+        "x",
+        "social-media",
+        "xurl",
+        "official-api"
+      ]
+    },
+    {
+      "name": "dogfood",
+      "description": "Exploratory QA of web apps: find bugs, evidence, reports.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/software-development/dogfood",
+      "license": "MIT",
+      "portability": "needs_service",
+      "ref": "main",
+      "requires": [],
+      "topic": "software-development",
+      "note": "a browser toolset the agent provides",
+      "author": "Teknium (teknium1), Hermes Agent",
+      "tags": [
+        "qa",
+        "testing",
+        "browser",
+        "web",
+        "dogfood"
+      ]
+    },
+    {
+      "name": "hermes-agent-skill-authoring",
+      "description": "Author in-repo SKILL.md files: frontmatter and structure.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/software-development/hermes-agent-skill-authoring",
+      "license": "MIT",
+      "portability": "needs_adaptation",
+      "ref": "main",
+      "requires": [],
+      "topic": "software-development",
+      "note": "the upstream repo's own conventions",
+      "author": "Hermes Agent",
+      "tags": [
+        "skills",
+        "authoring",
+        "hermes-agent",
+        "conventions",
+        "skill-md"
+      ]
+    },
+    {
+      "name": "inspecting-hermes-desktop-dom",
+      "description": "Read the live Hermes desktop DOM/CSS over CDP.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/software-development/inspecting-hermes-desktop-dom",
+      "license": "MIT",
+      "portability": "needs_adaptation",
+      "ref": "main",
+      "requires": [],
+      "topic": "software-development",
+      "note": "the upstream project's own desktop app",
+      "author": "Hermes Agent",
+      "tags": [
+        "desktop",
+        "electron",
+        "cdp",
+        "dom",
+        "ui-verification",
+        "self-inspection"
+      ]
+    },
+    {
+      "name": "node-inspect-debugger",
+      "description": "Debug Node.js via --inspect + Chrome DevTools Protocol CLI.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/software-development/node-inspect-debugger",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "software-development",
+      "note": "",
+      "author": "Hermes Agent",
+      "tags": [
+        "debugging",
+        "nodejs",
+        "node-inspect",
+        "cdp",
+        "breakpoints",
+        "ui-tui"
+      ]
+    },
+    {
+      "name": "plan",
+      "description": "Write a markdown plan to .hermes/plans/; no execution.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/software-development/plan",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "software-development",
+      "note": "",
+      "author": "Hermes Agent (writing-craft adapted from obra/superpowers)",
+      "tags": [
+        "planning",
+        "plan-mode",
+        "implementation",
+        "workflow",
+        "design",
+        "documentation"
+      ]
+    },
+    {
+      "name": "python-debugpy",
+      "description": "Debug Python: pdb REPL + debugpy remote (DAP).",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/software-development/python-debugpy",
+      "license": "MIT",
+      "portability": "os_locked",
+      "ref": "main",
+      "requires": [],
+      "topic": "software-development",
+      "note": "Linux, macOS",
+      "author": "Hermes Agent",
+      "tags": [
+        "debugging",
+        "python",
+        "pdb",
+        "debugpy",
+        "breakpoints",
+        "dap",
+        "post-mortem"
+      ]
+    },
+    {
+      "name": "requesting-code-review",
+      "description": "Pre-commit review: security scan, quality gates, auto-fix.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/software-development/requesting-code-review",
+      "license": "MIT",
+      "portability": "needs_adaptation",
+      "ref": "main",
+      "requires": [],
+      "topic": "software-development",
+      "note": "a separate subagent for the reviewer",
+      "author": "Hermes Agent (adapted from obra/superpowers + MorAlekss)",
+      "tags": [
+        "code-review",
+        "security",
+        "verification",
+        "quality",
+        "pre-commit",
+        "auto-fix"
+      ]
+    },
+    {
+      "name": "simplify-code",
+      "description": "Parallel 4-agent cleanup of recent code changes.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/software-development/simplify-code",
+      "license": "MIT",
+      "portability": "needs_adaptation",
+      "ref": "main",
+      "requires": [],
+      "topic": "software-development",
+      "note": "four parallel subagents",
+      "author": "Hermes Agent (inspired by Claude Code /simplify)",
+      "tags": [
+        "code-review",
+        "cleanup",
+        "refactor",
+        "delegation",
+        "subagent",
+        "parallel",
+        "simplify"
+      ]
+    },
+    {
+      "name": "spike",
+      "description": "Throwaway experiments to validate an idea before build.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/software-development/spike",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "software-development",
+      "note": "",
+      "author": "Hermes Agent (adapted from gsd-build/get-shit-done)",
+      "tags": [
+        "spike",
+        "prototype",
+        "experiment",
+        "feasibility",
+        "throwaway",
+        "exploration",
+        "research",
+        "planning",
+        "mvp",
+        "proof-of-concept"
+      ]
+    },
+    {
+      "name": "systematic-debugging",
+      "description": "4-phase root cause debugging: understand bugs before fixing.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/software-development/systematic-debugging",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "software-development",
+      "note": "",
+      "author": "Hermes Agent (adapted from obra/superpowers)",
+      "tags": [
+        "debugging",
+        "troubleshooting",
+        "problem-solving",
+        "root-cause",
+        "investigation"
+      ]
+    },
+    {
+      "name": "test-driven-development",
+      "description": "TDD: enforce RED-GREEN-REFACTOR, tests before code.",
+      "repo": "NousResearch/hermes-agent",
+      "path": "skills/software-development/test-driven-development",
+      "license": "MIT",
+      "portability": "native",
+      "ref": "main",
+      "requires": [],
+      "topic": "software-development",
+      "note": "",
+      "author": "Hermes Agent (adapted from obra/superpowers)",
+      "tags": [
+        "testing",
+        "tdd",
+        "development",
+        "quality",
+        "red-green-refactor"
+      ]
+    }
+  ]
+}
