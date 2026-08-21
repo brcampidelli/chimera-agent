@@ -500,6 +500,34 @@ def _owner_instructions(home: object) -> str:
         return ""
 
 
+def _record_run_spend(home: object, run_id: str, outcome: object) -> None:
+    """Put an orchestration run on the Cost screen, cancelled or not.
+
+    The receipts already carry per-delegation tokens and dollars; nothing ever moved them into the
+    usage log, so the one screen that answers "what has this cost me" was blind to the most
+    expensive thing the app can start.
+    """
+    from pathlib import Path as _Path
+
+    from chimera.api.usage import record_spend
+
+    receipts = list(getattr(outcome, "receipts", None) or [])
+    if not receipts:
+        return
+    priced = [r.usd for r in receipts if getattr(r, "usd", None) is not None]
+    record_spend(
+        _Path(str(home)),
+        session_id=f"orchestration:{run_id}",
+        model=str(getattr(receipts[0], "model", "") or ""),
+        prompt_tokens=sum(int(getattr(r, "prompt_tokens", 0) or 0) for r in receipts),
+        completion_tokens=sum(int(getattr(r, "completion_tokens", 0) or 0) for r in receipts),
+        # None when ANY delegation could not be priced: a partial sum presented as the total is the
+        # failure this whole accounting path exists to avoid.
+        usd=round(sum(priced), 6) if len(priced) == len(receipts) else None,
+        route_kind="hierarchy",
+    )
+
+
 def register_orchestration_api(
     app: FastAPI,
     guard: params.Depends,
@@ -664,11 +692,18 @@ def register_orchestration_api(
                     # The decomposition a person looked at and said yes to. Popped rather than
                     # read: a plan is consumed by its run, and leaving it behind would let a
                     # second run silently reuse a split that was approved for the first.
-                    orchestrator.run_prepared(req.task, approved.specs, shape=approved.shape)
+                    outcome = orchestrator.run_prepared(
+                        req.task, approved.specs, shape=approved.shape
+                    )
                 else:
                     # No id, or an id this process no longer has — decompose afresh. That is
                     # exactly the old behaviour, so a restart costs a model call, never an error.
-                    orchestrator.run(req.task)
+                    outcome = orchestrator.run(req.task)
+                # On the Cost screen, not only in the SSE stream that vanishes when the tab closes.
+                # This path spends a top-model decompose plus N workers plus a synthesis and wrote
+                # nothing to the usage log, so a screen reporting "the spend" left it out entirely —
+                # including for a run the user cancelled, which is charged all the same.
+                _record_run_spend(read_settings().home, run_id, outcome)
             except Exception as exc:  # noqa: BLE001 -- surfaced to the client as an error frame
                 _log.warning("hierarchy run failed: %s", exc)
                 emit("error", {"message": "the run failed"})

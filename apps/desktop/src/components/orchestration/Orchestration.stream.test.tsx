@@ -158,6 +158,34 @@ describe("watching a fan-out", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: /stopping/i })).toBeInTheDocument());
   });
 
+  it("shows what a stopped run cost, instead of saying nothing was spent", async () => {
+    const { handlers } = await startRun();
+
+    // The server sends the real spend on cancel and the reducer stores it. The totals used to be
+    // rendered only inside the `state.answer` branch — which is empty on a cancel — so the number
+    // arrived and was thrown away, under a sentence claiming nothing had been spent. The Stop
+    // button's own tooltip, two lines above it in the same component, said the opposite.
+    send(
+      handlers(),
+      frame(6, "worker_verified", { stage: "criteria", tokens: 900 }, "a"),
+      frame(7, "done", { answer: "", cancelled: true, total_tokens: 1700 }),
+    );
+
+    expect(screen.getByText(/1700 tokens/i)).toBeInTheDocument();
+    expect(screen.getByText(/were charged/i)).toBeInTheDocument();
+  });
+
+  it("does not claim a stopped run produced an answer", async () => {
+    const { handlers } = await startRun();
+
+    send(handlers(), frame(6, "done", { answer: "", cancelled: true, total_tokens: 0 }));
+
+    // Zero is a real number here: it means the stop landed before anything ran. Rendering it is
+    // not the same as rendering the answer section, which must stay absent.
+    expect(screen.getByText(/0 tokens/i)).toBeInTheDocument();
+    expect(screen.queryByText(/would have cost about/i)).toBeNull();
+  });
+
   it("renders the answer and prices it against the counterfactual", async () => {
     const { handlers } = await startRun();
 

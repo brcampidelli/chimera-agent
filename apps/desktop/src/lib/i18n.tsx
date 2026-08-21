@@ -1101,7 +1101,8 @@ const en: Dict = {
   "orch.stop": "Stop",
   "orch.stopping": "Stopping",
   "orch.stopHint": "Stops before the next model call; calls already in flight finish and are charged.",
-  "orch.cancelled": "Stopped. The answer was never synthesised, so nothing was spent on it.",
+  "orch.cancelled":
+    "Stopped before the answer was synthesised. The workers that had already started were charged — what that came to is below.",
   "orch.tokens": "{n} tokens",
   "orch.counterfactual": "one agent would have cost about {n}",
   "orch.fellback.buildCrew": "Build a crew",
@@ -2238,7 +2239,8 @@ const pt: Dict = {
   "orch.stop": "Parar",
   "orch.stopping": "Parando",
   "orch.stopHint": "Para antes da próxima chamada ao modelo; as que já estão em voo terminam e são cobradas.",
-  "orch.cancelled": "Parado. A resposta não chegou a ser sintetizada, então nada foi gasto nela.",
+  "orch.cancelled":
+    "Parado antes de a resposta ser sintetizada. Os trabalhadores que já tinham começado foram cobrados — o total está abaixo.",
   "orch.tokens": "{n} tokens",
   "orch.counterfactual": "um agente só teria custado cerca de {n}",
   "orch.fellback.buildCrew": "Montar um time",
@@ -3385,7 +3387,8 @@ const es: Dict = {
   "orch.stop": "Detener",
   "orch.stopping": "Deteniendo",
   "orch.stopHint": "Se detiene antes de la próxima llamada al modelo; las que ya están en vuelo terminan y se cobran.",
-  "orch.cancelled": "Detenido. La respuesta nunca se sintetizó, así que no se gastó nada en ella.",
+  "orch.cancelled":
+    "Detenido antes de sintetizar la respuesta. Los trabajadores que ya habían empezado se cobraron: el total está abajo.",
   "orch.tokens": "{n} tokens",
   "orch.counterfactual": "un solo agente habría costado unos {n}",
   "orch.fellback.buildCrew": "Formar un equipo",
@@ -4545,7 +4548,8 @@ const fr: Dict = {
   "orch.stop": "Arrêter",
   "orch.stopping": "Arrêt",
   "orch.stopHint": "S'arrête avant le prochain appel au modèle ; ceux déjà en vol se terminent et sont facturés.",
-  "orch.cancelled": "Arrêté. La réponse n'a jamais été synthétisée, donc rien n'a été dépensé pour elle.",
+  "orch.cancelled":
+    "Arrêté avant la synthèse de la réponse. Les travailleurs déjà lancés ont été facturés — le total est ci-dessous.",
   "orch.tokens": "{n} jetons",
   "orch.counterfactual": "un seul agent aurait coûté environ {n}",
   "orch.fellback.buildCrew": "Constituer une équipe",
@@ -5702,7 +5706,8 @@ const de: Dict = {
   "orch.stop": "Stopp",
   "orch.stopping": "Stoppt",
   "orch.stopHint": "Hält vor dem nächsten Modellaufruf; bereits laufende Aufrufe enden und werden berechnet.",
-  "orch.cancelled": "Gestoppt. Die Antwort wurde nie zusammengefasst, dafür wurde also nichts ausgegeben.",
+  "orch.cancelled":
+    "Gestoppt, bevor die Antwort zusammengeführt wurde. Die bereits gestarteten Arbeiter wurden berechnet — die Summe steht unten.",
   "orch.tokens": "{n} Token",
   "orch.counterfactual": "ein einzelner Agent hätte etwa {n} gekostet",
   "orch.fellback.buildCrew": "Team zusammenstellen",
@@ -6778,7 +6783,8 @@ const zh: Dict = {
   "orch.stop": "停止",
   "orch.stopping": "正在停止",
   "orch.stopHint": "在下一次模型调用前停止；已经发出的调用会跑完并照常计费。",
-  "orch.cancelled": "已停止。答案从未被汇总，因此这一步没有产生花费。",
+  "orch.cancelled":
+    "在答案被综合之前就停止了。已经开始的工作者仍会计费 —— 总数在下面。",
   "orch.tokens": "{n} 词元",
   "orch.counterfactual": "单个智能体大约要花 {n}",
   "orch.fellback.buildCrew": "组建团队",
@@ -7916,7 +7922,8 @@ const ja: Dict = {
   "orch.stop": "停止",
   "orch.stopping": "停止中",
   "orch.stopHint": "次のモデル呼び出しの前で止まります。実行中の呼び出しは最後まで走り、課金されます。",
-  "orch.cancelled": "停止しました。回答は統合されなかったので、その分の費用は発生していません。",
+  "orch.cancelled":
+    "答えがまとめられる前に停止しました。すでに動き出していたワーカーの分は請求されます — 合計は下にあります。",
   "orch.tokens": "{n} トークン",
   "orch.counterfactual": "単独のエージェントなら約 {n} かかったはずです",
   "orch.fellback.buildCrew": "チームを組む",
@@ -9068,7 +9075,8 @@ const it: Dict = {
   "orch.stop": "Ferma",
   "orch.stopping": "In arresto",
   "orch.stopHint": "Si ferma prima della prossima chiamata al modello; quelle già in volo finiscono e vengono addebitate.",
-  "orch.cancelled": "Fermato. La risposta non è mai stata sintetizzata, quindi non è stato speso nulla per essa.",
+  "orch.cancelled":
+    "Fermato prima che la risposta fosse sintetizzata. I lavoratori già avviati sono stati addebitati: il totale è qui sotto.",
   "orch.tokens": "{n} token",
   "orch.counterfactual": "un solo agente sarebbe costato circa {n}",
   "orch.fellback.buildCrew": "Forma una squadra",
@@ -10212,7 +10220,8 @@ const pl: Dict = {
   "orch.stop": "Zatrzymaj",
   "orch.stopping": "Zatrzymywanie",
   "orch.stopHint": "Zatrzymuje przed kolejnym wywołaniem modelu; te już w locie kończą się i są naliczane.",
-  "orch.cancelled": "Zatrzymane. Odpowiedź nigdy nie została scalona, więc nic na nią nie wydano.",
+  "orch.cancelled":
+    "Zatrzymano, zanim odpowiedź została złożona. Pracownicy, którzy już ruszyli, zostali policzeni — suma jest poniżej.",
   "orch.tokens": "tokeny: {n}",
   "orch.counterfactual": "jeden agent kosztowałby około {n}",
   "orch.fellback.buildCrew": "Zbuduj zespół",
@@ -11362,7 +11371,8 @@ const ru: Dict = {
   "orch.stop": "Остановить",
   "orch.stopping": "Останавливается",
   "orch.stopHint": "Останавливает до следующего вызова модели; уже начатые вызовы дойдут до конца и будут оплачены.",
-  "orch.cancelled": "Остановлено. Ответ не сводился, поэтому на него ничего не потрачено.",
+  "orch.cancelled":
+    "Остановлено до того, как ответ был собран. Работники, которые уже начали, оплачены — итог ниже.",
   "orch.tokens": "токенов: {n}",
   "orch.counterfactual": "один агент обошёлся бы примерно в {n}",
   "orch.fellback.buildCrew": "Собрать команду",
