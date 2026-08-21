@@ -285,7 +285,12 @@ def main() -> None:
         # putting a branch on the remote to prove it.
         print("  would commit:\n    " + "\n    ".join(changed), file=sys.stderr)
         run("git", "checkout", "--", ".")
-        print("  dry run — tree restored, nothing pushed", file=sys.stderr)
+        # The install too, not just the tree. Verifying the snapshot stamping means really
+        # refreshing the metadata, and a dry run that left the environment reporting a version
+        # the repository does not have is not dry — it made the next `pytest` fail on a
+        # snapshot that was perfectly correct.
+        refresh_install()
+        print("  dry run - tree and install restored, nothing pushed", file=sys.stderr)
         return
 
     url = open_pull_request(version, changed)
