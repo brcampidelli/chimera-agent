@@ -303,13 +303,13 @@ pip install 'chimera-agent[full]'     # 下記の非 GPU 機能すべてを 1 �
 | **専門エージェントのチーム** | — | `chimera crew "あなたのタスク" --mode supervisor` |
 | **プロジェクト全体を最後までやり切る**（危険な手順の前に確認で一時停止） | — | `chimera project start spec.yaml -w .` |
 | **画像を見る**（ビジョン） | キー：Gemini か OpenAI | `chimera run --image photo.jpg "これは何？" --model gemini/gemini-2.0-flash` |
-| **音声を聞く**（音声 → 文字） | `[stt]` + ffmpeg | `chimera run "meeting.mp3 を文字起こしして"` |
+| **音声を聞く**（音声 → 文字） | `[stt]` + ffmpeg | `chimera agent "meeting.mp3 を文字起こしして"` |
 | **話す**（文字 → 音声） | キー：ElevenLabs か OpenAI | 任意のタスクに「これを読み上げて speech.mp3 に保存して」 |
-| **ドキュメントを読む**（PDF・Word・Excel → 文字） | `[documents]` | `chimera run "report.pdf を要約して"` |
-| **動画/音声をダウンロード**（YouTube ほか 1000+ サイト） | `[media-dl]` + ffmpeg | `chimera run "<url> の音声をダウンロードして"` |
-| **データ分析とグラフ作成** | `[data,viz]` | `chimera run "sales.csv を読み込んで月次売上をグラフに"` |
-| **ウェブ検索** | キー：Tavily | `chimera run "ウェブ検索：最新の Python バージョン"` |
-| **実際のウェブページを読む・スクレイプ**（本物のブラウザ） | — | `chimera run "example.com を開いて見出しを教えて"` |
+| **ドキュメントを読む**（PDF・Word・Excel → 文字） | `[documents]` | `chimera agent "report.pdf を要約して"` |
+| **動画/音声をダウンロード**（YouTube ほか 1000+ サイト） | `[media-dl]` + ffmpeg | `chimera agent "<url> の音声をダウンロードして"` |
+| **データ分析とグラフ作成** | `[data,viz]` | `chimera agent "sales.csv を読み込んで月次売上をグラフに"` |
+| **ウェブ検索** | キー：Tavily | `chimera agent "ウェブ検索：最新の Python バージョン"` |
+| **実際のウェブページを読む・スクレイプ**（本物のブラウザ） | — | `chimera agent "example.com を開いて見出しを教えて"` |
 | **長期記憶** | — | `chimera memory add "..."` · `chimera memory search "..."` |
 | **再利用可能なスキルを自分で学習** | — | `chimera solve` の実行中に起こる；`chimera skills-stats` で一覧（`chimera skills` は組み込みを一覧） |
 | **厳選されたスキルカードを使う**（23 枚、9 言語） | — | `chimera skills-import skills/verify-before-claiming` |

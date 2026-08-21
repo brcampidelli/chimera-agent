@@ -323,13 +323,13 @@ Spalte „Braucht"). **Docker? Das offizielle Image enthält bereits alles unten
 | **Ein Team von Spezialisten-Agenten** | — | `chimera crew "deine Aufgabe" --mode supervisor` |
 | **Ein ganzes Projekt bis zum Ende führen** (pausiert vor riskanten Schritten) | — | `chimera project start spec.yaml -w .` |
 | **Bilder sehen** (Vision) | Schlüssel: Gemini oder OpenAI | `chimera run --image foto.jpg "was ist das?" --model gemini/gemini-2.0-flash` |
-| **Audio hören** (Sprache → Text) | `[stt]` + ffmpeg | `chimera run "transkribiere meeting.mp3"` |
+| **Audio hören** (Sprache → Text) | `[stt]` + ffmpeg | `chimera agent "transkribiere meeting.mp3"` |
 | **Sprechen** (Text → Sprache) | Schlüssel: ElevenLabs oder OpenAI | bitte eine Aufgabe „lies das laut nach speech.mp3 vor" |
-| **Dokumente lesen** (PDF, Word, Excel → Text) | `[documents]` | `chimera run "fasse bericht.pdf zusammen"` |
-| **Video/Audio herunterladen** (YouTube + 1000+ Seiten) | `[media-dl]` + ffmpeg | `chimera run "lade das Audio von <url> herunter"` |
-| **Daten analysieren & Diagramme erstellen** | `[data,viz]` | `chimera run "lade umsatz.csv und plotte den Monatsumsatz"` |
-| **Im Web suchen** | Schlüssel: Tavily | `chimera run "suche im Web: die neueste Python-Version"` |
-| **Echte Webseiten lesen & scrapen** (ein echter Browser) | — | `chimera run "öffne example.com und nenne die Überschrift"` |
+| **Dokumente lesen** (PDF, Word, Excel → Text) | `[documents]` | `chimera agent "fasse bericht.pdf zusammen"` |
+| **Video/Audio herunterladen** (YouTube + 1000+ Seiten) | `[media-dl]` + ffmpeg | `chimera agent "lade das Audio von <url> herunter"` |
+| **Daten analysieren & Diagramme erstellen** | `[data,viz]` | `chimera agent "lade umsatz.csv und plotte den Monatsumsatz"` |
+| **Im Web suchen** | Schlüssel: Tavily | `chimera agent "suche im Web: die neueste Python-Version"` |
+| **Echte Webseiten lesen & scrapen** (ein echter Browser) | — | `chimera agent "öffne example.com und nenne die Überschrift"` |
 | **Langzeitgedächtnis** | — | `chimera memory add "..."` · `chimera memory search "..."` |
 | **Wiederverwendbare Skills selbst lernen** | — | passiert während `chimera solve`; auflisten mit `chimera skills-stats` (`chimera skills` listet die eingebauten) |
 | **Eine kuratierte Skill-Karte nutzen** (23 Stück, 9 Sprachen) | — | `chimera skills-import skills/verify-before-claiming` |

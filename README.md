@@ -215,7 +215,7 @@ a long run stays useful, and most of it is invisible until it fails. Chimera mea
 ### 🚀 Run anywhere, safely
 - **Any model, one interface** — hosted models or your own local ones, with automatic fallback if one is down and rotation across multiple keys.
 - **One-command server deploy** — run it with Docker (or bare-metal) so it stays up and restarts on reboot. See **[docs/deploy.md](docs/deploy.md)**.
-- **Safety kernel** — a check on each action it is wired to (allow / warn / review / block), an **opt-in** network-isolated container for untrusted code (`CHIMERA_SANDBOX=docker`; the default local runner is *not* isolated), and a redacted audit log of what it did. **Where it runs, precisely:** `chimera run --guard` and `solve --guard`, the scheduler, the ACP endpoint, and — once `CHIMERA_GOVERNANCE` is `observe` or `enforce` — the API's run and turn endpoints. It does **not** yet reach the chat stream, the OpenAI-compatible endpoint, or the board and project endpoints; that gap is named here rather than left for you to discover, and it is open work. This bullet used to say "every action", which was not true of anything served over HTTP. Whether a `review` verdict stops to ask you or simply refuses is the approval mode (`CHIMERA_APPROVAL_MODE=ask|deny|allow`) — unattended, it denies rather than inventing consent, and over HTTP it never prompts on the server's own terminal, because whoever is looking at that console is not the person who made the request.
+- **Safety kernel** — a check on each action it is wired to (allow / warn / review / block), an **opt-in** network-isolated container for untrusted code (`CHIMERA_SANDBOX=docker`; the default local runner is *not* isolated), and a redacted audit log of what it did. **Where it runs, precisely:** `chimera agent --guard` and `solve --guard`, the scheduler, the ACP endpoint, and — once `CHIMERA_GOVERNANCE` is `observe` or `enforce` — the API's run and turn endpoints. It does **not** yet reach the chat stream, the OpenAI-compatible endpoint, or the board and project endpoints; that gap is named here rather than left for you to discover, and it is open work. This bullet used to say "every action", which was not true of anything served over HTTP. Whether a `review` verdict stops to ask you or simply refuses is the approval mode (`CHIMERA_APPROVAL_MODE=ask|deny|allow`) — unattended, it denies rather than inventing consent, and over HTTP it never prompts on the server's own terminal, because whoever is looking at that console is not the person who made the request.
 - **Stop before it commits, when it read something it shouldn't trust** (`--pause-on-taint`) — a run that consumed untrusted content parks itself instead of finalising, and waits for you. You can accept the result, accept a version you edited, send guidance and let it try again, or reject it outright — from the terminal *or* the desktop app. Nothing is saved and nothing is learned until you decide, and a pause is never reported as a failure: it hasn't reached a verdict, it's waiting on a person.
 - **A desktop app that pilots a run, not just launches one** — five destinations instead of a menu of fifteen, in ten languages. Start a run and walk away: the progress is still there when you come back, the status bar names what the agent is doing from every screen, and Stop works from all of them. Native installers for Windows / macOS / Linux on [Releases](https://github.com/brcampidelli/chimera-agent/releases).
 
@@ -303,13 +303,13 @@ Prefer a lean install? Keep `pip install chimera-agent` and add only the extras 
 | **A team of specialist agents** | — | `chimera crew "your task" --mode supervisor` |
 | **Run a whole project to completion** (asks you before risky steps) | — | `chimera project start spec.yaml -w .` |
 | **See images** (vision) | key: Gemini or OpenAI | `chimera run --image photo.jpg "what's in this?" --model gemini/gemini-2.0-flash` |
-| **Hear audio** (speech → text) | `[stt]` + ffmpeg | `chimera run "transcribe meeting.mp3"` |
+| **Hear audio** (speech → text) | `[stt]` + ffmpeg | `chimera agent "transcribe meeting.mp3"` |
 | **Speak** (text → speech) | key: ElevenLabs or OpenAI | ask any task to "read this out loud to speech.mp3" |
-| **Read documents** (PDF, Word, Excel → text) | `[documents]` | `chimera run "summarize report.pdf"` |
-| **Download video/audio** (YouTube + 1000+ sites) | `[media-dl]` + ffmpeg | `chimera run "download the audio of <url>"` |
-| **Analyze data & make charts** | `[data,viz]` | `chimera run "load sales.csv and chart monthly revenue"` |
-| **Search the web** | key: Tavily | `chimera run "search the web: the latest Python version"` |
-| **Read & scrape real web pages** (a real browser) | — | `chimera run "open example.com and tell me the heading"` |
+| **Read documents** (PDF, Word, Excel → text) | `[documents]` | `chimera agent "summarize report.pdf"` |
+| **Download video/audio** (YouTube + 1000+ sites) | `[media-dl]` + ffmpeg | `chimera agent "download the audio of <url>"` |
+| **Analyze data & make charts** | `[data,viz]` | `chimera agent "load sales.csv and chart monthly revenue"` |
+| **Search the web** | key: Tavily | `chimera agent "search the web: the latest Python version"` |
+| **Read & scrape real web pages** (a real browser) | — | `chimera agent "open example.com and tell me the heading"` |
 | **Long-term memory** | — | `chimera memory add "..."` · `chimera memory search "..."` |
 | **Learn reusable skills automatically** | — | happens during `chimera solve`; list what it learned with `chimera skills-stats` (`chimera skills` lists the built-in ones) |
 | **Use a curated skill card** (23 of them, 9 languages) | — | `chimera skills-import skills/verify-before-claiming` |

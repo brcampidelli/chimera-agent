@@ -316,13 +316,13 @@ chcesz (zobacz kolumnę „Wymaga"). **Używasz Dockera? Oficjalny obraz ma już
 | **Zespół agentów-specjalistów** | — | `chimera crew "twoje zadanie" --mode supervisor` |
 | **Poprowadź cały projekt do końca** (pyta przed ryzykownymi krokami) | — | `chimera project start spec.yaml -w .` |
 | **Widzieć obrazy** (wizja) | klucz: Gemini albo OpenAI | `chimera run --image zdjecie.jpg "co tu jest?" --model gemini/gemini-2.0-flash` |
-| **Słyszeć audio** (mowa → tekst) | `[stt]` + ffmpeg | `chimera run "transkrybuj spotkanie.mp3"` |
+| **Słyszeć audio** (mowa → tekst) | `[stt]` + ffmpeg | `chimera agent "transkrybuj spotkanie.mp3"` |
 | **Mówić** (tekst → mowa) | klucz: ElevenLabs albo OpenAI | poproś dowolne zadanie o „przeczytaj to na głos do speech.mp3" |
-| **Czytać dokumenty** (PDF, Word, Excel → tekst) | `[documents]` | `chimera run "streść raport.pdf"` |
-| **Pobierać wideo/audio** (YouTube + 1000+ stron) | `[media-dl]` + ffmpeg | `chimera run "pobierz audio z <url>"` |
-| **Analizować dane i robić wykresy** | `[data,viz]` | `chimera run "wczytaj sprzedaz.csv i zrób wykres miesięcznych przychodów"` |
-| **Szukać w sieci** | klucz: Tavily | `chimera run "poszukaj w sieci: najnowsza wersja Pythona"` |
-| **Czytać i zbierać prawdziwe strony** (prawdziwa przeglądarka) | — | `chimera run "otwórz example.com i podaj mi nagłówek"` |
+| **Czytać dokumenty** (PDF, Word, Excel → tekst) | `[documents]` | `chimera agent "streść raport.pdf"` |
+| **Pobierać wideo/audio** (YouTube + 1000+ stron) | `[media-dl]` + ffmpeg | `chimera agent "pobierz audio z <url>"` |
+| **Analizować dane i robić wykresy** | `[data,viz]` | `chimera agent "wczytaj sprzedaz.csv i zrób wykres miesięcznych przychodów"` |
+| **Szukać w sieci** | klucz: Tavily | `chimera agent "poszukaj w sieci: najnowsza wersja Pythona"` |
+| **Czytać i zbierać prawdziwe strony** (prawdziwa przeglądarka) | — | `chimera agent "otwórz example.com i podaj mi nagłówek"` |
 | **Pamięć długoterminowa** | — | `chimera memory add "..."` · `chimera memory search "..."` |
 | **Uczyć się wielokrotnego użytku umiejętności samodzielnie** | — | dzieje się podczas `chimera solve`; wypisz przez `chimera skills-stats` (`chimera skills` pokazuje wbudowane) |
 | **Użyć kuratorowanej karty umiejętności** (jest ich 23, w 9 językach) | — | `chimera skills-import skills/verify-before-claiming` |

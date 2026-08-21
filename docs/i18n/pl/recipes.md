@@ -17,7 +17,7 @@ Zainstaluj [Ollama](https://ollama.com), pobierz model, potem skieruj na niego C
 ```bash
 ollama pull llama3.1                     # or qwen2.5, mistral, phi3, …
 export CHIMERA_MODEL=ollama/llama3.1     # the `ollama/` prefix = local, keyless
-chimera run "Summarise this file in 3 bullets" -w .
+chimera agent "Summarise this file in 3 bullets" -w .
 ```
 
 I to wszystko — bez `OPENROUTER_API_KEY`, bez chmury. Brama poświadczeń rozpoznaje `ollama/…`
@@ -146,8 +146,8 @@ instalacji:
   pól, których selektor nie wypełnił.
 
 ```bash
-uv run chimera run "scrape https://news.ycombinator.com and summarize the top 5 stories"
-uv run chimera run "extract the fields title, price, availability from https://example.com/product --taint"
+uv run chimera agent "scrape https://news.ycombinator.com and summarize the top 5 stories"
+uv run chimera agent "extract the fields title, price, availability from https://example.com/product --taint"
 ```
 
 Dla całych stron są jeszcze dwa czasowniki:
@@ -163,7 +163,7 @@ Dla całych stron są jeszcze dwa czasowniki:
   (`resume=true` domyślnie).
 
 ```bash
-uv run chimera run "map https://docs.example.com then crawl the /guide section (max 20 pages) and summarize it"
+uv run chimera agent "map https://docs.example.com then crawl the /guide section (max 20 pages) and summarize it"
 ```
 
 Wszystko jest otoczone ogrodzeniem danych i skaża przebieg (to niezaufana treść webowa), więc
@@ -180,7 +180,7 @@ przeciwnym razie hostowanego API OpenAI Whisper (wymaga klucza OpenAI):
 
 ```bash
 uv sync --extra stt      # optional: local, offline transcription (heavier — downloads a model)
-uv run chimera run "transcribe meeting.m4a and give me 5 bullet-point action items"
+uv run chimera agent "transcribe meeting.m4a and give me 5 bullet-point action items"
 ```
 
 > Uwaga o zakresie, w uczciwym duchu tego projektu: Chimera jest **agentem**, nie modelem.
@@ -200,7 +200,7 @@ wymaga też `ffmpeg` w PATH:
 
 ```bash
 uv sync --extra media-dl
-uv run chimera run "download the audio of https://youtu.be/… then transcribe it and summarize"
+uv run chimera agent "download the audio of https://youtu.be/… then transcribe it and summarize"
 ```
 
 Naturalnie łączy się z `transcribe_audio` powyżej: pobierz → transkrybuj → podsumuj, wszystko w
@@ -215,7 +215,7 @@ następnie wykonuje.
 
 ```bash
 uv sync --extra data     # pandas + scikit-learn for the generated code
-uv run chimera run "use the data_analysis skill: predict churn from customers.csv and report accuracy"
+uv run chimera agent "use the data_analysis skill: predict churn from customers.csv and report accuracy"
 ```
 
 ## Generowanie obrazów (hostowane lub w pełni lokalne)
@@ -227,7 +227,7 @@ lokalnie. `auto` (domyślne) używa lokalnego tylko wtedy, gdy nie ma klucza Ope
 
 ```bash
 uv sync --extra imagegen-local     # pulls torch + diffusers; downloads multi-GB weights on first use
-CHIMERA_IMAGE_BACKEND=local uv run chimera run "generate an image of a fox in a snowy forest"
+CHIMERA_IMAGE_BACKEND=local uv run chimera agent "generate an image of a fox in a snowy forest"
 ```
 
 > Ten sam uczciwy zakres co powyżej: Chimera tutaj *uruchamia* model dyfuzyjny; nie trenuje go.
@@ -248,7 +248,7 @@ wbudowaną dyscypliną backendu headless (`matplotlib.use("Agg")`) i zapisu do w
 
 ```bash
 uv sync --extra viz     # matplotlib + seaborn + plotly for the generated code
-uv run chimera run "use data_visualization: line chart of revenue.csv over time, save revenue.png"
+uv run chimera agent "use data_visualization: line chart of revenue.csv over time, save revenue.png"
 ```
 
 **2. Narzędzie `render_chart` — bezpieczna, deklaratywna specyfikacja Vega-Lite.**
@@ -260,7 +260,7 @@ specyfikację + CDN Vega); PNG/SVG używają opcjonalnego extra `viz-vega`
 (`vl-convert-python`).
 
 ```bash
-uv run chimera run "build a Vega-Lite bar chart of {A:5,B:8,C:3} and render_chart it to chart.html"
+uv run chimera agent "build a Vega-Lite bar chart of {A:5,B:8,C:3} and render_chart it to chart.html"
 uv sync --extra viz-vega   # optional: static PNG/SVG rendering (heavy — Rust+V8 binary)
 ```
 

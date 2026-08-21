@@ -950,9 +950,9 @@ const en: Dict = {
   "governance.injection.disarmed":
     "Switched OFF in this install (CHIMERA_TAINT_NARROW=0) — the defended column below describes a configuration you are not running.",
   "governance.injection.kernel":
-    "Nothing here measures the BLOCK/REVIEW policy rules. They run under `chimera run --guard`, `solve --guard`, and — when CHIMERA_GOVERNANCE is set — the run and turn endpoints. This score is about taint narrowing only.",
+    "Nothing here measures the BLOCK/REVIEW policy rules. They run under `chimera agent --guard`, `solve --guard`, and — when CHIMERA_GOVERNANCE is set — the run and turn endpoints. This score is about taint narrowing only.",
   "governance.audit.empty":
-    "No audit events — here that means nothing has been narrowed, escalated or suppressed, not that nothing is watching. The app records an entry whenever a defence fires; `chimera run --guard` and `solve --guard/--taint` also write their policy decisions.",
+    "No audit events — here that means nothing has been narrowed, escalated or suppressed, not that nothing is watching. The app records an entry whenever a defence fires; `chimera agent --guard` and `solve --guard/--taint` also write their policy decisions.",
   "nav.maturity": "Maturity",
   "maturity.title": "Maturity",
   "maturity.overall": "Overall",
@@ -2088,9 +2088,9 @@ const pt: Dict = {
   "governance.injection.disarmed":
     "Desligada nesta instalação (CHIMERA_TAINT_NARROW=0) — a coluna com defesa abaixo descreve uma configuração que você não está usando.",
   "governance.injection.kernel":
-    "Nada aqui mede as regras de política BLOCK/REVIEW. Elas rodam em `chimera run --guard`, `solve --guard` e — quando CHIMERA_GOVERNANCE está definido — nos endpoints de run e turn. Esta pontuação é só sobre taint narrowing.",
+    "Nada aqui mede as regras de política BLOCK/REVIEW. Elas rodam em `chimera agent --guard`, `solve --guard` e — quando CHIMERA_GOVERNANCE está definido — nos endpoints de run e turn. Esta pontuação é só sobre taint narrowing.",
   "governance.audit.empty":
-    "Nenhum evento de auditoria — aqui isso significa que nada foi estreitado, escalado ou suprimido, não que ninguém está observando. O aplicativo registra uma entrada sempre que uma defesa dispara; `chimera run --guard` e `solve --guard/--taint` também gravam suas decisões de política.",
+    "Nenhum evento de auditoria — aqui isso significa que nada foi estreitado, escalado ou suprimido, não que ninguém está observando. O aplicativo registra uma entrada sempre que uma defesa dispara; `chimera agent --guard` e `solve --guard/--taint` também gravam suas decisões de política.",
   "nav.maturity": "Maturidade",
   "maturity.title": "Maturidade",
   "maturity.overall": "Geral",
@@ -3237,9 +3237,9 @@ const es: Dict = {
   "governance.injection.disarmed":
     "Desactivada en esta instalación (CHIMERA_TAINT_NARROW=0) — la columna con defensa de abajo describe una configuración que no estás usando.",
   "governance.injection.kernel":
-    "Nada aquí mide las reglas de política BLOCK/REVIEW. Se ejecutan con `chimera run --guard`, `solve --guard` y — cuando CHIMERA_GOVERNANCE está definido — en los endpoints de run y turn. Esta puntuación trata solo del taint narrowing.",
+    "Nada aquí mide las reglas de política BLOCK/REVIEW. Se ejecutan con `chimera agent --guard`, `solve --guard` y — cuando CHIMERA_GOVERNANCE está definido — en los endpoints de run y turn. Esta puntuación trata solo del taint narrowing.",
   "governance.audit.empty":
-    "Ningún evento de auditoría — aquí eso significa que nada se ha restringido, escalado ni suprimido, no que nadie esté vigilando. La app registra una entrada cada vez que una defensa se activa; `chimera run --guard` y `solve --guard/--taint` también escriben sus decisiones de política.",
+    "Ningún evento de auditoría — aquí eso significa que nada se ha restringido, escalado ni suprimido, no que nadie esté vigilando. La app registra una entrada cada vez que una defensa se activa; `chimera agent --guard` y `solve --guard/--taint` también escriben sus decisiones de política.",
   "nav.maturity": "Madurez",
   "maturity.title": "Madurez",
   "maturity.overall": "General",
@@ -4398,9 +4398,9 @@ const fr: Dict = {
   "governance.injection.disarmed":
     "Désactivée sur cette installation (CHIMERA_TAINT_NARROW=0) — la colonne défendue ci-dessous décrit une configuration que vous n'utilisez pas.",
   "governance.injection.kernel":
-    "Rien ici ne mesure les règles de politique BLOCK/REVIEW. Elles tournent sous `chimera run --guard`, `solve --guard` et — quand CHIMERA_GOVERNANCE est défini — sur les endpoints run et turn. Ce score ne porte que sur le taint narrowing.",
+    "Rien ici ne mesure les règles de politique BLOCK/REVIEW. Elles tournent sous `chimera agent --guard`, `solve --guard` et — quand CHIMERA_GOVERNANCE est défini — sur les endpoints run et turn. Ce score ne porte que sur le taint narrowing.",
   "governance.audit.empty":
-    "Aucun événement d'audit — ici cela veut dire que rien n'a été restreint, escaladé ni supprimé, pas que personne ne surveille. L'app enregistre une entrée dès qu'une défense se déclenche ; `chimera run --guard` et `solve --guard/--taint` écrivent aussi leurs décisions de politique.",
+    "Aucun événement d'audit — ici cela veut dire que rien n'a été restreint, escaladé ni supprimé, pas que personne ne surveille. L'app enregistre une entrée dès qu'une défense se déclenche ; `chimera agent --guard` et `solve --guard/--taint` écrivent aussi leurs décisions de politique.",
   "nav.maturity": "Maturité",
   "maturity.title": "Maturité",
   "maturity.overall": "Global",
@@ -5558,9 +5558,9 @@ const de: Dict = {
   "governance.injection.disarmed":
     "In dieser Installation AUS (CHIMERA_TAINT_NARROW=0) — die Spalte „mit Abwehr“ unten beschreibt eine Konfiguration, die du nicht fährst.",
   "governance.injection.kernel":
-    "Hier misst nichts die BLOCK/REVIEW-Policy-Regeln. Sie laufen unter `chimera run --guard`, `solve --guard` und — wenn CHIMERA_GOVERNANCE gesetzt ist — auf den Run- und Turn-Endpunkten. Dieser Wert betrifft nur Taint-Narrowing.",
+    "Hier misst nichts die BLOCK/REVIEW-Policy-Regeln. Sie laufen unter `chimera agent --guard`, `solve --guard` und — wenn CHIMERA_GOVERNANCE gesetzt ist — auf den Run- und Turn-Endpunkten. Dieser Wert betrifft nur Taint-Narrowing.",
   "governance.audit.empty":
-    "Keine Audit-Ereignisse — das heißt hier, dass nichts eingeschränkt, eskaliert oder unterdrückt wurde, nicht dass niemand hinsieht. Die App schreibt einen Eintrag, sobald eine Abwehr greift; `chimera run --guard` und `solve --guard/--taint` schreiben zusätzlich ihre Policy-Entscheidungen.",
+    "Keine Audit-Ereignisse — das heißt hier, dass nichts eingeschränkt, eskaliert oder unterdrückt wurde, nicht dass niemand hinsieht. Die App schreibt einen Eintrag, sobald eine Abwehr greift; `chimera agent --guard` und `solve --guard/--taint` schreiben zusätzlich ihre Policy-Entscheidungen.",
   "nav.maturity": "Reife",
   "maturity.title": "Reife",
   "maturity.overall": "Gesamt",
@@ -6643,9 +6643,9 @@ const zh: Dict = {
   "governance.injection.disarmed":
     "本安装中已关闭（CHIMERA_TAINT_NARROW=0）——下方“有防御”一列描述的并不是你正在运行的配置。",
   "governance.injection.kernel":
-    "这里不衡量 BLOCK/REVIEW 策略规则。它们运行于 `chimera run --guard`、`solve --guard`，以及设置了 CHIMERA_GOVERNANCE 时的 run 与 turn 端点。此分数只关于 taint narrowing。",
+    "这里不衡量 BLOCK/REVIEW 策略规则。它们运行于 `chimera agent --guard`、`solve --guard`，以及设置了 CHIMERA_GOVERNANCE 时的 run 与 turn 端点。此分数只关于 taint narrowing。",
   "governance.audit.empty":
-    "没有审计事件——在这里这意味着没有任何调用被收紧、升级或抑制，而不是没人在看。防御一旦触发，应用就会记录一条；`chimera run --guard` 和 `solve --guard/--taint` 也会写入各自的策略决策。",
+    "没有审计事件——在这里这意味着没有任何调用被收紧、升级或抑制，而不是没人在看。防御一旦触发，应用就会记录一条；`chimera agent --guard` 和 `solve --guard/--taint` 也会写入各自的策略决策。",
   "nav.maturity": "成熟度",
   "maturity.title": "成熟度",
   "maturity.overall": "总体",
@@ -7780,9 +7780,9 @@ const ja: Dict = {
   "governance.injection.disarmed":
     "このインストールではオフです（CHIMERA_TAINT_NARROW=0）——下の「防御あり」の列は、あなたが動かしていない構成を示しています。",
   "governance.injection.kernel":
-    "ここでは BLOCK/REVIEW のポリシー規則を測定していません。これらは `chimera run --guard`、`solve --guard`、そして CHIMERA_GOVERNANCE が設定されている場合の run と turn のエンドポイントで動きます。このスコアは taint narrowing のみを対象としています。",
+    "ここでは BLOCK/REVIEW のポリシー規則を測定していません。これらは `chimera agent --guard`、`solve --guard`、そして CHIMERA_GOVERNANCE が設定されている場合の run と turn のエンドポイントで動きます。このスコアは taint narrowing のみを対象としています。",
   "governance.audit.empty":
-    "監査イベントはありません——ここではそれは、絞り込み・エスカレーション・抑止のいずれも起きていないという意味であり、誰も見ていないという意味ではありません。防御が働くたびにアプリが記録します。`chimera run --guard` と `solve --guard/--taint` もポリシー判断を書き込みます。",
+    "監査イベントはありません——ここではそれは、絞り込み・エスカレーション・抑止のいずれも起きていないという意味であり、誰も見ていないという意味ではありません。防御が働くたびにアプリが記録します。`chimera agent --guard` と `solve --guard/--taint` もポリシー判断を書き込みます。",
   "nav.maturity": "成熟度",
   "maturity.title": "成熟度",
   "maturity.overall": "全体",
@@ -8935,9 +8935,9 @@ const it: Dict = {
   "governance.injection.disarmed":
     "Disattivata in questa installazione (CHIMERA_TAINT_NARROW=0) — la colonna con difesa qui sotto descrive una configurazione che non stai usando.",
   "governance.injection.kernel":
-    "Qui nulla misura le regole di policy BLOCK/REVIEW. Girano con `chimera run --guard`, `solve --guard` e — quando CHIMERA_GOVERNANCE è impostato — sugli endpoint run e turn. Questo punteggio riguarda solo il taint narrowing.",
+    "Qui nulla misura le regole di policy BLOCK/REVIEW. Girano con `chimera agent --guard`, `solve --guard` e — quando CHIMERA_GOVERNANCE è impostato — sugli endpoint run e turn. Questo punteggio riguarda solo il taint narrowing.",
   "governance.audit.empty":
-    "Nessun evento di audit — qui significa che nulla è stato ristretto, escalato o soppresso, non che nessuno stia guardando. L'app registra una voce ogni volta che una difesa scatta; anche `chimera run --guard` e `solve --guard/--taint` scrivono le loro decisioni di policy.",
+    "Nessun evento di audit — qui significa che nulla è stato ristretto, escalato o soppresso, non che nessuno stia guardando. L'app registra una voce ogni volta che una difesa scatta; anche `chimera agent --guard` e `solve --guard/--taint` scrivono le loro decisioni di policy.",
   "nav.maturity": "Maturità",
   "maturity.title": "Maturità",
   "maturity.overall": "Complessivo",
@@ -10082,9 +10082,9 @@ const pl: Dict = {
   "governance.injection.disarmed":
     "Wyłączone w tej instalacji (CHIMERA_TAINT_NARROW=0) — kolumna z obroną poniżej opisuje konfigurację, której nie używasz.",
   "governance.injection.kernel":
-    "Nic tutaj nie mierzy reguł policy BLOCK/REVIEW. Działają pod `chimera run --guard`, `solve --guard` oraz — gdy ustawiono CHIMERA_GOVERNANCE — na endpointach run i turn. Ten wynik dotyczy wyłącznie taint narrowing.",
+    "Nic tutaj nie mierzy reguł policy BLOCK/REVIEW. Działają pod `chimera agent --guard`, `solve --guard` oraz — gdy ustawiono CHIMERA_GOVERNANCE — na endpointach run i turn. Ten wynik dotyczy wyłącznie taint narrowing.",
   "governance.audit.empty":
-    "Brak zdarzeń audytu — tutaj znaczy to, że nic nie zostało zawężone, eskalowane ani wstrzymane, a nie że nikt nie patrzy. Aplikacja zapisuje wpis za każdym razem, gdy zadziała zabezpieczenie; `chimera run --guard` i `solve --guard/--taint` zapisują też swoje decyzje policy.",
+    "Brak zdarzeń audytu — tutaj znaczy to, że nic nie zostało zawężone, eskalowane ani wstrzymane, a nie że nikt nie patrzy. Aplikacja zapisuje wpis za każdym razem, gdy zadziała zabezpieczenie; `chimera agent --guard` i `solve --guard/--taint` zapisują też swoje decyzje policy.",
   "nav.maturity": "Dojrzałość",
   "maturity.title": "Dojrzałość",
   "maturity.overall": "Ogółem",
@@ -11235,9 +11235,9 @@ const ru: Dict = {
   "governance.injection.disarmed":
     "В этой установке ВЫКЛЮЧЕНО (CHIMERA_TAINT_NARROW=0) — столбец «с защитой» ниже описывает конфигурацию, которая у вас не работает.",
   "governance.injection.kernel":
-    "Здесь ничто не измеряет правила политики BLOCK/REVIEW. Они работают в `chimera run --guard`, `solve --guard` и — когда задан CHIMERA_GOVERNANCE — на эндпоинтах run и turn. Эта оценка относится только к taint narrowing.",
+    "Здесь ничто не измеряет правила политики BLOCK/REVIEW. Они работают в `chimera agent --guard`, `solve --guard` и — когда задан CHIMERA_GOVERNANCE — на эндпоинтах run и turn. Эта оценка относится только к taint narrowing.",
   "governance.audit.empty":
-    "Событий аудита нет — здесь это значит, что ничего не сужалось, не повышалось и не подавлялось, а не что никто не наблюдает. Приложение делает запись всякий раз, когда срабатывает защита; `chimera run --guard` и `solve --guard/--taint` тоже записывают свои решения.",
+    "Событий аудита нет — здесь это значит, что ничего не сужалось, не повышалось и не подавлялось, а не что никто не наблюдает. Приложение делает запись всякий раз, когда срабатывает защита; `chimera agent --guard` и `solve --guard/--taint` тоже записывают свои решения.",
   "nav.maturity": "Зрелость",
   "maturity.title": "Зрелость",
   "maturity.overall": "В целом",

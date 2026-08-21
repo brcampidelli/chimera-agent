@@ -1835,6 +1835,57 @@
     },
     {
       "deprecated": false,
+      "help": "Search a repository by what code DOES, not by the string it contains.\n\n`chimera/rag/` has been in the tree since 0.44.0 \u2014 symbol-level chunking over Python's AST, one\nSQLite file with an FTS5 index, RRF fusion \u2014 measured, documented, and reachable from nothing.\nA library with no entrance is a library nobody has. This is the entrance.\n\nKeyword retrieval only, and that is stated rather than glossed: the semantic half needs an\nembedder, none is wired, and the pre-registered baseline in `bench/rag/` says exactly what the\nkeyword half is worth on this repository \u2014 recall@10 of 0.4925 over 400 probes. Half the\nanswers are not in the top ten. Printing that beside the results is the difference between a\ntool you can calibrate and one you learn to distrust.",
+      "hidden": false,
+      "name": "find",
+      "params": [
+        {
+          "help": "What you are looking for, in words.",
+          "kind": "argument",
+          "name": "query",
+          "opts": [
+            "query"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "default": "'.'",
+          "help": "Repository to search.",
+          "kind": "option",
+          "name": "path",
+          "opts": [
+            "--path"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "8",
+          "help": "How many results.",
+          "kind": "option",
+          "name": "k",
+          "opts": [
+            "--k"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "help": "Rebuild the index before searching.",
+          "kind": "option",
+          "name": "reindex",
+          "opts": [
+            "--reindex"
+          ],
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": "find"
+    },
+    {
+      "deprecated": false,
       "help": "Run a prompt through the LLM-Fusion engine (panel -> judge -> synthesizer).",
       "hidden": false,
       "name": "fuse",

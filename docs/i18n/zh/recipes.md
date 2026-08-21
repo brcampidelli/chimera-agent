@@ -16,7 +16,7 @@ source_sha256: f08c31cf980c0d86795fe456d5f9ed6871b58325c9e429e93f48c71b6e998356
 ```bash
 ollama pull llama3.1                     # or qwen2.5, mistral, phi3, …
 export CHIMERA_MODEL=ollama/llama3.1     # the `ollama/` prefix = local, keyless
-chimera run "Summarise this file in 3 bullets" -w .
+chimera agent "Summarise this file in 3 bullets" -w .
 ```
 
 就这么简单——不需要 `OPENROUTER_API_KEY`，也不涉及云端。凭据检查会把 `ollama/…`（以及
@@ -138,8 +138,8 @@ uv run chimera solve "Research 'on-device small language models 2026': web_searc
   不经过 LLM**——只有选择器没能填上的字段才会用到那个安全的 LLM。
 
 ```bash
-uv run chimera run "scrape https://news.ycombinator.com and summarize the top 5 stories"
-uv run chimera run "extract the fields title, price, availability from https://example.com/product --taint"
+uv run chimera agent "scrape https://news.ycombinator.com and summarize the top 5 stories"
+uv run chimera agent "extract the fields title, price, availability from https://example.com/product --taint"
 ```
 
 针对整个站点，还有两个动词可用：
@@ -153,7 +153,7 @@ uv run chimera run "extract the fields title, price, availability from https://e
   会从第 N+1 页继续（默认 `resume=true`）。
 
 ```bash
-uv run chimera run "map https://docs.example.com then crawl the /guide section (max 20 pages) and summarize it"
+uv run chimera agent "map https://docs.example.com then crawl the /guide section (max 20 pages) and summarize it"
 ```
 
 所有内容都会被数据围栏并给这次运行打上污点（因为这些都是不可信的网页内容），因此
@@ -169,7 +169,7 @@ Chimera 能把语音转成文字——是它图像生成和文本转语音工具
 
 ```bash
 uv sync --extra stt      # optional: local, offline transcription (heavier — downloads a model)
-uv run chimera run "transcribe meeting.m4a and give me 5 bullet-point action items"
+uv run chimera agent "transcribe meeting.m4a and give me 5 bullet-point action items"
 ```
 
 > 关于能力边界的说明，秉持本项目一贯的诚实态度：Chimera 是一个 **agent**，而不是一个模型。它
@@ -188,7 +188,7 @@ pytube 这类单站点抓取工具容易失效的地方）。这是可选安装�
 
 ```bash
 uv sync --extra media-dl
-uv run chimera run "download the audio of https://youtu.be/… then transcribe it and summarize"
+uv run chimera agent "download the audio of https://youtu.be/… then transcribe it and summarize"
 ```
 
 和上面的 `transcribe_audio` 天然搭配：下载 → 转录 → 总结，一次运行全部完成。
@@ -201,7 +201,7 @@ Chimera 不会重新实现 scikit-learn——它会**编写正确的 pandas/skle
 
 ```bash
 uv sync --extra data     # pandas + scikit-learn for the generated code
-uv run chimera run "use the data_analysis skill: predict churn from customers.csv and report accuracy"
+uv run chimera agent "use the data_analysis skill: predict churn from customers.csv and report accuracy"
 ```
 
 ## 图像生成（云端托管或完全本地）
@@ -213,7 +213,7 @@ uv run chimera run "use the data_analysis skill: predict churn from customers.cs
 
 ```bash
 uv sync --extra imagegen-local     # pulls torch + diffusers; downloads multi-GB weights on first use
-CHIMERA_IMAGE_BACKEND=local uv run chimera run "generate an image of a fox in a snowy forest"
+CHIMERA_IMAGE_BACKEND=local uv run chimera agent "generate an image of a fox in a snowy forest"
 ```
 
 > 和上文一样诚实地划定范围：Chimera 在这里*运行*一个扩散模型，而不是训练一个。视频生成
@@ -233,7 +233,7 @@ plotly（交互式 HTML）的脚本，并内置了无头后端设置（`matplotl
 
 ```bash
 uv sync --extra viz     # matplotlib + seaborn + plotly for the generated code
-uv run chimera run "use data_visualization: line chart of revenue.csv over time, save revenue.png"
+uv run chimera agent "use data_visualization: line chart of revenue.csv over time, save revenue.png"
 ```
 
 **2. `render_chart` 工具——一份安全、声明式的 Vega-Lite 规范。** 一份 Vega-Lite 规范是**惰性
@@ -243,7 +243,7 @@ uv run chimera run "use data_visualization: line chart of revenue.csv over time,
 PNG/SVG 输出则需要可选的 `viz-vega` extra（`vl-convert-python`）。
 
 ```bash
-uv run chimera run "build a Vega-Lite bar chart of {A:5,B:8,C:3} and render_chart it to chart.html"
+uv run chimera agent "build a Vega-Lite bar chart of {A:5,B:8,C:3} and render_chart it to chart.html"
 uv sync --extra viz-vega   # optional: static PNG/SVG rendering (heavy — Rust+V8 binary)
 ```
 
