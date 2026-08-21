@@ -245,10 +245,35 @@ class Agent:
             from chimera.skills import retrieve_relevant_skills, skills_context_block
 
             registry = self.skills or _default_skill_registry()
-            return skills_context_block(retrieve_relevant_skills(registry, task))
+            block = skills_context_block(retrieve_relevant_skills(registry, task))
         except Exception as exc:  # skill retrieval must never break the loop
             _log.debug("skill-context retrieval skipped: %s", exc)
+            block = ""
+        return block + self._bundle_context()
+
+    def _bundle_context(self) -> str:
+        """The installed skill bundles the owner has switched ON, as one line each.
+
+        Name, sentence, path — level 1 of progressive disclosure and no more. A bundle's body runs
+        to hundreds of lines and several ship dozens of reference files, so carrying them in every
+        prompt would cost more than the skills are worth; the agent has file tools and reads the
+        procedure at the moment it decides to use it.
+
+        Only the active ones. A freshly installed bundle is `pending` and reaches nothing until a
+        person turns it on — these are other people's instructions, downloaded from the internet,
+        and an instruction in the system prompt has the standing of one the owner wrote.
+        """
+        try:
+            from chimera.settings import get_settings
+            from chimera.skills.bundles import context_lines
+
+            lines = context_lines(get_settings().home)
+        except Exception as exc:  # noqa: BLE001 -- same discipline as above
+            _log.debug("bundle context skipped: %s", exc)
             return ""
+        if not lines:
+            return ""
+        return "\n\nInstalled skills you may use:\n" + "\n".join(lines)
 
     def _project_context(self) -> str:
         """The workspace's own AGENTS.md, as a system-prompt block ("" when there is none).

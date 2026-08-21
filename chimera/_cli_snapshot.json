@@ -3971,6 +3971,81 @@
     },
     {
       "deprecated": false,
+      "help": "Switch a bundle off, keeping it on disk.\n\nOff is not uninstalled, deliberately: trying several and leaving two running is the normal\nway to use these, and making \"off\" mean \"delete\" would charge a download for every change of\nmind. Use ``skills-uninstall`` when you want the files gone.",
+      "hidden": false,
+      "name": "skills-bundle-disable",
+      "params": [
+        {
+          "help": "An installed bundle from `chimera skills-bundles`.",
+          "kind": "argument",
+          "name": "name",
+          "opts": [
+            "name"
+          ],
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "path": "skills-bundle-disable"
+    },
+    {
+      "deprecated": false,
+      "help": "Switch an installed bundle on, so the agent may use it.\n\nDo this after reading it. An enabled bundle's name and description reach the agent's prompt\nwhen they match a task, and its instructions can tell the agent to run the scripts that came\nwith it \u2014 which is why nothing is on by default.",
+      "hidden": false,
+      "name": "skills-bundle-enable",
+      "params": [
+        {
+          "help": "An installed bundle from `chimera skills-bundles`.",
+          "kind": "argument",
+          "name": "name",
+          "opts": [
+            "name"
+          ],
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "path": "skills-bundle-enable"
+    },
+    {
+      "deprecated": false,
+      "help": "List the skill bundles installed on this machine, and where each came from.",
+      "hidden": false,
+      "name": "skills-bundles",
+      "params": [],
+      "path": "skills-bundles"
+    },
+    {
+      "deprecated": false,
+      "help": "Browse the installable skills from the wider Agent Skills ecosystem.\n\nThese are other people's skills, fetched from their repositories on request \u2014 not bundled here.\nThe table says what each one NEEDS, because most were written for a different harness and a\ncatalogue that hid that would be advertising features that fail after the download.",
+      "hidden": false,
+      "name": "skills-catalog",
+      "params": [
+        {
+          "help": "Filter by name or description.",
+          "kind": "argument",
+          "name": "query",
+          "opts": [
+            "query"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Only this topic.",
+          "kind": "option",
+          "name": "topic",
+          "opts": [
+            "--topic"
+          ],
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "path": "skills-catalog"
+    },
+    {
+      "deprecated": false,
       "help": "Reflectively evolve a skill's prompt template against graded instances (GEPA).\n\nEach instance is a `{input, expect}` pair; the (simple, honest) scorer gives 1.0 when the\nproduced output contains the `expect` substring, else 0.0. GEPA reflects on a failing case to\nrewrite the template and keeps a Pareto frontier of candidates. Dry-run by default: the\nimproved skill is only written back to the store with ``--apply``, and only if it beats the seed.",
       "hidden": false,
       "name": "skills-evolve",
@@ -4077,6 +4152,35 @@
         }
       ],
       "path": "skills-import"
+    },
+    {
+      "deprecated": false,
+      "help": "Download a skill bundle from its source repository into your skills directory.\n\nFetches; runs nothing. The bundle lands **pending**: its files are on disk and no part of it\nreaches a prompt until you approve it. That is the same rule an imported card follows \u2014 a skill\nfrom a stranger has the standing of an instruction from the owner \u2014 and a bundle is that plus\nexecutable scripts, so it holds with more reason, not less.",
+      "hidden": false,
+      "name": "skills-install",
+      "params": [
+        {
+          "help": "A skill name from `chimera skills-catalog`.",
+          "kind": "argument",
+          "name": "name",
+          "opts": [
+            "name"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "help": "Replace it if it is already installed.",
+          "kind": "option",
+          "name": "force",
+          "opts": [
+            "--force"
+          ],
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": "skills-install"
     },
     {
       "deprecated": false,
@@ -4226,6 +4330,25 @@
       "name": "skills-stats",
       "params": [],
       "path": "skills-stats"
+    },
+    {
+      "deprecated": false,
+      "help": "Delete an installed skill bundle and its files.",
+      "hidden": false,
+      "name": "skills-uninstall",
+      "params": [
+        {
+          "help": "An installed bundle from `chimera skills-bundles`.",
+          "kind": "argument",
+          "name": "name",
+          "opts": [
+            "name"
+          ],
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "path": "skills-uninstall"
     },
     {
       "deprecated": false,

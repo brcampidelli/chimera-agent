@@ -3833,6 +3833,156 @@ def skills_library(
                   "chimera skills-import <name>[/dim]")
 
 
+@app.command("skills-catalog")
+def skills_catalog(
+    query: str = typer.Argument(None, help="Filter by name or description."),
+    topic: str = typer.Option(None, "--topic", help="Only this topic."),
+) -> None:
+    """Browse the installable skills from the wider Agent Skills ecosystem.
+
+    These are other people's skills, fetched from their repositories on request — not bundled here.
+    The table says what each one NEEDS, because most were written for a different harness and a
+    catalogue that hid that would be advertising features that fail after the download.
+    """
+    from chimera.skills.catalog import CATALOG, license_is_permissive, search
+
+    if not CATALOG:
+        console.print("[yellow]This build ships no skill catalogue.[/yellow]")
+        return
+    found = search(query or "", topic=topic or "")
+    if not found:
+        console.print(f"[yellow]Nothing matches {query!r}.[/yellow] See: chimera skills-catalog")
+        return
+    table = Table(title=f"Installable skills ({len(found)}/{len(CATALOG)})", show_header=True,
+                  header_style="bold")
+    for column in ("Skill", "Topic", "Works here", "Licence", "Description"):
+        table.add_column(column)
+    for entry in found:
+        # The licence column earns its width: an entry with no licence found is not the same as a
+        # permissive one, and the person deciding to download deserves to see which they have.
+        lic = entry.license or "[red]none found[/red]"
+        if entry.license and not license_is_permissive(entry.license):
+            lic = f"[yellow]{escape(entry.license)}[/yellow]"
+        works = entry.portability.value.replace("_", " ")
+        table.add_row(entry.name, entry.topic or "-", works, lic, entry.description)
+    console.print(table)
+    console.print("[dim]Details: chimera skills-catalog <name> · Install: "
+                  "chimera skills-install <name>[/dim]")
+
+
+@app.command("skills-install")
+def skills_install(
+    name: str = typer.Argument(..., help="A skill name from `chimera skills-catalog`."),
+    force: bool = typer.Option(False, "--force", help="Replace it if it is already installed."),
+) -> None:
+    """Download a skill bundle from its source repository into your skills directory.
+
+    Fetches; runs nothing. The bundle lands **pending**: its files are on disk and no part of it
+    reaches a prompt until you approve it. That is the same rule an imported card follows — a skill
+    from a stranger has the standing of an instruction from the owner — and a bundle is that plus
+    executable scripts, so it holds with more reason, not less.
+    """
+    from chimera.skills.bundles import BundleError, install
+    from chimera.skills.catalog import find, license_is_permissive
+
+    entry = find(name)
+    if entry is None:
+        console.print(f"[red]No skill named {name!r} in the catalogue.[/red] "
+                      "See: chimera skills-catalog")
+        raise typer.Exit(code=1)
+
+    if entry.requires:
+        # Before the download, not after: this is the list that decides whether the thing will run
+        # at all, and finding it out afterwards means finding it out from a failure.
+        console.print(f"[yellow]Needs:[/yellow] {escape(', '.join(entry.requires))}")
+    if not license_is_permissive(entry.license):
+        terms = entry.license or "no licence file found"
+        console.print(f"[yellow]Licence:[/yellow] {escape(terms)} — read it before you rely on this.")
+
+    try:
+        record = install(entry, get_settings().home, force=force)
+    except BundleError as exc:
+        console.print(f"[red]Not installed:[/red] {escape(str(exc))}")
+        raise typer.Exit(code=1) from exc
+
+    console.print(f"[green]installed[/green] {record.name} "
+                  f"({len(record.files)} files) [yellow]— pending[/yellow]")
+    console.print(f"[dim]from {escape(record.source)}[/dim]")
+    console.print(f"[dim]at {escape(record.ref[:12])}[/dim]")
+    console.print(f"[dim]Read it, then:[/dim] chimera skills-bundle-enable {record.name}")
+
+
+@app.command("skills-bundles")
+def skills_bundles() -> None:
+    """List the skill bundles installed on this machine, and where each came from."""
+    from chimera.skills.bundles import bundles_root, installed
+
+    home = get_settings().home
+    found = installed(home)
+    if not found:
+        console.print("[dim]No skill bundles installed.[/dim] "
+                      "Browse them with: chimera skills-catalog")
+        return
+    table = Table(title=f"Installed bundles ({len(found)})", show_header=True, header_style="bold")
+    for column in ("Skill", "Status", "Files", "Licence", "Source"):
+        table.add_column(column)
+    for bundle in found:
+        tone = "green" if bundle.status == "active" else "yellow"
+        table.add_row(bundle.name, f"[{tone}]{bundle.status}[/{tone}]", str(len(bundle.files)),
+                      bundle.license or "-", bundle.source or "-")
+    console.print(table)
+    console.print(f"[dim]On disk at {escape(str(bundles_root(home)))}[/dim]")
+
+
+@app.command("skills-bundle-enable")
+def skills_bundle_enable(
+    name: str = typer.Argument(..., help="An installed bundle from `chimera skills-bundles`."),
+) -> None:
+    """Switch an installed bundle on, so the agent may use it.
+
+    Do this after reading it. An enabled bundle's name and description reach the agent's prompt
+    when they match a task, and its instructions can tell the agent to run the scripts that came
+    with it — which is why nothing is on by default.
+    """
+    from chimera.skills.bundles import set_status
+
+    if not set_status(name, get_settings().home, "active"):
+        console.print(f"[red]No installed bundle named {name!r}.[/red]")
+        raise typer.Exit(code=1)
+    console.print(f"[green]on[/green] {name}")
+
+
+@app.command("skills-bundle-disable")
+def skills_bundle_disable(
+    name: str = typer.Argument(..., help="An installed bundle from `chimera skills-bundles`."),
+) -> None:
+    """Switch a bundle off, keeping it on disk.
+
+    Off is not uninstalled, deliberately: trying several and leaving two running is the normal
+    way to use these, and making "off" mean "delete" would charge a download for every change of
+    mind. Use ``skills-uninstall`` when you want the files gone.
+    """
+    from chimera.skills.bundles import set_status
+
+    if not set_status(name, get_settings().home, "inactive"):
+        console.print(f"[red]No installed bundle named {name!r}.[/red]")
+        raise typer.Exit(code=1)
+    console.print(f"[dim]off[/dim] {name} [dim](still installed)[/dim]")
+
+
+@app.command("skills-uninstall")
+def skills_uninstall(
+    name: str = typer.Argument(..., help="An installed bundle from `chimera skills-bundles`."),
+) -> None:
+    """Delete an installed skill bundle and its files."""
+    from chimera.skills.bundles import remove
+
+    if not remove(name, get_settings().home):
+        console.print(f"[red]No installed bundle named {name!r}.[/red]")
+        raise typer.Exit(code=1)
+    console.print(f"[green]removed[/green] {name}")
+
+
 @app.command("skills-pending")
 def skills_pending() -> None:
     """List learned skills held for review (e.g. distilled during a tainted run)."""

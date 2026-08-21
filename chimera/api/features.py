@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, params
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 from starlette.concurrency import run_in_threadpool
 
@@ -174,6 +174,47 @@ class ApproveBody(BaseModel):
     card: str | None = None
 
 
+class CatalogEntryOut(BaseModel):
+    """One installable skill, and everything a person needs before deciding to download it."""
+
+    name: str = ""
+    description: str = ""
+    topic: str = ""
+    license: str = ""
+    permissive: bool = Field(
+        default=False,
+        description="Whether the licence is one that needs no further reading before use.",
+    )
+    portability: str = Field(
+        default="",
+        description=(
+            "native | needs_setup | needs_service | needs_heavy | os_locked | needs_adaptation — "
+            "these were written for another agent, and most do not transfer unchanged."
+        ),
+    )
+    requires: list[str] = Field(default_factory=list)
+    note: str = ""
+    author: str = ""
+    homepage: str = ""
+    #: What is on this machine already: "" when not installed, else pending/active/inactive.
+    installed: str = ""
+
+
+class BundleOut(BaseModel):
+    name: str = ""
+    description: str = ""
+    status: str = Field(default="", description="pending | active | inactive | unknown")
+    license: str = ""
+    source: str = ""
+    ref: str = ""
+    installed_at: str = ""
+    files: list[str] = Field(default_factory=list)
+
+
+class BundleStatusIn(BaseModel):
+    status: str = Field(default="active", description="active | inactive")
+
+
 def register_features(
     app: FastAPI, guard: params.Depends, *, workspace: Path | None = None
 ) -> None:
@@ -240,6 +281,97 @@ def register_features(
     def retire_skill(name: str) -> dict[str, bool]:
         if not _skill_store().retire(name):
             raise HTTPException(status_code=404, detail="skill not found")
+        return {"retired": True}
+
+    # ---- Installable skills from the wider ecosystem -----------------------------------------
+    # A different SHAPE of skill from everything above, not a longer list of the same one. A card
+    # is text that goes in the prompt; these are directories that ship scripts and reference files,
+    # so they live on disk and what reaches the prompt is a name and a path. See
+    # `chimera/skills/bundles.py` for why the store could not hold them.
+    def _bundle_dicts() -> dict[str, str]:
+        from chimera.skills.bundles import installed as installed_bundles
+
+        return {b.name: b.status for b in installed_bundles(get_settings().home)}
+
+    @app.get("/api/skills/catalog", dependencies=[guard], response_model=list[CatalogEntryOut])
+    def list_catalog() -> list[dict[str, Any]]:
+        """The installable skills, with what each one needs said next to its name.
+
+        Not vendored and not fetched here: this is the curated pointer list, and the licence and
+        portability travel with every row because a flat list of eighty names would advertise
+        eighty working features and deliver rather fewer.
+        """
+        from chimera.skills.catalog import CATALOG, license_is_permissive
+
+        here = _bundle_dicts()
+        return [
+            CatalogEntryOut(
+                name=e.name,
+                description=e.description,
+                topic=e.topic,
+                license=e.license,
+                permissive=license_is_permissive(e.license),
+                portability=e.portability.value,
+                requires=list(e.requires),
+                note=e.note,
+                author=e.author,
+                homepage=e.homepage,
+                installed=here.get(e.name, ""),
+            ).model_dump()
+            for e in CATALOG
+        ]
+
+    @app.get("/api/skills/bundles", dependencies=[guard], response_model=list[BundleOut])
+    def list_bundles() -> list[dict[str, Any]]:
+        """What is installed on this machine, read from the disk rather than from an index."""
+        from chimera.skills.bundles import installed as installed_bundles
+
+        return [BundleOut(**b.to_dict()).model_dump() for b in installed_bundles(get_settings().home)]
+
+    @app.post("/api/skills/catalog/{name}/install", dependencies=[guard], response_model=BundleOut)
+    def install_bundle(name: str, force: bool = False) -> dict[str, Any]:
+        """Download one skill from its source repository. Runs nothing, and enables nothing.
+
+        The bundle lands `pending`: its files are on disk and no part of it reaches a prompt until
+        somebody switches it on. These are instructions written by a stranger, and an instruction
+        in the system prompt has the standing of one the owner wrote — so downloading is not
+        consenting, and it is a separate click.
+        """
+        from chimera.skills.bundles import BundleError, install
+        from chimera.skills.catalog import find
+
+        entry = find(name)
+        if entry is None:
+            raise HTTPException(status_code=404, detail=f"no skill named {name!r} in the catalogue")
+        try:
+            record = install(entry, get_settings().home, force=force)
+        except BundleError as exc:
+            # The message is written to be read by a person: which limit, which file, which host.
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return BundleOut(**record.to_dict()).model_dump()
+
+    @app.post("/api/skills/bundles/{name}/status", dependencies=[guard], response_model=BundleOut)
+    def set_bundle_status(name: str, body: BundleStatusIn) -> dict[str, Any]:
+        """Switch an installed bundle on or off, keeping it on disk either way."""
+        from chimera.skills.bundles import BundleError, set_status
+        from chimera.skills.bundles import installed as installed_bundles
+
+        try:
+            found = set_status(name, get_settings().home, body.status)
+        except BundleError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if not found:
+            raise HTTPException(status_code=404, detail="no such installed bundle")
+        current = {b.name: b for b in installed_bundles(get_settings().home)}
+        return BundleOut(**current[name].to_dict()).model_dump()
+
+    @app.delete("/api/skills/bundles/{name}", dependencies=[guard], response_model=RetiredOut)
+    def delete_bundle(name: str) -> dict[str, Any]:
+        """Delete an installed bundle and its files."""
+        from chimera.skills.bundles import remove
+
+        if not remove(name, get_settings().home):
+            raise HTTPException(status_code=404, detail="no such installed bundle")
         return {"retired": True}
 
     # ---- The curated library ----------------------------------------------------------------------

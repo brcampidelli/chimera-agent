@@ -25,7 +25,9 @@ import type {
   Benchmarks,
   GovernanceAudit,
   InjectionReport,
+  CatalogEntry,
   LibraryCard,
+  SkillBundle,
   CodeSessionRaw,
   Maturity,
   McpServers,
@@ -377,6 +379,25 @@ export const retireSkill = (name: string) =>
  * no route at all: the only documented way to use one was a CLI command naming a repo-relative
  * path, which resolves only inside a git checkout. */
 export const getSkillLibrary = () => json<LibraryCard[]>("/api/skills/library");
+
+// --- Installable skills ------------------------------------------------------------------------
+// A different SHAPE of skill from the cards above, not a longer list of the same one: these are
+// directories that ship scripts, fetched from their author's repository on request. Nothing is
+// bundled with the app, and nothing installed is switched on by itself.
+
+export const getSkillCatalog = () => json<CatalogEntry[]>("/api/skills/catalog");
+export const getSkillBundles = () => json<SkillBundle[]>("/api/skills/bundles");
+export const installSkillBundle = (name: string) =>
+  json<SkillBundle>(`/api/skills/catalog/${encodeURIComponent(name)}/install`, { method: "POST" });
+export const setSkillBundleStatus = (name: string, status: "active" | "inactive") =>
+  json<SkillBundle>(`/api/skills/bundles/${encodeURIComponent(name)}/status`, {
+    method: "POST",
+    body: JSON.stringify({ status }),
+  });
+export const uninstallSkillBundle = (name: string) =>
+  json<{ retired: boolean }>(`/api/skills/bundles/${encodeURIComponent(name)}`, {
+    method: "DELETE",
+  });
 /** One card WITH its body. The list carries metadata only — twenty-three Trigger/Do/Avoid/Check/Risk
  *  bodies is a quarter of a megabyte to draw a list of names. */
 export const getSkillLibraryCard = (name: string) =>

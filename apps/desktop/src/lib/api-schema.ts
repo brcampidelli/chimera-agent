@@ -1727,6 +1727,115 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/skills/bundles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Bundles
+         * @description What is installed on this machine, read from the disk rather than from an index.
+         */
+        get: operations["list_bundles_api_skills_bundles_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/skills/bundles/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Bundle
+         * @description Delete an installed bundle and its files.
+         */
+        delete: operations["delete_bundle_api_skills_bundles__name__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/skills/bundles/{name}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set Bundle Status
+         * @description Switch an installed bundle on or off, keeping it on disk either way.
+         */
+        post: operations["set_bundle_status_api_skills_bundles__name__status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/skills/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Catalog
+         * @description The installable skills, with what each one needs said next to its name.
+         *
+         *     Not vendored and not fetched here: this is the curated pointer list, and the licence and
+         *     portability travel with every row because a flat list of eighty names would advertise
+         *     eighty working features and deliver rather fewer.
+         */
+        get: operations["list_catalog_api_skills_catalog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/skills/catalog/{name}/install": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Install Bundle
+         * @description Download one skill from its source repository. Runs nothing, and enables nothing.
+         *
+         *     The bundle lands `pending`: its files are on disk and no part of it reaches a prompt until
+         *     somebody switches it on. These are instructions written by a stranger, and an instruction
+         *     in the system prompt has the standing of one the owner wrote — so downloading is not
+         *     consenting, and it is a separate click.
+         */
+        post: operations["install_bundle_api_skills_catalog__name__install_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/skills/library": {
         parameters: {
             query?: never;
@@ -2415,6 +2524,56 @@ export interface components {
              */
             headless: boolean;
         };
+        /** BundleOut */
+        BundleOut: {
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Files */
+            files?: string[];
+            /**
+             * Installed At
+             * @default
+             */
+            installed_at: string;
+            /**
+             * License
+             * @default
+             */
+            license: string;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /**
+             * Ref
+             * @default
+             */
+            ref: string;
+            /**
+             * Source
+             * @default
+             */
+            source: string;
+            /**
+             * Status
+             * @description pending | active | inactive | unknown
+             * @default
+             */
+            status: string;
+        };
+        /** BundleStatusIn */
+        BundleStatusIn: {
+            /**
+             * Status
+             * @description active | inactive
+             * @default active
+             */
+            status: string;
+        };
         /** CacheCfgOut */
         CacheCfgOut: {
             /** Completion */
@@ -2426,6 +2585,66 @@ export interface components {
         CancelOut: {
             /** Ok */
             ok: boolean;
+        };
+        /**
+         * CatalogEntryOut
+         * @description One installable skill, and everything a person needs before deciding to download it.
+         */
+        CatalogEntryOut: {
+            /**
+             * Author
+             * @default
+             */
+            author: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Homepage
+             * @default
+             */
+            homepage: string;
+            /**
+             * Installed
+             * @default
+             */
+            installed: string;
+            /**
+             * License
+             * @default
+             */
+            license: string;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            /**
+             * Permissive
+             * @description Whether the licence is one that needs no further reading before use.
+             * @default false
+             */
+            permissive: boolean;
+            /**
+             * Portability
+             * @description native | needs_setup | needs_service | needs_heavy | os_locked | needs_adaptation — these were written for another agent, and most do not transfer unchanged.
+             * @default
+             */
+            portability: string;
+            /** Requires */
+            requires?: string[];
+            /**
+             * Topic
+             * @default
+             */
+            topic: string;
         };
         /**
          * ChatCompletionRequest
@@ -7892,6 +8111,145 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SkillsOut"];
+                };
+            };
+        };
+    };
+    list_bundles_api_skills_bundles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BundleOut"][];
+                };
+            };
+        };
+    };
+    delete_bundle_api_skills_bundles__name__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetiredOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_bundle_status_api_skills_bundles__name__status_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BundleStatusIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BundleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_catalog_api_skills_catalog_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogEntryOut"][];
+                };
+            };
+        };
+    };
+    install_bundle_api_skills_catalog__name__install_post: {
+        parameters: {
+            query?: {
+                force?: boolean;
+            };
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BundleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

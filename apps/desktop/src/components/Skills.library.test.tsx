@@ -13,6 +13,13 @@ vi.mock("@/lib/api", () => ({
   getSkillLibrary: vi.fn(),
   getSkillLibraryCard: vi.fn(),
   importSkillLibraryCard: vi.fn(),
+  // The catalogue panel lives on the same screen and fetches on mount. Stubbed empty here so
+  // these tests keep testing the curated library rather than accidentally testing both.
+  getSkillCatalog: vi.fn(async () => []),
+  getSkillBundles: vi.fn(async () => []),
+  installSkillBundle: vi.fn(),
+  setSkillBundleStatus: vi.fn(),
+  uninstallSkillBundle: vi.fn(),
 }));
 
 function card(over: Record<string, unknown> = {}) {
