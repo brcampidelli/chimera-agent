@@ -1606,7 +1606,7 @@ accept.
   price of the answer), and requests are **stateless**, each getting a fresh ephemeral session, so a
   benchmark's items stay independent instead of a shared transcript quietly making later items easier.
   Unsupported sampling knobs are accepted and ignored rather than faked.
-- **First-class local models (Ollama) — fully local, no API key.** `CHIMERA_MODEL=ollama/llama3` now
+- **First-class local models (Ollama) — fully local, no API key.** `CHIMERA_DEFAULT_MODEL=ollama/llama3` now
   runs out of the box: the credential gate recognises `ollama/…` / `ollama_chat/…` as a keyless local
   runtime and no longer demands a provider key, and the gateway points LiteLLM at your Ollama server
   (`CHIMERA_OLLAMA_BASE_URL`, default `http://localhost:11434`; a value you already set is respected).

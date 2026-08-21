@@ -240,7 +240,7 @@ def _credential_error(exc: BaseException) -> CredentialRejectedError | None:
         return None
     return CredentialRejectedError(
         f"{what} {fix} — the relevant variables are {list(_KEY_ENV_VARS.values())} "
-        "(or use a local model, e.g. CHIMERA_MODEL=ollama/llama3, which needs no key). "
+        "(or use a local model, e.g. CHIMERA_DEFAULT_MODEL=ollama/llama3, which needs no key). "
         f"Provider said: {exc}"
     )
 
@@ -329,7 +329,7 @@ class LLMGateway:
             if value and not os.environ.get(env_var):
                 os.environ[env_var] = value
         # Point LiteLLM's Ollama provider at the configured local server (default localhost:11434), so
-        # `CHIMERA_MODEL=ollama/llama3` works out of the box — and a remote Ollama is one env var away.
+        # `CHIMERA_DEFAULT_MODEL=ollama/llama3` works out of the box — and a remote Ollama is one env var away.
         ollama_base = getattr(self.settings, "ollama_base_url", "") or ""
         if ollama_base and not os.environ.get("OLLAMA_API_BASE"):
             os.environ["OLLAMA_API_BASE"] = ollama_base
@@ -360,7 +360,7 @@ class LLMGateway:
             + (f" for '{head}'. Set {wanted}" if wanted else ". Set a provider key")
             + " in your environment or .env — any provider LiteLLM supports works, "
             f"not only {list(_KEY_ENV_VARS.values())} "
-            "(or use a local model, e.g. CHIMERA_MODEL=ollama/llama3, which needs no key)."
+            "(or use a local model, e.g. CHIMERA_DEFAULT_MODEL=ollama/llama3, which needs no key)."
         )
 
     def _provider_kwargs(self) -> dict[str, Any]:

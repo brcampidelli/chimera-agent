@@ -232,6 +232,7 @@ class Agent:
         tools: ToolRegistry,
         config: AgentConfig | None = None,
         skills: SkillRegistry | None = None,
+        cards: Any = None,
     ) -> None:
         self.backend = backend
         self.tools = tools
@@ -247,6 +248,15 @@ class Agent:
         # The skill library surfaced as context. Defaults to the built-in registry (lazy, shared),
         # so every construction site picks up skills without changes; pass an explicit one to override.
         self.skills = skills
+        # What this agent LEARNED, as opposed to what it shipped with — a `CardRetriever`, or None.
+        # Keyword-only in practice and duck-typed on `card_context`, so a caller with a search-only
+        # retriever, or none at all, gets nothing rather than an error.
+        #
+        # It exists here because `AutonomousAgent` had this seam and a plain `Agent` did not, and
+        # the Code screen — first in the navigation rail — builds a plain one. So the Settings row
+        # that mints cards promised "a learned skill is read back when it matches the task", and on
+        # the surface most people use, nothing learned ever came back.
+        self.cards = cards
 
     def _skill_context(self, task: str) -> str:
         """Task-relevant built-in skills as a prompt block ("" when none match or on any error)."""
@@ -261,6 +271,16 @@ class Agent:
             _log.debug("skill-context retrieval skipped: %s", exc)
             block = ""
         return block + self._bundle_context()
+
+    def _card_context(self, task: str) -> str:
+        """Learned skill cards relevant to this task ("" when there are none or on any error)."""
+        if self.cards is None:
+            return ""
+        try:
+            return str(self.cards.card_context(task) or "")
+        except Exception as exc:  # noqa: BLE001 -- retrieval must never break the loop
+            _log.debug("skill-card retrieval skipped: %s", exc)
+            return ""
 
     def _bundle_context(self) -> str:
         """The installed skill bundles the owner has switched ON, as one line each.
@@ -343,6 +363,12 @@ class Agent:
         skill_block = self._skill_context(task)
         if skill_block:
             system_prompt = f"{system_prompt}\n\n{skill_block}"
+        # What it LEARNED, after what it shipped with: a card comes from a run that
+        # actually worked here, so it is the more specific advice of the two. Advisory
+        # either way — the cards suggest, the verifier decides.
+        card_block = self._card_context(task)
+        if card_block:
+            system_prompt = f"{system_prompt}\n\n{card_block}"
         # After the skills, so the project's own conventions outrank a generic skill card that
         # happens to have been retrieved — a repository that says "never use bare except" should
         # win over one. Not last any more: see the owner's instructions below.

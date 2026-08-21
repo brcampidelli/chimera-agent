@@ -660,6 +660,35 @@ def _remember_and_tidy(message: str, memory: Any, settings: Settings) -> tuple[s
     return fact, removed
 
 
+def _card_retriever(settings: Settings, gateway: Any) -> Any:
+    """The learned-skill retriever, or None when the owner has the feature off or it cannot build.
+
+    Best-effort: a coding turn must not fail because a card store is unreadable. The answer is the
+    product; the cards are advice about it.
+    """
+    if not getattr(settings, "skill_cards", False):
+        return None
+    try:
+        from chimera.evolution import build_evolution_context
+
+        return build_evolution_context(
+            settings,
+            # Required by the signature and unused on this path: `evolve_skills=False` means nothing
+            # here calls a model. Passing the turn's own gateway rather than a stub, so if that ever
+            # stops being true it is the right one.
+            gateway,
+            None,
+            home=settings.home,
+            evolve_skills=False,  # reading, never minting: no verify-or-revert signal on this path
+            skill_cards=True,
+            include_memory=False,
+            include_playbook=False,
+        ).cards
+    except Exception as exc:  # noqa: BLE001 -- see the docstring
+        _log.debug("skill-card retriever unavailable: %s", exc)
+        return None
+
+
 def register_code_api(
     app: FastAPI,
     guard: params.Depends,
@@ -762,6 +791,16 @@ def register_code_api(
                 instructions=render_identity(load_identity(settings.home)),
                 trace_path=settings.home / "traces.jsonl",
             ),
+            # What the agent LEARNED, read back when it matches this task. The Settings row that
+            # mints cards says "a learned skill is read back when it matches the task"; it was true
+            # on `/api/runs`, which builds an `AutonomousAgent`, and this endpoint builds a plain
+            # `Agent`. So on the Code screen — first in the navigation rail — nothing the agent had
+            # ever learned came back.
+            #
+            # Read-only: `build_evolution_context` is asked for the retriever alone, with skill
+            # evolution off, because minting a card needs a verify-or-revert signal this path does
+            # not have. Advisory either way — the card suggests, the verifier decides.
+            cards=_card_retriever(live(), gateway),
         )
         if req.open_file:
             # Path only, never content: what a compaction must restore is *which* file is being
