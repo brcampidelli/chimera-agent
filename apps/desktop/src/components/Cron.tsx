@@ -136,7 +136,7 @@ export function Cron({ embedded = false }: { embedded?: boolean } = {}) {
                 )}
               </div>
               <button
-                className="opacity-0 transition group-hover:opacity-100"
+                className="opacity-0 transition focus:opacity-100 group-hover:opacity-100"
                 title={t("common.delete")}
                 onClick={() => remove.mutate(j.id)}
               >

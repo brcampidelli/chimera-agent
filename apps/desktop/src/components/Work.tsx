@@ -12,12 +12,21 @@ import { readWorkspace } from "@/lib/workspace";
 
 type Tab = "run" | "git" | "worth" | "orchestration";
 
-/** The tab named in the URL, if any. Read straight from the hash rather than through `useRoute`
- *  so the FIRST render already has it: a deep link that resolved one render late would show the
- *  Runs tab and then jump, which reads as a bug even though it settles correctly. */
-function readTab(): string {
+const TABS = ["run", "git", "worth", "orchestration"] as const;
+
+/** The tab named in the URL, or "run".
+ *
+ *  Read straight from the hash rather than through `useRoute` so the FIRST render already has it: a
+ *  deep link that resolved one render late would show the Runs tab and then jump, which reads as a
+ *  bug even though it settles correctly.
+ *
+ *  Checked against the whole list. It used to recognise `orchestration` and nothing else, so
+ *  `choose` wrote `?tab=git` into the URL and reopening that URL landed on Runs — the address bar
+ *  said one thing and the screen showed another, which is worse than having no deep link at all. */
+function readTab(): Tab {
   const query = window.location.hash.split("?")[1] ?? "";
-  return new URLSearchParams(query).get("tab") ?? "";
+  const named = new URLSearchParams(query).get("tab") ?? "";
+  return (TABS as readonly string[]).includes(named) ? (named as Tab) : "run";
 }
 
 /**
@@ -41,7 +50,7 @@ function readTab(): string {
 export function Work() {
   const t = useT();
   const id = useId();
-  const [tab, setTab] = useState<Tab>(() => (readTab() === "orchestration" ? "orchestration" : "run"));
+  const [tab, setTab] = useState<Tab>(readTab);
   // Only to leave: the fallback note on a write-shaped task offers the screen that IS for writing
   // work, and a suggestion you have to act on yourself is a suggestion with a step missing.
   const { navigate, setParams } = useRoute();
