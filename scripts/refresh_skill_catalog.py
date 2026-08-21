@@ -28,12 +28,17 @@ import json
 import os
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any
 
 import yaml
+
+# Run from the repository root, so the package next to this script is importable: the classifier
+# asks the real alias table which names we answer to, rather than keeping a second copy of it here.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 REPO = "NousResearch/hermes-agent"
 REF = "main"
@@ -100,6 +105,19 @@ UNDERSTATED: dict[str, list[str]] = {
 #: Skills whose instructions are written against the upstream agent's own runtime, so the procedure
 #: reads correctly but the interface it talks to is not ours. Recorded per skill with what it wants.
 NEEDS_ADAPTATION: dict[str, str] = {
+    # CURATED, from reading the bodies — and it stays curated after an attempt to derive it from
+    # a scan of tool calls, which is worth writing down because the attempt failed instructively.
+    #
+    # The scan moved this from 20 skills to 34, in the wrong direction and for a bad reason: a
+    # MENTION is not a DEPENDENCY. `test-driven-development` calls `delegate_task` once, inside a
+    # paragraph beginning "When dispatching subagents for implementation" — an optional escalation
+    # in a skill that is otherwise pure methodology. Counting that as a blocker marks a perfectly
+    # usable skill unusable. Nor could the authors' own frontmatter settle it: exactly three of the
+    # eighty-two declare `requires_toolsets`, and two of those declare `terminal`.
+    #
+    # Any threshold that separates "load-bearing" from "optional" by counting occurrences is a
+    # guess wearing a number. So the rating stays a judgement made by reading, and is labelled as
+    # one; the measured vocabulary rides alongside as `uses` and `missing`, labelled as measured.
     "sdlc-review": "the upstream Kanban toolset",
     "merge-reconciler": "the upstream Kanban CLI",
     "simplify-code": "four parallel subagents",
@@ -114,7 +132,6 @@ NEEDS_ADAPTATION: dict[str, str] = {
     "ocr-and-documents": "the upstream page-extraction and vision tools",
     "grounded-citations": "the upstream agent's home directory",
     "llm-wiki": "the upstream agent's home directory",
-    "arxiv": "the upstream page-extraction tool",
     "architecture-diagram": "the upstream agent's own preview tool",
     "popular-web-designs": "the upstream agent's browser and screenshot tools",
     "sketch": "the upstream agent's browser and screenshot tools",
@@ -195,30 +212,56 @@ def skill_paths() -> list[str]:
     )
 
 
-def frontmatter(path: str) -> dict[str, Any]:
-    """The YAML block at the top of one SKILL.md."""
-    import base64
+def skill_md(path: str) -> tuple[dict[str, Any], str]:
+    """One SKILL.md as (frontmatter, whole text), fetched from raw rather than from the API.
 
-    blob = gh(f"repos/{REPO}/contents/{path}?ref={REF}")
-    text = base64.b64decode(blob["content"]).decode("utf-8", errors="replace")
+    Eighty-two contents-API calls trip GitHub's secondary limit even well inside the hourly one —
+    it is the rate, not the count. The raw host is not metered the same way, so the whole run costs
+    a single API call for the tree and eighty-two ordinary file fetches.
+    """
+    url = f"https://raw.githubusercontent.com/{REPO}/{REF}/{path}"
+    request = urllib.request.Request(url, headers={"User-Agent": "chimera-catalog-refresh"})  # noqa: S310 -- fixed https host
+    # Eighty-two fetches in a row trips a rate limit that is about the RATE, not the count, and a
+    # maintenance script that hammers somebody else's host and then reports "the source is broken"
+    # is blaming the wrong party. Pace, and back off when asked to.
+    text = ""
+    for attempt in range(5):
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310 -- as above
+                text = response.read().decode("utf-8", errors="replace")
+            break
+        except urllib.error.HTTPError as exc:
+            if exc.code not in (429, 403) or attempt == 4:
+                raise SystemExit(f"GET {path} answered {exc.code}") from exc
+            wait = 5 * (attempt + 1)
+            print(f"  {exc.code} on {path} — waiting {wait}s", file=sys.stderr)
+            time.sleep(wait)
+    time.sleep(0.15)
     if not text.startswith("---"):
-        return {}
+        return {}, text
     _, _, rest = text.partition("---")
     block, _, _ = rest.partition("\n---")
     try:
         parsed = yaml.safe_load(block)
     except yaml.YAMLError:
-        return {}
-    return parsed if isinstance(parsed, dict) else {}
+        return {}, text
+    return (parsed if isinstance(parsed, dict) else {}), text
 
 
-def classify(name: str, meta: dict[str, Any]) -> tuple[str, list[str], str]:
-    """(portability, requires, note) — derived from the frontmatter, with the two curated cases.
+def classify(name: str, meta: dict[str, Any], body: str) -> tuple[str, list[str], str, list[str], list[str]]:
+    """(portability, requires, note, uses, missing) — derived, with two curated corrections.
 
-    Order matters: a skill can be several of these at once, and the rating shown is the one that
-    stops a person first. Needing a harness we are not beats needing a server, which beats needing
-    an operating system we might be on, which beats needing a package.
+    The verdict comes from the skill's own text: which tool names it calls, and which of those
+    this agent can answer to. That replaced a hand-written list, and the difference is not tidiness
+    — a hand list is a set of claims nobody can re-check, and it was wrong in both directions here
+    (it marked skills unusable whose only problem was that `web_extract` is called `scrape`, and it
+    missed ones that quietly need a capability we do not have).
+
+    Order matters: the rating shown is whatever stops a person first. A missing capability beats
+    needing a server, which beats needing an operating system we might be on, which beats a package.
     """
+    from chimera.skills.aliases import foreign_names, missing_names, translated_names
+
     platforms = meta.get("platforms") or []
     commands = ((meta.get("prerequisites") or {}).get("commands")) or []
     requires = [str(c) for c in commands if c]
@@ -226,20 +269,26 @@ def classify(name: str, meta: dict[str, Any]) -> tuple[str, list[str], str]:
         if extra not in requires:
             requires.append(extra)
 
+    # Measured, and kept apart from the verdict: `uses` is what we can answer to under another
+    # name, `missing` is what nothing here provides. Both are facts about the text. Whether a
+    # mention blocks the skill is not, and that is the line this function refuses to blur.
+    vocabulary = foreign_names(body)
+    uses, missing = translated_names(vocabulary), missing_names(vocabulary)
+
     if name in NEEDS_ADAPTATION:
-        return "needs_adaptation", requires, NEEDS_ADAPTATION[name]
+        return "needs_adaptation", requires, NEEDS_ADAPTATION[name], uses, missing
     if name in NEEDS_HEAVY:
-        return "needs_heavy", requires, NEEDS_HEAVY[name]
+        return "needs_heavy", requires, NEEDS_HEAVY[name], uses, missing
     if name in NEEDS_SERVICE:
-        return "needs_service", requires, NEEDS_SERVICE[name]
+        return "needs_service", requires, NEEDS_SERVICE[name], uses, missing
     if platforms and set(platforms) != {"linux", "macos", "windows"}:
         # The frontmatter's tokens are lowercase identifiers; these go into a sentence a person
         # reads, and "macos" in one is a typo they have no way to know we did not make.
         pretty = {"macos": "macOS", "linux": "Linux", "windows": "Windows"}
-        return "os_locked", requires, ", ".join(pretty.get(p, p) for p in sorted(platforms))
+        return "os_locked", requires, ", ".join(pretty.get(p, p) for p in sorted(platforms)), uses, missing
     if requires:
-        return "needs_setup", requires, ""
-    return "native", requires, ""
+        return "needs_setup", requires, "", uses, missing
+    return "native", requires, "", uses, missing
 
 
 def main() -> None:
@@ -252,13 +301,13 @@ def main() -> None:
     entries = []
     licences: dict[str, int] = {}
     for i, path in enumerate(paths, 1):
-        meta = frontmatter(path)
+        meta, body = skill_md(path)
         name = str(meta.get("name") or Path(path).parent.name)
         directory = str(Path(path).parent).replace("\\", "/")
         hermes = (meta.get("metadata") or {}).get("hermes") or {}
         licence = str(meta.get("license") or "")
         licences[licence or "(none)"] = licences.get(licence or "(none)", 0) + 1
-        portability, requires, note = classify(name, meta)
+        portability, requires, note, uses, missing = classify(name, meta, body)
         entries.append(
             {
                 "name": name,
@@ -275,6 +324,10 @@ def main() -> None:
                 "note": note,
                 "author": str(meta.get("author") or ""),
                 "tags": [str(t) for t in (hermes.get("tags") or [])],
+                # What it calls that we answer to under another name, and what it calls that
+                # nothing here provides. Shown before the install, not discovered after it.
+                "uses": uses,
+                "missing": missing,
             }
         )
         if i % 20 == 0:

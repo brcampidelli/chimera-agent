@@ -25,6 +25,10 @@
         "Apple",
         "macOS",
         "note-taking"
+      ],
+      "uses": [],
+      "missing": [
+        "memory"
       ]
     },
     {
@@ -47,7 +51,9 @@
         "todo",
         "macOS",
         "Apple"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "findmy",
@@ -68,6 +74,10 @@
         "tracking",
         "macOS",
         "Apple"
+      ],
+      "uses": [],
+      "missing": [
+        "vision_analyze"
       ]
     },
     {
@@ -90,7 +100,9 @@
         "messaging",
         "macOS",
         "Apple"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "claude-code",
@@ -112,6 +124,10 @@
         "Refactoring",
         "PTY",
         "Automation"
+      ],
+      "uses": [],
+      "missing": [
+        "memory"
       ]
     },
     {
@@ -132,6 +148,10 @@
         "OpenAI",
         "Code-Review",
         "Refactoring"
+      ],
+      "uses": [],
+      "missing": [
+        "process"
       ]
     },
     {
@@ -152,6 +172,10 @@
         "automation",
         "gui",
         "cross-platform"
+      ],
+      "uses": [],
+      "missing": [
+        "computer_use"
       ]
     },
     {
@@ -183,6 +207,13 @@
         "tui-widgets",
         "petdex",
         "development"
+      ],
+      "uses": [
+        "web_extract"
+      ],
+      "missing": [
+        "cronjob",
+        "delegate_task"
       ]
     },
     {
@@ -203,6 +234,13 @@
         "Merge-Conflict",
         "Kanban",
         "Arbitration"
+      ],
+      "uses": [
+        "search_files"
+      ],
+      "missing": [
+        "delegate_task",
+        "kanban_complete"
       ]
     },
     {
@@ -223,6 +261,10 @@
         "Autonomous",
         "Refactoring",
         "Code-Review"
+      ],
+      "uses": [],
+      "missing": [
+        "process"
       ]
     },
     {
@@ -245,7 +287,9 @@
         "visualization",
         "infrastructure",
         "cloud"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "ascii-art",
@@ -278,7 +322,9 @@
         "figlet",
         "cowsay",
         "boxes"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "ascii-video",
@@ -302,7 +348,9 @@
         "Video",
         "FFmpeg",
         "Terminal-Art"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "baoyu-infographic",
@@ -321,7 +369,9 @@
         "visual-summary",
         "creative",
         "image-generation"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "claude-design",
@@ -346,7 +396,9 @@
         "deck",
         "motion",
         "design-system"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "comfyui",
@@ -373,7 +425,9 @@
         "creative",
         "generative-ai",
         "video-generation"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "design-md",
@@ -400,7 +454,9 @@
         "tailwind",
         "dtcg",
         "google"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "excalidraw",
@@ -423,7 +479,9 @@
         "Architecture",
         "Visualization",
         "JSON"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "humanizer",
@@ -445,7 +503,9 @@
         "voice",
         "prose",
         "text"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "manim-video",
@@ -464,7 +524,9 @@
         "Animation",
         "Math",
         "Video"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "p5js",
@@ -490,7 +552,9 @@
         "webgl",
         "shaders",
         "animation"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "popular-web-designs",
@@ -504,7 +568,11 @@
       "topic": "creative",
       "note": "the upstream agent's browser and screenshot tools",
       "author": "Hermes Agent + Teknium (design systems sourced from VoltAgent/awesome-design-md)",
-      "tags": []
+      "tags": [],
+      "uses": [],
+      "missing": [
+        "browser_vision"
+      ]
     },
     {
       "name": "pretext",
@@ -527,7 +595,9 @@
         "generative",
         "text-layout",
         "kinetic-typography"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "sketch",
@@ -552,6 +622,11 @@
         "exploration",
         "wireframe",
         "comparison"
+      ],
+      "uses": [],
+      "missing": [
+        "browser_navigate",
+        "browser_vision"
       ]
     },
     {
@@ -566,7 +641,9 @@
       "topic": "creative",
       "note": "",
       "author": "Teknium (teknium1), Hermes Agent",
-      "tags": []
+      "tags": [],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "touchdesigner-mcp",
@@ -591,7 +668,9 @@
         "VJ",
         "installation",
         "GLSL"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "sdlc-review",
@@ -610,6 +689,17 @@
         "review",
         "quality",
         "verification"
+      ],
+      "uses": [
+        "search_files"
+      ],
+      "missing": [
+        "delegate_task",
+        "kanban_block",
+        "kanban_comment",
+        "kanban_complete",
+        "kanban_request_changes",
+        "kanban_show"
       ]
     },
     {
@@ -630,7 +720,9 @@
         "Triage",
         "Replies",
         "Productivity"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "himalaya",
@@ -652,7 +744,9 @@
         "SMTP",
         "CLI",
         "Communication"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "codebase-inspection",
@@ -675,7 +769,9 @@
         "Codebase",
         "Metrics",
         "Repository"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "github-auth",
@@ -696,6 +792,10 @@
         "gh-cli",
         "SSH",
         "Setup"
+      ],
+      "uses": [],
+      "missing": [
+        "process"
       ]
     },
     {
@@ -716,7 +816,11 @@
         "Pull-Requests",
         "Git",
         "Quality"
-      ]
+      ],
+      "uses": [
+        "search_files"
+      ],
+      "missing": []
     },
     {
       "name": "github-issue-to-pr",
@@ -736,7 +840,11 @@
         "Coding",
         "Pull-Requests",
         "CI"
-      ]
+      ],
+      "uses": [
+        "search_files"
+      ],
+      "missing": []
     },
     {
       "name": "github-issues",
@@ -756,7 +864,9 @@
         "Project-Management",
         "Bug-Tracking",
         "Triage"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "github-pr-workflow",
@@ -777,7 +887,9 @@
         "Git",
         "Automation",
         "Merge"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "github-repo-management",
@@ -798,7 +910,9 @@
         "Releases",
         "Secrets",
         "Configuration"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "gif-search",
@@ -822,7 +936,9 @@
         "Search",
         "Tenor",
         "API"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "songsee",
@@ -845,6 +961,10 @@
         "Spectrogram",
         "Music",
         "Analysis"
+      ],
+      "uses": [],
+      "missing": [
+        "vision_analyze"
       ]
     },
     {
@@ -866,7 +986,9 @@
         "Video",
         "Transcripts",
         "Media"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "evaluating-llms-harness",
@@ -891,7 +1013,9 @@
         "Model Quality",
         "Academic Benchmarks",
         "Industry Standard"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "weights-and-biases",
@@ -920,7 +1044,9 @@
         "PyTorch",
         "TensorFlow",
         "HuggingFace"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "huggingface-hub",
@@ -937,7 +1063,9 @@
       "topic": "mlops",
       "note": "",
       "author": "Hugging Face",
-      "tags": []
+      "tags": [],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "llama-cpp",
@@ -963,7 +1091,9 @@
         "Intel GPUs",
         "NVIDIA",
         "URL-first"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "serving-llms-vllm",
@@ -987,7 +1117,9 @@
         "OpenAI API",
         "Quantization",
         "Tensor Parallelism"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "obsidian",
@@ -1006,7 +1138,11 @@
         "Notes",
         "Markdown",
         "Vault"
-      ]
+      ],
+      "uses": [
+        "search_files"
+      ],
+      "missing": []
     },
     {
       "name": "airtable",
@@ -1028,6 +1164,12 @@
         "Productivity",
         "Database",
         "API"
+      ],
+      "uses": [
+        "web_extract"
+      ],
+      "missing": [
+        "browser_navigate"
       ]
     },
     {
@@ -1055,7 +1197,9 @@
         "Content Extraction",
         "CLI",
         "SDK"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "document-to-action-items",
@@ -1075,7 +1219,11 @@
         "Action-Items",
         "Deadlines",
         "Extraction"
-      ]
+      ],
+      "uses": [
+        "web_extract"
+      ],
+      "missing": []
     },
     {
       "name": "docx",
@@ -1097,7 +1245,9 @@
         "templates",
         "revisions",
         "comments"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "google-workspace",
@@ -1124,7 +1274,9 @@
         "Contacts",
         "Email",
         "OAuth"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "maps",
@@ -1151,7 +1303,9 @@
         "nominatim",
         "overpass",
         "osrm"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "meeting-action-items",
@@ -1170,7 +1324,9 @@
         "Action-Items",
         "Follow-Up",
         "Productivity"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "nano-pdf",
@@ -1195,7 +1351,9 @@
         "Editing",
         "NLP",
         "Productivity"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "notion",
@@ -1219,7 +1377,9 @@
         "API",
         "CLI",
         "Workers"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "ocr-and-documents",
@@ -1243,6 +1403,12 @@
         "Arxiv",
         "Text-Extraction",
         "OCR"
+      ],
+      "uses": [
+        "web_extract"
+      ],
+      "missing": [
+        "vision_analyze"
       ]
     },
     {
@@ -1264,6 +1430,10 @@
         "reportlab",
         "pypdf",
         "pdfplumber"
+      ],
+      "uses": [],
+      "missing": [
+        "vision_analyze"
       ]
     },
     {
@@ -1285,6 +1455,10 @@
         "slides",
         "office",
         "python-pptx"
+      ],
+      "uses": [],
+      "missing": [
+        "vision_analyze"
       ]
     },
     {
@@ -1305,6 +1479,13 @@
         "Shopping",
         "Travel",
         "Alerts"
+      ],
+      "uses": [
+        "web_extract"
+      ],
+      "missing": [
+        "browser_navigate",
+        "cronjob"
       ]
     },
     {
@@ -1325,6 +1506,11 @@
         "Cleanup",
         "Library",
         "Productivity"
+      ],
+      "uses": [],
+      "missing": [
+        "delegate_task",
+        "session_search"
       ]
     },
     {
@@ -1347,7 +1533,9 @@
         "Meetings",
         "Productivity",
         "Operations"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "weekly-review-planning",
@@ -1367,7 +1555,9 @@
         "Tasks",
         "Calendar",
         "Productivity"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "xlsx",
@@ -1388,7 +1578,9 @@
         "csv",
         "openpyxl",
         "productivity"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "arxiv",
@@ -1396,11 +1588,11 @@
       "repo": "NousResearch/hermes-agent",
       "path": "skills/research/arxiv",
       "license": "MIT",
-      "portability": "needs_adaptation",
+      "portability": "native",
       "ref": "main",
       "requires": [],
       "topic": "research",
-      "note": "the upstream page-extraction tool",
+      "note": "",
       "author": "Hermes Agent",
       "tags": [
         "Research",
@@ -1409,7 +1601,11 @@
         "Academic",
         "Science",
         "API"
-      ]
+      ],
+      "uses": [
+        "web_extract"
+      ],
+      "missing": []
     },
     {
       "name": "blocked-page-recovery",
@@ -1430,7 +1626,9 @@
         "Paywall",
         "WAF",
         "Fallback"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "blogwatcher",
@@ -1451,7 +1649,9 @@
         "Blogs",
         "Feed-Reader",
         "Monitoring"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "competitor-news-monitor",
@@ -1470,6 +1670,12 @@
         "News",
         "Market-Research",
         "Monitoring"
+      ],
+      "uses": [
+        "web_extract"
+      ],
+      "missing": [
+        "cronjob"
       ]
     },
     {
@@ -1491,6 +1697,12 @@
         "Sources",
         "Web",
         "Reports"
+      ],
+      "uses": [
+        "web_extract"
+      ],
+      "missing": [
+        "browser_navigate"
       ]
     },
     {
@@ -1512,7 +1724,12 @@
         "notes",
         "markdown",
         "rag-alternative"
-      ]
+      ],
+      "uses": [
+        "search_files",
+        "web_extract"
+      ],
+      "missing": []
     },
     {
       "name": "research-paper-writing",
@@ -1541,6 +1758,18 @@
         "LaTeX",
         "Citations",
         "Statistical Analysis"
+      ],
+      "uses": [
+        "read_text",
+        "web_extract"
+      ],
+      "missing": [
+        "cronjob",
+        "delegate_task",
+        "memory",
+        "process",
+        "skill_manage",
+        "todo"
       ]
     },
     {
@@ -1563,7 +1792,9 @@
         "Lights",
         "IoT",
         "Automation"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "xurl",
@@ -1587,7 +1818,9 @@
         "social-media",
         "xurl",
         "official-api"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "dogfood",
@@ -1607,6 +1840,11 @@
         "browser",
         "web",
         "dogfood"
+      ],
+      "uses": [],
+      "missing": [
+        "browser_navigate",
+        "browser_vision"
       ]
     },
     {
@@ -1627,6 +1865,18 @@
         "hermes-agent",
         "conventions",
         "skill-md"
+      ],
+      "uses": [
+        "read_text",
+        "search_files",
+        "web_extract"
+      ],
+      "missing": [
+        "browser_navigate",
+        "cronjob",
+        "delegate_task",
+        "skill_manage",
+        "vision_analyze"
       ]
     },
     {
@@ -1648,7 +1898,9 @@
         "dom",
         "ui-verification",
         "self-inspection"
-      ]
+      ],
+      "uses": [],
+      "missing": []
     },
     {
       "name": "node-inspect-debugger",
@@ -1669,6 +1921,10 @@
         "cdp",
         "breakpoints",
         "ui-tui"
+      ],
+      "uses": [],
+      "missing": [
+        "process"
       ]
     },
     {
@@ -1690,6 +1946,12 @@
         "workflow",
         "design",
         "documentation"
+      ],
+      "uses": [
+        "search_files"
+      ],
+      "missing": [
+        "delegate_task"
       ]
     },
     {
@@ -1712,6 +1974,10 @@
         "breakpoints",
         "dap",
         "post-mortem"
+      ],
+      "uses": [],
+      "missing": [
+        "process"
       ]
     },
     {
@@ -1733,6 +1999,10 @@
         "quality",
         "pre-commit",
         "auto-fix"
+      ],
+      "uses": [],
+      "missing": [
+        "delegate_task"
       ]
     },
     {
@@ -1755,6 +2025,12 @@
         "subagent",
         "parallel",
         "simplify"
+      ],
+      "uses": [
+        "search_files"
+      ],
+      "missing": [
+        "delegate_task"
       ]
     },
     {
@@ -1780,6 +2056,12 @@
         "planning",
         "mvp",
         "proof-of-concept"
+      ],
+      "uses": [
+        "web_extract"
+      ],
+      "missing": [
+        "delegate_task"
       ]
     },
     {
@@ -1800,6 +2082,13 @@
         "problem-solving",
         "root-cause",
         "investigation"
+      ],
+      "uses": [
+        "search_files",
+        "web_extract"
+      ],
+      "missing": [
+        "delegate_task"
       ]
     },
     {
@@ -1820,6 +2109,10 @@
         "development",
         "quality",
         "red-green-refactor"
+      ],
+      "uses": [],
+      "missing": [
+        "delegate_task"
       ]
     }
   ]

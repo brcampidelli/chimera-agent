@@ -6,6 +6,7 @@ on. Higher-level, *learned* procedures live in :mod:`chimera.skills`.
 
 from __future__ import annotations
 
+from contextlib import suppress
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -118,6 +119,17 @@ def default_registry(
     registry.register(ExtractTool())
     registry.register(MapTool())
     registry.register(CrawlTool())
+
+    # The catalogued skills' vocabulary, when any of them is switched on. Same shape as the
+    # key-gated tools below — a condition that is met, not a flag: a machine with no installed
+    # skill bundles gets exactly the registry it got before, and one with an active bundle also
+    # answers to the names that bundle's instructions use. See `chimera.skills.aliases`.
+    with suppress(Exception):  # a skills directory that cannot be read is not a broken registry
+        from chimera.skills.aliases import install_into
+        from chimera.skills.bundles import active, bundles_root
+
+        if active(settings.home):
+            install_into(registry, bundles_root=bundles_root(settings.home))
 
     # Key-gated optional tools light up when their credential is set.
     if settings.tavily_api_key:

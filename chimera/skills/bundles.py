@@ -96,6 +96,11 @@ class InstalledBundle:
     files: list[str] = field(default_factory=list)
     #: `pending` until a person approves it. Nothing reads a pending bundle into a prompt.
     status: str = "pending"
+    #: Tool names this skill calls that we answer to under another name, and ones we do not have.
+    #: Read out of its SKILL.md at install, because that is when the file is in hand and because a
+    #: person deciding whether to switch it on should not have to grep for it.
+    uses: list[str] = field(default_factory=list)
+    missing: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -258,6 +263,10 @@ def install(entry: Any, home: Path, *, force: bool = False) -> InstalledBundle:
         if not any(f.upper() == "SKILL.MD" for f in files):
             # Without it there is no skill here, whatever else was downloaded.
             raise BundleError("no SKILL.md at that path — this is not a skill directory")
+        from chimera.skills.aliases import foreign_names, missing_names, translated_names
+
+        body = (staging / "SKILL.md").read_text(encoding="utf-8", errors="replace")
+        vocabulary = foreign_names(body)
         record = InstalledBundle(
             name=entry.name,
             description=entry.description,
@@ -269,6 +278,8 @@ def install(entry: Any, home: Path, *, force: bool = False) -> InstalledBundle:
             installed_at=datetime.now(UTC).isoformat(timespec="seconds"),
             files=sorted(files),
             status="pending",
+            uses=translated_names(vocabulary),
+            missing=missing_names(vocabulary),
         )
         (staging / "bundle.json").write_text(
             json.dumps(record.to_dict(), indent=2, ensure_ascii=False), encoding="utf-8"
@@ -355,9 +366,25 @@ def context_lines(home: Path) -> list[str]:
     the whole integration, and it reads the procedure at the moment it decides to use it.
     """
     out = []
+    gaps: set[str] = set()
     for bundle in active(home):
-        where = bundles_root(home) / bundle.name / "SKILL.md"
-        out.append(f"- {bundle.name}: {bundle.description} (read {where} before using it)")
+        gaps.update(bundle.missing)
+        # Named as a tool call, not as a path. The path was the first version and it was wrong:
+        # `read_file` is rooted in the workspace and a bundle lives in the home directory, so the
+        # line told the agent to open a file its own file tool refuses. `skill_view` is the tool
+        # that can — see `chimera.skills.aliases.SkillView`.
+        out.append(
+            f'- {bundle.name}: {bundle.description} '
+            f'(read it with skill_view(name="{bundle.name}") before using it)'
+        )
+    if gaps:
+        # Said, not left as an absence. These skills' instructions read as though the tool is
+        # there; an agent told "no delegate_task here" adapts or reports, while one left to find
+        # out calls a tool that does not exist and tries again.
+        from chimera.skills.aliases import glossary
+
+        out.append("Some of them mention tools this agent does not have:")
+        out.extend(glossary(sorted(gaps)))
     return out
 
 

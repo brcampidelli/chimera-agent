@@ -45,6 +45,10 @@ from chimera.tools.base import Tool
 #: accident, which is the criterion `_DOCUMENT_ARGS` exists to serve.
 _IDENTIFIERS = frozenset({
     "action",
+    # `skill_view`: which installed skill, and which file inside it. Both name a thing; the file's
+    # CONTENT comes back in the result, which is where the untrusted-output marker lives.
+    "file_path",
+    "name",
     "allow_invalid",
     "audio_only",
     "command",

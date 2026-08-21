@@ -96,7 +96,9 @@ def test_real_default_registry_is_readable_and_native(tmp_path: Any) -> None:
     # extra was absent from the test environment: `transcribe_audio` registers when faster-whisper
     # is installed OR an OpenAI key is present, and it flags untrusted output for exactly the same
     # reason. Naming the SET is the durable claim; "there is one of them" was a fact about a machine.
-    READS_EXTERNAL = {"read_document", "transcribe_audio"}
+    # `skill_view` joins these when a skill bundle is switched on: it reads files downloaded from
+    # somebody else's repository, and a reference file is not the SKILL.md a person reviewed.
+    READS_EXTERNAL = {"read_document", "transcribe_audio", "skill_view"}
     flagged = {i["name"] for i in infos if i["untrusted_output"]}
     assert flagged <= READS_EXTERNAL
     assert "read_document" in flagged  # always registered; the others depend on optional extras
