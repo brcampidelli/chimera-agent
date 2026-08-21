@@ -254,13 +254,16 @@ class AuditLog:
             if line.strip()
         ]
 
-    def verify(self) -> ChainCheck:
+    def verify(self, entries: list[dict[str, Any]] | None = None) -> ChainCheck:
         """Walk the chain and report the first break.
 
         A legacy entry (no ``hash``) is counted as *unchained* and skipped rather than failed — the
         log cannot vouch for what predates the chain, and saying so is more useful than a false pass.
+
+        ``entries`` lets a caller that has already read the file pass what it read, instead of
+        re-reading a log that grows for the life of the install.
         """
-        entries = self.entries()
+        entries = self.entries() if entries is None else entries
         prev_hash = GENESIS
         checked = unchained = 0
         for index, entry in enumerate(entries):

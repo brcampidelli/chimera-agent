@@ -723,8 +723,14 @@ def build_api_app(
         # Read-only, newest-first. Written by CLI guarded/tainted runs AND, since the ledger got an
         # audit log, by the app itself whenever a defence fires. Empty is still expected — it just
         # stopped meaning "nothing is recording" and started meaning "nothing has happened".
-        events = [_audit_event(e) for e in read_audit(settings.home / "audit.jsonl")]
-        return {"events": events, "count": len(events), "populated": bool(events)}
+        raw, chain = read_audit(settings.home / "audit.jsonl")
+        events = [_audit_event(e) for e in raw]
+        # The chain state travels with the entries. Every write pays for a digest of the entry
+        # before it, and until now nothing ever walked it — so the log detected tampering the way an
+        # unread smoke alarm detects fire.
+        return {
+            "events": events, "count": len(events), "populated": bool(events), "chain": chain
+        }
 
     @app.get("/api/maturity", dependencies=[guard], response_model=MaturityOut)
     def maturity_endpoint() -> dict[str, Any]:

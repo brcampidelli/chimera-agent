@@ -2361,6 +2361,22 @@ export interface components {
             /** Verify Output */
             verify_output: string;
         };
+        /**
+         * AuditChainOut
+         * @description Whether the log's own tamper-evidence holds. Reported because nothing used to ask.
+         */
+        AuditChainOut: {
+            /** Broken At */
+            broken_at: number | null;
+            /** Checked */
+            checked: number;
+            /** Ok */
+            ok: boolean;
+            /** Reason */
+            reason: string;
+            /** Unchained */
+            unchained: number;
+        };
         /** AuditEventOut */
         AuditEventOut: {
             /** Seq */
@@ -3673,6 +3689,7 @@ export interface components {
         };
         /** GovernanceAuditOut */
         GovernanceAuditOut: {
+            chain: components["schemas"]["AuditChainOut"];
             /** Count */
             count: number;
             /** Events */

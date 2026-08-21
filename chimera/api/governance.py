@@ -107,11 +107,29 @@ def run_injection_suite(settings: Settings | None = None) -> dict[str, Any]:
     }
 
 
-def read_audit(path: Path, *, limit: int = 200) -> list[dict[str, Any]]:
-    """Read the governance audit log newest-first (highest ``seq`` first), capped at ``limit``.
+def read_audit(path: Path, *, limit: int = 200) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """The audit log newest-first (capped at ``limit``), and the state of its hash chain.
 
-    Returns ``[]`` when the file is missing (``AuditLog.entries`` already handles that). Read-only —
-    each entry is the arbitrary dict its writer persisted; the app.py handler flattens it for the UI.
+    Returns ``([], ...)`` when the file is missing (``AuditLog.entries`` already handles that).
+    Read-only — each entry is the arbitrary dict its writer persisted; the app.py handler flattens
+    it for the UI.
+
+    The chain is checked here because nothing checked it anywhere. Every entry carries the digest of
+    the one before it, which is a cost paid on every write for a property — this log has not been
+    edited — that no code and no screen ever asked about. An unverified chain is bookkeeping, not
+    evidence: it detects tampering only if somebody walks it.
+
+    Verified from the entries already read rather than by re-reading: this file grows for the life
+    of the install, and reading it twice to answer one question is a cost that arrives later.
     """
-    entries = AuditLog(Path(path)).entries()
-    return list(reversed(entries))[:limit]
+    log = AuditLog(Path(path))
+    entries = log.entries()
+    check = log.verify(entries)
+    chain = {
+        "ok": check.ok,
+        "checked": check.checked,
+        "unchained": check.unchained,
+        "broken_at": check.broken_at,
+        "reason": check.reason,
+    }
+    return list(reversed(entries))[:limit], chain

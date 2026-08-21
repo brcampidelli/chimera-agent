@@ -1182,10 +1182,21 @@ class AuditEventOut(BaseModel):
     summary: str  # a short human string flattened from the entry's remaining (arbitrary) keys
 
 
+class AuditChainOut(BaseModel):
+    """Whether the log's own tamper-evidence holds. Reported because nothing used to ask."""
+
+    ok: bool  # False ONLY for a link that is actually broken — never for an empty or legacy log
+    checked: int  # entries whose digest was verified
+    unchained: int  # legacy entries with no digest: cannot be verified either way, never "failed"
+    broken_at: int | None  # index of the first entry that does not hold
+    reason: str
+
+
 class GovernanceAuditOut(BaseModel):
     events: list[AuditEventOut]  # newest-first (highest seq first)
     count: int
     populated: bool  # False when the audit file has no entries — drives the honest empty-state
+    chain: AuditChainOut
 
 
 # --- memory layers (by-kind + provenance + by-source view) ----------------------------------------
