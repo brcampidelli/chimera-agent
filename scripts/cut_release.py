@@ -129,6 +129,27 @@ def write_versions(version: str) -> None:
     TAURI.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
+def refresh_install() -> None:
+    """Rebuild the editable install's metadata so it reports the version just written.
+
+    Done here rather than demanded of the caller, because demanding it is impossible: the metadata
+    can only be rebuilt from a pyproject that already says the new version, and a script that
+    stopped at this point would have reverted that file on its way out. "Reinstall, then run
+    again" described a loop with no entrance.
+
+    `--no-deps` keeps it to what is actually stale — the dist-info of the install this script is
+    already writing into. Dependencies are not part of a version bump, and resolving them here
+    would turn a thirty-second release into a several-minute one.
+    """
+    print("  refreshing the editable install so the snapshots stamp the new version...",
+          file=sys.stderr)
+    subprocess.run(
+        [sys.executable, "-m", "pip", "install", "-e", ".", "--no-deps", "-q"],
+        cwd=ROOT,
+        check=False,
+    )
+
+
 def regenerate_snapshots(version: str) -> None:
     """Regenerate the three generated files, and refuse if they came out stamped with the old version.
 
@@ -137,12 +158,14 @@ def regenerate_snapshots(version: str) -> None:
     the previous version installed produces snapshots stamped with the version before this one —
     a release commit that looks complete, passes locally, and is wrong in three files.
     """
+    if installed_version() != version:
+        refresh_install()
     stale = installed_version()
     if stale != version:
         raise Stop(
-            f"the installed package still reports {stale}, so the snapshots would be stamped with "
-            f"it instead of {version}. Reinstall first, then run this again:\n"
-            "    pip install -e .          (or: uv sync)"
+            f"the installed package still reports {stale}, so the snapshots would be stamped "
+            f"with it instead of {version}, and this could not refresh it. Do it by hand and "
+            f"run again:\n    pip install -e . --no-deps          (or: uv sync)"
         )
 
     for target, module in SNAPSHOTS.items():

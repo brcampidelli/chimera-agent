@@ -78,9 +78,15 @@ def test_the_bump_hits_the_version_line_and_nothing_else(tmp_path: Path, monkeyp
 
 def test_a_stale_install_stops_the_release_rather_than_stamping_the_old_version(monkeypatch) -> None:
     monkeypatch.setattr(cut_release, "installed_version", lambda: "0.48.0rc9")
+    # Stubbed, or this "unit" test reinstalls the package into the developer's environment —
+    # which it did, and the only sign was the runtime going from one second to five.
+    tried: list[bool] = []
+    monkeypatch.setattr(cut_release, "refresh_install", lambda: tried.append(True))
 
     with pytest.raises(SystemExit) as refused:
         cut_release.regenerate_snapshots("0.48.0rc10")
+
+    assert tried == [True], "it must try to refresh before giving up"
 
     # The snapshots read `chimera.__version__`, which is the INSTALLED metadata, not pyproject.
     # Regenerating against a stale install produces three files stamped for the previous release —
