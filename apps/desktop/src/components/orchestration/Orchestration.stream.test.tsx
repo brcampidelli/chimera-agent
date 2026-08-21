@@ -158,6 +158,32 @@ describe("watching a fan-out", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: /stopping/i })).toBeInTheDocument());
   });
 
+  it("comes back out of Stopping when the ask could not be delivered", async () => {
+    // `stopping` was set on click and never cleared. A cancel that could not land — a dropped
+    // request, or a run id the server no longer has — left a disabled spinner beside a run that was
+    // still going, and nothing else cleared it either: the run stays running until a terminal frame
+    // arrives and no such frame was coming. Reloading was the only way out.
+    const { user } = await startRun();
+    mockCancel.mockRejectedValue(new Error("network"));
+
+    await user.click(screen.getByRole("button", { name: /^stop$/i }));
+
+    await screen.findByText(/could not tell/i);
+    // Re-armed, because being able to ask again is the only honest offer left.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /^stop$/i })).not.toBeDisabled(),
+    );
+  });
+
+  it("treats a run the server no longer knows as unknown, not as stopped", async () => {
+    const { user } = await startRun();
+    mockCancel.mockResolvedValue({ ok: false, cancelled: false });
+
+    await user.click(screen.getByRole("button", { name: /^stop$/i }));
+
+    await screen.findByText(/could not tell/i);
+  });
+
   it("shows what a stopped run cost, instead of saying nothing was spent", async () => {
     const { handlers } = await startRun();
 

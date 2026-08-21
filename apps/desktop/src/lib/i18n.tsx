@@ -1100,6 +1100,8 @@ const en: Dict = {
   "orch.stateOnly": "Workers report state changes, not live text.",
   "orch.stop": "Stop",
   "orch.stopping": "Stopping",
+  "orch.stopUnknown":
+    "We asked and could not tell — it may already be finished. Press again to ask once more.",
   "orch.stopHint": "Stops before the next model call; calls already in flight finish and are charged.",
   "orch.cancelled":
     "Stopped before the answer was synthesised. The workers that had already started were charged — what that came to is below.",
@@ -2240,6 +2242,8 @@ const pt: Dict = {
   "orch.stateOnly": "Os trabalhadores relatam mudanças de estado, não texto ao vivo.",
   "orch.stop": "Parar",
   "orch.stopping": "Parando",
+  "orch.stopUnknown":
+    "Pedimos e não deu para saber — pode já ter terminado. Aperte de novo para pedir mais uma vez.",
   "orch.stopHint": "Para antes da próxima chamada ao modelo; as que já estão em voo terminam e são cobradas.",
   "orch.cancelled":
     "Parado antes de a resposta ser sintetizada. Os trabalhadores que já tinham começado foram cobrados — o total está abaixo.",
@@ -3390,6 +3394,8 @@ const es: Dict = {
   "orch.stateOnly": "Los trabajadores informan cambios de estado, no texto en vivo.",
   "orch.stop": "Detener",
   "orch.stopping": "Deteniendo",
+  "orch.stopUnknown":
+    "Lo pedimos y no pudimos saberlo: puede que ya haya terminado. Pulsa de nuevo para pedirlo otra vez.",
   "orch.stopHint": "Se detiene antes de la próxima llamada al modelo; las que ya están en vuelo terminan y se cobran.",
   "orch.cancelled":
     "Detenido antes de sintetizar la respuesta. Los trabajadores que ya habían empezado se cobraron: el total está abajo.",
@@ -4553,6 +4559,8 @@ const fr: Dict = {
   "orch.stateOnly": "Les travailleurs signalent des changements d'état, pas du texte en direct.",
   "orch.stop": "Arrêter",
   "orch.stopping": "Arrêt",
+  "orch.stopUnknown":
+    "Nous avons demandé sans pouvoir le savoir — c'est peut-être déjà terminé. Appuyez encore pour redemander.",
   "orch.stopHint": "S'arrête avant le prochain appel au modèle ; ceux déjà en vol se terminent et sont facturés.",
   "orch.cancelled":
     "Arrêté avant la synthèse de la réponse. Les travailleurs déjà lancés ont été facturés — le total est ci-dessous.",
@@ -5713,6 +5721,8 @@ const de: Dict = {
   "orch.stateOnly": "Worker melden Zustandswechsel, keinen laufenden Text.",
   "orch.stop": "Stopp",
   "orch.stopping": "Stoppt",
+  "orch.stopUnknown":
+    "Wir haben gefragt und konnten es nicht feststellen — vielleicht ist es schon fertig. Nochmals drücken, um erneut zu fragen.",
   "orch.stopHint": "Hält vor dem nächsten Modellaufruf; bereits laufende Aufrufe enden und werden berechnet.",
   "orch.cancelled":
     "Gestoppt, bevor die Antwort zusammengeführt wurde. Die bereits gestarteten Arbeiter wurden berechnet — die Summe steht unten.",
@@ -6792,6 +6802,8 @@ const zh: Dict = {
   "orch.stateOnly": "工作者只报告状态变化，不提供实时文字。",
   "orch.stop": "停止",
   "orch.stopping": "正在停止",
+  "orch.stopUnknown":
+    "我们发出了请求但无法确认 —— 也可能它已经结束了。再按一次可以重新请求。",
   "orch.stopHint": "在下一次模型调用前停止；已经发出的调用会跑完并照常计费。",
   "orch.cancelled":
     "在答案被综合之前就停止了。已经开始的工作者仍会计费 —— 总数在下面。",
@@ -7933,6 +7945,8 @@ const ja: Dict = {
   "orch.stateOnly": "ワーカーが伝えるのは状態の変化で、逐次のテキストではありません。",
   "orch.stop": "停止",
   "orch.stopping": "停止中",
+  "orch.stopUnknown":
+    "停止を頼みましたが結果を確認できませんでした — すでに終わっているかもしれません。もう一度押すと再度頼めます。",
   "orch.stopHint": "次のモデル呼び出しの前で止まります。実行中の呼び出しは最後まで走り、課金されます。",
   "orch.cancelled":
     "答えがまとめられる前に停止しました。すでに動き出していたワーカーの分は請求されます — 合計は下にあります。",
@@ -9088,6 +9102,8 @@ const it: Dict = {
   "orch.stateOnly": "I lavoratori segnalano cambi di stato, non testo dal vivo.",
   "orch.stop": "Ferma",
   "orch.stopping": "In arresto",
+  "orch.stopUnknown":
+    "Abbiamo chiesto e non siamo riusciti a saperlo: potrebbe essere già finito. Premi di nuovo per richiedere.",
   "orch.stopHint": "Si ferma prima della prossima chiamata al modello; quelle già in volo finiscono e vengono addebitate.",
   "orch.cancelled":
     "Fermato prima che la risposta fosse sintetizzata. I lavoratori già avviati sono stati addebitati: il totale è qui sotto.",
@@ -10235,6 +10251,8 @@ const pl: Dict = {
   "orch.stateOnly": "Pracownicy zgłaszają zmiany stanu, nie tekst na żywo.",
   "orch.stop": "Zatrzymaj",
   "orch.stopping": "Zatrzymywanie",
+  "orch.stopUnknown":
+    "Poprosiliśmy i nie udało się ustalić — może już się skończyło. Naciśnij ponownie, żeby zapytać jeszcze raz.",
   "orch.stopHint": "Zatrzymuje przed kolejnym wywołaniem modelu; te już w locie kończą się i są naliczane.",
   "orch.cancelled":
     "Zatrzymano, zanim odpowiedź została złożona. Pracownicy, którzy już ruszyli, zostali policzeni — suma jest poniżej.",
@@ -11388,6 +11406,8 @@ const ru: Dict = {
   "orch.stateOnly": "Работники сообщают смену состояний, а не текст в реальном времени.",
   "orch.stop": "Остановить",
   "orch.stopping": "Останавливается",
+  "orch.stopUnknown":
+    "Мы попросили и не смогли выяснить — возможно, всё уже закончилось. Нажмите ещё раз, чтобы попросить снова.",
   "orch.stopHint": "Останавливает до следующего вызова модели; уже начатые вызовы дойдут до конца и будут оплачены.",
   "orch.cancelled":
     "Остановлено до того, как ответ был собран. Работники, которые уже начали, оплачены — итог ниже.",

@@ -1,12 +1,14 @@
-import { useEffect, useReducer, useState } from "react";
-import { AlertTriangle, Check, FolderGit2, Loader2, Square, X } from "lucide-react";
+import { useEffect, useReducer } from "react";
+import { AlertTriangle, Check, FolderGit2, Loader2, X } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/panel";
-import { cancelOrchestration, streamCrew, type CrewRunInput } from "@/lib/api";
+import { streamCrew, type CrewRunInput } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { applyCrewFrame, EMPTY_CREW, isCrewRunning, type CrewWorkerState } from "@/lib/orchestration-run";
 import { cn } from "@/lib/utils";
+
+import { StopButton } from "./StopButton";
+import { useStop } from "./use-stop";
 
 const rails: Record<CrewWorkerState["status"], string> = {
   queued: "bg-muted",
@@ -175,7 +177,6 @@ function CrewWorkerCard({ worker }: { worker: CrewWorkerState }) {
 export function CrewRun({ request }: { request: CrewRunInput }) {
   const t = useT();
   const [state, dispatch] = useReducer(applyCrewFrame, EMPTY_CREW);
-  const [stopping, setStopping] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -198,6 +199,7 @@ export function CrewRun({ request }: { request: CrewRunInput }) {
   }, []);
 
   const running = isCrewRunning(state);
+  const stop = useStop(state.runId ?? "", running);
 
   return (
     <div className="space-y-4">
@@ -210,19 +212,7 @@ export function CrewRun({ request }: { request: CrewRunInput }) {
               : t("crew.working", { n: state.workers.length })}
         </div>
         {running && state.runId ? (
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={stopping}
-            onClick={() => {
-              setStopping(true);
-              void cancelOrchestration(state.runId as string).catch(() => undefined);
-            }}
-            title={t("crew.stopHint")}
-          >
-            {stopping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4" />}
-            {stopping ? t("orch.stopping") : t("orch.stop")}
-          </Button>
+          <StopButton stop={stop} hint={t("crew.stopHint")} />
         ) : null}
       </div>
 
