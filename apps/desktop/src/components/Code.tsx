@@ -335,8 +335,11 @@ export function Code() {
   // thirty times what the person expected. "" means the install's default, and the picker offers to
   // make a pick the standing default — which is the same intent, stated rather than accumulated.
   const [model, setModel] = useState("");
-  // Same: a default the system applies, and the receipt records `profile_source: "system"` so the
-  // cost panel never counts it beside a profile somebody deliberately picked.
+  // A default the system applies — there is no picker for it on any screen. A coding TURN files no
+  // delegation receipt, so nothing here reaches the cost panel; what does reach it is the run
+  // started below, and that one says `profile_source: "system"` so the panel never counts a default
+  // beside a profile somebody deliberately chose. This comment used to claim the turn recorded it,
+  // which was a claim about a receipt this screen does not write.
   const profile: Profile = "balanced";
 
   /** Change the project this screen is working in. One function, because it was three near-copies.
@@ -357,13 +360,29 @@ export function Code() {
       writeWorkspace(next);
       setProjectDraft(next);
       setSessionId(null);
-      setConversationKey((n) => n + 1);
-      setOpenFile(null);
+      startConversation();
       void qc.invalidateQueries({ queryKey: ["fs-file"] });
       void qc.invalidateQueries({ queryKey: ["git-status"] });
     },
     [qc, workspace],
   );
+
+  /** Everything that has to be true at the START of a conversation.
+   *
+   *  The model pick says "Applies to this conversation" and is described in code as session-local,
+   *  "because a model quietly carried over from a week ago is how a turn ends up costing thirty
+   *  times what the person expected". It was screen state: it survived New conversation, Resume and
+   *  a project switch, so the chip said one scope and the state had another. The fusion cast was
+   *  already correct — remounted by `key={conversationKey}` — which is what made the two disagree.
+   *
+   *  One function because it was three near-copies, and the copy that forgot a line is exactly how
+   *  this happened.
+   */
+  const startConversation = useCallback(() => {
+    setConversationKey((n) => n + 1);
+    setOpenFile(null);
+    setModel("");
+  }, []);
 
   const refreshOpenFile = useCallback(() => {
     if (openFile) void qc.invalidateQueries({ queryKey: ["fs-file", workspace, openFile] });
@@ -424,13 +443,11 @@ export function Code() {
             // A new conversation, not a cleared one: the old transcript stays on disk and stays in
             // the list. Clearing used to be the only way to start over, and it deleted the session.
             setSessionId(null);
-            setConversationKey((n) => n + 1);
-            setOpenFile(null);
+            startConversation();
           }}
           onResume={(session) => {
             setSessionId(session.id);
-            setConversationKey((n) => n + 1);
-            setOpenFile(null);
+            startConversation();
             if (session.workspace !== workspace) {
               setWorkspace(session.workspace);
               writeWorkspace(session.workspace);
@@ -457,7 +474,16 @@ export function Code() {
               // server infers the verify command from the project. Waiting for someone to press a
               // second button on a form with nothing left to fill in is not consent, it is friction.
               // The global status bar shows it and can stop it from any screen.
-              run.start({ task: text, verify: null, workspace: workspace || null, max_attempts: 3 })
+              run.start({
+                task: text,
+                verify: null,
+                workspace: workspace || null,
+                max_attempts: 3,
+                // Nobody picked a profile here either, and `worth.py` groups by
+                // (profile, profile_source) precisely so a run somebody chose "max" for and a run
+                // that got the default are not counted as the same evidence.
+                profile_source: "system",
+              })
             }
             onBatch={(tasks) => setBatch({ tasks, at: Date.now() })}
             onEdited={refreshOpenFile}

@@ -58,6 +58,8 @@ export function RunLauncher({
     max_attempts: maxAttempts,
     thread_id: threadId,
     pause_on_taint: pauseOnTaint,
+    // No profile picker on this screen either, so the receipt must not say a person picked one.
+    profile_source: "system",
   });
 
   function start() {
