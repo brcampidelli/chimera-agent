@@ -915,9 +915,26 @@ def register_code_api(
                         from chimera.api.app import resolve_verify
                         from chimera.core.verify import CommandVerifier
 
+                        # Minted for every turn that EDITED, not only for one whose verification
+                        # failed. The snapshot was already taken above and the Posture note promises
+                        # outright: "What is guaranteed is the snapshot and the undo, not the
+                        # limits." It was guaranteed on one branch of four. Verification that
+                        # passed, abstained, or was never configured — which for a project with no
+                        # test command is ALWAYS — left the snapshot to die with the request.
+                        #
+                        # A pass is not consent. The check answers "does this still build", and the
+                        # question the button answers is "do I want this", which nothing else on the
+                        # screen can answer for the person reading the diff.
+                        token = uuid.uuid4().hex
+                        _pending_reverts[token] = (guard, before)
+                        while len(_pending_reverts) > _MAX_PENDING_REVERTS:
+                            _pending_reverts.pop(next(iter(_pending_reverts)))
                         command, source = resolve_verify(None, ws)
                         if command is None:
-                            emit("verified", {"command": None, "source": source, "state": "none"})
+                            emit("verified", {
+                                "command": None, "source": source, "state": "none",
+                                "revert_token": token,
+                            })
                         else:
                             outcome = CommandVerifier(command, ws).verify()
                             state = (
@@ -925,12 +942,6 @@ def register_code_api(
                                 else "passed" if outcome.passed
                                 else "failed"
                             )
-                            token = ""
-                            if state == "failed":
-                                token = uuid.uuid4().hex
-                                _pending_reverts[token] = (guard, before)
-                                while len(_pending_reverts) > _MAX_PENDING_REVERTS:
-                                    _pending_reverts.pop(next(iter(_pending_reverts)))
                             emit("verified", {
                                 "command": command, "source": source, "state": state,
                                 "output": outcome.output[:4000], "revert_token": token,
@@ -1253,7 +1264,10 @@ def register_code_api(
 
     @app.post("/api/code/revert/{token}", dependencies=[guard])
     def revert_turn(token: str) -> dict[str, Any]:
-        """Undo an editing turn whose verification failed, if the user takes the offer.
+        """Undo an editing turn, if the user takes the offer.
+
+        Any editing turn, not only one whose verification failed. A check answers "does this still
+        build"; the button answers "do I want this", and only the person reading the diff can.
 
         A token is single-use and dies with the process. An unknown one is ``{ok: false}`` rather
         than a 404 — that is the state a second click hits, and a stale offer is not an error.
@@ -1262,7 +1276,15 @@ def register_code_api(
         if pending is None:
             return {"ok": False, "restored": 0}
         workspace_guard, snapshot = pending
-        return {"ok": True, "restored": workspace_guard.restore(snapshot)}
+        # Whether files this turn CREATED go away with it. Inside a git repository the delete pass
+        # is skipped unconditionally — deliberately, since a path bug once let a revert wipe a repo
+        # — so "Edits undone." over surviving new files reported something that did not happen.
+        left_new = not workspace_guard.deletes_new_files(snapshot)
+        return {
+            "ok": True,
+            "restored": workspace_guard.restore(snapshot),
+            "left_new_files": left_new,
+        }
 
     @app.delete("/api/code/sessions/{session_id}", dependencies=[guard])
     def delete_code_session(session_id: str) -> dict[str, bool]:
