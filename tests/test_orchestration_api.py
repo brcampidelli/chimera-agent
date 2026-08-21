@@ -462,3 +462,42 @@ def test_the_hierarchy_refuses_the_same_missing_folder(
     # Same check on both doors. The hierarchy's workers only read, so a missing folder shows up as
     # workers who found nothing rather than as an error — quieter, and just as wrong.
     assert response.status_code == 400
+
+
+def test_the_ready_made_approaches_are_served_rather_than_bundled(
+    app_and_backend: tuple[TestClient, FakeBackend],
+) -> None:
+    client, _ = app_and_backend
+
+    body = client.get("/api/orchestration/approaches").json()
+
+    # The instruction is a model prompt, so it lives with the backend's other prompts and travels
+    # to the app — not copied into the bundle, where changing one would mean a desktop release.
+    assert len(body["approaches"]) >= 4
+    assert all(item["id"] and item["instruction"] for item in body["approaches"])
+    ids = {item["id"] for item in body["approaches"]}
+    assert len(body["default"]) == 2 and set(body["default"]) <= ids
+    # The pair a crew opens with must not be the same approach twice, which is exactly the
+    # arrangement where both workers write the same diff and the conflict rule discards both.
+    assert body["default"][0] != body["default"][1]
+
+
+def test_a_worker_says_what_it_wrote_even_when_it_was_thrown_away(
+    app_and_backend: tuple[TestClient, FakeBackend], tmp_path: Path
+) -> None:
+    """The account of a discarded attempt, which otherwise does not survive the run.
+
+    The worktree is removed as the batch collects, so the file list has to be read there or not
+    at all. Before this, a run where every worker was rejected reported that three attempts had
+    happened and nothing whatsoever about what they were.
+    """
+    client, _ = app_and_backend
+
+    # `false` never exits 0, so every worker is rejected and nothing merges.
+    frames = _crew(client, workspace=str(tmp_path), verify="false")
+    produced = {p["task_id"]: p for k, p in frames if k == "crew_worker_produced"}
+
+    assert set(produced) == {"cauteloso", "direto"}, "reported for the discarded ones too"
+    assert all(p["landed"] is False for p in produced.values())
+    # And the frame is published, so the generated client has the shape.
+    assert "crew_worker_produced" in client.get("/api/orchestration/schema").json()

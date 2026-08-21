@@ -345,6 +345,27 @@ class ConflictOut(BaseModel):
     )
 
 
+class CrewWorkerProducedOut(BaseModel):
+    task_id: str = ""
+    files: list[str] = Field(
+        default_factory=list,
+        description="The files this worker wrote that actually reached the workspace.",
+    )
+    lost: list[str] = Field(
+        default_factory=list,
+        description=(
+            "The files it wrote that did NOT — discarded by the check, or contested by another "
+            "worker. Reported because a discarded attempt leaves nothing else behind: the "
+            "worktree is removed when the run ends."
+        ),
+    )
+    answer: str = Field(default="", description="The worker's own report, truncated.")
+    landed: bool = Field(
+        default=False,
+        description="Whether these files were merged. False means the work existed and was thrown away.",
+    )
+
+
 class CrewDoneOut(BaseModel):
     merged: int = 0
     conflicts: list[str] = Field(default_factory=list)
@@ -357,6 +378,25 @@ class CrewDoneOut(BaseModel):
             "False means the workers shared one folder because this is not a git repository — "
             "no isolation, and conflicts undetectable. The screen has to be able to say so."
         ),
+    )
+
+
+class ApproachOut(BaseModel):
+    id: str = ""
+    instruction: str = Field(
+        default="",
+        description=(
+            "The system prompt this approach sends, verbatim. Untranslated on purpose: a "
+            "translated prompt is a different prompt, and the screen shows what is actually sent."
+        ),
+    )
+
+
+class ApproachesOut(BaseModel):
+    approaches: list[ApproachOut] = Field(default_factory=list)
+    default: list[str] = Field(
+        default_factory=list,
+        description="The ids a fresh crew starts with — the widest pair in the catalogue.",
     )
 
 
@@ -378,6 +418,7 @@ class OrchestrationFramesOut(BaseModel):
     crew_worker_started: CrewWorkerStartedOut = Field(default_factory=CrewWorkerStartedOut)
     crew_worker_verified: CrewWorkerVerifiedOut = Field(default_factory=CrewWorkerVerifiedOut)
     crew_worker_rejected: CrewWorkerRejectedOut = Field(default_factory=CrewWorkerRejectedOut)
+    crew_worker_produced: CrewWorkerProducedOut = Field(default_factory=CrewWorkerProducedOut)
     conflict: ConflictOut = Field(default_factory=ConflictOut)
     crew_done: CrewDoneOut = Field(default_factory=CrewDoneOut)
 
@@ -754,6 +795,24 @@ def register_orchestration_api(
         fresh = not stop.is_set()
         stop.set()
         return {"ok": True, "cancelled": fresh}
+
+    @app.get(
+        "/api/orchestration/approaches", dependencies=[guard], response_model=ApproachesOut
+    )
+    def approaches_endpoint() -> dict[str, Any]:
+        """The ready-made ways of attacking a task that a crew can be built from.
+
+        Served rather than hard-coded in the app because the instruction is a model prompt: it
+        belongs with the rest of the repo's prompts, where the CLI can reach it too, and where
+        changing it does not mean shipping a new desktop build.
+        """
+        from chimera.orchestration.approaches import APPROACHES, default_pair
+
+        return {
+            "approaches": [ApproachOut(id=a.id, instruction=a.instruction).model_dump()
+                           for a in APPROACHES],
+            "default": [a.id for a in default_pair()],
+        }
 
     @app.get(
         "/api/orchestration/delegations", dependencies=[guard], response_model=DelegationsOut

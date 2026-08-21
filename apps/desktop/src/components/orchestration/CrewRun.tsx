@@ -26,6 +26,12 @@ const rails: Record<CrewWorkerState["status"], string> = {
  */
 function CrewWorkerCard({ worker }: { worker: CrewWorkerState }) {
   const t = useT();
+  // A worker built from the catalogue is named by its approach id, which is a routing key and not
+  // a thing to read ("no_new_deps"). Translate it when there is a translation and show the raw
+  // name when there is not, which is exactly the custom-worker case — no list of known ids to
+  // keep in step with the server's.
+  const key = `crew.approach.${worker.name}`;
+  const label = t(key) === key ? worker.name : t(key);
   const icon =
     worker.status === "running" ? (
       <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
@@ -43,7 +49,7 @@ function CrewWorkerCard({ worker }: { worker: CrewWorkerState }) {
       <div className="space-y-2 p-3">
         <div className="flex items-center gap-2">
           {icon}
-          <span className="text-sm font-medium text-foreground">{worker.name}</span>
+          <span className="text-sm font-medium text-foreground">{label}</span>
           <Badge
             tone={
               worker.status === "verified" ? "ok" : worker.status === "running" ? "accent"
@@ -96,6 +102,49 @@ function CrewWorkerCard({ worker }: { worker: CrewWorkerState }) {
 
         {worker.status === "failed" && worker.detail ? (
           <p className="text-xs text-bad">{worker.detail}</p>
+        ) : null}
+
+        {/* Two lists, not one with a heading that swings. A worker can pass the check and still
+            lose a file another worker also touched, so "what it wrote" splits into what reached
+            your project and what did not — and the second list is the point: the worktree is
+            removed when the run ends, so this is the only surviving account of a thrown-away
+            attempt. A single flag here once put "and that landed" directly above a panel saying
+            nothing landed. */}
+        {worker.files.length > 0 ? (
+          <div className="space-y-1">
+            <p className="text-xs text-ok">{t("crew.produced.landed")}</p>
+            <ul className="space-y-0.5">
+              {worker.files.map((file) => (
+                <li key={file} className="font-mono text-xs text-muted-foreground">
+                  {file}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {worker.lost.length > 0 ? (
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">{t("crew.produced.lost")}</p>
+            <ul className="space-y-0.5">
+              {worker.lost.map((file) => (
+                <li key={file} className="font-mono text-xs text-muted-foreground line-through">
+                  {file}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {/* Folded, and second: the files are the evidence, this is the worker's own account of
+            them — useful, and not the same kind of thing. */}
+        {worker.answer ? (
+          <details className="text-xs">
+            <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+              {t("crew.produced.report")}
+            </summary>
+            <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{worker.answer}</p>
+          </details>
         ) : null}
       </div>
     </article>

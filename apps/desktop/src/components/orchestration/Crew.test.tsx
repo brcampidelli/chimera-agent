@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Orchestration } from "@/components/orchestration/Orchestration";
 import {
   cancelOrchestration,
+  getApproaches,
   previewHierarchy,
   streamCrew,
   type HierarchyStreamHandlers,
@@ -18,10 +19,22 @@ vi.mock("@/lib/api", () => ({
   streamHierarchy: vi.fn(),
   streamCrew: vi.fn(),
   cancelOrchestration: vi.fn(),
+  getApproaches: vi.fn(),
 }));
 
 const mockPreview = vi.mocked(previewHierarchy);
 const mockCrew = vi.mocked(streamCrew);
+const mockApproaches = vi.mocked(getApproaches);
+
+/** A stand-in catalogue. Small and local on purpose: these tests are about what the form does
+ *  with a catalogue, not about which approaches the backend happens to ship this week. */
+const CATALOGUE = {
+  approaches: [
+    { id: "minimal", instruction: "Make the SMALLEST change that solves the task." },
+    { id: "rewrite", instruction: "Rewrite the unit that owns this problem." },
+  ],
+  default: ["minimal", "rewrite"],
+};
 
 /** A write-shaped task: what `classify_task` sends down the single-agent path, and what a crew
  *  exists for. */
@@ -47,11 +60,16 @@ function frame(seq: number, kind: string, data: Record<string, unknown> = {}, ta
 async function openCrewForm() {
   const user = userEvent.setup();
   mockPreview.mockResolvedValue(WRITE_PLAN);
+  mockApproaches.mockResolvedValue(CATALOGUE);
   renderWithProviders(<Orchestration workspace="/repo" onOpenCode={vi.fn()} />);
   await user.type(screen.getByLabelText(/task/i), "implemente o retry");
   await user.click(screen.getByRole("button", { name: /see the plan/i }));
   await waitFor(() => expect(screen.getByRole("button", { name: /build a crew/i })).toBeInTheDocument());
   await user.click(screen.getByRole("button", { name: /build a crew/i }));
+  // The catalogue arrives over the wire, so the seeded roles are not there on first paint.
+  await waitFor(() =>
+    expect(screen.getByLabelText(/approach for worker 1/i)).toHaveValue("minimal"),
+  );
   return user;
 }
 
@@ -63,8 +81,8 @@ async function runCrew(user: ReturnType<typeof userEvent.setup>, verify = "pytes
     return new Promise<void>(() => {});
   });
   if (verify) await user.type(screen.getByLabelText(/the check/i), verify);
-  await user.type(screen.getByLabelText(/instruction for worker 1/i), "mudança mínima");
-  await user.type(screen.getByLabelText(/instruction for worker 2/i), "reescreva");
+  // No instruction typed: the two seeded approaches already carry theirs, which is the change
+  // this form makes — two blank boxes invited two ways of saying the same thing.
   await user.click(screen.getByRole("button", { name: /run the crew/i }));
   await waitFor(() => expect(mockCrew).toHaveBeenCalled());
   return () => captured;
@@ -98,12 +116,41 @@ describe("the crew", () => {
   it("refuses two workers with the same name before asking the server", async () => {
     const user = await openCrewForm();
 
-    await user.clear(screen.getByLabelText(/name of worker 2/i));
-    await user.type(screen.getByLabelText(/name of worker 2/i), "conservador");
+    for (const n of [1, 2]) {
+      await user.selectOptions(screen.getByLabelText(new RegExp(`approach for worker ${n}`, "i")), "custom");
+      await user.type(screen.getByLabelText(new RegExp(`name of worker ${n}`, "i")), "meu");
+      await user.type(screen.getByLabelText(new RegExp(`instruction for worker ${n}`, "i")), "faça");
+    }
 
     // The name is how each worker's results are reported; two of them would put two workers on
     // one card. The server refuses it too — this just saves the round trip.
     expect(screen.getByText(/share a name/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /run the crew/i })).toBeDisabled();
+  });
+
+  it("fills in the instruction the chosen approach will actually send", async () => {
+    const user = await openCrewForm();
+
+    await user.selectOptions(screen.getByLabelText(/approach for worker 1/i), "rewrite");
+
+    // Verbatim and editable, not a translated paraphrase: a summary of a prompt can drift from
+    // the prompt, and then the screen is describing something other than what it sends.
+    expect(screen.getByLabelText(/instruction for worker 1/i)).toHaveValue(
+      "Rewrite the unit that owns this problem.",
+    );
+  });
+
+  it("warns when both workers were given the same approach", async () => {
+    const user = await openCrewForm();
+
+    await user.selectOptions(screen.getByLabelText(/approach for worker 2/i), "minimal");
+
+    // The intuition it corrects: two tries is not better odds here. They write the same change,
+    // both pass the check, and the one-file-one-owner rule discards both.
+    expect(screen.getByText(/discards both/i)).toBeInTheDocument();
+    // And it says THAT rather than "two workers share a name", which is only how the collision
+    // shows up — a catalogue worker is named by its approach.
+    expect(screen.queryByText(/share a name/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /run the crew/i })).toBeDisabled();
   });
 
@@ -139,6 +186,46 @@ describe("the crew", () => {
     // whose check is wrong, and that is only visible if the output is.
     expect(screen.getByText(/1 failed: test_desconto/)).toBeInTheDocument();
     expect(screen.getByText(/nothing from this worker reached your files/i)).toBeInTheDocument();
+  });
+
+  it("shows what a discarded worker wrote, since its checkout is already gone", async () => {
+    const user = await openCrewForm();
+    const handlers = await runCrew(user);
+
+    send(
+      handlers(),
+      frame(1, "run", { run_id: "c1" }),
+      frame(2, "crew_worker_started", {}, "minimal"),
+      frame(3, "crew_worker_rejected", { reason: "verify", detail: "1 failed" }, "minimal"),
+      frame(4, "crew_worker_produced", { files: [], lost: ["frete.py"], answer: "troquei o cálculo", landed: false }, "minimal"),
+    );
+
+    // The worktree is removed when the run ends, so this list is the only surviving account of
+    // an attempt that was thrown away — and "wrote a file" and "wrote a file and lost it" are
+    // not the same sentence.
+    expect(screen.getByText("frete.py")).toBeInTheDocument();
+    expect(screen.getByText(/^Files it wrote, and that were thrown away$/)).toBeInTheDocument();
+    expect(screen.queryByText(/^Files it wrote, and that landed$/)).not.toBeInTheDocument();
+  });
+
+  it("does not claim a worker landed files that another worker contested", async () => {
+    const user = await openCrewForm();
+    const handlers = await runCrew(user);
+
+    send(
+      handlers(),
+      frame(1, "run", { run_id: "c1" }),
+      frame(2, "crew_worker_started", {}, "minimal"),
+      frame(3, "crew_worker_verified", { verified_by: "pytest -q" }, "minimal"),
+      // It passed. It still lost the file, because the other worker passed on it too.
+      frame(4, "crew_worker_produced", { files: [], lost: ["frete.py"], landed: false }, "minimal"),
+      frame(5, "crew_done", { merged: 0, conflicts: ["frete.py"], is_repo: true }),
+    );
+
+    // The reading this screen exists to prevent: a card saying the files landed, sitting right
+    // above a panel saying none did.
+    expect(screen.queryByText(/^Files it wrote, and that landed$/)).not.toBeInTheDocument();
+    expect(screen.getByText(/NEITHER version was kept/i)).toBeInTheDocument();
   });
 
   it("says a contested file was kept by NEITHER worker", async () => {
@@ -247,9 +334,10 @@ describe("the crew", () => {
       expect.objectContaining({
         verify: "npm test",
         workspace: "/repo",
+        // Named by the approach they were built from, which is what the cards are keyed by.
         workers: [
-          expect.objectContaining({ name: "conservador" }),
-          expect.objectContaining({ name: "direto" }),
+          expect.objectContaining({ name: "minimal", instruction: CATALOGUE.approaches[0].instruction }),
+          expect.objectContaining({ name: "rewrite", instruction: CATALOGUE.approaches[1].instruction }),
         ],
       }),
       expect.anything(),

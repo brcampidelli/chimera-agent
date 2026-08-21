@@ -153,10 +153,21 @@ class GitWorktree:
         return cls(path, branch, repo_root)
 
     def changed_paths(self) -> list[str]:
-        """Paths the agent added/modified/deleted in the worktree, relative to root."""
+        """Paths the agent added/modified/deleted in the worktree, relative to root.
+
+        Filtered by ``_IGNORE_DIRS``, and not only to be tidy. `copy_back_to` already refuses to
+        copy these, but the CONFLICT set is computed from this list — so a `__pycache__` written
+        by running the verify command in two worktrees became two workers "both changing the same
+        file", and the bytecode was reported to a person as a contested file alongside their real
+        one. Ignored here means ignored everywhere it is counted.
+        """
         _git(["add", "-A"], self.path)  # stage so untracked files show as changes
         result = _git(["diff", "--cached", "--name-only", "HEAD"], self.path)
-        return [line for line in result.stdout.splitlines() if line.strip()]
+        return [
+            line
+            for line in result.stdout.splitlines()
+            if line.strip() and not any(part in _IGNORE_DIRS for part in Path(line).parts)
+        ]
 
     def copy_back_to(self, dest: Path, *, only: set[str] | None = None) -> int:
         """Apply the changed files to ``dest``. Returns the number of changes.

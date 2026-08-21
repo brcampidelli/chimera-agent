@@ -304,6 +304,34 @@ class IsolatedCrew:
             failures=failures,
             rejected=rejected,
         )
+        # What each worker actually produced, emitted here and not from inside `run_worker`,
+        # because here is where it exists: `run_isolated` reads each worktree's changed files as
+        # it collects, which is the last moment before the worktree is removed. Asking mid-flight
+        # would mean staging a checkout the worker is still writing to.
+        #
+        # Emitted for the rejected and the failed ones too, and that is the point. A worker whose
+        # attempt was thrown away leaves nothing else behind — without this, the only account of
+        # a discarded attempt is that it happened.
+        contested = set(batch.conflicts)
+        for result in batch.results:
+            answer = result.value.answer if result.value is not None else ""
+            # Split, because passing the check and landing are DIFFERENT THINGS and conflating
+            # them is the exact dishonesty this screen exists to avoid: two workers who both pass
+            # on one file both lose it, so a card saying "the files it wrote, and that landed"
+            # sat directly above a panel saying nothing landed. `ok` is the verifier's verdict;
+            # only `changed - conflicts` actually reached the workspace.
+            landed = [p for p in result.changed_paths if result.ok and p not in contested]
+            lost = [p for p in result.changed_paths if not result.ok or p in contested]
+            self._emit(
+                "worker_produced",
+                task_id=result.name,
+                files=landed,
+                lost=lost,
+                # Truncated because a worker's report can be long and this rides the same channel
+                # as the progress frames; the merged files themselves are on disk to be read.
+                answer=answer[:2000],
+                landed=bool(landed),
+            )
         # One frame per contested file, not one lump. A conflict is a file two workers both
         # changed and NEITHER landed — the thing a person has to go look at by name.
         for path in batch.conflicts:

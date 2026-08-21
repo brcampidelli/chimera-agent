@@ -135,3 +135,47 @@ def test_verify_gate_rejects_a_worker_whose_check_fails(tmp_path: Path) -> None:
     assert (tmp_path / "out" / "passer.txt").exists()
     assert not (tmp_path / "out" / "failer.txt").exists()  # rejected change was discarded
     assert not res.ok  # a rejected worker means the run isn't fully clean
+
+
+def test_a_worker_that_passed_but_lost_its_file_is_not_reported_as_landing_it(tmp_path: Path) -> None:
+    """Passing the check and landing are different things, and the frame has to keep them apart.
+
+    Two workers who both succeed on one file both lose it — the one-file-one-owner rule. Reporting
+    `landed` from the verifier's verdict put "the files it wrote, and that landed" on a card
+    directly above a panel saying nothing landed, which is precisely the reading this screen was
+    built to prevent.
+    """
+    _init_repo(tmp_path)
+    seen: list[Any] = []
+    crew = IsolatedCrew(
+        WritingBackend("_", "_"),
+        [_worker("a", "shared.txt", "from-A"), _worker("b", "shared.txt", "from-B")],
+        on_event=seen.append,
+    )
+
+    res = crew.run("edit shared", tmp_path)
+
+    produced = {e.task_id: e.data for e in seen if e.kind == "worker_produced"}
+    assert set(produced) == {"a", "b"}
+    for name, data in produced.items():
+        assert data["landed"] is False, name
+        assert data["files"] == [], name
+        # And the file is still named, because it is the only account of what that worker tried.
+        assert data["lost"] == ["shared.txt"], name
+    assert res.merged == 0
+
+
+def test_a_worker_that_actually_landed_says_so(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    seen: list[Any] = []
+    crew = IsolatedCrew(
+        WritingBackend("_", "_"),
+        [_worker("a", "a.txt", "AAA"), _worker("b", "b.txt", "BBB")],
+        on_event=seen.append,
+    )
+
+    crew.run("do your part", tmp_path)
+
+    produced = {e.task_id: e.data for e in seen if e.kind == "worker_produced"}
+    assert produced["a"]["landed"] is True and produced["a"]["files"] == ["a.txt"]
+    assert produced["a"]["lost"] == []

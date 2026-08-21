@@ -34,6 +34,9 @@ export interface WorkerState {
   /** The summary's SIZE. The text itself never travels on a progress frame. */
   summaryChars: number;
   gaps: string[];
+  /** Non-empty means this worker's output did not FIT the summary cap: what the synthesis read
+   *  is a head+tail slice, and the whole of it was written to these paths. */
+  evidenceRefs: string[];
 }
 
 export interface OrchestrationTotals {
@@ -117,6 +120,7 @@ function blankWorker(taskId: string, objective = ""): WorkerState {
     tokens: 0,
     summaryChars: 0,
     gaps: [],
+    evidenceRefs: [],
   };
 }
 
@@ -180,6 +184,7 @@ export function applyFrame(state: OrchestrationState, frame: OrchFrame): Orchest
           tokens: num(data.tokens),
           summaryChars: num(data.summary_chars),
           gaps: strings(data.gaps),
+          evidenceRefs: strings(data.evidence_refs),
         }),
       };
 
@@ -267,6 +272,16 @@ export interface CrewWorkerState {
   detail: string;
   reason: string;
   answerChars: number;
+  /** The files it wrote that actually reached the workspace. */
+  files: string[];
+  /** The files it wrote that did NOT — refused by the check, or contested by another worker.
+   *  Kept apart from `files` because passing a check and landing are different things: two
+   *  workers who both pass on one file both lose it. */
+  lost: string[];
+  /** The worker's own report of what it did. Arrives at the end, not while it runs. */
+  answer: string;
+  /** Whether those files were merged. False and non-empty means the work existed and was lost. */
+  landed: boolean;
 }
 
 export interface CrewState {
@@ -310,6 +325,10 @@ function patchCrewWorker(
     detail: "",
     reason: "",
     answerChars: 0,
+    files: [],
+    lost: [],
+    answer: "",
+    landed: false,
   };
   if (index === -1) return [...workers, { ...blank, ...patch }];
   const next = workers.slice();
@@ -360,6 +379,21 @@ export function applyCrewFrame(state: CrewState, frame: OrchFrame): CrewState {
           reason: str(data.reason),
           verify: frame.text,
           detail: str(data.detail),
+        }),
+      };
+
+    case "crew_worker_produced":
+      // Arrives after the worker finished, for the discarded ones too. Without it, a run where
+      // every worker was rejected reports that three attempts happened and nothing about what
+      // they were — the worktrees are gone by the time anyone could go and look.
+      return {
+        ...state,
+        seq,
+        workers: patchCrewWorker(state.workers, frame.task_id, {
+          files: strings(data.files),
+          lost: strings(data.lost),
+          answer: str(data.answer),
+          landed: data.landed === true,
         }),
       };
 
