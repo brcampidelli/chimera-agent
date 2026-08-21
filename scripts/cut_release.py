@@ -127,9 +127,21 @@ def write_versions(version: str) -> None:
         raise Stop("could not find the version line in Cargo.toml")
     CARGO.write_text(text, encoding="utf-8")
 
-    data = json.loads(TAURI.read_text(encoding="utf-8"))
-    data["version"] = tauri_version
-    TAURI.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    # Substituted on the line, not parsed and re-dumped. `json.dumps` normalises formatting it
+    # was never asked to touch: the first real cut with this expanded a compact
+    # `"targets": ["nsis", "dmg", ...]` onto five lines, so a commit that promises to change one
+    # version number arrived with eleven lines of noise around it.
+    text = TAURI.read_text(encoding="utf-8")
+    text, count = re.subn(
+        r'^(\s*"version"\s*:\s*)"[^"]*"',
+        rf'\g<1>"{tauri_version}"',
+        text,
+        count=1,
+        flags=re.M,
+    )
+    if count != 1:
+        raise Stop("could not find the version line in tauri.conf.json")
+    TAURI.write_text(text, encoding="utf-8")
 
 
 def refresh_install() -> None:
