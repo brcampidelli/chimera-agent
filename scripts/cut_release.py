@@ -94,8 +94,11 @@ def installed_version() -> str:
 
 
 def check_clean_and_on_main() -> None:
-    if run("git", "status", "--porcelain"):
-        raise Stop("the working tree has changes. Commit or stash them first.")
+    # TRACKED changes only. Untracked files are not part of any commit — the release adds its six
+    # files by name — and every real checkout has some: scratch scripts, bench output, a venv. The
+    # first run of this script on a real machine was refused by its own guard for exactly that.
+    if run("git", "status", "--porcelain", "--untracked-files=no"):
+        raise Stop("the working tree has uncommitted changes. Commit or stash them first.")
     branch = run("git", "rev-parse", "--abbrev-ref", "HEAD")
     if branch != "main":
         raise Stop(f"on branch {branch!r}. Cut releases from main.")

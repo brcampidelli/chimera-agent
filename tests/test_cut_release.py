@@ -93,3 +93,31 @@ def test_a_stale_install_stops_the_release_rather_than_stamping_the_old_version(
     # a commit that looks complete, passes locally, and is wrong. The message says what to run.
     assert "0.48.0rc9" in str(refused.value)
     assert "pip install -e ." in str(refused.value)
+
+
+def test_scratch_files_do_not_block_a_release(monkeypatch) -> None:
+    """Untracked files are not a reason to refuse. Tracked modifications are.
+
+    The first real run of this script was refused by its own guard, on a checkout whose only
+    "changes" were bench output and a helper script nobody tracks. A precondition that no real
+    machine can satisfy is not a precondition, it is a bug with a polite message.
+    """
+    seen: list[tuple[str, ...]] = []
+
+    def fake_run(*args: str, capture: bool = True) -> str:
+        seen.append(args)
+        if args[:2] == ("git", "status"):
+            return ""  # nothing tracked has changed
+        if args[:2] == ("git", "rev-parse"):
+            return "main"
+        if args[:2] == ("git", "rev-list"):
+            return "0"
+        return ""
+
+    monkeypatch.setattr(cut_release, "run", fake_run)
+    cut_release.check_clean_and_on_main()
+
+    status = next(args for args in seen if args[:2] == ("git", "status"))
+    assert "--untracked-files=no" in status, (
+        "the guard must ignore untracked files, or it refuses on every real checkout"
+    )
