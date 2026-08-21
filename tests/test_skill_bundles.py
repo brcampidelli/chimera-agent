@@ -196,7 +196,10 @@ def test_a_skill_that_cannot_work_here_says_so_before_the_install_button() -> No
     # Seventy names in one flat list would advertise seventy working features and deliver rather
     # fewer, and the person who found that out would find it out after installing.
     assert macos_only.portability is Portability.OS_LOCKED
-    assert "macos" in macos_only.note
+    # Case-insensitively, because the note names the operating system for a person to read and
+    # "macOS" is how that name is spelled — asserting the frontmatter's lowercase token would be
+    # pinning the raw identifier we deliberately stopped showing.
+    assert "macos" in macos_only.note.lower()
 
     heavy = find("manim-video")
     assert heavy is not None and heavy.portability is Portability.NEEDS_HEAVY
