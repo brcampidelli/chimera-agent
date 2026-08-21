@@ -46,6 +46,29 @@ class EchoTool(Tool):
         return str(kwargs.get("text", ""))
 
 
+#: Tools this registry only sometimes contains — a credential, an optional package, or an
+#: installed skill bundle decides. Declared here because two guards in the suite pin the set of
+#: tools against the set of translated descriptions, and those guards are exact mirrors: with no
+#: notion of "sometimes", a conditional tool fails one of them on every machine where its
+#: condition differs from CI's. Naming them is what lets both guards stay strict about the tools
+#: that are always here.
+OPTIONAL_TOOLS: frozenset[str] = frozenset({
+    # Key-gated.
+    "web_search",
+    "generate_image",
+    "text_to_speech",
+    "transcribe_audio",
+    "send_email",
+    "read_email",
+    "calendar_events",
+    # Present only when a skill bundle is switched on — see `chimera.skills.aliases`.
+    "web_extract",
+    "search_files",
+    "read_text",
+    "skill_view",
+})
+
+
 def default_registry(
     workspace: Path | None = None,
     *,
