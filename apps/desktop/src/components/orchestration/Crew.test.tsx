@@ -283,6 +283,45 @@ describe("the crew", () => {
     expect(cancelOrchestration).toHaveBeenCalledWith("c1");
   });
 
+  it("does not present a merge as approved when the check decided nothing", async () => {
+    const user = await openCrewForm();
+    const handlers = await runCrew(user);
+
+    // `pytest` that is not installed exits 127, and `VerificationResult` reports that as
+    // `passed=True` on purpose — the work is not punished for our inability to check it. Reading
+    // only `passed` turned "the command does not exist" into "the command approved this", on a
+    // screen whose entire premise is that the test picks the winner.
+    send(
+      handlers(),
+      frame(1, "run", { run_id: "c1" }),
+      frame(2, "crew_worker_started", {}, "conservador"),
+      frame(
+        3,
+        "crew_worker_verified",
+        { verified_by: "", abstained: true, detail: "pytest: command not found" },
+        "conservador",
+      ),
+    );
+
+    expect(screen.getByText(/reached no verdict/i)).toBeInTheDocument();
+    expect(screen.getByText(/nothing approved it/i)).toBeInTheDocument();
+  });
+
+  it("still says a real pass is a pass", async () => {
+    // Or the test above would pass against a version that had stopped trusting any check at all.
+    const user = await openCrewForm();
+    const handlers = await runCrew(user);
+
+    send(
+      handlers(),
+      frame(1, "run", { run_id: "c1" }),
+      frame(2, "crew_worker_started", {}, "conservador"),
+      frame(3, "crew_worker_verified", { verified_by: "pytest -q" }, "conservador"),
+    );
+
+    expect(screen.queryByText(/reached no verdict/i)).toBeNull();
+  });
+
   it("tells a check that could not run apart from one that failed", async () => {
     const user = await openCrewForm();
     const handlers = await runCrew(user);
