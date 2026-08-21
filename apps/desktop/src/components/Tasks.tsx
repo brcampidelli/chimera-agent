@@ -176,7 +176,12 @@ function Board({
       {cols.map((col) => (
         <div key={col} className="w-56 shrink-0">
           <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {col} · {columns[col].length}
+            {/* Translated. These were rendered raw, so a board in Portuguese read "backlog /
+                doing / review / blocked / done" — and so did one in Japanese. The card's `lane`
+                below stays raw, deliberately: that is an agent id, the literal string the
+                dispatcher matches on, and translating it would name something that does not
+                exist. */}
+            {t(`tasks.column.${col}`)} · {columns[col].length}
           </div>
           <div className="space-y-2">
             {columns[col].map((c) => (
@@ -203,7 +208,7 @@ function Board({
                   >
                     {COLUMN_ORDER.map((target) => (
                       <option key={target} value={target}>
-                        {target}
+                        {t(`tasks.column.${target}`)}
                       </option>
                     ))}
                   </select>
