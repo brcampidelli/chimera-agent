@@ -116,6 +116,26 @@ describe("Code — choosing the model", () => {
     });
   });
 
+  it("gives a new conversation the default back, as the chip promises", async () => {
+    // The chip says "Applies to this conversation" and the code calls it session-local, "because a
+    // model quietly carried over from a week ago is how a turn ends up costing thirty times what
+    // the person expected". It was screen state: it survived New conversation, Resume and a
+    // project switch. The fusion cast beside it was already remounted per conversation, which is
+    // what made the two disagree about the same word.
+    const user = userEvent.setup();
+    renderCode();
+
+    await user.click(await screen.findByRole("button", { name: /default/i }));
+    await user.click(await screen.findByText("DeepSeek: V3.1"));
+    await user.click(screen.getByRole("button", { name: /new conversation/i }));
+
+    await user.type(screen.getByPlaceholderText(/Ask about this code/i), "oi");
+    await user.click(screen.getByRole("button", { name: /^Send$/i }));
+
+    await waitFor(() => expect(streamCodeTurn).toHaveBeenCalled());
+    expect(vi.mocked(streamCodeTurn).mock.calls[0][0]).not.toHaveProperty("model");
+  });
+
   it("asks the catalogue only once somebody opens the menu", async () => {
     // A composer nobody has touched must not reach a public catalogue on the network. This is the
     // whole reason the query is `enabled` rather than eager.
