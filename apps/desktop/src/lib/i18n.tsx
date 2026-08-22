@@ -1056,6 +1056,8 @@ const en: Dict = {
   "orch.worker.deadline": "Ran past the batch deadline and was abandoned.",
   "orch.worker.discarded": "Discarded — it does not reach the final answer.",
   "orch.stateOnly": "Workers report state changes, not live text.",
+  "orch.interrupted":
+    "This run is from before — it stopped without finishing, and it is not still going. What its workers had already produced is below; nothing more is coming.",
   "orch.stop": "Stop",
   "orch.stopping": "Stopping",
   "orch.stopUnknown":
@@ -2154,6 +2156,8 @@ const pt: Dict = {
   "orch.worker.deadline": "Passou do prazo do lote e foi abandonado.",
   "orch.worker.discarded": "Descartado — não entra na resposta final.",
   "orch.stateOnly": "Os trabalhadores relatam mudanças de estado, não texto ao vivo.",
+  "orch.interrupted":
+    "Esta execução é de antes — ela parou sem terminar, e não está mais rodando. O que os trabalhadores já tinham produzido está abaixo; não vem mais nada.",
   "orch.stop": "Parar",
   "orch.stopping": "Parando",
   "orch.stopUnknown":
@@ -3263,6 +3267,8 @@ const es: Dict = {
   "orch.worker.deadline": "Superó el plazo del lote y fue abandonado.",
   "orch.worker.discarded": "Descartado: no llega a la respuesta final.",
   "orch.stateOnly": "Los trabajadores informan cambios de estado, no texto en vivo.",
+  "orch.interrupted":
+    "Esta ejecución es de antes: se detuvo sin terminar y ya no sigue en marcha. Lo que sus trabajadores alcanzaron a producir está abajo; no viene nada más.",
   "orch.stop": "Detener",
   "orch.stopping": "Deteniendo",
   "orch.stopUnknown":
@@ -4385,6 +4391,8 @@ const fr: Dict = {
   "orch.worker.deadline": "A dépassé le délai du lot et a été abandonné.",
   "orch.worker.discarded": "Écarté : il n'atteint pas la réponse finale.",
   "orch.stateOnly": "Les travailleurs signalent des changements d'état, pas du texte en direct.",
+  "orch.interrupted":
+    "Cette exécution date d'avant : elle s'est arrêtée sans finir et ne tourne plus. Ce que ses travailleurs avaient déjà produit est ci-dessous ; rien d'autre n'arrivera.",
   "orch.stop": "Arrêter",
   "orch.stopping": "Arrêt",
   "orch.stopUnknown":
@@ -5504,6 +5512,8 @@ const de: Dict = {
   "orch.worker.deadline": "Überschritt die Frist des Stapels und wurde aufgegeben.",
   "orch.worker.discarded": "Verworfen — fließt nicht in die endgültige Antwort ein.",
   "orch.stateOnly": "Worker melden Zustandswechsel, keinen laufenden Text.",
+  "orch.interrupted":
+    "Dieser Lauf ist von vorher — er hat ohne Abschluss aufgehört und läuft nicht mehr. Was seine Arbeiter bereits erzeugt hatten, steht unten; mehr kommt nicht.",
   "orch.stop": "Stopp",
   "orch.stopping": "Stoppt",
   "orch.stopUnknown":
@@ -6545,6 +6555,8 @@ const zh: Dict = {
   "orch.worker.deadline": "超过批次时限，已被放弃。",
   "orch.worker.discarded": "已丢弃——不会进入最终答案。",
   "orch.stateOnly": "工作者只报告状态变化，不提供实时文字。",
+  "orch.interrupted":
+    "这是之前的一次运行 —— 它没有跑完就停了，现在也没有在继续。工作者已经产出的内容在下面；不会再有新的了。",
   "orch.stop": "停止",
   "orch.stopping": "正在停止",
   "orch.stopUnknown":
@@ -7646,6 +7658,8 @@ const ja: Dict = {
   "orch.worker.deadline": "バッチの期限を過ぎたため打ち切られました。",
   "orch.worker.discarded": "破棄されました。最終回答には含まれません。",
   "orch.stateOnly": "ワーカーが伝えるのは状態の変化で、逐次のテキストではありません。",
+  "orch.interrupted":
+    "これは以前の実行です。最後まで行かずに止まっており、いまも動いてはいません。ワーカーがすでに出したものは下にあります。これ以上は届きません。",
   "orch.stop": "停止",
   "orch.stopping": "停止中",
   "orch.stopUnknown":
@@ -8759,6 +8773,8 @@ const it: Dict = {
   "orch.worker.deadline": "Ha superato la scadenza del lotto ed è stato abbandonato.",
   "orch.worker.discarded": "Scartato: non arriva alla risposta finale.",
   "orch.stateOnly": "I lavoratori segnalano cambi di stato, non testo dal vivo.",
+  "orch.interrupted":
+    "Questa esecuzione è di prima: si è fermata senza finire e non è più in corso. Quello che i suoi lavoratori avevano già prodotto è qui sotto; non arriverà altro.",
   "orch.stop": "Ferma",
   "orch.stopping": "In arresto",
   "orch.stopUnknown":
@@ -9865,6 +9881,8 @@ const pl: Dict = {
   "orch.worker.deadline": "Przekroczył termin partii i został porzucony.",
   "orch.worker.discarded": "Odrzucony — nie trafia do końcowej odpowiedzi.",
   "orch.stateOnly": "Pracownicy zgłaszają zmiany stanu, nie tekst na żywo.",
+  "orch.interrupted":
+    "Ten przebieg jest z wcześniej — zatrzymał się bez ukończenia i już nie trwa. To, co jego pracownicy zdążyli wytworzyć, jest poniżej; nic więcej nie przyjdzie.",
   "orch.stop": "Zatrzymaj",
   "orch.stopping": "Zatrzymywanie",
   "orch.stopUnknown":
@@ -10977,6 +10995,8 @@ const ru: Dict = {
   "orch.worker.deadline": "Вышел за срок пакета и был брошен.",
   "orch.worker.discarded": "Отброшен — в итоговый ответ не попадает.",
   "orch.stateOnly": "Работники сообщают смену состояний, а не текст в реальном времени.",
+  "orch.interrupted":
+    "Этот запуск — из прошлого: он остановился, не завершившись, и сейчас не идёт. То, что работники успели выдать, ниже; больше ничего не будет.",
   "orch.stop": "Остановить",
   "orch.stopping": "Останавливается",
   "orch.stopUnknown":

@@ -1,7 +1,7 @@
 import { useEffect, useReducer } from "react";
 import Markdown from "react-markdown";
 
-import { streamHierarchy, type HierarchyRunInput } from "@/lib/api";
+import { streamHierarchy, type HierarchyRunInput, type OrchFrame } from "@/lib/api";
 import { useT, type TFunc } from "@/lib/i18n";
 import {
   applyFrame,
@@ -11,6 +11,7 @@ import {
 } from "@/lib/orchestration-run";
 
 import { FellBackNote } from "./FellBackNote";
+import { rememberRun } from "./resume";
 import { StopButton } from "./StopButton";
 import { useStop } from "./use-stop";
 import { RunStepper } from "./RunStepper";
@@ -25,15 +26,37 @@ import { WorkerCard } from "./WorkerCard";
  */
 export function HierarchyRun({
   request,
+  resume,
   onOpenCode,
 }: {
-  request: HierarchyRunInput;
+  /** Start a run. Absent when `resume` is given — a transcript is read, never re-run. */
+  request?: HierarchyRunInput;
+  /** A past run's frames, replayed. The same reducer the live stream feeds, so a resumed run and a
+   *  live one differ in exactly one thing: whether more is coming. */
+  resume?: OrchFrame[];
   onOpenCode: () => void;
 }) {
   const t = useT();
   const [state, dispatch] = useReducer(applyFrame, EMPTY_RUN);
 
+  // Remember which run this is, so a reload can ask the server for what it missed. Written from the
+  // reducer rather than from a second copy: the id arrives as the `run` frame and there is one
+  // source of truth for it.
   useEffect(() => {
+    if (state.runId) rememberRun(state.runId);
+  }, [state.runId]);
+
+  useEffect(() => {
+    if (!resume) return;
+    // Replayed in one pass. No stream is opened: this run finished, or died with the process that
+    // was running it, and either way nothing more is coming — re-running it would spend the money
+    // again to reproduce an answer that is already on disk.
+    for (const frame of resume) dispatch(frame);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!request) return;
     const controller = new AbortController();
     void streamHierarchy(
       request,
@@ -58,8 +81,12 @@ export function HierarchyRun({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const running = isRunning(state);
+  // A replayed run is never running, whatever its frames say. A transcript that stops mid-fan-out
+  // is a process that died, and showing a spinner and a Stop button over it would offer to halt
+  // something that ended before this window opened.
+  const running = !resume && isRunning(state);
   const stop = useStop(state.runId ?? "", running);
+  const interrupted = Boolean(resume) && isRunning(state);
 
   return (
     <div className="space-y-4">
@@ -69,6 +96,14 @@ export function HierarchyRun({
           <StopButton stop={stop} disabled={!state.runId} hint={t("orch.stopHint")} />
         ) : null}
       </div>
+
+      {/* Said before the cards, not under them: someone reading a half-finished fan-out needs to
+          know it is over before they start waiting for the rest of it. */}
+      {interrupted ? (
+        <p className="rounded-card border border-warn/25 bg-warn/5 p-3 text-sm text-warn-foreground">
+          {t("orch.interrupted")}
+        </p>
+      ) : null}
 
       {state.fellBack ? (
         <FellBackNote
