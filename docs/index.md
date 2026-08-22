@@ -36,6 +36,10 @@ This site is task-oriented: pick what you want to do.
   How the fusion core, evolution, and safety layers fit together.
   [Architecture →](architecture.md)
 
+- **:material-console: Every command**
+  All 79, generated from the CLI itself — including the 33 that appeared in no doc at all.
+  [Command reference →](commands.md)
+
 </div>
 
 ## The one-liner
