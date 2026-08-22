@@ -29,8 +29,33 @@ T = TypeVar("T")
 
 
 def _git(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+    """Run one git command and read its output as UTF-8.
+
+    The encoding is named, and that is the whole point of this function existing. ``text=True``
+    alone decodes with the machine's locale — cp1252 on a default Windows install, where the bytes
+    ``0x81 0x8D 0x8F 0x90 0x9D`` are undefined. Those bytes are ordinary inside UTF-8: they appear
+    in emoji, in most CJK, and in plenty of prose.
+
+    The failure was worse than an error. ``UnicodeDecodeError`` is raised on the reader thread, so
+    the call returns a *successful* process whose ``stdout`` is ``None`` — and ``GET /api/git/diff``
+    fed that ``None`` into a response field typed ``str`` and answered **500, in plain text**, so a
+    client calling ``.json()`` on the body broke a second time. Reproducible against Chimera's own
+    installation directory, whose JavaScript bundles contain those bytes; ``git/status`` survived
+    the same repository only because status prints file names and diff prints content.
+
+    ``errors="replace"`` rather than strict: a diff viewer that refuses to show a file because one
+    byte in it is not valid UTF-8 helps nobody. Git writes UTF-8 on every platform, so this is the
+    right codec rather than a guess — and every git call in the app goes through here, so naming it
+    once is also the only way to be sure it is named at all.
+    """
     return subprocess.run(
-        ["git", *args], cwd=cwd, capture_output=True, text=True, timeout=60
+        ["git", *args],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=60,
     )
 
 
