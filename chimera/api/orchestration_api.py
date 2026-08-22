@@ -422,6 +422,47 @@ class OrchRunsOut(BaseModel):
     runs: list[OrchRunSummaryOut]  # newest first
 
 
+#: What the SSE client lifts out of a frame's payload and onto the frame itself. Everything else
+#: rides under ``data``. Kept as one constant because the split has to match ``api.ts`` exactly.
+_FRAME_TOP_LEVEL = ("seq", "task_id", "text")
+
+
+def _as_stream_frame(raw: dict[str, Any]) -> dict[str, Any] | None:
+    """One persisted line in the shape the live stream delivers, or None if it is not a frame.
+
+    The transcript is written as ``{"event": event, **payload}`` — flat, and keyed ``event``. The
+    stream delivers ``{seq, kind, task_id, text, data}``, because the client lifts three fields out
+    and nests the rest. The desktop's reducer switches on ``kind``, so handing back the raw line
+    gave it ``kind is undefined`` and it matched nothing: a replayed run drew its stepper, which
+    renders unconditionally, and **no worker cards and no answer**.
+
+    That made the whole persistence feature a shell. Transcripts were written from rc11 onward, and
+    reading one back produced an empty run — which nobody saw, because until the run list was wired
+    the only way to reach a replay was to reload the page mid-run.
+
+    Normalised here rather than on disk. The file is also a debugging artefact and every transcript
+    already written would be stranded by a format change; converting on the way out costs nothing
+    and makes the contract the one the client was always promised — *this endpoint returns what the
+    stream returns*.
+
+    A line with no ``event`` is dropped rather than given an empty ``kind``. The reducer would
+    accept such a frame and ignore it, which turns a damaged transcript into a silently short one.
+    """
+    event = raw.get("event")
+    if not event:
+        return None
+    data = {k: v for k, v in raw.items() if k != "event" and k not in _FRAME_TOP_LEVEL}
+    return {
+        "seq": int(raw.get("seq") or 0),
+        "kind": str(event),
+        # Coerced rather than passed through: an older transcript may not carry these at all, and a
+        # replay that raised on one frame would lose the run it was meant to preserve.
+        "task_id": str(raw.get("task_id") or ""),
+        "text": str(raw.get("text") or ""),
+        "data": data,
+    }
+
+
 class OrchFramesOut(BaseModel):
     """A run's transcript from ``since`` onward, in the order its single writer stamped."""
 
@@ -953,8 +994,9 @@ def register_orchestration_api(
         `seq` it has already applied — which is what makes replay-then-live and live-only converge
         on one state instead of two.
         """
-        frames = runlog.frames(Path(read_settings().home), run_id, since=since)
-        highest = max((int(f.get("seq") or 0) for f in frames), default=since)
+        raw = runlog.frames(Path(read_settings().home), run_id, since=since)
+        frames = [f for f in (_as_stream_frame(line) for line in raw) if f is not None]
+        highest = max((int(f["seq"]) for f in frames), default=since)
         return {"run_id": run_id, "frames": frames, "seq": highest}
 
     @app.get(

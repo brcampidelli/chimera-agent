@@ -128,13 +128,41 @@ def _bin_present(binary: str | None) -> bool:
     return binary is None or shutil.which(binary) is not None
 
 
+def _is_configured(settings: Settings, var: str) -> bool:
+    """Whether the variable a feature names is actually set, by the name a user would type.
+
+    Two namespaces answer to that question and this used to consult only one. ``credentials()``
+    holds thirteen unprefixed provider slots — ``OPENAI_API_KEY`` and friends — while four features
+    declare ``CHIMERA_*`` names: IMAP host, SMTP host, the calendar URL, the OpenAI key pool. A
+    ``dict.get`` for a key that cannot be in that dict returns ``None`` every single time, so those
+    four reported ``has_key=False`` no matter what was configured.
+
+    What that produced is worse than a missing feature. With ``CHIMERA_IMAP_HOST`` exported and
+    ``Settings`` reading it correctly, ``chimera features`` printed *"set CHIMERA_IMAP_HOST"* in
+    yellow while ``default_registry()`` in the same process registered ``read_email``. **The tool
+    worked and the report said it could not**, which sends someone to debug configuration that was
+    already right.
+
+    The second namespace is read from the model's own field aliases rather than from another
+    hand-written table. A second hand-written table is what drifted here; a third would drift too,
+    and this way a field added tomorrow answers without anyone remembering to add it.
+    """
+    creds = settings.credentials()
+    if var in creds:
+        return bool(creds[var])
+    for name, field in type(settings).model_fields.items():
+        if field.validation_alias == var:
+            return bool(getattr(settings, name, None))
+    return False
+
+
 def feature_status(settings: Settings | None = None) -> list[FeatureStatus]:
     """Resolve each catalog feature against the current credentials, deps, and system binaries."""
-    creds = (settings or get_settings()).credentials()
+    resolved = settings or get_settings()
     return [
         FeatureStatus(
             feature=feature,
-            has_key=any(creds.get(var) for var in feature.env_any),
+            has_key=any(_is_configured(resolved, var) for var in feature.env_any),
             has_dep=_dep_present(feature.dep),
             has_bin=_bin_present(feature.bin),
         )
