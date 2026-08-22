@@ -83,9 +83,9 @@ CATALOG: tuple[CatalogEntry, ...] = (
         notes="the paid variant; the :free one was withdrawn on 2026-08-18",
     ),
     CatalogEntry(
-        "openrouter/openai/gpt-oss-20b:free", "weak", "OpenAI",
-        0.0, 0.0, tools=True, context_k=131,
-        notes="genuinely free and rate-limited; a free tier can be withdrawn without notice",
+        "openrouter/openai/gpt-oss-20b", "weak", "OpenAI",
+        0.03, 0.13, tools=True, context_k=131,
+        notes="the paid variant; the :free one was withdrawn on 2026-08-21",
     ),
     # --- mid: the daily workhorses. Reliable tools, cents per task. ---
     CatalogEntry(
