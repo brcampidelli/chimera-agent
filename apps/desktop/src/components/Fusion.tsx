@@ -27,14 +27,27 @@ function pct(value: number | null): string | null {
   return value == null ? null : `${Math.round(value * 100)}%`;
 }
 
+/** The engine's stage identifier -> the key its human name lives under.
+ *
+ *  `synth` and `synthesizer` are the same role with two spellings: the Literal the engine routes on,
+ *  and the word a person reads. Mapping rather than renaming either, because the Literal is a wire
+ *  value and the name is a translation. */
+const STAGE_KEY: Record<string, string> = { panel: "panel", judge: "judge", synth: "synthesizer" };
+
 function PanelRow({ entry }: { entry: FusionPanelEntry }) {
+  const t = useT();
   const tok = tokens(entry.prompt_tokens, entry.completion_tokens);
   return (
     <div className="px-4 py-3">
       <div className="flex items-center gap-1.5">
-        <span className="font-mono text-xs text-foreground">{entry.model}</span>
-        {entry.error ? <Badge tone="bad">error</Badge> : null}
-        {tok ? <span className="text-xs text-muted-foreground">{tok}</span> : null}
+        {/* This panel is 288px wide (`Activity` is `w-72`), and a slug like
+            `openrouter/deepseek/deepseek-chat-v3.1` does not fit. Truncated with the full value in
+            the title, rather than left to overflow the row and push the badges out of it. */}
+        <span className="min-w-0 flex-1 truncate font-mono text-xs text-foreground" title={entry.model}>
+          {entry.model}
+        </span>
+        {entry.error ? <Badge tone="bad">{t("fusion.error")}</Badge> : null}
+        {tok ? <span className="shrink-0 text-xs text-muted-foreground">{tok}</span> : null}
       </div>
       {entry.error ? (
         <div className="mt-1 whitespace-pre-wrap text-xs text-bad">{entry.error}</div>
@@ -48,11 +61,21 @@ function PanelRow({ entry }: { entry: FusionPanelEntry }) {
 }
 
 function StageRow({ stage }: { stage: FusionStage }) {
+  const t = useT();
   const tok = tokens(stage.prompt_tokens, stage.completion_tokens);
   return (
     <div className="flex items-center gap-2 px-4 py-3">
-      <Badge tone="muted">{stage.stage}</Badge>
-      <span className="min-w-0 flex-1 truncate font-mono text-xs text-foreground">{stage.model}</span>
+      {/* The role's NAME, not its identifier. `stage.stage` is "panel" / "judge" / "synth" — a
+          Literal the engine uses to route, and three untranslated English words on a screen that
+          has proper names for all three, in ten languages. */}
+      <Badge tone="muted">{t(`fusion.role.${STAGE_KEY[stage.stage] ?? stage.stage}`)}</Badge>
+      {/* Truncated with the full slug in the title, same reason as the panel row above. */}
+      <span
+        className="min-w-0 flex-1 truncate font-mono text-xs text-foreground"
+        title={stage.model}
+      >
+        {stage.model}
+      </span>
       {tok ? <span className="shrink-0 text-xs text-muted-foreground">{tok}</span> : null}
     </div>
   );
@@ -67,7 +90,10 @@ function FusionBreakdown({ meta, t }: { meta: FusionMeta; t: TFunc }) {
         title={t("fusion.panel")}
         action={
           <div className="flex items-center gap-1.5">
-            <Badge tone="muted">{meta.aggregation}</Badge>
+            {/* How the panel's answers became one: synthesized, or decided by majority. Another
+                wire value that was being shown as a word — `aggregation` is a Literal the engine
+                routes on, and "synth" is not a thing a reader is supposed to know. */}
+            <Badge tone="muted">{t(`fusion.aggregation.${meta.aggregation}`)}</Badge>
             {meta.early_stopped ? <Badge tone="accent">{t("fusion.earlyStopped")}</Badge> : null}
             {diversity ? (
               <Badge tone="muted">

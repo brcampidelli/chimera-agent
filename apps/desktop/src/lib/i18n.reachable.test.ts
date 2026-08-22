@@ -28,6 +28,7 @@ const DYNAMIC = [
   "catalog.portability.",
   "catalog.reason.",
   "catalog.state.",
+  "fusion.aggregation.",
   "code.posture.approval.",
   "code.posture.reach.",
   "code.posture.saysPause.",
