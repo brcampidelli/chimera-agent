@@ -47,6 +47,10 @@ export function ProviderPicker({
       <div className="flex overflow-hidden rounded-chip border border-border">
         <button
           type="button"
+          // Which one is chosen was said in colour and nowhere else, so a screen reader heard
+          // three buttons and no answer to "which is active". This is a toggle group; pressed is
+          // the state it has.
+          aria-pressed={value === ""}
           disabled={disabled}
           onClick={() => onChange("")}
           className={cn(
@@ -66,11 +70,24 @@ export function ProviderPicker({
           >
             <button
               type="button"
-              disabled={disabled || !agent.available}
-              onClick={() => onChange(agent.key)}
+              aria-pressed={value === agent.key}
+              // `aria-disabled` rather than `disabled` for an agent that is merely missing.
+              //
+              // The tooltip beside this already carries the reason — "not installed here, run
+              // this to get it" — and a `disabled` button takes no focus, so that reason reached
+              // a pointer and nobody else. Marked this way the button is still reachable, still
+              // announces that it cannot be used, and the sentence explaining WHY is finally
+              // available to someone navigating by keyboard.
+              //
+              // `disabled` stays real for the other case: a turn in flight is not a missing
+              // install, and there is nothing to explain there.
+              aria-disabled={!agent.available || undefined}
+              disabled={disabled}
+              onClick={() => agent.available && onChange(agent.key)}
               className={cn(
                 "px-2.5 py-1 text-xs transition-colors duration-1 ease-out disabled:opacity-40",
                 focusRing,
+                !agent.available && "cursor-not-allowed opacity-40",
                 value === agent.key
                   ? "bg-accent/20 text-accent"
                   : "text-muted-foreground hover:text-foreground",
