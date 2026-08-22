@@ -501,3 +501,47 @@ def test_a_worker_says_what_it_wrote_even_when_it_was_thrown_away(
     assert all(p["landed"] is False for p in produced.values())
     # And the frame is published, so the generated client has the shape.
     assert "crew_worker_produced" in client.get("/api/orchestration/schema").json()
+
+
+def test_numbering_persisting_and_enqueuing_happen_under_one_lock() -> None:
+    """The ordering invariant, asserted where it cannot be flaky.
+
+    `test_every_frame_is_numbered_and_the_numbers_only_go_up` is the behavioural version, and it is
+    timing-dependent: the same commit passed on 3.11 and 3.13 and failed on 3.12 with
+    `[1, 2, 3, 5, 4, ...]`. A test that only sometimes sees the defect is a test the defect gets
+    past, so the shape is pinned here as well.
+
+    What went wrong is worth stating plainly, because "out of order" undersells it. The client's
+    reducer drops a frame whose `seq` is not greater than the last it applied — that is what makes
+    replay-after-reload idempotent — so a frame that arrives late is not reordered, it is GONE. Two
+    workers stamping 4 and 5 and handing them over the other way round lose card 4 from the screen,
+    with the run still reporting itself healthy.
+
+    The window always existed and was one statement wide. Persisting the transcript put a file
+    append inside it, which is what made it happen.
+    """
+    import ast
+    import inspect
+
+    from chimera.api import orchestration_api
+
+    source = inspect.getsource(orchestration_api)
+    emits = [
+        node
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.FunctionDef) and node.name == "emit"
+    ]
+    assert len(emits) == 2, f"expected the hierarchy's emit and the crew's, found {len(emits)}"
+
+    for emit in emits:
+        withs = [n for n in emit.body if isinstance(n, ast.With)]
+        assert len(withs) == 1, "the whole body's work belongs to one `with seq_lock:`"
+        inside = ast.dump(ast.Module(body=withs[0].body, type_ignores=[]))
+        assert "AugAssign" in inside and "numbered" in inside, (
+            "the number is stamped inside the lock"
+        )
+        assert "runlog" in inside, "the transcript is written inside the lock"
+        assert "call_soon_threadsafe" in inside, (
+            "the frame is handed to the stream inside the lock — outside it, two workers can stamp "
+            "4 and 5 and enqueue them the other way round, and the client DROPS 4"
+        )
