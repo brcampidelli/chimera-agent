@@ -240,6 +240,10 @@ _ACTIONABLE = (
     "image input",
     "does not exist",
     "not found",
+    # "LLM Provider NOT provided" — what a slug the router cannot parse produces, which is what
+    # typing a model by hand produces. As fixable as "does not exist" and it was reaching the
+    # composer as "the coding turn failed", which reads like a crash in us.
+    "llm provider",
     "no endpoints",
     "context length",
     "maximum context",
@@ -1133,6 +1137,34 @@ def register_code_api(
 
             except Exception as exc:  # noqa: BLE001 — surfaced to the client as an error event
                 _log.warning("code turn failed: %s", exc)
+                # A turn that failed after paying for work is still a turn that spent money.
+                #
+                # `_log_usage` lives in `_verify_and_finish`, which only the success path reaches —
+                # so a run measured on rc13 made seven tool calls, wrote 19 KB of correct output,
+                # died, and left the usage log untouched. The Cost screen then answered "what has
+                # this cost me" with a total that was missing the most expensive turn of the day.
+                #
+                # Only when something was actually spent. A turn that fails on its first call — a
+                # model name that does not exist — has nothing to record, and writing a zero row
+                # there would swap a silent undercount for an invented entry, which is worse
+                # because nothing downstream can tell an invented row from a real one.
+                from chimera.core.agent import partial_spend
+
+                spent = partial_spend(exc)
+                if spent is not None and (spent.prompt_tokens or spent.completion_tokens):
+                    _log_usage(
+                        {
+                            "model": spent.model,
+                            "prompt_tokens": spent.prompt_tokens,
+                            "completion_tokens": spent.completion_tokens,
+                            "usd": spent.usd,
+                            "tool_names": [],
+                            "memory_facts_used": len(facts),
+                            "route_meta": None,
+                        },
+                        session_id,
+                        live(),
+                    )
                 # An external agent's own words when we have them. "the coding turn failed" is right
                 # for the native branch, where the failure is ours to debug — but an adapter that is
                 # not installed, or that could not authenticate, has already said something more

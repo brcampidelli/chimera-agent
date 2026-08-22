@@ -167,6 +167,49 @@ class ToolActivity:
     observation: str
 
 
+@dataclass(frozen=True)
+class PartialSpend:
+    """What a run had already paid for at the moment it failed.
+
+    A failing turn is not a free turn. One measured on rc13 made seven tool calls and wrote 19 KB
+    of correct output before it died, and left nothing in the usage log at all — because everything
+    a run has spent lives in a tally local to :meth:`Agent.run`, and an exception takes the frame
+    with it. This rides out on the exception so the layer that owns the ledger can still record it.
+
+    Carried on the exception rather than returned, because the caller is in an ``except`` block by
+    then: changing the raise into a return would make every existing handler treat a dead run as a
+    finished one, which is a much worse bug than the one being fixed.
+    """
+
+    prompt_tokens: int
+    completion_tokens: int
+    usd: float | None
+    model: str
+    steps: int
+
+
+_SPEND_ATTR = "_chimera_partial_spend"
+
+
+def partial_spend(exc: BaseException) -> PartialSpend | None:
+    """What the run behind ``exc`` had already paid for, or None if it never reached a model."""
+    value = getattr(exc, _SPEND_ATTR, None)
+    return value if isinstance(value, PartialSpend) else None
+
+
+def _last_answering_model(steplog: StepLog) -> str:
+    """The model that answered most recently in this run, or "" if none did.
+
+    Read backwards because the last name is the one a reader is asking about after a run stops, and
+    a failover means the first step and the last can be different models. Empty steps are skipped
+    rather than trusted: a record written before the call returned has no name to give.
+    """
+    for step in reversed(steplog.steps):
+        if step.model:
+            return step.model
+    return ""
+
+
 @dataclass
 class _UsageTally:
     """Running sum of token usage across every model call in one run."""
@@ -451,12 +494,43 @@ class Agent:
                 # partial answer is kept — the transcript up to here is the work already paid for,
                 # and throwing it away would spend the budget for nothing.
                 _log.info("run stopped on budget: %s", exc)
-                # `self.config.model`, not the answering model: the call that would have named one
-                # is the call that did not happen.
+                # The configured model when there is one, else the model that ANSWERED.
+                #
+                # It used to be `self.config.model or ""`, defended by: the call that would have
+                # named one is the call that did not happen. True of the refused call, and beside
+                # the point — a run only reaches its ceiling by making calls that DID happen. A
+                # caller that names no model (the desktop does not; the gateway resolves the
+                # default) therefore left the name empty, and the turn arrived in the cost
+                # breakdown as a blank row carrying real dollars. "What did I spend this on" is not
+                # a question a receipt may answer with nothing.
+                #
+                # Still empty when nothing answered, because then there is nothing to attribute and
+                # a name here would point at a model that was never called.
                 return self._result(
                     str(exc), step - 1, "budget", messages, tool_calls_made, tool_names, usage,
-                    self.config.model or "", None, steplog, task,
+                    self.config.model or _last_answering_model(steplog), None, steplog, task,
                 )
+            except Exception as exc:  # noqa: BLE001 — re-raised immediately, see PartialSpend
+                # The model call is the only thing in this loop that costs money, so it is the only
+                # place a failure can strand a bill. Tools cannot get here: `_run_tool` turns their
+                # failures into tool output on purpose, so the model can react to them.
+                #
+                # Attach and re-raise, unchanged. Swallowing it would turn a dead run into a
+                # finished one for every caller that already handles this.
+                setattr(
+                    exc,
+                    _SPEND_ATTR,
+                    PartialSpend(
+                        prompt_tokens=usage.prompt,
+                        completion_tokens=usage.completion,
+                        # `None` when any call could not be priced — the same rule `_result` uses.
+                        # A partial total presented as a whole is what this file keeps refusing.
+                        usd=None if usage.unpriced is not None else round(usage.usd, 6),
+                        model=self.config.model or _last_answering_model(steplog),
+                        steps=step - 1,
+                    ),
+                )
+                raise
             call_ms = int((time.monotonic() - call_started) * 1000)
             # `result.prompt_tokens` is the provider's own count for the prompt we just sent — which
             # is exactly the live size of the context. Keeping it per step (instead of only summing
