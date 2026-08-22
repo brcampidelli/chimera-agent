@@ -702,16 +702,26 @@ def register_orchestration_api(
             # in parallel and has no order to offer; a consumer that needs one — to replay after a
             # reload without duplicating what it already has — gets it from the single writer.
             nonlocal seq
+            # Numbered, persisted AND enqueued under one lock. The number alone is not enough: the
+            # client's reducer drops a frame whose `seq` is not greater than the last it applied, so
+            # two workers that stamp 4 and 5 and then hand them over in the other order lose card 4
+            # entirely — silently, on the screen, with the run still reporting itself healthy.
+            #
+            # That window always existed and was one statement wide. Persisting the frame put a file
+            # append inside it and made it happen: CI went red on 3.12 with `[1, 2, 3, 5, 4, ...]`.
+            #
+            # The cost is that emits serialise around a buffered local append, which is microseconds
+            # and is already what the numbering does. `call_soon_threadsafe` appends to the loop's
+            # callback queue in call order and the loop runs it FIFO, so calling it here is what
+            # makes the stream's order the order the numbers claim.
             with seq_lock:
                 seq += 1
                 numbered = {**payload, "seq": seq}
-            # To disk BEFORE the queue. A fan-out costs a top-model decompose, N workers and a
-            # synthesis, and until this every frame of that existed only in an SSE stream: close the
-            # app, reload the page or lose the connection, and the answer was gone while the bill
-            # stayed. Written under the same lock that stamped `seq`, so the file is in the order
-            # the numbers claim.
-            runlog.append(read_settings().home, run_id, event, numbered)
-            loop.call_soon_threadsafe(queue.put_nowait, (event, numbered))
+                # A fan-out costs a top-model decompose, N workers and a synthesis, and until this
+                # every frame of it existed only in the stream: close the app and the answer was
+                # gone while the bill stayed.
+                runlog.append(read_settings().home, run_id, event, numbered)
+                loop.call_soon_threadsafe(queue.put_nowait, (event, numbered))
 
         # Sent before any work, so a Stop control can target this run from the first moment.
         emit("run", {"run_id": run_id, "task": req.task})
@@ -793,11 +803,13 @@ def register_orchestration_api(
 
         def emit(event: str, payload: dict[str, Any]) -> None:
             nonlocal seq
+            # One lock over all three, for the reason spelled out on the hierarchy's emit above: a
+            # frame that arrives out of order is not reordered by the client, it is DROPPED.
             with seq_lock:
                 seq += 1
                 numbered = {**payload, "seq": seq}
-            runlog.append(read_settings().home, run_id, event, numbered)
-            loop.call_soon_threadsafe(queue.put_nowait, (event, numbered))
+                runlog.append(read_settings().home, run_id, event, numbered)
+                loop.call_soon_threadsafe(queue.put_nowait, (event, numbered))
 
         emit("run", {"run_id": run_id, "task": req.task, "workspace": str(ws)})
 

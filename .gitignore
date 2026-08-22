@@ -75,3 +75,9 @@ apps/desktop/src-tauri/target/
 apps/desktop/src-tauri/gen/
 apps/desktop/src-tauri/sidecar-dist/
 apps/desktop/src-tauri/sidecar-build/
+
+# A personal WSL launcher: it hardcodes one machine's checkout path, so it is useful to exactly one
+# person and noise in everyone else's `git status`. What is NOT personal — that `gh` lives on the
+# Windows side and that `shutil.which` looks for `gh`, not `gh.exe` — is in `cut_release.py`'s
+# refusal message, which is where somebody actually hits it.
+_wsl.sh
