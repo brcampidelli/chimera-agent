@@ -234,7 +234,14 @@ def preflight() -> None:
         raise Stop(
             "`gh` is not on PATH. This opens the pull request with it, and `main` is protected, "
             "so there is no way to finish without it.\n"
-            "  If you are in WSL and gh is installed on the Windows side, run this from there."
+            "  In WSL with gh installed on the Windows side, put a `gh` SHIM on PATH — this "
+            "looks for `gh`, not `gh.exe`, so inheriting the Windows PATH is not enough:\n"
+            "    mkdir -p /tmp/shims && ln -sfn '/mnt/c/Program Files/GitHub CLI/gh.exe' "
+            "/tmp/shims/gh && export PATH=/tmp/shims:$PATH\n"
+            "  Do NOT just run this from Windows instead. The snapshots stamp the version from "
+            "the INSTALLED package metadata, so they carry whatever THAT interpreter has — and "
+            "if it imports chimera from the source tree, cutting a release would install the "
+            "package there as a side effect of cutting it."
         )
     if subprocess.run(["gh", "auth", "status"], capture_output=True, check=False).returncode != 0:
         raise Stop("`gh` is installed but not logged in. Run `gh auth login` first.")
