@@ -419,8 +419,15 @@ export function Code() {
         </Button>
         {/* The typed field stays: someone who knows the path should not have to click through to
             it, and it is what the tests and a paste from a terminal both use. The picker is for
-            everyone else. */}
-        <Button size="sm" variant="ghost" onClick={() => setPicking((p) => !p)}>
+            everyone else.
+
+            `type="button"` is load-bearing, not tidiness. A `<button>` inside a `<form>` submits it
+            by default, so this one ran `switchProject(projectDraft)` as well as opening the picker
+            — and the natural way to reach for it is with an EMPTY field, because not wanting to
+            type is the reason you clicked. That switched the root to nothing and started a new
+            conversation before showing a single folder to choose from. Choosing is a navigation
+            gesture; it must not decide anything. */}
+        <Button size="sm" type="button" variant="ghost" onClick={() => setPicking((p) => !p)}>
           <Folder className="h-4 w-4" /> {t("code.picker.browse")}
         </Button>
       </form>

@@ -1477,11 +1477,20 @@ export interface paths {
         put?: never;
         /**
          * Cancel Run
-         * @description Ask a run to stop at its next boundary.
+         * @description Ask a run to stop, and stop waiting for it either way.
          *
-         *     Cooperative, and worth being precise about in the UI: the flag is read between units of
-         *     work, so a model call already in flight finishes and is charged. What it does buy is every
-         *     call that had not started — the queued workers, the verifier's re-ask, the synthesis.
+         *     Cooperative first: the flag is read between units of work, so a worker that is between
+         *     steps returns a real outcome and the run can report WHY it stopped. A model call already in
+         *     flight still finishes and is still charged — nothing can interrupt one.
+         *
+         *     What changed is what happens when the flag cannot be heard. It used to be nothing: a worker
+         *     stuck inside a model call never read it, and the batch went on waiting under a four-hour
+         *     default. Measured on rc13 — three workers all produced correct work, one reported, the run
+         *     sat at `done: false` for twenty-two minutes, and this endpoint answered
+         *     `{"ok": true, "cancelled": true}` to a run it could not touch. The wait now gives an
+         *     unresponsive unit a couple of seconds to leave cleanly and then abandons it, so the run
+         *     concludes and the screen stops spinning. An abandoned worker produced no outcome, so its
+         *     worktree is discarded rather than merged: stopping still cannot land half an edit.
          *
          *     An unknown or finished id is ``{ok: false}`` with a 200, never a 404: a run that already
          *     ended is exactly the state a stale Stop click lands in.
@@ -4475,6 +4484,11 @@ export interface components {
             frames: number;
             /** Kind */
             kind: string;
+            /**
+             * Orphaned
+             * @default false
+             */
+            orphaned: boolean;
             /** Run Id */
             run_id: string;
             /** Started */

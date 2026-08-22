@@ -79,11 +79,32 @@ def call_with_deadline(fn: Callable[[], T], timeout: float | None) -> T:
     return outcome.value  # type: ignore[return-value]
 
 
+#: How often a cancelled wait looks up. Short enough that Stop feels immediate, long enough that a
+#: batch of a handful of units costs nothing to poll. Only reached when a caller passes
+#: ``cancelled`` — without one the wait is a single blocking call, exactly as before.
+_CANCEL_POLL_S = 0.2
+
+#: How long a cancelled unit is given to stop by ITSELF before it is abandoned.
+#:
+#: Cooperative stopping is the better path and must stay the primary one: a unit that reads the
+#: flag between steps returns a real outcome, so the caller learns *why* it stopped and can report
+#: it. Abandoning only ever says *that* it stopped. Without this grace, adding the backstop turned
+#: every clean cancel into an abandonment — caught by a test written for an older defect, where a
+#: worker that used to be reported as rejected started arriving as a failure instead.
+#:
+#: Two seconds because the cooperative check happens the moment the current step returns; a unit
+#: already on its way out takes milliseconds, and one that is truly stuck is stuck inside a model
+#: call that has up to ``CHIMERA_REQUEST_TIMEOUT`` to run. Anything longer is the hang again with a
+#: smaller number on it.
+_CANCEL_GRACE_S = 2.0
+
+
 def run_all_with_deadline(
     units: list[tuple[str, Callable[[], T]]],
     *,
     max_workers: int,
     timeout: float | None,
+    cancelled: Callable[[], bool] | None = None,
 ) -> dict[str, Outcome[T]]:
     """Run every unit concurrently and wait at most ``timeout`` for **the whole batch**.
 
@@ -94,6 +115,21 @@ def run_all_with_deadline(
     immediately and only ``max_workers`` of them run at once. Callers here submit batches sized by a
     human (a handful of parallel agents), and a thread parked on a semaphore costs a stack — a queue
     would buy nothing and need its own shutdown story.
+
+    ``cancelled`` ends the WAIT, which is the only thing a cancel can end.
+
+    Cooperative stop flags are read between units — before one starts, after its model call
+    returns — so a unit stuck *inside* a model call never reads one, and this function went on
+    waiting for an outcome that would not arrive. Measured: a crew whose three workers had all
+    finished correct work sat at `done: false` for twenty-two minutes, and Stop answered
+    `{"ok": true, "cancelled": true}` to a run it could not touch. The deadline underneath is
+    ``CHIMERA_BATCH_TIMEOUT``, four hours, in a desktop app with somebody watching.
+
+    An abandoned unit keeps running on its daemon thread and its result is discarded — the same
+    contract :func:`call_with_deadline` documents, and the only thing Python allows. What matters
+    downstream is that it has NO outcome: ``timed_out`` stays true, so a caller filtering on
+    success (``run_isolated`` merges only units that succeeded) discards its work rather than
+    landing half of it.
     """
     gate = threading.Semaphore(max(1, max_workers))
     outcomes: dict[str, Outcome[T]] = {name: Outcome(name) for name, _ in units}
@@ -103,8 +139,39 @@ def run_all_with_deadline(
     deadline = None if timeout is None else time.monotonic() + timeout
     for outcome in outcomes.values():
         remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
-        outcome.done.wait(remaining)
+        if cancelled is None:
+            outcome.done.wait(remaining)
+            continue
+        _wait_unless_cancelled(outcome, remaining, cancelled)
     return outcomes
+
+
+def _wait_unless_cancelled(
+    outcome: Outcome[T], remaining: float | None, cancelled: Callable[[], bool]
+) -> None:
+    """Wait for one outcome, abandoning it shortly after the caller's flag goes up.
+
+    Shortly, not immediately — see :data:`_CANCEL_GRACE_S`. A unit that stops by itself returns a
+    real outcome and can say why; abandoning is the backstop for the one that cannot hear.
+
+    The flag is read before the first sleep as well as between them, so a Stop that arrived while
+    the batch was being assembled does not buy a poll interval per unit.
+    """
+    end = None if remaining is None else time.monotonic() + remaining
+    abandon_at: float | None = None
+    while True:
+        now = time.monotonic()
+        if abandon_at is None and cancelled():
+            abandon_at = now + _CANCEL_GRACE_S
+        limits = [x for x in (end, abandon_at) if x is not None]
+        if limits:
+            left = min(limits) - now
+            if left <= 0:
+                return
+            if outcome.done.wait(min(_CANCEL_POLL_S, left)):
+                return
+        elif outcome.done.wait(_CANCEL_POLL_S):
+            return
 
 
 def _spawn(

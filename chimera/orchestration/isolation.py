@@ -98,6 +98,7 @@ def run_isolated(
     succeeded: Callable[[T], bool] = lambda _: True,
     max_workers: int = 4,
     timeout: float | None = None,
+    cancelled: Callable[[], bool] | None = None,
 ) -> IsolatedBatch[T]:
     """Run each unit in its own git worktree concurrently; merge non-conflicting edits back.
 
@@ -109,6 +110,12 @@ def run_isolated(
     ``timeout`` bounds the WHOLE batch in wall-clock seconds. Omitting it does **not** mean
     *forever* — it means the deployment's ``CHIMERA_BATCH_TIMEOUT`` (see :func:`_batch_deadline`,
     which explains why the default lives there and not in each caller). Pass ``0`` for no bound.
+
+    ``cancelled`` stops WAITING for units that have not finished. The deadline above is four hours
+    by default, which is a reasonable bound for a batch job and an absurd one for a person who has
+    pressed Stop: a unit stuck inside a model call never reads a cooperative flag, so without this
+    the batch waited out the whole four hours for it. A unit abandoned this way has no outcome,
+    fails ``succeeded``, and is therefore NOT merged — cancelling cannot land half an edit.
     """
     workspace = Path(workspace).resolve()
     if not units:
@@ -130,9 +137,11 @@ def run_isolated(
             [(name, partial(fn, paths[name])) for name, fn in units],
             max_workers=max_workers,
             timeout=deadline,
+            cancelled=cancelled,
         )
+        stopped = bool(cancelled and cancelled())
         for name, _ in units:
-            results[name] = _collect(outcomes[name], trees[name], succeeded, deadline)
+            results[name] = _collect(outcomes[name], trees[name], succeeded, deadline, stopped)
         conflicts, merged = _merge_back(workspace, trees, results)
     finally:
         for tree in trees.values():
@@ -149,9 +158,13 @@ def _collect(
     tree: GitWorktree | None,
     succeeded: Callable[[T], bool],
     timeout: float | None,
+    stopped: bool = False,
 ) -> IsolatedResult[T]:
     if slot.timed_out:
-        return IsolatedResult(slot.name, ok=False, error=f"timed out after {timeout}s")
+        # "timed out after 14400.0s" would be a lie told to the person who pressed Stop four
+        # seconds ago, and the reason a unit was dropped is the whole content of this field.
+        reason = "cancelled before it finished" if stopped else f"timed out after {timeout}s"
+        return IsolatedResult(slot.name, ok=False, error=reason)
     if slot.error is not None:
         return IsolatedResult(
             slot.name, ok=False, error=f"{type(slot.error).__name__}: {slot.error}"

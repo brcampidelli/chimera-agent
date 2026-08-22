@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Scale } from "lucide-react";
 import { getWorth, type ProfileWorth } from "@/lib/api";
+import { DelegationSavings } from "@/components/orchestration/DelegationSavings";
 import { useT, type TFunc } from "@/lib/i18n";
 
 /** A group's cost, or the honest absence of one.
@@ -77,6 +78,9 @@ export function WorthPanel({ workspace }: { workspace?: string } = {}) {
           <h2 className="text-sm font-semibold text-foreground">{t("code.worth.title")}</h2>
         </div>
         <p className="text-xs text-muted-foreground">{t("code.worth.empty")}</p>
+        {/* Still rendered here: an orchestrated run leaves a delegation receipt without leaving a
+            profile row, so "nothing to show" about profiles is not "nothing to show". */}
+        <DelegationSavings />
       </div>
     );
   }
@@ -112,6 +116,7 @@ export function WorthPanel({ workspace }: { workspace?: string } = {}) {
         <p className="text-xs text-warn">{t("code.worth.tooFew", { n: readable_n })}</p>
       ) : null}
       <p className="text-xs text-muted-foreground">{t("code.worth.notAnExperiment")}</p>
+      <DelegationSavings />
     </div>
   );
 }

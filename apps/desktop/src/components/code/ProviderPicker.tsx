@@ -4,7 +4,20 @@ import { getDoctor } from "@/lib/api";
 import { focusRing } from "@/components/ui/focus";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { useT } from "@/lib/i18n";
+import { type TFunc, useT } from "@/lib/i18n";
+
+/** The agent's note in the reader's language, falling back to the server's English.
+ *
+ * `t` answers a key it does not have with the key itself, which is a useful default everywhere
+ * except a tooltip: "code.provider.note.my-adapter" is worse than a sentence in the wrong language.
+ * A `custom` provider someone registered has no entry here and never will, so the server's own
+ * `notes` is the honest fallback rather than a blank or an identifier.
+ */
+function translatedNote(t: TFunc, key: string, fallback: string): string {
+  const dictKey = `code.provider.note.${key}`;
+  const note = t(dictKey);
+  return note === dictKey ? fallback : note;
+}
 
 /**
  * Who does the work: Chimera's own loop, or an agent you already trust.
@@ -66,7 +79,21 @@ export function ProviderPicker({
         {agents.map((agent) => (
           <Tooltip
             key={agent.key}
-            label={agent.available ? agent.notes : t("code.provider.missing", { hint: agent.install_hint })}
+            // Both halves of this sentence come from the dictionary now.
+            //
+            // `install_hint` is a command, so it is interpolated rather than translated — but it
+            // used to carry prose too, and that prose arrived in English inside an otherwise
+            // Portuguese tooltip. `notes` was worse: shown raw, it was English end to end for
+            // every agent that IS installed, which is the case a user sees most.
+            //
+            // Falling back to the server's string keeps an agent we have no key for legible
+            // rather than blank — a `custom` provider someone added is still an agent, and an
+            // empty tooltip explains less than an untranslated one.
+            label={
+              agent.available
+                ? translatedNote(t, agent.key, agent.notes)
+                : t("code.provider.missing", { hint: agent.install_hint })
+            }
           >
             <button
               type="button"

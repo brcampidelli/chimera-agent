@@ -33,6 +33,7 @@ const DYNAMIC = [
   "code.posture.reach.",
   "code.posture.saysPause.",
   "code.posture.saysShell.",
+  "code.provider.note.",
   "code.roles.profile.",
   "crew.approach.",
   "crew.status.",

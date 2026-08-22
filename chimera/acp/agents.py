@@ -29,7 +29,14 @@ class AcpAgentSpec:
     #: needs a key — so the exception is named here, one variable at a time. Passing the whole
     #: environment would be easier and would hand every future adapter every key on the machine.
     passthrough_env: tuple[str, ...] = ()
-    #: What to say when the program is missing. The install line, not "not found".
+    #: The command that installs this agent, and NOTHING else — no prose around it.
+    #:
+    #: The desktop splices this field into a translated sentence ("Not installed here — run {hint}"),
+    #: so prose kept in here arrives untranslated: a Portuguese tooltip read "Não instalado aqui —
+    #: npm i -g @google/gemini-cli (the ACP mode is flagged experimental upstream)". A command must
+    #: not be translated and a sentence must, so one string holding both forces every UI to pick a
+    #: single wrong answer for the pair. Anything explanatory belongs in ``notes``, which the
+    #: desktop renders from its own dictionary.
     install_hint: str = ""
     #: True when the agent has file and shell tools of its own, so our handlers are an offer it can
     #: decline. Drives the sentence the posture note has to show; see the package docstring.
@@ -46,8 +53,8 @@ CLAUDE = AcpAgentSpec(
     label="Claude Code",
     argv=["npx", "-y", "@agentclientprotocol/claude-agent-acp"],
     passthrough_env=("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "CLAUDE_CONFIG_DIR"),
-    install_hint="needs Node 22+ and npx on PATH (npm i -g @agentclientprotocol/claude-agent-acp)",
-    notes="Uses the Claude Agent SDK, which has its own file and shell tools.",
+    install_hint="npm i -g @agentclientprotocol/claude-agent-acp",
+    notes="Needs Node 22+ and npx on PATH. Uses the Claude Agent SDK, which has its own file and shell tools.",
 )
 
 GEMINI = AcpAgentSpec(
@@ -55,7 +62,7 @@ GEMINI = AcpAgentSpec(
     label="Gemini CLI",
     argv=["gemini", "--experimental-acp"],
     passthrough_env=("GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_APPLICATION_CREDENTIALS"),
-    install_hint="npm i -g @google/gemini-cli (the ACP mode is flagged experimental upstream)",
+    install_hint="npm i -g @google/gemini-cli",
     notes="ACP mode is experimental upstream and its behaviour may change between releases.",
 )
 
@@ -66,7 +73,7 @@ CUSTOM = AcpAgentSpec(
     key="custom",
     label="Custom command",
     argv=[],
-    install_hint="set the command yourself (chimera.acp.command)",
+    install_hint="chimera.acp.command",
     notes="Whatever you point it at. Chimera makes no claim about what it does with your files.",
 )
 

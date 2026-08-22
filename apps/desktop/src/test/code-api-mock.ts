@@ -65,6 +65,13 @@ export function makeCodeApiMock() {
     getPostureFacts: vi.fn(),
     getRoleModels: vi.fn(),
     getWorth: vi.fn(),
+    // The Worth tab hosts the delegation panel and the Orchestration tab hosts the run list, so
+    // both endpoints are reached by screens these tests render. Defaulted to "nothing recorded"
+    // rather than left out: an absent export throws where an empty one renders the empty state,
+    // which is what a fresh install actually shows.
+    getDelegations: vi.fn(async () => ({ summary: null })),
+    getOrchestrationRuns: vi.fn(async () => ({ runs: [] })),
+    getOrchestrationFrames: vi.fn(async () => ({ run_id: "", frames: [], seq: 0 })),
     // Git and the cost table moved to the Work screen, which also mounts Runs and Agents on its
     // other tabs — and a tab that is not shown still renders its screen's shared queries. Mounting
     // a bigger host means mocking a bigger surface; leaving these out fails as "No export is

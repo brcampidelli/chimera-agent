@@ -14,6 +14,9 @@ import { renderWithProviders } from "@/test/utils";
 import type { HierarchyPreview } from "@/lib/types";
 
 vi.mock("@/lib/api", () => ({
+  // The history list mounts on this screen, so its endpoint has to exist in the mock.
+  getOrchestrationRuns: vi.fn(async () => ({ runs: [] })),
+  getOrchestrationFrames: vi.fn(async () => ({ run_id: "", frames: [], seq: 0 })),
   previewHierarchy: vi.fn(),
   streamHierarchy: vi.fn(),
   cancelOrchestration: vi.fn(),

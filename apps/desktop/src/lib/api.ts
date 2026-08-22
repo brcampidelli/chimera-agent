@@ -1573,6 +1573,12 @@ export const getOrchestrationRuns = () =>
        *  leaves a transcript that stops, and calling that finished would turn a crash into a
        *  completed run in the one list built to find them again. */
       done: boolean;
+      /** Unfinished AND not being worked on by the server right now.
+       *
+       *  `done: false` covered two states a reader has to tell apart. One measured run sat at five
+       *  frames for twenty-two minutes with every worker process gone, and on the wire it was
+       *  indistinguishable from one that was still thinking. */
+      orphaned: boolean;
     }[];
   }>("/api/orchestration/runs");
 
