@@ -314,6 +314,17 @@ class IsolatedCrew:
             succeeded=lambda outcome: outcome.verified,  # merge only verified workers
             max_workers=self.max_workers,
             timeout=timeout,
+            # The stop flag reaches the WAIT as well as the workers now.
+            #
+            # The two checks inside `run_worker` are read between units — before one starts and
+            # after its model turn returns — so a worker stuck inside that turn never reads one and
+            # the batch went on waiting for it under a four-hour default. Measured: three workers
+            # all produced correct work, one reported, and the run sat at `done: false` for
+            # twenty-two minutes while Stop replied that it had cancelled.
+            #
+            # Safe by the same rule as before: an abandoned worker has no `WorkerOutcome`, so
+            # `succeeded` is False and its worktree is discarded rather than merged.
+            cancelled=self.should_stop,
         )
         transcript: list[AgentMessage] = []
         failures: dict[str, str] = {}

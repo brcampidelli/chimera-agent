@@ -406,6 +406,17 @@ class OrchRunSummaryOut(BaseModel):
     leaves a transcript that stops, and calling that finished would turn a crash into a completed
     run in the one list built to find them again."""
 
+    orphaned: bool = False
+    """Not finished, and nothing in this process is running it either.
+
+    Computed, never stored: a run is orphaned when its transcript says unfinished and its id is
+    absent from the live cancel registry, which every in-flight run is entered into for the whole
+    of its life. That combination means the thread is gone — the process was restarted, or it died.
+
+    Without it, `done: false` covered two states a reader has to tell apart: still working, and
+    abandoned. One measured run sat at five frames for twenty-two minutes with every worker
+    process gone, and nothing on the wire distinguished it from one that was still thinking."""
+
 
 class OrchRunsOut(BaseModel):
     runs: list[OrchRunSummaryOut]  # newest first
@@ -885,11 +896,20 @@ def register_orchestration_api(
         response_model=OrchCancelOut,
     )
     def cancel_run(run_id: str) -> dict[str, Any]:
-        """Ask a run to stop at its next boundary.
+        """Ask a run to stop, and stop waiting for it either way.
 
-        Cooperative, and worth being precise about in the UI: the flag is read between units of
-        work, so a model call already in flight finishes and is charged. What it does buy is every
-        call that had not started — the queued workers, the verifier's re-ask, the synthesis.
+        Cooperative first: the flag is read between units of work, so a worker that is between
+        steps returns a real outcome and the run can report WHY it stopped. A model call already in
+        flight still finishes and is still charged — nothing can interrupt one.
+
+        What changed is what happens when the flag cannot be heard. It used to be nothing: a worker
+        stuck inside a model call never read it, and the batch went on waiting under a four-hour
+        default. Measured on rc13 — three workers all produced correct work, one reported, the run
+        sat at `done: false` for twenty-two minutes, and this endpoint answered
+        `{"ok": true, "cancelled": true}` to a run it could not touch. The wait now gives an
+        unresponsive unit a couple of seconds to leave cleanly and then abandons it, so the run
+        concludes and the screen stops spinning. An abandoned worker produced no outcome, so its
+        worktree is discarded rather than merged: stopping still cannot land half an edit.
 
         An unknown or finished id is ``{ok: false}`` with a 200, never a 404: a run that already
         ended is exactly the state a stale Stop click lands in.
@@ -911,7 +931,17 @@ def register_orchestration_api(
         """
         home = Path(read_settings().home)
         runlog.prune(home)
-        return {"runs": [OrchRunSummaryOut(**vars(s)).model_dump() for s in runlog.recent(home)]}
+        return {
+            "runs": [
+                OrchRunSummaryOut(
+                    **vars(s),
+                    # Live registry, not the transcript: only this process knows which runs it is
+                    # actually working on, and that is exactly the fact the file cannot carry.
+                    orphaned=not s.done and s.run_id not in _orch_cancels,
+                ).model_dump()
+                for s in runlog.recent(home)
+            ]
+        }
 
     @app.get(
         "/api/orchestration/runs/{run_id}", dependencies=[guard], response_model=OrchFramesOut

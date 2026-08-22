@@ -5164,6 +5164,11 @@
             "title": "Kind",
             "type": "string"
           },
+          "orphaned": {
+            "default": false,
+            "title": "Orphaned",
+            "type": "boolean"
+          },
           "run_id": {
             "title": "Run Id",
             "type": "string"
@@ -10062,7 +10067,7 @@
     },
     "/api/orchestration/runs/{run_id}/cancel": {
       "post": {
-        "description": "Ask a run to stop at its next boundary.\n\nCooperative, and worth being precise about in the UI: the flag is read between units of\nwork, so a model call already in flight finishes and is charged. What it does buy is every\ncall that had not started \u2014 the queued workers, the verifier's re-ask, the synthesis.\n\nAn unknown or finished id is ``{ok: false}`` with a 200, never a 404: a run that already\nended is exactly the state a stale Stop click lands in.",
+        "description": "Ask a run to stop, and stop waiting for it either way.\n\nCooperative first: the flag is read between units of work, so a worker that is between\nsteps returns a real outcome and the run can report WHY it stopped. A model call already in\nflight still finishes and is still charged \u2014 nothing can interrupt one.\n\nWhat changed is what happens when the flag cannot be heard. It used to be nothing: a worker\nstuck inside a model call never read it, and the batch went on waiting under a four-hour\ndefault. Measured on rc13 \u2014 three workers all produced correct work, one reported, the run\nsat at `done: false` for twenty-two minutes, and this endpoint answered\n`{\"ok\": true, \"cancelled\": true}` to a run it could not touch. The wait now gives an\nunresponsive unit a couple of seconds to leave cleanly and then abandons it, so the run\nconcludes and the screen stops spinning. An abandoned worker produced no outcome, so its\nworktree is discarded rather than merged: stopping still cannot land half an edit.\n\nAn unknown or finished id is ``{ok: false}`` with a 200, never a 404: a run that already\nended is exactly the state a stale Stop click lands in.",
         "operationId": "cancel_run_api_orchestration_runs__run_id__cancel_post",
         "parameters": [
           {
