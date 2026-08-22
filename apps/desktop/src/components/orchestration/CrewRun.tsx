@@ -2,7 +2,7 @@ import { useEffect, useReducer } from "react";
 import { AlertTriangle, Check, FolderGit2, Loader2, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/panel";
-import { streamCrew, type CrewRunInput } from "@/lib/api";
+import { streamCrew, type CrewRunInput, type OrchFrame } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { applyCrewFrame, EMPTY_CREW, isCrewRunning, type CrewWorkerState } from "@/lib/orchestration-run";
 import { cn } from "@/lib/utils";
@@ -174,11 +174,34 @@ function CrewWorkerCard({ worker }: { worker: CrewWorkerState }) {
   );
 }
 
-export function CrewRun({ request }: { request: CrewRunInput }) {
+export function CrewRun({
+  request,
+  resume,
+}: {
+  /** Start a run. Absent when `resume` is given — a transcript is read, never re-run. */
+  request?: CrewRunInput;
+  /** A past run's frames, replayed through the same reducer the live stream feeds.
+   *
+   *  Crew runs were being written to disk and could never be read back: `HierarchyRun` had this
+   *  and this one did not, so half of what the run list offers was unopenable. A crew is the more
+   *  expensive of the two — N workers, each with its own worktree — which makes it the worse half
+   *  to lose. */
+  resume?: OrchFrame[];
+}) {
   const t = useT();
   const [state, dispatch] = useReducer(applyCrewFrame, EMPTY_CREW);
 
   useEffect(() => {
+    if (!resume) return;
+    // One pass, no stream. This run ended, or died with the process that was running it; either
+    // way nothing more is coming, and re-running it would spend the money again to reproduce an
+    // answer that is already on disk.
+    for (const frame of resume) dispatch(frame);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!request) return;
     const controller = new AbortController();
     void streamCrew(
       request,

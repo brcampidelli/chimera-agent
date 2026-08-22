@@ -20,7 +20,7 @@ pytest.importorskip("sse_starlette")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from chimera.config import Settings  # noqa: E402
-from chimera.core.agent import PartialSpend, _SPEND_ATTR  # noqa: E402
+from chimera.core.agent import _SPEND_ATTR, PartialSpend  # noqa: E402
 from chimera.core.context_budget import RunState  # noqa: E402
 from chimera.interface import ChatSession  # noqa: E402
 

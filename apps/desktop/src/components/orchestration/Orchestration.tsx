@@ -16,6 +16,7 @@ import { CrewRun } from "./CrewRun";
 import { HierarchyRun } from "./HierarchyRun";
 import { forgetRun, resumeFrames } from "./resume";
 import { PlanPreview } from "./PlanPreview";
+import { RunHistory } from "./RunHistory";
 
 /**
  * Orchestration: describe a task, see what the orchestrator would do with it, then run it.
@@ -50,6 +51,11 @@ export function Orchestration({
   // threw the answer away and kept the bill.
   const [resumed, setResumed] = useState<OrchFrame[] | null>(null);
   const [crew, setCrew] = useState<{ at: number; request: CrewRunInput } | null>(null);
+  // A run opened from the history. Keyed by its own id so opening a second one replaces the first
+  // rather than replaying into a component that already holds another run's frames.
+  const [opened, setOpened] = useState<{ runId: string; kind: string; frames: OrchFrame[] } | null>(
+    null,
+  );
 
   useEffect(() => {
     // Once, on mount. A run started in THIS session is already on screen; this is for the one that
@@ -69,6 +75,7 @@ export function Orchestration({
     // Asking for a new plan is saying the old run is done with. Leaving it on screen under a fresh
     // plan would put two runs in one column with nothing saying which is which.
     setResumed(null);
+    setOpened(null);
     forgetRun();
     // Cleared before the request, not after it. Leaving the previous plan up while a new one
     // loads shows a decomposition for the PREVIOUS task next to the current text — and the
@@ -158,6 +165,28 @@ export function Orchestration({
         <HierarchyRun key="resumed" resume={resumed} onOpenCode={onOpenCode} />
       ) : null}
       {crew ? <CrewRun key={crew.at} request={crew.request} /> : null}
+
+      {/* A run opened from the list, replayed. Both kinds, because both were being written to disk
+          and only one of them could ever be read back. */}
+      {opened ? (
+        opened.kind === "crew" ? (
+          <CrewRun key={opened.runId} resume={opened.frames} />
+        ) : (
+          <HierarchyRun key={opened.runId} resume={opened.frames} onOpenCode={onOpenCode} />
+        )
+      ) : null}
+
+      {/* Last, because it is the archive and not the work. Hidden while something is live on this
+          screen: two runs in one column with nothing saying which is which is the confusion the
+          resume path already avoids. */}
+      {!run && !crew ? (
+        <RunHistory
+          onOpen={(picked) => {
+            setResumed(null);
+            setOpened(picked);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
