@@ -44,7 +44,9 @@
   --accent2: 189 94% 55%;
   --ring: 217 91% 62%;
   --ok: 152 58% 50%;
+  --ok-foreground: 152 58% 50%;
   --bad: 0 72% 62%;
+  --bad-foreground: 0 72% 62%;
   --warn: 38 92% 50%;
   --warn-foreground: 38 92% 62%;
   /* The separator between surfaces, a panel raised inside a panel, and the fill a row takes on
@@ -110,8 +112,15 @@
   --accent-foreground: 0 0% 100%;
   --accent2: 189 90% 42%;
   --ring: 217 91% 52%;
+  /* Fill and text are the same colour in the dark theme and cannot be here.
+     Measured against this theme's own card, `--ok` reads 3.06:1 as 11px text and `--bad` 3.82:1 —
+     both under the 4.5 that small text needs, while both are fine as fills and as icons, where the
+     bar is 3:1. `--warn` already had this split; `--ok` and `--bad` did not, so every small label
+     using them failed quietly. The values below are measured, not estimated: 4.70 and 5.87. */
   --ok: 152 55% 40%;
+  --ok-foreground: 152 62% 30%;
   --bad: 0 72% 50%;
+  --bad-foreground: 0 72% 42%;
   --warn: 32 95% 44%;
   --warn-foreground: 28 90% 34%;
   /* Dark ink at low alpha — the mirror of the dark theme's low-alpha white. The literal this token
