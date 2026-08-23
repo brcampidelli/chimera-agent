@@ -101,6 +101,13 @@ function ProjectRow({
  * to file work against (the card waits in the backlog until it does), and a dropdown would quietly
  * make "the agents you have right now" the limit of what you can plan for.
  */
+/** Lanes the server always registers, whatever the agent registry holds.
+ *
+ *  Duplicated from `chimera/api/features.py`, and `tests/test_builtin_lanes_agree.py` fails if the
+ *  two ever disagree — the server is the source of truth, this is a copy that cannot drift quietly.
+ */
+export const BUILT_IN_LANES = ["solve", "crew"];
+
 function AddCard({
   onAdd,
   known,
@@ -114,7 +121,15 @@ function AddCard({
   const [lane, setLane] = useState("solve");
   // Suggested, not enforced. A datalist offers the agents that exist without closing the field to
   // an agent that does not exist yet — which is the whole reason the lane is text and not a select.
-  const unknown = lane.trim() !== "" && known.length > 0 && !known.includes(lane.trim());
+  //
+  // BUILT_IN_LANES is here because this warned about its own default. The field starts on "solve",
+  // `known` is the AGENT registry, and a built-in lane is never in it — so the moment you registered
+  // your first agent, a form you had not touched started saying the one lane that always works does
+  // not exist. Backwards twice over: adding an agent is what triggered it, and the accusation was
+  // aimed at the runner with no way to be missing.
+  const trimmed = lane.trim();
+  const unknown =
+    trimmed !== "" && known.length > 0 && !known.includes(trimmed) && !BUILT_IN_LANES.includes(trimmed);
 
   return (
     <form
