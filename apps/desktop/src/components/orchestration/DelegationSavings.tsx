@@ -19,6 +19,12 @@ import { useT } from "@/lib/i18n";
  *   cost is modelled. A saving quoted against a number that was never observed is a projection,
  *   and calling it a measurement is how a benchmark stops being worth anything.
  * - **How many were estimated is on screen**, not folded into the total.
+ * - **A loss is not printed as a saving.** `token_saving` is `counterfactual − measured`: a SIGNED
+ *   net, negative whenever the fan-out cost more than doing it inline. This printed it verbatim
+ *   into "{n} tokens saved", so a real screen read "-12,961 tokens saved", and the dollar line was
+ *   `text-ok` green either way. The two halves can also disagree honestly — more tokens on cheaper
+ *   models is fewer dollars, which is the whole point of routing by role — so they are decided
+ *   separately rather than from one verdict.
  */
 export function DelegationSavings() {
   const t = useT();
@@ -30,6 +36,10 @@ export function DelegationSavings() {
   }
 
   const priced = summary.usd_saving !== null && summary.usd_saving !== undefined;
+  // Split before formatting, and `Math.abs` before the sentence: the minus sign belongs to the
+  // wording, not to a number sitting inside a phrase that already says "saved".
+  const tokens = summary.token_saving ?? 0;
+  const usd = summary.usd_saving ?? 0;
   return (
     <section className="space-y-1.5 border-t border-hairline p-3">
       <div className="flex items-center gap-2 text-accent">
@@ -37,16 +47,16 @@ export function DelegationSavings() {
         <h2 className="text-sm font-semibold text-foreground">{t("orch.saving.title")}</h2>
       </div>
 
-      <p className="text-xs text-foreground">
-        {t("orch.saving.tokens", {
-          n: (summary.token_saving ?? 0).toLocaleString(),
+      <p className={tokens < 0 ? "text-xs text-warn" : "text-xs text-foreground"}>
+        {t(tokens < 0 ? "orch.saving.tokensMore" : "orch.saving.tokens", {
+          n: Math.abs(tokens).toLocaleString(),
           runs: summary.n,
         })}
       </p>
 
       {priced ? (
-        <p className="text-xs tabular-nums text-ok">
-          {t("orch.saving.usd", { usd: (summary.usd_saving ?? 0).toFixed(4) })}
+        <p className={usd < 0 ? "text-xs tabular-nums text-warn" : "text-xs tabular-nums text-ok"}>
+          {t(usd < 0 ? "orch.saving.usdMore" : "orch.saving.usd", { usd: Math.abs(usd).toFixed(4) })}
         </p>
       ) : (
         <p className="text-xs text-warn">

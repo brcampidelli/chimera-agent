@@ -799,6 +799,8 @@ const en: Dict = {
   "code.roles.verify": "Verify",
   "code.roles.verifyNote": "runs your command — no model, nothing to choose",
   "code.roles.default": "default",
+  "code.roles.everyStep": "Every step",
+  "code.roles.oneModel": "use one model for everything",
   "code.roles.panel": "panel",
   "code.roles.unproven":
     "Routing each role to a different model is NOT yet measured. See bench/role_routing — until that runs, this is a choice about cost and models, not a claim that it works better.",
@@ -1040,6 +1042,8 @@ const en: Dict = {
   "orch.saving.title": "Delegation",
   "orch.saving.tokens": "{n} tokens saved across {runs} delegated runs, against an estimated single-agent run.",
   "orch.saving.usd": "≈ ${usd} saved",
+  "orch.saving.tokensMore": "{n} tokens MORE than an estimated single-agent run, across {runs} delegated runs.",
+  "orch.saving.usdMore": "≈ ${usd} more",
   "orch.saving.unpriced": "cost unknown — {priced} of {n} runs had a price",
   "orch.saving.estimated": "{n} of {total} estimated",
   "orch.plan.parallel": "Parallel reading",
@@ -1914,6 +1918,8 @@ const pt: Dict = {
   "code.roles.verify": "Verificar",
   "code.roles.verifyNote": "roda o seu comando — sem modelo, nada a escolher",
   "code.roles.default": "padrão",
+  "code.roles.everyStep": "Todas as etapas",
+  "code.roles.oneModel": "usar um modelo só para tudo",
   "code.roles.panel": "painel",
   "code.roles.unproven":
     "Rotear cada papel para um modelo diferente AINDA não foi medido. Veja bench/role_routing — até isso rodar, esta é uma escolha de custo e de modelos, não uma alegação de que funciona melhor.",
@@ -2157,6 +2163,8 @@ const pt: Dict = {
   "orch.saving.title": "Delegação",
   "orch.saving.tokens": "{n} tokens economizados em {runs} corridas delegadas, contra uma corrida de agente único estimada.",
   "orch.saving.usd": "≈ US$ {usd} economizados",
+  "orch.saving.tokensMore": "{n} tokens A MAIS que uma corrida de agente único estimada, em {runs} corridas delegadas.",
+  "orch.saving.usdMore": "≈ US$ {usd} a mais",
   "orch.saving.unpriced": "custo desconhecido — {priced} de {n} corridas tinham preço",
   "orch.saving.estimated": "{n} de {total} estimadas",
   "orch.plan.parallel": "Leitura paralela",
@@ -3040,6 +3048,8 @@ const es: Dict = {
   "code.roles.verify": "Verificar",
   "code.roles.verifyNote": "ejecuta tu comando — sin modelo, nada que elegir",
   "code.roles.default": "por defecto",
+  "code.roles.everyStep": "Cada paso",
+  "code.roles.oneModel": "usar un solo modelo para todo",
   "code.roles.panel": "panel",
   "code.roles.unproven":
     "Enrutar cada rol a un modelo distinto AÚN no está medido. Ver bench/role_routing — hasta que se ejecute, esto es una elección de coste y de modelos, no una afirmación de que funcione mejor.",
@@ -3285,6 +3295,8 @@ const es: Dict = {
   "orch.saving.title": "Delegación",
   "orch.saving.tokens": "{n} tokens ahorrados en {runs} ejecuciones delegadas, frente a una ejecución de un solo agente estimada.",
   "orch.saving.usd": "≈ ${usd} ahorrados",
+  "orch.saving.tokensMore": "{n} tokens MÁS que una ejecución de un solo agente estimada, en {runs} ejecuciones delegadas.",
+  "orch.saving.usdMore": "≈ US$ {usd} más",
   "orch.saving.unpriced": "costo desconocido: {priced} de {n} ejecuciones tenían precio",
   "orch.saving.estimated": "{n} de {total} estimadas",
   "orch.plan.parallel": "Lectura paralela",
@@ -4179,6 +4191,8 @@ const fr: Dict = {
   "code.roles.verifyNote":
     "exécute votre commande — aucun modèle, rien à choisir",
   "code.roles.default": "par défaut",
+  "code.roles.everyStep": "Chaque étape",
+  "code.roles.oneModel": "utiliser un seul modèle pour tout",
   "code.roles.panel": "panel",
   "code.roles.unproven":
     "Router chaque rôle vers un modèle différent n'est PAS encore mesuré. Voir bench/role_routing — tant que ce n'est pas exécuté, c'est un choix de coût et de modèles, pas une affirmation que cela marche mieux.",
@@ -4426,6 +4440,8 @@ const fr: Dict = {
   "orch.saving.title": "Délégation",
   "orch.saving.tokens": "{n} jetons économisés sur {runs} exécutions déléguées, face à une exécution mono-agent estimée.",
   "orch.saving.usd": "≈ {usd} $ économisés",
+  "orch.saving.tokensMore": "{n} tokens de PLUS qu'une exécution à agent unique estimée, sur {runs} exécutions déléguées.",
+  "orch.saving.usdMore": "≈ {usd} $ de plus",
   "orch.saving.unpriced": "coût inconnu — {priced} des {n} exécutions avaient un prix",
   "orch.saving.estimated": "{n} sur {total} estimées",
   "orch.plan.parallel": "Lecture parallèle",
@@ -5317,6 +5333,8 @@ const de: Dict = {
   "code.roles.verifyNote":
     "führt deinen Befehl aus — kein Modell, nichts zu wählen",
   "code.roles.default": "Standard",
+  "code.roles.everyStep": "Jeder Schritt",
+  "code.roles.oneModel": "ein Modell für alles verwenden",
   "code.roles.panel": "Panel",
   "code.roles.unproven":
     "Jede Rolle auf ein eigenes Modell zu routen ist NOCH NICHT gemessen. Siehe bench/role_routing — bis das läuft, ist das eine Entscheidung über Kosten und Modelle, keine Behauptung, dass es besser funktioniert.",
@@ -5564,6 +5582,8 @@ const de: Dict = {
   "orch.saving.title": "Delegation",
   "orch.saving.tokens": "{n} Token gespart über {runs} delegierte Läufe, gegenüber einem geschätzten Einzelagenten-Lauf.",
   "orch.saving.usd": "≈ {usd} $ gespart",
+  "orch.saving.tokensMore": "{n} Token MEHR als ein geschätzter Lauf mit einem einzigen Agenten, über {runs} delegierte Läufe.",
+  "orch.saving.usdMore": "≈ {usd} $ mehr",
   "orch.saving.unpriced": "Kosten unbekannt — {priced} von {n} Läufen hatten einen Preis",
   "orch.saving.estimated": "{n} von {total} geschätzt",
   "orch.plan.parallel": "Paralleles Lesen",
@@ -6387,6 +6407,8 @@ const zh: Dict = {
   "code.roles.verify": "验证",
   "code.roles.verifyNote": "执行你的命令——没有模型，无从选择",
   "code.roles.default": "默认",
+  "code.roles.everyStep": "每一步",
+  "code.roles.oneModel": "所有步骤使用同一个模型",
   "code.roles.panel": "面板",
   "code.roles.unproven":
     "把每个角色路由到不同模型这件事尚未被测量。见 bench/role_routing——在那跑完之前，这只是关于成本和模型的选择，不是它更好用的主张。",
@@ -6624,6 +6646,8 @@ const zh: Dict = {
   "orch.saving.title": "委派",
   "orch.saving.tokens": "在 {runs} 次委派运行中节省 {n} 个 token，对比一次估算的单代理运行。",
   "orch.saving.usd": "≈ 节省 {usd} 美元",
+  "orch.saving.tokensMore": "在 {runs} 次委派运行中，比估算的单智能体运行多用了 {n} 个 token。",
+  "orch.saving.usdMore": "≈ 多花 ${usd}",
   "orch.saving.unpriced": "成本未知 — {n} 次运行中只有 {priced} 次有价格",
   "orch.saving.estimated": "{total} 次中有 {n} 次为估算",
   "orch.plan.parallel": "并行阅读",
@@ -7501,6 +7525,8 @@ const ja: Dict = {
   "code.roles.verifyNote":
     "あなたのコマンドを実行します — モデルはなく、選ぶものもありません",
   "code.roles.default": "デフォルト",
+  "code.roles.everyStep": "すべての段階",
+  "code.roles.oneModel": "すべてを 1 つのモデルで",
   "code.roles.panel": "パネル",
   "code.roles.unproven":
     "役割ごとに別のモデルへ振り分けることは、まだ測定されていません。bench/role_routing を参照してください — それが走るまで、これはコストとモデルの選択であって、より良く動くという主張ではありません。",
@@ -7744,6 +7770,8 @@ const ja: Dict = {
   "orch.saving.title": "委譲",
   "orch.saving.tokens": "{runs} 件の委譲実行で {n} トークンを節約（単一エージェント実行の推定値との比較）。",
   "orch.saving.usd": "≈ {usd} ドルの節約",
+  "orch.saving.tokensMore": "{runs} 件の委譲実行で、単一エージェントの推定より {n} トークン多く使いました。",
+  "orch.saving.usdMore": "≈ ${usd} 多い",
   "orch.saving.unpriced": "コスト不明 — {n} 件中 {priced} 件に価格がありました",
   "orch.saving.estimated": "{total} 件中 {n} 件が推定",
   "orch.plan.parallel": "並列読み取り",
@@ -8631,6 +8659,8 @@ const it: Dict = {
   "code.roles.verifyNote":
     "esegue il tuo comando — nessun modello, niente da scegliere",
   "code.roles.default": "predefinito",
+  "code.roles.everyStep": "Ogni passo",
+  "code.roles.oneModel": "usare un solo modello per tutto",
   "code.roles.panel": "panel",
   "code.roles.unproven":
     "Instradare ogni ruolo su un modello diverso NON è ancora misurato. Vedi bench/role_routing — finché non viene eseguito, questa è una scelta di costo e di modelli, non un'affermazione che funzioni meglio.",
@@ -8876,6 +8906,8 @@ const it: Dict = {
   "orch.saving.title": "Delega",
   "orch.saving.tokens": "{n} token risparmiati su {runs} esecuzioni delegate, rispetto a una stimata esecuzione con un solo agente.",
   "orch.saving.usd": "≈ ${usd} risparmiati",
+  "orch.saving.tokensMore": "{n} token IN PIÙ rispetto a un'esecuzione con un solo agente stimata, su {runs} esecuzioni delegate.",
+  "orch.saving.usdMore": "≈ {usd} $ in più",
   "orch.saving.unpriced": "costo sconosciuto — {priced} su {n} esecuzioni avevano un prezzo",
   "orch.saving.estimated": "{n} su {total} stimate",
   "orch.plan.parallel": "Lettura parallela",
@@ -9756,6 +9788,8 @@ const pl: Dict = {
   "code.roles.verifyNote":
     "uruchamia twoje polecenie — bez modelu, nie ma czego wybierać",
   "code.roles.default": "domyślny",
+  "code.roles.everyStep": "Każdy krok",
+  "code.roles.oneModel": "użyj jednego modelu do wszystkiego",
   "code.roles.panel": "panel",
   "code.roles.unproven":
     "Kierowanie każdej roli do innego modelu NIE zostało jeszcze zmierzone. Zobacz bench/role_routing — dopóki to nie zostanie uruchomione, jest to wybór kosztu i modeli, a nie twierdzenie, że działa lepiej.",
@@ -10001,6 +10035,8 @@ const pl: Dict = {
   "orch.saving.title": "Delegowanie",
   "orch.saving.tokens": "Zaoszczędzono {n} tokenów w {runs} delegowanych uruchomieniach, wobec szacowanego uruchomienia jednym agentem.",
   "orch.saving.usd": "≈ {usd} $ oszczędności",
+  "orch.saving.tokensMore": "{n} tokenów WIĘCEJ niż szacowany przebieg z jednym agentem, w {runs} przebiegach delegowanych.",
+  "orch.saving.usdMore": "≈ {usd} $ więcej",
   "orch.saving.unpriced": "koszt nieznany — {priced} z {n} uruchomień miało cenę",
   "orch.saving.estimated": "{n} z {total} oszacowanych",
   "orch.plan.parallel": "Czytanie równoległe",
@@ -10887,6 +10923,8 @@ const ru: Dict = {
   "code.roles.verifyNote":
     "выполняет вашу команду — модели нет, выбирать нечего",
   "code.roles.default": "по умолчанию",
+  "code.roles.everyStep": "Каждый шаг",
+  "code.roles.oneModel": "использовать одну модель для всего",
   "code.roles.panel": "панель",
   "code.roles.unproven":
     "Направление каждой роли к своей модели ПОКА не измерено. Смотрите bench/role_routing — пока это не запущено, перед вами выбор про стоимость и модели, а не утверждение, что так лучше.",
@@ -11132,6 +11170,8 @@ const ru: Dict = {
   "orch.saving.title": "Делегирование",
   "orch.saving.tokens": "Сэкономлено {n} токенов за {runs} делегированных запусков против расчётного запуска одним агентом.",
   "orch.saving.usd": "≈ ${usd} экономии",
+  "orch.saving.tokensMore": "на {n} токенов БОЛЬШЕ, чем оценочный запуск с одним агентом, за {runs} делегированных запусков.",
+  "orch.saving.usdMore": "≈ на ${usd} больше",
   "orch.saving.unpriced": "стоимость неизвестна — цена была у {priced} из {n} запусков",
   "orch.saving.estimated": "{n} из {total} расчётные",
   "orch.plan.parallel": "Параллельное чтение",

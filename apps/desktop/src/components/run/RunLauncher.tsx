@@ -7,7 +7,8 @@ import { Panel } from "@/components/ui/panel";
 import { Switch } from "@/components/ui/switch";
 import { PausedRunCard } from "@/components/run/PausedRunCard";
 import { focusRing } from "@/components/ui/focus";
-import { getPausedRuns, type RunEvent } from "@/lib/api";
+import { NO_OVERRIDE, RolesBar, toRoleModels, type RoleOverride } from "@/components/code/RolesBar";
+import { getPausedRuns, type Profile, type RunEvent } from "@/lib/api";
 import { useRunSession } from "@/lib/run-session";
 import { useT, type TFunc } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -41,6 +42,13 @@ export function RunLauncher({
   const [ws, setWs] = useState("");
   const [maxAttempts, setMaxAttempts] = useState(3);
   const [pauseOnTaint, setPauseOnTaint] = useState(false);
+  // Who does what. `touched` is not decoration: `worth.py` groups evidence by
+  // (profile, profile_source), so a run that got the default and a run somebody deliberately set
+  // to "max" must not be counted as the same thing. Sending `profile_source: "user"` for a form
+  // nobody touched would fabricate exactly that.
+  const [profile, setProfile] = useState<Profile>("balanced");
+  const [roles, setRoles] = useState<RoleOverride>(NO_OVERRIDE);
+  const [touched, setTouched] = useState(false);
   // Runs parked before this window opened. A pause outlives the stream that reported it, so the
   // only way to see one you did not personally witness is to ask.
   const parked = useQuery({ queryKey: ["runs", "paused"], queryFn: getPausedRuns });
@@ -58,8 +66,11 @@ export function RunLauncher({
     max_attempts: maxAttempts,
     thread_id: threadId,
     pause_on_taint: pauseOnTaint,
-    // No profile picker on this screen either, so the receipt must not say a person picked one.
-    profile_source: "system",
+    // `/api/runs` has always accepted both — `app.py` routes plan, edit and review off them — and
+    // this screen sent neither, so every run here took the built-in tiers no matter what.
+    profile,
+    roles: toRoleModels(roles),
+    profile_source: touched ? "user" : "system",
   });
 
   function start() {
@@ -118,6 +129,23 @@ export function RunLauncher({
           disabled={running}
         />
       )}
+      {/* Beside the attempt budget rather than behind a settings screen: which model writes the
+          patch is a property of THIS run, and the receipt it produces is grouped by it. */}
+      <div className="border-t border-hairline pt-3">
+        <RolesBar
+          profile={profile}
+          onProfile={(p) => {
+            setProfile(p);
+            setTouched(true);
+          }}
+          override={roles}
+          onOverride={(o) => {
+            setRoles(o);
+            setTouched(true);
+          }}
+          disabled={running}
+        />
+      </div>
       <div className="flex items-center gap-3">
         <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
           {t("runs.maxAttempts")}

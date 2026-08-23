@@ -3,59 +3,103 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * The three columns of the Code screen have to be able to shrink, or one paints over the panel.
+ * The Code screen's row has three columns and only one of them is allowed to give ground.
  *
- * A flex child defaults to `min-width: auto`, which refuses to go below its content's intrinsic
- * width. With the file viewer open the row holds three columns, and the conversation column simply
- * would not give ground: the viewer was pushed past the row's right edge and its code painted
- * across the activity panel.
+ * A flex child defaults to `min-width: auto` and refuses to shrink below its content. Get the roles
+ * wrong and the row overflows into the activity panel beside it, which does not move.
  *
- * Measured in the running app at a 1600px viewport — which is what a 2000px screenshot looks like
- * under Windows' 125% display scaling, and why it did not reproduce at first:
+ * Two rounds of this, and the second is why the check now encodes ROLES rather than a class string:
  *
- *     before   code ends 1511 · panel starts 1312 · overlap 199px
- *              elementFromPoint at the panel's edge returned `code.hljs`
- *     after    code ends 1301 · panel starts 1312 · gap 11px
- *              elementFromPoint returned the panel's own content
+ *     rc16   the inner Conversation div and the viewer got `min-w-0`; the row's own flex-1 child
+ *            did not. At 1600px that was enough. At **1280** the conversation held 778px of a
+ *            936px row, the viewer was crushed to 0.67px, and the pair painted 82px into the panel.
+ *            Found by hit-testing a grid inside the panel: the composer strip and the transcript
+ *            bubbles were what landed there — the code was innocent that time.
  *
- * `min-h-0` was already on both columns, guarding the vertical axis. Nothing guarded the horizontal
- * one, and the horizontal one is where a long line lives.
+ *     now    the sidebar is a fixed rail (`shrink-0`), the viewer is a fixed width (`shrink-0`,
+ *            and `min-w-0` so its own long lines still clip), and the conversation is the one that
+ *            absorbs (`flex-1 min-w-0`).
  *
- * This is a source check because jsdom has no layout engine: `getBoundingClientRect` returns zeros
- * there, so a test that measured the overlap would pass on a broken build for the wrong reason. It
- * asserts the declaration instead, and says so rather than pretending to measure.
+ * A source check rather than a measurement, and that is a limitation worth stating: jsdom has no
+ * layout engine, so a test that measured the overlap would pass on a broken build for the wrong
+ * reason. What catches a NEW breaking width is driving the real app, not this file.
  */
 
 const SRC = join(__dirname, "..", "..");
 
+/** The line DECLARING one column: it carries the marker and it is a `className=` line.
+ *
+ * The `className=` half is not belt and braces. The first version matched on the marker alone and
+ * found the COMMENT above the viewer — which mentions `lg:w-[28rem]` while explaining why the class
+ * is there — and then reported the class as missing. That is the fourth time in this codebase a
+ * check has read prose about code as code, so the rule is now written into the matcher rather than
+ * left to whoever picks the next marker.
+ */
+function columnLine(file: string, marker: string): string {
+  const source = readFileSync(join(SRC, file), "utf8");
+  const line = source
+    .split("\n")
+    .find((l) => l.includes(marker) && l.includes("className=") && !l.trimStart().startsWith("//"));
+  if (!line) throw new Error(`no className line matching ${marker} in ${file}`);
+  return line;
+}
+
 const COLUMNS = [
   {
-    file: join(SRC, "components", "code", "Conversation.tsx"),
-    marker: "relative flex min-h-0",
-    what: "the conversation column",
+    what: "the session sidebar",
+    file: join("components", "code", "SessionSidebar.tsx"),
+    marker: "<aside className=",
+    must: ["w-60", "shrink-0", "min-h-0"],
+    mustNot: ["flex-1"],
   },
   {
-    file: join(SRC, "components", "Code.tsx"),
-    marker: "flex min-h-0 min-w-0 flex-col border-hairline lg:w-[28rem]",
-    what: "the file viewer column",
+    what: "the conversation — the column that absorbs",
+    file: join("components", "Code.tsx"),
+    marker: "<main className=",
+    must: ["flex-1", "min-w-0", "min-h-0"],
+    mustNot: ["shrink-0"],
+  },
+  {
+    what: "the file viewer",
+    file: join("components", "Code.tsx"),
+    marker: "lg:w-[28rem]",
+    must: ["min-w-0", "shrink-0", "min-h-0"],
+    mustNot: ["flex-1"],
+  },
+  {
+    what: "the conversation's inner column",
+    file: join("components", "code", "Conversation.tsx"),
+    marker: 'className="relative flex',
+    must: ["min-w-0", "min-h-0", "flex-1"],
+    mustNot: [],
   },
 ];
 
-describe("the Code screen's columns", () => {
-  it.each(COLUMNS)("$what declares min-w-0", ({ file, marker }) => {
-    const source = readFileSync(file, "utf8");
-    const line = source.split("\n").find((l) => l.includes(marker));
-
-    expect(line, `no element matching ${marker}`).toBeDefined();
-    expect(line).toContain("min-w-0");
+describe("the Code screen's three columns", () => {
+  it.each(COLUMNS)("$what declares $must", ({ file, marker, must }) => {
+    const line = columnLine(file, marker);
+    for (const cls of must) expect(line, `missing ${cls}`).toContain(cls);
   });
 
-  it("keeps min-h-0 as well — the fix adds an axis, it does not swap one", () => {
-    for (const { file, marker } of COLUMNS) {
-      const line = readFileSync(file, "utf8")
-        .split("\n")
-        .find((l) => l.includes(marker));
-      expect(line).toContain("min-h-0");
-    }
+  it.each(COLUMNS.filter((c) => c.mustNot.length))(
+    "$what does not claim what belongs to another column",
+    ({ file, marker, mustNot }) => {
+      const line = columnLine(file, marker);
+      for (const cls of mustNot) expect(line, `should not carry ${cls}`).not.toContain(cls);
+    },
+  );
+
+  it("has exactly one column that grows", () => {
+    // The property the whole layout rests on. Two growing columns is how the row stops having a
+    // single answer to "who gives ground", and one is how the file viewer ended up at 0.67px.
+    const growers = COLUMNS.filter((c) => {
+      const line = columnLine(c.file, c.marker);
+      return /\bflex-1\b/.test(line) && !/\bshrink-0\b/.test(line);
+    });
+
+    expect(growers.map((c) => c.what)).toEqual([
+      "the conversation — the column that absorbs",
+      "the conversation's inner column",
+    ]);
   });
 });
