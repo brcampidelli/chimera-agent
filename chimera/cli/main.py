@@ -842,7 +842,16 @@ def bench_rag(
 
     from chimera.eval import run_rag_bench
 
-    with tempfile.TemporaryDirectory() as tmp:
+    # `ignore_cleanup_errors` because the index is SQLite and this is Windows.
+    #
+    # The bench leaves its connection open, and Windows refuses to delete a file another handle
+    # holds — so the cleanup raised `PermissionError(13)` and took the whole measurement with it,
+    # after the measurement had already succeeded. Caught by the Windows CI job, which exists for
+    # exactly this family of Unix assumption.
+    #
+    # The scratch index is worth nothing once the report is printed. Failing to remove it must not
+    # fail the thing it was for.
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         report = run_rag_bench(
             Path(root), index_path=Path(tmp) / "index.db", k=k, max_probes=max_probes
         )
