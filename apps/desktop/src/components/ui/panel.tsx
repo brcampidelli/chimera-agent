@@ -49,9 +49,13 @@ export function Panel({ title, action, children }: { title?: string; action?: Re
 type Tone = "muted" | "ok" | "warn" | "bad" | "accent";
 const tones: Record<Tone, string> = {
   muted: "bg-surface-2 text-muted-foreground ring-1 ring-hairline",
-  ok: "bg-ok/15 text-ok ring-1 ring-ok/20",
+  // Fill and ring take the plain token; the LABEL takes the -foreground pair. `warn` already did
+  // this and the other two did not, which is the whole defect: measured on the light theme, `text-ok`
+  // reads 3.06:1 as 11px text and `text-bad` 3.82:1, both under the 4.5 small text needs. The dark
+  // theme passes on either, so the split only shows up on light — and only when read with a ruler.
+  ok: "bg-ok/15 text-ok-foreground ring-1 ring-ok/20",
   warn: "bg-warn/15 text-warn-foreground ring-1 ring-warn/25",
-  bad: "bg-bad/15 text-bad ring-1 ring-bad/25",
+  bad: "bg-bad/15 text-bad-foreground ring-1 ring-bad/25",
   accent: "bg-accent/15 text-accent ring-1 ring-accent/25",
 };
 

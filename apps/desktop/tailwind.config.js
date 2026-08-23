@@ -15,8 +15,8 @@ export default {
         accent: { DEFAULT: "hsl(var(--accent))", foreground: "hsl(var(--accent-foreground))" },
         accent2: "hsl(var(--accent2))",
         primary: { DEFAULT: "hsl(var(--primary))", foreground: "hsl(var(--primary-foreground))" },
-        ok: "hsl(var(--ok))",
-        bad: "hsl(var(--bad))",
+        ok: { DEFAULT: "hsl(var(--ok))", foreground: "hsl(var(--ok-foreground))" },
+        bad: { DEFAULT: "hsl(var(--bad))", foreground: "hsl(var(--bad-foreground))" },
         warn: { DEFAULT: "hsl(var(--warn))", foreground: "hsl(var(--warn-foreground))" },
         // The 1px separator between surfaces. Was written as `border-white/5` everywhere, which is
         // invisible on the light theme's white cards — this is a bug fix wearing a token's clothes.

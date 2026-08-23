@@ -44,6 +44,30 @@ function columnLine(file: string, marker: string): string {
   return line;
 }
 
+/** Rows INSIDE a column that hold controls, and must not push past it.
+ *
+ *  The columns guard below was written after two rounds of the row overflowing. It passed on rc18
+ *  while the conversation's own header ran 95px past its column and painted "Limpar" across the file
+ *  viewer's filename — 261px of buttons in a 248px column at 1280 with a viewer open.
+ *
+ *  A toolbar cannot both keep its buttons and fit, so the answer is `flex-wrap` rather than a clip:
+ *  hiding a working control to fix a layout is trading a visible bug for an invisible one.
+ */
+const TOOLBAR_ROWS = [
+  {
+    what: "the conversation header",
+    file: join("components", "code", "Conversation.tsx"),
+    marker: "border-b border-hairline px-3 py-2 text-accent",
+    must: ["flex-wrap"],
+  },
+  {
+    what: "the conversation header's button group",
+    file: join("components", "code", "Conversation.tsx"),
+    marker: "ml-auto flex min-w-0 items-center gap-1",
+    must: ["min-w-0"],
+  },
+];
+
 const COLUMNS = [
   {
     what: "the session sidebar",
@@ -88,6 +112,11 @@ describe("the Code screen's three columns", () => {
       for (const cls of mustNot) expect(line, `should not carry ${cls}`).not.toContain(cls);
     },
   );
+
+  it.each(TOOLBAR_ROWS)("$what can give ground rather than overflow", ({ file, marker, must }) => {
+    const line = columnLine(file, marker);
+    for (const cls of must) expect(line, `missing ${cls}`).toContain(cls);
+  });
 
   it("has exactly one column that grows", () => {
     // The property the whole layout rests on. Two growing columns is how the row stops having a

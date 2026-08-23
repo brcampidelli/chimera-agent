@@ -54,7 +54,20 @@ const styles = readStyles(join(process.cwd(), "src"));
 
 /** Source files excluding this gate and its data, which necessarily contain the banned patterns. */
 function appSources(): [string, string][] {
-  return Object.entries(sources).filter(([path]) => !path.includes("/design/"));
+  // What SHIPS. Two exclusions, and the first one was silently doing nothing.
+  //
+  // The keys `import.meta.glob` hands back are relative to THIS file, so a sibling in `src/design/`
+  // arrives as `./thing.ts` and a component as `../components/Thing.tsx`. Neither contains
+  // "/design/", so the old filter matched no file at all — it read as an exclusion and was a no-op.
+  // A guard on this folder's own files is the one thing it was written to prevent, and it took a
+  // new sibling that talks ABOUT colour to notice.
+  //
+  // Test files go too, for the reason that surfaced it: a test that asserts a literal colour is
+  // wrong has to contain that literal, and flagging it is the same class of mistake as reading a
+  // comment about `hsl()` as a call to it.
+  return Object.entries(sources).filter(
+    ([path]) => !path.startsWith("./") && !/\.test\.tsx?$/.test(path),
+  );
 }
 
 /** Every `className="…"` / `className={"…"}` string literal in the app, with its file. */

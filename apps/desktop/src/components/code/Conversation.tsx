@@ -876,13 +876,18 @@ export function Conversation({
     // real overlap, with `elementFromPoint` returning `code.hljs` where the panel should be.
     // `min-h-0` was already here guarding the vertical axis; the horizontal one had nothing.
     <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="flex items-center gap-2 border-b border-hairline px-3 py-2 text-accent">
+      {/* `flex-wrap`, because this header is 261px of buttons and the column it lives in is 248px
+          once a file viewer opens at 1280. Its toolbar ran 95px PAST the column and painted "Limpar"
+          across the viewer's filename — the same defect the three top-level columns had, one level
+          down. Clipping instead would have hidden working controls; wrapping keeps all three
+          reachable and costs 28px of height only at the widths where they would not have fit. */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-hairline px-3 py-2 text-accent">
         <MessageSquare className="h-4 w-4" />
         <h2 className="text-sm font-semibold text-foreground">
           {t("code.chat.title")}
         </h2>
         {exchanges.length > 0 ? (
-          <div className="ml-auto flex items-center gap-1">
+          <div className="ml-auto flex min-w-0 items-center gap-1">
             {/* A record of what an agent did to a repository should be able to leave the window it
                 happened in. Until this, the only clipboard call in the whole app copied a `pip
                 install` line. */}

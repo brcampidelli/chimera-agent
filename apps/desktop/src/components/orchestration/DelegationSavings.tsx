@@ -47,7 +47,7 @@ export function DelegationSavings() {
         <h2 className="text-sm font-semibold text-foreground">{t("orch.saving.title")}</h2>
       </div>
 
-      <p className={tokens < 0 ? "text-xs text-warn" : "text-xs text-foreground"}>
+      <p className={tokens < 0 ? "text-xs text-warn-foreground" : "text-xs text-foreground"}>
         {t(tokens < 0 ? "orch.saving.tokensMore" : "orch.saving.tokens", {
           n: Math.abs(tokens).toLocaleString(),
           runs: summary.n,
@@ -55,7 +55,7 @@ export function DelegationSavings() {
       </p>
 
       {priced ? (
-        <p className={usd < 0 ? "text-xs tabular-nums text-warn" : "text-xs tabular-nums text-ok"}>
+        <p className={usd < 0 ? "text-xs tabular-nums text-warn-foreground" : "text-xs tabular-nums text-ok-foreground"}>
           {t(usd < 0 ? "orch.saving.usdMore" : "orch.saving.usd", { usd: Math.abs(usd).toFixed(4) })}
         </p>
       ) : (
