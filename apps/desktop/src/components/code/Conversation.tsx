@@ -869,7 +869,13 @@ export function Conversation({
   }
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col">
+    // `min-w-0` is not decoration. A flex child defaults to `min-width: auto`, which refuses to
+    // shrink below its content — so with the file viewer open this column held its intrinsic width,
+    // pushed the viewer past the row's right edge, and the code painted OVER the activity panel.
+    // Measured at a 1600px viewport (a 2000px screenshot at Windows' 125% scaling): 199 pixels of
+    // real overlap, with `elementFromPoint` returning `code.hljs` where the panel should be.
+    // `min-h-0` was already here guarding the vertical axis; the horizontal one had nothing.
+    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="flex items-center gap-2 border-b border-hairline px-3 py-2 text-accent">
         <MessageSquare className="h-4 w-4" />
         <h2 className="text-sm font-semibold text-foreground">

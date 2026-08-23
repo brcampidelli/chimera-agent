@@ -6,6 +6,7 @@ import {
   Folder,
   FolderGit2,
   Loader2,
+  MessageSquare,
   Pencil,
   Save,
   X,
@@ -26,6 +27,7 @@ import { Conversation } from "@/components/code/Conversation";
 import { PostureNote } from "@/components/code/PostureNote";
 import { ModelPicker } from "@/components/code/ModelPicker";
 import { ProviderPicker } from "@/components/code/ProviderPicker";
+import { Tooltip } from "@/components/ui/tooltip";
 import { RolesBar } from "@/components/code/RolesBar";
 import { SessionSidebar } from "@/components/code/SessionSidebar";
 import { ProjectPicker } from "@/components/code/ProjectPicker";
@@ -437,6 +439,21 @@ export function Code() {
         <Button size="sm" type="button" variant="ghost" onClick={() => setPicking((p) => !p)}>
           <Folder className="h-4 w-4" /> {t("code.picker.browse")}
         </Button>
+        {/* The way out of a project, which did not exist.
+            A conversation with no workspace works — the turn runs, answers, is priced and reads
+            memory — and the sidebar already groups those under their own heading. What was missing
+            was any way to START one: once a folder was chosen, every new conversation inherited it,
+            and nothing on the screen let go. So the plain "ask it something" conversation was
+            reachable only by never having opened a project in the first place.
+            Only when there IS one to leave, and `switchProject("")` already does exactly the right
+            thing — clears the root, drops the session id, opens a new conversation. */}
+        {workspace ? (
+          <Tooltip label={t("code.noProject.hint")}>
+            <Button size="sm" type="button" variant="ghost" onClick={() => switchProject("")}>
+              <MessageSquare className="h-4 w-4" /> {t("code.noProject")}
+            </Button>
+          </Tooltip>
+        ) : null}
       </form>
       {picking ? (
         <div className="border-b border-hairline px-5 py-2">
@@ -560,8 +577,11 @@ export function Code() {
           ) : null}
         </main>
         {/* The viewer is a consequence of opening a file, not a permanent third of the window. */}
+        {/* `min-w-0` for the same reason as the conversation column beside it: a fixed
+            `lg:w-[28rem]` is a BASIS, not a ceiling, and a flex child without it will not shrink —
+            it overflowed the row instead and painted across the activity panel. */}
         {openFile ? (
-          <div className="flex min-h-0 flex-col border-hairline lg:w-[28rem] lg:border-l">
+          <div className="flex min-h-0 min-w-0 flex-col border-hairline lg:w-[28rem] lg:border-l">
             <Viewer workspace={workspace} path={openFile} />
           </div>
         ) : null}
