@@ -64,7 +64,7 @@
      Hues are picked off the existing accents (blue keyword, cyan type) so a highlighted file looks
      like it belongs to this app rather than to whichever editor theme was copied in. */
   --code-plain: 210 22% 91%;
-  --code-comment: 214 14% 52%;
+  --code-comment: 214 15% 57%;
   --code-keyword: 217 91% 72%;
   --code-string: 152 48% 62%;
   --code-number: 28 90% 68%;
@@ -148,7 +148,13 @@
      would be invisible rather than merely wrong, because the dark value is chosen to sit on a dark
      page. Darkened and desaturated: the same hues at dark-theme lightness are unreadable on white. */
   --code-plain: 222 47% 14%;
-  --code-comment: 222 12% 48%;
+  /* Measured on the editor's own ground, which is the page plus the active-line wash — NOT the
+     page alone, and not the wash's base colour either. Reading that base as the background is
+     what first produced a wrong number here: `222 40% 20%` looks dark, but at 5% over a near
+     white page it composites to rgb(231,234,240).
+     Both themes were under the bar on their own ground: 3.83:1 light, 4.42:1 dark. Now 5.28 and
+     5.26, still an order of magnitude quieter than `--code-plain` at ~14. */
+  --code-comment: 222 16% 40%;
   --code-keyword: 217 82% 42%;
   --code-string: 152 52% 30%;
   --code-number: 24 78% 38%;
