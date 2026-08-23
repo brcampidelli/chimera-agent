@@ -73,8 +73,22 @@ def installed_models(base_url: str, *, timeout_s: float = DEFAULT_TIMEOUT_S) -> 
     except ImportError:  # pragma: no cover — httpx is a hard dependency
         return InstalledModels(base, False, reason="unreachable")
 
+    # The deadline bounds the WHOLE probe, not each connection attempt.
+    #
+    # `timeout_s` is httpx's per-operation budget, and `localhost` resolves to both `::1` and
+    # `127.0.0.1`. When nothing is listening, neither refuses on every stack — so httpx tries them
+    # in turn and pays the full timeout each. Measured live: 4.4s against the 2.0s this module's
+    # own docstring promises, on every machine WITHOUT Ollama, which is most of them. And it is
+    # paid by the model picker as a whole, because listing calls this.
+    #
+    # An abandoned probe keeps running on its daemon thread and its answer is discarded — the same
+    # contract every other deadline here has, and harmless for a GET that changes nothing.
+    from chimera.concurrency import call_with_deadline
+
     try:
-        response = httpx.get(f"{base}/api/tags", timeout=timeout_s)
+        response = call_with_deadline(
+            lambda: httpx.get(f"{base}/api/tags", timeout=timeout_s), timeout_s
+        )
     except Exception as exc:  # noqa: BLE001 — an absent Ollama is a normal state, not a 500
         _log.debug("ollama tag list failed at %s: %s", base, exc)
         return InstalledModels(base, False, reason="unreachable")

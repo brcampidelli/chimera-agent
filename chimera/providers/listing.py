@@ -298,8 +298,18 @@ def available_models(
     Curated models come first, deduplicated against the remote list so a model that is both keeps
     its recommendation. Everything else keeps the remote catalogue's own order.
     """
-    providers = list(settings.configured_providers())
-    wants_openrouter = (provider or "").strip().lower() == "openrouter" or "openrouter" in providers
+    # A named provider REPLACES the configured set rather than being compared against one literal.
+    #
+    # It used to be tested only against `"openrouter"`, and the curated list below was built from
+    # `configured_providers()` — the very set this argument exists to stand in for. So the wizard's
+    # question, *what does this key buy*, was answered with whatever the machine already had:
+    # `provider=anthropic` returned 422 OpenRouter slugs, and so did `provider=nonsense`. Four
+    # different values, four byte-identical bodies.
+    #
+    # Replacing is what "regardless of the keys present" means. Absent, nothing changes for anyone.
+    named = (provider or "").strip().lower()
+    providers = [named] if named else list(settings.configured_providers())
+    wants_openrouter = "openrouter" in providers
 
     remote: tuple[ModelOption, ...] = ()
     reason: Reason = "" if wants_openrouter else "no_provider"
