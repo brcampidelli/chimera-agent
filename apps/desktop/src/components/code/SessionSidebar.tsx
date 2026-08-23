@@ -207,7 +207,7 @@ export function SessionSidebar({
                     className={cn(
                       "flex min-w-0 flex-1 items-center gap-1.5 px-3 py-1 text-left text-xs font-semibold",
                       project === workspace
-                        ? "text-accent"
+                        ? "text-accent-ink"
                         : "text-foreground/70 hover:text-foreground",
                     )}
                   >

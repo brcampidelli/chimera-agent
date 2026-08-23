@@ -159,14 +159,34 @@ describe("colour", () => {
     // variant map, so a className-only scan walks past them — which is the exact blind spot the
     // colour-literal test above documents having been written to avoid, and which this guard
     // inherited by reusing `classNameLiterals()`. Sabotage on two different tones proved it.
+    // Every quoted string, and every `cn(...)` call read as ONE class list.
+    //
+    // Three shapes had to be covered, each found only after the previous rule shipped:
+    //   1. size and colour in the same string   -> the original rule
+    //   2. a variant MAP, no size anywhere near -> caught by pairing `bg-x/NN` with `text-x`
+    //   3. size and colour in different ARMS of one `cn()` — `cn("... text-xs", on ? "text-accent"
+    //      : "...")`. Neither earlier rule sees it, and it is what left the project name in the
+    //      session sidebar at 4.29:1 after two rounds of sweeping.
     const strings: { file: string; value: string }[] = [];
+    const QUOTE = String.fromCharCode(34);
     for (const [file, text] of appSources()) {
-      // Split on the quote instead of matching. Written as a regex, the newline class became a
-      // real line break and the literal did not parse — the second time an escape has not
-      // survived being written into this file. Odd indices of a split on a quote ARE the quoted
-      // strings, exactly, with nothing to escape.
-      const chunks = text.split(String.fromCharCode(34));
+      const chunks = text.split(QUOTE);
       for (let i = 1; i < chunks.length; i += 2) strings.push({ file, value: chunks[i] });
+      // `cn(` spans, joined. Depth counting rather than a regex: a call can nest, and the arms
+      // are separated by commas that a flat match would not respect.
+      let at = text.indexOf("cn(");
+      while (at !== -1) {
+        let depth = 0;
+        let end = at + 2;
+        for (; end < text.length; end++) {
+          if (text[end] === "(") depth++;
+          else if (text[end] === ")") { depth--; if (depth === 0) break; }
+        }
+        const inner = text.slice(at, end).split(QUOTE);
+        const joined = inner.filter((_, i) => i % 2 === 1).join(" ");
+        if (joined) strings.push({ file, value: joined });
+        at = text.indexOf("cn(", end);
+      }
     }
     for (const { file, value } of strings) {
       const parts = value.split(" ").map((c) => c.trim()).filter(Boolean);

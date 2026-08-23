@@ -44,7 +44,7 @@ function Hits({
           <p
             className={cn(
               "sticky top-0 truncate bg-card/80 px-2 py-1 text-xs backdrop-blur",
-              path === activePath ? "text-accent" : "text-muted-foreground",
+              path === activePath ? "text-accent-ink" : "text-muted-foreground",
             )}
             title={path}
           >

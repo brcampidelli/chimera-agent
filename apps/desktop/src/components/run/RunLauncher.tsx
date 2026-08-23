@@ -210,7 +210,7 @@ export function RunLauncher({
           is judging this, a model will read the answer" — reached the user only afterwards, in the
           receipt, when the run was already over. A warning that arrives after the fact is a report. */}
       {run.verify ? (
-        <p className={cn("text-xs", run.verify.command ? "text-muted-foreground" : "text-warn")}>
+        <p className={cn("text-xs", run.verify.command ? "text-muted-foreground" : "text-warn-foreground")}>
           {run.verify.command
             ? t("runs.judgedBy", { cmd: run.verify.command, src: run.verify.source })
             : t("runs.judgedByModel")}

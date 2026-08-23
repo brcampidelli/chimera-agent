@@ -154,7 +154,7 @@ function CascadeRoute({ meta, t }: { meta: CascadeMeta; t: TFunc }) {
               <span
                 className={cn(
                   "min-w-0 flex-1 truncate font-mono text-xs",
-                  accepted ? "text-accent" : "text-foreground",
+                  accepted ? "text-accent-ink" : "text-foreground",
                 )}
               >
                 {meta.models[tier] ?? "—"}
