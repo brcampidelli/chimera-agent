@@ -56,7 +56,7 @@ const tones: Record<Tone, string> = {
   ok: "bg-ok/15 text-ok-foreground ring-1 ring-ok/20",
   warn: "bg-warn/15 text-warn-foreground ring-1 ring-warn/25",
   bad: "bg-bad/15 text-bad-foreground ring-1 ring-bad/25",
-  accent: "bg-accent/15 text-accent ring-1 ring-accent/25",
+  accent: "bg-accent/15 text-accent-ink ring-1 ring-accent/25",
 };
 
 export function Badge({

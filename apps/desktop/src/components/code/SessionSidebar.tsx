@@ -248,7 +248,7 @@ export function SessionSidebar({
                     className={cn(
                       "min-w-0 flex-1 truncate px-3 py-1 pl-8 text-left text-xs transition-colors duration-1 ease-out",
                       session.id === activeSession
-                        ? "bg-accent/15 text-accent"
+                        ? "bg-accent/15 text-accent-ink"
                         : "text-muted-foreground hover:text-foreground",
                     )}
                   >

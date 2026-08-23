@@ -115,7 +115,7 @@ export function VersionBadge() {
         onClick={() => setOpen((o) => !o)}
         className={cn(
           "inline-flex items-center gap-1.5 rounded-chip px-2 py-1 text-xs font-medium",
-          "bg-accent/15 text-accent ring-1 ring-accent/25 transition-colors hover:bg-accent/25",
+          "bg-accent/15 text-accent-ink ring-1 ring-accent/25 transition-colors hover:bg-accent/25",
         )}
       >
         <ArrowUpCircle className="h-3.5 w-3.5" />

@@ -128,7 +128,7 @@ export function SearchPanel({
           className={cn(
             "rounded p-1 transition-colors duration-1 ease-out",
             focusRing,
-            caseSensitive ? "bg-accent/20 text-accent" : "text-muted-foreground",
+            caseSensitive ? "bg-accent/20 text-accent-ink" : "text-muted-foreground",
           )}
         >
           <CaseSensitive className="h-3.5 w-3.5" />
@@ -142,7 +142,7 @@ export function SearchPanel({
           className={cn(
             "rounded p-1 transition-colors duration-1 ease-out",
             focusRing,
-            regex ? "bg-accent/20 text-accent" : "text-muted-foreground",
+            regex ? "bg-accent/20 text-accent-ink" : "text-muted-foreground",
           )}
         >
           <Regex className="h-3.5 w-3.5" />
