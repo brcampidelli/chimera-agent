@@ -48,11 +48,21 @@ export function ModelPicker({
   value,
   onChange,
   disabled,
+  fallback: fallbackOverride,
+  label,
 }: {
   /** The chosen slug, or "" for whatever the install's default is. */
   value: string;
   onChange: (slug: string) => void;
   disabled?: boolean;
+  /** What "no choice" resolves to HERE, when that is not the install default.
+   *
+   *  Beside a role, it is not: `Explorar` with nothing picked runs on the profile's weak tier, not
+   *  on the install default. Without this the row printed both — the install default in the chip
+   *  and the role's real model beside it — and the wrong one was the prominent one. */
+  fallback?: string;
+  /** Replaces the "MODEL" caption. A row that already says `Explorar` does not need it. */
+  label?: string | null;
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -73,7 +83,7 @@ export function ModelPicker({
   // $0.25 rather than GPT-5.5 at $5. A control that hides what it is set to is a control you have to
   // click to read.
   const doctor = useQuery({ queryKey: ["doctor"], queryFn: getDoctor });
-  const fallback = doctor.data?.default_model ?? "";
+  const fallback = fallbackOverride ?? doctor.data?.default_model ?? "";
 
   // The chosen slug's own tail rather than its label, because the label is a sentence ("DeepSeek:
   // DeepSeek V3.1") and this is a chip in an already crowded row. Same for the default's name: the
@@ -87,9 +97,11 @@ export function ModelPicker({
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs uppercase tracking-wider text-muted-foreground">
-          {t("model.pick.label")}
-        </span>
+        {label === null ? null : (
+          <span className="text-xs uppercase tracking-wider text-muted-foreground">
+            {label ?? t("model.pick.label")}
+          </span>
+        )}
         <button
           type="button"
           disabled={disabled}

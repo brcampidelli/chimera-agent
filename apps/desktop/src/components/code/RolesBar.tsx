@@ -70,6 +70,8 @@ export function RolesBar({
   compact,
   override,
   onOverride,
+  oneModel,
+  onOneModel,
 }: {
   profile: Profile;
   onProfile: (p: Profile) => void;
@@ -79,6 +81,9 @@ export function RolesBar({
   /** Per-role model choice. Omit both and the profile's tiers are shown read-only. */
   override?: RoleOverride;
   onOverride?: (o: RoleOverride) => void;
+  /** "One model does all four." Held by the caller, not derived — see the note by `single`. */
+  oneModel?: boolean;
+  onOneModel?: (v: boolean) => void;
 }) {
   const t = useT();
   const roles = useQuery({
@@ -89,11 +94,15 @@ export function RolesBar({
   // Narrowed once. Repeating `override && onOverride` at each use site made TS decide the second
   // half was always true and error on it — and read worse than the thing it was guarding.
   const pick = override && onOverride ? { value: override, set: onOverride } : null;
-  // "One model for everything" is a STATE, not a mode: it is true exactly when all four roles carry
-  // the same non-empty slug. A separate flag would let the checkbox and the rows disagree, and the
-  // disagreement would stay invisible until a run came back on a model nobody picked.
-  const single =
-    !!override && !!override.explore && ROLES.every((r) => override[r] === override.explore);
+  // A flag, and the first version's reasoning against one was wrong. Deriving "one model" from the
+  // four values cannot work, because THREE intents exist and two of them share the same values:
+  // "use the profile's tiers" and "one model, not chosen yet" are both four empty strings. Ticking
+  // the box before picking anything therefore did nothing at all — it wrote four blanks and the
+  // derivation read them back as "not single", so the box would not even stay ticked.
+  //
+  // What made a flag unsafe was drift between it and the rows. That is closed by construction here
+  // rather than by argument: while it is on, the only control rendered writes all four at once.
+  const single = !!oneModel;
 
   // Resolved server-side: the tiers honour the user's cost mode and per-tier settings, and a second
   // copy of that resolution here would display a model the run does not actually use.
@@ -136,22 +145,19 @@ export function RolesBar({
     <div key={role} className="flex items-baseline gap-2">
       <span className="w-20 shrink-0 text-muted-foreground">{t(ROLE_KEY[role])}</span>
       {pick ? (
-        <>
-          <ModelPicker
-            value={pick.value[role]}
-            onChange={(slug) => pick.set({ ...pick.value, [role]: slug })}
-            disabled={disabled}
-          />
-          {/* What the profile would give you, kept visible beside the picker rather than replaced by
-              it. The first version swapped one for the other, and the effect was that turning the
-              control ON hid the very information it exists to change: four empty fields where four
-              model names had been. A choice you cannot compare to the default is not a choice. */}
-          {pick.value[role] ? null : (
-            <span className="truncate font-mono text-foreground/60">
-              {resolved[role] ?? t("code.roles.default")}
-            </span>
-          )}
-        </>
+        // The role's OWN resolved model as the chip's "no choice" reading, and no caption — the row
+        // already says which role this is. Two earlier shapes were wrong in opposite directions: the
+        // first replaced the resolved slug with an empty field, hiding the information the control
+        // exists to change; the second showed both, and the chip's half was the INSTALL default, so
+        // `Explorar` read "padrão · deepseek-chat-v3.1" beside the mistral it actually runs on. Two
+        // model names on one row, and the prominent one wrong for that role.
+        <ModelPicker
+          value={pick.value[role]}
+          onChange={(slug) => pick.set({ ...pick.value, [role]: slug })}
+          fallback={resolved[role] ?? ""}
+          label={null}
+          disabled={disabled}
+        />
       ) : (
         <span className="truncate font-mono text-foreground/80">
           {resolved[role] ?? t("code.roles.default")}
@@ -175,6 +181,7 @@ export function RolesBar({
               onChange={(slug) =>
                 pick.set(Object.fromEntries(ROLES.map((r) => [r, slug])) as RoleOverride)
               }
+              label={null}
               disabled={disabled}
             />
           </div>
@@ -193,15 +200,19 @@ export function RolesBar({
               type="checkbox"
               checked={single}
               disabled={disabled}
-              onChange={(e) =>
+              onChange={(e) => {
+                onOneModel?.(e.target.checked);
+                // Collapse to whatever was already picked, so ticking the box never silently
+                // discards a choice — and untick clears, because four copies of one slug left
+                // behind would read as four deliberate per-role picks.
                 pick.set(
                   e.target.checked
                     ? (Object.fromEntries(
                         ROLES.map((r) => [r, pick.value.explore || pick.value.edit || ""]),
                       ) as RoleOverride)
                     : NO_OVERRIDE,
-                )
-              }
+                );
+              }}
             />
             {t("code.roles.oneModel")}
           </label>
