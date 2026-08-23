@@ -1,10 +1,45 @@
 import { useQuery } from "@tanstack/react-query";
 import { Layers } from "lucide-react";
+import { ModelPicker } from "@/components/code/ModelPicker";
 import { getRoleModels, type Profile } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const PROFILES: Profile[] = ["economy", "balanced", "max"];
+
+/** The four roles a model can be chosen for, in the order the loop runs them. */
+export const ROLES = ["explore", "plan", "edit", "review"] as const;
+export type Role = (typeof ROLES)[number];
+
+/** Written out rather than built with `code.roles.${role}`.
+ *
+ *  `i18n.reachable.test.ts` greps for each key as a literal and lists anything it cannot find as
+ *  dead. A template hides four keys from it, and the alternative — exempting the whole
+ *  `code.roles.` prefix — would hide eleven more that really could go dead unnoticed.
+ */
+const ROLE_KEY = {
+  explore: "code.roles.explore",
+  plan: "code.roles.plan",
+  edit: "code.roles.edit",
+  review: "code.roles.review",
+} as const;
+
+/** One slug per role, `""` meaning "whatever the profile resolves to". */
+export type RoleOverride = Record<Role, string>;
+
+export const NO_OVERRIDE: RoleOverride = { explore: "", plan: "", edit: "", review: "" };
+
+/** The override in the shape the API takes, or `null` when nothing was overridden.
+ *
+ *  `null` rather than an object of empty strings on purpose: `resolve()` merges field by field and
+ *  reads `None` as "keep the profile's answer", so sending an empty slug would be a request to run
+ *  that role on a model named empty-string.
+ */
+export function toRoleModels(o: RoleOverride): Record<string, string> | null {
+  const out: Record<string, string> = {};
+  for (const r of ROLES) if (o[r]) out[r] = o[r];
+  return Object.keys(out).length ? out : null;
+}
 
 /** Which model does what, and the sentence that keeps this a control rather than a claim.
  *
@@ -12,12 +47,16 @@ const PROFILES: Profile[] = ["economy", "balanced", "max"];
  *  localisation is a search, planning and review are judgements, writing the patch is neither. So
  *  this routes by role.
  *
- *  Two honesty constraints are visible in the markup rather than only in the backend.
+ *  Three honesty constraints are visible in the markup rather than only in the backend.
  *
  *  **Fusion appears on plan and review and nowhere else.** A "fuse" switch on the coding loop would
  *  be a lie: the router sends any turn carrying tool schemas to a single model, and every turn in a
  *  coding loop carries tools, so it would never fire and would report that it had. Planning and
  *  review are the two turns with no tools.
+ *
+ *  **Verify has no picker, and that is the point.** It runs the user's command. The thing that
+ *  decides whether the work was good is the one part with no opinion, which is what makes the rest
+ *  measurable at all — a field for it would imply a choice exists.
  *
  *  **The note at the bottom is not a disclaimer, it is the status.** Routing has not been measured
  *  yet (`bench/role_routing/PREREGISTRATION.md` is written and unfunded), and every competitor that
@@ -29,12 +68,17 @@ export function RolesBar({
   onProfile,
   disabled,
   compact,
+  override,
+  onOverride,
 }: {
   profile: Profile;
   onProfile: (p: Profile) => void;
   disabled?: boolean;
   /** Render as one row for the composer strip instead of a titled block. */
   compact?: boolean;
+  /** Per-role model choice. Omit both and the profile's tiers are shown read-only. */
+  override?: RoleOverride;
+  onOverride?: (o: RoleOverride) => void;
 }) {
   const t = useT();
   const roles = useQuery({
@@ -42,14 +86,27 @@ export function RolesBar({
     queryFn: () => getRoleModels(profile),
   });
 
+  // Narrowed once. Repeating `override && onOverride` at each use site made TS decide the second
+  // half was always true and error on it — and read worse than the thing it was guarding.
+  const pick = override && onOverride ? { value: override, set: onOverride } : null;
+  // "One model for everything" is a STATE, not a mode: it is true exactly when all four roles carry
+  // the same non-empty slug. A separate flag would let the checkbox and the rows disagree, and the
+  // disagreement would stay invisible until a run came back on a model nobody picked.
+  const single =
+    !!override && !!override.explore && ROLES.every((r) => override[r] === override.explore);
+
   // Resolved server-side: the tiers honour the user's cost mode and per-tier settings, and a second
   // copy of that resolution here would display a model the run does not actually use.
-  const rows: [string, string | null | undefined, boolean][] = [
-    [t("code.roles.explore"), roles.data?.explore, false],
-    [t("code.roles.plan"), roles.data?.plan, !!roles.data?.fuse_plan],
-    [t("code.roles.edit"), roles.data?.edit, false],
-    [t("code.roles.review"), roles.data?.review, !!roles.data?.fuse_review],
-  ];
+  const resolved: Record<Role, string | null | undefined> = {
+    explore: roles.data?.explore,
+    plan: roles.data?.plan,
+    edit: roles.data?.edit,
+    review: roles.data?.review,
+  };
+  const fused: Partial<Record<Role, boolean>> = {
+    plan: !!roles.data?.fuse_plan,
+    review: !!roles.data?.fuse_review,
+  };
 
   const picker = (
     <div className="flex overflow-hidden rounded-chip border border-border">
@@ -57,16 +114,16 @@ export function RolesBar({
         <button
           key={p}
           type="button"
-          // Same fix the worker picker took in rc13, and it was needed here for the same reason:
-          // this is a toggle group, and which one is chosen was said in colour and nowhere else.
-          // It stayed invisible because nothing rendered this control at all — surfacing it is
-          // what surfaced the gap.
+          // Same fix the worker picker took in rc13, and needed here for the same reason: this is a
+          // toggle group, and which one is chosen was said in colour and nowhere else.
           aria-pressed={profile === p}
           disabled={disabled}
           onClick={() => onProfile(p)}
           className={cn(
             "px-2.5 py-1 text-xs transition-colors disabled:opacity-50",
-            profile === p ? "bg-accent/20 text-accent" : "text-muted-foreground hover:text-foreground",
+            profile === p
+              ? "bg-accent/20 text-accent"
+              : "text-muted-foreground hover:text-foreground",
           )}
         >
           {t(`code.roles.profile.${p}` as const)}
@@ -75,25 +132,80 @@ export function RolesBar({
     </div>
   );
 
+  const roleRow = (role: Role) => (
+    <div key={role} className="flex items-baseline gap-2">
+      <span className="w-20 shrink-0 text-muted-foreground">{t(ROLE_KEY[role])}</span>
+      {pick ? (
+        <>
+          <ModelPicker
+            value={pick.value[role]}
+            onChange={(slug) => pick.set({ ...pick.value, [role]: slug })}
+            disabled={disabled}
+          />
+          {/* What the profile would give you, kept visible beside the picker rather than replaced by
+              it. The first version swapped one for the other, and the effect was that turning the
+              control ON hid the very information it exists to change: four empty fields where four
+              model names had been. A choice you cannot compare to the default is not a choice. */}
+          {pick.value[role] ? null : (
+            <span className="truncate font-mono text-foreground/60">
+              {resolved[role] ?? t("code.roles.default")}
+            </span>
+          )}
+        </>
+      ) : (
+        <span className="truncate font-mono text-foreground/80">
+          {resolved[role] ?? t("code.roles.default")}
+        </span>
+      )}
+      {fused[role] ? <span className="shrink-0 text-accent">· {t("code.roles.panel")}</span> : null}
+    </div>
+  );
+
   const table = (
     <details className="text-xs">
       <summary className="cursor-pointer text-muted-foreground">{t("code.roles.show")}</summary>
       <div className="mt-1.5 space-y-1">
-        {rows.map(([label, model, fused]) => (
-          <div key={label} className="flex items-baseline gap-2">
-            <span className="w-20 shrink-0 text-muted-foreground">{label}</span>
-            <span className="truncate font-mono text-foreground/80">
-              {model ?? t("code.roles.default")}
-            </span>
-            {fused ? <span className="shrink-0 text-accent">· {t("code.roles.panel")}</span> : null}
+        {pick && single ? (
+          // One picker, not four showing the same slug. Four would invite editing one of them, which
+          // silently leaves this state while the checkbox above still says "one model".
+          <div className="flex items-baseline gap-2">
+            <span className="w-20 shrink-0 text-muted-foreground">{t("code.roles.everyStep")}</span>
+            <ModelPicker
+              value={pick.value.explore}
+              onChange={(slug) =>
+                pick.set(Object.fromEntries(ROLES.map((r) => [r, slug])) as RoleOverride)
+              }
+              disabled={disabled}
+            />
           </div>
-        ))}
+        ) : (
+          ROLES.map(roleRow)
+        )}
         <div className="flex items-baseline gap-2">
           <span className="w-20 shrink-0 text-muted-foreground">{t("code.roles.verify")}</span>
           {/* The one row with no model, and the reason the rest can be measured at all: the thing
               that decides whether the work was good is the part with no opinion. */}
           <span className="text-muted-foreground">{t("code.roles.verifyNote")}</span>
         </div>
+        {pick ? (
+          <label className="flex items-center gap-2 pt-1 text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={single}
+              disabled={disabled}
+              onChange={(e) =>
+                pick.set(
+                  e.target.checked
+                    ? (Object.fromEntries(
+                        ROLES.map((r) => [r, pick.value.explore || pick.value.edit || ""]),
+                      ) as RoleOverride)
+                    : NO_OVERRIDE,
+                )
+              }
+            />
+            {t("code.roles.oneModel")}
+          </label>
+        ) : null}
       </div>
     </details>
   );
@@ -116,7 +228,7 @@ export function RolesBar({
   }
 
   return (
-    <div className="space-y-2 border-b border-hairline p-3">
+    <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
         <Layers className="h-4 w-4 text-accent" />
         <h2 className="text-sm font-semibold text-foreground">{t("code.roles.title")}</h2>

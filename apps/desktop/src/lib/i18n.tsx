@@ -799,6 +799,8 @@ const en: Dict = {
   "code.roles.verify": "Verify",
   "code.roles.verifyNote": "runs your command — no model, nothing to choose",
   "code.roles.default": "default",
+  "code.roles.everyStep": "Every step",
+  "code.roles.oneModel": "use one model for everything",
   "code.roles.panel": "panel",
   "code.roles.unproven":
     "Routing each role to a different model is NOT yet measured. See bench/role_routing — until that runs, this is a choice about cost and models, not a claim that it works better.",
@@ -1914,6 +1916,8 @@ const pt: Dict = {
   "code.roles.verify": "Verificar",
   "code.roles.verifyNote": "roda o seu comando — sem modelo, nada a escolher",
   "code.roles.default": "padrão",
+  "code.roles.everyStep": "Todas as etapas",
+  "code.roles.oneModel": "usar um modelo só para tudo",
   "code.roles.panel": "painel",
   "code.roles.unproven":
     "Rotear cada papel para um modelo diferente AINDA não foi medido. Veja bench/role_routing — até isso rodar, esta é uma escolha de custo e de modelos, não uma alegação de que funciona melhor.",
@@ -3040,6 +3044,8 @@ const es: Dict = {
   "code.roles.verify": "Verificar",
   "code.roles.verifyNote": "ejecuta tu comando — sin modelo, nada que elegir",
   "code.roles.default": "por defecto",
+  "code.roles.everyStep": "Cada paso",
+  "code.roles.oneModel": "usar un solo modelo para todo",
   "code.roles.panel": "panel",
   "code.roles.unproven":
     "Enrutar cada rol a un modelo distinto AÚN no está medido. Ver bench/role_routing — hasta que se ejecute, esto es una elección de coste y de modelos, no una afirmación de que funcione mejor.",
@@ -4179,6 +4185,8 @@ const fr: Dict = {
   "code.roles.verifyNote":
     "exécute votre commande — aucun modèle, rien à choisir",
   "code.roles.default": "par défaut",
+  "code.roles.everyStep": "Chaque étape",
+  "code.roles.oneModel": "utiliser un seul modèle pour tout",
   "code.roles.panel": "panel",
   "code.roles.unproven":
     "Router chaque rôle vers un modèle différent n'est PAS encore mesuré. Voir bench/role_routing — tant que ce n'est pas exécuté, c'est un choix de coût et de modèles, pas une affirmation que cela marche mieux.",
@@ -5317,6 +5325,8 @@ const de: Dict = {
   "code.roles.verifyNote":
     "führt deinen Befehl aus — kein Modell, nichts zu wählen",
   "code.roles.default": "Standard",
+  "code.roles.everyStep": "Jeder Schritt",
+  "code.roles.oneModel": "ein Modell für alles verwenden",
   "code.roles.panel": "Panel",
   "code.roles.unproven":
     "Jede Rolle auf ein eigenes Modell zu routen ist NOCH NICHT gemessen. Siehe bench/role_routing — bis das läuft, ist das eine Entscheidung über Kosten und Modelle, keine Behauptung, dass es besser funktioniert.",
@@ -6387,6 +6397,8 @@ const zh: Dict = {
   "code.roles.verify": "验证",
   "code.roles.verifyNote": "执行你的命令——没有模型，无从选择",
   "code.roles.default": "默认",
+  "code.roles.everyStep": "每一步",
+  "code.roles.oneModel": "所有步骤使用同一个模型",
   "code.roles.panel": "面板",
   "code.roles.unproven":
     "把每个角色路由到不同模型这件事尚未被测量。见 bench/role_routing——在那跑完之前，这只是关于成本和模型的选择，不是它更好用的主张。",
@@ -7501,6 +7513,8 @@ const ja: Dict = {
   "code.roles.verifyNote":
     "あなたのコマンドを実行します — モデルはなく、選ぶものもありません",
   "code.roles.default": "デフォルト",
+  "code.roles.everyStep": "すべての段階",
+  "code.roles.oneModel": "すべてを 1 つのモデルで",
   "code.roles.panel": "パネル",
   "code.roles.unproven":
     "役割ごとに別のモデルへ振り分けることは、まだ測定されていません。bench/role_routing を参照してください — それが走るまで、これはコストとモデルの選択であって、より良く動くという主張ではありません。",
@@ -8631,6 +8645,8 @@ const it: Dict = {
   "code.roles.verifyNote":
     "esegue il tuo comando — nessun modello, niente da scegliere",
   "code.roles.default": "predefinito",
+  "code.roles.everyStep": "Ogni passo",
+  "code.roles.oneModel": "usare un solo modello per tutto",
   "code.roles.panel": "panel",
   "code.roles.unproven":
     "Instradare ogni ruolo su un modello diverso NON è ancora misurato. Vedi bench/role_routing — finché non viene eseguito, questa è una scelta di costo e di modelli, non un'affermazione che funzioni meglio.",
@@ -9756,6 +9772,8 @@ const pl: Dict = {
   "code.roles.verifyNote":
     "uruchamia twoje polecenie — bez modelu, nie ma czego wybierać",
   "code.roles.default": "domyślny",
+  "code.roles.everyStep": "Każdy krok",
+  "code.roles.oneModel": "użyj jednego modelu do wszystkiego",
   "code.roles.panel": "panel",
   "code.roles.unproven":
     "Kierowanie każdej roli do innego modelu NIE zostało jeszcze zmierzone. Zobacz bench/role_routing — dopóki to nie zostanie uruchomione, jest to wybór kosztu i modeli, a nie twierdzenie, że działa lepiej.",
@@ -10887,6 +10905,8 @@ const ru: Dict = {
   "code.roles.verifyNote":
     "выполняет вашу команду — модели нет, выбирать нечего",
   "code.roles.default": "по умолчанию",
+  "code.roles.everyStep": "Каждый шаг",
+  "code.roles.oneModel": "использовать одну модель для всего",
   "code.roles.panel": "панель",
   "code.roles.unproven":
     "Направление каждой роли к своей модели ПОКА не измерено. Смотрите bench/role_routing — пока это не запущено, перед вами выбор про стоимость и модели, а не утверждение, что так лучше.",

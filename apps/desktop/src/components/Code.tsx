@@ -350,6 +350,7 @@ export function Code() {
   // A run started below still reports `profile_source: "system"` when nobody touched this, so the
   // cost panel keeps counting a default apart from a profile somebody deliberately chose.
   const [profile, setProfile] = useState<Profile>("balanced");
+  const [profileTouched, setProfileTouched] = useState(false);
 
   /** Change the project this screen is working in. One function, because it was three near-copies.
    *
@@ -516,10 +517,13 @@ export function Code() {
                 verify: null,
                 workspace: workspace || null,
                 max_attempts: 3,
-                // Nobody picked a profile here either, and `worth.py` groups by
-                // (profile, profile_source) precisely so a run somebody chose "max" for and a run
-                // that got the default are not counted as the same evidence.
-                profile_source: "system",
+                // The bar above IS the picker now, and this dropped what it chose: a run started
+                // here took the built-in tiers whatever the bar said, and then filed the receipt
+                // under "system". `worth.py` groups by (profile, profile_source) precisely so a run
+                // somebody chose "max" for and a run that got the default stay separate evidence —
+                // which only works if what was chosen actually travels.
+                profile,
+                profile_source: profileTouched ? "user" : "system",
               })
             }
             onBatch={(tasks) => setBatch({ tasks, at: Date.now() })}
@@ -546,7 +550,10 @@ export function Code() {
                   <RolesBar
                     compact
                     profile={profile}
-                    onProfile={setProfile}
+                    onProfile={(p) => {
+                      setProfile(p);
+                      setProfileTouched(true);
+                    }}
                     disabled={runBusy}
                   />
                 ) : null}

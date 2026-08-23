@@ -18,12 +18,11 @@ import { renderWithProviders } from "@/test/utils";
 
 // Runs embeds RunLauncher, which asks for parked runs on mount — stubbed to empty so these tests
 // exercise the receipt rows and nothing else.
-vi.mock("@/lib/api", () => ({
-  getRuns: vi.fn(),
-  getPausedRuns: vi.fn().mockResolvedValue([]),
-  startRun: vi.fn(),
-  cancelRun: vi.fn(),
-}));
+// The SHARED mock, not a hand-written four-key one. This file listed exactly the helpers `Runs`
+// called the day it was written, so the launcher gaining a model picker turned eleven tests about
+// receipt evidence red over `getDoctor` — a function none of them care about. Same shape as the
+// TooltipProvider breakage: a component added to a shared screen should not be a per-file edit.
+vi.mock("@/lib/api", async () => (await import("@/test/code-api-mock")).makeCodeApiMock());
 const mockGetRuns = vi.mocked(getRuns);
 
 beforeEach(() => vi.clearAllMocks());

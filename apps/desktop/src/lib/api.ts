@@ -570,8 +570,11 @@ export interface RunRequestInput {
   posture?: { reach: Reach; approval: Approval } | null;
   // Which tier each ROLE draws from. Not a claim that routing helps — see bench/role_routing.
   profile?: Profile | null;
-  // Who chose `profile`: "user" or "system". The screen stopped asking, so the app sends a default;
-  // the receipt must not record that default as a decision somebody made.
+  /** One model slug per role, overriding whatever the profile resolves that role to. Omitted keys
+   *  keep the profile's answer, which is why an unset picker must send nothing rather than "". */
+  roles?: Partial<Record<"explore" | "plan" | "edit" | "review", string>> | null;
+  // Who chose `profile`: "user" or "system". The launcher asks again as of this release; a form
+  // nobody touched still says "system", because the receipt must not record a default as a decision.
   profile_source?: string;
   /** Dollar ceiling per ATTEMPT, not per run: the worker is called once per attempt and each call
    *  gets a fresh allowance, so this times `max_attempts` is what a run can cost. Named that way on
