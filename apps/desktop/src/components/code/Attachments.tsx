@@ -66,7 +66,7 @@ export function AttachmentTray({
           key={a.id}
           className={cn(
             "flex items-center gap-1.5 rounded-chip border px-2 py-1 text-xs",
-            a.note ? "border-warn/40 text-warn" : "border-border text-muted-foreground",
+            a.note ? "border-warn/40 text-warn-foreground" : "border-border text-muted-foreground",
           )}
           title={a.note || undefined}
         >
@@ -99,7 +99,7 @@ export function AttachmentTray({
         <span
           className={cn(
             "flex items-center gap-1.5 text-xs",
-            vision.data.support === "no" ? "text-bad" : "text-warn",
+            vision.data.support === "no" ? "text-bad-foreground" : "text-warn-foreground",
           )}
         >
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" />

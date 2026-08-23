@@ -139,7 +139,7 @@ function Verdict({
       <p
         className={cn(
           "text-xs",
-          undone === "ok" ? "text-ok" : undone === "partial" ? "text-warn" : "text-bad",
+          undone === "ok" ? "text-ok-foreground" : undone === "partial" ? "text-warn-foreground" : "text-bad-foreground",
         )}
       >
         {t(
@@ -162,7 +162,7 @@ function Verdict({
         <p
           className={cn(
             "text-xs",
-            v.state === "passed" ? "text-ok" : "text-warn",
+            v.state === "passed" ? "text-ok-foreground" : "text-warn-foreground",
           )}
         >
           {v.state === "none"
@@ -1224,7 +1224,7 @@ export function Conversation({
           <span
             className={cn(
               "ml-auto text-xs",
-              fuse ? "text-warn" : "text-muted-foreground",
+              fuse ? "text-warn-foreground" : "text-muted-foreground",
             )}
           >
             {fuse ? t("composer.fuseOn") : t("code.chat.hint")}
