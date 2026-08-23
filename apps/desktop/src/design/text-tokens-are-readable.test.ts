@@ -18,10 +18,19 @@ import { describe, expect, it } from "vitest";
  * and no layout, which is the point: the browser measurement that found this cannot run in CI, and
  * a defect nothing can re-check is a defect waiting to come back.
  *
+ * **It measures against the badge's tint, not the page.** That distinction is the whole calibration.
+ * A `Badge` paints its label on a 15% wash of its own colour (`bg-ok`, `bg-bad`, `bg-warn` at /15) — which pulls the ground toward
+ * the ink and costs most of a point of contrast. The first version of this file checked against
+ * `--background` and passed an `--ok-foreground` that scored 4.70 there and **4.04** on the tint:
+ * a guard that measured the fix in the easy place. `--warn-foreground` had been failing the same
+ * way since it was written, at 4.33, with nothing to say so.
+ *
  * **What it deliberately does not check.** Fills and icons take the plain token, where the bar is
  * 3:1, and this file has nothing to say about them. It also cannot see which class a component
  * actually reaches for — `panel.tsx`'s tone map is what routes labels to the -foreground pair, and
- * that is guarded by the app's own render tests.
+ * that is guarded by the app's own render tests. Nor does it model a badge sitting on a raised card
+ * rather than the page; measured in the running app that costs a further ~0.7, so treat these
+ * numbers as the ceiling and keep a margin.
  */
 
 const CSS = readFileSync(join(__dirname, "..", "index.css"), "utf8");
@@ -54,6 +63,22 @@ function luminance([r, g, b]: [number, number, number]): number {
 
 function contrast(a: string, b: string): number {
   const [x, y] = [luminance(hslToRgb(a)), luminance(hslToRgb(b))];
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+}
+
+/** `fill` at 15% over `base` — the ground a `Badge` actually paints its label on.
+ *
+ *  Writing the class as `bg-<state>` and the alpha in words, because spelling it with a star and a
+ *  slash closes the comment: this file failed to parse at all on the first attempt, and the error
+ *  pointed four lines past the cause. */
+function tinted(fill: string, base: string): [number, number, number] {
+  const f = hslToRgb(fill);
+  const b = hslToRgb(base);
+  return [0, 1, 2].map((i) => f[i] * 0.15 + b[i] * 0.85) as [number, number, number];
+}
+
+function contrastOn(ink: string, ground: [number, number, number]): number {
+  const [x, y] = [luminance(hslToRgb(ink)), luminance(ground)];
   return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
 }
 
@@ -102,10 +127,24 @@ describe("text colours", () => {
     }
   });
 
+  it.each([["--ok", "--ok-foreground"], ["--bad", "--bad-foreground"], ["--warn", "--warn-foreground"]])(
+    "%s reads on its own badge tint, in both themes",
+    (fill, ink) => {
+      for (const [name, theme] of [["light", light], ["dark", dark]] as const) {
+        const ratio = contrastOn(theme[ink], tinted(theme[fill], theme["--background"]));
+        expect(ratio, `${ink} on ${fill}/15 (${name}) is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(AA_SMALL);
+      }
+    },
+  );
+
   it("checks a ratio that a wrong value would actually fail", () => {
     // Guarding the guard. `hslToRgb` returning something constant, or `contrast` collapsing to 1,
     // would make every assertion above pass for the wrong reason — so pin one known-bad pairing.
     expect(contrast("152 55% 40%", light["--background"])).toBeLessThan(AA_SMALL);
     expect(contrast(light["--ok-foreground"], light["--background"])).toBeGreaterThanOrEqual(AA_SMALL);
+    // And that the tint is doing something: the value this file first shipped passed on the page
+    // and failed on the badge, so a `tinted()` that quietly returned the page would hide exactly
+    // the defect it was added for.
+    expect(contrastOn("152 62% 30%", tinted(light["--ok"], light["--background"]))).toBeLessThan(AA_SMALL);
   });
 });

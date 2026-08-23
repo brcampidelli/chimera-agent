@@ -44,9 +44,9 @@
   --accent2: 189 94% 55%;
   --ring: 217 91% 62%;
   --ok: 152 58% 50%;
-  --ok-foreground: 152 58% 50%;
+  --ok-foreground: 152 58% 58%;
   --bad: 0 72% 62%;
-  --bad-foreground: 0 72% 62%;
+  --bad-foreground: 0 78% 70%;
   --warn: 38 92% 50%;
   --warn-foreground: 38 92% 62%;
   /* The separator between surfaces, a panel raised inside a panel, and the fill a row takes on
@@ -116,13 +116,19 @@
      Measured against this theme's own card, `--ok` reads 3.06:1 as 11px text and `--bad` 3.82:1 —
      both under the 4.5 that small text needs, while both are fine as fills and as icons, where the
      bar is 3:1. `--warn` already had this split; `--ok` and `--bad` did not, so every small label
-     using them failed quietly. The values below are measured, not estimated: 4.70 and 5.87. */
+     using them failed quietly.
+
+     The values are measured against the BADGE's background, not the page's. That distinction is
+     the whole calibration: a `Badge` paints its label on `bg-*/15`, a tint of its own colour, which
+     moves the ground toward the ink and costs most of a point. The first pass here picked 4.70
+     against the page and scored 4.04 on the tint — a fix that measured itself in the easy place.
+     `--warn-foreground` had the same problem all along and read 4.33 there. */
   --ok: 152 55% 40%;
-  --ok-foreground: 152 62% 30%;
+  --ok-foreground: 152 65% 26%;
   --bad: 0 72% 50%;
-  --bad-foreground: 0 72% 42%;
+  --bad-foreground: 0 75% 38%;
   --warn: 32 95% 44%;
-  --warn-foreground: 28 90% 34%;
+  --warn-foreground: 28 92% 30%;
   /* Dark ink at low alpha — the mirror of the dark theme's low-alpha white. The literal this token
      replaced was a 5%-white border, i.e. white-on-white here: the light theme had NO visible
      panel edges at all. That is the bug this token exists to fix. */
