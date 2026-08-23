@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, GitBranch, Loader2 } from "lucide-react";
+import { Check, GitBranch, Loader2, Undo2 } from "lucide-react";
 
-import { getGitDiff, getGitStatus, gitCommit } from "@/lib/api";
+import { getGitDiff, getGitStatus, gitCommit, gitRevert } from "@/lib/api";
 import type { GitFile } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/async";
@@ -108,6 +108,30 @@ export function GitPanel({ workspace }: { workspace: string }) {
 
   const selectedPaths = files.filter((f) => checked[f.path]).map((f) => f.path);
 
+  const [reverting, setReverting] = useState(false);
+
+  /** Throw away the selected paths' changes.
+   *
+   *  Confirmed first, and that is not politeness: this is the one button on the screen with no
+   *  undo behind it. The commit box beside it can be amended, a wrong branch can be checked out
+   *  again — a discarded working-tree change is gone.
+   */
+  async function revert() {
+    if (selectedPaths.length === 0) return;
+    if (!window.confirm(t("code.git.revertConfirm", { n: selectedPaths.length }))) return;
+    setReverting(true);
+    try {
+      await gitRevert(workspace || null, selectedPaths);
+      // The same two invalidations the commit path does: the status list is stale, and so is the
+      // file tree — a reverted file may have gone back to not existing.
+      await qc.invalidateQueries({ queryKey: ["git-status", workspace] });
+      void qc.invalidateQueries({ queryKey: ["fs-tree"] });
+      setSelected(null);
+    } finally {
+      setReverting(false);
+    }
+  }
+
   async function commit() {
     if (!message.trim() || selectedPaths.length === 0 || committing) return;
     setCommitting(true);
@@ -212,6 +236,24 @@ export function GitPanel({ workspace }: { workspace: string }) {
               >
                 {committing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                 {t("code.git.commit")} ({selectedPaths.length})
+              </Button>
+              {/* The other half of what a git panel is for, and the half that was missing.
+                  `gitRevert` was written, typed and routed, and no screen called it — so the panel
+                  could keep a change and could not throw one away. Selected paths only: the same
+                  rule the commit box follows, because `git checkout -- .` is how somebody loses an
+                  afternoon. */}
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={selectedPaths.length === 0 || committing || reverting}
+                onClick={() => void revert()}
+              >
+                {reverting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Undo2 className="h-3.5 w-3.5" />
+                )}
+                {t("code.git.revert")} ({selectedPaths.length})
               </Button>
               {commitHash ? (
                 <span className="font-mono text-xs text-ok">

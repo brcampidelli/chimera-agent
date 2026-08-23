@@ -315,6 +315,17 @@ class Settings(BaseSettings):
     # panels — use it with panels >= ~5, or lower CHIMERA_SKILL_MIN_TRANSFER. ---
     skill_accept_mode: str = Field(default="point", validation_alias="CHIMERA_SKILL_ACCEPT_MODE")
 
+    # --- The threshold the comment above tells you to lower, and could not.
+    #
+    # It was a constructor default of 0.5 inside `AutoSkillEvolver` that `build_evolution_context`
+    # never passed, so it was unreachable by configuration — while BOTH the comment above and a
+    # runtime log line ("Lower min_transfer, enlarge the panel, or use 'point'") advised changing
+    # it. Advice pointing at a knob that does not exist is worse than no advice: it sends someone
+    # looking for a setting, and they find nothing and assume the fault is theirs. ---
+    skill_min_transfer: float = Field(
+        default=0.5, validation_alias="CHIMERA_SKILL_MIN_TRANSFER", ge=0.0, le=1.0
+    )
+
     # --- SkillCoach process filter for `chimera evolve export`: keep only trajectories
     # whose step-following score >= this (so a lucky success with failed tool steps is not
     # trained on). 0.0 = off (default). ---

@@ -1,62 +1,117 @@
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { Code } from "@/components/Code";
-import { getFsTree, getGitStatus, getPostureFacts, getRuns, streamCodeTurn } from "@/lib/api";
-import { emptyTree, gitStatus, postureFacts, scriptTurn } from "@/test/code-api-mock";
+import { getFsTree, getGitStatus, getPostureFacts, getRoleModels, getRuns } from "@/lib/api";
+import { emptyTree, gitStatus, postureFacts } from "@/test/code-api-mock";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", async () => (await import("@/test/code-api-mock")).makeCodeApiMock());
 
 /**
- * This suite used to exercise a three-way profile selector and the table under it: which model each
- * role resolves to, where a fusion panel is marked, that Verify has no model, and the standing
- * "routing is not measured yet" note.
+ * Which model does which job — a control that existed and was never placed.
  *
- * The selector is gone — with one model configured it showed the same slug four times, and with
- * several it asked the user to choose between options nobody has evidence about. What it protected
- * did not go with it, it moved:
+ * `RolesBar` is 124 lines, documented, with a `compact` mode whose own comment says it is "for the
+ * composer strip". Its name occurred exactly once in the entire source: its own definition. So
+ * `Code.tsx` carried `const profile: Profile = "balanced"` with a comment admitting there was no
+ * picker on any screen, and the words "economy" and "max" existed nowhere a user could reach.
  *
- * - The routing RULES (fusion only on the tool-free turns; Verify has no model; the reviewer refuses
- *   to be the model that wrote the patch) are asserted in `tests/test_roles.py`, against the
- *   resolver itself rather than against a table rendering it.
- * - The "not measured" claim now lives with the benchmark it points at, `bench/role_routing`, and no
- *   longer needs a disclaimer beside a control the user cannot press.
- * - What CANNOT move is below: the app must still send a profile, and must say that IT chose.
+ * That is not dead code in the harmless sense. It is a capability the product has, pays to
+ * maintain, translates into ten languages, and does not offer.
  */
-describe("Code — the profile the system applies", () => {
+describe("Code — the routing profile is choosable", () => {
   beforeEach(() => {
     vi.mocked(getFsTree).mockResolvedValue(emptyTree());
     vi.mocked(getGitStatus).mockResolvedValue(gitStatus());
-    vi.mocked(getRuns).mockResolvedValue([]);
-    vi.mocked(streamCodeTurn).mockImplementation(scriptTurn());
     vi.mocked(getPostureFacts).mockResolvedValue(postureFacts());
+    vi.mocked(getRuns).mockResolvedValue([]);
+    vi.mocked(getRoleModels).mockResolvedValue({
+      explore: "openrouter/weak",
+      plan: "openrouter/top",
+      edit: "openrouter/mid",
+      review: "openrouter/top",
+      fuse_plan: false,
+      fuse_review: false,
+    } as never);
   });
 
-  it("still sends a profile rather than letting the server default it", async () => {
-    // Omitting `profile` is not "apply the default". It means no cheap explorer, no fusion on the
-    // deliberative turns, and — the expensive one — a Manager reviewing with the very model that
-    // wrote the patch, which is the self-grading collapse the reviewer rule exists to prevent.
+  it("offers all three profiles, not just the one that was hard-coded", async () => {
+    renderWithProviders(<Code />);
+
+    expect(await screen.findByRole("button", { name: "economy" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "balanced" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "max" })).toBeTruthy();
+  });
+
+  it("asks the server for the models of the profile that was picked", async () => {
     const user = userEvent.setup();
     renderWithProviders(<Code />);
 
-    await user.type(screen.getByPlaceholderText(/^Ask about this code/), "what does this do?");
-    await user.click(screen.getByRole("button", { name: "Send" }));
+    await user.click(await screen.findByRole("button", { name: "economy" }));
 
-    await waitFor(() => expect(streamCodeTurn).toHaveBeenCalled());
-    expect(vi.mocked(streamCodeTurn).mock.calls[0][0].profile).toBe("balanced");
+    // The assertion that the hard-coded constant could never satisfy.
+    await waitFor(() => expect(getRoleModels).toHaveBeenCalledWith("economy"));
   });
 
-  it("offers no profile control at all", async () => {
-    // The regression this guards is a selector creeping back in "just to expose the option": three
-    // choices with no measured difference between them is a question the user cannot answer, and
-    // the app asking it implies an answer exists.
+  it("says which profile is selected, not only which one is coloured", async () => {
+    const user = userEvent.setup();
     renderWithProviders(<Code />);
-    // Wait on the composer, not on the posture call — the posture query is skipped entirely until a
-    // project is chosen, so it stopped being a "the screen has settled" signal.
-    await screen.findByPlaceholderText(/^Ask about this code/);
 
-    expect(screen.queryByRole("button", { name: /^economy$/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^max$/i })).not.toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "max" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "max" }).getAttribute("aria-pressed")).toBe("true"),
+    );
+    expect(screen.getByRole("button", { name: "balanced" }).getAttribute("aria-pressed")).toBe(
+      "false",
+    );
+  });
+});
+
+/**
+ * The other half of the same finding: `PostureBar`, 210 lines, also rendered by nothing.
+ *
+ * Deleted rather than placed. The Settings screen already carries reach and approval, `PostureNote`
+ * already states the resulting posture beside the session, and the composer strip has just gained
+ * the profile picker. Two interactive surfaces for one setting is how the two come to disagree,
+ * and the one that is easier to reach wins arguments it should not be in.
+ *
+ * Its three exclusive dictionary keys went with it — thirty strings across ten languages. The
+ * dynamic `code.posture.reach.*` / `code.posture.approval.*` entries stayed, because Settings
+ * renders those.
+ */
+describe("PostureBar is gone, not merely unrendered", () => {
+  const SRC = join(__dirname, "..");
+
+  function sources(dir: string, out: string[] = []): string[] {
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry);
+      if (statSync(full).isDirectory()) sources(full, out);
+      else if (/\.tsx?$/.test(entry)) out.push(full);
+    }
+    return out;
+  }
+
+  it("leaves no file and no importer behind", () => {
+    const files = sources(SRC);
+
+    expect(files.filter((f) => f.endsWith("PostureBar.tsx"))).toEqual([]);
+    const importers = files.filter(
+      (f) => !f.endsWith("Code.roles.test.tsx") && /\bPostureBar\b/.test(readFileSync(f, "utf8")),
+    );
+    expect(importers).toEqual([]);
+  });
+
+  it("keeps the keys Settings still renders", async () => {
+    // The check that stops "delete the component" from becoming "delete its whole namespace".
+    const { DICTS } = await import("@/lib/i18n");
+    for (const [lang, dict] of Object.entries(DICTS)) {
+      const table = dict as Record<string, string>;
+      expect(table["code.posture.reach.workspace"], `${lang}`).toBeTruthy();
+      expect(table["code.posture.title"], `${lang} kept a key nothing renders`).toBeUndefined();
+    }
   });
 });

@@ -14,6 +14,8 @@ import {
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", () => ({
+  // Settings shows the inline-suggestion acceptance rate now.
+  getCompletionStats: vi.fn(async () => ({ accepted: 0, dismissed: 0, rate: null, mean_ms: null })),
   addPoolKey: vi.fn(async () => ({ provider: "openrouter", count: 2 })),
   getConfig: vi.fn(),
   getDoctor: vi.fn(),

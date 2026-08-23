@@ -13,6 +13,7 @@ import {
   getDoctor,
   getInstructions,
   getMessaging,
+  getCompletionStats,
   getOllamaModels,
   patchConfig,
   putInstructions,
@@ -414,6 +415,32 @@ function TextField({
  * The URL is in the query key rather than read once, so editing the row above re-asks the new
  * server instead of answering about the old one.
  */
+/** How often the inline suggestions are taken, on this machine.
+ *
+ *  `rate` is null until something has been accepted or dismissed, and the row says so in words
+ *  rather than showing 0%. Zero would be a claim — "nobody wants these" — where the truth is that
+ *  nobody has answered yet, and that distinction is the whole reason the field is nullable.
+ */
+function CompletionAcceptanceRow() {
+  const t = useT();
+  const stats = useQuery({ queryKey: ["completion-stats"], queryFn: getCompletionStats });
+  const data = stats.data;
+  const shown =
+    !data || data.rate === null || data.rate === undefined
+      ? t("settings.value.acceptanceNone")
+      : t("settings.value.acceptance", {
+          accepted: data.accepted,
+          dismissed: data.dismissed,
+          rate: `${Math.round(data.rate * 100)}%`,
+        });
+  return (
+    <Row label={t("settings.row.acceptance")}>
+      <span className="text-xs text-muted-foreground">{shown}</span>
+    </Row>
+  );
+}
+
+
 function OllamaModelPicker({
   baseUrl,
   current,
@@ -1028,6 +1055,12 @@ export function Settings() {
                       onSave={(v) => save({ CHIMERA_COMPLETE_MODEL: v })}
                     />
                   </Row>
+                  {/* What the machine already knows and never told anyone.
+                      Every accept and dismiss is posted to the server by the editor
+                      (`postCompletionOutcome`), and `getCompletionStats` — the endpoint that reads
+                      it back — had no caller in the app at all. So the product collected an
+                      answer to "are these suggestions any good" and showed it to nobody. */}
+                  <CompletionAcceptanceRow />
                   <Row
                     label={t("settings.row.fallbackModels")}
                     hint={t("settings.hint.fallbackModels")}

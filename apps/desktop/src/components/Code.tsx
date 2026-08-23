@@ -26,6 +26,7 @@ import { Conversation } from "@/components/code/Conversation";
 import { PostureNote } from "@/components/code/PostureNote";
 import { ModelPicker } from "@/components/code/ModelPicker";
 import { ProviderPicker } from "@/components/code/ProviderPicker";
+import { RolesBar } from "@/components/code/RolesBar";
 import { SessionSidebar } from "@/components/code/SessionSidebar";
 import { ProjectPicker } from "@/components/code/ProjectPicker";
 import { useRunSession } from "@/lib/run-session";
@@ -335,12 +336,18 @@ export function Code() {
   // thirty times what the person expected. "" means the install's default, and the picker offers to
   // make a pick the standing default — which is the same intent, stated rather than accumulated.
   const [model, setModel] = useState("");
-  // A default the system applies — there is no picker for it on any screen. A coding TURN files no
-  // delegation receipt, so nothing here reaches the cost panel; what does reach it is the run
-  // started below, and that one says `profile_source: "system"` so the panel never counts a default
-  // beside a profile somebody deliberately chose. This comment used to claim the turn recorded it,
-  // which was a claim about a receipt this screen does not write.
-  const profile: Profile = "balanced";
+  // Which model does which job. Session-local, like `provider` and `model` above and for the same
+  // reason: routing that quietly carried over from last week is how a turn costs what nobody
+  // expected.
+  //
+  // It was `const profile = "balanced"` with a comment admitting there was no picker on any screen
+  // — and `RolesBar`, which IS that picker and carries a `compact` mode documented as "for the
+  // composer strip", existed with exactly one occurrence in the whole source: its own definition.
+  // A control written for a place it was never put, so "economy" and "max" were unreachable words.
+  //
+  // A run started below still reports `profile_source: "system"` when nobody touched this, so the
+  // cost panel keeps counting a default apart from a profile somebody deliberately chose.
+  const [profile, setProfile] = useState<Profile>("balanced");
 
   /** Change the project this screen is working in. One function, because it was three near-copies.
    *
@@ -509,6 +516,17 @@ export function Code() {
                     Reversed, someone reads what the agent may do to their files and then changes
                     who the agent is — which is the order in which a promise stops being true. */}
                 <ProviderPicker value={provider} onChange={setProvider} disabled={runBusy} />
+                {/* Only for Chimera's own loop, same as the model picker below: an external agent
+                    routes its own roles, and offering the control beside it would describe a
+                    decision this app does not get to make. */}
+                {provider === "" ? (
+                  <RolesBar
+                    compact
+                    profile={profile}
+                    onProfile={setProfile}
+                    disabled={runBusy}
+                  />
+                ) : null}
                 {/* Only for Chimera's own loop. Claude Code and Gemini pick their own model, so a
                     selector next to them would offer a choice this app cannot make — and the turn
                     would run on something other than what the row says. */}

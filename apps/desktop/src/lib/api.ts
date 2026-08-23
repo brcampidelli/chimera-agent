@@ -37,15 +37,11 @@ import type {
   MemoryProfile,
   ModelListing,
   OllamaModels,
-  PlanResult,
   PoolWrite,
   ProjectState,
   RunReceipt,
-  SessionMeta,
   SkillStat,
   TaskCard,
-  TurnReport,
-  ToolEvent,
   Tools,
   UsageSummary,
   VersionInfo,
@@ -112,11 +108,6 @@ async function json<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
-export const listSessions = () => json<SessionMeta[]>("/api/sessions");
-export const getSession = (id: string) =>
-  json<{ id: string; turns: { user: string; assistant: string }[] }>(`/api/sessions/${id}`);
-export const deleteSession = (id: string) =>
-  json<{ deleted: boolean }>(`/api/sessions/${id}`, { method: "DELETE" });
 
 // The running version + an HONEST update signal: `update_available` is true ONLY when GitHub confirms
 // a strictly-newer release. Offline / any error → {latest:null, update_available:false} (never a false
@@ -557,75 +548,8 @@ export const approveProject = (id: string, card?: string) =>
 export const denyProject = (id: string, card: string) =>
   json<ProjectState>(`/api/projects/${id}/deny`, { method: "POST", body: JSON.stringify({ card }) });
 
-export interface StreamHandlers {
-  onSession?: (id: string) => void;
-  onToken?: (text: string) => void;
-  onTool?: (t: ToolEvent) => void;
-  onDone?: (r: TurnReport) => void;
-  onError?: (msg: string) => void;
-}
 
-/** Stream one chat turn. The API's SSE lives on a POST, so we read the response body ourselves
- *  (EventSource is GET-only) and parse `event:`/`data:` frames as they arrive. */
-export async function streamChat(
-  message: string,
-  sessionId: string | null,
-  handlers: StreamHandlers,
-  signal?: AbortSignal,
-  fuse = false,
-): Promise<void> {
-  let res: Response;
-  try {
-    res = await fetch(apiUrl("/api/chat/stream"), {
-      method: "POST",
-      headers: authHeaders(),
-      body: JSON.stringify({ message, session_id: sessionId, stream: true, fuse }),
-      signal,
-    });
-  } catch (err) {
-    handlers.onError?.(err instanceof Error ? err.message : "network error");
-    return;
-  }
-  if (!res.ok || !res.body) {
-    handlers.onError?.(await streamRefusal(res));
-    return;
-  }
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
-    let sep: number;
-    while ((sep = buffer.indexOf("\n\n")) !== -1) {
-      dispatch(buffer.slice(0, sep), handlers);
-      buffer = buffer.slice(sep + 2);
-    }
-  }
-  if (buffer.trim()) dispatch(buffer, handlers);
-}
 
-function dispatch(frame: string, h: StreamHandlers): void {
-  let event = "message";
-  let data = "";
-  for (const line of frame.split("\n")) {
-    if (line.startsWith("event:")) event = line.slice(6).trim();
-    else if (line.startsWith("data:")) data += line.slice(5).trim();
-  }
-  if (!data) return;
-  let payload: Record<string, unknown>;
-  try {
-    payload = JSON.parse(data);
-  } catch {
-    return;
-  }
-  if (event === "session") h.onSession?.(payload.session_id as string);
-  else if (event === "token") h.onToken?.(payload.text as string);
-  else if (event === "tool") h.onTool?.(payload as unknown as ToolEvent);
-  else if (event === "done") h.onDone?.(payload as unknown as TurnReport);
-  else if (event === "error") h.onError?.(payload.message as string);
-}
 
 // --- Runs (in-app autonomous run trigger, streamed) ---
 
@@ -655,15 +579,6 @@ export interface RunRequestInput {
   max_usd?: number | null;
 }
 
-/** Preview a plan for a task: runs ONLY the planner (a single model call) — NO edits, NO tools, no
- *  workspace changes. Kept on the client because the CLI and the Runs screen still use it; the Code
- *  screen no longer previews a plan, since approving one before any file is touched is a second
- *  confirmation for a run that already reverts itself when the verifier says no. */
-export const getPlan = (workspace: string | null | undefined, task: string) =>
-  json<PlanResult>("/api/plan", {
-    method: "POST",
-    body: JSON.stringify({ task, workspace: workspace || null }),
-  });
 
 /** One live progress frame from the run loop (an AgentEvent, serialized). `kind` picks the shape. */
 export interface RunEvent {

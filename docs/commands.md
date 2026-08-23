@@ -45,6 +45,7 @@ Run `chimera <command> --help` for the full text of any entry.
 | [`lifecycle`](#lifecycle) | SDLC crew: plan -> build -> test -> review with verify-or-revert. Requires a key. |
 | [`maturity`](#maturity) | Render the maturity scorecard: surfaces × coverage-IDs proven by real tests. |
 | [`mcp`](#mcp) | Configure MCP servers (persisted to .chimera/mcp.json). Terminal-first source of truth. |
+| [`measure`](#measure) | Run the rulers this project measures itself with. |
 | [`memory`](#memory) | Curated long-term memory. |
 | [`memory-bench`](#memory-bench) | Measure recall@k as memory grows — lexical vs paraphrase. |
 | [`memory-poison`](#memory-poison) | Ablate the memory-poisoning defenses: what reaches a LATER run's prompt, and unmarked. |
@@ -659,6 +660,14 @@ Configure MCP servers (persisted to .chimera/mcp.json). Terminal-first source of
 
 ```bash
 chimera mcp
+```
+
+## measure
+
+Run the rulers this project measures itself with.
+
+```bash
+chimera measure
 ```
 
 ## memory

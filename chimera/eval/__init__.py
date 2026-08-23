@@ -94,6 +94,24 @@ if TYPE_CHECKING:
 # Exported name -> (submodule, attribute in that submodule). The attribute differs from the exported
 # name only where the original re-export renamed it (`compare as compare_ab`, etc.).
 _LAZY: dict[str, tuple[str, str]] = {
+    # The two rulers this package tells you to use, and did not export.
+    #
+    # `rag/__init__.py` points at `run_rag_bench` to say the retriever's existence is not a claim
+    # that it helps, and `evolution/reranker.py` says to measure with `run_reranker_ab` BEFORE
+    # putting the reranker in a hot path. Both sentences were prose: neither module was importable
+    # from `chimera.eval`, and neither had a caller outside its own test. The advice pointed at
+    # something you could not reach from the package that gave it.
+    "RagReport": ("rag_bench", "RagReport"),
+    "build_probes": ("rag_bench", "build_probes"),
+    "run_rag_bench": ("rag_bench", "run_rag_bench"),
+    "RerankerABReport": ("reranker_ab", "RerankerABReport"),
+    "auc": ("reranker_ab", "auc"),
+    "run_reranker_ab": ("reranker_ab", "run_reranker_ab"),
+    # Not orphaned, listed for the same reason: `bench/learning_lift` and `bench/local_lift` both
+    # import it, so it has real callers — just none inside `chimera/`.
+    "TaskCheck": ("selftest", "TaskCheck"),
+    "assert_discriminating": ("selftest", "assert_discriminating"),
+    "run_selftest": ("selftest", "run_selftest"),
     "ABResult": ("bench_ab", "ABResult"),
     "Arm": ("bench_ab", "Arm"),
     "format_report": ("bench_ab", "format_report"),
