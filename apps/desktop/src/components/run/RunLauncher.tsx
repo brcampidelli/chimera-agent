@@ -48,6 +48,7 @@ export function RunLauncher({
   // nobody touched would fabricate exactly that.
   const [profile, setProfile] = useState<Profile>("balanced");
   const [roles, setRoles] = useState<RoleOverride>(NO_OVERRIDE);
+  const [oneModel, setOneModel] = useState(false);
   const [touched, setTouched] = useState(false);
   // Runs parked before this window opened. A pause outlives the stream that reported it, so the
   // only way to see one you did not personally witness is to ask.
@@ -143,6 +144,8 @@ export function RunLauncher({
             setRoles(o);
             setTouched(true);
           }}
+          oneModel={oneModel}
+          onOneModel={setOneModel}
           disabled={running}
         />
       </div>

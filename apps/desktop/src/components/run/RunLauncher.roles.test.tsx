@@ -85,15 +85,50 @@ describe("RunLauncher — the choice reaches the run", () => {
     expect(sent().roles).toBeNull();
   });
 
-  it("shows what the profile resolved to before anyone overrides it", async () => {
-    // The regression this exists for: the first version of the picker REPLACED the resolved slug
-    // instead of sitting beside it, so switching the control on emptied four fields that had been
-    // showing four model names. One per role, so a row wired to the wrong role fails here.
+  it("collapses to one picker when one model should do everything", async () => {
+    // The box did nothing at first, and the reason is worth keeping: "one model" was DERIVED from
+    // the four values being equal and non-empty, so ticking it before choosing anything wrote four
+    // blanks and read them straight back as "not one model" — the box would not even stay ticked.
+    // Three intents exist and two share the same four values, so it has to be held, not derived.
+    const user = await launch();
+    await user.click(screen.getByText(/which model does what|qual modelo faz o quê/i));
+
+    const box = screen.getByRole("checkbox", { name: /one model|um modelo/i });
+    await user.click(box);
+
+    expect((box as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByText(/every step|todas as etapas/i)).toBeTruthy();
+    // And the per-role rows are gone: four pickers showing the same slug would invite editing one
+    // of them, which silently leaves the state the box still claims.
+    expect(screen.queryByText(/^Explore$|^Explorar$/)).toBeNull();
+  });
+
+  it("gives the roles back when it is unticked", async () => {
+    const user = await launch();
+    await user.click(screen.getByText(/which model does what|qual modelo faz o quê/i));
+    const box = screen.getByRole("checkbox", { name: /one model|um modelo/i });
+
+    await user.click(box);
+    await user.click(box);
+
+    expect((box as HTMLInputElement).checked).toBe(false);
+    expect(screen.getByText(/^Explore$|^Explorar$/)).toBeTruthy();
+  });
+
+  it("shows each role's own model as what 'no choice' means there", async () => {
+    // Two wrong shapes preceded this, in opposite directions. The first REPLACED the resolved slug
+    // with an empty picker, so switching the control on hid the four model names it exists to
+    // change. The second showed both — and the picker's own half was the INSTALL default, so
+    // `Explore` read "default · deepseek-chat-v3.1" beside the mistral it actually runs on: two
+    // model names on one row, the prominent one wrong for that role.
+    //
+    // One name per row now, inside the chip, and it is the role's. A row wired to the wrong role
+    // fails here, which is why all four are asserted rather than one.
     await launch();
     await userEvent.setup().click(screen.getByText(/which model does what|qual modelo faz o quê/i));
 
     for (const slug of ["scout-model", "planner-model", "writer-model", "critic-model"]) {
-      expect(await screen.findByText(slug), `${slug} is not shown`).toBeTruthy();
+      expect(await screen.findByText(new RegExp(slug)), `${slug} is not shown`).toBeTruthy();
     }
   });
 });
