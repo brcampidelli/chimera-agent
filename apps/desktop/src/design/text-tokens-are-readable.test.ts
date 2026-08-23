@@ -82,6 +82,22 @@ function contrastOn(ink: string, ground: [number, number, number]): number {
   return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
 }
 
+/** `H S% L% / A` composited over `base` — the editor's ground is the page plus its active-line wash.
+ *
+ *  Getting this wrong is what produced a wrong number the first time: `--code-active-line` reads
+ *  `222 40% 20% / 0.05` on the light theme, and 20% lightness LOOKS dark. At 5% over a near-white
+ *  page it composites to rgb(231,234,240) — a light surface. Measuring the comment against the
+ *  wash's base colour instead of the composite said 3.04:1 when the truth was 3.83:1, and pointed
+ *  the fix in the opposite direction.
+ */
+function over(washSpec: string, base: string): [number, number, number] {
+  const [colour, alphaPart] = washSpec.split("/");
+  const alpha = alphaPart ? parseFloat(alphaPart) : 1;
+  const w = hslToRgb(colour);
+  const b = hslToRgb(base);
+  return [0, 1, 2].map((i) => w[i] * alpha + b[i] * (1 - alpha)) as [number, number, number];
+}
+
 /** The two `:root` blocks, keyed by which theme they define. */
 function themes(): Record<"dark" | "light", Record<string, string>> {
   const blocks = [...CSS.matchAll(/:root[^{]*\{([\s\S]*?)\n\}/g)].map((m) => m[1]);
@@ -136,6 +152,24 @@ describe("text colours", () => {
       }
     },
   );
+
+  it.each([["light"], ["dark"]])("code comments are readable on the editor's ground (%s)", (which) => {
+    const theme = which === "light" ? light : dark;
+    const ground = over(theme["--code-active-line"], theme["--background"]);
+    const ratio = contrastOn(theme["--code-comment"], ground);
+    expect(ratio, `--code-comment is ${ratio.toFixed(2)}:1 on the editor ground`).toBeGreaterThanOrEqual(AA_SMALL);
+  });
+
+  it.each([["light"], ["dark"]])("a comment still reads as quieter than code (%s)", (which) => {
+    // The fix must not turn comments into ordinary text — the colour exists so the eye can skip
+    // them. Plain code sits near 14:1 on the same ground, so half of it is a generous ceiling and
+    // still leaves the two unmistakably different.
+    const theme = which === "light" ? light : dark;
+    const ground = over(theme["--code-active-line"], theme["--background"]);
+    expect(contrastOn(theme["--code-comment"], ground)).toBeLessThan(
+      contrastOn(theme["--code-plain"], ground) * 0.5,
+    );
+  });
 
   it("checks a ratio that a wrong value would actually fail", () => {
     // Guarding the guard. `hslToRgb` returning something constant, or `contrast` collapsing to 1,
