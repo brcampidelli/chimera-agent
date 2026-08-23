@@ -119,7 +119,7 @@
      using them failed quietly.
 
      The values are measured against the BADGE's background, not the page's. That distinction is
-     the whole calibration: a `Badge` paints its label on `bg-*/15`, a tint of its own colour, which
+     the whole calibration: a `Badge` paints its label on a 15% wash of its own colour, which
      moves the ground toward the ink and costs most of a point. The first pass here picked 4.70
      against the page and scored 4.04 on the tint — a fix that measured itself in the easy place.
      `--warn-foreground` had the same problem all along and read 4.33 there. */
