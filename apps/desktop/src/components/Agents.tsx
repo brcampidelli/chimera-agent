@@ -119,7 +119,7 @@ function AgentCard({
                 being wrong. Printed verbatim from the server (`timed out after Ns`, or the
                 exception that killed the unit); this component never invents the reason. */}
             {result.error ? (
-              <p className="break-words font-mono text-xs text-bad">{result.error}</p>
+              <p className="break-words font-mono text-xs text-bad-foreground">{result.error}</p>
             ) : null}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
               <span>
@@ -336,7 +336,7 @@ export function Agents({
                 <Square className="h-4 w-4" /> {t("agents.stopAll")}
               </Button>
             ) : null}
-            {error ? <span className="text-xs text-bad">{error}</span> : null}
+            {error ? <span className="text-xs text-bad-foreground">{error}</span> : null}
           </div>
         </div>
 
@@ -360,7 +360,7 @@ export function Agents({
             </div>
             {batch.conflicts.length > 0 ? (
               <div className="rounded-chip border border-bad/30 bg-bad/10 px-3 py-2">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-bad">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-bad-foreground">
                   <AlertTriangle className="h-3.5 w-3.5" />
                   {t("agents.conflictsTitle")} ({batch.conflicts.length})
                 </div>

@@ -97,7 +97,7 @@ function CrewWorkerCard({ worker }: { worker: CrewWorkerState }) {
 
         {worker.status === "rejected" ? (
           <div className="space-y-1">
-            <p className="text-xs text-bad">
+            <p className="text-xs text-bad-foreground">
               {worker.reason === "cancelled"
                 ? t("crew.rejected.cancelled")
                 : /could not run|not found|no such file/i.test(worker.detail)
@@ -124,7 +124,7 @@ function CrewWorkerCard({ worker }: { worker: CrewWorkerState }) {
         ) : null}
 
         {worker.status === "failed" && worker.detail ? (
-          <p className="text-xs text-bad">{worker.detail}</p>
+          <p className="text-xs text-bad-foreground">{worker.detail}</p>
         ) : null}
 
         {/* Two lists, not one with a heading that swings. A worker can pass the check and still
@@ -135,7 +135,7 @@ function CrewWorkerCard({ worker }: { worker: CrewWorkerState }) {
             nothing landed. */}
         {worker.files.length > 0 ? (
           <div className="space-y-1">
-            <p className="text-xs text-ok">{t("crew.produced.landed")}</p>
+            <p className="text-xs text-ok-foreground">{t("crew.produced.landed")}</p>
             <ul className="space-y-0.5">
               {worker.files.map((file) => (
                 <li key={file} className="font-mono text-xs text-muted-foreground">
@@ -276,7 +276,7 @@ export function CrewRun({
       ) : null}
 
       {state.error ? (
-        <p className="rounded-card border border-bad/25 bg-bad/5 p-3 text-sm text-bad">
+        <p className="rounded-card border border-bad/25 bg-bad/5 p-3 text-sm text-bad-foreground">
           {state.error}
         </p>
       ) : null}

@@ -126,6 +126,31 @@ describe("colour", () => {
     expect(offenders, "colour literals").toEqual([]);
   });
 
+  it("uses the ink pair whenever a state colour is a TEXT colour", () => {
+    // `--ok` and `--bad` are fills. Read as 11px text on the light theme they measure 3.06:1 and
+    // 3.82:1, under the 4.5 small text needs — which is why each has a darker `-foreground` pair.
+    //
+    // The rule is mechanical because the distinction is: a className carrying a font size is
+    // styling TEXT, and one that only carries `h-4 w-4` is styling an icon, where the bar is 3:1
+    // and the plain token is right. 58 sites were on the wrong side of that line, spread over 28
+    // files, and every one of them looked correct beside a badge that had already been fixed.
+    // Split on spaces instead of matching with word boundaries. The first version used regexes
+    // and the escape did not survive being written to disk: `size` ended up as a BACKSPACE
+    // character followed by `text-`, which matches nothing, so the check skipped every value and
+    // passed while verifying nothing at all. Sabotage is the only reason that surfaced. Tailwind
+    // class lists are space-separated, so exact membership says the same thing and cannot rot.
+    const SIZES = new Set(["text-xs", "text-sm", "text-base", "text-lg", "text-xl"]);
+    const STATES = new Set(["text-ok", "text-bad", "text-warn"]);
+    const offenders: string[] = [];
+    for (const { file, value } of classNameLiterals()) {
+      const parts = value.split(" ").map((c) => c.trim()).filter(Boolean);
+      if (!parts.some((c) => SIZES.has(c))) continue;
+      const hit = parts.find((c) => STATES.has(c));
+      if (hit) offenders.push(`${file}: ${hit} - use ${hit}-foreground`);
+    }
+    expect(offenders, "state colours used as text").toEqual([]);
+  });
+
   it("never separates surfaces with raw white or black alpha", () => {
     // `border-white/5` is invisible on a white card. Every one of these became `--hairline`,
     // `--surface-2` or `--surface-hover`, each of which has a real light-theme value.

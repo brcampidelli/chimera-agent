@@ -59,7 +59,7 @@ export function DelegationSavings() {
           {t(usd < 0 ? "orch.saving.usdMore" : "orch.saving.usd", { usd: Math.abs(usd).toFixed(4) })}
         </p>
       ) : (
-        <p className="text-xs text-warn">
+        <p className="text-xs text-warn-foreground">
           {t("orch.saving.unpriced", { priced: summary.priced_n ?? 0, n: summary.n })}
         </p>
       )}

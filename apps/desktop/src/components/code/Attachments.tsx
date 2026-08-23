@@ -173,7 +173,7 @@ export function AttachButton({ onAdded }: { onAdded: (a: Attachment) => void }) 
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
         {t("code.attach.label")}
       </Button>
-      {failed ? <span className="text-xs text-bad">{t("code.attach.failed", { name: failed })}</span> : null}
+      {failed ? <span className="text-xs text-bad-foreground">{t("code.attach.failed", { name: failed })}</span> : null}
     </>
   );
 }
@@ -263,7 +263,7 @@ export function DictateButton({ onText }: { onText: (text: string) => void }) {
       {unavailable ? (
         <span className="text-xs text-muted-foreground">{t("code.dictate.unavailable")}</span>
       ) : note ? (
-        <span className="text-xs text-warn">{note}</span>
+        <span className="text-xs text-warn-foreground">{note}</span>
       ) : null}
     </>
   );

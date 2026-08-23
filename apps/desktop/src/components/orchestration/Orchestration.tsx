@@ -129,7 +129,7 @@ export function Orchestration({
           <span className="text-xs text-muted-foreground">{t("orch.previewCost")}</span>
         </div>
 
-        {error ? <p className="text-xs text-bad">{error}</p> : null}
+        {error ? <p className="text-xs text-bad-foreground">{error}</p> : null}
       </div>
 
       {plan && !run && !crew ? (

@@ -50,7 +50,7 @@ function PanelRow({ entry }: { entry: FusionPanelEntry }) {
         {tok ? <span className="shrink-0 text-xs text-muted-foreground">{tok}</span> : null}
       </div>
       {entry.error ? (
-        <div className="mt-1 whitespace-pre-wrap text-xs text-bad">{entry.error}</div>
+        <div className="mt-1 whitespace-pre-wrap text-xs text-bad-foreground">{entry.error}</div>
       ) : (
         <div className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">
           {truncate(entry.content)}

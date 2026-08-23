@@ -256,11 +256,11 @@ export function GitPanel({ workspace }: { workspace: string }) {
                 {t("code.git.revert")} ({selectedPaths.length})
               </Button>
               {commitHash ? (
-                <span className="font-mono text-xs text-ok">
+                <span className="font-mono text-xs text-ok-foreground">
                   {t("code.git.committed")} {commitHash}
                 </span>
               ) : null}
-              {commitErr ? <span className="text-xs text-bad">{t("code.git.commitError")}</span> : null}
+              {commitErr ? <span className="text-xs text-bad-foreground">{t("code.git.commitError")}</span> : null}
             </div>
           </div>
         </div>

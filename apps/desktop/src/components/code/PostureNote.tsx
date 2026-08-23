@@ -95,13 +95,13 @@ export function PostureNote({
       ) : facts.isError ? (
         // Silence here would read as "nothing to worry about", which is the opposite of what an
         // unknown posture means.
-        <p className="text-xs text-bad">{t("code.posture.unknown")}</p>
+        <p className="text-xs text-bad-foreground">{t("code.posture.unknown")}</p>
       ) : null}
       {facts.data?.unguarded ? (
         // The condition that makes a permissive default defensible. Nothing marks this conversation
         // after it reads untrusted content, so a page carrying a planted instruction can still get
         // a file written. Saying it is the whole difference between a trade-off and a trap.
-        <p className="flex items-start gap-1.5 text-xs text-warn">
+        <p className="flex items-start gap-1.5 text-xs text-warn-foreground">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           {t("code.posture.unguarded")}
         </p>
@@ -111,7 +111,7 @@ export function PostureNote({
         // shell tools of their own, so the write region governs only the calls they route through
         // us. Claiming prevention here would be the one lie the product cannot afford; what is real
         // is the snapshot taken before the turn and the revert offered after it.
-        <p className="flex items-start gap-1.5 text-xs text-warn">
+        <p className="flex items-start gap-1.5 text-xs text-warn-foreground">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           {t("code.posture.externalNote")}
         </p>
@@ -120,7 +120,7 @@ export function PostureNote({
         // The one case where the honest answer contradicts what the user set up. Pre-emptive on
         // purpose: telling someone their sandbox was not running AFTER a shell command already ran
         // on their machine is a report, not a warning.
-        <p className="flex items-start gap-1.5 text-xs text-bad">
+        <p className="flex items-start gap-1.5 text-xs text-bad-foreground">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           {t("code.posture.fellBack")}
         </p>

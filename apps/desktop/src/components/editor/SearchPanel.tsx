@@ -157,7 +157,7 @@ export function SearchPanel({
         ) : result.data ? (
           <>
             {result.data.error ? (
-              <p className="p-2 text-xs text-bad">{result.data.error}</p>
+              <p className="p-2 text-xs text-bad-foreground">{result.data.error}</p>
             ) : result.data.hits.length === 0 ? (
               <p className="p-2 text-xs text-muted-foreground">{t("edit.search.none")}</p>
             ) : (

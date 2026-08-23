@@ -103,7 +103,7 @@ function InjectionPanel({ data, t }: { data: InjectionReport; t: TFunc }) {
           and with it off the defended column describes a configuration nobody on this machine is
           running. */}
       {!data.armed ? (
-        <p className="border-b border-hairline px-4 py-3 text-xs text-bad">
+        <p className="border-b border-hairline px-4 py-3 text-xs text-bad-foreground">
           {t("governance.injection.disarmed")}
         </p>
       ) : null}

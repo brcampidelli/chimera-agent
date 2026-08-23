@@ -76,7 +76,7 @@ function ServerRow({
 
       {result && result.ok && (
         <div className="rounded-xl2 bg-ok/[0.06] px-3 py-2 ring-1 ring-ok/15">
-          <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-ok">
+          <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-ok-foreground">
             <Check className="h-3.5 w-3.5" /> {t("mcp.toolsExposed", { n: result.tools.length })}
           </div>
           <div className="flex flex-col gap-1">
@@ -94,7 +94,7 @@ function ServerRow({
         </div>
       )}
       {result && !result.ok && (
-        <div className="flex items-center gap-1.5 rounded-xl2 bg-bad/[0.08] px-3 py-2 text-xs text-bad ring-1 ring-bad/20">
+        <div className="flex items-center gap-1.5 rounded-xl2 bg-bad/[0.08] px-3 py-2 text-xs text-bad-foreground ring-1 ring-bad/20">
           <X className="h-3.5 w-3.5 shrink-0" /> {result.error ?? t("mcp.testFailed")}
         </div>
       )}
@@ -193,7 +193,7 @@ function AddForm({ onAdded }: { onAdded: () => void }) {
           {add.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : t("mcp.add")}
         </Button>
       </div>
-      {add.isError && <p className="text-xs text-bad">{t("mcp.addError")}</p>}
+      {add.isError && <p className="text-xs text-bad-foreground">{t("mcp.addError")}</p>}
     </div>
   );
 }

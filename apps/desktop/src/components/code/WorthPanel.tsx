@@ -113,7 +113,7 @@ export function WorthPanel({ workspace }: { workspace?: string } = {}) {
       {/* Shown when the data is thin, and NOT hidden once it is thick: these groups stay
           observational no matter how many rows accumulate. */}
       {!any_readable ? (
-        <p className="text-xs text-warn">{t("code.worth.tooFew", { n: readable_n })}</p>
+        <p className="text-xs text-warn-foreground">{t("code.worth.tooFew", { n: readable_n })}</p>
       ) : null}
       <p className="text-xs text-muted-foreground">{t("code.worth.notAnExperiment")}</p>
       <DelegationSavings />

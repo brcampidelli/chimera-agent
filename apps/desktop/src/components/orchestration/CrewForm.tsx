@@ -191,9 +191,9 @@ export function CrewForm({
           the mechanism and hide the mistake, which is that two identical roles write the same
           diff, both pass, and the conflict rule then discards both. */}
       {sameApproach ? (
-        <p className="text-xs text-bad">{t("crew.workers.sameApproach")}</p>
+        <p className="text-xs text-bad-foreground">{t("crew.workers.sameApproach")}</p>
       ) : duplicated ? (
-        <p className="text-xs text-bad">{t("crew.workers.duplicate")}</p>
+        <p className="text-xs text-bad-foreground">{t("crew.workers.duplicate")}</p>
       ) : null}
 
       <Button
