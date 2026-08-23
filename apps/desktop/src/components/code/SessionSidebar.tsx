@@ -122,7 +122,9 @@ export function SessionSidebar({
   }
 
   return (
-    <aside className="flex min-h-0 w-60 flex-col border-r border-hairline">
+    // `shrink-0`: this is a fixed 240px rail, not a column that negotiates. Letting it shrink meant
+    // three columns competing for the same pixels and none of them winning cleanly.
+    <aside className="flex min-h-0 w-60 shrink-0 flex-col border-r border-hairline">
       <div className="flex items-center gap-1 p-2">
         <Button size="sm" variant="ghost" className="flex-1 justify-start" onClick={onNew}>
           <Plus className="h-4 w-4" /> {t("code.sessions.new")}

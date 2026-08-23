@@ -491,7 +491,13 @@ export function Code() {
             the arithmetic did not work: the panels that could not shrink took every pixel and this
             was laid out at zero height. Git and the cost table now live on Work, where reviewing
             what a run did belongs; the two settings became one row inside the composer. */}
-        <main className="flex min-h-0 flex-1 flex-col">
+        {/* `min-w-0` on the column that is MEANT to absorb the shrinking.
+            rc16 put it on the inner Conversation div and on the viewer, and missed this one — the
+            row's own flex-1 child. So at 1280px the conversation held 778px of a 936px row, the
+            viewer was crushed to 0.67px, and the pair overflowed 82px into the activity panel.
+            Measured by hit-testing a grid inside the panel: the composer strip and the transcript
+            bubbles were painting there, not the code this time. */}
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col">
           <Conversation
             key={conversationKey}
             resumeSession={sessionId}
@@ -581,7 +587,7 @@ export function Code() {
             `lg:w-[28rem]` is a BASIS, not a ceiling, and a flex child without it will not shrink —
             it overflowed the row instead and painted across the activity panel. */}
         {openFile ? (
-          <div className="flex min-h-0 min-w-0 flex-col border-hairline lg:w-[28rem] lg:border-l">
+          <div className="flex min-h-0 min-w-0 shrink-0 flex-col border-hairline lg:w-[28rem] lg:border-l">
             <Viewer workspace={workspace} path={openFile} />
           </div>
         ) : null}
