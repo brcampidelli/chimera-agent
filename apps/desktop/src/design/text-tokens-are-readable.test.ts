@@ -102,7 +102,7 @@ function themes(): Record<"dark" | "light", Record<string, string>> {
 }
 
 const AA_SMALL = 4.5;
-const INK = ["--ok-foreground", "--bad-foreground", "--warn-foreground", "--muted-foreground", "--foreground"];
+const INK = ["--ok-foreground", "--bad-foreground", "--warn-foreground", "--accent-ink", "--muted-foreground", "--foreground"];
 
 describe("text colours", () => {
   const { dark, light } = themes();
@@ -127,7 +127,7 @@ describe("text colours", () => {
     }
   });
 
-  it.each([["--ok", "--ok-foreground"], ["--bad", "--bad-foreground"], ["--warn", "--warn-foreground"]])(
+  it.each([["--ok", "--ok-foreground"], ["--bad", "--bad-foreground"], ["--warn", "--warn-foreground"], ["--accent", "--accent-ink"]])(
     "%s reads on its own badge tint, in both themes",
     (fill, ink) => {
       for (const [name, theme] of [["light", light], ["dark", dark]] as const) {

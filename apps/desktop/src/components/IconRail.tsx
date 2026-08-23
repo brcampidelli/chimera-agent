@@ -95,7 +95,7 @@ function RailButton({
           // through fifteen destinations with nothing on screen telling them where they were.
           focusRing,
           active
-            ? "bg-accent/15 text-accent shadow-rail-active"
+            ? "bg-accent/15 text-accent-ink shadow-rail-active"
             : "text-muted-foreground hover:bg-surface-hover hover:text-foreground",
         )}
       >

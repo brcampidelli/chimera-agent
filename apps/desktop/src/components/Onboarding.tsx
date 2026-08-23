@@ -120,7 +120,7 @@ export function Onboarding({ onSkip }: { onSkip: () => void }) {
             href={pick.keys_url}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1.5 text-sm text-accent hover:underline"
+            className="inline-flex items-center gap-1.5 text-sm text-accent-ink hover:underline"
           >
             {t("onboarding.getKeyLink", { provider: label })}
             <ExternalLink className="h-3.5 w-3.5" />

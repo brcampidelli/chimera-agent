@@ -33,7 +33,7 @@ export function RunStepper({ state }: { state: OrchestrationState }) {
             className={cn(
               "rounded-chip px-2 py-0.5 text-xs transition-colors duration-200 ease-out",
               current
-                ? "bg-accent/15 text-accent ring-1 ring-accent/25"
+                ? "bg-accent/15 text-accent-ink ring-1 ring-accent/25"
                 : done
                   ? "bg-surface-2 text-muted-foreground ring-1 ring-hairline"
                   : "text-muted-foreground/60",

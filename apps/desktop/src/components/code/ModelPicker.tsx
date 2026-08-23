@@ -111,7 +111,7 @@ export function ModelPicker({
             "transition-colors duration-1 ease-out disabled:opacity-50",
             focusRing,
             value
-              ? "bg-accent/20 text-accent"
+              ? "bg-accent/20 text-accent-ink"
               : "text-muted-foreground hover:text-foreground",
           )}
         >
@@ -387,7 +387,7 @@ function Row({
         <span className="flex flex-wrap items-center gap-1.5">
           <span className="truncate text-sm">{label}</span>
           {recommended ? (
-            <span className="rounded-chip bg-surface-2 px-1.5 text-xs text-accent">
+            <span className="rounded-chip bg-surface-2 px-1.5 text-xs text-accent-ink">
               ★
             </span>
           ) : null}

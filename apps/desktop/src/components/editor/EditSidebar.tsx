@@ -61,7 +61,7 @@ export function EditSidebar({
                 "transition-colors duration-1 ease-out",
                 focusRing,
                 mode === key
-                  ? "bg-accent/20 text-accent"
+                  ? "bg-accent/20 text-accent-ink"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >

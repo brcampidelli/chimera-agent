@@ -52,7 +52,7 @@ function ProjectRow({
           type="button"
           onClick={onSelect}
           aria-pressed={selected}
-          className={cn("truncate font-mono text-sm hover:text-accent", focusRing)}
+          className={cn("truncate font-mono text-sm hover:text-accent-ink", focusRing)}
         >
           {p.id}
         </button>

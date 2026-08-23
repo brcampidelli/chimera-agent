@@ -131,7 +131,7 @@ export function RolesBar({
           className={cn(
             "px-2.5 py-1 text-xs transition-colors disabled:opacity-50",
             profile === p
-              ? "bg-accent/20 text-accent"
+              ? "bg-accent/20 text-accent-ink"
               : "text-muted-foreground hover:text-foreground",
           )}
         >
@@ -163,7 +163,7 @@ export function RolesBar({
           {resolved[role] ?? t("code.roles.default")}
         </span>
       )}
-      {fused[role] ? <span className="shrink-0 text-accent">· {t("code.roles.panel")}</span> : null}
+      {fused[role] ? <span className="shrink-0 text-accent-ink">· {t("code.roles.panel")}</span> : null}
     </div>
   );
 

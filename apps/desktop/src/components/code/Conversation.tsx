@@ -969,7 +969,7 @@ export function Conversation({
                   <button
                     type="button"
                     onClick={() => onOpenFile?.(edit.path)}
-                    className="font-mono text-xs text-accent underline decoration-dotted"
+                    className="font-mono text-xs text-accent-ink underline decoration-dotted"
                   >
                     {edit.path}
                   </button>

@@ -70,7 +70,7 @@ export function ProviderPicker({
             "px-2.5 py-1 text-xs transition-colors duration-1 ease-out disabled:opacity-50",
             focusRing,
             value === ""
-              ? "bg-accent/20 text-accent"
+              ? "bg-accent/20 text-accent-ink"
               : "text-muted-foreground hover:text-foreground",
           )}
         >
@@ -116,7 +116,7 @@ export function ProviderPicker({
                 focusRing,
                 !agent.available && "cursor-not-allowed opacity-40",
                 value === agent.key
-                  ? "bg-accent/20 text-accent"
+                  ? "bg-accent/20 text-accent-ink"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >

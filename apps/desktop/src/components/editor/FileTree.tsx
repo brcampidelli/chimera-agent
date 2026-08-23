@@ -54,7 +54,7 @@ function Node({
           "transition-colors duration-1 ease-out",
           focusRing,
           active
-            ? "bg-accent/15 text-accent"
+            ? "bg-accent/15 text-accent-ink"
             : "text-muted-foreground hover:bg-surface-hover hover:text-foreground",
         )}
         // Indentation is data, not design: it comes from how deep the node is, so it cannot be a

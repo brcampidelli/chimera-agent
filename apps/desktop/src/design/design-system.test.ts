@@ -140,13 +140,42 @@ describe("colour", () => {
     // passed while verifying nothing at all. Sabotage is the only reason that surfaced. Tailwind
     // class lists are space-separated, so exact membership says the same thing and cannot rot.
     const SIZES = new Set(["text-xs", "text-sm", "text-base", "text-lg", "text-xl"]);
-    const STATES = new Set(["text-ok", "text-bad", "text-warn"]);
+    // `text-accent` joined late, and the reason is worth keeping: `--accent-foreground` already
+    // existed, so it LOOKED like the accent had its ink pair. It is white — for text ON a solid
+    // accent fill, the opposite direction. Text IN the accent colour had no token at all and
+    // measured 4.29:1 on the page, 3.29:1 on the tint a selected toggle paints itself with.
+    const STATES = new Set(["text-ok", "text-bad", "text-warn", "text-accent"]);
     const offenders: string[] = [];
-    for (const { file, value } of classNameLiterals()) {
+    // Two ways to be sure a token is colouring TEXT, because the font size is not always in the
+    // same string. `panel.tsx` keeps its tones in a map — `bg-ok/15 text-ok ring-1 ring-ok/20` —
+    // while the `text-xs` that makes it text lives on the element. The size rule walked straight
+    // past it, which is how the badge tones were wrong to begin with, and sabotage proved the
+    // first version of THIS guard walked past it too.
+    //
+    // So: a size class in the same string, or a fill of the same colour in the same string. The
+    // second is the badge shape and means a label on its own wash by construction.
+    const ink = (c: string) => (c === "text-accent" ? "text-accent-ink" : `${c}-foreground`);
+    // EVERY quoted string, not just `className=` ones. `panel.tsx` keeps its badge tones in a
+    // variant map, so a className-only scan walks past them — which is the exact blind spot the
+    // colour-literal test above documents having been written to avoid, and which this guard
+    // inherited by reusing `classNameLiterals()`. Sabotage on two different tones proved it.
+    const strings: { file: string; value: string }[] = [];
+    for (const [file, text] of appSources()) {
+      // Split on the quote instead of matching. Written as a regex, the newline class became a
+      // real line break and the literal did not parse — the second time an escape has not
+      // survived being written into this file. Odd indices of a split on a quote ARE the quoted
+      // strings, exactly, with nothing to escape.
+      const chunks = text.split(String.fromCharCode(34));
+      for (let i = 1; i < chunks.length; i += 2) strings.push({ file, value: chunks[i] });
+    }
+    for (const { file, value } of strings) {
       const parts = value.split(" ").map((c) => c.trim()).filter(Boolean);
-      if (!parts.some((c) => SIZES.has(c))) continue;
       const hit = parts.find((c) => STATES.has(c));
-      if (hit) offenders.push(`${file}: ${hit} - use ${hit}-foreground`);
+      if (!hit) continue;
+      const fill = hit.replace("text-", "bg-");
+      const isText =
+        parts.some((c) => SIZES.has(c)) || parts.some((c) => c.startsWith(`${fill}/`));
+      if (isText) offenders.push(`${file}: ${hit} - use ${ink(hit)}`);
     }
     expect(offenders, "state colours used as text").toEqual([]);
   });

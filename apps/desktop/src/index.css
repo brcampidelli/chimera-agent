@@ -41,6 +41,7 @@
   --primary-foreground: 222 47% 11%;
   --accent: 217 91% 62%;
   --accent-foreground: 0 0% 100%;
+  --accent-ink: 217 91% 70%;
   --accent2: 189 94% 55%;
   --ring: 217 91% 62%;
   --ok: 152 58% 50%;
@@ -110,6 +111,12 @@
   --primary-foreground: 0 0% 100%;
   --accent: 217 91% 52%;
   --accent-foreground: 0 0% 100%;
+  /* The accent as INK, which `--accent-foreground` is not: that one is white, for text sitting
+     ON a solid accent fill. Text sitting IN the accent colour is the other direction, and it had
+     no token — measured 4.29:1 on the page and 3.29:1 on the `bg-accent/20` a selected toggle
+     paints itself with, both under the 4.5 small text needs. Same defect as `--ok` and `--bad`,
+     one token later, because the obvious name was taken and meant something else. */
+  --accent-ink: 217 91% 42%;
   --accent2: 189 90% 42%;
   --ring: 217 91% 52%;
   /* Fill and text are the same colour in the dark theme and cannot be here.
