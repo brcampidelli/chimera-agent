@@ -232,11 +232,11 @@ export function Onboarding({ onSkip }: { onSkip: () => void }) {
         {/* Honest status: "saved (present)" after Save; only "verified — it works" after a passed test. */}
         {result ? (
           result.ok ? (
-            <p className="flex items-center gap-1.5 text-sm text-ok">
+            <p className="flex items-center gap-1.5 text-sm text-ok-foreground">
               <Check className="h-4 w-4" /> {t("onboarding.verified")}
             </p>
           ) : (
-            <p className="flex items-start gap-1.5 text-sm text-bad">
+            <p className="flex items-start gap-1.5 text-sm text-bad-foreground">
               <X className="mt-0.5 h-4 w-4 shrink-0" />
               <span>
                 {t("onboarding.testFailed")}

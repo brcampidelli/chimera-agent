@@ -119,7 +119,7 @@ function Row({ entry }: { entry: CatalogEntry }) {
           <p className="text-xs text-muted-foreground">{t("catalog.by", { author: entry.author })}</p>
         ) : null}
         {failed ? (
-          <p className="text-xs text-bad">{failed instanceof Error ? failed.message : String(failed)}</p>
+          <p className="text-xs text-bad-foreground">{failed instanceof Error ? failed.message : String(failed)}</p>
         ) : null}
       </div>
 

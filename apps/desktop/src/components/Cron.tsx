@@ -76,7 +76,7 @@ function AddSchedule() {
             <Plus className="h-3.5 w-3.5" /> {t("cron.add.submit")}
           </Button>
         </div>
-        {create.isError && <div className="text-xs text-bad">{t("cron.add.error")}</div>}
+        {create.isError && <div className="text-xs text-bad-foreground">{t("cron.add.error")}</div>}
       </div>
     </Panel>
   );
@@ -130,7 +130,7 @@ export function Cron({ embedded = false }: { embedded?: boolean } = {}) {
                     a tooltip is found by accident. Truncated to one line: the full text is in the
                     title, and a stack trace must not push every other job off the screen. */}
                 {j.consecutive_failures > 0 && j.last_error && (
-                  <div className="mt-0.5 truncate font-mono text-xs text-bad" title={j.last_error}>
+                  <div className="mt-0.5 truncate font-mono text-xs text-bad-foreground" title={j.last_error}>
                     {j.last_error}
                   </div>
                 )}

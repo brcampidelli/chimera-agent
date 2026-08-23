@@ -127,7 +127,7 @@ function ImagePreview({ workspace, path }: { workspace: string; path: string }) 
     // Named separately from the generic binary note: "we could not load this image" is a different
     // fact from "this is not an image", and answering the second when the first happened would send
     // someone looking for a bug in a file that is fine.
-    return <div className="px-4 py-6 text-sm text-bad">{t("code.imageError")}</div>;
+    return <div className="px-4 py-6 text-sm text-bad-foreground">{t("code.imageError")}</div>;
   }
   if (!url) {
     return (
@@ -222,7 +222,7 @@ function Viewer({ workspace, path }: { workspace: string; path: string | null })
         {dirty ? <Badge tone="warn">{t("code.dirty")}</Badge> : null}
         {q.data?.truncated ? <Badge tone="warn">{t("code.truncated")}</Badge> : null}
         {savedFlash && !editing ? (
-          <span className="text-xs text-ok">{t("code.saved")}</span>
+          <span className="text-xs text-ok-foreground">{t("code.saved")}</span>
         ) : null}
         {editing ? (
           <>
@@ -269,7 +269,7 @@ function Viewer({ workspace, path }: { workspace: string; path: string | null })
               <Loader2 className="h-5 w-5 animate-spin" />
             </div>
           ) : q.isError ? (
-            <div className="px-4 py-6 text-sm text-bad">{t("code.fileError")}</div>
+            <div className="px-4 py-6 text-sm text-bad-foreground">{t("code.fileError")}</div>
           ) : q.data?.note && path !== null && isImagePath(path) ? (
             <ImagePreview workspace={workspace} path={path} />
           ) : q.data?.note ? (

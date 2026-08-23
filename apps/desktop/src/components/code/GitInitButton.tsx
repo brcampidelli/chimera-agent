@@ -63,7 +63,7 @@ export function GitInitButton({ workspace }: { workspace: string }) {
         )}
         {t("code.git.init")}
       </Button>
-      {failed ? <span className="text-xs text-bad">{t("code.git.initError")}</span> : null}
+      {failed ? <span className="text-xs text-bad-foreground">{t("code.git.initError")}</span> : null}
     </div>
   );
 }

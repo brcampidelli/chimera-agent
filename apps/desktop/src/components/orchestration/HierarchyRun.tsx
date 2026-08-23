@@ -128,7 +128,7 @@ export function HierarchyRun({
       ) : null}
 
       {state.error ? (
-        <p className="rounded-card border border-bad/25 bg-bad/5 p-3 text-sm text-bad">
+        <p className="rounded-card border border-bad/25 bg-bad/5 p-3 text-sm text-bad-foreground">
           {state.error}
         </p>
       ) : null}

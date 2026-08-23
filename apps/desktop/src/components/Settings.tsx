@@ -68,7 +68,7 @@ function AppliesNote({ when }: { when?: string }) {
   const t = useT();
   if (when !== "next_conversation" && when !== "next_launch") return null;
   return (
-    <div className="text-xs text-warn">
+    <div className="text-xs text-warn-foreground">
       {t(
         when === "next_launch"
           ? "settings.applies.nextLaunch"
@@ -99,7 +99,7 @@ function PinnedNote({ env }: { env?: string }) {
   const t = useT();
   const pinned = useContext(PinnedContext);
   if (!env || !pinned.has(env)) return null;
-  return <div className="text-xs text-warn">{t("settings.pinned")}</div>;
+  return <div className="text-xs text-warn-foreground">{t("settings.pinned")}</div>;
 }
 
 /**
@@ -210,7 +210,7 @@ function IdentityCard() {
             {t("common.save")}
           </Button>
           {dirty && (
-            <span className="text-xs text-warn">{t("settings.unsaved")}</span>
+            <span className="text-xs text-warn-foreground">{t("settings.unsaved")}</span>
           )}
         </div>
       </div>
@@ -296,7 +296,7 @@ function AutonomyCard({
       </Row>
       {confirmingHostExec && (
         <div className="flex flex-col gap-2 px-4 py-3">
-          <p className="text-xs text-bad">{t("settings.hostExec.warning")}</p>
+          <p className="text-xs text-bad-foreground">{t("settings.hostExec.warning")}</p>
           <div className="flex items-center gap-2">
             <Button
               size="sm"
@@ -717,7 +717,7 @@ function PoolField({
           {t("settings.pool.add")}
         </Button>
       </div>
-      {error ? <p className="text-xs text-bad">{error}</p> : null}
+      {error ? <p className="text-xs text-bad-foreground">{error}</p> : null}
     </div>
   );
 }
@@ -815,7 +815,7 @@ export function MessagingCard({
         <div className="flex items-center gap-2">
           {d?.error && !running && (
             <span
-              className="max-w-[16rem] truncate text-xs text-bad"
+              className="max-w-[16rem] truncate text-xs text-bad-foreground"
               title={d.error}
             >
               {d.error}
@@ -1342,7 +1342,7 @@ export function Settings() {
                 </Card>
 
                 {mutation.isError && (
-                  <p className="text-sm text-bad">{t("settings.saveError")}</p>
+                  <p className="text-sm text-bad-foreground">{t("settings.saveError")}</p>
                 )}
               </div>
             )}

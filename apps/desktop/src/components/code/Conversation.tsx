@@ -177,7 +177,7 @@ function Verdict({
 
   return (
     <div className="space-y-1.5 rounded-chip border border-bad/40 p-2">
-      <p className="text-xs text-bad">{t("code.chat.verdict.failed", args)}</p>
+      <p className="text-xs text-bad-foreground">{t("code.chat.verdict.failed", args)}</p>
       {v.output ? (
         <pre className="max-h-40 overflow-auto whitespace-pre-wrap font-mono text-xs text-muted-foreground">
           {v.output}
@@ -926,7 +926,7 @@ export function Conversation({
       {/* Said out loud rather than logged. "Your export is missing four turns" is exactly the kind
           of thing that must not be discovered later, by someone reading the file. */}
       {exportNote ? (
-        <p className="border-b border-hairline px-3 py-1 text-xs text-warn">
+        <p className="border-b border-hairline px-3 py-1 text-xs text-warn-foreground">
           {exportNote}
         </p>
       ) : null}
@@ -1023,7 +1023,7 @@ export function Conversation({
               ) : null}
               {e.failed ? (
                 <div className="space-y-1">
-                  <p className="text-xs text-bad">{t("code.chat.error")}</p>
+                  <p className="text-xs text-bad-foreground">{t("code.chat.error")}</p>
                   {/* Folded, not hidden: the headline stays one line for the common case where the
                     user only wants to retry, and the raw provider message is one click away for
                     the case where it says `invalid_api_key` and settles the whole question. */}
@@ -1043,7 +1043,7 @@ export function Conversation({
                 // At the answer, which is the only place it lands in time. The composer warns before
                 // the click; neither warning is visible at the moment someone reads a confident
                 // description of a file that was never opened.
-                <p className="flex items-start gap-1.5 text-xs text-warn">
+                <p className="flex items-start gap-1.5 text-xs text-warn-foreground">
                   <Network className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                   {t("composer.fusedAnswer")}
                 </p>
@@ -1107,7 +1107,7 @@ export function Conversation({
             <span className="min-w-0 flex-1 truncate text-xs">{queued}</span>
             <button
               type="button"
-              className="shrink-0 text-xs text-muted-foreground hover:text-bad"
+              className="shrink-0 text-xs text-muted-foreground hover:text-bad-foreground"
               // Back into the box rather than deleted: the user wrote it, and a cancel that destroys
               // text is a worse trade than one that hands it back.
               onClick={() => {
@@ -1173,7 +1173,7 @@ export function Conversation({
             itself; a file that arrived by clipboard has no button to stand beside, and silence
             would leave someone waiting for a screenshot that was never uploaded. */}
         {uploadFailed ? (
-          <p className="text-xs text-bad">
+          <p className="text-xs text-bad-foreground">
             {t("code.attach.failed", { name: uploadFailed })}
           </p>
         ) : null}

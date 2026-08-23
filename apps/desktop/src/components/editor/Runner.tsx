@@ -160,7 +160,7 @@ export function Runner({ workspace }: { workspace: string | null }) {
               type="button"
               onClick={() => void stop()}
               className={cn(
-                "flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-bad hover:bg-surface-hover",
+                "flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-bad-foreground hover:bg-surface-hover",
                 focusRing,
               )}
             >

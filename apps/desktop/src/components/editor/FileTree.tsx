@@ -115,7 +115,7 @@ function Level({
     // A directory that cannot be read is a fact about that directory, not a reason to blank the
     // tree. The rest of the workspace stays usable.
     return (
-      <div className="py-1 text-xs text-bad" style={{ paddingLeft: `${depth * 12 + 6}px` }}>
+      <div className="py-1 text-xs text-bad-foreground" style={{ paddingLeft: `${depth * 12 + 6}px` }}>
         {t("edit.tree.unreadable")}
       </div>
     );

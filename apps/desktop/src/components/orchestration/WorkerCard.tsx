@@ -84,7 +84,7 @@ export function WorkerCard({ worker }: { worker: WorkerState }) {
 
         {worker.status === "rejected" ? (
           <div className="space-y-1">
-            <p className="text-xs text-bad">
+            <p className="text-xs text-bad-foreground">
               {worker.reason === "no_output"
                 ? t("orch.worker.noOutput")
                 : worker.reason === "deadline"

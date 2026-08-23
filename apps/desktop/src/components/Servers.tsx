@@ -121,7 +121,7 @@ export function Servers() {
               </p>
             </div>
             {s.id === current ? (
-              <span className="flex items-center gap-1 text-xs text-ok">
+              <span className="flex items-center gap-1 text-xs text-ok-foreground">
                 <Check className="h-3 w-3" aria-hidden />
                 {t("server.inUse")}
               </span>
@@ -155,10 +155,10 @@ export function Servers() {
           role="status"
           className={
             note.kind === "ok"
-              ? "text-xs text-ok"
+              ? "text-xs text-ok-foreground"
               : note.kind === "warn"
                 ? "text-xs text-warn-foreground"
-                : "text-xs text-bad"
+                : "text-xs text-bad-foreground"
           }
         >
           {note.text}

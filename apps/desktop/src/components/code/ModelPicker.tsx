@@ -291,7 +291,7 @@ export function ModelDialog({
             </p>
           ) : null}
           {listing.isError ? (
-            <p className="px-2 py-3 text-xs text-bad">
+            <p className="px-2 py-3 text-xs text-bad-foreground">
               {t("model.pick.failed")}
             </p>
           ) : null}
