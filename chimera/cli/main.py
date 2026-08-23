@@ -807,6 +807,94 @@ def features() -> None:
     console.print(table)
 
 
+bench_app = typer.Typer(help="Run the rulers this project measures itself with.")
+
+#: Module-level singletons, matching the rest of this file: `typer.Argument(...)` evaluated in a
+#: default is a call at import time, which ruff's B008 flags for the reason it always does — the
+#: object is shared across every invocation.
+_BENCH_ROOT = typer.Argument(..., help="Folder to index and probe.")
+_BENCH_CORPUS = typer.Argument(..., help="JSONL of {query, text, success} records.")
+_BENCH_K = typer.Option(10, help="Retrieve this many chunks per probe.")
+_BENCH_PROBES = typer.Option(200, help="Cap the probe count; each one is a query.")
+_RERANK_K = typer.Option(5, help="Rank cut-off for the leave-one-out scoring.")
+
+
+@bench_app.command("rag")
+def bench_rag(
+    root: Path = _BENCH_ROOT,
+    k: int = _BENCH_K,
+    max_probes: int = _BENCH_PROBES,
+) -> None:
+    """Recall@k of each retriever over a real folder — lexical, and vector when an embedder is set.
+
+    This is the measurement `chimera/rag/__init__.py` names when it says the retriever's existence
+    is not a claim that it helps. That sentence pointed at a module you could not run: `rag_bench`
+    had no caller outside its own test and was not exported from `chimera.eval`.
+
+    No embedder is passed, so the vector and hybrid figures come back as None rather than zero —
+    an embedder that was never called did not fail, and printing 0.0 invites the wrong conclusion.
+    """
+    import tempfile
+
+    from chimera.eval import run_rag_bench
+
+    with tempfile.TemporaryDirectory() as tmp:
+        report = run_rag_bench(
+            Path(root), index_path=Path(tmp) / "index.db", k=k, max_probes=max_probes
+        )
+    table = Table(title=f"RAG recall@{k} over {root}", show_header=True, header_style="bold")
+    table.add_column("retriever")
+    table.add_column("recall", justify="right")
+    for name, value in (
+        ("keyword", report.keyword_recall),
+        ("vector", report.vector_recall),
+        ("hybrid", report.hybrid_recall),
+    ):
+        # "not measured" rather than a dash: the reader has to be able to tell an absent embedder
+        # from a retriever that scored nothing.
+        shown = f"{value:.3f}" if isinstance(value, float) else "[dim]not measured[/dim]"
+        table.add_row(name, shown)
+    console.print(table)
+    console.print(f"[dim]{report.probes} probes over {report.chunks} chunks[/dim]")
+    # The number that says whether a semantic layer could help at all: the share of probes keyword
+    # retrieval misses. A headroom near zero means the embedding bill buys nothing here.
+    console.print(f"[dim]headroom for a semantic layer: {report.headroom:.1%}[/dim]")
+    for note in report.notes:
+        console.print(f"[dim]{escape(note)}[/dim]")
+
+
+@bench_app.command("reranker")
+def bench_reranker(
+    corpus: Path = _BENCH_CORPUS,
+    k: int = _RERANK_K,
+) -> None:
+    """Leave-one-out AUC of the success reranker — does it discriminate, or is it noise?
+
+    `chimera/evolution/reranker.py` says to measure with this BEFORE putting the reranker in a hot
+    path. It was prose pointing at an unreachable module.
+
+    AUC of 0.5 is a coin flip. A reranker at 0.5 is not a weak reranker, it is not a reranker.
+    """
+    import json
+
+    from chimera.eval import run_reranker_ab
+    from chimera.eval.reranker_ab import format_report
+
+    records = []
+    for line in Path(corpus).read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        records.append((row["query"], row["text"], bool(row["success"])))
+    if not records:
+        console.print("[yellow]empty corpus — nothing to measure[/yellow]")
+        raise typer.Exit(1)
+    console.print(format_report(run_reranker_ab(records, k=k)))
+
+
+app.add_typer(bench_app, name="bench")
+
+
 @app.command()
 def guard(action: str = typer.Argument(..., help="The action/command to evaluate.")) -> None:
     """Show the governance verdict (allow/warn/review/block) for an action."""
