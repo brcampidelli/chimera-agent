@@ -2601,6 +2601,87 @@
       "commands": [
         {
           "deprecated": false,
+          "help": "Recall@k of each retriever over a real folder \u2014 lexical, and vector when an embedder is set.\n\nThis is the measurement `chimera/rag/__init__.py` names when it says the retriever's existence\nis not a claim that it helps. That sentence pointed at a module you could not run: `rag_bench`\nhad no caller outside its own test and was not exported from `chimera.eval`.\n\nNo embedder is passed, so the vector and hybrid figures come back as None rather than zero \u2014\nan embedder that was never called did not fail, and printing 0.0 invites the wrong conclusion.",
+          "hidden": false,
+          "name": "rag",
+          "params": [
+            {
+              "help": "Folder to index and probe.",
+              "kind": "argument",
+              "name": "root",
+              "opts": [
+                "root"
+              ],
+              "required": true,
+              "type": "path"
+            },
+            {
+              "default": "10",
+              "help": "Retrieve this many chunks per probe.",
+              "kind": "option",
+              "name": "k",
+              "opts": [
+                "--k"
+              ],
+              "required": false,
+              "type": "int"
+            },
+            {
+              "default": "200",
+              "help": "Cap the probe count; each one is a query.",
+              "kind": "option",
+              "name": "max_probes",
+              "opts": [
+                "--max-probes"
+              ],
+              "required": false,
+              "type": "int"
+            }
+          ],
+          "path": "measure rag"
+        },
+        {
+          "deprecated": false,
+          "help": "Leave-one-out AUC of the success reranker \u2014 does it discriminate, or is it noise?\n\n`chimera/evolution/reranker.py` says to measure with this BEFORE putting the reranker in a hot\npath. It was prose pointing at an unreachable module.\n\nAUC of 0.5 is a coin flip. A reranker at 0.5 is not a weak reranker, it is not a reranker.",
+          "hidden": false,
+          "name": "reranker",
+          "params": [
+            {
+              "help": "JSONL of {query, text, success} records.",
+              "kind": "argument",
+              "name": "corpus",
+              "opts": [
+                "corpus"
+              ],
+              "required": true,
+              "type": "path"
+            },
+            {
+              "default": "5",
+              "help": "Rank cut-off for the leave-one-out scoring.",
+              "kind": "option",
+              "name": "k",
+              "opts": [
+                "--k"
+              ],
+              "required": false,
+              "type": "int"
+            }
+          ],
+          "path": "measure reranker"
+        }
+      ],
+      "deprecated": false,
+      "help": "Run the rulers this project measures itself with.",
+      "hidden": false,
+      "name": "measure",
+      "params": [],
+      "path": "measure"
+    },
+    {
+      "commands": [
+        {
+          "deprecated": false,
           "help": "Remember a fact (ADD / UPDATE / NOOP, deduped).",
           "hidden": false,
           "name": "add",

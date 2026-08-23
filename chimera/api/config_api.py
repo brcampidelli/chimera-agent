@@ -26,12 +26,20 @@ from chimera.providers.catalog import PROVIDERS
 #: Credentials that buy a capability rather than a model — search, speech, images. Listed on the
 #: settings screen beside the providers, and deliberately NOT offered by the first-run wizard: none
 #: of them makes ``has_any_key`` true, so choosing one there would be a dead end that confirms.
+# Two of these register a tool the moment the key is set; three do not, and the labels used to read
+# alike. "Brave (web search)" sitting beside "Tavily (web search)" says they are the same kind of
+# thing — paste the key and it works — when only one of them is. `chimera/tools/web.py` implements
+# Tavily and nothing else, and the `.env.example` was already more honest than this screen: it
+# marks Stability "(reserved)" while the label here said "Stability (images)".
+#
+# Kept rather than removed. They are reachable through the OpenAPI->tool importer, the same route
+# `spotify` and `x_search` already document — so the slot is real and the promise was the lie.
 _TOOL_CREDENTIALS = {
     "TAVILY_API_KEY": "Tavily (web search)",
-    "BRAVE_API_KEY": "Brave (web search)",
-    "SERPAPI_API_KEY": "SerpAPI",
+    "BRAVE_API_KEY": "Brave — no built-in tool; import its OpenAPI spec",
+    "SERPAPI_API_KEY": "SerpAPI — no built-in tool; import its OpenAPI spec",
     "ELEVENLABS_API_KEY": "ElevenLabs (TTS)",
-    "STABILITY_API_KEY": "Stability (images)",
+    "STABILITY_API_KEY": "Stability — no built-in tool; import its OpenAPI spec",
 }
 # The model providers come from the catalog, which owns their slugs and their labels. Keeping a
 # second list here is how the CLI and the app end up disagreeing about what a provider is called.

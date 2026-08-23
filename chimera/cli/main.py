@@ -807,7 +807,11 @@ def features() -> None:
     console.print(table)
 
 
-bench_app = typer.Typer(help="Run the rulers this project measures itself with.")
+# Named `measure`, not `bench`: `chimera bench` already exists (the A/B harness at the bottom of
+# this file), and mounting a Typer sub-app under that name SHADOWS it — `chimera bench` stopped
+# exiting 1 without a key and started exiting 2 for a missing subcommand. Caught by the existing
+# `test_bench_without_key_exits`, which is the only reason I know the command was there at all.
+measure_app = typer.Typer(help="Run the rulers this project measures itself with.")
 
 #: Module-level singletons, matching the rest of this file: `typer.Argument(...)` evaluated in a
 #: default is a call at import time, which ruff's B008 flags for the reason it always does — the
@@ -819,7 +823,7 @@ _BENCH_PROBES = typer.Option(200, help="Cap the probe count; each one is a query
 _RERANK_K = typer.Option(5, help="Rank cut-off for the leave-one-out scoring.")
 
 
-@bench_app.command("rag")
+@measure_app.command("rag")
 def bench_rag(
     root: Path = _BENCH_ROOT,
     k: int = _BENCH_K,
@@ -863,7 +867,7 @@ def bench_rag(
         console.print(f"[dim]{escape(note)}[/dim]")
 
 
-@bench_app.command("reranker")
+@measure_app.command("reranker")
 def bench_reranker(
     corpus: Path = _BENCH_CORPUS,
     k: int = _RERANK_K,
@@ -892,7 +896,7 @@ def bench_reranker(
     console.print(format_report(run_reranker_ab(records, k=k)))
 
 
-app.add_typer(bench_app, name="bench")
+app.add_typer(measure_app, name="measure")
 
 
 @app.command()

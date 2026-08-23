@@ -63,7 +63,13 @@ export function makeCodeApiMock() {
       autonomy: { reach: "", approval: "", host_exec: "ask", denied_tools: [] },
     })),
     getPostureFacts: vi.fn(),
-    getRoleModels: vi.fn(),
+    // The composer strip renders RolesBar now, so every screen that mounts Code asks this. An
+    // undefined answer makes react-query warn and leaves the picker in a state no user sees.
+    getRoleModels: vi.fn(async () => ({
+      explore: "openrouter/weak", plan: "openrouter/top",
+      edit: "openrouter/mid", review: "openrouter/top",
+      fuse_plan: false, fuse_review: false,
+    })),
     getWorth: vi.fn(),
     // The Worth tab hosts the delegation panel and the Orchestration tab hosts the run list, so
     // both endpoints are reached by screens these tests render. Defaulted to "nothing recorded"

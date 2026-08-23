@@ -140,6 +140,9 @@ def build_evolution_context(
                 else None
             ),
             accept_mode=settings.skill_accept_mode,
+            min_transfer=settings.skill_min_transfer,
+            # Passed, not left at the constructor default: the setting existing is half the fix,
+            # and the half that does nothing on its own.
         )
     # Semantic card recall (memory_bench: keyword misses paraphrases 0% -> semantic 94%): when
     # ``semantic_memory`` is on, rank cards by embedding cosine instead of BM25 so a card matches a task

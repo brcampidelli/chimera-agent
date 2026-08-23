@@ -56,7 +56,7 @@ def test_the_rag_bench_runs_from_the_command_line(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    result = runner.invoke(app, ["bench", "rag", str(corpus), "--max-probes", "5"])
+    result = runner.invoke(app, ["measure", "rag", str(corpus), "--max-probes", "5"])
 
     assert result.exit_code == 0, result.output
     assert "keyword" in result.output
@@ -76,7 +76,7 @@ def test_it_says_not_measured_rather_than_zero_without_an_embedder(tmp_path: Pat
         encoding="utf-8",
     )
 
-    result = runner.invoke(app, ["bench", "rag", str(corpus), "--max-probes", "3"])
+    result = runner.invoke(app, ["measure", "rag", str(corpus), "--max-probes", "3"])
 
     assert "not measured" in result.output
     assert "0.000" not in result.output.split("hybrid")[-1]
@@ -97,7 +97,7 @@ def test_the_reranker_ab_runs_from_the_command_line(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    result = runner.invoke(app, ["bench", "reranker", str(corpus)])
+    result = runner.invoke(app, ["measure", "reranker", str(corpus)])
 
     assert result.exit_code == 0, result.output
     assert "auc" in result.output.lower()
@@ -109,7 +109,7 @@ def test_an_empty_corpus_refuses_rather_than_reporting_a_number(tmp_path: Path) 
     corpus = tmp_path / "corpus.jsonl"
     corpus.write_text("\n", encoding="utf-8")
 
-    result = runner.invoke(app, ["bench", "reranker", str(corpus)])
+    result = runner.invoke(app, ["measure", "reranker", str(corpus)])
 
     assert result.exit_code == 1
     assert "empty" in result.output.lower()

@@ -57,6 +57,11 @@ export function RolesBar({
         <button
           key={p}
           type="button"
+          // Same fix the worker picker took in rc13, and it was needed here for the same reason:
+          // this is a toggle group, and which one is chosen was said in colour and nowhere else.
+          // It stayed invisible because nothing rendered this control at all — surfacing it is
+          // what surfaced the gap.
+          aria-pressed={profile === p}
           disabled={disabled}
           onClick={() => onProfile(p)}
           className={cn(
