@@ -106,6 +106,35 @@ describe("when the orchestrator picks one agent", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
+  it("says what would change the answer, when nothing was named", async () => {
+    // "This task is short and direct" is a claim about the TASK, and for somebody who wrote
+    // "compare the two reports in this folder" it is false twice over. What was short is what the
+    // RULE could see: `count_sources` reads the wording and never opens the folder — deterministic
+    // by design, since classification is never an LLM call. Blaming the task for that sends a user
+    // whose work really is divisible away believing it is not.
+    await preview({ shape: "parallel_read", fell_back_reason: "unprofitable", sources: 0 });
+
+    expect(screen.getByText(/never opens the folder/i)).toBeInTheDocument();
+  });
+
+  it("does not tell someone to do what they already did", async () => {
+    // The control. With two sources counted, the rule DID see the files and declined on size —
+    // repeating "name them" would be advice they already followed, and would make the screen look
+    // like it is not reading its own input.
+    await preview({ shape: "parallel_read", fell_back_reason: "unprofitable", sources: 2 });
+
+    expect(screen.getByText(/costs more than it saves/i)).toBeInTheDocument();
+    expect(screen.queryByText(/never opens the folder/i)).toBeNull();
+  });
+
+  it("does not say it about work that is going to the crew", async () => {
+    // Write-shaped work is not declined for want of named sources — it is routed. The useful next
+    // step is already on screen as a button, and a second instruction competes with it.
+    await preview({ shape: "sequential_write", fell_back_reason: "shape", sources: 0 });
+
+    expect(screen.queryByText(/never opens the folder/i)).toBeNull();
+  });
+
   it("never starts a run just because the plan was asked for", async () => {
     await preview();
 

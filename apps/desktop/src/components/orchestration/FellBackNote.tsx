@@ -22,6 +22,7 @@ import { useT } from "@/lib/i18n";
 export function FellBackNote({
   shape,
   reason,
+  sources,
   onRun,
   onOpenCode,
   onCrew,
@@ -29,6 +30,8 @@ export function FellBackNote({
 }: {
   shape: string;
   reason: string;
+  /** Distinct sources NAMED IN THE TASK TEXT — `count_sources`, which never opens the folder. */
+  sources?: number;
   /** Absent once the run is under way — by then it is a report, not an offer. */
   onRun?: () => void;
   onOpenCode?: () => void;
@@ -51,6 +54,17 @@ export function FellBackNote({
             ? t("orch.fellback.write")
             : t("orch.fellback.simple");
 
+  // "This task is short and direct" is an assertion about the TASK, and for somebody who wrote
+  // "compare the two reports in this folder" it is simply false: the task is neither, and what was
+  // short was what the rule could see. `count_sources` reads the wording and nothing else — by
+  // design, since classification is deterministic and never an LLM call — so a divisible task
+  // whose files were not named lands here with a sentence that blames the task.
+  //
+  // Only when nothing was named. With two or more sources counted, the rule DID see them and
+  // declined on size, and repeating "name them" would be advice they already followed.
+  const nameThem =
+    (reason === "unprofitable" || (!reason && shape !== "sequential_write")) && (sources ?? 0) < 2;
+
   return (
     <div className="rounded-card border border-accent/25 bg-accent/5 p-4">
       <div className="flex items-center gap-2 text-accent">
@@ -58,6 +72,9 @@ export function FellBackNote({
         <h3 className="text-sm font-semibold">{t("orch.fellback.title")}</h3>
       </div>
       <p className="mt-2 text-sm text-muted-foreground">{why}</p>
+      {nameThem ? (
+        <p className="mt-1.5 text-sm text-muted-foreground">{t("orch.fellback.nameThem")}</p>
+      ) : null}
       {onRun || onOpenCode ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {/* First, because it is the answer to what was actually asked. A task that edits files

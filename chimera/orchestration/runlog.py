@@ -80,6 +80,19 @@ def append(home: Path, run_id: str, event: str, payload: dict[str, Any]) -> None
         _log.debug("orchestration frame not persisted: %s", exc)
 
 
+def exists(home: Path, run_id: str) -> bool:
+    """Whether this run was ever recorded.
+
+    `frames()` cannot answer it: an unknown id and a run that has not produced anything past
+    ``since`` both come back empty, and a caller cannot tell "no such run" from "nothing new yet"
+    — which are opposite instructions for a client deciding whether to keep polling.
+    """
+    try:
+        return (run_dir(home, run_id) / "frames.jsonl").exists()
+    except ValueError:
+        return False
+
+
 def frames(home: Path, run_id: str, *, since: int = 0) -> list[dict[str, Any]]:
     """Every frame after ``since``, oldest first.
 

@@ -109,6 +109,7 @@ export function HierarchyRun({
         <FellBackNote
           shape={state.fellBack.shape}
           reason={state.fellBack.reason}
+          sources={state.sources}
           onOpenCode={onOpenCode}
         />
       ) : null}

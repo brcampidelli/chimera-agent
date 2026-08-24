@@ -337,6 +337,42 @@ def test_max_usd_is_enforced_and_absent_means_no_ceiling(
     assert [p for k, p in solto if k == "done" and p.get("total_tokens")], "the free run produced nothing"
 
 
+def test_an_unknown_run_id_is_a_404_and_a_real_one_is_not(
+    app_and_backend: tuple[TestClient, FakeBackend], tmp_path: Path
+) -> None:
+    """200 with an empty list is what a live run looks like before its first frame."""
+    client, _backend = app_and_backend
+    frames = _read_sse(
+        client.post("/api/orchestration/hierarchy", json={"task": _READ_TASK, "workspace": str(tmp_path)}).text
+    )
+    run_id = next(p["run_id"] for k, p in frames if k == "run")
+
+    assert client.get("/api/orchestration/runs/nao-gravado-nunca").status_code == 404
+    # The control, and it is the whole risk of this change: a 404 that fires for everything turns
+    # every reload into a lost run, which is worse than the defect.
+    ok = client.get(f"/api/orchestration/runs/{run_id}")
+    assert ok.status_code == 200
+    assert ok.json()["frames"], "a run that just finished replayed as empty"
+
+
+def test_the_transcript_records_which_folder_was_read(
+    app_and_backend: tuple[TestClient, FakeBackend], tmp_path: Path
+) -> None:
+    """The crew's `run` frame carried the workspace and the hierarchy's did not.
+
+    Nothing on screen reads it today; the transcript is the durable record of a run that cost
+    money, and the folder it read is the first thing anyone opening one later needs. Two routes
+    recording different things about the same event is a difference that outlives the reason.
+    """
+    client, _backend = app_and_backend
+    frames = _read_sse(
+        client.post("/api/orchestration/hierarchy", json={"task": _READ_TASK, "workspace": str(tmp_path)}).text
+    )
+
+    run = next(p for k, p in frames if k == "run")
+    assert run.get("workspace") == str(tmp_path)
+
+
 # --- the crew: N roles, one task, one worktree each ------------------------------------------
 
 

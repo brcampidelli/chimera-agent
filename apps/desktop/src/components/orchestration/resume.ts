@@ -1,4 +1,4 @@
-import { getOrchestrationFrames } from "@/lib/api";
+import { ApiError, getOrchestrationFrames } from "@/lib/api";
 import type { OrchFrame } from "@/lib/api";
 
 /**
@@ -50,7 +50,12 @@ export async function resumeFrames(): Promise<{ runId: string; frames: OrchFrame
     // It is a stale key, and the honest response is to drop it and start clean.
     if (frames.length === 0) forgetRun();
     return { runId, frames };
-  } catch {
+  } catch (err) {
+    // 404 is the server saying the transcript is gone — pruned past `MAX_RUNS`, or a different
+    // home directory. That is a dead key, and keeping it makes every mount from here on issue a
+    // request that cannot succeed. Anything else — offline, the server still starting, a proxy
+    // hiccup — is "could not ask", where forgetting would throw away a run still worth resuming.
+    if (err instanceof ApiError && err.status === 404) forgetRun();
     return { runId: "", frames: [] };
   }
 }

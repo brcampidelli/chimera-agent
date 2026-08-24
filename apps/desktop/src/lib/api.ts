@@ -75,6 +75,24 @@ function authHeadersNoContentType(): HeadersInit {
   return bearer ? { Authorization: `Bearer ${bearer}` } : {};
 }
 
+/**
+ * A refusal that still knows which one it was.
+ *
+ * Every caller wants the sentence, and a few need the code: "this run is gone" and "I could not
+ * ask about this run" both arrive here as a thrown Error, and they are opposite instructions —
+ * forget the id, or keep it and try again later. Matching on the message would work until someone
+ * improves the wording, which is the same trap the frame reasons avoid by carrying an enum.
+ */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 /** The reason a request was refused, when the server gave one.
  *
  *  Every refusal in this app used to reach the screen as "400 Bad Request" — the status line,
@@ -104,7 +122,7 @@ async function streamRefusal(res: Response): Promise<string> {
 
 async function json<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(apiUrl(path), { ...init, headers: authHeaders(init?.headers) });
-  if (!res.ok) throw new Error(await refusal(res));
+  if (!res.ok) throw new ApiError(await refusal(res), res.status);
   return (await res.json()) as T;
 }
 
@@ -189,7 +207,7 @@ export async function getFsImage(
   });
   // Same reason as `json`: an image that could not be read has a server-side reason, and "400
   // Bad Request" is not it.
-  if (!res.ok) throw new Error(await refusal(res));
+  if (!res.ok) throw new ApiError(await refusal(res), res.status);
   return res.blob();
 }
 
@@ -840,7 +858,7 @@ export async function uploadAttachment(file: File): Promise<Attachment> {
     headers: authHeadersNoContentType(),
     body,
   });
-  if (!res.ok) throw new Error(await refusal(res));
+  if (!res.ok) throw new ApiError(await refusal(res), res.status);
   return (await res.json()) as Attachment;
 }
 
@@ -889,7 +907,7 @@ export async function transcribe(audio: Blob): Promise<Transcript> {
     headers: authHeadersNoContentType(),
     body,
   });
-  if (!res.ok) throw new Error(await refusal(res));
+  if (!res.ok) throw new ApiError(await refusal(res), res.status);
   return (await res.json()) as Transcript;
 }
 

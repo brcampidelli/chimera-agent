@@ -759,7 +759,7 @@ def register_orchestration_api(
         # Checked HERE, before the stream opens, and not where `_build` needs it: once the SSE
         # response has been handed back the status code is already 200, and a missing folder can
         # only arrive as an error frame — a failure dressed as a run that started.
-        _resolve_workspace(req.workspace, workspace)
+        ws = _resolve_workspace(req.workspace, workspace)
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue[tuple[str, Any] | None] = asyncio.Queue()
         run_id = uuid.uuid4().hex
@@ -797,7 +797,10 @@ def register_orchestration_api(
                 loop.call_soon_threadsafe(queue.put_nowait, (event, numbered))
 
         # Sent before any work, so a Stop control can target this run from the first moment.
-        emit("run", {"run_id": run_id, "task": req.task})
+        # With the folder, like the crew's does. The transcript is the durable record of the run,
+        # and which folder was read is the first thing anyone reading one later needs — the two
+        # routes recorded different things for no reason but the order they were written.
+        emit("run", {"run_id": run_id, "task": req.task, "workspace": str(ws)})
 
         def on_event(event: OrchEvent) -> None:
             emit(event.kind, {"task_id": event.task_id, "text": event.text, **event.data})
@@ -1046,7 +1049,14 @@ def register_orchestration_api(
         `seq` it has already applied — which is what makes replay-then-live and live-only converge
         on one state instead of two.
         """
-        raw = runlog.frames(Path(read_settings().home), run_id, since=since)
+        home = Path(read_settings().home)
+        # 404 for an id that was never recorded. It used to answer 200 with an empty list, which is
+        # the same answer a live run gives before its first frame lands — so a client resuming from
+        # a stale localStorage entry polled a run that did not exist, forever, showing an empty
+        # screen that looked like a slow one.
+        if not runlog.exists(home, run_id):
+            raise HTTPException(status_code=404, detail="no such run")
+        raw = runlog.frames(home, run_id, since=since)
         frames = [f for f in (_as_stream_frame(line) for line in raw) if f is not None]
         highest = max((int(f["seq"]) for f in frames), default=since)
         return {"run_id": run_id, "frames": frames, "seq": highest}

@@ -157,3 +157,33 @@ def test_the_transcript_is_valid_jsonl(tmp_path: Path) -> None:
 
     for line in raw.splitlines():
         assert isinstance(json.loads(line), dict)
+
+
+def test_an_unknown_run_is_distinguishable_from_a_quiet_one(tmp_path: Path) -> None:
+    """`frames()` answers both with an empty list, and they are opposite instructions.
+
+    A client resuming from a stale localStorage entry asked for a run this machine had never
+    recorded and got the same reply a live run gives before its first frame lands — so it kept
+    waiting, showing an empty screen that looked like a slow one rather than a gone one.
+    """
+    _write(tmp_path, "existe", 3)
+
+    assert runlog.exists(tmp_path, "existe")
+    assert not runlog.exists(tmp_path, "nunca-gravado")
+    # The pair that motivates it: both return nothing, and only `exists` separates them.
+    assert runlog.frames(tmp_path, "existe", since=3) == []
+    assert runlog.frames(tmp_path, "nunca-gravado") == []
+
+
+def test_a_run_id_cannot_probe_the_filesystem(tmp_path: Path) -> None:
+    """Existence is now observable through the API, so the id is a path built from a request.
+
+    `run_dir` strips everything but alphanumerics, `-` and `_`, which leaves traversal with nothing
+    to work with — but an empty result raises rather than resolving to the orchestration directory
+    itself, and this pins that it stays a False rather than becoming a 500.
+    """
+    (tmp_path / "orchestration").mkdir(parents=True, exist_ok=True)
+
+    assert not runlog.exists(tmp_path, "../../etc/passwd")
+    assert not runlog.exists(tmp_path, "..")
+    assert not runlog.exists(tmp_path, "")
