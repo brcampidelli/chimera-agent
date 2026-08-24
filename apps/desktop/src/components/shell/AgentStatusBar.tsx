@@ -6,7 +6,7 @@ import { VersionBadge } from "@/components/VersionBadge";
 import { focusRing } from "@/components/ui/focus";
 import { useAgent } from "@/lib/agent-context";
 import { useRunSession } from "@/lib/run-session";
-import { useT } from "@/lib/i18n";
+import { useNum, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /**
@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
  */
 export function AgentStatusBar({ onOpenUsage }: { onOpenUsage?: () => void }) {
   const t = useT();
+  const num = useNum();
   const { status, tools, report, busy, stop } = useAgent();
   const run = useRunSession();
   // A live run outranks the chat turn as the subject of this bar. Both can be going at once, but
@@ -74,7 +75,7 @@ export function AgentStatusBar({ onOpenUsage }: { onOpenUsage?: () => void }) {
         <>
           <Separator />
           {/* Prompt + completion, matching what the Activity panel shows for the same turn. */}
-          <span>{(report.prompt_tokens + report.completion_tokens).toLocaleString()} tok</span>
+          <span>{num(report.prompt_tokens + report.completion_tokens)} tok</span>
           <button
             type="button"
             onClick={onOpenUsage}

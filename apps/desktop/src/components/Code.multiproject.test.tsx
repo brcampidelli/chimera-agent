@@ -55,6 +55,11 @@ async function withDraft(user: ReturnType<typeof userEvent.setup>) {
  * Two defects that are invisible with one project and routine with several — which is why neither
  * was found by a suite that only ever had one.
  */
+// `delay: null` on every `setup` here. This file types three sentences and a path through
+// `user.type`, which simulates a keystroke at a time with a delay between them; isolated that is
+// ~1.5s, and under a full parallel suite it crossed the 5s per-test budget and started failing
+// consistently. The delay models human typing speed, which none of these tests assert anything
+// about — what they assert is which `session_id` each turn carries.
 describe("Code — with more than one project", () => {
   beforeEach(() => {
     vi.mocked(getFsTree).mockResolvedValue(emptyTree());
@@ -75,7 +80,7 @@ describe("Code — with more than one project", () => {
     // keeping the id across a project change left the next turn writing into a conversation filed
     // under the OLD project: the screen said one thing, the disk said another, and the disk was
     // right.
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     renderWithProviders(<Code />);
 
     await send(user, "what is here?");
@@ -104,20 +109,20 @@ describe("Code — with more than one project", () => {
     // directory would race. That stops being true the moment the run is somewhere else, and
     // blocking anyway is a lie about why.
     runningIn("/some-other-project");
-    expect(await withDraft(userEvent.setup())).not.toBeDisabled();
+    expect(await withDraft(userEvent.setup({ delay: null }))).not.toBeDisabled();
   });
 
   it("a run in THIS project still does", async () => {
     // "" is the screen's project here: a fresh app has chosen none and the server falls back to its
     // own workspace. Same project, empty or not, is the case the block exists for.
     runningIn("");
-    expect(await withDraft(userEvent.setup())).toBeDisabled();
+    expect(await withDraft(userEvent.setup({ delay: null }))).toBeDisabled();
   });
 
   it("a run whose project is unknown still blocks", async () => {
     // "We cannot tell which directory it is editing" is a reason to be careful, not a reason to
     // allow — the unknown case has to fail towards the safe answer.
     runningIn(null);
-    expect(await withDraft(userEvent.setup())).toBeDisabled();
+    expect(await withDraft(userEvent.setup({ delay: null }))).toBeDisabled();
   });
 });

@@ -60,7 +60,7 @@ import {
   transcriptFilename,
   type TranscriptExchange,
 } from "@/lib/transcript";
-import { useT, type TFunc } from "@/lib/i18n";
+import { useNum, useT, type TFunc } from "@/lib/i18n";
 import { useAgent } from "@/lib/agent-context";
 import { useStickToBottom } from "@/lib/useStickToBottom";
 import { cn } from "@/lib/utils";
@@ -295,6 +295,7 @@ const STOP_REASONS: Record<string, string> = {
  *  a saved memory against none, an unknown cost against a free one. Those are exactly the claims
  *  this file exists to keep honest, so they are worth asserting directly. */
 export function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
+  const num = useNum();
   // `stopped_reason` arrives on every `done` frame and, outside types and mocks, nothing read it.
   // So a turn that hit the step ceiling and stopped mid-task was pixel-for-pixel identical to one
   // that finished the work — the receipt drew nine badges and not the one that says whether to
@@ -319,7 +320,7 @@ export function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
       {done.context_peak_tokens !== null && done.context_peak_tokens > 0 ? (
         <Badge>
           {t("code.chat.peak", {
-            n: done.context_peak_tokens.toLocaleString(),
+            n: num(done.context_peak_tokens),
           })}
         </Badge>
       ) : null}

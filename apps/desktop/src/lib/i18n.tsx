@@ -11351,3 +11351,21 @@ export function useI18n(): I18nValue {
 export function useT(): TFunc {
   return useI18n().t;
 }
+
+/** Group digits the way the CHOSEN language does, not the way the machine does.
+ *
+ *  `Number.toLocaleString()` with no argument follows the operating system. On a pt-BR machine with
+ *  the app set to English that renders 4200 as "4.200", and the English sentence around it —
+ *  "4.200 tokens saved across 3 delegated runs" — reads as four point two. A thousandfold misread,
+ *  in the one place a number is the whole content.
+ *
+ *  The formatter is memoised per language rather than built per call: these render inside lists that
+ *  can hold hundreds of rows, and `Intl.NumberFormat` construction is the expensive half.
+ */
+export function useNum(): (n: number) => string {
+  const { lang } = useI18n();
+  return useMemo(() => {
+    const fmt = new Intl.NumberFormat(lang);
+    return (n: number) => fmt.format(n);
+  }, [lang]);
+}

@@ -20,15 +20,15 @@ vi.mock("@/lib/api", async () => (await import("@/test/code-api-mock")).makeCode
  * derived both lines from one verdict would have to call that either a win or a loss, and it is
  * both, so they are decided separately.
  */
-/** The digits, however the runtime's locale groups them.
+/** The digits as the APP's language groups them.
  *
- *  `toLocaleString()` takes no locale argument anywhere in this app, so it follows the OS rather
- *  than the language selector — 4200 renders "4,200" on an English machine and "4.200" on Bruno's.
- *  Hard-coding either separator would make this file pass or fail by whose laptop ran it, which is
- *  not what it is here to check. (The mismatch itself is real and filed separately: "4.200 tokens"
- *  inside an English sentence reads as four point two.)
+ *  This used to accept either separator, because `toLocaleString()` took no locale anywhere in the
+ *  app and so followed the machine — 4200 was "4,200" on one laptop and "4.200" on another, and
+ *  hard-coding either made the file pass or fail by whose laptop ran it. That is fixed: `useNum`
+ *  formats for the chosen language, the tests render in English, and the separator is now a fact
+ *  rather than a coin toss. `numbers-follow-the-language.test.tsx` is what keeps it one.
  */
-const grouped = (n: number) => new RegExp(n.toLocaleString().replace(/[.,]/g, "[.,]"));
+const grouped = (n: number) => new RegExp(new Intl.NumberFormat("en").format(n).replace(",", ","));
 
 function summary(token_saving: number, usd_saving: number | null) {
   vi.mocked(getDelegations).mockResolvedValue({
@@ -55,7 +55,7 @@ describe("DelegationSavings", () => {
     expect(line.textContent).toContain("MORE");
     expect(line.textContent).not.toContain("saved");
     // The minus belongs to the wording. "-12,961 tokens MORE" would be the same defect rephrased.
-    expect(line.textContent).not.toContain(`-${(12961).toLocaleString()}`);
+    expect(line.textContent).not.toContain(`-${new Intl.NumberFormat("en").format(12961)}`);
   });
 
   it("keeps the dollars honest on their own, not from the token verdict", async () => {

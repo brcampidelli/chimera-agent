@@ -5,11 +5,10 @@ import { addMemory, deleteMemory, getMemory, getMemoryLayers } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
 import { ErrorState } from "@/components/ui/async";
-import { useT, type TFunc } from "@/lib/i18n";
+import { useNum, useT, type TFunc } from "@/lib/i18n";
 import type { MemoryLayers } from "@/lib/types";
 
 const inputCls = "field h-9 w-full px-3 text-sm";
-const num = (n: number): string => n.toLocaleString();
 
 type LayerRow = MemoryLayers["layers"][number];
 
@@ -28,6 +27,7 @@ function Tile({ label, value, tone }: { label: string; value: string; tone?: "ok
 
 /** One kind's row: name, count · clean N · unverified M, and a proportional bar (guard max ≥ 1). */
 function LayerBar({ row, max, t }: { row: LayerRow; max: number; t: TFunc }) {
+  const num = useNum();
   const pct = row.count > 0 ? Math.max((row.count / max) * 100, 3) : 0;
   return (
     <div className="px-4 py-3">
@@ -47,6 +47,7 @@ function LayerBar({ row, max, t }: { row: LayerRow; max: number; t: TFunc }) {
 
 /** The layers + provenance overview above the fact list, driven by /api/memory/layers. */
 function LayersPanel({ t }: { t: TFunc }) {
+  const num = useNum();
   const q = useQuery({ queryKey: ["memory-layers"], queryFn: getMemoryLayers });
   const data = q.data;
 

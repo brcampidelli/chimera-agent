@@ -3,7 +3,7 @@ import { BarChart3 } from "lucide-react";
 import { getUsage } from "@/lib/api";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
 import { ErrorState } from "@/components/ui/async";
-import { useT, type TFunc } from "@/lib/i18n";
+import { useNum, useT, type TFunc } from "@/lib/i18n";
 import type { UsageSummary } from "@/lib/types";
 
 /** Grouped rows carry a leading key field (day / model / session_id); type them structurally. */
@@ -11,7 +11,6 @@ type DayRow = UsageSummary["by_day"][number];
 type ModelRow = UsageSummary["by_model"][number];
 type SessionRow = UsageSummary["by_session"][number];
 
-const num = (n: number): string => n.toLocaleString();
 const usd = (n: number): string => `$${n.toFixed(4)}`;
 /** Honest per-group price: "—" when EVERY turn in the group is unpriced (unknown cost — never a fake
  *  $0.0000); otherwise the summed cost of the priced turns. */
@@ -42,6 +41,7 @@ function DayBars({
   chartUsd: boolean;
   t: TFunc;
 }) {
+  const num = useNum();
   const value = (d: DayRow): number => (chartUsd ? d.usd : d.prompt_tokens + d.completion_tokens);
   const label = (d: DayRow): string =>
     chartUsd ? groupUsd(d.usd, d.unpriced, d.turns) : num(d.prompt_tokens + d.completion_tokens);
@@ -109,6 +109,7 @@ function DayBars({
 
 /** A ranked horizontal bar (CSS width, accent gradient) with the model's turns/tokens/usd. */
 function ModelBar({ row, max }: { row: ModelRow; max: number }) {
+  const num = useNum();
   const tokens = row.prompt_tokens + row.completion_tokens;
   const pct = Math.max((row.turns / max) * 100, 3);
   return (
@@ -127,6 +128,7 @@ function ModelBar({ row, max }: { row: ModelRow; max: number }) {
 }
 
 export function Usage({ embedded = false }: { embedded?: boolean } = {}) {
+  const num = useNum();
   const t = useT();
   const q = useQuery({ queryKey: ["usage"], queryFn: getUsage });
 
