@@ -43,7 +43,8 @@ function worker(over: Partial<WorkerState> = {}): WorkerState {
 const REASONS: ReadonlyArray<[RejectReason, RegExp]> = [
   ["no_output", /had nothing to say|não tinha o que dizer/i],
   ["deadline", /deadline|prazo/i],
-  ["budget", /budget|orçamento/i],
+  ["budget", /delegation budget|orçamento de delegação/i],
+  ["spend", /spending cap|teto de gasto/i],
   ["max_steps", /step limit|limite de passos/i],
   ["tool_loop", /same tool|mesma ferramenta/i],
   ["cancelled", /ended the run|você parou/i],

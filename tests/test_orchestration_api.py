@@ -294,6 +294,49 @@ def test_a_worker_is_told_not_to_describe_what_it_has_not_opened(
     assert "Never describe a file you have not opened" in WORKER_SYSTEM
 
 
+def test_max_usd_is_enforced_and_absent_means_no_ceiling(
+    app_and_backend: tuple[TestClient, FakeBackend], tmp_path: Path
+) -> None:
+    """The other field this route accepted and never read.
+
+    The unit tests next door prove `SpendCappedBackend` stops a run; this proves the ROUTE reaches
+    for it, which is the half that was missing — the mechanism has existed since
+    `AgentConfig.max_usd` and the whole defect was that nothing here called it.
+
+    The fake answers as a model no price table knows, and `SpendBudget` refuses rather than
+    guessing: an unpriced call means the spend so far is unknown, so the ceiling cannot say it is
+    under. That is the documented rule, not an artefact of the fake — a ceiling that skips what it
+    cannot price shows green while the bill climbs.
+    """
+    client, _backend = app_and_backend
+    corpo = {"task": _READ_TASK, "workspace": str(tmp_path)}
+
+    # A millionth of a dollar: the decompose alone costs more than that, so the ceiling is already
+    # spent when the workers ask. A larger figure would pass for the wrong reason — the fake bills
+    # 150 tokens a call on a real ladder slug, which is fractions of a cent, so a $0.01 cap never
+    # fires and the assertion would be measuring the fake's appetite rather than the ceiling.
+    capped = _read_sse(client.post("/api/orchestration/hierarchy", json={**corpo, "max_usd": 1e-6}).text)
+    solto = _read_sse(client.post("/api/orchestration/hierarchy", json=corpo).text)
+
+    motivos = {p.get("reason") for k, p in capped if k == "worker_rejected"}
+    assert "spend" in motivos, (
+        f"workers came back with {motivos or 'nothing'} — a dollar cap must not reach the screen "
+        "as a delegation-token cut or a provider fault"
+    )
+    # The ending says which ceiling and how much of it went, rather than "the run failed" — this is
+    # the one failure the caller asked for, and reporting a working cap as a fault sends them
+    # looking for a bug.
+    erro = next((p.get("message", "") for k, p in capped if k == "error"), "")
+    assert "spend cap" in erro, f"the run ended saying {erro!r}"
+
+    # The control: same task, same fake, no ceiling — and nothing capped. Without it, a wrapper
+    # that refused every call would pass everything above.
+    assert not [p for k, p in solto if k == "worker_rejected" and p.get("reason") == "spend"], (
+        "a run with no ceiling was capped anyway"
+    )
+    assert [p for k, p in solto if k == "done" and p.get("total_tokens")], "the free run produced nothing"
+
+
 # --- the crew: N roles, one task, one worktree each ------------------------------------------
 
 
@@ -307,6 +350,32 @@ def _crew(client: TestClient, **over: Any) -> list[tuple[str, dict[str, Any]]]:
         **over,
     }
     return _read_sse(client.post("/api/orchestration/crew", json=body).text)
+
+
+def test_synthesize_produces_a_report_and_off_produces_none(
+    app_and_backend: tuple[TestClient, FakeBackend], tmp_path: Path
+) -> None:
+    """`synthesize` was accepted, documented, published to the TypeScript client — and read by
+    nothing.
+
+    Everything downstream already worked: `IsolatedCrew` emits the summary on its `done` frame, the
+    reducer stores it, `CrewRun` renders it. The one missing link was the supervisor whose presence
+    is what makes the crew synthesise at all, so the switch reached a route that never built one.
+
+    Both directions in one test, deliberately: "on produces a report" passes just as well if the
+    report was always there, and this field's whole meaning is that it costs a top-model call the
+    caller did not have to pay.
+    """
+    client, _backend = app_and_backend
+
+    ligado = _crew(client, workspace=str(tmp_path), synthesize=True)
+    desligado = _crew(client, workspace=str(tmp_path), synthesize=False)
+
+    def resposta(frames: list[tuple[str, dict[str, Any]]]) -> str:
+        return str(next((p for k, p in frames if k == "crew_done"), {}).get("answer") or "")
+
+    assert resposta(ligado), "synthesize=true still produced no report"
+    assert not resposta(desligado), "a report was written for a caller who did not ask to pay for one"
 
 
 def test_a_crew_reports_every_worker_by_name(

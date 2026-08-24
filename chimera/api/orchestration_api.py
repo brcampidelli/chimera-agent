@@ -35,6 +35,7 @@ from starlette.concurrency import run_in_threadpool
 
 from chimera.api.code_api import CodeSeams
 from chimera.orchestration import runlog
+from chimera.orchestration.budget import SpendExceeded
 from chimera.orchestration.events import OrchEvent
 from chimera.telemetry import get_logger
 
@@ -127,6 +128,10 @@ class HierarchyRunIn(BaseModel):
     fuse: bool = True
     max_usd: float | None = Field(
         default=None,
+        # Matching `CodeSeams.max_usd`. Zero and negatives are not "no ceiling" — `SpendBudget`
+        # rejects them, and accepting one here would have refused the run at construction instead
+        # of at validation, which is a 500 where a 422 belongs.
+        gt=0,
         description=(
             "Ceiling for the whole run. The token budget is per delegation and says nothing about "
             "money; a fan-out spends a top-model decompose, N mid-model workers and a synthesis."
@@ -651,7 +656,11 @@ def register_orchestration_api(
         from chimera.evolution import build_evolution_context
         from chimera.fusion import FusionEngine
         from chimera.orchestration.artifacts import ArtifactStore
-        from chimera.orchestration.budget import EffortPolicy
+        from chimera.orchestration.budget import (
+            EffortPolicy,
+            SpendBudget,
+            SpendCappedBackend,
+        )
         from chimera.orchestration.hierarchy import HierarchicalOrchestrator, HierarchyConfig
         from chimera.providers import LLMGateway
 
@@ -662,8 +671,20 @@ def register_orchestration_api(
         # cannot end up rooted differently.
         ws = _resolve_workspace(req.workspace, workspace)
         fuse = getattr(req, "fuse", True)
+        # Declared on the request, documented as "ceiling for the whole run", and read by nothing
+        # until now: the field reached the schema and the TypeScript client and stopped there. The
+        # plan carried it as risk #1 — this route spends a top-model decompose, N mid-model workers
+        # and a synthesis, and `budget` caps TOKENS PER DELEGATION, which says nothing about money.
+        #
+        # Around the gateway rather than through `AgentConfig.max_usd`, because that builds a
+        # SpendBudget per `Agent.run`: N workers would get N separate ceilings and the decompose
+        # and synthesis would get none. One wrapper, every call.
+        capped: Any = gateway
+        max_usd = getattr(req, "max_usd", None)
+        if max_usd:
+            capped = SpendCappedBackend(gateway, SpendBudget(max_usd))
         return HierarchicalOrchestrator(
-            gateway,
+            capped,
             weak_model=ladder.weak,
             mid_model=ladder.mid,
             top_model=ladder.top,
@@ -672,7 +693,7 @@ def register_orchestration_api(
             # Only when asked for. Fusion at synthesis is already conditional on the envelopes
             # actually conflicting; this is the outer switch, and a caller who turned it off
             # should not pay for a panel.
-            fusion=FusionEngine(gateway) if fuse else None,
+            fusion=FusionEngine(capped) if fuse else None,
             receipts_path=Path(live.home) / "delegations.jsonl",
             config=HierarchyConfig(
                 max_workers=max(1, min(_MAX_WORKERS, req.max_workers)),
@@ -801,6 +822,15 @@ def register_orchestration_api(
                 # nothing to the usage log, so a screen reporting "the spend" left it out entirely —
                 # including for a run the user cancelled, which is charged all the same.
                 _record_run_spend(read_settings().home, run_id, outcome)
+            except SpendExceeded as exc:
+                # The one failure the caller ASKED for. `SpendBudget.blocked()` already says which
+                # ceiling and how much of it was spent, and that sentence is the whole point of
+                # setting one — "the run failed" would report a working cap as a fault.
+                #
+                # Nothing extra is charged getting here: the wrapper refuses BEFORE the call, so the
+                # single-agent fallback the empty fan-out routes into never reaches a provider.
+                _log.info("hierarchy run stopped on its spend ceiling: %s", exc)
+                emit("error", {"message": str(exc)})
             except Exception as exc:  # noqa: BLE001 -- surfaced to the client as an error frame
                 _log.warning("hierarchy run failed: %s", exc)
                 emit("error", {"message": "the run failed"})
@@ -878,7 +908,7 @@ def register_orchestration_api(
                 from chimera.api.code_api import assemble_registry
                 from chimera.governance.ledger import SharedTaint
                 from chimera.orchestration.crew import IsolatedCrew, IsolatedWorker
-                from chimera.orchestration.roles import Role
+                from chimera.orchestration.roles import Role, RoleAgent
                 from chimera.providers import LLMGateway
 
                 live = read_settings()
@@ -896,6 +926,27 @@ def register_orchestration_api(
                     )
                     return registry
 
+                # `synthesize` was accepted, documented and dropped: the field reached the schema
+                # and the TypeScript client, and nothing here ever read it. Everything downstream
+                # was already in place — the crew emits the summary on its `done` frame, the reducer
+                # stores it, `CrewRun` renders it — so the only missing link was the supervisor that
+                # makes `IsolatedCrew` call `_synthesize` at all. Top tier, because folding N merged
+                # reports into one is the reasoning step of the run, and the field's own description
+                # already tells the caller it costs a top-model call.
+                supervisor = (
+                    RoleAgent(
+                        Role(
+                            "supervisor",
+                            "You coordinate a team and write a single, unified final report from "
+                            "the merged worker outputs. Be concise, and say plainly which workers "
+                            "were rejected or left files in conflict.",
+                            model=live.tier_ladder().top,
+                        ),
+                        gateway,
+                    )
+                    if req.synthesize
+                    else None
+                )
                 crew = IsolatedCrew(
                     gateway,
                     [
@@ -906,6 +957,7 @@ def register_orchestration_api(
                         )
                         for w in req.workers
                     ],
+                    supervisor=supervisor,
                     max_workers=max(1, min(_MAX_WORKERS, req.max_workers)),
                     on_event=on_event,
                     should_stop=stop.is_set,

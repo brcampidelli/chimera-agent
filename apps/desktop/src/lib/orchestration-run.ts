@@ -26,6 +26,7 @@ export type RejectReason =
   // `no_output`, which reads as a provider fault — but a budget cut is the one case a user can
   // act on, by raising the budget, and folding the two together hid that.
   | "budget"
+  | "spend"
   | "max_steps"
   | "tool_loop"
   | "cancelled"

@@ -14,6 +14,7 @@ propagates into receipts so estimated numbers never masquerade as measured.
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -26,6 +27,15 @@ _log = get_logger("orchestration.budget")
 
 class BudgetExceeded(RuntimeError):
     """Raised (hard mode) when a call would exceed the delegation's token budget."""
+
+
+class SpendExceeded(BudgetExceeded):
+    """Raised when a call would exceed the RUN's dollar ceiling.
+
+    A subclass, so every ``except BudgetExceeded`` already written keeps working — but its own type,
+    because the two ceilings answer different questions and a caller that can tell them apart can
+    say which one the person watching should raise.
+    """
 
 
 class SpendBudget:
@@ -253,6 +263,48 @@ class BudgetedBackend:
         )
         self.budget.note_cache(result.cache_read_tokens, result.cache_write_tokens)
         return result
+
+
+class SpendCappedBackend:
+    """A ``SupportsComplete`` that enforces ONE dollar ceiling across a whole fan-out.
+
+    :class:`SpendBudget` is built inside ``Agent.run`` from ``AgentConfig.max_usd``, deliberately —
+    one Agent serves several runs and a cap carried between them would refuse the second task for
+    what the first spent. That is right for an agent and wrong for a fan-out: N workers each get
+    their own ceiling, so a "$1 run" can spend N dollars, and the decompose and the synthesis are
+    not inside any worker at all.
+
+    So the ceiling goes around the BACKEND instead, once, and every call the run makes passes
+    through it — decompose, each worker, each verifier re-ask, the synthesis. Wrapping outermost is
+    what makes that true: a per-delegation :class:`BudgetedBackend` layered on top of this one still
+    reaches the model through here.
+
+    Locked, because a fan-out calls this from N threads and ``self._spent += usd`` is a read, an
+    add and a store. Held across the whole call, not just the arithmetic: releasing it between the
+    check and the record lets N threads all read "under budget" and then all spend.
+    """
+
+    def __init__(self, inner: SupportsComplete, budget: SpendBudget) -> None:
+        self.inner = inner
+        self.budget = budget
+        self._lock = threading.Lock()
+
+    def complete(self, messages: list[MessageLike], **kwargs: Any) -> CompletionResult:
+        with self._lock:
+            why = self.budget.blocked()
+            if why is not None:
+                raise SpendExceeded(why)
+            result = self.inner.complete(messages, **kwargs)
+            # By stages when the turn has them: a fused turn answers as `model="fusion"`, which no
+            # price table resolves, and charging that at $0.00 would let the cap sleep through the
+            # most expensive call the app makes.
+            self.budget.record_result(result)
+            return result
+
+    def __getattr__(self, name: str) -> Any:
+        """Everything else is the wrapped backend's. A gateway carries more than ``complete``, and a
+        wrapper that hides the rest breaks callers that never spend a cent."""
+        return getattr(self.inner, name)
 
 
 @dataclass(frozen=True)

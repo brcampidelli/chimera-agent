@@ -35,7 +35,13 @@ if TYPE_CHECKING:
     from chimera.evolution.context import EvolutionContext
 
 from chimera.orchestration.artifacts import ArtifactStore, build_envelope
-from chimera.orchestration.budget import BudgetedBackend, BudgetExceeded, EffortPolicy, TokenBudget
+from chimera.orchestration.budget import (
+    BudgetedBackend,
+    BudgetExceeded,
+    EffortPolicy,
+    SpendExceeded,
+    TokenBudget,
+)
 from chimera.orchestration.envelope_verify import EnvelopeVerifier
 from chimera.orchestration.events import OrchEvent, OrchEventSink
 from chimera.orchestration.receipts import (
@@ -219,7 +225,7 @@ class HierarchyResult:
 
 #: Stop reasons that mean the worker was CUT OFF rather than finished. Its text is then a report
 #: about the run, not about the task, and must not be verified or synthesised as a finding.
-_CUT_OFF_REASONS = frozenset({"budget", "max_steps", "tool_loop", "cancelled"})
+_CUT_OFF_REASONS = frozenset({"budget", "spend", "max_steps", "tool_loop", "cancelled"})
 
 
 class HierarchicalOrchestrator:
@@ -698,12 +704,12 @@ class HierarchicalOrchestrator:
             #
             # The API path always has tools, so this WAS the ordinary case, not a corner.
             cut_off = worker.last_stop if worker.last_stop in _CUT_OFF_REASONS else ""
-        except BudgetExceeded:
+        except BudgetExceeded as exc:
             # The tool-free path RAISES where the agent loop returns the message as an answer,
             # so `last_stop` never moves off "final" here. Same event, opposite mechanics — and
             # without this line the one branch that cannot lie about its cause would have been
             # the one reported as "the provider failed".
-            cut_off, raw = "budget", ""
+            cut_off, raw = ("spend" if isinstance(exc, SpendExceeded) else "budget"), ""
         except Exception as exc:  # noqa: BLE001 -- a provider error must not nuke the batch
             _log.warning("worker %s failed: %s", spec.task_id, exc)
             raw = ""
