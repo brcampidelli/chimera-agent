@@ -46,6 +46,17 @@ const REJECTED_KEY: Partial<Record<string, "orch.worker.noOutput" | "orch.worker
   cancelled: "orch.worker.cutOff.cancelled",
 };
 
+/** The gate's own name, for the tooltip that lists what ran.
+ *
+ *  The badge was translated and its title was not: it interpolated the raw enum, so a Portuguese
+ *  screen read "o que foi checado: schema". Same defect the badge itself had, one attribute over.
+ */
+const GATE_KEY: Record<string, "orch.worker.gate.schema" | "orch.worker.gate.criteria" | "orch.worker.gate.spot"> = {
+  schema: "orch.worker.gate.schema",
+  criteria: "orch.worker.gate.criteria",
+  spot: "orch.worker.gate.spot",
+};
+
 const CHECK_KEY: Record<string, "orch.worker.checked.schema" | "orch.worker.checked.criteria" | "orch.worker.checked.spot"> = {
   schema: "orch.worker.checked.schema",
   criteria: "orch.worker.checked.criteria",
@@ -112,7 +123,9 @@ export function WorkerCard({ worker }: { worker: WorkerState }) {
           {worker.status === "verified" && worker.checksRun.length ? (
             <Badge
               tone={worker.checksRun.length > 1 ? "ok" : "muted"}
-              title={t("orch.worker.checked.title", { n: worker.checksRun.join(" + ") })}
+              title={t("orch.worker.checked.title", {
+           n: worker.checksRun.map((g) => t(GATE_KEY[g] ?? "orch.worker.gate.schema")).join(" + "),
+         })}
             >
               {t(CHECK_KEY[worker.checksRun[worker.checksRun.length - 1]] ?? "orch.worker.checked.schema")}
             </Badge>

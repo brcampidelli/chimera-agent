@@ -55,6 +55,20 @@ export function Dialog({
       <RadixDialog.Portal>
         <RadixDialog.Overlay className="backdrop fixed inset-0 z-50 bg-scrim" />
         <RadixDialog.Content
+          // Radix's own way to say "this dialog has no description", and the reason the sr-only
+          // copy below could go: without it Radix warns, and the previous answer to that warning
+          // was an invisible Description holding the TITLE — so a screen reader announced the same
+          // sentence twice, once as the heading and once as the description, in every dialog in
+          // the app that passes no description. Heard walking the delete confirmation.
+          // Radix's own way to say "this dialog has no description", and the reason the sr-only
+          // copy below could go: without it Radix warns, and the previous answer to that warning
+          // was an invisible Description holding the TITLE — so a screen reader announced the same
+          // sentence twice, as heading and as description, in every dialog that passes none.
+          //
+          // Spread rather than a ternary, and the difference is not style: passing the attribute as
+          // `undefined` is what silences Radix, while NOT passing it lets Radix point it at the
+          // real Description. A ternary between two `undefined`s would have silenced both.
+          {...(description ? {} : { "aria-describedby": undefined })}
           onCloseAutoFocus={(e) => {
             const target = restoreTo.current;
             // Only take over when the element is still in the document — if the dialog deleted the
@@ -78,13 +92,7 @@ export function Dialog({
                 <RadixDialog.Description className="mt-1 text-sm text-muted-foreground">
                   {description}
                 </RadixDialog.Description>
-              ) : (
-                // Radix warns when Content has no Description. An explicitly empty one says "this
-                // dialog is its title" rather than leaving a warning nobody reads.
-                <RadixDialog.Description className="sr-only">
-                  {title}
-                </RadixDialog.Description>
-              )}
+              ) : null}
             </div>
             <RadixDialog.Close
               className={cn(
