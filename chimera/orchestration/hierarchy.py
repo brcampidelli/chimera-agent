@@ -217,6 +217,11 @@ class HierarchyResult:
     caller just asked not to spend."""
 
 
+#: Stop reasons that mean the worker was CUT OFF rather than finished. Its text is then a report
+#: about the run, not about the task, and must not be verified or synthesised as a finding.
+_CUT_OFF_REASONS = frozenset({"budget", "max_steps", "tool_loop", "cancelled"})
+
+
 class HierarchicalOrchestrator:
     """Top model decomposes -> budgeted mid workers execute -> verifier gates ->
     top model synthesizes over summaries. Falls back to single-agent whenever the
@@ -663,17 +668,34 @@ class HierarchicalOrchestrator:
         # The receipt's counterfactual shares the orchestrator context across the D subtasks (loaded
         # once inline), so the summed aggregate isn't inflated; the gate above keeps full context.
         cf = _shared_counterfactual(spec, n_subtasks)
+        cut_off = ""
         try:
             raw = worker.act(spec.render())
+            # A worker with tools never raises `BudgetExceeded` — `Agent.run` catches it and returns
+            # the message AS THE ANSWER, deliberately ("the run did what it was told to do with the
+            # money it was given"). That is right for the coding loop and wrong here: the string
+            # "delegation budget exhausted: 1336/400 tokens" is not a finding, and treating it as one
+            # produced a verified green card on a run that read nothing. Reproduced at a 400-token
+            # cap: 44-character summary, zero evidence, `verified (accepted)`.
+            #
+            # The API path always has tools, so this WAS the ordinary case, not a corner.
+            cut_off = worker.last_stop if worker.last_stop in _CUT_OFF_REASONS else ""
         except BudgetExceeded:
             raw = ""
         except Exception as exc:  # noqa: BLE001 -- a provider error must not nuke the batch
             _log.warning("worker %s failed: %s", spec.task_id, exc)
             raw = ""
+        if cut_off:
+            _log.info("worker %s was cut off (%s); not treating its output as a finding",
+                      spec.task_id, cut_off)
+        produced = bool(raw.strip()) and not cut_off
         envelope = build_envelope(
             spec, raw, self.store,
-            status="ok" if raw.strip() else "failed",
-            gaps=[] if raw.strip() else ["worker produced no output (budget or provider error)"],
+            status="ok" if produced else "failed",
+            gaps=[] if produced else [
+                f"worker stopped early ({cut_off}) before reporting" if cut_off
+                else "worker produced no output (budget or provider error)"
+            ],
         )
         # A result is trustworthy input to the synthesizer ONLY if it passes
         # verification. If the bounded re-ask also fails, the envelope is dropped
@@ -681,7 +703,7 @@ class HierarchicalOrchestrator:
         verified = False
         reasked = False
         outcome = None
-        if raw.strip():
+        if produced:
             outcome = self.verifier.verify(spec, envelope)
             verified = outcome.passed
             if not verified and self._stopped():
@@ -728,9 +750,18 @@ class HierarchicalOrchestrator:
             # cannot follow a contract.
             if outcome is None:
                 self._emit(
-                    "worker_rejected", text="no output", task_id=spec.task_id,
-                    reason="no_output",
-                    detail="worker produced no output (budget or provider error)",
+                    "worker_rejected",
+                    text=f"stopped early ({cut_off})" if cut_off else "no output",
+                    task_id=spec.task_id,
+                    # `cut_off` is its own reason. Folding it into "no_output" hid the one case a
+                    # user can act on — raise the budget — inside a string that also means "the
+                    # provider broke", and the two want opposite responses.
+                    reason=cut_off or "no_output",
+                    detail=(
+                        f"worker stopped early ({cut_off}) before reporting"
+                        if cut_off
+                        else "worker produced no output (provider error or empty answer)"
+                    ),
                     tokens=budget.spent,
                 )
             else:
@@ -745,6 +776,12 @@ class HierarchicalOrchestrator:
             text=f"verified ({outcome.stage if outcome else 'inline'})",
             task_id=spec.task_id,
             stage=outcome.stage if outcome else "",
+            # WHICH gates ran, so the card can name the check instead of implying all three. For
+            # ordinary output this is ("schema",) alone — criteria needs `regex:` lines in a prose
+            # `output_format`, and the spot check needs evidence refs that only exist above the
+            # 8000-char cap. A badge reading "verificado · accepted" over a one-gate verdict is the
+            # screen making a claim the data does not carry.
+            checks_run=list(outcome.checks_run) if outcome else [],
             reasked=reasked,
             tokens=budget.spent,
             # The summary's SIZE, not the summary. This is a progress frame; the envelope carries

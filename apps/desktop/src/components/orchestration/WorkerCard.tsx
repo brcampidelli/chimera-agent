@@ -24,6 +24,14 @@ const rails: Record<WorkerState["status"], string> = {
   rejected: "bg-bad",
 };
 
+/** Written out rather than built with a template: `i18n.reachable.test.ts` greps for each key as
+ *  a literal and lists anything it cannot find as dead. Fourth time this file pattern is needed. */
+const CHECK_KEY: Record<string, "orch.worker.checked.schema" | "orch.worker.checked.criteria" | "orch.worker.checked.spot"> = {
+  schema: "orch.worker.checked.schema",
+  criteria: "orch.worker.checked.criteria",
+  spot: "orch.worker.checked.spot",
+};
+
 export function WorkerCard({ worker }: { worker: WorkerState }) {
   const t = useT();
 
@@ -73,7 +81,21 @@ export function WorkerCard({ worker }: { worker: WorkerState }) {
               model and charged as such; showing every card as a mid-tier worker would misprice
               the run in the only place the user can see it. */}
           {worker.tier ? <Badge>{t(`orch.worker.tier.${worker.tier}`)}</Badge> : null}
-          {worker.status === "verified" && worker.stage ? <Badge>{worker.stage}</Badge> : null}
+          {/* WHAT was checked, not a raw backend enum. This rendered `worker.stage` — the string
+              "accepted", untranslated, in a pt-BR interface — and "accepted" only ever meant "no
+              gate rejected". For ordinary output that is ONE gate: criteria needs `regex:` lines in
+              an `output_format` a model writes as prose, and the spot check needs evidence refs
+              that `build_envelope` fills only above the 8000-character cap. So a card read
+              "verificado · accepted" over a verdict that had checked shape and nothing else.
+              Naming the gate is the difference between a claim and a receipt. */}
+          {worker.status === "verified" && worker.checksRun.length ? (
+            <Badge
+              tone={worker.checksRun.length > 1 ? "ok" : "muted"}
+              title={t("orch.worker.checked.title", { n: worker.checksRun.join(" + ") })}
+            >
+              {t(CHECK_KEY[worker.checksRun[worker.checksRun.length - 1]] ?? "orch.worker.checked.schema")}
+            </Badge>
+          ) : null}
           {worker.reasked ? <Badge tone="warn">{t("orch.worker.reasked")}</Badge> : null}
           {worker.tokens > 0 ? (
             <span className="text-xs tabular-nums text-muted-foreground">

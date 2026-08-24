@@ -70,6 +70,19 @@ class RoleAgent:
         # agent read AGENTS.md, and a crew worker editing a repo was the one worker in the stack
         # not reading it.
         self.project_root = project_root
+        #: Why the last `act()` stopped, from `AgentResult.stopped_reason`: "final" when the model
+        #: chose to answer, or "budget" / "max_steps" / "tool_loop" / "cancelled" when the loop was
+        #: cut off. `act()` returns a bare string and eight call sites depend on that, so the reason
+        #: rides here rather than widening the signature.
+        #:
+        #: It exists because discarding it was a defect with teeth. `Agent.run` catches
+        #: `BudgetExceeded` and returns the message AS THE ANSWER — "not an error: the run did what
+        #: it was told to do with the money it was given" — so a worker that was cut off produced a
+        #: 44-character string that read like a finding, went through verification, and came back
+        #: `verified (accepted)` with a green card. Reproduced at a 400-token cap.
+        #:
+        #: Safe as instance state because a RoleAgent is built per worker per run; nothing shares one.
+        self.last_stop = "final"
 
     @property
     def name(self) -> str:
@@ -98,7 +111,12 @@ class RoleAgent:
                     project_root=self.project_root,
                 ),
             )
-            return agent.run(user).answer
+            result = agent.run(user)
+            self.last_stop = result.stopped_reason
+            return result.answer
+        # No loop here, so nothing can cut it short: a plain completion either answers or raises,
+        # and `BudgetExceeded` propagates to the caller instead of becoming the answer.
+        self.last_stop = "final"
         system = self.role.system_prompt
         if self.identity:
             # In front of the role, matching the agent loop's own order: the role is the more

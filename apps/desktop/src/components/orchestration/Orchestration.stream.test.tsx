@@ -109,16 +109,22 @@ describe("watching a fan-out", () => {
     expect(screen.getAllByText(/running/i).length).toBeGreaterThan(0);
   });
 
-  it("says which stage accepted a worker, and shows the objection when one is refused", async () => {
+  it("names the check that ran, and shows the objection when one is refused", async () => {
+    // This asserted `stage` verbatim — "criteria", "accepted" — which was the defect rather than
+    // the feature. `stage` is the backend's enum for "which gate decided", and `accepted` means
+    // "none rejected"; for ordinary output that is ONE gate, because criteria needs `regex:` lines
+    // in a prose `output_format` and the spot check needs evidence refs that only exist above the
+    // 8000-char cap. The card now names the gates that actually ran.
     const { handlers } = await startRun();
 
     send(
       handlers(),
-      frame(6, "worker_verified", { stage: "criteria", tokens: 900, gaps: [] }, "a"),
+      frame(6, "worker_verified", { stage: "accepted", checks_run: ["schema", "criteria"], tokens: 900, gaps: [] }, "a"),
       frame(7, "worker_rejected", { reason: "verifier", stage: "spot", detail: "unsupported claim" }, "b"),
     );
 
-    expect(screen.getByText("criteria")).toBeInTheDocument();
+    expect(screen.getByText(/criteria|critérios/i)).toBeInTheDocument();
+    expect(screen.queryByText("accepted")).not.toBeInTheDocument();
     // Verbatim, not summarised: the objection is the only evidence of why an envelope was dropped.
     expect(screen.getByText("unsupported claim")).toBeInTheDocument();
   });
