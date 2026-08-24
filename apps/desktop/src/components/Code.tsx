@@ -28,7 +28,12 @@ import { PostureNote } from "@/components/code/PostureNote";
 import { ModelPicker } from "@/components/code/ModelPicker";
 import { ProviderPicker } from "@/components/code/ProviderPicker";
 import { Tooltip } from "@/components/ui/tooltip";
-import { RolesBar } from "@/components/code/RolesBar";
+import {
+  NO_OVERRIDE,
+  RolesBar,
+  toRoleModels,
+  type RoleOverride,
+} from "@/components/code/RolesBar";
 import { SessionSidebar } from "@/components/code/SessionSidebar";
 import { ProjectPicker } from "@/components/code/ProjectPicker";
 import { useRunSession } from "@/lib/run-session";
@@ -352,6 +357,12 @@ export function Code() {
   // cost panel keeps counting a default apart from a profile somebody deliberately chose.
   const [profile, setProfile] = useState<Profile>("balanced");
   const [profileTouched, setProfileTouched] = useState(false);
+  // Which MODEL does which job, over the profile's answer. The bar has rendered read-only here
+  // since it arrived — `RolesBar` shows the tiers and nothing else when the caller omits these two
+  // props — while the identical bar on the Runs screen has been fully editable. Same component,
+  // same backend field (`CodeSeams.roles`), one screen allowed to use it.
+  const [roles, setRoles] = useState<RoleOverride>(NO_OVERRIDE);
+  const [oneModel, setOneModel] = useState(false);
 
   /** Change the project this screen is working in. One function, because it was three near-copies.
    *
@@ -530,6 +541,10 @@ export function Code() {
                 // somebody chose "max" for and a run that got the default stay separate evidence —
                 // which only works if what was chosen actually travels.
                 profile,
+                // `null` rather than four empty strings when nothing was picked: the server merges
+                // field by field and reads a missing key as "keep the profile's answer", so a blank
+                // slug would be a request to run that role on a model named empty-string.
+                roles: toRoleModels(roles),
                 profile_source: profileTouched ? "user" : "system",
               })
             }
@@ -561,6 +576,13 @@ export function Code() {
                       setProfile(p);
                       setProfileTouched(true);
                     }}
+                    override={roles}
+                    onOverride={(o) => {
+                      setRoles(o);
+                      setProfileTouched(true);
+                    }}
+                    oneModel={oneModel}
+                    onOneModel={setOneModel}
                     disabled={runBusy}
                   />
                 ) : null}

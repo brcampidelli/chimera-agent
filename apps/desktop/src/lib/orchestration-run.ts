@@ -18,7 +18,19 @@ export type WorkerStatus = "queued" | "running" | "verified" | "rejected";
 /** Why a worker produced nothing usable. `no_output` is a budget or provider fault, `verifier` is
  *  a judgement with a stage behind it, `deadline` is the batch bound firing. Kept apart because
  *  collapsing them reads a provider outage as a model that cannot follow a contract. */
-export type RejectReason = "no_output" | "verifier" | "deadline" | "";
+export type RejectReason =
+  | "no_output"
+  | "verifier"
+  | "deadline"
+  // The worker was CUT OFF mid-run rather than producing nothing. It used to arrive as
+  // `no_output`, which reads as a provider fault — but a budget cut is the one case a user can
+  // act on, by raising the budget, and folding the two together hid that.
+  | "budget"
+  | "spend"
+  | "max_steps"
+  | "tool_loop"
+  | "cancelled"
+  | "";
 
 export interface WorkerState {
   taskId: string;
@@ -27,6 +39,8 @@ export interface WorkerState {
   /** "top" for a subtask small enough to be answered inline, "mid" for a delegated worker. */
   tier: string;
   stage: string;
+  /** Which verification gates actually RAN. See `checks_run` in `envelope_verify.py`. */
+  checksRun: string[];
   detail: string;
   reason: RejectReason;
   reasked: boolean;
@@ -118,6 +132,7 @@ function blankWorker(taskId: string, objective = ""): WorkerState {
     reason: "",
     reasked: false,
     tokens: 0,
+    checksRun: [],
     summaryChars: 0,
     gaps: [],
     evidenceRefs: [],
@@ -180,6 +195,7 @@ export function applyFrame(state: OrchestrationState, frame: OrchFrame): Orchest
         workers: patchWorker(state.workers, frame.task_id, {
           status: "verified",
           stage: str(data.stage),
+          checksRun: strings(data.checks_run),
           reasked: data.reasked === true,
           tokens: num(data.tokens),
           summaryChars: num(data.summary_chars),

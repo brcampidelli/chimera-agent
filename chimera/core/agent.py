@@ -24,7 +24,7 @@ from chimera.core.context_budget import ContextBudget, RunState, compact
 from chimera.core.steplog import StepLog, StepRecord, clip, tool_record
 from chimera.core.tool_loop import ToolLoopDetector
 from chimera.governance.ledger import WRITE_TOOLS
-from chimera.orchestration.budget import BudgetExceeded, SpendBudget
+from chimera.orchestration.budget import BudgetExceeded, SpendBudget, SpendExceeded
 from chimera.providers.gateway import CompletionResult, MessageLike, SupportsComplete
 from chimera.telemetry import get_logger
 from chimera.tools.base import is_refusal
@@ -243,7 +243,7 @@ class AgentResult:
 
     answer: str
     steps: int
-    stopped_reason: str  # "final" | "max_steps" | "tool_loop" | "budget" | "cancelled"
+    stopped_reason: str  # "final" | "max_steps" | "tool_loop" | "budget" | "spend" | "cancelled"
     transcript: list[MessageLike] = field(default_factory=list)
     tool_calls_made: int = 0
     # Token/cost accounting, summed across every model call in the run (0 when the backend reported
@@ -506,8 +506,12 @@ class Agent:
                 #
                 # Still empty when nothing answered, because then there is nothing to attribute and
                 # a name here would point at a model that was never called.
+                # Which ceiling, not just that one was hit. `SpendExceeded` is a subclass, so it
+                # arrives here too — and the two are raised by different things, refused for
+                # different reasons, and raised again by the person watching in different places.
                 return self._result(
-                    str(exc), step - 1, "budget", messages, tool_calls_made, tool_names, usage,
+                    str(exc), step - 1, "spend" if isinstance(exc, SpendExceeded) else "budget",
+                    messages, tool_calls_made, tool_names, usage,
                     self.config.model or _last_answering_model(steplog), None, steplog, task,
                 )
             except Exception as exc:  # noqa: BLE001 — re-raised immediately, see PartialSpend

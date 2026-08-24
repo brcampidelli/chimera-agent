@@ -9,6 +9,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { Dialog } from "@/components/ui/dialog";
+import { I18nProvider } from "@/lib/i18n";
 import { Switch } from "@/components/ui/switch";
 import { Tabs } from "@/components/ui/tabs";
 import { ToastProvider, useToast } from "@/components/ui/toast";
@@ -107,15 +108,20 @@ describe("Tabs", () => {
 });
 
 describe("Dialog", () => {
+  // Wrapped, because the close control is named through `t()` now. It renders as an X and had
+  // "Close" hardcoded, so every dialog in the app announced an English word to a screen reader
+  // reading Portuguese — the app's own default. The provider is how the primitive gets its
+  // language, and requiring it here is cheaper than giving the most-used primitive a fallback
+  // that would quietly ship English wherever someone forgot the wrapper.
   function Harness() {
     const [open, setOpen] = useState(false);
     return (
-      <>
+      <I18nProvider>
         <button onClick={() => setOpen(true)}>Open</button>
         <Dialog open={open} onOpenChange={setOpen} title="Delete session">
           <button>Confirm</button>
         </Dialog>
-      </>
+      </I18nProvider>
     );
   }
 

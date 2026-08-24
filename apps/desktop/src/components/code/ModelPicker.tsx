@@ -50,6 +50,7 @@ export function ModelPicker({
   disabled,
   fallback: fallbackOverride,
   label,
+  name,
 }: {
   /** The chosen slug, or "" for whatever the install's default is. */
   value: string;
@@ -63,6 +64,11 @@ export function ModelPicker({
   fallback?: string;
   /** Replaces the "MODEL" caption. A row that already says `Explorar` does not need it. */
   label?: string | null;
+  /** What this picker chooses FOR, folded into the button's accessible name.
+   *
+   *  Separate from `label`, which controls the visible caption: the roles strip prints the role
+   *  beside the button and passes `label={null}`, so the name had nowhere to come from. */
+  name?: string;
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -105,6 +111,11 @@ export function ModelPicker({
         <button
           type="button"
           disabled={disabled}
+          // Named for what it CHOOSES FOR, not only what is in it. Four of these sit in the roles
+          // strip and a fifth beside the composer, and every one reads "default · x" — so by name
+          // alone they were five identical buttons, told apart only by text sitting next to them
+          // that the button's own name did not include.
+          aria-label={name ? `${name}: ${buttonLabel}` : undefined}
           onClick={() => setOpen(true)}
           className={cn(
             "flex items-center gap-1.5 rounded-chip border border-border px-2.5 py-1 text-xs",

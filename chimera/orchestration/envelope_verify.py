@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import random
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal
 
 from chimera.core.contract import CompletionContract
@@ -78,6 +78,16 @@ class VerifyOutcome:
     passed: bool
     stage: VerifyStage
     detail: str = ""
+    checks_run: tuple[str, ...] = ()
+    """Which gates actually EXECUTED, in order — not which ones exist.
+
+    `stage="accepted"` only ever meant "no gate rejected", and for ordinary output that is one gate:
+    criteria needs `regex:` lines in an `output_format` written as prose by a model, and the spot
+    check needs `evidence_refs`, which `build_envelope` fills in only when the output overruns the
+    8000-character cap. Both are skipped by construction, so `accepted` was reported for a verdict
+    that had checked shape and nothing else — and the screen rendered it as "verificado".
+
+    Naming what ran is the difference between a claim and a receipt. The UI reads this."""
     escalate: bool = False
     """True when the spot check disagreed with the summary — the orchestrator
     should treat the envelope as suspect (re-ask or read evidence itself)."""
@@ -117,28 +127,37 @@ class EnvelopeVerifier:
         triggered by a spot failure, so the expensive audit that caught the unfaithfulness isn't then
         skipped ~80% of the time on the retry (which could re-accept a still-unfaithful summary).
         """
-        # Gate 1 — schema (free).
+        ran: list[str] = []
+
+        # Gate 1 — schema (free). Always runs, which is exactly why naming it matters: on its own
+        # it asserts "non-empty text, right task_id, under the cap" and nothing about the content.
+        ran.append("schema")
         problems = validate_envelope(spec, envelope)
         if problems:
-            return VerifyOutcome(passed=False, stage="schema", detail="; ".join(problems))
+            return VerifyOutcome(
+                passed=False, stage="schema", detail="; ".join(problems), checks_run=tuple(ran)
+            )
 
         # Gate 2 — acceptance criteria (deterministic, no model).
         contract = _contract_from_spec(spec)
         if contract:
+            ran.append("criteria")
             result = contract.evaluate(envelope.summary)
             if not result.satisfied:
                 return VerifyOutcome(
-                    passed=False, stage="criteria", detail="; ".join(result.failures)
+                    passed=False, stage="criteria", detail="; ".join(result.failures),
+                    checks_run=tuple(ran),
                 )
 
         # Gate 3 — spot check (probabilistic; forced when the worker admits gaps or on a re-ask).
         should_spot = force_spot or bool(envelope.gaps) or self.rng.random() < self.spot_rate
         if should_spot and envelope.evidence_refs and self._spot_backend is not None:
+            ran.append("spot")
             outcome = self._spot_check(spec, envelope)
             if outcome is not None:
-                return outcome
+                return replace(outcome, checks_run=tuple(ran))
 
-        return VerifyOutcome(passed=True, stage="accepted")
+        return VerifyOutcome(passed=True, stage="accepted", checks_run=tuple(ran))
 
     def _spot_check(self, spec: TaskSpec, envelope: ResultEnvelope) -> VerifyOutcome | None:
         """Grade summary faithfulness against the raw artifact. None = check unavailable."""

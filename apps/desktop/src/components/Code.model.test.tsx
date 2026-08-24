@@ -65,6 +65,9 @@ function doctorWith(agents: { key: string; label: string }[] = []) {
  * from memory. The assertions below are therefore mostly about the REQUEST, not the menu: a picker
  * that changes a chip and sends the same body as before is the bug wearing the fix's clothes.
  */
+// `/^default/i` rather than `/default/i`, and the anchor is load-bearing: the roles strip beside
+// this now renders four more model pickers, each named "Explore: default · x". Unanchored, the
+// query matches five buttons and the failure reads like a broken screen rather than a broadened one.
 describe("Code — choosing the model", () => {
   beforeEach(() => {
     localStorage.setItem(WORKSPACE_KEY, "/repo");
@@ -104,7 +107,7 @@ describe("Code — choosing the model", () => {
     const user = userEvent.setup();
     renderCode();
 
-    await user.click(await screen.findByRole("button", { name: /default/i }));
+    await user.click(await screen.findByRole("button", { name: /^default/i }));
     await user.click(await screen.findByText("DeepSeek: V3.1"));
 
     await user.type(screen.getByPlaceholderText(/Ask about this code/i), "oi");
@@ -125,7 +128,7 @@ describe("Code — choosing the model", () => {
     const user = userEvent.setup();
     renderCode();
 
-    await user.click(await screen.findByRole("button", { name: /default/i }));
+    await user.click(await screen.findByRole("button", { name: /^default/i }));
     await user.click(await screen.findByText("DeepSeek: V3.1"));
     await user.click(screen.getByRole("button", { name: /new conversation/i }));
 
@@ -144,7 +147,7 @@ describe("Code — choosing the model", () => {
     await screen.findByPlaceholderText(/Ask about this code/i);
     expect(getModels).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole("button", { name: /default/i }));
+    await user.click(screen.getByRole("button", { name: /^default/i }));
     await waitFor(() => expect(getModels).toHaveBeenCalled());
   });
 
@@ -152,7 +155,7 @@ describe("Code — choosing the model", () => {
     const user = userEvent.setup();
     renderCode();
 
-    await user.click(await screen.findByRole("button", { name: /default/i }));
+    await user.click(await screen.findByRole("button", { name: /^default/i }));
     await user.click(await screen.findByText("Z.ai: GLM 4.6"));
     await user.click(screen.getByRole("button", { name: /glm-4.6/i }));
     // A search that matches nothing still leaves the row that undoes the choice.
@@ -175,7 +178,7 @@ describe("Code — choosing the model", () => {
     });
     renderCode();
 
-    await user.click(await screen.findByRole("button", { name: /default/i }));
+    await user.click(await screen.findByRole("button", { name: /^default/i }));
     await user.click(await screen.findByText("Toy: No Tools"));
 
     expect(await screen.findByText(/Cannot call tools/i)).toBeInTheDocument();
@@ -193,7 +196,7 @@ describe("Code — choosing the model", () => {
     });
     renderCode();
 
-    await user.click(await screen.findByRole("button", { name: /default/i }));
+    await user.click(await screen.findByRole("button", { name: /^default/i }));
     await user.click(await screen.findByText("llama3"));
 
     expect(screen.queryByText(/Cannot call tools/i)).not.toBeInTheDocument();
@@ -211,7 +214,7 @@ describe("Code — choosing the model", () => {
     });
     renderCode();
 
-    await user.click(await screen.findByRole("button", { name: /default/i }));
+    await user.click(await screen.findByRole("button", { name: /^default/i }));
     expect(await screen.findByText(/full catalogue did not answer/i)).toBeInTheDocument();
     expect(screen.getByText("Curated: Model")).toBeInTheDocument();
   });
@@ -220,7 +223,7 @@ describe("Code — choosing the model", () => {
     const user = userEvent.setup();
     renderCode();
 
-    await user.click(await screen.findByRole("button", { name: /default/i }));
+    await user.click(await screen.findByRole("button", { name: /^default/i }));
     // Nothing picked yet: the button would write what is already written.
     expect(screen.getByRole("button", { name: /Make it the default/i })).toBeDisabled();
 
@@ -243,11 +246,11 @@ describe("Code — choosing the model", () => {
     vi.mocked(getDoctor).mockResolvedValue(doctorWith([{ key: "claude", label: "Claude Code" }]));
     renderCode();
 
-    expect(await screen.findByRole("button", { name: /default/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /^default/i })).toBeInTheDocument();
     // Awaited, not read synchronously: the worker row appears when `doctor` resolves, and the model
     // chip is already on screen before that — so a `getBy` here races the fetch it depends on.
     await user.click(await screen.findByRole("button", { name: "Claude Code" }));
-    expect(screen.queryByRole("button", { name: /default/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^default/i })).not.toBeInTheDocument();
   });
 
   it("does not send a model to an external agent even if one was picked first", async () => {
@@ -257,7 +260,7 @@ describe("Code — choosing the model", () => {
     vi.mocked(getDoctor).mockResolvedValue(doctorWith([{ key: "claude", label: "Claude Code" }]));
     renderCode();
 
-    await user.click(await screen.findByRole("button", { name: /default/i }));
+    await user.click(await screen.findByRole("button", { name: /^default/i }));
     await user.click(await screen.findByText("DeepSeek: V3.1"));
     await user.click(screen.getByRole("button", { name: "Claude Code" }));
 

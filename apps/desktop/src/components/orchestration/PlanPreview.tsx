@@ -33,6 +33,7 @@ export function PlanPreview({
       <FellBackNote
         shape={plan.shape}
         reason={plan.fell_back_reason}
+        sources={plan.sources}
         onRun={onRun}
         onOpenCode={onOpenCode}
         onCrew={onCrew}

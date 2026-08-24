@@ -2615,6 +2615,20 @@
         "title": "DelegationsOut",
         "type": "object"
       },
+      "DeletedCountOut": {
+        "description": "How many records a delete actually removed.\n\nDistinct from :class:`DeletedOut`, which is a boolean and right for deleting ONE thing by id.\nA bulk delete has a third answer those two cannot tell apart: \"the project was already empty\"\nand \"seven conversations are gone\" are different sentences for the person who clicked.",
+        "properties": {
+          "deleted": {
+            "title": "Deleted",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "deleted"
+        ],
+        "title": "DeletedCountOut",
+        "type": "object"
+      },
       "DeletedOut": {
         "properties": {
           "deleted": {
@@ -3132,6 +3146,44 @@
           "bytes"
         ],
         "title": "FsFileWrittenOut",
+        "type": "object"
+      },
+      "FsMadeDirOut": {
+        "description": "The folder, and whether this call is what made it.\n\nAn existing folder is not an error \u2014 it is the answer, already true \u2014 but the screen should not\nsay \"created\" about something that was already there.",
+        "properties": {
+          "created": {
+            "title": "Created",
+            "type": "boolean"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "created"
+        ],
+        "title": "FsMadeDirOut",
+        "type": "object"
+      },
+      "FsMakeDirIn": {
+        "description": "Where to create a folder, and what to call it.\n\nTwo fields rather than one path, deliberately: a single string would put the whole guard on\nparsing, and the parent is not the caller's to choose freely \u2014 it is the folder the picker is\nalready showing.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "parent": {
+            "title": "Parent",
+            "type": "string"
+          }
+        },
+        "required": [
+          "parent",
+          "name"
+        ],
+        "title": "FsMakeDirIn",
         "type": "object"
       },
       "FsNodeOut": {
@@ -3815,6 +3867,7 @@
           "max_usd": {
             "anyOf": [
               {
+                "exclusiveMinimum": 0.0,
                 "type": "number"
               },
               {
@@ -7588,6 +7641,46 @@
         "summary": "Code Posture"
       }
     },
+    "/api/code/projects": {
+      "delete": {
+        "description": "Forget every conversation filed under one project. **The folder is not touched.**\n\nA project is a grouping and nothing more: the sidebar files conversations by the workspace\neach recorded, and no other record of one exists. So \"delete the project\" can only honestly\nmean the transcripts \u2014 and the count comes back so the screen can say how many went rather\nthan reporting a success with no size.",
+        "operationId": "delete_code_project_api_code_projects_delete",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "title": "Workspace",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedCountOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Code Project"
+      }
+    },
     "/api/code/revert/{token}": {
       "post": {
         "description": "Undo an editing turn, if the user takes the offer.\n\nAny editing turn, not only one whose verification failed. A check answers \"does this still\nbuild\"; the button answers \"do I want this\", and only the person reading the diff can.\n\nA token is single-use and dies with the process. An unknown one is ``{ok: false}`` rather\nthan a 404 \u2014 that is the state a second click hits, and a stale offer is not an error.",
@@ -8479,6 +8572,45 @@
           }
         },
         "summary": "Fs Browse Endpoint"
+      }
+    },
+    "/api/fs/dir": {
+      "post": {
+        "description": "Create one folder, so starting a project does not mean leaving the app for Explorer.\n\nThe picker beside this could only ever SELECT, which meant a new project began somewhere\nelse \u2014 and the folder people then picked was often the wrong one, because the right one did\nnot exist yet.\n\nA POST where the rest of the browsing path is GETs, and the guarding is in `make_dir`: one\nsegment, no separators, checked again after resolving, and `mkdir` rather than `mkdir -p`.",
+        "operationId": "fs_make_dir_endpoint_api_fs_dir_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FsMakeDirIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FsMadeDirOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Fs Make Dir Endpoint"
       }
     },
     "/api/fs/exec": {

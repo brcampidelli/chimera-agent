@@ -109,16 +109,22 @@ describe("watching a fan-out", () => {
     expect(screen.getAllByText(/running/i).length).toBeGreaterThan(0);
   });
 
-  it("says which stage accepted a worker, and shows the objection when one is refused", async () => {
+  it("names the check that ran, and shows the objection when one is refused", async () => {
+    // This asserted `stage` verbatim — "criteria", "accepted" — which was the defect rather than
+    // the feature. `stage` is the backend's enum for "which gate decided", and `accepted` means
+    // "none rejected"; for ordinary output that is ONE gate, because criteria needs `regex:` lines
+    // in a prose `output_format` and the spot check needs evidence refs that only exist above the
+    // 8000-char cap. The card now names the gates that actually ran.
     const { handlers } = await startRun();
 
     send(
       handlers(),
-      frame(6, "worker_verified", { stage: "criteria", tokens: 900, gaps: [] }, "a"),
+      frame(6, "worker_verified", { stage: "accepted", checks_run: ["schema", "criteria"], tokens: 900, gaps: [] }, "a"),
       frame(7, "worker_rejected", { reason: "verifier", stage: "spot", detail: "unsupported claim" }, "b"),
     );
 
-    expect(screen.getByText("criteria")).toBeInTheDocument();
+    expect(screen.getByText(/criteria|critérios/i)).toBeInTheDocument();
+    expect(screen.queryByText("accepted")).not.toBeInTheDocument();
     // Verbatim, not summarised: the objection is the only evidence of why an envelope was dropped.
     expect(screen.getByText("unsupported claim")).toBeInTheDocument();
   });
@@ -138,7 +144,10 @@ describe("watching a fan-out", () => {
 
     send(handlers(), frame(6, "worker_rejected", { reason: "no_output" }, "a"));
 
-    expect(screen.getByText(/budget ran out or the provider failed/i)).toBeInTheDocument();
+    // Not "its budget ran out" any more: a budget cut has carried its own reason since it
+    // stopped being folded in here, and leaving the words behind would have kept the two
+    // states looking alike on screen after the code stopped confusing them.
+    expect(screen.getByText(/had nothing to say/i)).toBeInTheDocument();
   });
 
   it("admits there is no live text rather than faking a cursor", async () => {
@@ -200,7 +209,8 @@ describe("watching a fan-out", () => {
       frame(7, "done", { answer: "", cancelled: true, total_tokens: 1700 }),
     );
 
-    expect(screen.getByText(/1700 tokens/i)).toBeInTheDocument();
+    // "1,700" in English, "1.700" in Portuguese: the digits are grouped by the CHOSEN language.
+    expect(screen.getByText(/1,700 tokens/i)).toBeInTheDocument();
     expect(screen.getByText(/were charged/i)).toBeInTheDocument();
   });
 
@@ -212,10 +222,10 @@ describe("watching a fan-out", () => {
     // Zero is a real number here: it means the stop landed before anything ran. Rendering it is
     // not the same as rendering the answer section, which must stay absent.
     expect(screen.getByText(/0 tokens/i)).toBeInTheDocument();
-    expect(screen.queryByText(/would have cost about/i)).toBeNull();
+    expect(screen.queryByText(/cost gate predicted/i)).toBeNull();
   });
 
-  it("renders the answer and prices it against the counterfactual", async () => {
+  it("says which side of the estimate the run landed on", async () => {
     const { handlers } = await startRun();
 
     send(
@@ -231,10 +241,33 @@ describe("watching a fan-out", () => {
     );
 
     expect(screen.getByText(/upgrading breaks the config loader/i)).toBeInTheDocument();
-    expect(screen.getByText(/2400 tokens/i)).toBeInTheDocument();
-    expect(screen.getByText(/would have cost about 7000/i)).toBeInTheDocument();
+    expect(screen.getByText(/2,400 tokens/i)).toBeInTheDocument();
+    // Named for what it is — the gate's own arithmetic — and placed relative to what was spent.
+    expect(
+      screen.getByText(/cost gate predicted about 7,000, and it came in under/i),
+    ).toBeInTheDocument();
+    // Never as a saving. No second run happened, so there is no measured difference to claim.
+    expect(screen.queryByText(/saved|saving/i)).toBeNull();
     // The run is over: no Stop control left to click.
     expect(screen.queryByRole("button", { name: /^stop$/i })).toBeNull();
+  });
+
+  it("does not print a loss in the grammar of a saving", async () => {
+    // Measured live, before this: **"8721 tokens · um agente só teria custado cerca de 8000"** —
+    // the two numbers joined by a neutral dot, no comparison drawn, on a run that cost 721 tokens
+    // MORE than the estimate it was being shown against. Both readings were available to a reader
+    // and the sentence drew neither, so the one it got was the flattering one.
+    const { handlers } = await startRun();
+
+    send(
+      handlers(),
+      frame(6, "worker_verified", { stage: "criteria", tokens: 900 }, "a"),
+      frame(7, "done", { answer: "Done.", total_tokens: 8721, counterfactual_tokens: 8000 }),
+    );
+
+    expect(screen.getByText(/8,721 tokens/i)).toBeInTheDocument();
+    expect(screen.getByText(/predicted about 8,000, and it went over/i)).toBeInTheDocument();
+    expect(screen.queryByText(/came in under/i)).toBeNull();
   });
 
   it("prices a run with no counterfactual in tokens alone, inventing no comparison", async () => {

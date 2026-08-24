@@ -2,7 +2,7 @@ import { useEffect, useReducer } from "react";
 import Markdown from "react-markdown";
 
 import { streamHierarchy, type HierarchyRunInput, type OrchFrame } from "@/lib/api";
-import { useT, type TFunc } from "@/lib/i18n";
+import { useNum, useT, type TFunc } from "@/lib/i18n";
 import {
   applyFrame,
   EMPTY_RUN,
@@ -109,6 +109,7 @@ export function HierarchyRun({
         <FellBackNote
           shape={state.fellBack.shape}
           reason={state.fellBack.reason}
+          sources={state.sources}
           onOpenCode={onOpenCode}
         />
       ) : null}
@@ -157,18 +158,38 @@ export function HierarchyRun({
   );
 }
 
-/** What the run cost, under the answer or under the notice that there will not be one. */
+/**
+ * What the run cost.
+ *
+ * It used to print the two numbers side by side, joined by a dot and nothing else:
+ *
+ *     8721 tokens · um agente só teria custado cerca de 8000
+ *
+ * A 721-token LOSS, in the grammar of a saving. And the second number is not a measurement — no
+ * second run happened. It is the profitability gate's own arithmetic: a fixed 24000-character
+ * context divided by the subtask count, which comes out to roughly 6000 + 1000 per subtask, always,
+ * for every task of that width. `receipts.py` says so in its own comment, and says the saving must
+ * not be quoted until the sweep has a tool-enabled arm to measure it against.
+ *
+ * So this names each number for what it is and says which side the run landed on. What it will not
+ * do is call the difference a saving.
+ */
 function Totals({ totals, t }: { totals: OrchestrationState["totals"]; t: TFunc }) {
+  const num = useNum();
   if (!totals) return null;
+  const spent = totals.tokens ?? 0;
+  const guess = totals.counterfactual ?? 0;
   return (
     <p className="mt-3 border-t border-hairline pt-3 text-xs tabular-nums text-muted-foreground">
-      {t("orch.tokens", { n: totals.tokens ?? 0 })}
-      {/* Only when there IS one. A counterfactual is an ESTIMATE of what one inline agent would
-          have spent, and the word matters: printing a saving without it would read as a
-          measurement of two runs that never both happened. */}
-      {totals.counterfactual
-        ? ` · ${t("orch.counterfactual", { n: totals.counterfactual })}`
-        : ""}
+      {t("orch.tokens", { n: num(spent) })}
+      {guess ? (
+        <>
+          {" · "}
+          <span title={t("orch.estimate.what")}>
+            {t(spent <= guess ? "orch.estimate.under" : "orch.estimate.over", { n: num(guess) })}
+          </span>
+        </>
+      ) : null}
     </p>
   );
 }
