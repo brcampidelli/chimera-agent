@@ -2,6 +2,7 @@ import * as RadixDialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
 
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { focusRing } from "@/components/ui/focus";
 
@@ -43,6 +44,7 @@ export function Dialog({
    * drops focus on `<body>`, which puts a keyboard user back at the top of the document every time
    * they dismiss something. Remembering the element ourselves is the whole fix.
    */
+  const t = useT();
   const restoreTo = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (open) restoreTo.current = document.activeElement as HTMLElement | null;
@@ -92,7 +94,10 @@ export function Dialog({
               )}
             >
               <X className="h-4 w-4" />
-              <span className="sr-only">Close</span>
+              {/* The only name this control has: it renders as an X. It was hardcoded English, so
+                  every dialog in the app announced "Close" to a screen reader reading Portuguese
+                  — the app's own default language. Invisible on screen, which is why it lasted. */}
+              <span className="sr-only">{t("common.close")}</span>
             </RadixDialog.Close>
           </div>
 

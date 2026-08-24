@@ -295,7 +295,15 @@ export function SessionSidebar({
         description={inspecting?.title || undefined}
       >
         <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-all text-xs text-muted-foreground">
-          {raw.data ? readable(raw.data.text) : t("common.loading")}
+          {/* Three states, not two. It read `data ? text : loading`, so a request that FAILED
+              sat on "loading" for ever — and 404 here is ordinary: another window deleted the
+              session, or it was pruned. Reproduced by deleting one and opening its JSON: a
+              spinner-less "Carregando…" that never resolves, which reads as a hung app. */}
+          {raw.isError
+            ? t("code.sessions.jsonFailed")
+            : raw.data
+              ? readable(raw.data.text)
+              : t("common.loading")}
         </pre>
         {raw.data ? (
           <p className="mt-2 text-xs text-muted-foreground">
