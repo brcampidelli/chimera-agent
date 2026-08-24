@@ -124,7 +124,13 @@ export function SessionSidebar({
   return (
     // `shrink-0`: this is a fixed 240px rail, not a column that negotiates. Letting it shrink meant
     // three columns competing for the same pixels and none of them winning cleanly.
-    <aside className="flex min-h-0 w-60 shrink-0 flex-col border-r border-hairline">
+    //
+    // `max-h-40` only while STACKED. Below `lg` the row is a COLUMN, and `shrink-0` — right on the
+    // horizontal axis, where this is a fixed rail — then means "do not shrink my HEIGHT". Stacked,
+    // this and the file viewer ate the whole row and the conversation's `flex-1` resolved to zero:
+    // measured at 1000x900 it had height 0 at y=1068, off a 900px window, and the shell scrolled to
+    // 1424. The list scrolls inside itself already, so a cap costs only how many rows show at once.
+    <aside className="flex max-h-40 min-h-0 w-60 shrink-0 flex-col border-r border-hairline lg:max-h-none">
       <div className="flex items-center gap-1 p-2">
         <Button size="sm" variant="ghost" className="flex-1 justify-start" onClick={onNew}>
           <Plus className="h-4 w-4" /> {t("code.sessions.new")}
