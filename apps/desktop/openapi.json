@@ -3815,6 +3815,7 @@
           "max_usd": {
             "anyOf": [
               {
+                "exclusiveMinimum": 0.0,
                 "type": "number"
               },
               {
