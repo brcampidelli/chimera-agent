@@ -513,6 +513,9 @@ function LanguageSelect() {
   return (
     <select
       className={inputCls}
+      // A bare select announced as "combo box, Português" — the value, with no statement of what
+      // it selects. It sits in a Row like every other control here and simply never asked it.
+      aria-label={useContext(RowLabelContext)}
       value={lang}
       onChange={(e) =>
         setLang(e.target.value as (typeof LANGS)[number]["code"])
@@ -619,6 +622,12 @@ function SecretField({
         type="password"
         autoFocus
         placeholder={t("settings.pasteKey")}
+        // Named from its Row, like the model field above. Five of these render at once on the
+        // Conexões tab and every one announced the same thing — "cole a chave…", the placeholder,
+        // with nothing saying WHICH provider. A placeholder is not a label: it disappears the
+        // moment there is content, and on a password field where the wrong paste is a real error
+        // that is the point at which knowing matters most.
+        aria-label={useContext(RowLabelContext)}
         value={v}
         onChange={(e) => setV(e.target.value)}
       />
@@ -703,6 +712,10 @@ function PoolField({
           className={inputCls}
           type="password"
           placeholder={t("settings.pasteKey")}
+          // Third copy of this markup and the third to need naming. This one is not inside a Row,
+          // so it names itself from the pool's provider — which is the whole distinction between
+          // one pool's field and the next.
+          aria-label={`${t("settings.pasteKey")} — ${pool.provider}`}
           value={v}
           onChange={(e) => {
             setV(e.target.value);
@@ -770,6 +783,9 @@ export function MessagingCard({
               type="password"
               autoFocus
               placeholder={t("settings.pasteKey")}
+              // Named for its platform: Discord's token field and Telegram's are the same markup on
+              // the same screen, and the placeholder cannot tell them apart.
+              aria-label={t("settings.row.botToken", { platform: label })}
               value={token}
               onChange={(e) => setToken(e.target.value)}
             />
