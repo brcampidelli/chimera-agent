@@ -26,6 +26,25 @@ const rails: Record<WorkerState["status"], string> = {
 
 /** Written out rather than built with a template: `i18n.reachable.test.ts` greps for each key as
  *  a literal and lists anything it cannot find as dead. Fourth time this file pattern is needed. */
+/**
+ * Why the worker was dropped, in the reader's language.
+ *
+ * Only `verifier` carries a `detail` — it is the verifier's own objection, already specific. Every
+ * other reason is a machine enum with no text behind it, and the card used to fall through to
+ * `worker.detail` for anything it did not name: an EMPTY red line above "discarded", saying a
+ * worker was thrown away and nothing about why. Reasons live longer than the branches that read
+ * them, so this is a map rather than a chain — a new one added to `RejectReason` and not here shows
+ * up as a missing translation, not as a blank.
+ */
+const REJECTED_KEY: Partial<Record<string, "orch.worker.noOutput" | "orch.worker.deadline" | "orch.worker.cutOff.budget" | "orch.worker.cutOff.max_steps" | "orch.worker.cutOff.tool_loop" | "orch.worker.cutOff.cancelled">> = {
+  no_output: "orch.worker.noOutput",
+  deadline: "orch.worker.deadline",
+  budget: "orch.worker.cutOff.budget",
+  max_steps: "orch.worker.cutOff.max_steps",
+  tool_loop: "orch.worker.cutOff.tool_loop",
+  cancelled: "orch.worker.cutOff.cancelled",
+};
+
 const CHECK_KEY: Record<string, "orch.worker.checked.schema" | "orch.worker.checked.criteria" | "orch.worker.checked.spot"> = {
   schema: "orch.worker.checked.schema",
   criteria: "orch.worker.checked.criteria",
@@ -34,6 +53,7 @@ const CHECK_KEY: Record<string, "orch.worker.checked.schema" | "orch.worker.chec
 
 export function WorkerCard({ worker }: { worker: WorkerState }) {
   const t = useT();
+  const rejected = REJECTED_KEY[worker.reason];
 
   const icon =
     worker.status === "running" ? (
@@ -107,11 +127,7 @@ export function WorkerCard({ worker }: { worker: WorkerState }) {
         {worker.status === "rejected" ? (
           <div className="space-y-1">
             <p className="text-xs text-bad-foreground">
-              {worker.reason === "no_output"
-                ? t("orch.worker.noOutput")
-                : worker.reason === "deadline"
-                  ? t("orch.worker.deadline")
-                  : worker.detail}
+              {rejected ? t(rejected) : worker.detail}
             </p>
             {/* The line that keeps the answer honest. Without it a user watches four workers,
                 reads an answer built from three, and has no way to know one was dropped. */}

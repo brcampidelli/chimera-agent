@@ -22,20 +22,12 @@ The second half — that "accepted" over-claimed even for real answers — is
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 import pytest
 
 from chimera.orchestration.hierarchy import _CUT_OFF_REASONS
 from chimera.orchestration.roles import Role, RoleAgent
-
-
-class _BackendQueTrunca:
-    """A backend whose agent loop stops for `motivo` and hands back a report about the run."""
-
-    def __init__(self, motivo: str) -> None:
-        self.motivo = motivo
 
 
 @pytest.mark.parametrize("motivo", sorted(_CUT_OFF_REASONS))

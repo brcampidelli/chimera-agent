@@ -601,12 +601,30 @@ class HierarchicalOrchestrator:
             for i, spec in enumerate(specs)
         ]
         outcomes = run_all_with_deadline(
-            units, max_workers=self.config.max_workers, timeout=_batch_deadline(None)
+            units,
+            max_workers=self.config.max_workers,
+            timeout=_batch_deadline(None),
+            # Without this, Stop could not end this wait. Cooperative flags are read BETWEEN units —
+            # before one starts, after its model call returns — so a worker parked INSIDE a model
+            # call never reads one, and the wait fell through to the batch deadline: four hours, in
+            # a desktop app with somebody watching, while `/cancel` answered `{"ok": true}` to a run
+            # it had not touched. `run_isolated` was given this argument when a live consumer was
+            # first attached to the crew; the two call sites are the same shape and only one got it.
+            cancelled=self._stopped,
         )
         results: list[tuple[ResultEnvelope | None, DelegationReceipt | None]] = []
         for i, spec in enumerate(specs):
             outcome = outcomes[f"{i}:{spec.task_id}"]
-            if outcome.timed_out:
+            if outcome.timed_out and self._stopped():
+                # Abandoned the same way — the thread runs on, its result is discarded — but for a
+                # reason the person watching supplied themselves. Telling somebody who just pressed
+                # Stop that their subtask "overran the batch deadline" describes the mechanism and
+                # misnames the cause, and it is the one wording they can prove wrong.
+                _log.info("worker %s abandoned because the run was cancelled", spec.task_id)
+                self._emit("worker_rejected", task_id=spec.task_id,
+                           text="cancelled before it reported", reason="cancelled")
+                results.append((None, None))
+            elif outcome.timed_out:
                 # Abandoned, not cancelled — the thread runs on and its result is discarded. Said
                 # out loud rather than counted as a silent failure, because a subtask missing from
                 # the synthesis for a reason nobody logged is the hardest kind of gap to notice.
@@ -681,7 +699,11 @@ class HierarchicalOrchestrator:
             # The API path always has tools, so this WAS the ordinary case, not a corner.
             cut_off = worker.last_stop if worker.last_stop in _CUT_OFF_REASONS else ""
         except BudgetExceeded:
-            raw = ""
+            # The tool-free path RAISES where the agent loop returns the message as an answer,
+            # so `last_stop` never moves off "final" here. Same event, opposite mechanics — and
+            # without this line the one branch that cannot lie about its cause would have been
+            # the one reported as "the provider failed".
+            cut_off, raw = "budget", ""
         except Exception as exc:  # noqa: BLE001 -- a provider error must not nuke the batch
             _log.warning("worker %s failed: %s", spec.task_id, exc)
             raw = ""

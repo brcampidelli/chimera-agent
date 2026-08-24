@@ -144,7 +144,10 @@ describe("watching a fan-out", () => {
 
     send(handlers(), frame(6, "worker_rejected", { reason: "no_output" }, "a"));
 
-    expect(screen.getByText(/budget ran out or the provider failed/i)).toBeInTheDocument();
+    // Not "its budget ran out" any more: a budget cut has carried its own reason since it
+    // stopped being folded in here, and leaving the words behind would have kept the two
+    // states looking alike on screen after the code stopped confusing them.
+    expect(screen.getByText(/had nothing to say/i)).toBeInTheDocument();
   });
 
   it("admits there is no live text rather than faking a cursor", async () => {
