@@ -33,6 +33,7 @@ import { SessionSidebar } from "@/components/code/SessionSidebar";
 import { ProjectPicker } from "@/components/code/ProjectPicker";
 import { useRunSession } from "@/lib/run-session";
 import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { readWorkspace, writeWorkspace } from "@/lib/workspace";
 
 const fieldCls = "field w-full px-3 text-sm";
@@ -498,7 +499,13 @@ export function Code() {
             viewer was crushed to 0.67px, and the pair overflowed 82px into the activity panel.
             Measured by hit-testing a grid inside the panel: the composer strip and the transcript
             bubbles were painting there, not the code this time. */}
-        <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {/* Below `lg` the row is a column, and three stacked panes do not fit: the conversation
+            needs ~368px for its composer and header alone, and capping all three to make room
+            left it 161px and overflowing onto the viewer. So below `lg` the viewer REPLACES the
+            conversation rather than sharing the height with it — which is what the note over
+            the viewer already says it is: a consequence of opening a file, not a third of the
+            window. Close the file and the conversation is back. */}
+        <main className={cn("flex min-h-0 min-w-0 flex-1 flex-col", openFile && "max-lg:hidden")}>
           <Conversation
             key={conversationKey}
             resumeSession={sessionId}
@@ -594,7 +601,7 @@ export function Code() {
             `lg:w-[28rem]` is a BASIS, not a ceiling, and a flex child without it will not shrink —
             it overflowed the row instead and painted across the activity panel. */}
         {openFile ? (
-          <div className="flex min-h-0 min-w-0 shrink-0 flex-col border-hairline lg:w-[28rem] lg:border-l">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col border-hairline lg:w-[28rem] lg:flex-none lg:shrink-0 lg:border-l">
             <Viewer workspace={workspace} path={openFile} />
           </div>
         ) : null}

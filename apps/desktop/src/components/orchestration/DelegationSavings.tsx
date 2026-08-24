@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Split } from "lucide-react";
 
 import { getDelegations } from "@/lib/api";
-import { useT } from "@/lib/i18n";
+import { useNum, useT } from "@/lib/i18n";
 
 /**
  * What splitting the work actually saved, measured against what one agent would have cost.
@@ -28,6 +28,7 @@ import { useT } from "@/lib/i18n";
  */
 export function DelegationSavings() {
   const t = useT();
+  const num = useNum();
   const { data } = useQuery({ queryKey: ["delegations"], queryFn: getDelegations });
   const summary = data?.summary;
 
@@ -49,7 +50,7 @@ export function DelegationSavings() {
 
       <p className={tokens < 0 ? "text-xs text-warn-foreground" : "text-xs text-foreground"}>
         {t(tokens < 0 ? "orch.saving.tokensMore" : "orch.saving.tokens", {
-          n: Math.abs(tokens).toLocaleString(),
+          n: num(Math.abs(tokens)),
           runs: summary.n,
         })}
       </p>

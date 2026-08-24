@@ -87,8 +87,13 @@ const COLUMNS = [
     what: "the file viewer",
     file: join("components", "Code.tsx"),
     marker: "lg:w-[28rem]",
-    must: ["min-w-0", "shrink-0", "min-h-0"],
-    mustNot: ["flex-1"],
+    // `flex-1` WITHOUT a breakpoint would be wrong, and `flex-1` with `lg:flex-none` is the only
+    // way to be right on both axes: below `lg` the row is a column and the viewer must fill the
+    // height it is given and scroll inside; from `lg` up the row is a row and it must hold 28rem.
+    // Written as `shrink-0` alone it grew to its content height when stacked — 2273px in a 774px
+    // row — and the shell scrolled.
+    must: ["min-w-0", "min-h-0", "flex-1", "lg:flex-none", "lg:shrink-0"],
+    mustNot: [],
   },
   {
     what: "the conversation's inner column",
@@ -118,16 +123,40 @@ describe("the Code screen's three columns", () => {
     for (const cls of must) expect(line, `missing ${cls}`).toContain(cls);
   });
 
+  it("the stacked layout gives the conversation a real share", () => {
+    // Below `lg` the row is a COLUMN. Measured at 1000x900 before this rule, with a project and a
+    // file open: aside 968 tall, conversation height 0 at y=1068 — off a 900px window — viewer 2273,
+    // and the shell scrolled to 3341. Everything that is correct on the horizontal axis (`shrink-0`
+    // on a fixed rail and a fixed panel) is wrong on the vertical one, where it reads "do not shrink
+    // my height".
+    //
+    // Three panes do not fit: the conversation needs ~368px for its composer and header alone, and
+    // capping all three to make room left it 161 and overflowing. So below `lg` there are two: the
+    // capped rail, and EITHER the conversation OR the viewer.
+    const rail = columnLine(join("components", "code", "SessionSidebar.tsx"), "<aside className=");
+    expect(rail, "the rail must be capped while stacked").toContain("max-h-40");
+    expect(rail, "and uncapped once it is a column again").toContain("lg:max-h-none");
+
+    const source = readFileSync(join(SRC, "components", "Code.tsx"), "utf8");
+    expect(
+      /openFile && "max-lg:hidden"/.test(source),
+      "the conversation must yield to the viewer while stacked",
+    ).toBe(true);
+  });
+
   it("has exactly one column that grows", () => {
     // The property the whole layout rests on. Two growing columns is how the row stops having a
     // single answer to "who gives ground", and one is how the file viewer ended up at 0.67px.
     const growers = COLUMNS.filter((c) => {
       const line = columnLine(c.file, c.marker);
-      return /\bflex-1\b/.test(line) && !/\bshrink-0\b/.test(line);
+      // Growing on the HORIZONTAL axis, which is the row from `lg` up. A `flex-1` that is
+      // cancelled by `lg:flex-none` grows only while stacked, and that is a different question.
+      return /flex-1/.test(line) && !/shrink-0/.test(line) || /flex-1/.test(line) && /lg:flex-none/.test(line);
     });
 
     expect(growers.map((c) => c.what)).toEqual([
       "the conversation — the column that absorbs",
+      "the file viewer",
       "the conversation's inner column",
     ]);
   });
