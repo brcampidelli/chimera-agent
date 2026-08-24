@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { ChevronUp, Folder, Loader2 } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronUp, Folder, FolderPlus, Loader2 } from "lucide-react";
 
-import { browseDirs } from "@/lib/api";
+import { browseDirs, makeDir } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/i18n";
 
@@ -29,7 +29,26 @@ export function ProjectPicker({
 }) {
   const t = useT();
   const [at, setAt] = useState("");
+  // The name being typed, or null when the field is closed. Not a boolean plus a string: "closed"
+  // and "open and empty" are different states and only one of them should render a field.
+  const [naming, setNaming] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const qc = useQueryClient();
   const q = useQuery({ queryKey: ["fs-browse", at], queryFn: () => browseDirs(at) });
+  const create = useMutation({
+    mutationFn: (name: string) => makeDir(q.data?.path ?? at, name),
+    // Straight into the folder that was just made. Creating one and staying in the parent means
+    // the next click is "Use this folder" on the WRONG folder — the one the new one is inside.
+    onSuccess: (made) => {
+      setNaming(null);
+      setFailed(false);
+      void qc.invalidateQueries({ queryKey: ["fs-browse"] });
+      setAt(made.path);
+    },
+    // The server refuses a name that cannot be a folder, and the reason belongs on screen: a
+    // silent no-op reads as a broken button, and the fix is one character away.
+    onError: () => setFailed(true),
+  });
 
   return (
     <div className="flex max-h-80 w-full max-w-lg flex-col rounded-chip border border-border bg-surface-2 shadow-lg">
@@ -78,9 +97,56 @@ export function ProjectPicker({
         ) : null}
       </div>
 
+      {naming !== null ? (
+        <form
+          className="flex items-center gap-2 border-t border-hairline px-3 py-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (naming.trim()) create.mutate(naming.trim());
+          }}
+        >
+          <input
+            autoFocus
+            aria-label={t("code.picker.newFolderName")}
+            placeholder={t("code.picker.newFolderName")}
+            className="field h-8 min-w-0 flex-1 px-2 text-sm"
+            value={naming}
+            onChange={(e) => {
+              setNaming(e.target.value);
+              setFailed(false);
+            }}
+            onKeyDown={(e) => e.key === "Escape" && setNaming(null)}
+          />
+          <Button size="sm" type="submit" disabled={!naming.trim() || create.isPending}>
+            {t("code.picker.create")}
+          </Button>
+          <Button size="sm" variant="ghost" type="button" onClick={() => setNaming(null)}>
+            {t("code.picker.cancel")}
+          </Button>
+        </form>
+      ) : null}
+      {failed ? (
+        <p className="px-3 pb-2 text-xs text-bad-foreground">{t("code.picker.newFolderFailed")}</p>
+      ) : null}
+
       <div className="flex items-center gap-2 border-t border-hairline px-3 py-2">
         <Button size="sm" onClick={() => onPick(q.data?.path ?? "")} disabled={!q.data}>
           {t("code.picker.useThis")}
+        </Button>
+        {/* The gap this picker had: it could only SELECT, so a new project began in Explorer — and
+            the folder people then picked was often the wrong one, because the right one did not
+            exist yet. */}
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            setNaming("");
+            setFailed(false);
+          }}
+          disabled={!q.data}
+        >
+          <FolderPlus className="mr-1 h-3.5 w-3.5" />
+          {t("code.picker.newFolder")}
         </Button>
         <Button size="sm" variant="ghost" onClick={onCancel}>
           {t("code.picker.cancel")}

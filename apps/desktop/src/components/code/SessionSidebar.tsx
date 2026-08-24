@@ -8,10 +8,13 @@ import {
   FolderPlus,
   Pencil,
   Plus,
+  Trash2,
   X,
 } from "lucide-react";
 
 import {
+  deleteCodeProject,
+  deleteCodeSession,
   forkCodeSession,
   getCodeSessionRaw,
   listCodeSessions,
@@ -87,6 +90,12 @@ export function SessionSidebar({
   const [renaming, setRenaming] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState("");
   const [inspecting, setInspecting] = useState<CodeSessionMeta | null>(null);
+  // What a confirmation is being asked about. One state for both kinds, because only one dialog can
+  // be open — and holding the OBJECT rather than a boolean is what lets the dialog name the thing
+  // and count it, instead of asking "are you sure?" about nothing in particular.
+  const [confirming, setConfirming] = useState<
+    { kind: "session"; session: CodeSessionMeta } | { kind: "project"; project: string; n: number } | null
+  >(null);
   const groups = groupByProject(q.data ?? [], registered);
 
   const fork = useMutation({
@@ -97,6 +106,18 @@ export function SessionSidebar({
       // thing they typed landed in the conversation they were trying to leave alone — which is the
       // one outcome duplicating exists to prevent.
       onResume(branch);
+    },
+  });
+  const remove = useMutation({
+    mutationFn: async (target: NonNullable<typeof confirming>) =>
+      target.kind === "session"
+        ? deleteCodeSession(target.session.id)
+        : deleteCodeProject(target.project),
+    // Closed on settle, not on success: a delete that failed leaves the row on screen, and a dialog
+    // that stays open over it reads as "still working" for something that already stopped.
+    onSettled: () => {
+      setConfirming(null);
+      qc.invalidateQueries({ queryKey: ["code-sessions"] });
     },
   });
   const raw = useQuery({
@@ -240,6 +261,22 @@ export function SessionSidebar({
                       <Pencil className="h-3 w-3" />
                     </button>
                   ) : null}
+                  {/* Also not for the default group: it is where conversations with no project
+                      land, so "delete it" would mean deleting the ones nobody filed. */}
+                  {project ? (
+                    <button
+                      type="button"
+                      aria-label={t("code.projects.deleteOne", {
+                        name: projectLabel(project, aliases),
+                      })}
+                      className="px-2 text-muted-foreground opacity-0 hover:text-bad-foreground focus:opacity-100 group-hover/project:opacity-100"
+                      onClick={() =>
+                        setConfirming({ kind: "project", project, n: sessions.length })
+                      }
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  ) : null}
                 </div>
               )}
               {sessions.map((session) => (
@@ -281,6 +318,19 @@ export function SessionSidebar({
                   >
                     <Braces className="h-3 w-3" />
                   </button>
+                  {/* Deleting a conversation has existed on the server since the list did, and
+                      reached the screen only as "Clear" — which acts on the conversation you have
+                      OPEN. Every other row was permanent. */}
+                  <button
+                    type="button"
+                    aria-label={t("code.sessions.deleteOne", {
+                      name: session.title || t("code.sessions.untitled"),
+                    })}
+                    className="px-2 text-muted-foreground opacity-0 hover:text-bad-foreground focus:opacity-100 group-hover/session:opacity-100"
+                    onClick={() => setConfirming({ kind: "session", session })}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
                 </div>
               ))}
             </div>
@@ -310,6 +360,44 @@ export function SessionSidebar({
             {t("code.sessions.jsonBytes", { n: raw.data.bytes })}
           </p>
         ) : null}
+      </Dialog>
+
+      {/* One dialog for both, because only one can be open — and it NAMES what it is about.
+          "Are you sure?" over an unnamed thing is how a person deletes the wrong row.
+
+          The project body says the folder is untouched, out loud, because "delete the project" has
+          an obvious wrong reading and the moment to correct it is before the click, not in a
+          release note. */}
+      <Dialog
+        open={confirming !== null}
+        onOpenChange={(next) => !next && setConfirming(null)}
+        title={
+          confirming?.kind === "project"
+            ? t("code.projects.deleteTitle", { n: confirming.n })
+            : t("code.sessions.deleteTitle", {
+                name: confirming?.kind === "session"
+                  ? confirming.session.title || t("code.sessions.untitled")
+                  : "",
+              })
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          {confirming?.kind === "project"
+            ? t("code.projects.deleteBody")
+            : t("code.sessions.deleteBody")}
+        </p>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={() => setConfirming(null)}>
+            {t("common.cancel")}
+          </Button>
+          <Button
+            size="sm"
+            disabled={remove.isPending}
+            onClick={() => confirming && remove.mutate(confirming)}
+          >
+            {t("common.delete")}
+          </Button>
+        </div>
       </Dialog>
     </aside>
   );

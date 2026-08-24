@@ -296,6 +296,26 @@ class CodeSessionStore:
         path.unlink()
         return True
 
+    def delete_project(self, workspace: str) -> int:
+        """Forget every conversation filed under one project, and return how many went.
+
+        **The folder on disk is not touched.** A "project" here is a grouping: the sidebar files
+        conversations by the workspace each one recorded, and nothing else about it is stored. So
+        the only thing there is to delete is the transcripts, and deleting the user's source code
+        because they tidied a sidebar is not a behaviour that gets a second chance to be wrong.
+
+        Matched EXACTLY against the stored string, because that is what the list groups by: two
+        spellings of the same folder show as two rows, and this must remove the row that was
+        clicked rather than everything that resolves to the same place.
+        """
+        if not workspace.strip() or not self.root.is_dir():
+            return 0
+        gone = 0
+        for meta in self.list_meta():
+            if meta["workspace"] == workspace:
+                gone += int(self.delete(str(meta["id"])))
+        return gone
+
     def fork(self, session_id: str) -> str | None:
         """Copy a stored conversation to a new id and return it, or ``None`` if there is none.
 

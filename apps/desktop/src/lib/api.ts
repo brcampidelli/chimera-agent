@@ -1137,6 +1137,17 @@ export const browseDirs = (path: string) =>
     `/api/fs/browse?path=${encodeURIComponent(path)}`,
   );
 
+/** Create one folder inside `parent`, so starting a project does not mean leaving for Explorer.
+ *
+ * `created` is false when the folder was already there, which is not an error — the request was
+ * "make me this folder" and it is already true. The screen just must not claim it made one.
+ */
+export const makeDir = (parent: string, name: string) =>
+  json<{ path: string; created: boolean }>("/api/fs/dir", {
+    method: "POST",
+    body: JSON.stringify({ parent, name }),
+  });
+
 /** A stored conversation, already folded into exchanges by the backend.
  *
  * The fold (model messages → "I asked this, it did these things, it answered that") lives on the
@@ -1162,6 +1173,17 @@ export const getCodeSession = (sessionId: string) =>
  *  state a second click on Clear hits. */
 export const deleteCodeSession = (sessionId: string) =>
   json<{ ok: boolean }>(`/api/code/sessions/${encodeURIComponent(sessionId)}`, {
+    method: "DELETE",
+  });
+
+/** Forget every conversation filed under one project, and learn how many went.
+ *
+ * The FOLDER is not touched — a project is a grouping of conversations by the workspace each one
+ * recorded, and that grouping is the only thing that exists to delete. The count comes back so the
+ * screen can say what happened rather than reporting a success with no size.
+ */
+export const deleteCodeProject = (workspace: string) =>
+  json<{ deleted: number }>(`/api/code/projects?workspace=${encodeURIComponent(workspace)}`, {
     method: "DELETE",
   });
 

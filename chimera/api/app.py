@@ -61,6 +61,8 @@ from chimera.api.schemas import (
     FsBrowseOut,
     FsFileOut,
     FsFileWrittenOut,
+    FsMadeDirOut,
+    FsMakeDirIn,
     FsTreeOut,
     GitCommitOut,
     GitDiffOut,
@@ -1098,6 +1100,24 @@ def build_api_app(
         from chimera.api.fs_api import browse_dirs
 
         return browse_dirs(path)
+
+    @app.post("/api/fs/dir", dependencies=[guard], response_model=FsMadeDirOut)
+    def fs_make_dir_endpoint(body: FsMakeDirIn) -> dict[str, Any]:
+        """Create one folder, so starting a project does not mean leaving the app for Explorer.
+
+        The picker beside this could only ever SELECT, which meant a new project began somewhere
+        else — and the folder people then picked was often the wrong one, because the right one did
+        not exist yet.
+
+        A POST where the rest of the browsing path is GETs, and the guarding is in `make_dir`: one
+        segment, no separators, checked again after resolving, and `mkdir` rather than `mkdir -p`.
+        """
+        from chimera.api.fs_api import make_dir
+
+        try:
+            return make_dir(body.parent, body.name)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.get("/api/fs/tree", dependencies=[guard], response_model=FsTreeOut)
     def fs_tree_endpoint(path: str = "", workspace: str | None = None) -> dict[str, Any]:

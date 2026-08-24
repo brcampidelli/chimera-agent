@@ -83,6 +83,40 @@ class TranscriptOut(BaseModel):
     note: str = ""
 
 
+class FsMakeDirIn(BaseModel):
+    """Where to create a folder, and what to call it.
+
+    Two fields rather than one path, deliberately: a single string would put the whole guard on
+    parsing, and the parent is not the caller's to choose freely — it is the folder the picker is
+    already showing.
+    """
+
+    parent: str
+    name: str
+
+
+class FsMadeDirOut(BaseModel):
+    """The folder, and whether this call is what made it.
+
+    An existing folder is not an error — it is the answer, already true — but the screen should not
+    say "created" about something that was already there.
+    """
+
+    path: str
+    created: bool
+
+
+class DeletedCountOut(BaseModel):
+    """How many records a delete actually removed.
+
+    Distinct from :class:`DeletedOut`, which is a boolean and right for deleting ONE thing by id.
+    A bulk delete has a third answer those two cannot tell apart: "the project was already empty"
+    and "seven conversations are gone" are different sentences for the person who clicked.
+    """
+
+    deleted: int
+
+
 class CodeSessionMetaOut(BaseModel):
     """One row of the coding-conversation list.
 

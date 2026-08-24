@@ -62,6 +62,7 @@ from chimera.api.schemas import (
     CodeSessionMetaOut,
     CodeSessionOut,
     CodeSessionRawOut,
+    DeletedCountOut,
     DictationOut,
     TranscriptOut,
     VisionOut,
@@ -1422,3 +1423,14 @@ def register_code_api(
             return {"ok": store.delete(session_id)}
         except ValueError:
             return {"ok": False}
+
+    @app.delete("/api/code/projects", dependencies=[guard], response_model=DeletedCountOut)
+    def delete_code_project(workspace: str) -> dict[str, int]:
+        """Forget every conversation filed under one project. **The folder is not touched.**
+
+        A project is a grouping and nothing more: the sidebar files conversations by the workspace
+        each recorded, and no other record of one exists. So "delete the project" can only honestly
+        mean the transcripts — and the count comes back so the screen can say how many went rather
+        than reporting a success with no size.
+        """
+        return {"deleted": store.delete_project(workspace)}

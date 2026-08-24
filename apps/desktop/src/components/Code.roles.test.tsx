@@ -72,6 +72,60 @@ describe("Code — the routing profile is choosable", () => {
 });
 
 /**
+ * The per-role pickers, on the screen that had them rendered read-only.
+ *
+ * `RolesBar` shows the profile's tiers as plain text unless the caller passes `override` and
+ * `onOverride` — its own doc says so. The Runs screen passed them and the Code screen did not, so
+ * the identical bar was editable on one screen and a label on the other, with the backend field
+ * (`CodeSeams.roles`) accepting the choice all along.
+ *
+ * Both halves matter and only one is visible: rendering the pickers without sending what they
+ * choose is worse than not having them, because the screen would then report a routing decision
+ * that the run does not make.
+ */
+describe("Code — a model can be chosen per role", () => {
+  beforeEach(() => {
+    vi.mocked(getFsTree).mockResolvedValue(emptyTree());
+    vi.mocked(getGitStatus).mockResolvedValue(gitStatus());
+    vi.mocked(getPostureFacts).mockResolvedValue(postureFacts());
+    vi.mocked(getRuns).mockResolvedValue([]);
+    vi.mocked(getRoleModels).mockResolvedValue({
+      explore: "openrouter/weak",
+      plan: "openrouter/top",
+      edit: "openrouter/mid",
+      review: "openrouter/top",
+      fuse_plan: false,
+      fuse_review: false,
+    } as never);
+  });
+
+  async function abrirOsPapeis() {
+    const user = userEvent.setup();
+    renderWithProviders(<Code />);
+    await screen.findByRole("button", { name: "balanced" });
+    const disclosure = screen.getByText(/which model does what|qual modelo faz o qu/i);
+    await user.click(disclosure);
+    return user;
+  }
+
+  it("offers a picker per role instead of printing the tier", async () => {
+    await abrirOsPapeis();
+
+    // One picker per role that CAN take a model — they read "default · {model}" until something is
+    // chosen. Four, not five: Verify has none on purpose, because it runs the user's command and a
+    // field there would imply a choice exists.
+    const pickers = screen.getAllByRole("button", { name: /default ·|padrão ·/i });
+    expect(pickers.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("offers the one-model shortcut", async () => {
+    await abrirOsPapeis();
+
+    expect(screen.getByRole("checkbox", { name: /one model|um modelo/i })).toBeTruthy();
+  });
+});
+
+/**
  * The other half of the same finding: `PostureBar`, 210 lines, also rendered by nothing.
  *
  * Deleted rather than placed. The Settings screen already carries reach and approval, `PostureNote`

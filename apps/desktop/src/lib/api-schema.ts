@@ -173,6 +173,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Code Project
+         * @description Forget every conversation filed under one project. **The folder is not touched.**
+         *
+         *     A project is a grouping and nothing more: the sidebar files conversations by the workspace
+         *     each recorded, and no other record of one exists. So "delete the project" can only honestly
+         *     mean the transcripts — and the count comes back so the screen can say how many went rather
+         *     than reporting a success with no size.
+         */
+        delete: operations["delete_code_project_api_code_projects_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/revert/{token}": {
         parameters: {
             query?: never;
@@ -633,6 +658,33 @@ export interface paths {
         get: operations["fs_browse_endpoint_api_fs_browse_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/fs/dir": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fs Make Dir Endpoint
+         * @description Create one folder, so starting a project does not mean leaving the app for Explorer.
+         *
+         *     The picker beside this could only ever SELECT, which meant a new project began somewhere
+         *     else — and the folder people then picked was often the wrong one, because the right one did
+         *     not exist yet.
+         *
+         *     A POST where the rest of the browsing path is GETs, and the guarding is in `make_dir`: one
+         *     segment, no separators, checked again after resolving, and `mkdir` rather than `mkdir -p`.
+         */
+        post: operations["fs_make_dir_endpoint_api_fs_dir_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3356,6 +3408,18 @@ export interface components {
         DelegationsOut: {
             summary: components["schemas"]["DelegationSummaryOut"];
         };
+        /**
+         * DeletedCountOut
+         * @description How many records a delete actually removed.
+         *
+         *     Distinct from :class:`DeletedOut`, which is a boolean and right for deleting ONE thing by id.
+         *     A bulk delete has a third answer those two cannot tell apart: "the project was already empty"
+         *     and "seven conversations are gone" are different sentences for the person who clicked.
+         */
+        DeletedCountOut: {
+            /** Deleted */
+            deleted: number;
+        };
         /** DeletedOut */
         DeletedOut: {
             /** Deleted */
@@ -3597,6 +3661,33 @@ export interface components {
             bytes: number;
             /** Path */
             path: string;
+        };
+        /**
+         * FsMadeDirOut
+         * @description The folder, and whether this call is what made it.
+         *
+         *     An existing folder is not an error — it is the answer, already true — but the screen should not
+         *     say "created" about something that was already there.
+         */
+        FsMadeDirOut: {
+            /** Created */
+            created: boolean;
+            /** Path */
+            path: string;
+        };
+        /**
+         * FsMakeDirIn
+         * @description Where to create a folder, and what to call it.
+         *
+         *     Two fields rather than one path, deliberately: a single string would put the whole guard on
+         *     parsing, and the parent is not the caller's to choose freely — it is the folder the picker is
+         *     already showing.
+         */
+        FsMakeDirIn: {
+            /** Name */
+            name: string;
+            /** Parent */
+            parent: string;
         };
         /** FsNodeOut */
         FsNodeOut: {
@@ -5706,6 +5797,37 @@ export interface operations {
             };
         };
     };
+    delete_code_project_api_code_projects_delete: {
+        parameters: {
+            query: {
+                workspace: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletedCountOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     revert_turn_api_code_revert__token__post: {
         parameters: {
             query?: never;
@@ -6427,6 +6549,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FsBrowseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fs_make_dir_endpoint_api_fs_dir_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FsMakeDirIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FsMadeDirOut"];
                 };
             };
             /** @description Validation Error */

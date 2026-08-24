@@ -155,7 +155,11 @@ export function RolesBar({
           value={pick.value[role]}
           onChange={(slug) => pick.set({ ...pick.value, [role]: slug })}
           fallback={resolved[role] ?? ""}
+          // `label` stays null — the row already prints the role beside this, and a second copy
+          // would be noise. `name` is a different thing: the button's ACCESSIBLE name, which was
+          // "default · x" on all four, so by name alone they were four identical controls.
           label={null}
+          name={t(ROLE_KEY[role])}
           disabled={disabled}
         />
       ) : (

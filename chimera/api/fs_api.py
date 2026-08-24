@@ -221,3 +221,54 @@ def browse_dirs(path: str, *, max_entries: int = 300) -> dict[str, Any]:
         entries = [{"name": c.name, "path": str(c)} for c in children]
     parent = str(root.parent) if root.parent != root else ""
     return {"path": str(root), "parent": parent, "entries": entries, "capped": capped}
+
+
+#: Names Windows refuses whatever the extension, and which fail in ways that do not look like a
+#: bad name — a device, not a file. Checked on every platform: a folder made on Linux and synced
+#: to Windows is somebody's Monday morning.
+_RESERVED = frozenset(
+    {"con", "prn", "aux", "nul"}
+    | {f"com{i}" for i in range(1, 10)}
+    | {f"lpt{i}" for i in range(1, 10)}
+)
+
+
+def make_dir(parent: str, name: str) -> dict[str, Any]:
+    """Create ONE folder inside ``parent`` so a project can be started without leaving the app.
+
+    A write, where everything else on this browsing path is a read, so the name is treated as
+    hostile even though the only caller is a text field on localhost:
+
+    * **One segment.** Any separator, any drive letter, `.` or `..` — refused. The folder is
+      created with ``mkdir``, never ``mkdir -p``, so even a name that slipped through could not
+      build a tree.
+    * **Checked after resolving too**, because the rules above are about strings and the filesystem
+      has the last word: a name that resolves anywhere but a direct child of ``parent`` is refused.
+    * **Reserved device names refused** on every platform, not only Windows.
+    * **The parent must already exist.** This creates a folder, not a path.
+
+    An existing folder is not an error — it is the answer to "make me this folder", already true.
+    ``created`` says which happened so the screen can be honest about it.
+    """
+    limpo = name.strip().rstrip(". ")
+    if not limpo or limpo in {".", ".."} or limpo.lower() in _RESERVED:
+        raise ValueError("invalid folder name")
+    if any(sep in limpo for sep in ("/", "\\", ":")) or limpo.startswith("."):
+        raise ValueError("invalid folder name")
+    base = Path(parent).expanduser()
+    try:
+        base = base.resolve()
+    except OSError as exc:
+        raise ValueError("invalid parent") from exc
+    if not base.is_dir():
+        raise ValueError("invalid parent")
+    alvo = (base / limpo).resolve()
+    if alvo.parent != base:
+        raise ValueError("invalid folder name")
+    if alvo.is_dir():
+        return {"path": str(alvo), "created": False}
+    try:
+        alvo.mkdir()
+    except OSError as exc:
+        raise ValueError("could not create the folder") from exc
+    return {"path": str(alvo), "created": True}

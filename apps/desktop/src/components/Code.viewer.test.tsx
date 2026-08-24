@@ -51,6 +51,9 @@ async function openFile(file: FsFile = fsFile(), path = "src/app.py") {
   return user;
 }
 
+// `/^Edit$/` rather than `/Edit/`: the composer strip now carries a model picker per role, and the
+// one for the Edit role is named "Edit: default · x". Unanchored, this matched both and failed in a
+// way that reads like the viewer broke.
 describe("Code — the file viewer", () => {
   beforeEach(() => {
     vi.mocked(getPostureFacts).mockResolvedValue(postureFacts());
@@ -63,7 +66,7 @@ describe("Code — the file viewer", () => {
   it("opens a file read-only, with no editor until Edit is clicked", async () => {
     await openFile();
 
-    expect(await screen.findByRole("button", { name: /Edit/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /^Edit$/ })).toBeInTheDocument();
     // The file's real content is rendered (highlighted) — not loaded into an editable field.
     expect(screen.getByText(/print/)).toBeInTheDocument();
     expect(screen.queryByDisplayValue(LOADED)).not.toBeInTheDocument();
@@ -73,7 +76,7 @@ describe("Code — the file viewer", () => {
   it("swaps in an editor holding the loaded content when Edit is clicked", async () => {
     const user = await openFile();
 
-    await user.click(await screen.findByRole("button", { name: /Edit/ }));
+    await user.click(await screen.findByRole("button", { name: /^Edit$/ }));
 
     expect(editorOf()).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Save/ })).toBeInTheDocument();
@@ -82,7 +85,7 @@ describe("Code — the file viewer", () => {
   it("saves the draft to the open workspace path and leaves edit mode", async () => {
     const user = await openFile();
 
-    await user.click(await screen.findByRole("button", { name: /Edit/ }));
+    await user.click(await screen.findByRole("button", { name: /^Edit$/ }));
     const editor = editorOf();
     await user.clear(editor);
     await user.type(editor, "print('bye')");
@@ -90,14 +93,14 @@ describe("Code — the file viewer", () => {
 
     await waitFor(() => expect(saveFile).toHaveBeenCalledWith(null, "src/app.py", "print('bye')"));
     // Edit mode is left (Edit is offered again) and the save is honestly acknowledged.
-    expect(await screen.findByRole("button", { name: /Edit/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /^Edit$/ })).toBeInTheDocument();
     expect(screen.getByText("Saved.")).toBeInTheDocument();
   });
 
   it("marks the draft unsaved only once it differs from the loaded content", async () => {
     const user = await openFile();
 
-    await user.click(await screen.findByRole("button", { name: /Edit/ }));
+    await user.click(await screen.findByRole("button", { name: /^Edit$/ }));
     // Freshly entered edit mode: the draft IS the file — nothing is unsaved yet.
     expect(screen.queryByText("unsaved")).not.toBeInTheDocument();
 
@@ -109,7 +112,7 @@ describe("Code — the file viewer", () => {
   it("refuses to save a draft identical to the file on disk", async () => {
     const user = await openFile();
 
-    await user.click(await screen.findByRole("button", { name: /Edit/ }));
+    await user.click(await screen.findByRole("button", { name: /^Edit$/ }));
 
     expect(screen.getByRole("button", { name: /Save/ })).toBeDisabled();
     expect(saveFile).not.toHaveBeenCalled();
@@ -118,7 +121,7 @@ describe("Code — the file viewer", () => {
   it("reverts the draft on Discard without writing anything", async () => {
     const user = await openFile();
 
-    await user.click(await screen.findByRole("button", { name: /Edit/ }));
+    await user.click(await screen.findByRole("button", { name: /^Edit$/ }));
     await user.type(editorOf(), "# throwaway");
     await screen.findByText("unsaved");
     await user.click(screen.getByRole("button", { name: /Discard/ }));
@@ -126,7 +129,7 @@ describe("Code — the file viewer", () => {
     expect(saveFile).not.toHaveBeenCalled();
     expect(screen.queryByText("unsaved")).not.toBeInTheDocument();
     // Back to the read-only view of the untouched file — the throwaway draft is gone.
-    expect(await screen.findByRole("button", { name: /Edit/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /^Edit$/ })).toBeInTheDocument();
     expect(screen.queryByDisplayValue(/# throwaway/)).not.toBeInTheDocument();
   });
 
@@ -134,14 +137,14 @@ describe("Code — the file viewer", () => {
     await openFile(fsFile({ truncated: true }));
 
     expect(await screen.findByText("truncated")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Edit/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Edit$/ })).not.toBeInTheDocument();
   });
 
   it("does not offer to edit a binary file, and says why it isn't shown", async () => {
     await openFile(fsFile({ note: "binary", content: "" }));
 
     expect(await screen.findByText("Binary or non-text file — not shown.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Edit/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Edit$/ })).not.toBeInTheDocument();
   });
 
   it("shows the chart the agent drew, instead of calling it a binary file", async () => {
@@ -177,7 +180,7 @@ describe("Code — the file viewer", () => {
     vi.mocked(saveFile).mockRejectedValue(new Error("413 too large"));
     const user = await openFile();
 
-    await user.click(await screen.findByRole("button", { name: /Edit/ }));
+    await user.click(await screen.findByRole("button", { name: /^Edit$/ }));
     await user.type(editorOf(), "# more");
     await user.click(screen.getByRole("button", { name: /Save/ }));
 
@@ -192,7 +195,7 @@ describe("Code — the file viewer", () => {
   it("warns while editing that a save cannot be undone", async () => {
     const user = await openFile();
 
-    await user.click(await screen.findByRole("button", { name: /Edit/ }));
+    await user.click(await screen.findByRole("button", { name: /^Edit$/ }));
 
     expect(
       screen.getByText("No undo after save (unless this folder is a git repo you commit)."),
