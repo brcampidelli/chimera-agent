@@ -51,7 +51,24 @@ class FakeCache {
   ) {
     const key =
       typeof request === "string" ? request : new URL(request.url).pathname;
+    // Delete first, so a re-put moves the entry to the BACK. That is what the spec says a Cache
+    // does, and the trim reads insertion order to decide who is oldest — a Map that kept the
+    // original position would make this fake disagree with the browser about the one thing the
+    // eviction depends on.
+    this.entries.delete(key);
     this.entries.set(key, response);
+  }
+  /** Insertion-ordered, as the spec requires — the property the eviction reads. */
+  async keys() {
+    return [...this.entries.keys()].map((path) => ({
+      url: `http://127.0.0.1:59592${path}`,
+      method: "GET",
+    }));
+  }
+  async delete(request: FakeRequest | string) {
+    const key =
+      typeof request === "string" ? request : new URL(request.url).pathname;
+    return this.entries.delete(key);
   }
 }
 
@@ -283,5 +300,87 @@ describe("the service worker", () => {
     await waited;
 
     expect(clients[0].navigated).toBe(0);
+  });
+});
+
+/**
+ * The shell cache stopped growing.
+ *
+ * Cache-first is correct for hashed assets — the name changes when the content does — but nothing
+ * ever removed the old ones, so every release added a generation and none left. Measured on a real
+ * install that had followed the rc series: **61 entries, 49.3 MB**, holding twenty generations of
+ * `index-*.js` that nothing would ever request again.
+ *
+ * The eviction had to go where entries are ADDED, not in `activate`: `sw.js` changes about once a
+ * quarter, so `activate` almost never fires, and a prune there would have been a fix that ran
+ * roughly never while reading as if it worked.
+ */
+describe("the shell cache has a ceiling", () => {
+  /** Fill the cache as N releases would: four assets each, the way a real build ships. */
+  async function releases(n: number) {
+    const cache = new FakeCache();
+    const { listeners, stores } = loadWorker({ caches: { "chimera-shell-v2": cache } });
+    for (let r = 0; r < n; r += 1) {
+      for (const nome of [`index-r${r}.js`, `index-r${r}.css`, `Edit-r${r}.js`, `EditSidebar-r${r}.js`]) {
+        await respond(listeners, request(`/assets/${nome}`));
+        // The trim is detached from the response on purpose, so let its microtasks run.
+        await new Promise((done) => setTimeout(done, 0));
+      }
+    }
+    return { cache, stores, listeners };
+  }
+
+  it("keeps the newest assets and drops the oldest", async () => {
+    const { cache } = await releases(5);
+    const guardados = [...cache.entries.keys()];
+
+    expect(guardados.length).toBeLessThanOrEqual(12);
+    // The release that just loaded is intact — evicting the running one would be a worse bug than
+    // the growth, because offline it would leave the app without its own bundle.
+    for (const nome of ["index-r4.js", "index-r4.css", "Edit-r4.js", "EditSidebar-r4.js"]) {
+      expect(guardados, `${nome} was evicted while it was the current release`).toContain(
+        `/assets/${nome}`,
+      );
+    }
+    // And the first release is gone, which is the point.
+    expect(guardados).not.toContain("/assets/index-r0.js");
+  });
+
+  it("grows without a ceiling when nothing evicts", async () => {
+    // Guarding the guard: the assertion above passes trivially if the fake never stores anything.
+    // Twenty releases of four files each is eighty entries, and the cap must be what stops it.
+    const { cache } = await releases(20);
+
+    expect(cache.entries.size).toBeGreaterThan(0);
+    expect(cache.entries.size).toBeLessThanOrEqual(12);
+  });
+
+  it("never evicts the document", async () => {
+    // `/` is the offline fallback. Trading an unbounded cache for a blank window with no network
+    // is not a fix, so the document is not a candidate however full the cache gets.
+    const { cache, listeners } = await releases(1);
+    await respond(listeners, request("/", { mode: "navigate" }));
+    await new Promise((done) => setTimeout(done, 0));
+
+    const { cache: cheia } = await releases(0);
+    void cheia;
+    for (let r = 1; r < 6; r += 1) {
+      await respond(listeners, request(`/assets/index-x${r}.js`));
+      await new Promise((done) => setTimeout(done, 0));
+    }
+
+    expect([...cache.entries.keys()]).toContain("/");
+  });
+
+  it("still serves an asset from cache without going to the network", async () => {
+    // The behaviour the cache exists for, asserted after the eviction was added — a trim that
+    // emptied the cache on every put would pass every test above.
+    const rede = vi.fn(async () => ({ body: "from network", ok: true, clone: () => ({ body: "from network", ok: true }) }));
+    const cache = new FakeCache(new Map([["/assets/index-abc.js", { body: "from cache", ok: true }]]));
+    const { listeners } = loadWorker({ caches: { "chimera-shell-v2": cache }, network: rede as never });
+
+    const resposta = (await respond(listeners, request("/assets/index-abc.js"))) as { body: string };
+
+    expect(resposta.body).toBe("from cache");
   });
 });

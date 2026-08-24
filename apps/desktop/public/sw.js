@@ -15,6 +15,40 @@
 // for them and there is nothing to revalidate.
 const CACHE = "chimera-shell-v2";
 
+// How many hashed assets to keep. Cache-first is CORRECT for them — the name changes when the
+// content does — but nothing ever removed the old ones, so the cache grew by a release every
+// release and never shrank. Measured on a machine that had followed the rc series: 61 entries,
+// 49.3 MB, holding twenty generations of index-*.js nothing would ever ask for again.
+//
+// Twelve, because one release ships FOUR files under /assets (the bundle, the stylesheet and two
+// lazy chunks) totalling 3.1 MB. So this keeps three releases: the running one can never be the
+// victim, and the ceiling is ~10 MB instead of none.
+const MAX_ASSETS = 12;
+
+// One trim at a time. A page load puts several assets within milliseconds, and N trims each
+// computing a victim list from the same snapshot would each delete the same overshoot — N times.
+let trimming = null;
+
+function trimAssets(cache) {
+  if (trimming) return trimming;
+  trimming = (async () => {
+    // `keys()` is insertion-ordered, so the front of this list is the oldest — the previous
+    // releases. The document and the icon are deliberately not candidates: `/` is the offline
+    // fallback, and trading an unbounded cache for a blank window with no network is not a fix.
+    const assets = (await cache.keys()).filter((request) =>
+      new URL(request.url).pathname.startsWith("/assets/"),
+    );
+    for (const stale of assets.slice(0, Math.max(0, assets.length - MAX_ASSETS))) {
+      await cache.delete(stale);
+    }
+  })()
+    .catch(() => {})
+    .finally(() => {
+      trimming = null;
+    });
+  return trimming;
+}
+
 self.addEventListener("install", () => self.skipWaiting());
 
 self.addEventListener("activate", (event) =>
@@ -73,7 +107,14 @@ self.addEventListener("fetch", (event) => {
       const cached = await cache.match(event.request);
       const network = fetch(event.request)
         .then((resp) => {
-          if (resp && resp.ok) cache.put(event.request, resp.clone());
+          // Trimmed after the put, never before the response: this is housekeeping, and a user
+          // waiting on it would be paying for a problem that is not theirs. Detached on purpose —
+          // if the worker is killed mid-trim, the next asset put picks it up.
+          if (resp && resp.ok)
+            cache
+              .put(event.request, resp.clone())
+              .then(() => trimAssets(cache))
+              .catch(() => {});
           return resp;
         })
         .catch(() => cached);
