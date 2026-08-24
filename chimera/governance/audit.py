@@ -33,13 +33,17 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from chimera.core.filelock import locked
+
+_log = logging.getLogger(__name__)
 
 # Reserved on every entry; a payload may not override them, or the chain would be forgeable by the
 # caller that is supposed to be audited.
@@ -106,6 +110,22 @@ def _redacted(payload: dict[str, Any]) -> dict[str, Any]:
 #: larger than any entry written here — the kernel truncates ``action`` and ``reason`` to 200
 #: characters — so the loop below finds its newline on the first read in the ordinary case.
 _TAIL_CHUNK = 8192
+
+#: How many times `record` re-tries when the FILE lock could not be taken.
+#:
+#: `locked()` degrades rather than raising: on Windows `msvcrt.locking` retries for ~10s and then
+#: gives up, and the helper writes unlocked so a 24/7 process is never wedged. That is the right
+#: default for most callers and the wrong one here — two processes that both skip the lock read the
+#: same tail, claim the same `seq`, and chain onto the same `prev`. Caught as an intermittent CI
+#: failure: `seq duplicado: [0, 1, 2, 1, 2, 3, ...]`.
+#:
+#: Three attempts turn a ~10s window into ~30s of trying. It cannot close the hole — without a lock
+#: there is no way to make read-then-append atomic — but it makes losing the race require sustained
+#: contention rather than a moment of it.
+_LOCK_ATTEMPTS = 3
+
+#: Seconds between attempts, multiplied by the attempt number.
+_LOCK_BACKOFF_S = 0.25
 
 #: One lock per audit file per process, shared by every :class:`AuditLog` naming that file. Bounded
 #: by how many distinct audit files a process touches, never by how much it writes to them.
@@ -232,18 +252,42 @@ class AuditLog:
         # own thread. Holding the process lock first leaves the file lock arbitrating only BETWEEN
         # processes, which is the job it is good at and the one `chimera serve` needs: the cron
         # daemon and the HTTP gateway write this same file from different processes, all day.
-        with _process_lock(self.path), locked(self.path):
-            seq, prev = self._tail_state()
-            entry: dict[str, Any] = {"seq": seq, "type": event_type, **_redacted(payload)}
-            # Chain fields are written last on purpose: a payload cannot overwrite them.
-            entry["prev"] = prev
-            entry["hash"] = _digest(entry)
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            with self.path.open("a", encoding="utf-8") as handle:
-                handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
-            self._count = seq + 1
-            self._head = entry["hash"]
-        return entry
+        # Retry rather than accept the degraded write. `locked()` yields whether a real lock was
+        # taken precisely so a caller can react, and this is the caller that must: an unlocked
+        # append duplicates `seq` and breaks the chain, which the Security screen then reports as
+        # tampering on a log nobody touched.
+        #
+        # The last attempt writes ANYWAY. An audit log that silently drops entries under contention
+        # is worse than one with a break somebody can see and explain — a missing entry is never
+        # honest about itself, and a break at least is.
+        #
+        # Marking the entry and letting `verify` treat it as unchained was the other candidate and
+        # is worse: `unlocked: true` would become a field anyone can forge to make the chain restart
+        # wherever they want it to, which widens the one hatch the legacy path already opens.
+        for attempt in range(_LOCK_ATTEMPTS):
+            with _process_lock(self.path), locked(self.path) as got_lock:
+                if not got_lock and attempt < _LOCK_ATTEMPTS - 1:
+                    continue
+                if not got_lock:
+                    _log.error(
+                        "appending to %s WITHOUT the file lock after %d attempts; a concurrent "
+                        "writer can duplicate seq and break the chain here",
+                        self.path.name,
+                        _LOCK_ATTEMPTS,
+                    )
+                seq, prev = self._tail_state()
+                entry: dict[str, Any] = {"seq": seq, "type": event_type, **_redacted(payload)}
+                # Chain fields are written last on purpose: a payload cannot overwrite them.
+                entry["prev"] = prev
+                entry["hash"] = _digest(entry)
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                with self.path.open("a", encoding="utf-8") as handle:
+                    handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+                self._count = seq + 1
+                self._head = entry["hash"]
+                return entry
+            time.sleep(_LOCK_BACKOFF_S * (attempt + 1))
+        raise AssertionError("unreachable: the last attempt always writes")
 
     def entries(self) -> list[dict[str, Any]]:
         if not self.path.exists():
