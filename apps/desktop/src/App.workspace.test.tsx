@@ -106,6 +106,15 @@ afterEach(() => {
   window.location.hash = "";
 });
 
+/** The default one second is not enough on a loaded machine.
+ *
+ * These assertions are about ORDER — the LAST tree call must be the project chosen most
+ * recently — and they went from always green to mostly green purely because the suite grew:
+ * one failed inside a full run and passed alone and on the next run. So the clock is raised
+ * rather than the bar lowered; the last call still has to be the right project.
+ */
+const LENTO = { timeout: 5000 };
+
 describe("the project the editor works in", () => {
   it("is the one the chat screen last chose, not the one open at startup", async () => {
     // The app starts with one project…
@@ -120,13 +129,16 @@ describe("the project the editor works in", () => {
     window.location.hash = "#/edit";
     window.dispatchEvent(new HashChangeEvent("hashchange"));
 
-    await waitFor(() => {
-      const shown = vi
-        .mocked(getFsTree)
-        .mock.calls.map((call) => String(call[0]))
-        .filter((ws) => ws.startsWith("/projects/"));
-      expect(shown[shown.length - 1]).toBe("/projects/second");
-    });
+    await waitFor(
+      () => {
+        const shown = vi
+          .mocked(getFsTree)
+          .mock.calls.map((call) => String(call[0]))
+          .filter((ws) => ws.startsWith("/projects/"));
+        expect(shown[shown.length - 1]).toBe("/projects/second");
+      },
+      LENTO,
+    );
   });
 
   it("survives leaving the editor and coming back", async () => {
@@ -141,12 +153,15 @@ describe("the project the editor works in", () => {
 
     // Re-reading on the way in must not mean re-reading something stale: nothing wrote to storage
     // in between, so the folder is the same one both times.
-    await waitFor(() => {
-      const shown = vi
-        .mocked(getFsTree)
-        .mock.calls.map((call) => String(call[0]))
-        .filter((ws) => ws.startsWith("/projects/"));
-      expect(shown[shown.length - 1]).toBe("/projects/second");
-    });
+    await waitFor(
+      () => {
+        const shown = vi
+          .mocked(getFsTree)
+          .mock.calls.map((call) => String(call[0]))
+          .filter((ws) => ws.startsWith("/projects/"));
+        expect(shown[shown.length - 1]).toBe("/projects/second");
+      },
+      LENTO,
+    );
   });
 });
