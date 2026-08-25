@@ -142,3 +142,40 @@ describe("the installable-skills catalogue", () => {
     expect(screen.getByText(/Jim Liu/)).toBeInTheDocument();
   });
 });
+
+/**
+ * The card's own text sat flush against its border while its heading did not.
+ *
+ * `Panel` insets its TITLE BAR by `px-4` and gives its body nothing, so a panel whose content
+ * forgets to pad disagrees with its own heading by 16px. Measured in the running app before the
+ * fix: the title 17px from the panel's left edge, "82 disponíveis · 0 instaladas aqui" at 1px.
+ *
+ * Asserting a class rather than a position, because jsdom has no layout — but the class is the
+ * thing that was missing, and this is the panel it was missing from. The padding lives here rather
+ * than in `Panel` on purpose: the divider lines in a LIST panel are meant to run edge to edge, and
+ * padding the shared wrapper would inset those too.
+ *
+ * Worth recording how this was found, because it is the second lesson: three measurements were
+ * taken and the first two produced five false positives between them. Measuring the ELEMENT BOX
+ * called four correct panels broken; treating a full-bleed band as a leaf called a fifth broken.
+ * Only measuring where the GLYPHS are — `Range.getBoundingClientRect` over text nodes — agreed with
+ * what could be seen on screen, and it found exactly one defect.
+ */
+describe("SkillCatalog — the body is inset like its heading", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCatalog.mockResolvedValue([entry()]);
+  });
+
+  it("puts the content inside the panel's own margin", async () => {
+    const { container } = renderWithProviders(<SkillCatalog />);
+    await screen.findByText(/maps/);
+
+    const titulo = container.querySelector("h2");
+    const barra = titulo?.parentElement;
+    const corpo = barra?.nextElementSibling?.firstElementChild;
+
+    expect(barra?.className, "the title bar stopped carrying the inset this is measured against").toContain("px-4");
+    expect(corpo?.className, "the panel body is flush against the border again").toContain("px-4");
+  });
+});

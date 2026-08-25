@@ -197,6 +197,14 @@ export function SkillCatalog() {
 
   return (
     <Panel title={t("catalog.title")}>
+      {/* `Panel` insets its TITLE BAR by `px-4` and gives its body nothing, so a panel whose content
+          forgets to pad sits flush against the border while its own heading does not — a 16px
+          disagreement inside one card. Measured here before the fix: title 17px from the edge,
+          first paragraph 1px.
+
+          The body is padded here rather than in `Panel`, because the divider lines in a LIST panel
+          are meant to run edge to edge and padding the wrapper would inset those too. */}
+      <div className="px-4 py-3">
       <p className="mb-3 text-xs text-muted-foreground">
         {t("catalog.subtitle", { n: catalog.data?.length ?? 0, installed })}
       </p>
@@ -232,6 +240,7 @@ export function SkillCatalog() {
           </section>
         ))
       )}
+      </div>
     </Panel>
   );
 }

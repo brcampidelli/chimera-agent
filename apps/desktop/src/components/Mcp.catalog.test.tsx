@@ -117,13 +117,23 @@ describe("the MCP catalogue", () => {
     expect(usar, "the unavailable entry offered a button anyway").toHaveLength(1);
   });
 
-  it("keeps saying what actually limits each server", async () => {
-    // Not a "read-only" badge: for most of these the limit is the CREDENTIAL, and a one-word chip
-    // would say the opposite of the truth for the database entries.
+  it("keeps saying what actually limits each server, in the reader's language", async () => {
+    // Two things at once, and the second was a real defect: this screen printed the backend's
+    // ENGLISH onto a Portuguese page — the same mistake as the hardcoded "Close" in the dialog, one
+    // release earlier and one layer up. The catalogue carries machine facts; the sentences belong
+    // to the dictionary.
+    //
+    // So the assertion is not just "some containment text is present" — it is that the DICTIONARY's
+    // text is present and the backend's is not. The mocks below deliberately carry wording that
+    // appears in no dictionary, so a regression to `entry.containment` fails here.
     render();
 
-    expect(await screen.findByText(/token never reaches Chimera/i)).toBeInTheDocument();
+    expect(await screen.findByText(/never reaches disk or Chimera/i)).toBeInTheDocument();
     expect(screen.getByText(/a DROP runs/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/the token never reaches Chimera\.$/),
+      "the backend's own English reached the screen instead of the translation",
+    ).toBeNull();
   });
 
   it("does not present a stranger's server as the vendor's", async () => {
