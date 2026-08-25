@@ -22,7 +22,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
 
-from chimera.core.filelock import atomic_write_text, locked, read_text
+from chimera.core.filelock import atomic_write_text, exclusively, read_text
 from chimera.memory.models import MemoryItem, MemoryKind
 from chimera.telemetry import get_logger
 
@@ -92,7 +92,7 @@ class MemoryStore:
         This is the blunt form and it is kept for callers that hold the whole picture. It does
         **not** merge concurrent writes — use :meth:`add` / :meth:`remove`, which do.
         """
-        with self._lock, locked(self.path):
+        with self._lock, exclusively(self.path):
             self._write()
 
     def _mutate(self, apply: Callable[[dict[str, MemoryItem]], None]) -> None:
@@ -102,7 +102,7 @@ class MemoryStore:
         whatever the file held when this object was constructed, so a second writer's records
         vanish on the next save with nothing to show it happened.
         """
-        with self._lock, locked(self.path):
+        with self._lock, exclusively(self.path):
             self.load()
             apply(self._items)
             self._write()

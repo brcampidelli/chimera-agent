@@ -160,3 +160,54 @@ def locked(path: Path) -> Iterator[bool]:
             _release(handle)
     finally:
         handle.close()
+
+
+class LockUnavailable(OSError):
+    """The exclusive lock could not be taken within the retry budget.
+
+    An ``OSError`` so that a caller already handling I/O failures around a store catches it without
+    knowing this type exists; a distinct class so that one which wants to tell "the disk is full"
+    from "somebody else is writing" can.
+    """
+
+
+#: How many times :func:`exclusively` re-enters the lock before giving up, and the pause between
+#: attempts (multiplied by the attempt number).
+#:
+#: Three turns Windows' own ~10s wait into roughly thirty seconds of trying. The numbers match the
+#: audit log's, which arrived at them first and for the same reason — losing the race should require
+#: sustained contention rather than a moment of it.
+LOCK_ATTEMPTS = 3
+LOCK_BACKOFF_S = 0.25
+
+
+@contextmanager
+def exclusively(path: Path, *, attempts: int = LOCK_ATTEMPTS) -> Iterator[None]:
+    """Hold a REAL lock for ``path`` while the body runs, or raise :class:`LockUnavailable`.
+
+    :func:`locked` degrades: when the OS refuses the lock it runs the body unlocked and says so by
+    yielding ``False``. That is deliberate and right for a caller that would rather write than stop
+    — the audit log takes it, loudly, because a broken hash chain it can complain about beats a
+    wedged 24/7 process.
+
+    It is the wrong answer for a whole-file store, and that was measured rather than argued. Twelve
+    processes each adding twenty-five learned skills: ``locked`` yielded ``False`` two or three
+    times per run, every caller discarded that boolean, and two to five skills vanished — no error,
+    no warning the operator would see, and a rerun of the same commit passing cleanly. The CI
+    failure this chased read ``assert 49 == 50``.
+
+    So this retries, and then refuses. A caller that cannot get the lock has two honest options and
+    "write anyway" is not one of them: what it is about to lose is another process's record.
+    """
+    for attempt in range(attempts):
+        with locked(path) as got_lock:
+            if got_lock:
+                yield
+                return
+        # Outside the `with`, so the failed handle is closed before the next try.
+        if attempt < attempts - 1:
+            time.sleep(LOCK_BACKOFF_S * (attempt + 1))
+    raise LockUnavailable(
+        f"could not take the exclusive lock for {path.name} after {attempts} attempts; "
+        "another process is holding it. Nothing was written."
+    )

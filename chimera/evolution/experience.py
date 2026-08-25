@@ -28,7 +28,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ValidationError
 
-from chimera.core.filelock import atomic_write_text, locked, read_text
+from chimera.core.filelock import atomic_write_text, exclusively, read_text
 from chimera.telemetry import get_logger
 
 _log = get_logger("evolution.experience")
@@ -125,7 +125,7 @@ class ExperienceBuffer:
         The blunt form, kept for callers holding the whole picture: it does **not** merge concurrent
         writes. :meth:`record` does.
         """
-        with self._lock, locked(self.path):
+        with self._lock, exclusively(self.path):
             self._write()
 
     def record(self, task: str, outcome: Outcome, detail: str = "") -> Experience:
@@ -135,7 +135,7 @@ class ExperienceBuffer:
         runs the autonomous work in one process and an operator can run ``chimera`` in another, and
         without it whichever writes second republishes a snapshot from before the other started.
         """
-        with self._lock, locked(self.path):
+        with self._lock, exclusively(self.path):
             self.load()
             exp = Experience(seq=self._next_seq, task=task, outcome=outcome, detail=detail)
             self._next_seq += 1
