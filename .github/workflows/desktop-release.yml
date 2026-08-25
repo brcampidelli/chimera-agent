@@ -85,7 +85,13 @@ jobs:
           # complete ffmpeg — x264, x265, AV1 encoders — to decode microphone audio. A video codec
           # suite in every download so that dictation can avoid one API call is the wrong trade, and
           # on Linux the AppImage bundler then copies much of it a second time.
-          uv sync --extra desktop --extra documents --extra stt
+          # `mcp` ships too, and it is small (pure Python, no native code) — without it the MCP
+          # screen and its whole catalogue are decoration: every server fails to connect in the
+          # packaged app, and the failure reads as "did not become ready" rather than as a missing
+          # dependency. Verified by searching the frozen binary for the SDK's module names, with
+          # `chimera.integrations.mcp_client` and `litellm.utils` as controls to prove the search
+          # finds what IS there.
+          uv sync --extra desktop --extra documents --extra stt --extra mcp
           uv pip install pyinstaller
 
       - name: Freeze the backend sidecar
