@@ -49,10 +49,30 @@ def _settings(tmp_path, monkeypatch, servers: str) -> Settings:
 
 
 def test_a_server_that_cannot_start_says_what_went_wrong(tmp_path, monkeypatch, caplog) -> None:
-    """`command-that-does-not-exist` is the cheapest real failure, and it needs no SDK."""
-    settings = _settings(
-        tmp_path, monkeypatch, '[{"name": "quebrado", "command": "comando-que-nao-existe-mesmo", "args": []}]'
-    )
+    """End to end, through the real session — and the reason is ASKED FOR, not assumed.
+
+    A command that does not exist fails for one of two reasons depending on the machine: with the
+    SDK installed it is a `FileNotFoundError` naming the command; without it, the import guard fires
+    first and it is the sentence about the missing SDK. Both lines are correct.
+
+    The first draft asserted the command's name, which passed on a laptop where the optional
+    dependency happened to be installed and went red on all three CI Pythons where it is not — a
+    test about a log line that was quietly a test about the environment. So it triggers the failure
+    itself, reads whatever message came out, and requires THAT to survive into the log.
+    """
+    from chimera.integrations import StdioMCPSession
+
+    comando = "comando-que-nao-existe-mesmo"
+    try:
+        StdioMCPSession(comando, [], None, connect_timeout=5.0).start()
+    except Exception as exc:
+        motivo = str(exc)
+    else:  # pragma: no cover - would mean that name really is an MCP server
+        pytest.fail(f"{comando!r} started successfully, so there is no failure to report")
+
+    assert motivo.strip(), "the failure carries no message at all, so nothing could be logged"
+
+    settings = _settings(tmp_path, monkeypatch, f'[{{"name": "quebrado", "command": "{comando}", "args": []}}]')
 
     with caplog.at_level(logging.WARNING):
         assert mcp_pool.connectors(settings) is None
@@ -63,8 +83,8 @@ def test_a_server_that_cannot_start_says_what_went_wrong(tmp_path, monkeypatch, 
     # No disjunction here, deliberately. The first draft read `... in linha or len(linha) > N`,
     # and the fallback clause is true of the OLD line too — sabotaging the fix back to
     # `type(exc).__name__` left this test passing. A guard that survives its own defect is not one.
-    assert "comando-que-nao-existe-mesmo" in linha, (
-        f"the line names the server and not the reason: {linha!r}"
+    assert motivo[:60] in linha, (
+        f"the line names the server and not the reason.\n  logged:   {linha!r}\n  reason:   {motivo!r}"
     )
 
 
