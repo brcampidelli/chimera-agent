@@ -146,6 +146,22 @@ class StdioMCPSession:
     def start(self) -> StdioMCPSession:
         import asyncio
 
+        # Checked HERE, before anything is spawned, and the reason is a message a user actually
+        # got. The SDK is imported inside `_serve`, which runs on the background loop — so with the
+        # package absent the ImportError was raised where nothing was listening, `_ready` never
+        # fired, and `start` reported "did not become ready". That is the SAME sentence a command
+        # which simply is not an MCP server produces, so somebody whose install lacked the optional
+        # dependency was told to go and check their configuration.
+        #
+        # Measured against the packaged desktop app, where the extra was not bundled at all: every
+        # server in the catalogue failed this way, and nothing on screen could say why.
+        try:
+            import mcp  # noqa: F401
+        except ModuleNotFoundError as exc:
+            raise ModuleNotFoundError(
+                "the MCP SDK is not installed — install it with: pip install 'chimera-agent[mcp]'"
+            ) from exc
+
         self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
         self._thread.start()

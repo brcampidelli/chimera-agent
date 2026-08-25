@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "chimera-agent"
-version = "0.48.0rc29"
+version = "0.48.0rc30"
 description = "An open-source, self-evolving AI agent whose reasoning core is an LLM-Fusion engine (panel -> judge -> synthesizer)."
 readme = "README.md"
 # Upper bound tracks the litellm ceiling below (<1.92, which requires Python <3.14). Without it a
@@ -53,7 +53,16 @@ dependencies = [
 
 [project.optional-dependencies]
 mcp = [
-    "mcp>=1.0",
+    # Ceiling, not preference — the same shape as the litellm pin above, and measured the same way.
+    # `mcp>=1.0` resolves to 2.1.0 today, and 2.x removed the low-level decorator API that
+    # `ChimeraMCP.build` is written against: `@server.list_tools()` raises
+    # `AttributeError: 'Server' object has no attribute 'list_tools'`, so `chimera mcp-serve` dies
+    # on start for anyone who installed the extra this week. The CLIENT half is fine on both — the
+    # catalogue and the tool pool import `ClientSession` and `stdio_client`, which 2.x still has —
+    # so this ceiling costs the client nothing and is what keeps the server working.
+    #
+    # Lift it by porting `ChimeraMCP.build` to the 2.x handler API, not by widening the range.
+    "mcp>=1.0,<2",
 ]
 # Native messaging platform adapters. Install to run `chimera serve --discord/--slack`;
 # the core agent never requires it. (Telegram needs no extra — it is plain HTTP.)
