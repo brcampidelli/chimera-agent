@@ -958,7 +958,13 @@ def register_code_api(
         # Read memory BEFORE building the agent: the facts go into this turn's system prompt.
         # The store the SETTINGS describe, which is not always the one the app booted with.
         turn_memory, turn_graph = _live_memory(live(), memory, graph, boot_memory_key)
-        facts, memory_layer = recall_facts(req.message, memory=turn_memory, graph=turn_graph)
+        # Scoped to the folder this turn is in. What the agent learns while working here is
+        # written here too, so an unrelated project's note stops arriving as context — which is
+        # what a real store did: a note about one project rode along on ordinary requests in
+        # another. Facts with no project belong everywhere and still arrive.
+        facts, memory_layer = recall_facts(
+            req.message, memory=turn_memory, graph=turn_graph, project=str(ws)
+        )
         agent, ledger = build_agent(req, ws, facts, note)
         session = store.load(req.session_id, agent) if req.session_id else CodeSession(agent)
         session.agent = agent  # a loaded session carries messages, not the agent that made them

@@ -4412,6 +4412,8 @@ export interface components {
              * @default semantic
              */
             kind: string;
+            /** Project */
+            project?: string | null;
         };
         /** MemoryAddOut */
         MemoryAddOut: {
@@ -4448,6 +4450,8 @@ export interface components {
             id: string;
             /** Kind */
             kind: string;
+            /** Project */
+            project?: string | null;
             /** Provenance */
             provenance: string;
             /** Source */

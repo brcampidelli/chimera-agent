@@ -168,7 +168,10 @@ def test_autonomous_success_on_tainted_run_marks_artifacts(tmp_path: Path) -> No
         def __init__(self) -> None:
             self.calls: list[tuple[str, str]] = []
 
-        def remember(self, content: str, *, key: str | None = None, provenance: str = "clean"):
+        def remember(
+            self, content: str, *, key: str | None = None, provenance: str = "clean",
+            project: str | None = None,
+        ):
             self.calls.append((content, provenance))
             return ("ADD", None)
 

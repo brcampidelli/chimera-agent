@@ -12,7 +12,7 @@ import re
 import uuid
 from collections.abc import Callable
 
-from chimera.memory.models import MemoryItem, MemoryKind
+from chimera.memory.models import EVERY_PROJECT, MemoryItem, MemoryKind
 from chimera.memory.semantic import EmbedFn, SemanticIndex
 from chimera.memory.store import MemoryBackend
 from chimera.telemetry import get_logger
@@ -42,7 +42,15 @@ class MemoryManager:
         key: str | None = None,
         source: str = "chimera",
         provenance: str = "clean",
+        project: str | None = None,
     ) -> MemoryItem:
+        """Store a fact. ``project=None`` means it belongs everywhere.
+
+        Everywhere is the DEFAULT here and not the norm at the call sites, deliberately: a caller
+        that knows which folder it is in says so, and one that does not cannot invent an answer.
+        Persona facts are the clearest case of the default being right — how somebody likes to be
+        answered is about them, not about the repository they happen to have open.
+        """
         item = MemoryItem(
             # Full uuid4 hex, not [:8]: an 8-char (32-bit) id has a ~1% birthday-collision chance by
             # 10k memories, and add() overwrites on a clash — silently destroying a distinct memory.
@@ -52,6 +60,7 @@ class MemoryManager:
             key=key,
             source=source,
             provenance=provenance,
+            project=project,
         )
         self.store.add(item)
         return item
@@ -82,6 +91,7 @@ class MemoryManager:
         key: str | None = None,
         source: str = "chimera",
         provenance: str = "clean",
+        project: str | None = None,
     ) -> tuple[str, MemoryItem]:
         """ADD a new fact, UPDATE an existing one (same key), or NOOP a duplicate.
 
@@ -92,7 +102,9 @@ class MemoryManager:
         """
         duplicate = self._find_duplicate(content, key)
         if duplicate is None:
-            return "ADD", self.add(content, kind, key=key, source=source, provenance=provenance)
+            return "ADD", self.add(
+                content, kind, key=key, source=source, provenance=provenance, project=project
+            )
         if _normalize(duplicate.content) == _normalize(content):
             return "NOOP", duplicate
         updated = self.update(duplicate.id, content)
@@ -232,8 +244,24 @@ class MemoryManager:
             for _, item in rank(personas)[:max_items]
         ]
 
+    def _in_scope(self, project: str | None) -> list[MemoryItem]:
+        """The facts a turn in ``project`` may recall: that project's, plus the global ones.
+
+        A fact with no project belongs everywhere — which is what every fact written before the
+        field existed is, so an upgrade loses nobody's memory.
+        """
+        items = self.store.all()
+        if project == EVERY_PROJECT:
+            return items
+        return [i for i in items if i.project is None or i.project == project]
+
     def search(
-        self, query: str, *, k: int = 5, on_layer: Callable[[str], None] | None = None
+        self,
+        query: str,
+        *,
+        k: int = 5,
+        on_layer: Callable[[str], None] | None = None,
+        project: str | None = EVERY_PROJECT,
     ) -> list[MemoryItem]:
         """Retrieve relevant memories.
 
@@ -245,6 +273,14 @@ class MemoryManager:
         ``on_layer`` (optional) is called with the name of the layer that actually produced the
         hits — ``"semantic"`` | ``"fts"`` | ``"keyword"`` — and never when a layer returns nothing,
         so a UI can honestly show which layer contributed rather than guessing.
+
+        ``project`` scopes the CANDIDATES, not the results, and that is the load-bearing part:
+        filtering afterwards would let ``k`` fill up with facts from other folders and return
+        fewer than asked for — or nothing — while relevant ones sat just below the cut.
+
+        * :data:`EVERY_PROJECT` (the default) — no filter. Every existing caller.
+        * a path — that project's facts, plus the ones that belong everywhere.
+        * ``None`` — only the ones that belong everywhere, which is a turn with no folder open.
         """
         from chimera.memory.tokens import idf_weights, informative, tokens
 
@@ -257,7 +293,7 @@ class MemoryManager:
             return []
         if self._semantic is not None:
             try:
-                hits = self._semantic.search(query, self.store.all(), k)
+                hits = self._semantic.search(query, self._in_scope(project), k)
                 if hits:
                     if on_layer is not None:
                         on_layer("semantic")
@@ -266,7 +302,9 @@ class MemoryManager:
                 _log.warning("semantic recall failed, falling back to keyword: %s", exc)
         backend_search = getattr(self.store, "search", None)
         if callable(backend_search):  # e.g. the SQLite/FTS5 store
-            result: list[MemoryItem] = backend_search(query, k=k)
+            # The backend filters in SQL rather than here, for the same reason as above: a
+            # LIMIT applied before scoping returns the wrong page.
+            result: list[MemoryItem] = backend_search(query, k=k, project=project)
             if result and on_layer is not None:
                 on_layer("fts")
             return result
@@ -280,7 +318,7 @@ class MemoryManager:
             return []
         # Read once: `store.all()` can be a file read, and this used to call it inside the loop's
         # own iteration anyway.
-        corpus = [(item, set(tokens(item.content))) for item in self.store.all()]
+        corpus = [(item, set(tokens(item.content))) for item in self._in_scope(project)]
         weights = idf_weights(terms, [list(hay) for _, hay in corpus])
         scored: list[tuple[float, str, MemoryItem]] = []
         for item, haystack in corpus:

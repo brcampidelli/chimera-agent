@@ -80,11 +80,18 @@ def test_a_tainted_run_writes_a_fact_marked_as_tainted(tmp_path: Path) -> None:
     written: list[dict[str, Any]] = []
 
     class _Memory:
-        def remember(self, fact: str, *, key: str, provenance: str = "clean") -> None:
+        def remember(
+            self, fact: str, *, key: str, provenance: str = "clean",
+            project: str | None = None,
+        ) -> None:
             written.append({"fact": fact, "key": key, "provenance": provenance})
 
     agent = object.__new__(AutonomousAgent)
     agent.memory = _Memory()
+    # The method also reads the workspace now, to scope the fact to the folder the work happened
+    # in. A bare object has to carry every attribute the method under test touches; None is the
+    # honest value here, and it means the fact belongs everywhere.
+    agent.workspace = None
     AutonomousAgent._remember_success(agent, "fix the parser", "done", tainted=True)
 
     assert written[0]["provenance"] == "tainted"

@@ -738,6 +738,10 @@ class MemoryItemOut(BaseModel):
     kind: str
     provenance: str
     source: str
+    #: The folder this fact belongs to, or None for one that belongs everywhere. On screen because
+    #: the default is now to save into the project you are in: unshown, a fact meant for every
+    #: project gets quietly filed under one, stops arriving elsewhere, and nothing says why.
+    project: str | None = None
 
 
 class MemoryProfileOut(BaseModel):
