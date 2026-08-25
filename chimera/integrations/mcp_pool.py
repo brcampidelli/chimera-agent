@@ -77,7 +77,16 @@ def _build(settings: Settings) -> Any:
             # prefix means there is nothing to collide over.
             pool.register(MCPConnector(cfg.name, session, name_prefix=f"{cfg.name}_"))
         except Exception as exc:  # noqa: BLE001 — a broken server must never break a turn
-            _log.warning("MCP: skipping server %r (%s)", cfg.name, type(exc).__name__)
+            # The MESSAGE, not just the class. `ModuleNotFoundError` on its own is the least useful
+            # half of "the MCP SDK is not installed — install it with: pip install
+            # 'chimera-agent[mcp]'": the sentence was written precisely so this case would stop
+            # looking like a broken config, and logging only the type threw it away again.
+            #
+            # Bounded, and the bound is not decoration: a connect failure carries the command and
+            # its arguments, and `mcp.json` is also where a user's tokens live. `env` is never in
+            # an exception message today, and a log line is the wrong place to bet on that staying
+            # true forever.
+            _log.warning("MCP: skipping server %r — %s", cfg.name, str(exc)[:300])
     return pool if pool.names() else None
 
 
