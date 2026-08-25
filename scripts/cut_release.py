@@ -33,6 +33,9 @@ ROOT = Path(__file__).resolve().parent.parent
 PYPROJECT = ROOT / "pyproject.toml"
 CARGO = ROOT / "apps" / "desktop" / "src-tauri" / "Cargo.toml"
 TAURI = ROOT / "apps" / "desktop" / "src-tauri" / "tauri.conf.json"
+#: Not a version file by appearance, and one by behaviour: it records this package's own
+#: version, so a release that skips it leaves the repository contradicting itself.
+LOCK = ROOT / "uv.lock"
 
 #: Generated, not edited. Each embeds the version it was produced for, so a release regenerates
 #: them rather than substituting a string — a hand-edited "generated" file is correct exactly once.
@@ -206,15 +209,38 @@ def regenerate_snapshots(version: str) -> None:
         raise Stop(f"these snapshots came out stamped for another version: {wrong}")
 
 
+def refresh_lock(version: str) -> None:
+    """Re-resolve ``uv.lock`` so it names the version just written.
+
+    Left out of the original six, and it drifted five releases before anyone looked: the lock said
+    0.43.0 while ``pyproject.toml`` said 0.48.0rc30. Nothing broke, which is exactly why nobody
+    looked — the release workflow runs a bare ``uv sync``, which re-locks silently. But "re-locks
+    silently" is a property of today's workflow rather than a guarantee, and a repository whose
+    lock disagrees with its own manifest fails ``uv sync --locked`` for everyone who uses it.
+
+    Conservative by construction: ``uv lock`` keeps every pin that still satisfies its constraint,
+    so this rewrites the two lines describing THIS package and nothing else. It is not a dependency
+    upgrade wearing a release's clothes — which is the reason it can be part of a release at all.
+    """
+    print("  re-resolving uv.lock so it names the new version...", file=sys.stderr)
+    run("uv", "lock")
+    if 'version = "' + version + '"' not in LOCK.read_text(encoding="utf-8"):
+        raise Stop(
+            "`uv lock` ran but " + LOCK.name + " still does not name " + version + ". Cutting the "
+            "release would leave the lock disagreeing with pyproject.toml, which is the drift this "
+            "exists to end."
+        )
+
+
 def check_only_expected_files_changed(version: str) -> list[str]:
     changed = sorted(run("git", "diff", "--name-only").splitlines())
     expected = sorted(
         str(path.relative_to(ROOT)).replace("\\", "/")
-        for path in [PYPROJECT, CARGO, TAURI, *SNAPSHOTS]
+        for path in [PYPROJECT, CARGO, TAURI, LOCK, *SNAPSHOTS]
     )
     if changed != expected:
         raise Stop(
-            "a release should touch exactly the six version files. This run changed:\n    "
+            "a release should touch exactly the seven version files. This run changed:\n    "
             + "\n    ".join(changed or ["(nothing — is that already the version?)"])
             + "\n  expected:\n    "
             + "\n    ".join(expected)
@@ -329,6 +355,7 @@ def main() -> None:
     write_versions(version)
     try:
         regenerate_snapshots(version)
+        refresh_lock(version)
         changed = check_only_expected_files_changed(version)
     except SystemExit:
         # Leave the tree as it was: a half-applied bump is a trap for whoever runs `git status`

@@ -1,6 +1,6 @@
 """Cutting a release — the two spellings, and the files it must not touch.
 
-The script exists because a release is six files and two version formats, and both are the kind of
+The script exists because a release is seven files and two version formats, and both are the kind of
 thing that is right until one day it is not. So the tests are about the parts that would be wrong
 quietly: a version converted into the wrong SemVer, and a substitution that hits more than the
 line it was aimed at.
@@ -173,3 +173,43 @@ def test_it_checks_for_gh_before_writing_anything(monkeypatch) -> None:
     # Checking late means bumping six files and regenerating three snapshots before finding out
     # the release cannot be opened at all — which is what the first WSL run did.
     assert "gh" in str(refused.value)
+
+
+def test_the_lock_is_one_of_the_files_a_release_updates(monkeypatch, tmp_path: Path) -> None:
+    """It was not, and it drifted five releases: the lock said 0.43.0, pyproject said 0.48.0rc30.
+
+    Nothing broke, which is the whole reason it went unnoticed — the release workflow runs a bare
+    `uv sync`, and that re-locks silently. So the defect had no symptom until somebody ran
+    `uv sync --locked`, and the guard has to be about the file rather than about a failure.
+    """
+    lock = tmp_path / "uv.lock"
+    lock.write_text('version = "0.48.0rc31"\n', encoding="utf-8")
+    monkeypatch.setattr(cut_release, "LOCK", lock)
+    monkeypatch.setattr(cut_release, "run", lambda *a, **k: "")
+
+    cut_release.refresh_lock("0.48.0rc31")  # names the new version: accepted
+
+    lock.write_text('version = "0.43.0"\n', encoding="utf-8")
+    with pytest.raises(SystemExit) as refused:
+        cut_release.refresh_lock("0.48.0rc31")
+
+    assert "0.48.0rc31" in str(refused.value)
+    assert "pyproject" in str(refused.value), "the message must say what disagrees with what"
+
+
+def test_a_release_that_leaves_the_lock_behind_is_refused() -> None:
+    """The check that says "exactly these files" is what kept the lock OUT for five releases.
+
+    Adding `refresh_lock` without adding the lock here would produce the opposite failure — the
+    script would update it and then refuse its own change as unexpected. So the two belong in one
+    commit, and this asserts the pair rather than either half.
+    """
+    fonte = (
+        Path(cut_release.__file__).parent / "cut_release.py"
+    ).read_text(encoding="utf-8")
+
+    esperados = fonte.split("for path in [")[1].split("]")[0]
+    assert "LOCK" in esperados, (
+        "uv.lock is not in the expected-file set, so `refresh_lock` updating it would make the "
+        "script refuse its own release"
+    )
