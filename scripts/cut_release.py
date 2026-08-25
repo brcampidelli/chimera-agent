@@ -67,6 +67,11 @@ def run(*args: str, capture: bool = True, env: dict[str, str] | None = None) -> 
         text=True,
         check=False,
         encoding="utf-8",
+        # Not decoration. Every command here used to be git, whose output is ASCII; `uv lock` is the
+        # first that is not, and on a Windows console it emits cp1252 bytes. Without this the reader
+        # thread dies on a byte 0x97, prints a traceback nobody can act on, and — worse — leaves
+        # `stderr` empty, so a command that FAILED would be reported with no reason attached.
+        errors="replace",
         env={**os.environ, **env} if env else None,
     )
     if result.returncode != 0:

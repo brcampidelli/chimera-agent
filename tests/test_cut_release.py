@@ -213,3 +213,22 @@ def test_a_release_that_leaves_the_lock_behind_is_refused() -> None:
         "uv.lock is not in the expected-file set, so `refresh_lock` updating it would make the "
         "script refuse its own release"
     )
+
+
+def test_a_command_whose_output_is_not_utf8_does_not_take_the_release_down() -> None:
+    """Every command here used to be git, and git's output is ASCII.
+
+    `uv lock` — added to the release when the lock file joined the version files — is the first that
+    is not, and on a Windows console it emits cp1252 bytes. The first release cut after that change
+    printed a `UnicodeDecodeError` traceback from a reader thread: alarming, unactionable, and worse
+    than it looks, because a crashed reader leaves `stderr` EMPTY. A command that actually failed
+    would have been reported with no reason attached.
+
+    Written as a real subprocess rather than a source check: the assertion is about behaviour under
+    bytes that are not valid UTF-8, and `\x97` is exactly the byte that did it.
+    """
+    saida = cut_release.run(
+        sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'ok\\x97ok')"
+    )
+
+    assert "ok" in saida, f"the output was lost entirely: {saida!r}"
