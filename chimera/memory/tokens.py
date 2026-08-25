@@ -41,7 +41,7 @@ import re
 import unicodedata
 from collections.abc import Iterable, Sequence
 
-__all__ = ["idf_weights", "informative", "tokens"]
+__all__ = ["fold_for_match", "idf_weights", "informative", "tokens"]
 
 #: Any letter or digit in any script, after folding. `[^\W_]` rather than a named list of ranges:
 #: a range list is a promise to remember every alphabet, and this file exists because one was
@@ -130,6 +130,26 @@ def _fold(text: str) -> str:
         base = decomposed[0] if decomposed else ch
         if "a" <= base <= "z" or "0" <= base <= "9":
             out.append("".join(c for c in decomposed if not unicodedata.combining(c)))
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+def fold_for_match(text: str) -> str:
+    """``text`` with Latin diacritics folded, and EXACTLY the same length.
+
+    For matching a pattern against prose and then slicing the ORIGINAL string by the match's
+    offsets. `_fold` is free to change length (a ligature decomposes into two characters); here a
+    character whose fold is not exactly one character is left alone, because a shifted offset would
+    cut a sentence in the wrong place — and the sentence is what gets shown to the user and saved.
+    """
+    out: list[str] = []
+    for ch in text:
+        decomposed = unicodedata.normalize("NFKD", ch.lower())
+        base = decomposed[0] if decomposed else ch
+        if "a" <= base <= "z":
+            folded = "".join(c for c in decomposed if not unicodedata.combining(c))
+            out.append(folded if len(folded) == 1 else ch)
         else:
             out.append(ch)
     return "".join(out)

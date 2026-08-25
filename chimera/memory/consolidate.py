@@ -9,17 +9,29 @@ supplies the real, model-backed one. A merge is a write, so it's opt-in (``memor
 
 from __future__ import annotations
 
-import re
 from collections.abc import Callable
 
 from chimera.memory.models import MemoryItem
 
-_TOKEN = re.compile(r"[a-z0-9]+")
 Summarizer = Callable[[list[str]], str]
+
+#: Below this many characters a token is a fragment or a function word, and Jaccard overlap on
+#: those measures grammar rather than meaning. It does NOT apply to scripts where one character is
+#: a word: `tokens` splits Han per character, and a two-character rule would discard every one of
+#: them — which is how Chinese and Russian memories came to never cluster at all.
+_MIN_LENGTH = 3
 
 
 def _tokens(text: str) -> set[str]:
-    return {token for token in _TOKEN.findall(text.lower()) if len(token) >= 3}
+    """Significant tokens, through the shared tokenizer.
+
+    This module had its own ``[a-z0-9]+``, so two nearly identical Russian facts produced two empty
+    sets and `_similar` refused them both. Measured: Portuguese and English clustered, Russian and
+    Chinese never did — consolidation was inert in those languages rather than merely worse.
+    """
+    from chimera.memory.tokens import tokens as _shared
+
+    return {t for t in _shared(text) if len(t) >= _MIN_LENGTH or not t.isascii()}
 
 
 def _similar(a: str, b: str, threshold: float) -> bool:

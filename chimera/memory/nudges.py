@@ -14,22 +14,73 @@ from __future__ import annotations
 
 import re
 
-# First-person preference verbs (optionally preceded by an adverb like "always"/"really").
+from chimera.memory.tokens import fold_for_match
+
+#: First-person preference statements, in the languages this app ships in.
+#:
+#: This was one English pattern — ``\bi (?:always )?(?:prefer|like|...)s?\b`` — and measured, that
+#: is exactly what it detected. "eu prefiro respostas curtas", "prefiero respuestas cortas",
+#: "je prefere des reponses courtes", "ich bevorzuge kurze antworten" and
+#: "я предпочитаю краткие ответы" all returned NOTHING. Not fewer suggestions: none, ever. The
+#: feature existed for one of ten audiences.
+#:
+#: Note what this fixed and what it did not. The tokenizer in this module was ASCII-only too, and
+#: repairing that alone would have changed nothing measurable — the pattern rejects a sentence
+#: before a token is ever taken. A fix that fixes nothing is worth naming rather than shipping.
+#:
+#: Romance and Germanic languages drop the pronoun freely ("prefiro", "prefiero"), so the pronoun is
+#: optional there; requiring it would miss the commonest phrasing. English keeps it required,
+#: because "like" without "I" is a simile far more often than a preference.
 _PREFERENCE = re.compile(
-    r"\bi (?:always |usually |generally |really |only |never )?"
-    r"(?:prefer|like|love|use|need|want|require|avoid|dislike|hate)s?\b",
-    re.IGNORECASE,
+    "|".join(
+        (
+            # English — pronoun required: bare "like" is usually a comparison, not a preference.
+            r"\bi (?:always |usually |generally |really |only |never )?"
+            r"(?:prefer|like|love|use|need|want|require|avoid|dislike|hate)s?\b",
+            # Portuguese
+            r"\b(?:eu )?(?:sempre |normalmente |realmente |so |nunca )?"
+            r"(?:prefiro|gosto de|adoro|uso|preciso de|quero|evito|detesto|odeio)\b",
+            # Spanish
+            r"\b(?:yo )?(?:siempre |normalmente |realmente |solo |nunca )?"
+            r"(?:prefiero|me gusta|me gustan|adoro|uso|necesito|quiero|evito|odio)\b",
+            # French — "je" REQUIRED. French does not drop the subject pronoun, and with it
+            # optional the folded "prefere" also matched Portuguese THIRD person ("o cliente
+            # prefere respostas curtas") and Portuguese questions ("voce prefere qual?").
+            # Both measured, both suggested saving somebody else's preference as the user's.
+            r"\bje (?:toujours |normalement |vraiment |seulement |jamais )?"
+            r"(?:prefere|aime|adore|utilise|ai besoin de|veux|evite|deteste)\b",
+            # Italian
+            r"\b(?:io )?(?:sempre |di solito |davvero |solo |mai )?"
+            r"(?:preferisco|mi piace|adoro|uso|ho bisogno di|voglio|evito|odio)\b",
+            # German — "ich" required: the verbs are common in other persons.
+            r"\bich (?:immer |normalerweise |wirklich |nur |nie )?"
+            r"(?:bevorzuge|mag|liebe|benutze|brauche|will|vermeide|hasse)\b",
+            # Polish
+            r"\b(?:ja )?(?:zawsze |zwykle |naprawde |tylko |nigdy )?"
+            r"(?:wole|lubie|uwielbiam|uzywam|potrzebuje|chce|unikam|nienawidze)\b",
+            # Russian — pronoun required, for the same reason as German.
+            r"\bя (?:всегда |обычно |действительно |только |никогда )?"
+            r"(?:предпочитаю|люблю|нравится|использую|нужно|хочу|избегаю|ненавижу)\b",
+        )
+    ),
+    re.IGNORECASE | re.UNICODE,
 )
-_TOKEN = re.compile(r"[a-z0-9]+")
-_STOPWORDS = frozenset(
-    {"i", "you", "the", "a", "an", "for", "and", "to", "of", "my", "is", "are", "it"}
-)
-# A suggestion whose significant tokens are mostly present in a stored fact is "known".
-_KNOWN_OVERLAP = 0.6
+
+#: Function words, shared with recall so one list serves both. This module had its own English
+#: thirteen; the shared one covers the eight alphabetic languages the app ships in.
+_KNOWN_OVERLAP = 0.6  # a suggestion this much inside a stored fact is already known
 
 
 def _significant(text: str) -> set[str]:
-    return {t for t in _TOKEN.findall(text.lower()) if len(t) >= 3 and t not in _STOPWORDS}
+    """Meaningful tokens of ``text``, through the shared tokenizer and word list.
+
+    The length rule keeps its exception for scripts where one character is a word — Han is split per
+    character, and a three-character floor would discard all of them.
+    """
+    from chimera.memory.tokens import informative
+    from chimera.memory.tokens import tokens as _shared
+
+    return {t for t in informative(_shared(text)) if len(t) >= 3 or not t.isascii()}
 
 
 def _normalize(text: str) -> str:
@@ -56,7 +107,12 @@ def detect_nudges(
     suggestions: list[str] = []
     for text in user_texts:
         for sentence in re.split(r"[.\n;!?]+", text):
-            match = _PREFERENCE.search(sentence)
+            # Matched against the FOLDED sentence and sliced out of the original one. The
+            # patterns are written without diacritics, and run against raw text they silently
+            # excluded every correctly written French and Polish sentence: `je prefere` matched,
+            # `je préfère` did not. `fold_for_match` preserves length, so the offsets still cut
+            # the original sentence in the right place.
+            match = _PREFERENCE.search(fold_for_match(sentence))
             if match is None:
                 continue
             phrase = sentence[match.start() :].strip().strip(",")
