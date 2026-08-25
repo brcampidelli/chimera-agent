@@ -28,7 +28,7 @@ import threading
 from collections.abc import Callable
 from pathlib import Path
 
-from chimera.core.filelock import atomic_write_text, locked, read_text
+from chimera.core.filelock import atomic_write_text, exclusively, read_text
 from chimera.evolution.learned_skill import LearnedSkill
 from chimera.providers.gateway import SupportsComplete
 
@@ -81,7 +81,7 @@ class SkillStore:
         The blunt form, kept for callers that hold the whole picture. It does **not** merge a
         concurrent writer — use the mutating methods, which do.
         """
-        with self._lock, locked(self.path):
+        with self._lock, exclusively(self.path):
             self._write()
 
     def _mutate(self, apply: Callable[[dict[str, dict[str, object]]], None]) -> None:
@@ -90,7 +90,7 @@ class SkillStore:
         The re-read is the part that was missing. Without it every write publishes the dict this
         object loaded at construction, so the sibling instance's just-added skill disappears.
         """
-        with self._lock, locked(self.path):
+        with self._lock, exclusively(self.path):
             self.load()
             apply(self._dicts)
             self._write()
@@ -105,7 +105,7 @@ class SkillStore:
         a second ago.
         """
         found = False
-        with self._lock, locked(self.path):
+        with self._lock, exclusively(self.path):
             self.load()
             if name in self._dicts:
                 found = True
