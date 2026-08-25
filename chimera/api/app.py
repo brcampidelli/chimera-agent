@@ -76,6 +76,7 @@ from chimera.api.schemas import (
     InjectionReportOut,
     MaturityOut,
     McpAddRequest,
+    McpCatalogOut,
     McpServersOut,
     McpTestOut,
     MessagingPlatformOut,
@@ -688,6 +689,19 @@ def build_api_app(
         from chimera.api.mcp_api import list_servers
 
         return list_servers(settings.home)
+
+    @app.get("/api/mcp/catalog", dependencies=[guard], response_model=McpCatalogOut)
+    def mcp_catalog_endpoint() -> dict[str, Any]:
+        """Servers that are known to work, so connecting one is a choice rather than a transcription.
+
+        Static data plus one PATH lookup per entry — no connect, no network, nothing spawned. The
+        lookup is the reason this is a route at all rather than a constant in the frontend: only
+        this process can see whether `docker` or `uvx` exists on the machine.
+        """
+        from chimera.integrations.mcp_catalog import catalog_as_dicts
+
+        entries = catalog_as_dicts()
+        return {"entries": entries, "count": len(entries)}
 
     @app.post("/api/mcp", dependencies=[guard], response_model=McpServersOut)
     def mcp_add_endpoint(req: McpAddRequest) -> dict[str, Any]:

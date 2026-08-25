@@ -1131,6 +1131,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/mcp/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Mcp Catalog Endpoint
+         * @description Servers that are known to work, so connecting one is a choice rather than a transcription.
+         *
+         *     Static data plus one PATH lookup per entry — no connect, no network, nothing spawned. The
+         *     lookup is the reason this is a route at all rather than a constant in the frontend: only
+         *     this process can see whether `docker` or `uvx` exists on the machine.
+         */
+        get: operations["mcp_catalog_endpoint_api_mcp_catalog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/mcp/{name}": {
         parameters: {
             query?: never;
@@ -4268,6 +4292,76 @@ export interface components {
             /** Name */
             name: string;
         };
+        /**
+         * McpCatalogEntry
+         * @description A verified way to run one MCP server.
+         *
+         *     ``available`` is resolved on the SERVER, because only this process can see the machine's PATH —
+         *     an entry offered where its runner is missing is the failure the catalogue exists to remove.
+         *
+         *     ``containment`` is the field that carries its weight: for most servers what limits the damage is
+         *     the CREDENTIAL (a database grant, a token scope), not the tool list, and a "read-only" badge
+         *     would say the opposite.
+         */
+        McpCatalogEntry: {
+            /** Args */
+            args?: string[];
+            /** Available */
+            available: boolean;
+            /** Command */
+            command: string;
+            /**
+             * Containment
+             * @default
+             */
+            containment: string;
+            /**
+             * Docs
+             * @default
+             */
+            docs: string;
+            /** Env */
+            env?: {
+                [key: string]: string;
+            };
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /**
+             * Official
+             * @default true
+             */
+            official: boolean;
+            /** Runner */
+            runner: string;
+            /** Secrets */
+            secrets?: components["schemas"]["McpCatalogSecret"][];
+            /** Summary */
+            summary: string;
+        };
+        /** McpCatalogOut */
+        McpCatalogOut: {
+            /** Count */
+            count: number;
+            /** Entries */
+            entries: components["schemas"]["McpCatalogEntry"][];
+        };
+        /**
+         * McpCatalogSecret
+         * @description One environment variable a catalogue entry needs, and where the user gets it.
+         */
+        McpCatalogSecret: {
+            /** Hint */
+            hint: string;
+            /** Key */
+            key: string;
+            /**
+             * Source
+             * @default
+             */
+            source: string;
+        };
         /** McpCfgOut */
         McpCfgOut: {
             /** Autoload */
@@ -7353,6 +7447,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mcp_catalog_endpoint_api_mcp_catalog_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpCatalogOut"];
                 };
             };
         };

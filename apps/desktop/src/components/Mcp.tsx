@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plug, Trash2, Check, X, Loader2, Plus } from "lucide-react";
+import { Plug, Trash2, Check, X, Loader2, Plus, ExternalLink } from "lucide-react";
 import {
   addMcpServer,
   getConfig,
+  getMcpCatalog,
   getMcpServers,
   removeMcpServer,
   testMcpServer,
@@ -12,6 +13,7 @@ import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel
 import { ErrorState } from "@/components/ui/async";
 import { Button } from "@/components/ui/button";
 import { useT, type TFunc } from "@/lib/i18n";
+import type { McpCatalogEntry } from "@/lib/api";
 import type { McpServer, McpTest } from "@/lib/types";
 
 /** Per-server test state, keyed by name. `undefined` = never tested (no "connected" claim by default). */
@@ -102,12 +104,89 @@ function ServerRow({
   );
 }
 
-function AddForm({ onAdded }: { onAdded: () => void }) {
+/** What a catalogue entry hands to the form. Empty for a hand-written server. */
+export interface Prefill {
+  name: string;
+  command: string;
+  args: string;
+  envRows: { key: string; value: string }[];
+}
+
+const BLANK: Prefill = { name: "", command: "", args: "", envRows: [] };
+
+/** What the entry would write into `mcp.json`, in the form's own shape.
+ *
+ *  A secret becomes an EMPTY row rather than a placeholder value: the user has to type it, and an
+ *  example sitting in the field is something somebody eventually saves by accident.
+ */
+function toPrefill(entry: McpCatalogEntry): Prefill {
+  return {
+    name: entry.id,
+    command: entry.command,
+    args: entry.args.join(" "),
+    envRows: [
+      ...Object.entries(entry.env).map(([key, value]) => ({ key, value })),
+      ...entry.secrets.map((s) => ({ key: s.key, value: "" })),
+    ],
+  };
+}
+
+function CatalogCard({ entry, onPick }: { entry: McpCatalogEntry; onPick: () => void }) {
   const t = useT();
-  const [name, setName] = useState("");
-  const [command, setCommand] = useState("");
-  const [args, setArgs] = useState("");
-  const [envRows, setEnvRows] = useState<{ key: string; value: string }[]>([]);
+  return (
+    <div className="rounded-card border border-hairline p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-semibold text-foreground">{entry.label}</span>
+        <Badge tone={entry.official ? "accent" : "muted"}>
+          {entry.official ? t("mcp.catalog.official") : t("mcp.catalog.community")}
+        </Badge>
+        {entry.docs ? (
+          <a
+            href={entry.docs}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <ExternalLink className="h-3 w-3" /> {t("mcp.catalog.docs")}
+          </a>
+        ) : null}
+      </div>
+      <p className="mt-1 text-sm text-muted-foreground">{entry.summary}</p>
+      {/* The field this whole screen exists to be honest about. Not a badge: for most of these the
+          limit is the CREDENTIAL, and a one-word "read-only" chip would say the opposite. */}
+      <p className="mt-1.5 text-xs text-muted-foreground">{entry.containment}</p>
+      {entry.secrets.length ? (
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          {t("mcp.catalog.asks", { n: entry.secrets.map((s) => s.key).join(", ") })}
+        </p>
+      ) : null}
+      <div className="mt-2.5">
+        {entry.available ? (
+          <Button size="sm" variant="outline" onClick={onPick}>
+            {t("mcp.catalog.use")}
+          </Button>
+        ) : (
+          // Shown rather than hidden. "Install docker first" is actionable; an entry that silently
+          // is not there teaches nothing, and one that IS there and then fails to connect teaches
+          // the wrong thing.
+          <span className="text-xs text-muted-foreground">
+            {t("mcp.catalog.needs", { n: entry.runner })}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AddForm({ prefill, onAdded }: { prefill: Prefill; onAdded: () => void }) {
+  const t = useT();
+  // Seeded from the prefill rather than synced to it. The parent remounts this component with a
+  // `key` per pick, which is the same device the run boards use — and it is what lets somebody
+  // EDIT a prefilled value without the next render putting the catalogue's version back.
+  const [name, setName] = useState(prefill.name);
+  const [command, setCommand] = useState(prefill.command);
+  const [args, setArgs] = useState(prefill.args);
+  const [envRows, setEnvRows] = useState<{ key: string; value: string }[]>(prefill.envRows);
 
   const add = useMutation({
     mutationFn: addMcpServer,
@@ -203,7 +282,13 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
   const qc = useQueryClient();
   const servers = useQuery({ queryKey: ["mcp"], queryFn: getMcpServers });
   const config = useQuery({ queryKey: ["config"], queryFn: getConfig });
+  const catalog = useQuery({ queryKey: ["mcp-catalog"], queryFn: getMcpCatalog });
   const [tests, setTests] = useState<TestState>({});
+  // The chosen entry, and a counter that remounts the form. Two pieces rather than one, because
+  // picking the SAME entry twice has to reset the form again — a key that never changes would
+  // leave whatever the user had half-typed in place.
+  const [prefill, setPrefill] = useState<Prefill>(BLANK);
+  const [picked, setPicked] = useState(0);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["mcp"] });
   const remove = useMutation({ mutationFn: removeMcpServer, onSuccess: invalidate });
@@ -274,8 +359,31 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
         )}
       </Panel>
 
+      {catalog.data?.entries.length ? (
+        <Panel title={t("mcp.catalog.title")}>
+          <div className="flex flex-col gap-3 px-4 py-3">
+            <p className="text-sm text-muted-foreground">{t("mcp.catalog.lead")}</p>
+            <div className="grid gap-2 lg:grid-cols-2">
+              {catalog.data.entries.map((entry) => (
+                <CatalogCard
+                  key={entry.id}
+                  entry={entry}
+                  onPick={() => {
+                    setPrefill(toPrefill(entry));
+                    setPicked((n) => n + 1);
+                  }}
+                />
+              ))}
+            </div>
+            {/* Said here, next to the entries that ask for one, rather than only in the footnote:
+                a value typed into this screen lands in mcp.json as text. */}
+            <p className="text-xs text-muted-foreground">{t("mcp.catalog.plaintext")}</p>
+          </div>
+        </Panel>
+      ) : null}
+
       <Panel title={t("mcp.addServer")}>
-        <AddForm onAdded={invalidate} />
+        <AddForm key={picked} prefill={prefill} onAdded={invalidate} />
       </Panel>
 
       <p className="px-1 text-xs text-muted-foreground">{t("mcp.note")}</p>

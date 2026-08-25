@@ -439,6 +439,32 @@ export const deleteCron = (id: string) =>
 // --- MCP / Integrations ---
 // Config reads/writes are cheap and NEVER connect (env values are never returned). `testMcpServer` is
 // the ONLY connecting call — a real stdio connect + tool enumeration, the sole honest "connected" proof.
+/** One verified way to run an MCP server, with `available` already resolved by the server.
+ *
+ * `available` cannot be decided here: only the backend can see whether `docker` or `uvx` exists on
+ * the machine, and offering an entry whose runner is missing is the exact failure the catalogue was
+ * built to remove. `containment` is the field that carries the weight — for most of these servers
+ * what limits the damage is the CREDENTIAL, not the tool list, so a "read-only" badge would be
+ * saying the opposite of the truth.
+ */
+export interface McpCatalogEntry {
+  id: string;
+  label: string;
+  summary: string;
+  runner: string;
+  available: boolean;
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+  secrets: { key: string; hint: string; source: string }[];
+  containment: string;
+  official: boolean;
+  docs: string;
+}
+
+export const getMcpCatalog = () =>
+  json<{ entries: McpCatalogEntry[]; count: number }>("/api/mcp/catalog");
+
 export const getMcpServers = () => json<McpServers>("/api/mcp");
 export const addMcpServer = (body: {
   name: string;
