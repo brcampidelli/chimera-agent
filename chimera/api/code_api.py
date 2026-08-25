@@ -425,9 +425,22 @@ def assemble_registry(
     from chimera.governance import TaintLedger, ledger_registry, restrict_registry
     from chimera.governance.audit import AuditLog
     from chimera.governance.profile import govern_step
+    from chimera.integrations import mcp_pool
     from chimera.tools import default_registry
 
     registry = default_registry(ws, write_region=build_write_region(seams.write_region, ws))
+    # The configured MCP servers, HERE and not lower down, because everything below this line has to
+    # reach them: the denial list, the trust kernel, and the taint ledger that treats their output as
+    # untrusted. The chat path learned this the hard way and says so at its own injection point — "a
+    # denylist that cover only the tools we wrote is not a denylist" — and until now this surface did
+    # not pour them in at all, so the Code screen, runs and orchestration ran without the servers a
+    # user had connected and watched Test prove live.
+    #
+    # Pooled per process rather than connected here: this function runs once per TURN and once per
+    # worker in a fan-out, so connecting per call would spawn a container per message.
+    pool = mcp_pool.connectors(settings)
+    if pool is not None:
+        pool.into_tool_registry(registry)
     # Union, never replace: a posture, an explicit denylist and the deployment's own denylist are
     # three ways of saying "not this tool", and letting one overwrite another means the strictest of
     # several stated intentions loses.
