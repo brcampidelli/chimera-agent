@@ -131,8 +131,47 @@ function toPrefill(entry: McpCatalogEntry): Prefill {
   };
 }
 
+/** The entry's own words, in the reader's language.
+ *
+ *  The first version of this screen printed the backend's English straight onto a Portuguese page —
+ *  the same defect as the hardcoded "Close" in the dialog, one release earlier and one layer up.
+ *  The catalogue is data with machine facts in it (command, args, runner); the SENTENCES belong to
+ *  the dictionary, keyed by entry id.
+ *
+ *  Written out rather than built with a template, because `i18n.reachable.test.ts` greps for each
+ *  key as a literal and would list every one of these as dead. The five database entries share one
+ *  pair of keys with the label interpolated — they differ only by which database they name.
+ *
+ *  The fallback is the backend's own text, so an entry added to the catalogue and not to the
+ *  dictionary still says something rather than rendering blank.
+ */
+const ENTRY_TEXT: Record<
+  string,
+  { summary: "mcp.entry.github.summary" | "mcp.entry.githubBinary.summary" | "mcp.entry.firebase.summary" | "mcp.entry.supabase.summary"; containment: "mcp.entry.github.containment" | "mcp.entry.githubBinary.containment" | "mcp.entry.firebase.containment" | "mcp.entry.supabase.containment" }
+> = {
+  github: { summary: "mcp.entry.github.summary", containment: "mcp.entry.github.containment" },
+  "github-binary": {
+    summary: "mcp.entry.githubBinary.summary",
+    containment: "mcp.entry.githubBinary.containment",
+  },
+  firebase: { summary: "mcp.entry.firebase.summary", containment: "mcp.entry.firebase.containment" },
+  supabase: { summary: "mcp.entry.supabase.summary", containment: "mcp.entry.supabase.containment" },
+};
+
 function CatalogCard({ entry, onPick }: { entry: McpCatalogEntry; onPick: () => void }) {
   const t = useT();
+  const chaves = ENTRY_TEXT[entry.id];
+  const ehBanco = entry.id.startsWith("db-");
+  const summary = chaves
+    ? t(chaves.summary)
+    : ehBanco
+      ? t("mcp.entry.db.summary", { n: entry.label })
+      : entry.summary;
+  const containment = chaves
+    ? t(chaves.containment)
+    : ehBanco
+      ? t("mcp.entry.db.containment")
+      : entry.containment;
   return (
     <div className="rounded-card border border-hairline p-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -151,10 +190,10 @@ function CatalogCard({ entry, onPick }: { entry: McpCatalogEntry; onPick: () => 
           </a>
         ) : null}
       </div>
-      <p className="mt-1 text-sm text-muted-foreground">{entry.summary}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{summary}</p>
       {/* The field this whole screen exists to be honest about. Not a badge: for most of these the
           limit is the CREDENTIAL, and a one-word "read-only" chip would say the opposite. */}
-      <p className="mt-1.5 text-xs text-muted-foreground">{entry.containment}</p>
+      <p className="mt-1.5 text-xs text-muted-foreground">{containment}</p>
       {entry.secrets.length ? (
         <p className="mt-1.5 text-xs text-muted-foreground">
           {t("mcp.catalog.asks", { n: entry.secrets.map((s) => s.key).join(", ") })}
