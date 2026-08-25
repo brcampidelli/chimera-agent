@@ -4728,6 +4728,17 @@
             "default": "semantic",
             "title": "Kind",
             "type": "string"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project"
           }
         },
         "required": [
@@ -4804,6 +4815,17 @@
           "kind": {
             "title": "Kind",
             "type": "string"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project"
           },
           "provenance": {
             "title": "Provenance",

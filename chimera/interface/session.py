@@ -15,7 +15,7 @@ from typing import Any, Protocol
 
 from chimera.core.agent import AgentResult, ToolActivity
 from chimera.memory.gate import MemoryGate
-from chimera.memory.models import MemoryItem
+from chimera.memory.models import EVERY_PROJECT, MemoryItem
 
 
 class SupportsRun(Protocol):
@@ -233,12 +233,17 @@ def recall_facts(
     gate: Any = None,
     k: int = 3,
     search: Any = None,
+    project: str | None = EVERY_PROJECT,
 ) -> tuple[list[str], str | None]:
     """Long-term facts relevant to ``message``: gated keyword/semantic hits + graph-linked facts.
 
     Returns ``(facts, layer)``. ``layer`` names the retrieval layer(s) that actually contributed —
     e.g. ``"semantic"``, ``"fts"``, ``"keyword"``, ``"keyword+graph"`` — or None when nothing was
     recalled. It reflects real hits (never guessed): a layer that returns nothing is not listed.
+
+    ``project`` narrows what may be recalled to that folder's facts plus the ones that belong
+    everywhere. It defaults to :data:`EVERY_PROJECT` — no narrowing — because this function is also
+    the chat's recall, and a conversation with no folder open is not a project.
     """
     facts: list[str] = []
     layers: list[str] = []
@@ -250,10 +255,17 @@ def recall_facts(
         if search is not None:
             items = search(message, on_layer)
         else:
+            # Graded, one keyword at a time. A single try/except around both was measured to
+            # drop `on_layer` whenever `project` was unsupported: the facts still arrived and the
+            # layer came back None, so the UI reported "nothing contributed" about a recall that
+            # had. A tolerance that swallows the wrong argument reports a lie instead of failing.
             try:
-                items = memory.search(message, k=k, on_layer=on_layer)
-            except TypeError:  # a minimal SupportsRecall fake that doesn't accept on_layer
-                items = memory.search(message, k=k)
+                items = memory.search(message, k=k, on_layer=on_layer, project=project)
+            except TypeError:
+                try:
+                    items = memory.search(message, k=k, on_layer=on_layer)
+                except TypeError:  # a minimal SupportsRecall fake that accepts neither
+                    items = memory.search(message, k=k)
         if gate is not None:
             items = gate.filter(items, message)  # admission gate (trust boundary)
         if items:

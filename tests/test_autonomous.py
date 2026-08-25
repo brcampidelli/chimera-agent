@@ -607,7 +607,8 @@ class RecordingMemory:
         self.saved: list[tuple[str, str | None]] = []
 
     def remember(
-        self, content: str, *, key: str | None = None, provenance: str = "clean"
+        self, content: str, *, key: str | None = None, provenance: str = "clean",
+        project: str | None = None,
     ) -> object:
         self.saved.append((content, key))
         return ("ADD", None)

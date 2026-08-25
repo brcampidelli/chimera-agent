@@ -83,6 +83,10 @@ def _item_dict(item: Any) -> dict[str, Any]:
         "kind": item.kind,
         "provenance": item.provenance,
         "source": item.source,
+        # Which folder this belongs to, or null for everywhere. On screen because the DEFAULT is
+        # now to save into the project you are in: without it shown, a fact meant for every project
+        # gets quietly filed under one and stops arriving, and nothing on the screen says why.
+        "project": getattr(item, "project", None),
     }
 
 
@@ -168,6 +172,10 @@ class MemoryAdd(BaseModel):
     content: str
     kind: str = "semantic"
     key: str | None = None
+    #: Which project this fact belongs to. Omitted means everywhere, which is what a fact
+    #: typed into the Memory screen usually is — the owner stating something, rather than
+    #: the agent noting what it learned inside one folder.
+    project: str | None = None
 
 
 class ApproveBody(BaseModel):
@@ -269,7 +277,12 @@ def register_features(
         if body.kind not in _MEMORY_KINDS:
             raise HTTPException(status_code=400, detail=f"kind must be one of {sorted(_MEMORY_KINDS)}")
         mgr = _memory_manager()
-        status, item = mgr.remember(body.content, body.kind, key=body.key)
+        # `project` omitted means everywhere, and that is right for this route: a fact typed
+        # by hand into the Memory screen is the owner stating something, not the agent noting
+        # what it learned while working in a folder.
+        status, item = mgr.remember(
+            body.content, body.kind, key=body.key, project=body.project
+        )
         return {"status": status, "item": _item_dict(item)}
 
     @app.delete("/api/memory/{item_id}", dependencies=[guard], response_model=DeletedOut)

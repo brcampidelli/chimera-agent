@@ -181,7 +181,12 @@ class SupportsRemember(Protocol):
     """Anything that can store a durable fact (a MemoryManager)."""
 
     def remember(
-        self, content: str, *, key: str | None = None, provenance: str = "clean"
+        self,
+        content: str,
+        *,
+        key: str | None = None,
+        provenance: str = "clean",
+        project: str | None = None,
     ) -> object: ...
 
 
@@ -1237,8 +1242,14 @@ class AutonomousAgent:
             return
         snippet = next((line.strip() for line in answer.splitlines() if line.strip()), "")[:160]
         fact = f"Accomplished: {task}" + (f" — {snippet}" if snippet else "")
+        # Scoped to the folder the work happened in. "Accomplished: <task>" is about THIS
+        # codebase, and a note from one project arriving as context in another is the noise this
+        # exists to stop. A run with no workspace has no project and stays global.
         self.memory.remember(
-            fact, key=f"solve:{_slug(task)}", provenance="tainted" if tainted else "clean"
+            fact,
+            key=f"solve:{_slug(task)}",
+            provenance="tainted" if tainted else "clean",
+            project=str(self.workspace) if self.workspace else None,
         )
 
     def _review(self, task: str, answer: str, context: str) -> tuple[bool, str]:

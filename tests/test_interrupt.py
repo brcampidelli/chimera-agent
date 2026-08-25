@@ -71,7 +71,10 @@ def test_approved_hollow_tainted_success_is_not_learned(tmp_path: Path) -> None:
         def __init__(self) -> None:
             self.saved: list[tuple[str, str]] = []
 
-        def remember(self, content: str, *, key: str | None = None, provenance: str = "clean") -> object:
+        def remember(
+            self, content: str, *, key: str | None = None, provenance: str = "clean",
+            project: str | None = None,
+        ) -> object:
             self.saved.append((content, provenance))
             return ("ADD", None)
 

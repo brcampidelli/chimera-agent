@@ -13,12 +13,12 @@ import json
 import sqlite3
 from pathlib import Path
 
-from chimera.memory.models import MemoryItem, MemoryKind
+from chimera.memory.models import EVERY_PROJECT, MemoryItem, MemoryKind
 
 # NOTE: provenance is a first-class column, not folded into metadata: it is a SECURITY signal
 # (a tainted memory must never launder itself to "clean"), and it must round-trip identically to the
 # JSON store or the guarantee breaks purely by backend choice.
-_COLUMNS = "id, kind, content, key, source, metadata, provenance"
+_COLUMNS = "id, kind, content, key, source, metadata, provenance, project"
 
 
 class SqliteMemoryStore:
@@ -29,14 +29,17 @@ class SqliteMemoryStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(str(self.path))
         self._fts = self._init_schema()
+        # Order matters: provenance first, because it rebuilds from a six-column layout and
+        # the project migration reads the seven-column one.
         self._migrate_provenance()
+        self._migrate_project()
 
     def _init_schema(self) -> bool:
         try:
             self._conn.execute(
                 "CREATE VIRTUAL TABLE IF NOT EXISTS memories USING fts5("
                 "id UNINDEXED, kind UNINDEXED, content, key UNINDEXED, source UNINDEXED, "
-                "metadata UNINDEXED, provenance UNINDEXED)"
+                "metadata UNINDEXED, provenance UNINDEXED, project UNINDEXED)"
             )
             self._conn.commit()
             return True
@@ -44,10 +47,35 @@ class SqliteMemoryStore:
             self._conn.execute(
                 "CREATE TABLE IF NOT EXISTS memories ("
                 "id TEXT PRIMARY KEY, kind TEXT, content TEXT, key TEXT, source TEXT, "
-                "metadata TEXT, provenance TEXT DEFAULT 'clean')"
+                "metadata TEXT, provenance TEXT DEFAULT 'clean', project TEXT)"
             )
             self._conn.commit()
             return False
+
+    def _migrate_project(self) -> None:
+        """Add the project column to a store created before it existed (rows stay global).
+
+        Same shape as the provenance migration below and for the same reason: an FTS5
+        virtual table cannot ALTER, so it is rebuilt. A row written before scoping existed
+        has no project and therefore belongs everywhere, which is the behaviour it always
+        had — an upgrade must not hide somebody's memories behind a folder they never chose.
+        """
+        cols = {r[1] for r in self._conn.execute("PRAGMA table_info(memories)").fetchall()}
+        if "project" in cols:
+            return
+        old = "id, kind, content, key, source, metadata, provenance"
+        rows = self._conn.execute(f"SELECT {old} FROM memories").fetchall()
+        if self._fts:
+            self._conn.execute("DROP TABLE memories")
+            self._init_schema()
+            if rows:
+                self._conn.executemany(
+                    f"INSERT INTO memories ({_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)",
+                    rows,
+                )
+        else:
+            self._conn.execute("ALTER TABLE memories ADD COLUMN project TEXT")
+        self._conn.commit()
 
     def _migrate_provenance(self) -> None:
         """Add the provenance column to a store created before it existed (rows default to 'clean').
@@ -72,8 +100,8 @@ class SqliteMemoryStore:
         self._conn.commit()
 
     @staticmethod
-    def _to_item(row: tuple[str, str, str, str, str, str, str]) -> MemoryItem:
-        item_id, kind, content, key, source, metadata, provenance = row
+    def _to_item(row: tuple[str, str, str, str, str, str, str, str | None]) -> MemoryItem:
+        item_id, kind, content, key, source, metadata, provenance, project = row
         return MemoryItem(
             id=item_id,
             kind=kind,  # type: ignore[arg-type]
@@ -82,14 +110,18 @@ class SqliteMemoryStore:
             source=source,
             metadata=json.loads(metadata) if metadata else {},
             provenance=provenance or "clean",
+            # Empty string and NULL both mean global. SQLite hands back one or the other
+            # depending on whether the row predates the column, and a fact scoped to a
+            # project named "" is not a thing.
+            project=project or None,
         )
 
     def add(self, item: MemoryItem) -> None:
         self._conn.execute("DELETE FROM memories WHERE id = ?", (item.id,))
         self._conn.execute(
-            f"INSERT INTO memories ({_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            f"INSERT INTO memories ({_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (item.id, item.kind, item.content, item.key or "", item.source,
-             json.dumps(item.metadata), item.provenance),
+             json.dumps(item.metadata), item.provenance, item.project),
         )
         self._conn.commit()
 
@@ -115,7 +147,9 @@ class SqliteMemoryStore:
         ).fetchall()
         return [self._to_item(row) for row in rows]
 
-    def search(self, query: str, k: int = 5) -> list[MemoryItem]:
+    def search(
+        self, query: str, k: int = 5, *, project: str | None = EVERY_PROJECT
+    ) -> list[MemoryItem]:
         """Full-text recall (FTS5 MATCH; LIKE fallback), best matches first.
 
         Through the same tokenizer and the same function-word list the keyword path uses. This
@@ -128,12 +162,23 @@ class SqliteMemoryStore:
         terms = sorted(informative(tokens(query)))
         if not terms:
             return []
+        # Scoped in SQL, not afterwards: a LIMIT applied before the filter returns the wrong
+        # page — k rows of other projects while this project's sat below the cut.
+        escopo_params: list[object]
+        if project == EVERY_PROJECT:
+            escopo, escopo_params = "", []
+        elif project is None:
+            escopo, escopo_params = " AND project IS NULL", []
+        else:
+            escopo, escopo_params = " AND (project IS NULL OR project = ?)", [project]
+
         if self._fts:
             match = " OR ".join(terms)
             try:
                 rows = self._conn.execute(
-                    f"SELECT {_COLUMNS} FROM memories WHERE content MATCH ? ORDER BY rank LIMIT ?",
-                    (match, k),
+                    f"SELECT {_COLUMNS} FROM memories WHERE content MATCH ?{escopo} "
+                    "ORDER BY rank LIMIT ?",
+                    (match, *escopo_params, k),
                 ).fetchall()
                 if rows:
                     return [self._to_item(row) for row in rows]
@@ -145,9 +190,10 @@ class SqliteMemoryStore:
                 pass  # malformed FTS query — fall through to LIKE
         clause = " OR ".join("lower(content) LIKE ?" for _ in terms)
         params: list[object] = [f"%{term}%" for term in terms]
+        params.extend(escopo_params)
         params.append(k)
         rows = self._conn.execute(
-            f"SELECT {_COLUMNS} FROM memories WHERE {clause} LIMIT ?", params
+            f"SELECT {_COLUMNS} FROM memories WHERE ({clause}){escopo} LIMIT ?", params
         ).fetchall()
         return [self._to_item(row) for row in rows]
 
