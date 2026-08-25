@@ -4468,6 +4468,126 @@
         "title": "McpAddRequest",
         "type": "object"
       },
+      "McpCatalogEntry": {
+        "description": "A verified way to run one MCP server.\n\n``available`` is resolved on the SERVER, because only this process can see the machine's PATH \u2014\nan entry offered where its runner is missing is the failure the catalogue exists to remove.\n\n``containment`` is the field that carries its weight: for most servers what limits the damage is\nthe CREDENTIAL (a database grant, a token scope), not the tool list, and a \"read-only\" badge\nwould say the opposite.",
+        "properties": {
+          "args": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Args",
+            "type": "array"
+          },
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "command": {
+            "title": "Command",
+            "type": "string"
+          },
+          "containment": {
+            "default": "",
+            "title": "Containment",
+            "type": "string"
+          },
+          "docs": {
+            "default": "",
+            "title": "Docs",
+            "type": "string"
+          },
+          "env": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Env",
+            "type": "object"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "official": {
+            "default": true,
+            "title": "Official",
+            "type": "boolean"
+          },
+          "runner": {
+            "title": "Runner",
+            "type": "string"
+          },
+          "secrets": {
+            "items": {
+              "$ref": "#/components/schemas/McpCatalogSecret"
+            },
+            "title": "Secrets",
+            "type": "array"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "summary",
+          "runner",
+          "available",
+          "command"
+        ],
+        "title": "McpCatalogEntry",
+        "type": "object"
+      },
+      "McpCatalogOut": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/McpCatalogEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          }
+        },
+        "required": [
+          "entries",
+          "count"
+        ],
+        "title": "McpCatalogOut",
+        "type": "object"
+      },
+      "McpCatalogSecret": {
+        "description": "One environment variable a catalogue entry needs, and where the user gets it.",
+        "properties": {
+          "hint": {
+            "title": "Hint",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "hint"
+        ],
+        "title": "McpCatalogSecret",
+        "type": "object"
+      },
       "McpCfgOut": {
         "properties": {
           "autoload": {
@@ -9558,6 +9678,25 @@
           }
         },
         "summary": "Mcp Add Endpoint"
+      }
+    },
+    "/api/mcp/catalog": {
+      "get": {
+        "description": "Servers that are known to work, so connecting one is a choice rather than a transcription.\n\nStatic data plus one PATH lookup per entry \u2014 no connect, no network, nothing spawned. The\nlookup is the reason this is a route at all rather than a constant in the frontend: only\nthis process can see whether `docker` or `uvx` exists on the machine.",
+        "operationId": "mcp_catalog_endpoint_api_mcp_catalog_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpCatalogOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Mcp Catalog Endpoint"
       }
     },
     "/api/mcp/{name}": {

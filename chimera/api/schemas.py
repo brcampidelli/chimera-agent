@@ -106,6 +106,44 @@ class FsMadeDirOut(BaseModel):
     created: bool
 
 
+class McpCatalogSecret(BaseModel):
+    """One environment variable a catalogue entry needs, and where the user gets it."""
+
+    key: str
+    hint: str
+    source: str = ""
+
+
+class McpCatalogEntry(BaseModel):
+    """A verified way to run one MCP server.
+
+    ``available`` is resolved on the SERVER, because only this process can see the machine's PATH —
+    an entry offered where its runner is missing is the failure the catalogue exists to remove.
+
+    ``containment`` is the field that carries its weight: for most servers what limits the damage is
+    the CREDENTIAL (a database grant, a token scope), not the tool list, and a "read-only" badge
+    would say the opposite.
+    """
+
+    id: str
+    label: str
+    summary: str
+    runner: str
+    available: bool
+    command: str
+    args: list[str] = Field(default_factory=list)
+    env: dict[str, str] = Field(default_factory=dict)
+    secrets: list[McpCatalogSecret] = Field(default_factory=list)
+    containment: str = ""
+    official: bool = True
+    docs: str = ""
+
+
+class McpCatalogOut(BaseModel):
+    entries: list[McpCatalogEntry]
+    count: int
+
+
 class DeletedCountOut(BaseModel):
     """How many records a delete actually removed.
 
