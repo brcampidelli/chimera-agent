@@ -1767,21 +1767,18 @@ def desktop_app(
     # across sessions. Off by default (fast, no subprocess). A broken server is skipped gracefully so
     # it can never break boot; toggling this needs a restart to take effect. Connect eagerly here (not
     # per-session) so the subprocesses aren't respawned for every new chat.
+    # Through the shared pool rather than a second set of connections. This block used to build its
+    # own, and when the coding surfaces gained MCP they built THEIR own too — so with autoload on,
+    # one configured server became two subprocesses, two Docker containers, and for GitHub two
+    # sign-ins. Measured on a running app: one connection at boot with no turn run, two after a
+    # single turn on the Code screen. `connectors` is idempotent per process, so whichever surface
+    # asks first pays for the connect and the other reuses it.
     mcp_connectors = None
     if settings.mcp_autoload:
-        from chimera.integrations import ConnectorRegistry, MCPConnector, StdioMCPSession
-        from chimera.integrations.mcp_config import load_servers
+        from chimera.integrations import mcp_pool
 
-        mcp_connectors = ConnectorRegistry()
-        for cfg in load_servers(settings.home / "mcp.json"):
-            try:
-                sess = StdioMCPSession(
-                    cfg.command, cfg.args or None, cfg.env or None, connect_timeout=10.0
-                ).start()
-                mcp_connectors.register(MCPConnector(cfg.name, sess, name_prefix=f"{cfg.name}_"))
-            except Exception as exc:  # noqa: BLE001 — a broken server must never break app boot
-                console.print(f"[yellow]MCP: skipping '{cfg.name}' ({type(exc).__name__})[/yellow]")
-        loaded = len(mcp_connectors.names())
+        mcp_connectors = mcp_pool.connectors(settings)
+        loaded = len(mcp_connectors.names()) if mcp_connectors is not None else 0
         console.print(f"[dim]MCP autoload: {loaded} server(s) connected[/dim]")
 
     def factory() -> ChatSession:
