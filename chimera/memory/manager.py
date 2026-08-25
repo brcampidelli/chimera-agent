@@ -18,7 +18,6 @@ from chimera.memory.store import MemoryBackend
 from chimera.telemetry import get_logger
 
 _log = get_logger("memory.manager")
-_TOKEN = re.compile(r"[a-z0-9]+")
 
 
 def _normalize(text: str) -> str:
@@ -247,10 +246,14 @@ class MemoryManager:
         hits — ``"semantic"`` | ``"fts"`` | ``"keyword"`` — and never when a layer returns nothing,
         so a UI can honestly show which layer contributed rather than guessing.
         """
+        from chimera.memory.tokens import idf_weights, informative, tokens
+
         # A tokenless query (blank/whitespace/punctuation) has nothing to match — return [] up front
         # so every path agrees. Otherwise the semantic path would embed "" and return k arbitrary
-        # items while the keyword/FTS paths correctly return nothing.
-        if not _TOKEN.findall(query.lower()):
+        # items while the keyword/FTS paths correctly return nothing. Through the SAME tokenizer the
+        # keyword path uses: with two, a query written in Cyrillic was "tokenless" here and
+        # matchable there.
+        if not tokens(query):
             return []
         if self._semantic is not None:
             try:
@@ -267,15 +270,33 @@ class MemoryManager:
             if result and on_layer is not None:
                 on_layer("fts")
             return result
-        terms = set(_TOKEN.findall(query.lower()))
+        # Function words dropped BEFORE anything else. A real store of two facts recalled both of
+        # them for a sentence about compiling a kernel, on `o`, `com`, `a`, `e` — and inverse
+        # document frequency cannot catch that, because with two documents a word in one of them
+        # looks maximally rare. Measured, not assumed: the IDF-only version left every one of those
+        # false hits in place.
+        terms = informative(tokens(query))
         if not terms:
             return []
-        scored: list[tuple[int, str, MemoryItem]] = []
-        for item in self.store.all():
-            haystack = set(_TOKEN.findall(item.content.lower()))
-            score = len(terms & haystack)
-            if score:
-                scored.append((score, item.id, item))
+        # Read once: `store.all()` can be a file read, and this used to call it inside the loop's
+        # own iteration anyway.
+        corpus = [(item, set(tokens(item.content))) for item in self.store.all()]
+        weights = idf_weights(terms, [list(hay) for _, hay in corpus])
+        scored: list[tuple[float, str, MemoryItem]] = []
+        for item, haystack in corpus:
+            matched = terms & haystack
+            if not matched:
+                continue
+            # Ranked by how much each term distinguishes THIS fact from the others; a term
+            # common to every stored fact weighs nothing and simply does not lift a result up the
+            # list. NOT used to reject: a floor of `log(2)` was tried and dropped, because a query
+            # whose only real word appears in every fact ("how should answers be?" against two facts
+            # that both mention answers) scored exactly zero and recalled nothing. Rejecting the
+            # noise is the stopword list's job, and it does it without that side effect.
+            score = (
+                sum(weights.get(t, 0.0) for t in matched) if weights else 0.0
+            ) or float(len(matched))
+            scored.append((score, item.id, item))
         scored.sort(key=lambda entry: (-entry[0], entry[1]))
         top = [item for _, _, item in scored[:k]]
         if top and on_layer is not None:

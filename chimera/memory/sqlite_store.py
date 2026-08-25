@@ -10,7 +10,6 @@ FTS5 ships with most Python builds; if it is missing, this degrades to a ``LIKE`
 from __future__ import annotations
 
 import json
-import re
 import sqlite3
 from pathlib import Path
 
@@ -20,7 +19,6 @@ from chimera.memory.models import MemoryItem, MemoryKind
 # (a tainted memory must never launder itself to "clean"), and it must round-trip identically to the
 # JSON store or the guarantee breaks purely by backend choice.
 _COLUMNS = "id, kind, content, key, source, metadata, provenance"
-_TOKEN = re.compile(r"[a-z0-9]+")
 
 
 class SqliteMemoryStore:
@@ -118,8 +116,16 @@ class SqliteMemoryStore:
         return [self._to_item(row) for row in rows]
 
     def search(self, query: str, k: int = 5) -> list[MemoryItem]:
-        """Full-text recall (FTS5 MATCH; LIKE fallback), best matches first."""
-        terms = _TOKEN.findall(query.lower())
+        """Full-text recall (FTS5 MATCH; LIKE fallback), best matches first.
+
+        Through the same tokenizer and the same function-word list the keyword path uses. This
+        backend has its own search and so bypassed both: with the JSON store fixed, *"o que e isso?"*
+        recalled nothing, and against SQLite it still recalled every fact in the store. One rule
+        about what a query means, or the answer depends on which backend the owner picked.
+        """
+        from chimera.memory.tokens import informative, tokens
+
+        terms = sorted(informative(tokens(query)))
         if not terms:
             return []
         if self._fts:
@@ -129,7 +135,12 @@ class SqliteMemoryStore:
                     f"SELECT {_COLUMNS} FROM memories WHERE content MATCH ? ORDER BY rank LIMIT ?",
                     (match, k),
                 ).fetchall()
-                return [self._to_item(row) for row in rows]
+                if rows:
+                    return [self._to_item(row) for row in rows]
+                # Nothing, rather than an error — fall through to LIKE instead of returning empty.
+                # FTS5's tokenizer indexes a run of Han as ONE token, while `tokens` splits it per
+                # character so a query can reach inside a sentence; those two disagree, and LIKE
+                # (a substring match) is the one that can still find it.
             except sqlite3.OperationalError:
                 pass  # malformed FTS query — fall through to LIKE
         clause = " OR ".join("lower(content) LIKE ?" for _ in terms)
