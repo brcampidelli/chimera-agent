@@ -75,6 +75,7 @@ class Scheduler:
         now: float,
         created_by: CreatedBy = "human",
         workspace: str | None = None,
+        deliver_to: str | None = None,
     ) -> CronJob:
         if not croniter.is_valid(cron_expr):
             raise ValueError(f"invalid cron expression: {cron_expr!r}")
@@ -90,6 +91,7 @@ class Scheduler:
             enabled=created_by != "agent",
             next_run=_next_after(cron_expr, now),
             workspace=workspace,
+            deliver_to=deliver_to,
         )
         self.store.add(job)
         return job

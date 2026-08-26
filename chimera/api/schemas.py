@@ -835,6 +835,8 @@ class CronJobOut(BaseModel):
     workspace: str | None = None
     """The folder this job works in. None means the root the process was started with — which on a
     packaged build is the install directory, so the screen says so rather than leaving it blank."""
+    deliver_to: str | None = None
+    """A chat webhook URL the answer is posted to, or None to only write it to the result file."""
 
 
 class MessagingPlatformOut(BaseModel):
@@ -854,6 +856,8 @@ class CronCreateIn(BaseModel):
     workspace: str | None = None
     """The folder the job works in. Sent by the screen from the project the user chose; a client
     that omits it gets the process root, which is the previous behaviour."""
+    deliver_to: str | None = None
+    """Optional chat webhook (Discord or Slack) the answer is posted to when the job fires."""
 
 
 # --- tasks (kanban + projects) --------------------------------------------------------------------

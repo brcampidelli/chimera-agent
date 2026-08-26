@@ -3333,6 +3333,8 @@ export interface components {
         CronCreateIn: {
             /** Action */
             action: string;
+            /** Deliver To */
+            deliver_to?: string | null;
             /** Name */
             name: string;
             /** Schedule */
@@ -3351,6 +3353,8 @@ export interface components {
             consecutive_failures: number;
             /** Created By */
             created_by: string;
+            /** Deliver To */
+            deliver_to?: string | null;
             /** Enabled */
             enabled: boolean;
             /** Id */

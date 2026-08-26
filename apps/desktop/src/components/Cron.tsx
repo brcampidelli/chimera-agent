@@ -15,18 +15,34 @@ const PRESETS: { key: string; cron: string }[] = [
   { key: "cron.preset.weekdays", cron: "0 9 * * 1-5" },
 ];
 
+/** The host of a webhook URL, for showing where a job delivers without showing the secret.
+ *
+ * Falls back to the raw value only when it does not parse as a URL: an unparseable `deliver_to` is
+ * something the user typed and needs to see to fix, and hiding it would leave them staring at a row
+ * that says nothing.
+ */
+export function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+}
+
 function AddSchedule() {
   const t = useT();
   const qc = useQueryClient();
   const [name, setName] = useState("");
   const [schedule, setSchedule] = useState("0 7 * * *");
   const [action, setAction] = useState("");
+  const [deliverTo, setDeliverTo] = useState("");
   const create = useMutation({
     mutationFn: createCron,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["cron"] });
       setName("");
       setAction("");
+      setDeliverTo("");
     },
   });
   const canSubmit = name.trim() && schedule.trim() && action.trim() && !create.isPending;
@@ -68,6 +84,19 @@ function AddSchedule() {
           value={schedule}
           onChange={(e) => setSchedule(e.target.value)}
         />
+        {/* Optional, and a webhook URL rather than a bot token: a bot needs an application, an
+            invite and a server you administer, while a webhook is a URL you copy out of a channel's
+            settings. That is the difference between something every user can switch on and
+            something only the author of the app has set up. Left empty, the answer still lands in
+            the result file — which is what happened to EVERY answer before this field did
+            anything at all. */}
+        <input
+          className="field w-full px-3 py-2 font-mono text-xs"
+          placeholder={t("cron.add.deliver")}
+          aria-label={t("cron.add.deliver")}
+          value={deliverTo}
+          onChange={(e) => setDeliverTo(e.target.value)}
+        />
         <div className="flex items-center justify-between gap-3 pt-0.5">
           <span className="text-xs text-muted-foreground">{t("cron.add.hint")}</span>
           <Button
@@ -75,7 +104,14 @@ function AddSchedule() {
               // The folder the job will work in, fixed at the moment it is written rather than
               // read when it fires: a schedule runs for months, and "whichever project was open
               // at 7am" is not a root anybody chose.
-              canSubmit && create.mutate({ name, schedule, action, workspace: readWorkspace() || null })
+              canSubmit &&
+              create.mutate({
+                name,
+                schedule,
+                action,
+                workspace: readWorkspace() || null,
+                deliver_to: deliverTo.trim() || null,
+              })
             }
             disabled={!canSubmit}
           >
@@ -138,6 +174,14 @@ export function Cron({ embedded = false }: { embedded?: boolean } = {}) {
                 {j.workspace && (
                   <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground" title={j.workspace}>
                     {j.workspace}
+                  </div>
+                )}
+                {/* The HOST, never the URL. A webhook URL is a credential — anyone who reads it off
+                    a shared screen can post into that channel — and the host is what answers the
+                    question the row is asking: where does this end up? */}
+                {j.deliver_to && (
+                  <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {t("cron.deliversTo", { host: hostOf(j.deliver_to) })}
                   </div>
                 )}
                 {/* Inline, not a tooltip. WHY it failed is the whole reason to look at this row, and

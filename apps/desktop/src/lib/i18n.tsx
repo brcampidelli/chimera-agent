@@ -406,6 +406,8 @@ const en: Dict = {
   "cron.add.name": "name (e.g. morning brief)",
   "cron.add.action": "what should Chimera do? (e.g. summarise my unread email)",
   "cron.add.when": "when — cron: minute hour day month weekday",
+  "cron.add.deliver": "Discord or Slack webhook URL (optional)",
+  "cron.deliversTo": "delivers to {host}",
   "cron.add.submit": "Schedule",
   "cron.add.error": "Couldn't schedule — check the time expression.",
   "cron.add.presets": "Quick pick:",
@@ -1567,6 +1569,8 @@ const pt: Dict = {
   "cron.add.action":
     "o que o Chimera deve fazer? (ex.: resumir meus e-mails não lidos)",
   "cron.add.when": "quando — cron: minuto hora dia mês dia-da-semana",
+  "cron.add.deliver": "URL de webhook do Discord ou Slack (opcional)",
+  "cron.deliversTo": "entrega em {host}",
   "cron.add.submit": "Agendar",
   "cron.add.error":
     "Não foi possível agendar — verifique a expressão de horário.",
@@ -2406,6 +2410,8 @@ const es: Dict = {
   "cron.add.action":
     "¿qué debería hacer Chimera? (p. ej. resume mis correos sin leer)",
   "cron.add.when": "cuándo — cron: minuto hora día mes día-semana",
+  "cron.add.deliver": "URL de webhook de Discord o Slack (opcional)",
+  "cron.deliversTo": "entrega en {host}",
   "cron.add.submit": "Programar",
   "cron.add.error": "No se pudo programar — revisa la expresión de tiempo.",
   "cron.add.presets": "Elección rápida:",
@@ -3588,6 +3594,8 @@ const fr: Dict = {
   "cron.add.action":
     "que doit faire Chimera ? (par ex. résume mes e-mails non lus)",
   "cron.add.when": "quand — cron : minute heure jour mois jour-semaine",
+  "cron.add.deliver": "URL de webhook Discord ou Slack (facultatif)",
+  "cron.deliversTo": "livre sur {host}",
   "cron.add.submit": "Planifier",
   "cron.add.error":
     "Impossible de planifier — vérifiez l'expression temporelle.",
@@ -4781,6 +4789,8 @@ const de: Dict = {
   "cron.add.action":
     "Was soll Chimera tun? (z. B. fasse meine ungelesenen E-Mails zusammen)",
   "cron.add.when": "wann — cron: Minute Stunde Tag Monat Wochentag",
+  "cron.add.deliver": "Discord- oder Slack-Webhook-URL (optional)",
+  "cron.deliversTo": "liefert an {host}",
   "cron.add.submit": "Planen",
   "cron.add.error": "Konnte nicht geplant werden — prüfe den Zeitausdruck.",
   "cron.add.presets": "Schnellauswahl:",
@@ -5968,6 +5978,8 @@ const zh: Dict = {
   "cron.add.name": "名称（例如：早间简报）",
   "cron.add.action": "要 Chimera 做什么？（例如：总结我的未读邮件）",
   "cron.add.when": "何时 —— cron：分 时 日 月 周",
+  "cron.add.deliver": "Discord 或 Slack 的 webhook 链接（可选）",
+  "cron.deliversTo": "发送到 {host}",
   "cron.add.submit": "排程",
   "cron.add.error": "排程失败——请检查时间表达式。",
   "cron.add.presets": "快速选择：",
@@ -7085,6 +7097,8 @@ const ja: Dict = {
   "cron.add.name": "名前（例：朝のブリーフィング）",
   "cron.add.action": "Chimera に何をさせますか？（例：未読メールを要約して）",
   "cron.add.when": "いつ — cron: 分 時 日 月 曜日",
+  "cron.add.deliver": "Discord または Slack の webhook URL（任意）",
+  "cron.deliversTo": "{host} に届けます",
   "cron.add.submit": "スケジュール",
   "cron.add.error":
     "スケジュールできませんでした — 時刻の書式を確認してください。",
@@ -8594,6 +8608,8 @@ const it: Dict = {
   "cron.add.action":
     "cosa dovrebbe fare Chimera? (es. riassumi le mie email non lette)",
   "cron.add.when": "quando — cron: minuto ora giorno mese giorno-settimana",
+  "cron.add.deliver": "URL webhook di Discord o Slack (facoltativo)",
+  "cron.deliversTo": "consegna su {host}",
   "cron.add.submit": "Pianifica",
   "cron.add.error":
     "Non è stato possibile pianificare — controlla l'espressione temporale.",
@@ -9778,6 +9794,8 @@ const pl: Dict = {
   "cron.add.action":
     "co Chimera ma zrobić? (np. streść moje nieprzeczytane maile)",
   "cron.add.when": "kiedy — cron: minuta godzina dzień miesiąc dzień-tygodnia",
+  "cron.add.deliver": "Adres webhooka Discord lub Slack (opcjonalnie)",
+  "cron.deliversTo": "wysyła na {host}",
   "cron.add.submit": "Zaplanuj",
   "cron.add.error": "Nie udało się zaplanować — sprawdź wyrażenie czasowe.",
   "cron.add.presets": "Szybki wybór:",
@@ -10957,6 +10975,8 @@ const ru: Dict = {
   "cron.add.action":
     "что должна сделать Chimera? (например, кратко изложить непрочитанную почту)",
   "cron.add.when": "когда — cron: минута час день месяц день_недели",
+  "cron.add.deliver": "URL вебхука Discord или Slack (необязательно)",
+  "cron.deliversTo": "отправляет в {host}",
   "cron.add.submit": "Запланировать",
   "cron.add.error": "Не удалось запланировать — проверьте выражение времени.",
   "cron.add.presets": "Быстрый выбор:",
