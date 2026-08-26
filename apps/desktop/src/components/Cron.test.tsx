@@ -41,6 +41,9 @@ describe("Cron — create a schedule from the UI", () => {
           // Which folder the job will work in — null here because this test chose no project.
           // Sent on creation rather than read when it fires: see Cron.workspace.test.tsx.
           workspace: null,
+          // And where its answer goes. Null is "only the result file", which is what every
+          // schedule did before this field was wired to anything: see Cron.deliver.test.tsx.
+          deliver_to: null,
         },
         expect.anything(), // react-query passes a context object as the 2nd arg
       ),

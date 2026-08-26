@@ -1885,8 +1885,6 @@ def _start_cron_daemon(
     backend: SupportsComplete, model: str | None, max_steps: int, workspace: Path, tick: int
 ) -> Any:
     """Start the cron daemon in a background thread; return its stop event."""
-    import json
-    import time
     from datetime import UTC, datetime
 
     from chimera.api.usage import UsageRecord, append_usage, spent_today
@@ -1895,6 +1893,7 @@ def _start_cron_daemon(
     from chimera.core.instructions import render as render_identity
     from chimera.orchestration.budget import BudgetExceeded
     from chimera.scheduler import CronDaemon, CronJob, Scheduler, make_agent_dispatch
+    from chimera.scheduler.delivery import make_deliver
     from chimera.tools import default_registry
 
     scheduler = Scheduler(_cron_store())
@@ -2004,19 +2003,13 @@ def _start_cron_daemon(
 
     results_path = get_settings().home / "scheduler" / "cron_results.jsonl"
 
-    def deliver(job: CronJob, answer: str) -> None:
-        """Durable sink: append every cron result so nothing is silently lost."""
-        results_path.parent.mkdir(parents=True, exist_ok=True)
-        record = {
-            "at": time.time(),
-            "id": job.id,
-            "name": job.name,
-            "action": job.action,
-            "deliver_to": job.deliver_to,
-            "answer": answer,
-        }
-        with results_path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+    # The result file always, and the job's chat webhook when it names one. Built by
+    # `make_deliver` rather than written here: the defect it replaces was in the wiring rather than
+    # in any mechanism — `deliver_to` was declared, copied into the record, and read by nothing —
+    # and a sink that lives in a module is one a test can reach.
+    deliver = make_deliver(
+        results_path, warn=lambda linha: console.print(f"[yellow]{linha}[/yellow]")
+    )
 
     daemon = CronDaemon(
         scheduler, make_agent_dispatch(run_task, deliver, run_job=run_job), tick_seconds=tick

@@ -2352,6 +2352,17 @@
             "title": "Action",
             "type": "string"
           },
+          "deliver_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deliver To"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -2394,6 +2405,17 @@
           "created_by": {
             "title": "Created By",
             "type": "string"
+          },
+          "deliver_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deliver To"
           },
           "enabled": {
             "title": "Enabled",

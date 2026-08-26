@@ -74,6 +74,7 @@ def _job_dict(job: Any) -> dict[str, Any]:
         "consecutive_failures": job.consecutive_failures,
         "created_by": job.created_by,
         "workspace": job.workspace,
+        "deliver_to": job.deliver_to,
     }
 
 
@@ -469,6 +470,7 @@ def register_features(
                 now=time.time(),
                 created_by="human",
                 workspace=body.workspace,
+                deliver_to=body.deliver_to,
             )
         except ValueError as exc:  # an invalid cron expression is a client error, not a 500
             raise HTTPException(status_code=400, detail=str(exc)) from exc
