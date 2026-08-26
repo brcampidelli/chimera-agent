@@ -46,9 +46,9 @@ def fuso(monkeypatch: pytest.MonkeyPatch):
         time.tzset()
 
 
-def _agendar(tmp_path: Path, expr: str) -> float:
+def _agendar(tmp_path: Path, expr: str, *, now: float = NOW) -> float:
     sched = Scheduler(CronStore(tmp_path / "jobs.json"))
-    job = sched.schedule_cron("resumo", expr, "diga bom dia", now=NOW)
+    job = sched.schedule_cron("resumo", expr, "diga bom dia", now=now)
     assert job.next_run is not None
     return job.next_run
 
@@ -89,6 +89,22 @@ def test_in_utc_both_readings_agree_which_is_why_this_survived(tmp_path: Path, f
     quando = datetime.fromtimestamp(_agendar(tmp_path, "0 7 * * *"), tz=None)
     assert quando.hour == 7
     assert os.environ["TZ"] == "UTC"
+
+
+def test_a_timestamp_near_the_epoch_does_not_raise(tmp_path: Path) -> None:
+    """Small ``now`` values must survive, on every platform — and this one is not hypothetical.
+
+    Reading the clock locally invites a trap that only exists west of Greenwich: a naive
+    ``fromtimestamp(60)`` lands in 1969, and asking Windows for the local offset of a pre-1970
+    instant raises ``OSError: [Errno 22]``. The scheduler's own tests pass ``now=60``, so the naive
+    form took the entire Windows job down while Linux and WSL stayed green — which is how it reached
+    CI in the first place.
+
+    No zone fixture and no skip: this one has to run everywhere, because the platform IS the
+    variable. On Linux it is a cheap assertion; on Windows it is the regression.
+    """
+    for quando in (0.0, 60.0, 3600.0):
+        assert _agendar(tmp_path, "0 7 * * *", now=quando) > quando
 
 
 @sem_tzset

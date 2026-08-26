@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
 
 from croniter import croniter
 
@@ -50,11 +50,13 @@ def _next_after(cron_expr: str, after_epoch: float) -> float:
     A server in UTC is unaffected: local time IS UTC there, which is why the defect could sit in a
     codebase whose deployment target is a container. It only shows on the machine of a person.
 
-    ``astimezone()`` makes the offset explicit rather than leaving a naive datetime: croniter is
-    given an aware base either way, and the DST transitions stay the platform's problem rather than
-    becoming ours.
+    Built through UTC rather than straight to local, which is not stylistic. A naive
+    ``fromtimestamp(x)`` west of Greenwich puts a small ``x`` in 1969, and asking Windows for the
+    local offset of a pre-1970 instant raises ``OSError: [Errno 22]``. The scheduler's own tests
+    pass ``now=60``, so the naive form took the whole Windows suite down — on Linux and on WSL it is
+    fine, which is why it reached CI. An aware datetime converts by arithmetic and never asks.
     """
-    base = datetime.fromtimestamp(after_epoch).astimezone()
+    base = datetime.fromtimestamp(after_epoch, tz=UTC).astimezone()
     return float(croniter(cron_expr, base).get_next(float))
 
 
