@@ -2359,6 +2359,17 @@
           "schedule": {
             "title": "Schedule",
             "type": "string"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
           }
         },
         "required": [
@@ -2447,6 +2458,17 @@
           "trigger": {
             "title": "Trigger",
             "type": "string"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
           }
         },
         "required": [

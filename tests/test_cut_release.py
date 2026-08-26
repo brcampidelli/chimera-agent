@@ -1,6 +1,6 @@
 """Cutting a release — the two spellings, and the files it must not touch.
 
-The script exists because a release is seven files and two version formats, and both are the kind of
+The script exists because a release is eight files and two version formats, and both are the kind of
 thing that is right until one day it is not. So the tests are about the parts that would be wrong
 quietly: a version converted into the wrong SemVer, and a substitution that hits more than the
 line it was aimed at.
@@ -17,6 +17,28 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import cut_release  # noqa: E402
+
+#: Every module-level path `write_versions` writes to. A test redirects all of them or it edits the
+#: repository it is running inside — which is not hypothetical: adding `CARGO_LOCK` to the script
+#: and not to the test below left the real `Cargo.lock` stamped `0.48.0-rc.10`, a version that does
+#: not exist, and the suite passed while doing it.
+DESTINOS = ("PYPROJECT", "CARGO", "CARGO_LOCK", "TAURI")
+
+
+@pytest.fixture(autouse=True)
+def nunca_escreve_no_repositorio(monkeypatch, tmp_path: Path):
+    """Point every write target at a scratch copy, for every test in this file.
+
+    Autouse, because the failure is silent by nature: a test that forgets one target still passes.
+    Real content is copied in so the substitutions have something true to bite on; a test that
+    wants its own fixture content just overwrites the file it was given.
+    """
+    for nome in DESTINOS:
+        real: Path = getattr(cut_release, nome)
+        copia = tmp_path / real.name
+        copia.write_text(real.read_text(encoding="utf-8"), encoding="utf-8")
+        monkeypatch.setattr(cut_release, nome, copia)
+    return tmp_path
 
 
 @pytest.mark.parametrize(
@@ -70,8 +92,28 @@ def test_the_bump_hits_the_version_line_and_nothing_else(tmp_path: Path, monkeyp
         encoding="utf-8",
     )
 
+    # The lock, with a dependency that has a version line of its own — the thing an anchored
+    # `^version = ` would have rewritten instead.
+    cargo_lock = tmp_path / "Cargo.lock"
+    cargo_lock.write_text(
+        'version = 3\n'
+        '\n'
+        '[[package]]\n'
+        'name = "anyhow"\n'
+        'version = "1.0.86"\n'
+        '\n'
+        '[[package]]\n'
+        'name = "chimera-desktop"\n'
+        'version = "0.48.0-rc.9"\n'
+        'dependencies = [\n'
+        ' "serde",\n'
+        ']\n',
+        encoding="utf-8",
+    )
+
     monkeypatch.setattr(cut_release, "PYPROJECT", pyproject)
     monkeypatch.setattr(cut_release, "CARGO", cargo)
+    monkeypatch.setattr(cut_release, "CARGO_LOCK", cargo_lock)
     monkeypatch.setattr(cut_release, "TAURI", tauri)
 
     cut_release.write_versions("0.48.0rc10")
@@ -91,6 +133,12 @@ def test_the_bump_hits_the_version_line_and_nothing_else(tmp_path: Path, monkeyp
     # And nothing else moved. A release commit that reformats a config file it was only supposed
     # to bump has broken the promise the six-file check exists to make.
     assert '"targets": ["nsis", "dmg", "appimage", "deb"]' in after
+
+    # The lock records this package's own version, and only this package's. It sat two releases
+    # behind because nothing here wrote it: 0.46.0 against a Cargo.toml reading 0.48.0-rc.33.
+    lock_after = cargo_lock.read_text(encoding="utf-8")
+    assert 'name = "chimera-desktop"\nversion = "0.48.0-rc.10"' in lock_after
+    assert 'name = "anyhow"\nversion = "1.0.86"' in lock_after, "a dependency's pin was rewritten"
 
 
 def test_a_stale_install_stops_the_release_rather_than_stamping_the_old_version(monkeypatch) -> None:

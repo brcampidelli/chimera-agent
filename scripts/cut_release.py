@@ -2,7 +2,7 @@
 
 `main` is protected, so a release can no longer be a direct push — which is an improvement rather
 than an obstacle, because the version bump now passes CI *before* it lands instead of after. The
-extra steps are the reason this exists: nobody should have to remember six files and two different
+extra steps are the reason this exists: nobody should have to remember eight files and two different
 version formats to ship a release candidate.
 
     python scripts/cut_release.py 0.48.0rc10
@@ -36,6 +36,7 @@ TAURI = ROOT / "apps" / "desktop" / "src-tauri" / "tauri.conf.json"
 #: Not a version file by appearance, and one by behaviour: it records this package's own
 #: version, so a release that skips it leaves the repository contradicting itself.
 LOCK = ROOT / "uv.lock"
+CARGO_LOCK = ROOT / "apps" / "desktop" / "src-tauri" / "Cargo.lock"
 
 #: Generated, not edited. Each embeds the version it was produced for, so a release regenerates
 #: them rather than substituting a string — a hand-edited "generated" file is correct exactly once.
@@ -110,7 +111,7 @@ def installed_version() -> str:
 
 
 def check_clean_and_on_main() -> None:
-    # TRACKED changes only. Untracked files are not part of any commit — the release adds its six
+    # TRACKED changes only. Untracked files are not part of any commit — the release adds its eight
     # files by name — and every real checkout has some: scratch scripts, bench output, a venv. The
     # first run of this script on a real machine was refused by its own guard for exactly that.
     if run("git", "status", "--porcelain", "--untracked-files=no"):
@@ -142,6 +143,27 @@ def write_versions(version: str) -> None:
     if count != 1:
         raise Stop("could not find the version line in Cargo.toml")
     CARGO.write_text(text, encoding="utf-8")
+
+    # And the Cargo lock, which records this package's own version alongside its dependencies'.
+    # The same omission `refresh_lock` documents for `uv.lock`, found the same way: it said 0.46.0
+    # while Cargo.toml said 0.48.0-rc.33, two releases apart. Nothing broke, because cargo rewrites
+    # it on the next build — which is why nobody looked, and why every desktop build since carried
+    # an unexplained one-line diff that belonged to a release nobody was cutting at the time.
+    #
+    # Edited textually rather than by running `cargo update`: a release cut must not require a Rust
+    # toolchain on the machine cutting it, and the target is one line inside this package's own
+    # block. The name is part of the pattern for that reason — every one of the file's dependencies
+    # has a `version` line of its own, and an anchor on the line alone would rewrite the first.
+    text = CARGO_LOCK.read_text(encoding="utf-8")
+    text, count = re.subn(
+        r'(name = "chimera-desktop"\nversion = )".*"',
+        lambda m: m.group(1) + f'"{tauri_version}"',
+        text,
+        count=1,
+    )
+    if count != 1:
+        raise Stop("could not find chimera-desktop's own version line in Cargo.lock")
+    CARGO_LOCK.write_text(text, encoding="utf-8")
 
     # Substituted on the line, not parsed and re-dumped. `json.dumps` normalises formatting it
     # was never asked to touch: the first real cut with this expanded a compact
@@ -241,11 +263,11 @@ def check_only_expected_files_changed(version: str) -> list[str]:
     changed = sorted(run("git", "diff", "--name-only").splitlines())
     expected = sorted(
         str(path.relative_to(ROOT)).replace("\\", "/")
-        for path in [PYPROJECT, CARGO, TAURI, LOCK, *SNAPSHOTS]
+        for path in [PYPROJECT, CARGO, CARGO_LOCK, TAURI, LOCK, *SNAPSHOTS]
     )
     if changed != expected:
         raise Stop(
-            "a release should touch exactly the seven version files. This run changed:\n    "
+            "a release should touch exactly the eight version files. This run changed:\n    "
             + "\n    ".join(changed or ["(nothing — is that already the version?)"])
             + "\n  expected:\n    "
             + "\n    ".join(expected)
@@ -257,7 +279,7 @@ def preflight() -> None:
     """Everything this needs, checked before anything is written.
 
     `gh` is not optional here — the pull request is the whole point, and `main` is protected so
-    there is no fallback path. Checking late means bumping six files, regenerating three snapshots
+    there is no fallback path. Checking late means bumping eight files, regenerating three snapshots
     and only then finding out the release cannot be opened. Which is what happened the first time
     this ran under WSL, where `gh` is simply not installed.
     """
@@ -364,7 +386,7 @@ def main() -> None:
         changed = check_only_expected_files_changed(version)
     except SystemExit:
         # Leave the tree as it was: a half-applied bump is a trap for whoever runs `git status`
-        # next and sees three of six files changed.
+        # next and sees three of eight files changed.
         run("git", "checkout", "--", ".")
         raise
 

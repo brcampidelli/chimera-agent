@@ -203,6 +203,18 @@ export function Skills({ embedded = false }: { embedded?: boolean } = {}) {
                     {t("common.approve")}
                   </Button>
                 )}
+                {/* Retiring was a one-way door on this screen. The backend calls it "proposed for
+                    retirement, kept for review", and `approve` is documented as the transition that
+                    un-retires — but the only button that called it was gated on `pending`, so a
+                    retired skill had no control at all beside it. Found on a real install: one card,
+                    imported, retired, 0 uses, and no way back short of editing skills.json. Same
+                    route, different word: this is not approving a stranger's card, it is putting
+                    your own back to work. */}
+                {s.status === "retired" && (
+                  <Button size="sm" onClick={() => approve.mutate(s.name)}>
+                    {t("skills.reactivate")}
+                  </Button>
+                )}
                 {s.status !== "retired" && (
                   <Button size="sm" variant="outline" onClick={() => retire.mutate(s.name)}>
                     {t("skills.retire")}

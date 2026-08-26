@@ -34,7 +34,14 @@ describe("Cron — create a schedule from the UI", () => {
 
     await vi.waitFor(() =>
       expect(mockCreateCron).toHaveBeenCalledWith(
-        { name: "morning brief", schedule: "0 7 * * *", action: "summarise my email" },
+        {
+          name: "morning brief",
+          schedule: "0 7 * * *",
+          action: "summarise my email",
+          // Which folder the job will work in — null here because this test chose no project.
+          // Sent on creation rather than read when it fires: see Cron.workspace.test.tsx.
+          workspace: null,
+        },
         expect.anything(), // react-query passes a context object as the 2nd arg
       ),
     );
