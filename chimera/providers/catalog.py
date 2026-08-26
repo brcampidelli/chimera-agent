@@ -69,18 +69,18 @@ CATALOG: tuple[CatalogEntry, ...] = (
     # --- weak: near-free probes. Cheap first drafts, k-sample agreement. ---
     CatalogEntry(
         "openrouter/deepseek/deepseek-v4-flash", "weak", "DeepSeek",
-        0.074, 0.148, tools=True, context_k=1048,
+        0.0886, 0.1772, tools=True, context_k=1048,
         notes="cheapest capable probe here, with a frontier-sized window; unmeasured in this repo",
     ),
     CatalogEntry(
         "openrouter/mistralai/mistral-small-3.2-24b-instruct", "weak", "Mistral",
-        0.094, 0.25, tools=True, context_k=256,
+        0.075, 0.20, tools=True, context_k=256,
         notes="the local-lift goldilocks model; cheap paid weak with usable tools",
     ),
     CatalogEntry(
         "openrouter/meta-llama/llama-3.3-70b-instruct", "weak", "Meta",
-        0.10, 0.32, tools=True, context_k=131,
-        notes="the paid variant; the :free one was withdrawn on 2026-08-18",
+        0.71, 0.71, tools=True, context_k=131,
+        notes="the paid variant; the :free one was withdrawn on 2026-08-18. Input and output\n        cost the same here, which is unusual and is what the provider charges",
     ),
     CatalogEntry(
         "openrouter/openai/gpt-oss-20b", "weak", "OpenAI",
@@ -90,7 +90,7 @@ CATALOG: tuple[CatalogEntry, ...] = (
     # --- mid: the daily workhorses. Reliable tools, cents per task. ---
     CatalogEntry(
         "openrouter/deepseek/deepseek-chat-v3.1", "mid", "DeepSeek",
-        0.25, 0.95, tools=True, context_k=163,
+        0.55, 1.65, tools=True, context_k=163,
         notes="proven in this repo's benches; the product default",
     ),
     CatalogEntry(
