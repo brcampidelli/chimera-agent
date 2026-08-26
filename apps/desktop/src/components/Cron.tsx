@@ -7,6 +7,7 @@ import { ErrorState } from "@/components/ui/async";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useT } from "@/lib/i18n";
+import { readWorkspace } from "@/lib/workspace";
 
 const PRESETS: { key: string; cron: string }[] = [
   { key: "cron.preset.morning", cron: "0 7 * * *" },
@@ -70,7 +71,12 @@ function AddSchedule() {
         <div className="flex items-center justify-between gap-3 pt-0.5">
           <span className="text-xs text-muted-foreground">{t("cron.add.hint")}</span>
           <Button
-            onClick={() => canSubmit && create.mutate({ name, schedule, action })}
+            onClick={() =>
+              // The folder the job will work in, fixed at the moment it is written rather than
+              // read when it fires: a schedule runs for months, and "whichever project was open
+              // at 7am" is not a root anybody chose.
+              canSubmit && create.mutate({ name, schedule, action, workspace: readWorkspace() || null })
+            }
             disabled={!canSubmit}
           >
             <Plus className="h-3.5 w-3.5" /> {t("cron.add.submit")}
@@ -126,6 +132,14 @@ export function Cron({ embedded = false }: { embedded?: boolean } = {}) {
                 <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
                   {j.schedule} → {j.action}
                 </div>
+                {/* Which folder it works in. Only when there is one: a job with no workspace runs
+                    at whatever root the app was started with, and printing a guess for that is
+                    worse than the blank — it is the difference this row exists to make visible. */}
+                {j.workspace && (
+                  <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground" title={j.workspace}>
+                    {j.workspace}
+                  </div>
+                )}
                 {/* Inline, not a tooltip. WHY it failed is the whole reason to look at this row, and
                     a tooltip is found by accident. Truncated to one line: the full text is in the
                     title, and a stack trace must not push every other job off the screen. */}

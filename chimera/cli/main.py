@@ -1922,11 +1922,16 @@ def _start_cron_daemon(
             if spent >= cap:
                 raise BudgetExceeded(f"daily cap reached: ${spent:.4f} of ${cap:.4f}")
 
+        # The folder THIS job was written against, falling back to the process root. A schedule
+        # fires for months: "wherever the app was pointing when it went off" is not a root anybody
+        # chose, and on a packaged build the process root is the install directory.
+        job_root = Path(job.workspace).expanduser() if job.workspace else workspace
+
         # Governance on the path that runs unattended. In `observe` this refuses nothing and
         # records what enforcement would have cost; the count is reported below, per job, which is
         # the whole point of having a middle state.
         job_registry, job_approvals = governed_profile(
-            default_registry(workspace),
+            default_registry(job_root),
             settings=settings,
             home=settings.home,
             surface=f"cron:{job.name}",
@@ -1941,7 +1946,7 @@ def _start_cron_daemon(
                 # The same workspace the job's tools are rooted in. A scheduled job is the surface
                 # LEAST able to be told the conventions any other way — nobody is at a terminal to
                 # restate them — and it was the one reading none.
-                project_root=workspace,
+                project_root=job_root,
                 # And the owner's own instructions, which every other surface that answers a
                 # person already loads. A cron job reports to a person too — into Discord, into a
                 # log, into the app — and this was the second surface answering in English to an

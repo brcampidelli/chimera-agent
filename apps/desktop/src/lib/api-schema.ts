@@ -3337,6 +3337,8 @@ export interface components {
             name: string;
             /** Schedule */
             schedule: string;
+            /** Workspace */
+            workspace?: string | null;
         };
         /** CronJobOut */
         CronJobOut: {
@@ -3367,6 +3369,8 @@ export interface components {
             schedule: string;
             /** Trigger */
             trigger: string;
+            /** Workspace */
+            workspace?: string | null;
         };
         /** DecomposedOut */
         DecomposedOut: {

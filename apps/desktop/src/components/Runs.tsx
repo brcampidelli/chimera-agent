@@ -122,7 +122,11 @@ export function Runs({
 
   return (
     <Screen title={t("runs.title")} icon={<ListChecks className="h-5 w-5" />} embedded={embedded}>
-      <RunLauncher />
+      {/* The same project the list above is filtered by. Without it the launcher showed an empty
+          folder field whose placeholder reads "defaults to the app's workspace" — and that default
+          is the app's own install directory, which is nobody's project. `undefined` rather than ""
+          when nothing is chosen: that is what keeps the field visible so the user can say where. */}
+      <RunLauncher workspace={workspace || undefined} />
       {q.isError ? (
         <Panel>
           <ErrorState error={q.error} onRetry={() => q.refetch()} />

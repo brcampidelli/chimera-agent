@@ -1349,6 +1349,21 @@ def test_cron_list_enable_disable_delete(monkeypatch: Any, tmp_path: Any) -> Non
     assert client.post("/api/cron/nope/enable").status_code == 404
     assert client.delete("/api/cron/j1").json() == {"deleted": True}
     assert client.get("/api/cron").json() == []
+
+    # The folder a job works in, carried from the screen and read back. Without it every schedule
+    # ran at the process root, which on a packaged build is the app's install directory.
+    criado = client.post(
+        "/api/cron",
+        json={"name": "resumo", "schedule": "0 7 * * *", "action": "liste", "workspace": "/proj/a"},
+    ).json()
+    assert criado["workspace"] == "/proj/a"
+    assert client.get("/api/cron").json()[0]["workspace"] == "/proj/a"
+
+    # And a client that sends none keeps the previous behaviour rather than being refused.
+    sem = client.post(
+        "/api/cron", json={"name": "outro", "schedule": "0 8 * * *", "action": "liste"}
+    ).json()
+    assert sem["workspace"] is None
     get_settings.cache_clear()
 
 

@@ -73,6 +73,7 @@ def _job_dict(job: Any) -> dict[str, Any]:
         "last_error": job.last_error,
         "consecutive_failures": job.consecutive_failures,
         "created_by": job.created_by,
+        "workspace": job.workspace,
     }
 
 
@@ -462,7 +463,12 @@ def register_features(
 
         try:
             job = Scheduler(_cron_store()).schedule_cron(
-                body.name, body.schedule, body.action, now=time.time(), created_by="human"
+                body.name,
+                body.schedule,
+                body.action,
+                now=time.time(),
+                created_by="human",
+                workspace=body.workspace,
             )
         except ValueError as exc:  # an invalid cron expression is a client error, not a 500
             raise HTTPException(status_code=400, detail=str(exc)) from exc

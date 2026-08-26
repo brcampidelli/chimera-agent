@@ -69,4 +69,15 @@ class CronJob(BaseModel):
     this, a daily cap tripped at 2 p.m. leaves the account unwatched until midnight, which is a worse
     outcome than the money it saved. Deliberately not the default: a job is ordinary until someone
     decides, in writing, that it is not."""
+    workspace: str | None = None
+    """Which folder this job works in. ``None`` = whatever root the process was started with.
+
+    A schedule is written once and fires for months, so "wherever the app happens to be pointing
+    when it goes off" is not a root anybody chose — and on a packaged desktop build the process root
+    is the install directory. Found that way: *"list the project's files and say what changed
+    today"* walked 4757 files of the app's own installation and was abandoned at 1800s, five nights
+    running, having produced nothing.
+
+    Recorded on the job rather than read at dispatch on purpose: the answer must not depend on which
+    project the user happened to have open at 7am."""
     metadata: dict[str, Any] = Field(default_factory=dict)

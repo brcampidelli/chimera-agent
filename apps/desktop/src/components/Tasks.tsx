@@ -8,6 +8,7 @@ import { ErrorState } from "@/components/ui/async";
 import { focusRing } from "@/components/ui/focus";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { readWorkspace } from "@/lib/workspace";
 import type { ProjectState, TaskCard } from "@/lib/types";
 
 const COLUMN_ORDER = ["backlog", "doing", "review", "blocked", "done"];
@@ -318,8 +319,12 @@ function useDispatch(onCard: () => void) {
     setRunning(true);
     setLine(t("tasks.dispatching"));
     setConflicts([]);
+    // Where the cards get worked. Sending nothing meant the backend fell back to the app's own
+    // install directory, so a card naming a file in the user's project could not find it — and the
+    // agent's root became the folder holding the app's `.env`. The Code screen picks this once and
+    // every other surface reads the same choice.
     void streamKanbanRun(
-      { workers },
+      { workers, workspace: readWorkspace() || null },
       {
         onCard: (outcome) => {
           setLine(`${outcome.card_id} → ${outcome.moved_to}`);

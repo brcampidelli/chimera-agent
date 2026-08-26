@@ -428,7 +428,9 @@ export const stopMessaging = (platform: string) =>
 
 // --- Cron ---
 export const getCron = () => json<CronJob[]>("/api/cron");
-export const createCron = (body: { name: string; schedule: string; action: string }) =>
+export const createCron = (
+  body: { name: string; schedule: string; action: string; workspace?: string | null },
+) =>
   json<CronJob>("/api/cron", { method: "POST", body: JSON.stringify(body) });
 export const enableCron = (id: string) => json<CronJob>(`/api/cron/${id}/enable`, { method: "POST" });
 export const disableCron = (id: string) =>

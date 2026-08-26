@@ -832,6 +832,9 @@ class CronJobOut(BaseModel):
     consecutive_failures: int = 0
     """Since the last success. One failure is weather; forty is a broken job."""
     created_by: str
+    workspace: str | None = None
+    """The folder this job works in. None means the root the process was started with — which on a
+    packaged build is the install directory, so the screen says so rather than leaving it blank."""
 
 
 class MessagingPlatformOut(BaseModel):
@@ -848,6 +851,9 @@ class CronCreateIn(BaseModel):
     name: str
     schedule: str  # a 5-field cron expression, e.g. "0 7 * * *" for 07:00 daily
     action: str  # the task/prompt the agent runs when it fires
+    workspace: str | None = None
+    """The folder the job works in. Sent by the screen from the project the user chose; a client
+    that omits it gets the process root, which is the previous behaviour."""
 
 
 # --- tasks (kanban + projects) --------------------------------------------------------------------

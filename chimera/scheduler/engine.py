@@ -40,7 +40,23 @@ def _dispatch_bounded(
 
 
 def _next_after(cron_expr: str, after_epoch: float) -> float:
-    base = datetime.fromtimestamp(after_epoch, tz=UTC)
+    """The next epoch matching ``cron_expr``, read in the machine's own time zone.
+
+    ``0 7 * * *`` means seven in the morning where the machine is, which is what every crontab has
+    always meant and what a screen offering "every morning · 7h" is promising. This used to pin the
+    base to UTC, so on a desktop four hours west that job fired at 03:00 — measured on a real
+    install, where the job's own record read ``last_run 03:00`` under a schedule of ``0 7``.
+
+    A server in UTC is unaffected: local time IS UTC there, which is why the defect could sit in a
+    codebase whose deployment target is a container. It only shows on the machine of a person.
+
+    Built through UTC rather than straight to local, which is not stylistic. A naive
+    ``fromtimestamp(x)`` west of Greenwich puts a small ``x`` in 1969, and asking Windows for the
+    local offset of a pre-1970 instant raises ``OSError: [Errno 22]``. The scheduler's own tests
+    pass ``now=60``, so the naive form took the whole Windows suite down — on Linux and on WSL it is
+    fine, which is why it reached CI. An aware datetime converts by arithmetic and never asks.
+    """
+    base = datetime.fromtimestamp(after_epoch, tz=UTC).astimezone()
     return float(croniter(cron_expr, base).get_next(float))
 
 
@@ -58,6 +74,7 @@ class Scheduler:
         *,
         now: float,
         created_by: CreatedBy = "human",
+        workspace: str | None = None,
     ) -> CronJob:
         if not croniter.is_valid(cron_expr):
             raise ValueError(f"invalid cron expression: {cron_expr!r}")
@@ -72,6 +89,7 @@ class Scheduler:
             # the learner: an agent-created cron must not fire until a human enables it.
             enabled=created_by != "agent",
             next_run=_next_after(cron_expr, now),
+            workspace=workspace,
         )
         self.store.add(job)
         return job

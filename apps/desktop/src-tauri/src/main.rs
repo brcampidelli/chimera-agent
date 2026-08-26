@@ -348,10 +348,24 @@ fn start_sidecar(paths: &Paths, wanted: u16, budget: Budget) -> Result<Backend, 
     //
     // Four competing agent apps each hardened this same step, independently and in four different
     // frameworks. That is not convergent taste; it is the failure everyone met in the field.
+    // Where the agent's file tools are rooted when nothing else says. `resolve_app_workspace` falls
+    // back to the process CWD, which for a packaged build is wherever the launcher stood — the
+    // install directory. Its own docstring names the environment step as the packaged-build answer,
+    // and nothing was ever setting it, so the fallback ran: the agent's root became the folder
+    // holding the app's own `.env`, and `read_file(".env")` returned the API key in full.
+    //
+    // A dedicated empty folder, not the home directory and not the install: the backend already
+    // argues that case — "an empty, visible, wrong-looking root that the user corrects beats a
+    // large, plausible-looking one they never agreed to." Every screen that knows a project still
+    // sends it; this is only the answer for the ones that do not.
+    let workspace_dir = data_dir.join("workspace");
+    let _ = std::fs::create_dir_all(&workspace_dir);
+
     let mut cmd = Command::new(&exe);
     cmd.args(["--no-open", "--port", &wanted_arg, "--emit-port-file"])
         .arg(&port_file)
         .env("CHIMERA_HOME", data_dir.join("data"))
+        .env("CHIMERA_WORKSPACE", &workspace_dir)
         .stderr(Stdio::piped());
     hide_console(&mut cmd);
     let mut child = cmd
@@ -1158,6 +1172,55 @@ mod tests {
 
         stop(&state, watcher);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The agent's file tools must not be rooted where the app keeps its own `.env`.
+    ///
+    /// Without `CHIMERA_WORKSPACE`, `resolve_app_workspace` falls through to the process CWD, which
+    /// for an installed build is the launcher's directory — the folder holding `.env`. Measured on
+    /// a real install before this: `read_file(".env")` returned `OPENROUTER_API_KEY=sk-or-v1-…` in
+    /// full, and a scheduled job walking "the project" walked 4757 files and was abandoned at
+    /// 1800s, five nights running.
+    ///
+    /// Behavioural on purpose: the stand-in writes the variable it actually received, so this fails
+    /// if the line is dropped AND if it is set to something the child never sees.
+    #[test]
+    fn the_backend_is_told_where_to_root_its_tools() {
+        let dir = scratch("workspace-env");
+        let listener = TcpListener::bind("127.0.0.1:0").expect("a port to pretend on");
+        let url = format!("http://127.0.0.1:{}", listener.local_addr().unwrap().port());
+        let seen = dir.join("seen.txt");
+        let exe = dir.join(if cfg!(windows) { "backend.cmd" } else { "backend.sh" });
+        let body = if cfg!(windows) {
+            format!(">\"{}\" echo %CHIMERA_WORKSPACE%\r\n>\"%~5\" echo {url}\r\nexit /b 0\r\n", seen.display())
+        } else {
+            format!("#!/bin/sh\necho \"$CHIMERA_WORKSPACE\" > \"{}\"\necho '{url}' > \"$5\"\nexit 0\n", seen.display())
+        };
+        std::fs::write(&exe, body).expect("write the stand-in backend");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let paths =
+            Paths { exe, data_dir: dir.clone(), port_file: dir.join("port.txt") };
+
+        let mut backend =
+            start_sidecar(&paths, 0, quick(Tuning::default()).budget).expect("it came up");
+        let _ = backend.child.wait();
+
+        let got = std::fs::read_to_string(&seen).expect("the stand-in recorded its environment");
+        let got = got.trim();
+        assert!(
+            !got.is_empty() && got != "%CHIMERA_WORKSPACE%",
+            "the backend was left to guess its root from the CWD: {got:?}"
+        );
+        assert_eq!(
+            Path::new(got),
+            dir.join("workspace"),
+            "the root must be the app's own empty folder, never the install directory"
+        );
+        assert!(dir.join("workspace").is_dir(), "and it has to exist before the backend looks");
     }
 
     #[test]
