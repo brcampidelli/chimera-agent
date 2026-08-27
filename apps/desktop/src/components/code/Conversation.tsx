@@ -758,6 +758,10 @@ export function Conversation({
         // ceiling and nothing at all.
         ...(maxUsd === null ? {} : { max_usd: maxUsd }),
         posture,
+        // The second lock, beside the first. The reach mounts the shell tools; this decides whether
+        // a mounted one may run on the host. Sent together because they are one decision made in
+        // one place — a request carrying the reach without this asks for tools it cannot use.
+        allow_host_exec: posture.reach === "workspace_shell",
         profile,
         fuse,
         // Only with `fuse`: a cast on a turn that is not fused would be a second, invisible way to

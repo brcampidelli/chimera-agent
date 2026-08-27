@@ -2347,6 +2347,11 @@ export interface components {
          *     its own, because then the downgrade is invisible AND unchosen.
          */
         AgentsRequest: {
+            /**
+             * Allow Host Exec
+             * @default false
+             */
+            allow_host_exec: boolean;
             /** Allow Tools */
             allow_tools?: string[] | null;
             /** Attachments */
@@ -2959,6 +2964,11 @@ export interface components {
          * @description One turn of a coding conversation.
          */
         CodeTurnRequest: {
+            /**
+             * Allow Host Exec
+             * @default false
+             */
+            allow_host_exec: boolean;
             /** Allow Tools */
             allow_tools?: string[] | null;
             /** Attachments */
@@ -3157,6 +3167,11 @@ export interface components {
          *     this field as the point rather than as an option.
          */
         CrewRunIn: {
+            /**
+             * Allow Host Exec
+             * @default false
+             */
+            allow_host_exec: boolean;
             /** Allow Tools */
             allow_tools?: string[] | null;
             /** Attachments */
@@ -5084,6 +5099,11 @@ export interface components {
          *     things by the same field name.
          */
         RunRequest: {
+            /**
+             * Allow Host Exec
+             * @default false
+             */
+            allow_host_exec: boolean;
             /** Allow Tools */
             allow_tools?: string[] | null;
             /** Attachments */

@@ -9,6 +9,7 @@ import {
   MessageSquare,
   Pencil,
   Save,
+  Terminal,
   X,
 } from "lucide-react";
 import {
@@ -35,10 +36,12 @@ import {
   type RoleOverride,
 } from "@/components/code/RolesBar";
 import { SessionSidebar } from "@/components/code/SessionSidebar";
+import { HtmlPreview } from "@/components/code/HtmlPreview";
 import { ProjectPicker } from "@/components/code/ProjectPicker";
 import { useRunSession } from "@/lib/run-session";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { shellAllowed, setShellAllowed } from "@/lib/project-shell";
 import { readWorkspace, writeWorkspace } from "@/lib/workspace";
 
 const fieldCls = "field w-full px-3 text-sm";
@@ -92,6 +95,12 @@ function highlightFile(content: string, name: string): string {
  * navigation, and it needs nothing here anyway — an SVG is text, so the highlighted view already
  * shows it. */
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp"]);
+
+/** Whether this file is a page rather than code that happens to be markup. */
+function isHtmlPath(path: string): boolean {
+  const ext = path.includes(".") ? path.split(".").pop()!.toLowerCase() : "";
+  return ext === "html" || ext === "htm";
+}
 
 function isImagePath(path: string): boolean {
   const ext = path.includes(".") ? path.split(".").pop()!.toLowerCase() : "";
@@ -283,6 +292,10 @@ function Viewer({ workspace, path }: { workspace: string; path: string | null })
             // <img> pointed at one renders a broken-image icon, which claims a failure that did not
             // happen.
             <div className="px-4 py-6 text-sm text-muted-foreground">{t("code.binaryNote")}</div>
+          ) : path !== null && isHtmlPath(path) && q.data?.content ? (
+            // A page, as a page. Source is one click away inside the component — the toggle lives
+            // there because the preview is what someone opening an .html file came to see.
+            <HtmlPreview workspace={workspace} path={path} source={q.data.content} />
           ) : (
             <pre className="overflow-x-auto p-4 text-[12.5px] leading-relaxed">
               <code className="hljs bg-transparent" dangerouslySetInnerHTML={{ __html: html }} />
@@ -332,7 +345,20 @@ export function Code() {
   // applies the configured posture as a floor regardless; sending it keeps the two in agreement, so
   // the posture line in the transcript describes the run that is actually happening.
   const cfg = useQuery({ queryKey: ["config"], queryFn: getConfig });
-  const reach = (cfg.data?.autonomy.reach || "workspace") as Reach;
+  // Whether the agent may run commands IN THIS PROJECT. The setting in Settings is global — it was
+  // the only lever, so the honest choices were "no project may" and "every project may". Running
+  // the tests and `npm install` is what separates writing files from building something that works,
+  // and granting that for the folder you are in is a different decision from granting it for every
+  // folder you open next.
+  const [shellHere, setShellHere] = useState(() => shellAllowed(workspace));
+  useEffect(() => setShellHere(shellAllowed(workspace)), [workspace]);
+
+  const configured = (cfg.data?.autonomy.reach || "workspace") as Reach;
+  // The project's grant RAISES the reach; it never lowers what the owner configured. Somebody who
+  // set `read_only` system-wide means it, and a per-project checkbox is not the place to overrule
+  // a standing decision — the server agrees, and refuses `CHIMERA_HOST_EXEC=deny` outright.
+  const reach: Reach =
+    shellHere && configured === "workspace" ? "workspace_shell" : configured;
   const approval = (cfg.data?.autonomy.approval || "suspicious") as Approval;
   const posture = useMemo(() => ({ reach, approval }), [reach, approval]);
   // Who does the work. Session-local rather than persisted: handing your workspace to another
@@ -452,6 +478,27 @@ export function Code() {
         <Button size="sm" type="button" variant="ghost" onClick={() => setPicking((p) => !p)}>
           <Folder className="h-4 w-4" /> {t("code.picker.browse")}
         </Button>
+        {/* Commands, for THIS project. The lever for this was global — one setting covering every
+            folder — so the honest choices were "the agent may never run anything" and "it may run
+            anything anywhere". Running the tests is what separates writing files from building
+            something that works, and it is a decision people make per project.
+            A button rather than a checkbox in a menu: it states what is true right now, and the
+            state it is in is readable without opening anything. Only with a project — there is no
+            "this project" to grant when none is chosen. */}
+        {workspace ? (
+          <Tooltip label={t(shellHere ? "code.shell.onHint" : "code.shell.offHint")}>
+            <Button
+              size="sm"
+              type="button"
+              variant={shellHere ? "outline" : "ghost"}
+              aria-pressed={shellHere}
+              onClick={() => setShellHere(setShellAllowed(workspace, !shellHere))}
+            >
+              <Terminal className="h-4 w-4" />
+              {t(shellHere ? "code.shell.on" : "code.shell.off")}
+            </Button>
+          </Tooltip>
+        ) : null}
         {/* The way out of a project, which did not exist.
             A conversation with no workspace works — the turn runs, answers, is priced and reads
             memory — and the sidebar already groups those under their own heading. What was missing

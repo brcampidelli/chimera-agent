@@ -227,6 +227,11 @@
       "AgentsRequest": {
         "description": "A batch of coding tasks for the Agent Manager: each runs concurrently in its OWN git worktree.\n\nMirrors ``chimera solve-batch``. Isolation is REAL only in a git repo \u2014 outside one the tasks run\nin-place against ``workspace`` with no isolation (so concurrent edits can collide and conflicts\ncan't be detected); the response's ``is_repo`` flag says which happened, honestly.\n\n**Inherits ``CodeSeams`` so a batch is not structurally weaker than a single run.** It used to\ncarry no posture and no profile, and to hard-code three attempts \u2014 so the same task run as one of\ntwo was quietly granted different tool permissions, a different reviewer, and a different attempt\nbudget than the same task run alone. That was survivable while the user had to choose the Agents\nscreen deliberately; it stops being survivable the moment the composer can route into a batch on\nits own, because then the downgrade is invisible AND unchosen.",
         "properties": {
+          "allow_host_exec": {
+            "default": false,
+            "title": "Allow Host Exec",
+            "type": "boolean"
+          },
           "allow_tools": {
             "anyOf": [
               {
@@ -1457,6 +1462,11 @@
       "CodeTurnRequest": {
         "description": "One turn of a coding conversation.",
         "properties": {
+          "allow_host_exec": {
+            "default": false,
+            "title": "Allow Host Exec",
+            "type": "boolean"
+          },
           "allow_tools": {
             "anyOf": [
               {
@@ -1975,6 +1985,11 @@
       "CrewRunIn": {
         "description": "A crew: N roles, one task, one worktree each, and a check that decides who lands.\n\nInherits `CodeSeams` \u2014 the promise `HierarchyRunIn` made when it declined to. These workers\nwrite files, so posture, write region and the tool lists have something real to govern here.\n\nOn `verify`: without it, every worker that does not crash is merged, and since they all attack\nthe same task they tend to touch the same files \u2014 where one-file-one-owner then means NOBODY\nlands. A crew without a check is a crew that usually produces nothing, so the screen treats\nthis field as the point rather than as an option.",
         "properties": {
+          "allow_host_exec": {
+            "default": false,
+            "title": "Allow Host Exec",
+            "type": "boolean"
+          },
           "allow_tools": {
             "anyOf": [
               {
@@ -6234,6 +6249,11 @@
       "RunRequest": {
         "description": "An autonomous run: plan \u2192 execute \u2192 verify-or-revert \u2192 receipt.\n\nInherits the coding seams (``max_steps``, ``context_budget``, ``repo_map``, ``explorer``,\n``allow_tools``/``deny_tools``, ``write_region``) from :class:`~chimera.api.code_api.CodeSeams`\nrather than redeclaring them, so a run and a conversational turn cannot end up meaning different\nthings by the same field name.",
         "properties": {
+          "allow_host_exec": {
+            "default": false,
+            "title": "Allow Host Exec",
+            "type": "boolean"
+          },
           "allow_tools": {
             "anyOf": [
               {

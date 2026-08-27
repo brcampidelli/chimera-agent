@@ -10,6 +10,11 @@ import { describe, expect, it } from "vitest";
  * a user can reach. The `getPlan` docstring even claimed "the CLI and the Runs screen still use it"
  * — the Runs screen imports only `getRuns`, and the CLI does not speak HTTP to its own API.
  *
+ * `getPlan` has since returned, with the button that uses it: `POST /api/plan` runs only the
+ * planner, and letting someone read and correct the steps before any file is touched is the one
+ * moment where a correction costs nothing. It is guarded by the general check below like every
+ * other helper — the point was never that the route was bad, it was that nothing called it.
+ *
  * Two were wired, because the capability was worth having: the editor posts every accept and
  * dismiss and nobody was shown the result, and a git panel that can keep a change but not throw one
  * away is half a git panel. Five were deleted, because the chat subsystem they belong to has no
@@ -76,7 +81,10 @@ describe("lib/api.ts", () => {
   it("no longer carries the chat subsystem it never had a screen for", () => {
     const api = readFileSync(join(SRC, "lib", "api.ts"), "utf8");
 
-    for (const gone of ["streamChat", "listSessions", "deleteSession", "getPlan"]) {
+    // `getPlan` came back, and this list is the reason it had to come back WITH a caller: the
+    // helper was deleted for pointing at a capability no screen reached, and the fix for that is a
+    // button, not a re-export. The general check above now guards it like every other helper.
+    for (const gone of ["streamChat", "listSessions", "deleteSession"]) {
       expect(api).not.toContain(`export const ${gone}`);
       expect(api).not.toContain(`export async function ${gone}`);
     }

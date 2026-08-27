@@ -91,6 +91,26 @@ class CodeSeams(BaseModel):
     the same run started from a terminal, for no reason anyone had written down.
     """
 
+    allow_host_exec: bool = False
+    """Let this request's agent actually RUN the shell tools its reach already mounts.
+
+    Two locks, both opened deliberately. ``posture.reach`` decides whether the shell tools exist at
+    all; this decides whether a mounted one may run outside a container. Neither works alone —
+    setting this with a reach below ``workspace_shell`` changes nothing, because there is no shell
+    tool to ungate, and that is asserted by a test rather than left to reading.
+
+    **It closes an asymmetry rather than opening a door.** A caller that reaches this API can
+    already run host commands two other ways: `RunRequest.verify` goes to `CommandVerifier`, which
+    calls `subprocess.run(shell=True)`, and the Runner panel spawns processes with no gate at all.
+    The only thing refused was the AGENT — this machine would run pytest to judge its work and
+    refuse to let it run pytest to fix its work, while the screen said "asks" on a server that has
+    no terminal to ask at.
+
+    Per REQUEST, which is what makes it per project: enabling commands for one folder does not
+    enable them for the next folder someone opens. `CHIMERA_HOST_EXEC=deny` still refuses — an
+    owner who turned host execution off system-wide is not overridden by a field on a request.
+    """
+
     max_steps: int | None = None
     """Tool-loop steps the worker may take per turn. None = the agent's own default.
 
@@ -424,11 +444,30 @@ def assemble_registry(
     from chimera.core import ExploreRepositoryTool
     from chimera.governance import TaintLedger, ledger_registry, restrict_registry
     from chimera.governance.audit import AuditLog
+
+    # Whether a mounted shell tool may run on the host, decided per request rather than only per
+    # install. `resolve_host_exec_confirm` answers None for "no gate", a refusal for `deny`, and a
+    # terminal prompt for `ask` — and this surface has no terminal, so its `ask` has always been a
+    # refusal. Passing None is what lets a project someone opened commands for actually run them.
+    #
+    # BOTH locks, and never against the owner's `deny`. The reach lock is read from the resolved
+    # posture rather than from the reach string: `deny_tools` is what actually removes the tools, so
+    # asking the same question the registry asks keeps the two from drifting apart.
+    from chimera.governance.ledger import EXEC_TOOLS
     from chimera.governance.profile import govern_step
     from chimera.integrations import mcp_pool
+    from chimera.sandbox.confirm import resolve_host_exec_confirm
     from chimera.tools import default_registry
 
-    registry = default_registry(ws, write_region=build_write_region(seams.write_region, ws))
+    reach_mounts_shell = not (EXEC_TOOLS & set(resolve_posture(seams.posture).deny_tools))
+    owner_refuses = (settings.host_exec or "ask").lower() == "deny"
+    ungated = seams.allow_host_exec and reach_mounts_shell and not owner_refuses
+
+    registry = default_registry(
+        ws,
+        write_region=build_write_region(seams.write_region, ws),
+        host_exec_confirm=None if ungated else resolve_host_exec_confirm(settings),
+    )
     # The configured MCP servers, HERE and not lower down, because everything below this line has to
     # reach them: the denial list, the trust kernel, and the taint ledger that treats their output as
     # untrusted. The chat path learned this the hard way and says so at its own injection point — "a
