@@ -773,6 +773,10 @@ export interface CodeTurnInput {
   open_file?: string | null;
   max_steps?: number | null;
   context_budget?: number | null;
+  /** Whether a mounted shell tool may run on the host. The second of two locks: the posture's
+   *  reach decides whether the tools exist, this decides whether they may run outside a container.
+   *  Neither does anything alone. */
+  allow_host_exec?: boolean;
   /** Dollar ceiling for this turn. The loop refuses the call that would cross it, BEFORE making it,
    *  and keeps what it already has. Omit for no ceiling — the behaviour every earlier client had.
    *
