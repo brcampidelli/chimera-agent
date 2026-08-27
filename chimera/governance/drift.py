@@ -130,8 +130,44 @@ def _scan_absent(workspace: Path, pattern: str, skip: Path | None = None) -> tup
     return found, unscannable
 
 
+def _defines_pattern(name: str) -> re.Pattern[str]:
+    """How a symbol gets defined, in the languages this project actually writes.
+
+    The old pattern was ``^\\s*(def|class)\\s+NAME`` — Python and nothing else. Measured against
+    twenty real definition forms it matched **two**, so on a JavaScript or TypeScript project a
+    ``defines`` requirement could never be satisfied: the project would work, be checked, be told
+    it had not finished, and loop to its iteration ceiling before reporting failure over code that
+    was written correctly. Fail-closed, and indistinguishable from an incompetent agent.
+
+    Widening a positive check is the risky direction, so the false-positive side was measured too:
+    twenty definitions match, and ten near-misses — a call, an import, a comment, a re-export,
+    ``const NAME = 5`` — match none. The ``const`` branch is why: it requires something
+    function-shaped after the ``=``, because "there is a variable with this name" is not what a
+    requirement asking for a definition means.
+
+    Not a parser. A regex over text cannot know a definition from a string containing one, and the
+    project has no AST pass to lean on; this is the same trade the check has always made, made
+    across more than one language.
+    """
+    n = re.escape(name)
+    return re.compile(
+        r"^\s*(?:"
+        r"(?:async\s+)?def\s+" + n + r"\b"  # python
+        r"|class\s+" + n + r"\b"  # python · js · ts
+        r"|(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s*\*?\s*" + n + r"\b"  # js · ts
+        # An assignment only counts when what follows is a function: `const x = () => …`,
+        # `= function`, or a single-parameter arrow. `const x = 5` is a value, not a definition.
+        r"|(?:export\s+)?(?:const|let|var)\s+" + n + r"\s*(?::[^=]+)?=\s*"
+        r"(?:async\s*)?(?:function\b|\(|[A-Za-z_$][\w$]*\s*=>)"
+        r"|(?:pub\s+)?(?:async\s+)?fn\s+" + n + r"\b"  # rust
+        r"|func\s+(?:\([^)]*\)\s*)?" + n + r"\b"  # go, including a method receiver
+        r")",
+        re.MULTILINE,
+    )
+
+
 def _defined(workspace: Path, name: str, skip: Path | None = None) -> bool:
-    regex = re.compile(rf"^\s*(def|class)\s+{re.escape(name)}\b", re.MULTILINE)
+    regex = _defines_pattern(name)
     return any(regex.search(text) for text in _iter_text(workspace, skip))
 
 
