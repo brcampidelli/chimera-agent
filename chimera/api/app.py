@@ -87,6 +87,9 @@ from chimera.api.schemas import (
     PlanOut,
     PoolAddIn,
     PoolWriteOut,
+    RequirementOut,
+    RequirementsOut,
+    RequirementsRequest,
     ResourcesOut,
     RunReceiptOut,
     SearchOut,
@@ -262,6 +265,16 @@ class RunRequest(CodeSeams):
     """An approved/edited plan (the raw text from the plan preview). When set, the run uses THIS plan
     verbatim instead of re-planning — the worker follows the exact steps the human reviewed. None =
     the run plans for itself as before."""
+    requirements: list[RequirementOut] | None = None
+    """The requirement checklist a person read and edited, from ``POST /api/requirements``.
+
+    When set, it does two jobs: the worker sees the list up front so it targets every constraint
+    from the first attempt, and the same list is graded at the end as an AND-gate, with the misses
+    fed back as directed feedback for the retry.
+
+    None means nobody was asked, and then no checklist runs — arming an acceptance gate on a list
+    the owner never saw would be the same failure the whole feature exists to fix, wearing the
+    opposite sign. An empty list is a different answer: reviewed, nothing to gate on."""
     model: str | None = None
     """The model slug the worker runs on. None = the configured default model (unchanged behaviour)."""
     fuse: bool = False
@@ -780,6 +793,41 @@ def build_api_app(
             except Exception as exc:  # noqa: BLE001 — a model hiccup is an honest empty plan, never a 500
                 _log.warning("plan preview failed: %s", exc)
                 return {"steps": [], "text": "", "note": "the planner call did not complete"}
+
+        return await asyncio.get_running_loop().run_in_executor(None, work)
+
+    @app.post("/api/requirements", dependencies=[guard], response_model=RequirementsOut)
+    async def requirements_endpoint(req: RequirementsRequest) -> dict[str, Any]:
+        """Pull the task apart into atomic requirements, without running anything.
+
+        Sibling of ``/api/plan`` and the same shape: ONE tool-free model call, nothing touches the
+        workspace, and a model hiccup degrades to an empty list with a note rather than a 500.
+
+        The point is not the extraction — the loop has always been able to do that for itself. The
+        point is that somebody reads the list BEFORE the run and can correct it. Reading "include:
+        a contact form" is how a person notices they never said "with the menu", and whatever they
+        add becomes an acceptance criterion for free: the same list is the AND-gate at the end of
+        the run, with directed feedback on whatever it misses.
+        """
+
+        def work() -> dict[str, Any]:
+            from chimera.core.checklist import RequirementChecklist
+            from chimera.providers import LLMGateway
+
+            if not req.task.strip():
+                return {"items": [], "note": ""}
+            try:
+                items = RequirementChecklist(LLMGateway()).extract(req.task)
+            except Exception as exc:  # noqa: BLE001 — a model hiccup is not a server error
+                _log.warning("requirement extraction failed: %s", exc)
+                return {"items": [], "note": "the extraction call did not complete"}
+            # `extract` swallows its own failures and returns []. Empty means either "nothing to
+            # extract" or "it did not work", and the two read the same on a screen — so say so,
+            # rather than showing an empty checklist that looks like a task with no requirements.
+            return {
+                "items": [{"text": r.text, "kind": r.kind} for r in items],
+                "note": "" if items else "no requirements could be read from this task",
+            }
 
         return await asyncio.get_running_loop().run_in_executor(None, work)
 
@@ -1784,6 +1832,7 @@ def _build_solve_agent(
     from chimera.core import (
         AutonomousAgent as _AutonomousAgent,
     )
+    from chimera.core.checklist import RequirementChecklist
     from chimera.core.instructions import load as load_identity
     from chimera.core.instructions import render as render_identity
     from chimera.core.planner import Plan
@@ -1964,6 +2013,17 @@ def _build_solve_agent(
         # because a paused run with no durable identity is one nobody can ever come back to.
         pause_on_taint=bool(req.thread_id and (req.pause_on_taint or posture.pause_on_taint)),
         pause_always=bool(req.thread_id and posture.pause_always),
+        # The requirement checklist, armed ONLY when a person sent one back. Both halves matter and
+        # they are different jobs: the worker sees the list up front so it targets every constraint
+        # from attempt one, and the same list is graded at the end as an AND-gate whose misses
+        # become directed feedback for the retry.
+        #
+        # `None` — nobody was asked — leaves both off. Extracting a list here and silently gating on
+        # it would arm an acceptance criterion its owner never read, which is the same failure this
+        # feature exists to fix wearing the opposite sign. An empty list is a different answer:
+        # reviewed, and there is nothing to gate on.
+        checklist=RequirementChecklist(gateway, req.model) if req.requirements is not None else None,
+        given_requirements=list(req.requirements) if req.requirements is not None else None,
         config=AutonomousConfig(max_attempts=req.max_attempts),
     )
 

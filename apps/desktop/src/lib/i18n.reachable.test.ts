@@ -40,6 +40,7 @@ const DYNAMIC = [
   "crew.status.",
   "fusion.role.",
   "lifecycle.stage.",
+  "runs.reqs.kind.",
   "lifecycle.status.",
   "model.reason.",
   "nav.",

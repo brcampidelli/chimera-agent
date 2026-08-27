@@ -1845,6 +1845,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/requirements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Requirements Endpoint
+         * @description Pull the task apart into atomic requirements, without running anything.
+         *
+         *     Sibling of ``/api/plan`` and the same shape: ONE tool-free model call, nothing touches the
+         *     workspace, and a model hiccup degrades to an empty list with a note rather than a 500.
+         *
+         *     The point is not the extraction — the loop has always been able to do that for itself. The
+         *     point is that somebody reads the list BEFORE the run and can correct it. Reading "include:
+         *     a contact form" is how a person notices they never said "with the menu", and whatever they
+         *     add becomes an acceptance criterion for free: the same list is the AND-gate at the end of
+         *     the run, with directed feedback on whatever it misses.
+         */
+        post: operations["requirements_endpoint_api_requirements_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/resources": {
         parameters: {
             query?: never;
@@ -5225,6 +5254,42 @@ export interface components {
             set: boolean;
         };
         /**
+         * RequirementOut
+         * @description One atomic requirement pulled out of the task.
+         *
+         *     ``kind`` is ``do`` (must happen), ``avoid`` (must not happen) or ``include`` (the result must
+         *     contain it). The three are kept apart because a weak model drops ``avoid`` and ``include``
+         *     first — "must do X" survives context growth and "don't do Y" quietly does not — and because
+         *     seeing them labelled is what lets a person notice the one they never asked for.
+         */
+        RequirementOut: {
+            /**
+             * Kind
+             * @default do
+             */
+            kind: string;
+            /** Text */
+            text: string;
+        };
+        /** RequirementsOut */
+        RequirementsOut: {
+            /** Items */
+            items: components["schemas"]["RequirementOut"][];
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /**
+         * RequirementsRequest
+         * @description Extract a task's requirements without running anything. One model call, no tools.
+         */
+        RequirementsRequest: {
+            /** Task */
+            task: string;
+        };
+        /**
          * ResourcesOut
          * @description What this machine is spending, with every gap left as a gap.
          *
@@ -5391,6 +5456,8 @@ export interface components {
              * @default false
              */
             repo_map: boolean;
+            /** Requirements */
+            requirements?: components["schemas"]["RequirementOut"][] | null;
             roles?: components["schemas"]["RoleModels"] | null;
             /** Task */
             task: string;
@@ -8749,6 +8816,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectStateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    requirements_endpoint_api_requirements_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequirementsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequirementsOut"];
                 };
             };
             /** @description Validation Error */

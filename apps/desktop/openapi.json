@@ -6331,6 +6331,60 @@
         "title": "ProviderOut",
         "type": "object"
       },
+      "RequirementOut": {
+        "description": "One atomic requirement pulled out of the task.\n\n``kind`` is ``do`` (must happen), ``avoid`` (must not happen) or ``include`` (the result must\ncontain it). The three are kept apart because a weak model drops ``avoid`` and ``include``\nfirst \u2014 \"must do X\" survives context growth and \"don't do Y\" quietly does not \u2014 and because\nseeing them labelled is what lets a person notice the one they never asked for.",
+        "properties": {
+          "kind": {
+            "default": "do",
+            "title": "Kind",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "RequirementOut",
+        "type": "object"
+      },
+      "RequirementsOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RequirementOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "RequirementsOut",
+        "type": "object"
+      },
+      "RequirementsRequest": {
+        "description": "Extract a task's requirements without running anything. One model call, no tools.",
+        "properties": {
+          "task": {
+            "title": "Task",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "title": "RequirementsRequest",
+        "type": "object"
+      },
       "ResourcesOut": {
         "description": "What this machine is spending, with every gap left as a gap.\n\nNullable throughout, and that is the contract: a measurement that could not be taken is absent,\nnever zero. Zero VRAM reads as \"the GPU is idle\" and zero CPU reads as \"nothing is running\" \u2014\nboth are claims about a machine, and on a laptop whose GPU we cannot see, neither is ours to\nmake. `notes` says which tool was missing, in the words of what to install.",
         "properties": {
@@ -6762,6 +6816,20 @@
             "default": false,
             "title": "Repo Map",
             "type": "boolean"
+          },
+          "requirements": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RequirementOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requirements"
           },
           "roles": {
             "anyOf": [
@@ -11410,6 +11478,45 @@
           }
         },
         "summary": "Step Project"
+      }
+    },
+    "/api/requirements": {
+      "post": {
+        "description": "Pull the task apart into atomic requirements, without running anything.\n\nSibling of ``/api/plan`` and the same shape: ONE tool-free model call, nothing touches the\nworkspace, and a model hiccup degrades to an empty list with a note rather than a 500.\n\nThe point is not the extraction \u2014 the loop has always been able to do that for itself. The\npoint is that somebody reads the list BEFORE the run and can correct it. Reading \"include:\na contact form\" is how a person notices they never said \"with the menu\", and whatever they\nadd becomes an acceptance criterion for free: the same list is the AND-gate at the end of\nthe run, with directed feedback on whatever it misses.",
+        "operationId": "requirements_endpoint_api_requirements_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequirementsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequirementsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Requirements Endpoint"
       }
     },
     "/api/resources": {

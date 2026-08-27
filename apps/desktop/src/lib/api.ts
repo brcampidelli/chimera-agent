@@ -174,6 +174,26 @@ export const getPlan = (task: string, workspace?: string | null) =>
     body: JSON.stringify({ task, workspace: workspace || null }),
   });
 
+/** One atomic requirement pulled out of the task.
+ *
+ *  `kind` is `do` (must happen), `avoid` (must not happen) or `include` (the result must contain
+ *  it). Kept apart on the screen because a weak model drops `avoid` and `include` first, and
+ *  because seeing them labelled is what lets somebody spot the one they never asked for.
+ */
+export type TaskRequirement = { text: string; kind: string };
+
+/** Pull the task apart into requirements, without running anything. One model call, no tools.
+ *
+ *  The extraction is not the point — the loop could always do it for itself. The point is that
+ *  somebody reads the list BEFORE the run and can correct it, and whatever they add becomes an
+ *  acceptance criterion for free: the same list is the AND-gate at the end.
+ */
+export const getRequirements = (task: string) =>
+  json<{ items: TaskRequirement[]; note: string }>("/api/requirements", {
+    method: "POST",
+    body: JSON.stringify({ task }),
+  });
+
 export const getGovernanceInjection = () =>
   json<InjectionReport>("/api/governance/injection");
 export const getGovernanceAudit = () => json<GovernanceAudit>("/api/governance/audit");
@@ -683,6 +703,12 @@ export const denyProject = (id: string, card: string) =>
 
 export interface RunRequestInput {
   task: string;
+  /** The requirement checklist a person read and edited, or `null` when nobody was asked.
+   *
+   *  The two are different answers and both are sent as themselves. `null` runs no checklist at
+   *  all — arming an acceptance gate on a list its owner never saw would be the same failure the
+   *  feature exists to fix. `[]` means somebody read it and there is nothing to gate on. */
+  requirements?: TaskRequirement[] | null;
   verify?: string | null;
   workspace?: string | null;
   max_attempts?: number;

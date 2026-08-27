@@ -1083,6 +1083,31 @@ class PlanOut(BaseModel):
     note: str  # "" on success; a short, secret-free message when the planner call degraded (no 500)
 
 
+class RequirementOut(BaseModel):
+    """One atomic requirement pulled out of the task.
+
+    ``kind`` is ``do`` (must happen), ``avoid`` (must not happen) or ``include`` (the result must
+    contain it). The three are kept apart because a weak model drops ``avoid`` and ``include``
+    first — "must do X" survives context growth and "don't do Y" quietly does not — and because
+    seeing them labelled is what lets a person notice the one they never asked for.
+    """
+
+    text: str
+    kind: str = "do"
+
+
+class RequirementsRequest(BaseModel):
+    """Extract a task's requirements without running anything. One model call, no tools."""
+
+    task: str
+
+
+class RequirementsOut(BaseModel):
+    items: list[RequirementOut]
+    note: str = ""
+    """"" on success; a short message when the extraction degraded, in place of a 500."""
+
+
 # --- runs (autonomous run receipts) ---------------------------------------------------------------
 
 

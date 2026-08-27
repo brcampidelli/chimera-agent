@@ -313,6 +313,7 @@ class AutonomousAgent:
         pause_always: bool = False,
         repo_map: bool = False,
         checklist: RequirementChecklist | None = None,
+        given_requirements: list[Any] | None = None,
         spec_test_generator: SpecTestGenerator | None = None,
         workspace: Path | None = None,
         strong_verifier: StrongVerifier | None = None,
@@ -363,6 +364,13 @@ class AutonomousAgent:
         self.pause_always = pause_always
         self.repo_map = repo_map
         self.checklist = checklist
+        #: Requirements a PERSON already read and edited, in place of extracting them here.
+        #: The whole value of a checklist a human can correct is that the list the run is
+        #: graded against is the one they approved — re-extracting would quietly discard
+        #: every edit and grade against a list nobody saw, which is worse than no checklist
+        #: at all: it looks reviewed. An empty list is a real answer ("nothing to gate on")
+        #: and is distinct from None ("nobody was asked").
+        self.given_requirements = given_requirements
         self.spec_test_generator = spec_test_generator
         self.workspace = workspace
         self.strong_verifier = strong_verifier
@@ -550,7 +558,10 @@ class AutonomousAgent:
         # inject them into context, so the worker targets every requirement from the FIRST attempt
         # (not just discovers the dropped ones via a failed coverage grade on retry). Extraction is
         # task-level and stable, so it's done once here and reused by the coverage gate below.
-        requirements = self.checklist.extract(task) if self.checklist is not None else []
+        if self.given_requirements is not None:
+            requirements = list(self.given_requirements)
+        else:
+            requirements = self.checklist.extract(task) if self.checklist is not None else []
         requirements_ctx = _format_requirements(requirements)
         # Spec-grounded test generation (arXiv 2607.06636): when the user gave no --verify command,
         # turn the weak LLM coverage-grade proxy into EXECUTABLE pytest grounded in the extracted
