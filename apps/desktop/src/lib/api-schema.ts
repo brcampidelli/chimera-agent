@@ -552,6 +552,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cron/results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Cron Results
+         * @description What the scheduled jobs answered, most recent first.
+         *
+         *     Every dispatch has appended a line to `cron_results.jsonl` since the daemon existed, and
+         *     nothing read it: the screen that creates a schedule promised to "save each result" and there
+         *     was no way to see one without opening the file by hand.
+         *
+         *     Declared BEFORE `/api/cron/{job_id}` matters — FastAPI matches in declaration order, and the
+         *     parameterised route would otherwise swallow `results` as a job id and answer 404 for a path
+         *     that exists.
+         */
+        get: operations["cron_results_api_cron_results_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cron/{job_id}": {
         parameters: {
             query?: never;
@@ -3390,6 +3418,29 @@ export interface components {
             trigger: string;
             /** Workspace */
             workspace?: string | null;
+        };
+        /**
+         * CronResultOut
+         * @description One dispatch that produced an answer, for the Schedule screen.
+         */
+        CronResultOut: {
+            /** Action */
+            action: string;
+            /** Answer */
+            answer: string;
+            /** At */
+            at: number;
+            /** Delivered */
+            delivered?: boolean | null;
+            /**
+             * Delivery Detail
+             * @default
+             */
+            delivery_detail: string;
+            /** Job Id */
+            job_id: string;
+            /** Name */
+            name: string;
         };
         /** DecomposedOut */
         DecomposedOut: {
@@ -6511,6 +6562,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CronJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cron_results_api_cron_results_get: {
+        parameters: {
+            query?: {
+                job_id?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CronResultOut"][];
                 };
             };
             /** @description Validation Error */

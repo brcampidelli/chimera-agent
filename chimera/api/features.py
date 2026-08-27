@@ -31,6 +31,7 @@ from chimera.api.schemas import (
     ApprovedOut,
     CronCreateIn,
     CronJobOut,
+    CronResultOut,
     DeletedOut,
     KanbanCardIn,
     KanbanMoveIn,
@@ -455,6 +456,34 @@ def register_features(
     @app.get("/api/cron", dependencies=[guard], response_model=list[CronJobOut])
     def list_cron() -> list[dict[str, Any]]:
         return [_job_dict(j) for j in _cron_store().list()]
+
+    @app.get("/api/cron/results", dependencies=[guard], response_model=list[CronResultOut])
+    def cron_results(job_id: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+        """What the scheduled jobs answered, most recent first.
+
+        Every dispatch has appended a line to `cron_results.jsonl` since the daemon existed, and
+        nothing read it: the screen that creates a schedule promised to "save each result" and there
+        was no way to see one without opening the file by hand.
+
+        Declared BEFORE `/api/cron/{job_id}` matters — FastAPI matches in declaration order, and the
+        parameterised route would otherwise swallow `results` as a job id and answer 404 for a path
+        that exists.
+        """
+        from chimera.scheduler.results import load_results
+
+        caminho = get_settings().home / "scheduler" / "cron_results.jsonl"
+        return [
+            {
+                "at": r.at,
+                "job_id": r.job_id,
+                "name": r.name,
+                "action": r.action,
+                "answer": r.answer,
+                "delivered": r.delivered,
+                "delivery_detail": r.delivery_detail,
+            }
+            for r in load_results(caminho, job_id=job_id, limit=max(1, min(200, limit)))
+        ]
 
     @app.post("/api/cron", dependencies=[guard], response_model=CronJobOut)
     def create_cron(body: CronCreateIn) -> dict[str, Any]:

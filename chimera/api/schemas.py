@@ -839,6 +839,21 @@ class CronJobOut(BaseModel):
     """A chat webhook URL the answer is posted to, or None to only write it to the result file."""
 
 
+class CronResultOut(BaseModel):
+    """One dispatch that produced an answer, for the Schedule screen."""
+
+    at: float
+    job_id: str
+    name: str
+    action: str
+    answer: str
+    delivered: bool | None = None
+    """None when the job named no webhook. Not the same as a delivery that failed, and the screen
+    has to be able to tell those apart — one is "nobody asked for delivery", the other is "we tried
+    and could not"."""
+    delivery_detail: str = ""
+
+
 class MessagingPlatformOut(BaseModel):
     """Per-platform messaging status: is a token set, is the adapter running, did it die."""
 

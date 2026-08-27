@@ -454,6 +454,26 @@ export const createCron = (
   },
 ) =>
   json<CronJob>("/api/cron", { method: "POST", body: JSON.stringify(body) });
+/** What the schedules answered, most recent first.
+ *
+ *  Every dispatch has appended a line to `cron_results.jsonl` since the daemon existed, and nothing
+ *  read it — so the screen that creates a schedule promised to save each result and offered no way
+ *  to see one. */
+export const getCronResults = (jobId?: string, limit = 20) => {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (jobId) params.set("job_id", jobId);
+  return json<CronResult[]>(`/api/cron/results?${params.toString()}`);
+};
+export interface CronResult {
+  at: number;
+  job_id: string;
+  name: string;
+  action: string;
+  answer: string;
+  /** null when the job named no webhook — not the same as a delivery that failed. */
+  delivered: boolean | null;
+  delivery_detail: string;
+}
 export const enableCron = (id: string) => json<CronJob>(`/api/cron/${id}/enable`, { method: "POST" });
 export const disableCron = (id: string) =>
   json<CronJob>(`/api/cron/${id}/disable`, { method: "POST" });

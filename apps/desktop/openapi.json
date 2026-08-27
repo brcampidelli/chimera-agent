@@ -2522,6 +2522,56 @@
         "title": "CronJobOut",
         "type": "object"
       },
+      "CronResultOut": {
+        "description": "One dispatch that produced an answer, for the Schedule screen.",
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "answer": {
+            "title": "Answer",
+            "type": "string"
+          },
+          "at": {
+            "title": "At",
+            "type": "number"
+          },
+          "delivered": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivered"
+          },
+          "delivery_detail": {
+            "default": "",
+            "title": "Delivery Detail",
+            "type": "string"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "job_id",
+          "name",
+          "action",
+          "answer"
+        ],
+        "title": "CronResultOut",
+        "type": "object"
+      },
       "DecomposedOut": {
         "properties": {
           "overhead_tokens": {
@@ -8583,6 +8633,67 @@
           }
         },
         "summary": "Create Cron"
+      }
+    },
+    "/api/cron/results": {
+      "get": {
+        "description": "What the scheduled jobs answered, most recent first.\n\nEvery dispatch has appended a line to `cron_results.jsonl` since the daemon existed, and\nnothing read it: the screen that creates a schedule promised to \"save each result\" and there\nwas no way to see one without opening the file by hand.\n\nDeclared BEFORE `/api/cron/{job_id}` matters \u2014 FastAPI matches in declaration order, and the\nparameterised route would otherwise swallow `results` as a job id and answer 404 for a path\nthat exists.",
+        "operationId": "cron_results_api_cron_results_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "job_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Job Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CronResultOut"
+                  },
+                  "title": "Response Cron Results Api Cron Results Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cron Results"
       }
     },
     "/api/cron/{job_id}": {

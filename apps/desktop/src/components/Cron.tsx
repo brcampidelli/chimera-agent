@@ -1,7 +1,15 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Clock, Plus, Trash2 } from "lucide-react";
-import { createCron, deleteCron, disableCron, enableCron, getCron } from "@/lib/api";
+import {
+  createCron,
+  deleteCron,
+  disableCron,
+  enableCron,
+  getCron,
+  getCronResults,
+  type CronResult,
+} from "@/lib/api";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
 import { ErrorState } from "@/components/ui/async";
 import { Button } from "@/components/ui/button";
@@ -21,6 +29,25 @@ const PRESETS: { key: string; cron: string }[] = [
  * something the user typed and needs to see to fix, and hiding it would leave them staring at a row
  * that says nothing.
  */
+/** When an answer came back, in the reader's own locale and time zone.
+ *
+ *  Local, because the whole point of the recent fix to the scheduler is that a job set for 7am
+ *  fires at 7am where the person is. Printing UTC here would undo that on the screen.
+ */
+export function whenOf(at: number): string {
+  if (!at) return "";
+  try {
+    return new Date(at * 1000).toLocaleString(undefined, {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "";
+  }
+}
+
 export function hostOf(url: string): string {
   try {
     return new URL(url).hostname;
@@ -128,6 +155,12 @@ export function Cron({ embedded = false }: { embedded?: boolean } = {}) {
   const t = useT();
   const qc = useQueryClient();
   const jobs = useQuery({ queryKey: ["cron"], queryFn: getCron });
+  // What the schedules answered. Fetched with the list rather than per row: a screen with six jobs
+  // would otherwise open six requests to show six lines, and the file is read from its tail either
+  // way. The newest answer per job is all a row needs; the rest is one click away.
+  const results = useQuery({ queryKey: ["cron", "results"], queryFn: () => getCronResults() });
+  const latest = new Map<string, CronResult>();
+  for (const r of results.data ?? []) if (!latest.has(r.job_id)) latest.set(r.job_id, r);
   const invalidate = () => qc.invalidateQueries({ queryKey: ["cron"] });
   const enable = useMutation({ mutationFn: enableCron, onSuccess: invalidate });
   const disable = useMutation({ mutationFn: disableCron, onSuccess: invalidate });
@@ -176,6 +209,27 @@ export function Cron({ embedded = false }: { embedded?: boolean } = {}) {
                     {j.workspace}
                   </div>
                 )}
+                {/* What it last answered, folded. The row already says whether the job ran; this
+                    says what came of it, which is the thing the schedule exists to produce and the
+                    thing nothing in this app could show. */}
+                {latest.get(j.id) ? (
+                  <details className="mt-1 text-xs">
+                    <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                      {t("cron.lastAnswer", { when: whenOf(latest.get(j.id)!.at) })}
+                      {/* Absent delivery and failed delivery are different facts. Saying "not
+                          delivered" for a job that never named a webhook tells somebody their
+                          webhook is broken when they never set one. */}
+                      {latest.get(j.id)!.delivered === false ? (
+                        <span className="ml-1.5 text-bad-foreground">
+                          {t("cron.deliveryFailed")}
+                        </span>
+                      ) : null}
+                    </summary>
+                    <div className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded-chip bg-surface-2 p-2 text-muted-foreground">
+                      {latest.get(j.id)!.answer}
+                    </div>
+                  </details>
+                ) : null}
                 {/* The HOST, never the URL. A webhook URL is a credential — anyone who reads it off
                     a shared screen can post into that channel — and the host is what answers the
                     question the row is asking: where does this end up? */}
