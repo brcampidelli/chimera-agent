@@ -90,6 +90,54 @@
         "title": "AgentDefOut",
         "type": "object"
       },
+      "AgentDesignIn": {
+        "description": "Describe an agent in a sentence. One model call; nothing is saved.",
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          }
+        },
+        "required": [
+          "description"
+        ],
+        "title": "AgentDesignIn",
+        "type": "object"
+      },
+      "AgentDesignOut": {
+        "description": "A proposed agent, in the shape the registry form already edits.\n\nDeliberately the same field names as ``AgentDefOut`` so the screen can review a design in the\nform it already has, rather than growing a second surface that has to be kept in step with the\nfirst.",
+        "properties": {
+          "allowed_tools": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Tools",
+            "type": "array"
+          },
+          "id": {
+            "default": "",
+            "title": "Id",
+            "type": "string"
+          },
+          "instructions": {
+            "default": "",
+            "title": "Instructions",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "title": "AgentDesignOut",
+        "type": "object"
+      },
       "AgentIdentityOut": {
         "description": "Who the agent is, in the words of the person who runs it.\n\nReturned on write as well as on read, and deliberately not an echo of what was sent: the free\ntext is capped, so a caller that pasted more than the budget must see what the agent will\nactually be told rather than what they typed.",
         "properties": {
@@ -1315,6 +1363,18 @@
             "title": "Answer",
             "type": "string"
           },
+          "done": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Done"
+          },
           "edits": {
             "items": {
               "additionalProperties": {
@@ -1331,6 +1391,18 @@
             },
             "title": "Tools",
             "type": "array"
+          },
+          "verified": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified"
           },
           "you": {
             "title": "You",
@@ -2406,6 +2478,45 @@
         "title": "CronCreateIn",
         "type": "object"
       },
+      "CronFailingOut": {
+        "properties": {
+          "consecutive_failures": {
+            "title": "Consecutive Failures",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "last_status": {
+            "title": "Last Status",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "consecutive_failures",
+          "last_status"
+        ],
+        "title": "CronFailingOut",
+        "type": "object"
+      },
       "CronJobOut": {
         "properties": {
           "action": {
@@ -2520,6 +2631,119 @@
           "created_by"
         ],
         "title": "CronJobOut",
+        "type": "object"
+      },
+      "CronLateOut": {
+        "properties": {
+          "behind_seconds": {
+            "title": "Behind Seconds",
+            "type": "number"
+          },
+          "due_at": {
+            "title": "Due At",
+            "type": "number"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "schedule": {
+            "title": "Schedule",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "schedule",
+          "due_at",
+          "behind_seconds"
+        ],
+        "title": "CronLateOut",
+        "type": "object"
+      },
+      "CronResultOut": {
+        "description": "One dispatch that produced an answer, for the Schedule screen.",
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "answer": {
+            "title": "Answer",
+            "type": "string"
+          },
+          "at": {
+            "title": "At",
+            "type": "number"
+          },
+          "delivered": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivered"
+          },
+          "delivery_detail": {
+            "default": "",
+            "title": "Delivery Detail",
+            "type": "string"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "job_id",
+          "name",
+          "action",
+          "answer"
+        ],
+        "title": "CronResultOut",
+        "type": "object"
+      },
+      "CronSilenceOut": {
+        "description": "What the schedule is not telling you: what never ran, and what ran and lost.\n\nTwo lists rather than one, because the responses have nothing in common. ``overdue`` means\nnothing dispatched \u2014 that is about the daemon, and on the desktop the daemon is the app, so the\nusual cause is that the app was closed when the job was due. ``failing`` means the job ran, on\ntime, and lost every time; that is about the job. A single \"problems\" list would merge the one\nyou fix by opening the app with the one you fix by rewriting the action.",
+        "properties": {
+          "failing": {
+            "items": {
+              "$ref": "#/components/schemas/CronFailingOut"
+            },
+            "title": "Failing",
+            "type": "array"
+          },
+          "grace_seconds": {
+            "title": "Grace Seconds",
+            "type": "number"
+          },
+          "overdue": {
+            "items": {
+              "$ref": "#/components/schemas/CronLateOut"
+            },
+            "title": "Overdue",
+            "type": "array"
+          }
+        },
+        "required": [
+          "overdue",
+          "failing",
+          "grace_seconds"
+        ],
+        "title": "CronSilenceOut",
         "type": "object"
       },
       "DecomposedOut": {
@@ -4358,6 +4582,255 @@
         "title": "LibraryImportOut",
         "type": "object"
       },
+      "LifecycleRunIn": {
+        "description": "A run through plan \u2192 build \u2192 test \u2192 review.\n\nInherits the coding seams rather than redeclaring them, for the same reason ``RunRequest``\ndoes: the build stage writes files and can run shell, so ``write_region``, the allowlist and\nthe posture all govern something real here, and a field named ``max_steps`` must not mean two\ndifferent things on two routes.",
+        "properties": {
+          "allow_host_exec": {
+            "default": false,
+            "title": "Allow Host Exec",
+            "type": "boolean"
+          },
+          "allow_tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allow Tools"
+          },
+          "attachments": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Attachments",
+            "type": "array"
+          },
+          "context_budget": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Budget"
+          },
+          "deny_tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deny Tools"
+          },
+          "explorer": {
+            "default": false,
+            "title": "Explorer",
+            "type": "boolean"
+          },
+          "fuse": {
+            "default": false,
+            "title": "Fuse",
+            "type": "boolean"
+          },
+          "fusion_judge": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fusion Judge"
+          },
+          "fusion_panel": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fusion Panel"
+          },
+          "fusion_synthesizer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fusion Synthesizer"
+          },
+          "max_attempts": {
+            "default": 2,
+            "title": "Max Attempts",
+            "type": "integer"
+          },
+          "max_steps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Steps"
+          },
+          "max_usd": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Usd"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "posture": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Posture"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "enum": [
+                  "economy",
+                  "balanced",
+                  "max"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "provider_command": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Command"
+          },
+          "repo_map": {
+            "default": false,
+            "title": "Repo Map",
+            "type": "boolean"
+          },
+          "roles": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleModels"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          },
+          "verify": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verify"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          },
+          "write_region": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Write Region"
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "title": "LifecycleRunIn",
+        "type": "object"
+      },
       "MaturityOut": {
         "properties": {
           "available": {
@@ -6032,6 +6505,60 @@
         "title": "ProviderOut",
         "type": "object"
       },
+      "RequirementOut": {
+        "description": "One atomic requirement pulled out of the task.\n\n``kind`` is ``do`` (must happen), ``avoid`` (must not happen) or ``include`` (the result must\ncontain it). The three are kept apart because a weak model drops ``avoid`` and ``include``\nfirst \u2014 \"must do X\" survives context growth and \"don't do Y\" quietly does not \u2014 and because\nseeing them labelled is what lets a person notice the one they never asked for.",
+        "properties": {
+          "kind": {
+            "default": "do",
+            "title": "Kind",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "RequirementOut",
+        "type": "object"
+      },
+      "RequirementsOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RequirementOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "RequirementsOut",
+        "type": "object"
+      },
+      "RequirementsRequest": {
+        "description": "Extract a task's requirements without running anything. One model call, no tools.",
+        "properties": {
+          "task": {
+            "title": "Task",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "title": "RequirementsRequest",
+        "type": "object"
+      },
       "ResourcesOut": {
         "description": "What this machine is spending, with every gap left as a gap.\n\nNullable throughout, and that is the contract: a measurement that could not be taken is absent,\nnever zero. Zero VRAM reads as \"the GPU is idle\" and zero CPU reads as \"nothing is running\" \u2014\nboth are claims about a machine, and on a laptop whose GPU we cannot see, neither is ours to\nmake. `notes` says which tool was missing, in the words of what to install.",
         "properties": {
@@ -6351,6 +6878,11 @@
             ],
             "title": "Fusion Synthesizer"
           },
+          "gen_tests": {
+            "default": false,
+            "title": "Gen Tests",
+            "type": "boolean"
+          },
           "max_attempts": {
             "default": 3,
             "title": "Max Attempts",
@@ -6459,10 +6991,29 @@
             ],
             "title": "Provider Command"
           },
+          "replan": {
+            "default": false,
+            "title": "Replan",
+            "type": "boolean"
+          },
           "repo_map": {
             "default": false,
             "title": "Repo Map",
             "type": "boolean"
+          },
+          "requirements": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RequirementOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requirements"
           },
           "roles": {
             "anyOf": [
@@ -6800,6 +7351,149 @@
           "retirement_candidates"
         ],
         "title": "SkillsOut",
+        "type": "object"
+      },
+      "SpecDraftIn": {
+        "description": "Describe what you want; get a spec back. One model call, nothing written.",
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          }
+        },
+        "required": [
+          "description"
+        ],
+        "title": "SpecDraftIn",
+        "type": "object"
+      },
+      "SpecDraftOut": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "refused_commands": {
+            "default": 0,
+            "title": "Refused Commands",
+            "type": "integer"
+          },
+          "refused_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Refused Ids",
+            "type": "array"
+          },
+          "requirements": {
+            "items": {
+              "$ref": "#/components/schemas/SpecRequirementOut"
+            },
+            "title": "Requirements",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "requirements"
+        ],
+        "title": "SpecDraftOut",
+        "type": "object"
+      },
+      "SpecRequirementOut": {
+        "description": "One obligation in a drafted spec, in the two forms it has to exist in at once.\n\n``text`` is what the person approving reads; ``check``/``target`` is what actually runs. They\nare shown together on purpose \u2014 a drafted spec whose sentence does not describe its check is\nthe failure this whole flow has to avoid, and the only way anyone can catch it is by seeing\nboth.",
+        "properties": {
+          "check": {
+            "title": "Check",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "required": {
+            "default": true,
+            "title": "Required",
+            "type": "boolean"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          },
+          "text": {
+            "default": "",
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "check",
+          "target"
+        ],
+        "title": "SpecRequirementOut",
+        "type": "object"
+      },
+      "SpecWriteIn": {
+        "description": "Write a reviewed spec into the project folder. No model call.\n\nSeparate from drafting so the requirements that land on disk are the ones the person kept,\nnot the ones the model proposed \u2014 the edit in between is the entire point of showing them.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "requirements": {
+            "items": {
+              "$ref": "#/components/schemas/SpecRequirementOut"
+            },
+            "title": "Requirements",
+            "type": "array"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          }
+        },
+        "required": [
+          "name",
+          "requirements"
+        ],
+        "title": "SpecWriteIn",
+        "type": "object"
+      },
+      "SpecWriteOut": {
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "SpecWriteOut",
         "type": "object"
       },
       "SubtaskOut": {
@@ -7541,6 +8235,45 @@
           }
         },
         "summary": "Agents Stream"
+      }
+    },
+    "/api/agents/design": {
+      "post": {
+        "description": "Turn a sentence into a proposed agent. One model call; nothing is saved.\n\n`chimera meta` has been able to do this for a long time and printed the result into a\ntable \u2014 the blueprint was designed, shown, and thrown away every single time. Here the\nproposal lands in the registry form, which is the surface that already edits an agent, so\nthe review step is a form somebody was going to fill in anyway.\n\nReviewing is not a formality. Measured on three real descriptions, an agent asked only to\n*say what is weak about a marketing text* was designed with ``edit_file`` \u2014 a tool that\nrewrites files. Over-granting is the tendency, and the person reading the list is the one\nwho knows the agent was never meant to touch anything.",
+        "operationId": "design_agent_endpoint_api_agents_design_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentDesignIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentDesignOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Design Agent Endpoint"
       }
     },
     "/api/agents/registry": {
@@ -8583,6 +9316,108 @@
           }
         },
         "summary": "Create Cron"
+      }
+    },
+    "/api/cron/results": {
+      "get": {
+        "description": "What the scheduled jobs answered, most recent first.\n\nEvery dispatch has appended a line to `cron_results.jsonl` since the daemon existed, and\nnothing read it: the screen that creates a schedule promised to \"save each result\" and there\nwas no way to see one without opening the file by hand.\n\nDeclared BEFORE `/api/cron/{job_id}` matters \u2014 FastAPI matches in declaration order, and the\nparameterised route would otherwise swallow `results` as a job id and answer 404 for a path\nthat exists.",
+        "operationId": "cron_results_api_cron_results_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "job_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Job Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CronResultOut"
+                  },
+                  "title": "Response Cron Results Api Cron Results Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cron Results"
+      }
+    },
+    "/api/cron/silence": {
+      "get": {
+        "description": "Ask the schedule what it is not telling you.\n\nEvery other honesty mechanism in this project sits downstream of a run having happened \u2014\nthe verifier judges a result, the receipt names who approved it. None of them gets a turn\nwhen the run never occurred, and a schedule that produced no result reads exactly like a\nschedule with nothing due. That distinction matters more now that the app shows results:\nan empty row for a job that never fired and one for a job that answered nothing look the\nsame, and only one of them is a problem.\n\nOn the desktop the daemon IS the app, so the common cause of an overdue job is that the\nwindow was closed when its time came. Nothing can watch while the process is down \u2014 a\ncrashed process cannot log its own crash \u2014 so this is a question, not a watcher, and it is\nanswered the moment anything asks.\n\nDeclared BEFORE `/api/cron/{job_id}`: FastAPI matches in declaration order, and the\nparameterised route would otherwise take `silence` for a job id and 404 a path that exists.",
+        "operationId": "cron_silence_api_cron_silence_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "grace_minutes",
+            "required": false,
+            "schema": {
+              "default": 5.0,
+              "title": "Grace Minutes",
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CronSilenceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cron Silence"
       }
     },
     "/api/cron/{job_id}": {
@@ -9655,6 +10490,83 @@
         "summary": "Run Kanban"
       }
     },
+    "/api/lifecycle": {
+      "post": {
+        "description": "Run one task through the four stages, reporting each as it lands.\n\nSAFETY POSTURE: identical to ``POST /api/runs`` \u2014 the build writes files inside the\nworkspace and, if given, runs the caller's verify command there. Behind the bearer guard\nand the loopback bind, through the governed registry, and never outside the workspace.",
+        "operationId": "lifecycle_stream_api_lifecycle_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LifecycleRunIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Lifecycle Stream"
+      }
+    },
+    "/api/lifecycle/{run_id}/cancel": {
+      "post": {
+        "description": "Stop a run between stages. An unknown id is ``{ok: false}`` with a 200, not a 404 \u2014\na run that already ended is exactly the state a stale Stop click lands on.",
+        "operationId": "cancel_lifecycle_api_lifecycle__run_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Lifecycle"
+      }
+    },
     "/api/lsp/diagnostics": {
       "post": {
         "description": "What `ruff server` says about this buffer.\n\nPOST, and the request carries the text \u2014 see :class:`DiagnosticsRequest`. Not a WebSocket:\nthis app has never served one, `uvicorn` here is installed without `[standard]` so there is\nno `wsproto`, a browser WebSocket cannot send an `Authorization` header, and WS does not go\nthrough CORS. A new unauthenticated channel on a memorable localhost port, in a product\nwhose pitch is governance, is the worst trade available.\n\nSynchronous rather than streamed. Diagnostics arrive as a server NOTIFICATION, so a stream\nwould be honest \u2014 but it would also be a second long-lived connection per open file, and the\nwait here is the tens of milliseconds ruff takes on one buffer. A stream can replace this\nwithout the caller changing, which is the reason the response is a list rather than an event.",
@@ -10577,6 +11489,84 @@
         "summary": "Start Project"
       }
     },
+    "/api/projects/draft": {
+      "post": {
+        "description": "Draft a spec from a plain-language description. One model call; nothing is written.\n\nA token-spending path, which this module otherwise avoids \u2014 noted here rather than hidden,\nthe same way ``POST /api/kanban/run`` is. It earns the exception because the orchestrator\nit feeds is the most capable thing in the app and its only door was a field asking for the\npath of a YAML file: everyone who cannot write that YAML was standing outside it.\n\nDrafting and writing are separate calls so the requirements that reach disk are the ones\nthe person kept. Reviewing them is not a formality \u2014 the spec is the acceptance authority,\nso a requirement nobody understood is a project that finishes on a condition nobody chose.",
+        "operationId": "draft_project_spec_api_projects_draft_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpecDraftIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecDraftOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Draft Project Spec"
+      }
+    },
+    "/api/projects/spec": {
+      "post": {
+        "description": "Write a reviewed spec into the project folder. No model call.\n\n``command`` is refused here too, and not only in the drafter. The rule has to hold at the\nboundary that creates the file, or it is bypassable by anyone who edits the JSON on the way\npast \u2014 and a bug in the screen could write a shell command into the thing that judges the\nproject. Somebody who wants a ``command`` check writes the YAML themselves, which is a\ndifferent act: they chose the command.",
+        "operationId": "write_project_spec_api_projects_spec_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpecWriteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecWriteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Write Project Spec"
+      }
+    },
     "/api/projects/{project_id}": {
       "get": {
         "operationId": "get_project_api_projects__project_id__get",
@@ -10752,6 +11742,45 @@
           }
         },
         "summary": "Step Project"
+      }
+    },
+    "/api/requirements": {
+      "post": {
+        "description": "Pull the task apart into atomic requirements, without running anything.\n\nSibling of ``/api/plan`` and the same shape: ONE tool-free model call, nothing touches the\nworkspace, and a model hiccup degrades to an empty list with a note rather than a 500.\n\nThe point is not the extraction \u2014 the loop has always been able to do that for itself. The\npoint is that somebody reads the list BEFORE the run and can correct it. Reading \"include:\na contact form\" is how a person notices they never said \"with the menu\", and whatever they\nadd becomes an acceptance criterion for free: the same list is the AND-gate at the end of\nthe run, with directed feedback on whatever it misses.",
+        "operationId": "requirements_endpoint_api_requirements_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequirementsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequirementsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Requirements Endpoint"
       }
     },
     "/api/resources": {

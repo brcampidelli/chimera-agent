@@ -38,6 +38,7 @@ export function makeCodeApiMock() {
     // conversation die on a property access that has nothing to do with what it is testing.
     getCodeSession: vi.fn(async () => ({ id: "s1", workspace: "/w", exchanges: [] })),
     getPlan: vi.fn(),
+    getRequirements: vi.fn(),
     getRuns: vi.fn(),
     gitCommit: vi.fn(),
     gitInit: vi.fn(),

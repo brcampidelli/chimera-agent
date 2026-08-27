@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
-import { deleteAgent, getAgentRegistry, putAgent } from "@/lib/api";
+import { Loader2, Plus, Trash2, Wand2 } from "lucide-react";
+import { deleteAgent, designAgent, getAgentRegistry, putAgent } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/panel";
 import { useT } from "@/lib/i18n";
@@ -27,6 +27,16 @@ export function AgentRegistry({ embedded = false }: { embedded?: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<AgentDef | null>(null);
   const [busy, setBusy] = useState(false);
+  // Describing an agent instead of filling its form from an empty page. The proposal goes INTO the
+  // form rather than beside it: reviewing a design and editing an agent are the same act, and a
+  // second surface would be a second thing to keep in step.
+  const [describing, setDescribing] = useState(false);
+  const [description, setDescription] = useState("");
+  const [designNote, setDesignNote] = useState("");
+  // Whether the open draft came from a design. The warning about tools has to stand WHILE the
+  // tools are on screen: it was attached to the description box, and closing that box on
+  // success took the sentence away at the exact moment the generous tool list appeared.
+  const [fromDesign, setFromDesign] = useState(false);
 
   const load = () => {
     getAgentRegistry()
@@ -46,9 +56,36 @@ export function AgentRegistry({ embedded = false }: { embedded?: boolean }) {
     try {
       setAgents(await putAgent({ ...agent, id }));
       setDraft(null);
+      setFromDesign(false);
+      setDesignNote("");
       setError(null);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const design = async () => {
+    setBusy(true);
+    setDesignNote("");
+    try {
+      const d = await designAgent(description.trim());
+      setDesignNote(d.note);
+      if (d.id || d.name) {
+        setDraft({
+          id: d.id,
+          name: d.name,
+          instructions: d.instructions,
+          model: "",
+          allowed_tools: d.allowed_tools,
+        });
+        setFromDesign(true);
+        setDescribing(false);
+        setDescription("");
+      }
+    } catch (e: unknown) {
+      setDesignNote(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
@@ -71,6 +108,14 @@ export function AgentRegistry({ embedded = false }: { embedded?: boolean }) {
         <p className="max-w-measure text-xs text-muted-foreground">{t("registry.blurb")}</p>
         <Button
           size="sm"
+          variant="outline"
+          onClick={() => setDescribing((v) => !v)}
+          disabled={busy || draft !== null}
+        >
+          <Wand2 className="h-3.5 w-3.5" /> {t("registry.describe")}
+        </Button>
+        <Button
+          size="sm"
           onClick={() => setDraft({ id: "", name: "", instructions: "", model: "", allowed_tools: [] })}
           disabled={busy || draft !== null}
         >
@@ -79,13 +124,63 @@ export function AgentRegistry({ embedded = false }: { embedded?: boolean }) {
         </Button>
       </div>
 
+      {describing && (
+        <div className="flex flex-col gap-2 px-3 pb-2">
+          <div className="flex flex-wrap items-start gap-2">
+            <textarea
+              className="field min-h-14 min-w-48 flex-1 px-2 py-1.5 text-xs"
+              placeholder={t("registry.describePlaceholder")}
+              aria-label={t("registry.describe")}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              disabled={busy}
+            />
+            <Button size="sm" disabled={!description.trim() || busy} onClick={() => void design()}>
+              {busy ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Wand2 className="h-3.5 w-3.5" />
+              )}{" "}
+              {t("registry.designIt")}
+            </Button>
+          </div>
+          {designNote && (
+            <p className="text-xs text-warn-foreground" role="status">
+              {designNote}
+            </p>
+          )}
+        </div>
+      )}
+
       {error && (
         <p role="alert" className="px-3 py-2 text-xs text-bad-foreground">
           {error}
         </p>
       )}
 
-      {draft && <AgentForm draft={draft} onChange={setDraft} onSave={save} onCancel={() => setDraft(null)} busy={busy} />}
+      {draft && fromDesign && (
+        <div className="px-3 pb-1">
+          {/* Standing where the tools are, not where the description was. A design arrives with
+              tools already chosen and it chooses them generously: measured on three real
+              descriptions, an agent asked only to say what is weak about a marketing text came back
+              holding `edit_file`. */}
+          <p className="text-xs text-muted-foreground">{t("registry.describeHint")}</p>
+          {designNote && <p className="text-xs text-warn-foreground">{designNote}</p>}
+        </div>
+      )}
+      {draft && (
+        <AgentForm
+          draft={draft}
+          onChange={setDraft}
+          onSave={save}
+          onCancel={() => {
+            setDraft(null);
+            setFromDesign(false);
+            setDesignNote("");
+          }}
+          busy={busy}
+        />
+      )}
 
       {agents === null && !error && (
         <p className="px-3 py-2 text-xs text-muted-foreground">{t("common.loading")}</p>

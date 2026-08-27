@@ -31,6 +31,8 @@ from chimera.api.schemas import (
     ApprovedOut,
     CronCreateIn,
     CronJobOut,
+    CronResultOut,
+    CronSilenceOut,
     DeletedOut,
     KanbanCardIn,
     KanbanMoveIn,
@@ -46,6 +48,10 @@ from chimera.api.schemas import (
     ProjectStateOut,
     RetiredOut,
     SkillsOut,
+    SpecDraftIn,
+    SpecDraftOut,
+    SpecWriteIn,
+    SpecWriteOut,
     TaskCardOut,
 )
 from chimera.config import get_settings
@@ -456,6 +462,84 @@ def register_features(
     def list_cron() -> list[dict[str, Any]]:
         return [_job_dict(j) for j in _cron_store().list()]
 
+    @app.get("/api/cron/results", dependencies=[guard], response_model=list[CronResultOut])
+    def cron_results(job_id: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+        """What the scheduled jobs answered, most recent first.
+
+        Every dispatch has appended a line to `cron_results.jsonl` since the daemon existed, and
+        nothing read it: the screen that creates a schedule promised to "save each result" and there
+        was no way to see one without opening the file by hand.
+
+        Declared BEFORE `/api/cron/{job_id}` matters — FastAPI matches in declaration order, and the
+        parameterised route would otherwise swallow `results` as a job id and answer 404 for a path
+        that exists.
+        """
+        from chimera.scheduler.results import load_results
+
+        caminho = get_settings().home / "scheduler" / "cron_results.jsonl"
+        return [
+            {
+                "at": r.at,
+                "job_id": r.job_id,
+                "name": r.name,
+                "action": r.action,
+                "answer": r.answer,
+                "delivered": r.delivered,
+                "delivery_detail": r.delivery_detail,
+            }
+            for r in load_results(caminho, job_id=job_id, limit=max(1, min(200, limit)))
+        ]
+
+    @app.get("/api/cron/silence", dependencies=[guard], response_model=CronSilenceOut)
+    def cron_silence(grace_minutes: float = 5.0) -> dict[str, Any]:
+        """Ask the schedule what it is not telling you.
+
+        Every other honesty mechanism in this project sits downstream of a run having happened —
+        the verifier judges a result, the receipt names who approved it. None of them gets a turn
+        when the run never occurred, and a schedule that produced no result reads exactly like a
+        schedule with nothing due. That distinction matters more now that the app shows results:
+        an empty row for a job that never fired and one for a job that answered nothing look the
+        same, and only one of them is a problem.
+
+        On the desktop the daemon IS the app, so the common cause of an overdue job is that the
+        window was closed when its time came. Nothing can watch while the process is down — a
+        crashed process cannot log its own crash — so this is a question, not a watcher, and it is
+        answered the moment anything asks.
+
+        Declared BEFORE `/api/cron/{job_id}`: FastAPI matches in declaration order, and the
+        parameterised route would otherwise take `silence` for a job id and 404 a path that exists.
+        """
+        import time
+
+        from chimera.scheduler.engine import Scheduler
+
+        grace = max(0.0, grace_minutes) * 60
+        sched = Scheduler(_cron_store())
+        now = time.time()
+        return {
+            "overdue": [
+                {
+                    "id": job.id,
+                    "name": job.name,
+                    "schedule": job.schedule,
+                    "due_at": job.next_run or 0.0,
+                    "behind_seconds": behind,
+                }
+                for job, behind in sched.overdue(now, grace=grace)
+            ],
+            "failing": [
+                {
+                    "id": job.id,
+                    "name": job.name,
+                    "consecutive_failures": job.consecutive_failures,
+                    "last_status": job.last_status or "",
+                    "last_error": job.last_error,
+                }
+                for job in sched.failing(at_least=1)
+            ],
+            "grace_seconds": grace,
+        }
+
     @app.post("/api/cron", dependencies=[guard], response_model=CronJobOut)
     def create_cron(body: CronCreateIn) -> dict[str, Any]:
         """Schedule a job from the UI — the CLI's `chimera cron add`, over HTTP. A human-created job
@@ -624,6 +708,72 @@ def register_features(
                 yield frame
 
         return EventSourceResponse(stream())
+
+    @app.post("/api/projects/draft", dependencies=[guard], response_model=SpecDraftOut)
+    async def draft_project_spec(req: SpecDraftIn) -> dict[str, Any]:
+        """Draft a spec from a plain-language description. One model call; nothing is written.
+
+        A token-spending path, which this module otherwise avoids — noted here rather than hidden,
+        the same way ``POST /api/kanban/run`` is. It earns the exception because the orchestrator
+        it feeds is the most capable thing in the app and its only door was a field asking for the
+        path of a YAML file: everyone who cannot write that YAML was standing outside it.
+
+        Drafting and writing are separate calls so the requirements that reach disk are the ones
+        the person kept. Reviewing them is not a formality — the spec is the acceptance authority,
+        so a requirement nobody understood is a project that finishes on a condition nobody chose.
+        """
+
+        def work() -> dict[str, Any]:
+            from chimera.orchestration.draft import DraftError, draft_spec
+            from chimera.providers import LLMGateway
+
+            try:
+                drafted = draft_spec(req.description, LLMGateway())
+            except DraftError as exc:
+                # An honest empty draft with the reason, never a 500: the description was the
+                # user's, and "I could not turn that into a spec" is a sentence they can act on.
+                return {"name": "", "requirements": [], "note": str(exc)}
+            except Exception as exc:  # noqa: BLE001 — a model hiccup is not a server error
+                _log.warning("spec draft failed: %s", exc)
+                return {"name": "", "requirements": [], "note": "the draft call did not complete"}
+            return {
+                "name": drafted.spec.name,
+                "requirements": [r.model_dump() for r in drafted.spec.requirements],
+                "refused_commands": drafted.refused_commands,
+                "refused_ids": list(drafted.refused_ids),
+                "note": "",
+            }
+
+        return await asyncio.get_running_loop().run_in_executor(None, work)
+
+    @app.post("/api/projects/spec", dependencies=[guard], response_model=SpecWriteOut)
+    def write_project_spec(req: SpecWriteIn) -> dict[str, Any]:
+        """Write a reviewed spec into the project folder. No model call.
+
+        ``command`` is refused here too, and not only in the drafter. The rule has to hold at the
+        boundary that creates the file, or it is bypassable by anyone who edits the JSON on the way
+        past — and a bug in the screen could write a shell command into the thing that judges the
+        project. Somebody who wants a ``command`` check writes the YAML themselves, which is a
+        different act: they chose the command.
+        """
+        from chimera.governance.drift import Requirement, Spec
+        from chimera.orchestration.draft import DraftError, write_spec
+
+        if any(r.check == "command" for r in req.requirements):
+            raise HTTPException(
+                status_code=400,
+                detail="a 'command' check runs a shell command; write that spec file yourself",
+            )
+        ws = Path(req.workspace).expanduser().resolve() if req.workspace else default_workspace
+        try:
+            spec = Spec(
+                name=req.name,
+                requirements=[Requirement.model_validate(r.model_dump()) for r in req.requirements],
+            )
+            path = write_spec(spec, ws)
+        except (DraftError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {"path": str(path)}
 
     @app.post("/api/projects", dependencies=[guard], response_model=ProjectStateOut)
     def start_project(req: ProjectStartIn) -> dict[str, Any]:

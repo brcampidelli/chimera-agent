@@ -21,6 +21,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/agents/design": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Design Agent Endpoint
+         * @description Turn a sentence into a proposed agent. One model call; nothing is saved.
+         *
+         *     `chimera meta` has been able to do this for a long time and printed the result into a
+         *     table — the blueprint was designed, shown, and thrown away every single time. Here the
+         *     proposal lands in the registry form, which is the surface that already edits an agent, so
+         *     the review step is a form somebody was going to fill in anyway.
+         *
+         *     Reviewing is not a formality. Measured on three real descriptions, an agent asked only to
+         *     *say what is weak about a marketing text* was designed with ``edit_file`` — a tool that
+         *     rewrites files. Over-granting is the tendency, and the person reading the list is the one
+         *     who knows the agent was never meant to touch anything.
+         */
+        post: operations["design_agent_endpoint_api_agents_design_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/agents/registry": {
         parameters: {
             query?: never;
@@ -552,6 +582,69 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cron/results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Cron Results
+         * @description What the scheduled jobs answered, most recent first.
+         *
+         *     Every dispatch has appended a line to `cron_results.jsonl` since the daemon existed, and
+         *     nothing read it: the screen that creates a schedule promised to "save each result" and there
+         *     was no way to see one without opening the file by hand.
+         *
+         *     Declared BEFORE `/api/cron/{job_id}` matters — FastAPI matches in declaration order, and the
+         *     parameterised route would otherwise swallow `results` as a job id and answer 404 for a path
+         *     that exists.
+         */
+        get: operations["cron_results_api_cron_results_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cron/silence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Cron Silence
+         * @description Ask the schedule what it is not telling you.
+         *
+         *     Every other honesty mechanism in this project sits downstream of a run having happened —
+         *     the verifier judges a result, the receipt names who approved it. None of them gets a turn
+         *     when the run never occurred, and a schedule that produced no result reads exactly like a
+         *     schedule with nothing due. That distinction matters more now that the app shows results:
+         *     an empty row for a job that never fired and one for a job that answered nothing look the
+         *     same, and only one of them is a problem.
+         *
+         *     On the desktop the daemon IS the app, so the common cause of an overdue job is that the
+         *     window was closed when its time came. Nothing can watch while the process is down — a
+         *     crashed process cannot log its own crash — so this is a question, not a watcher, and it is
+         *     answered the moment anything asks.
+         *
+         *     Declared BEFORE `/api/cron/{job_id}`: FastAPI matches in declaration order, and the
+         *     parameterised route would otherwise take `silence` for a job id and 404 a path that exists.
+         */
+        get: operations["cron_silence_api_cron_silence_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cron/{job_id}": {
         parameters: {
             query?: never;
@@ -1059,6 +1152,51 @@ export interface paths {
          *     how many were actually worked rather than how many were queued.
          */
         post: operations["run_kanban_api_kanban_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lifecycle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lifecycle Stream
+         * @description Run one task through the four stages, reporting each as it lands.
+         *
+         *     SAFETY POSTURE: identical to ``POST /api/runs`` — the build writes files inside the
+         *     workspace and, if given, runs the caller's verify command there. Behind the bearer guard
+         *     and the loopback bind, through the governed registry, and never outside the workspace.
+         */
+        post: operations["lifecycle_stream_api_lifecycle_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lifecycle/{run_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Lifecycle
+         * @description Stop a run between stages. An unknown id is ``{ok: false}`` with a 200, not a 404 —
+         *     a run that already ended is exactly the state a stale Stop click lands on.
+         */
+        post: operations["cancel_lifecycle_api_lifecycle__run_id__cancel_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1638,6 +1776,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Draft Project Spec
+         * @description Draft a spec from a plain-language description. One model call; nothing is written.
+         *
+         *     A token-spending path, which this module otherwise avoids — noted here rather than hidden,
+         *     the same way ``POST /api/kanban/run`` is. It earns the exception because the orchestrator
+         *     it feeds is the most capable thing in the app and its only door was a field asking for the
+         *     path of a YAML file: everyone who cannot write that YAML was standing outside it.
+         *
+         *     Drafting and writing are separate calls so the requirements that reach disk are the ones
+         *     the person kept. Reviewing them is not a formality — the spec is the acceptance authority,
+         *     so a requirement nobody understood is a project that finishes on a condition nobody chose.
+         */
+        post: operations["draft_project_spec_api_projects_draft_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/spec": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Write Project Spec
+         * @description Write a reviewed spec into the project folder. No model call.
+         *
+         *     ``command`` is refused here too, and not only in the drafter. The rule has to hold at the
+         *     boundary that creates the file, or it is bypassable by anyone who edits the JSON on the way
+         *     past — and a bug in the screen could write a shell command into the thing that judges the
+         *     project. Somebody who wants a ``command`` check writes the YAML themselves, which is a
+         *     different act: they chose the command.
+         */
+        post: operations["write_project_spec_api_projects_spec_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}": {
         parameters: {
             query?: never;
@@ -1711,6 +1904,35 @@ export interface paths {
          *     every other request for as long as a card takes.
          */
         post: operations["step_project_api_projects__project_id__step_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/requirements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Requirements Endpoint
+         * @description Pull the task apart into atomic requirements, without running anything.
+         *
+         *     Sibling of ``/api/plan`` and the same shape: ONE tool-free model call, nothing touches the
+         *     workspace, and a model hiccup degrades to an empty list with a note rather than a 500.
+         *
+         *     The point is not the extraction — the loop has always been able to do that for itself. The
+         *     point is that somebody reads the list BEFORE the run and can correct it. Reading "include:
+         *     a contact form" is how a person notices they never said "with the menu", and whatever they
+         *     add becomes an acceptance criterion for free: the same list is the AND-gate at the end of
+         *     the run, with directed feedback on whatever it misses.
+         */
+        post: operations["requirements_endpoint_api_requirements_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2268,6 +2490,46 @@ export interface components {
              * @default
              */
             name: string;
+        };
+        /**
+         * AgentDesignIn
+         * @description Describe an agent in a sentence. One model call; nothing is saved.
+         */
+        AgentDesignIn: {
+            /** Description */
+            description: string;
+        };
+        /**
+         * AgentDesignOut
+         * @description A proposed agent, in the shape the registry form already edits.
+         *
+         *     Deliberately the same field names as ``AgentDefOut`` so the screen can review a design in the
+         *     form it already has, rather than growing a second surface that has to be kept in step with the
+         *     first.
+         */
+        AgentDesignOut: {
+            /** Allowed Tools */
+            allowed_tools?: string[];
+            /**
+             * Id
+             * @default
+             */
+            id: string;
+            /**
+             * Instructions
+             * @default
+             */
+            instructions: string;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
         };
         /**
          * AgentIdentityOut
@@ -2893,12 +3155,20 @@ export interface components {
         CodeExchangeOut: {
             /** Answer */
             answer: string;
+            /** Done */
+            done?: {
+                [key: string]: unknown;
+            } | null;
             /** Edits */
             edits: {
                 [key: string]: string;
             }[];
             /** Tools */
             tools: components["schemas"]["CodeToolOut"][];
+            /** Verified */
+            verified?: {
+                [key: string]: unknown;
+            } | null;
             /** You */
             you: string;
         };
@@ -3357,6 +3627,19 @@ export interface components {
             /** Workspace */
             workspace?: string | null;
         };
+        /** CronFailingOut */
+        CronFailingOut: {
+            /** Consecutive Failures */
+            consecutive_failures: number;
+            /** Id */
+            id: string;
+            /** Last Error */
+            last_error?: string | null;
+            /** Last Status */
+            last_status: string;
+            /** Name */
+            name: string;
+        };
         /** CronJobOut */
         CronJobOut: {
             /** Action */
@@ -3390,6 +3673,60 @@ export interface components {
             trigger: string;
             /** Workspace */
             workspace?: string | null;
+        };
+        /** CronLateOut */
+        CronLateOut: {
+            /** Behind Seconds */
+            behind_seconds: number;
+            /** Due At */
+            due_at: number;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Schedule */
+            schedule: string;
+        };
+        /**
+         * CronResultOut
+         * @description One dispatch that produced an answer, for the Schedule screen.
+         */
+        CronResultOut: {
+            /** Action */
+            action: string;
+            /** Answer */
+            answer: string;
+            /** At */
+            at: number;
+            /** Delivered */
+            delivered?: boolean | null;
+            /**
+             * Delivery Detail
+             * @default
+             */
+            delivery_detail: string;
+            /** Job Id */
+            job_id: string;
+            /** Name */
+            name: string;
+        };
+        /**
+         * CronSilenceOut
+         * @description What the schedule is not telling you: what never ran, and what ran and lost.
+         *
+         *     Two lists rather than one, because the responses have nothing in common. ``overdue`` means
+         *     nothing dispatched — that is about the daemon, and on the desktop the daemon is the app, so the
+         *     usual cause is that the app was closed when the job was due. ``failing`` means the job ran, on
+         *     time, and lost every time; that is about the job. A single "problems" list would merge the one
+         *     you fix by opening the app with the one you fix by rewriting the action.
+         */
+        CronSilenceOut: {
+            /** Failing */
+            failing: components["schemas"]["CronFailingOut"][];
+            /** Grace Seconds */
+            grace_seconds: number;
+            /** Overdue */
+            overdue: components["schemas"]["CronLateOut"][];
         };
         /** DecomposedOut */
         DecomposedOut: {
@@ -4254,6 +4591,78 @@ export interface components {
             /** Status */
             status: string;
         };
+        /**
+         * LifecycleRunIn
+         * @description A run through plan → build → test → review.
+         *
+         *     Inherits the coding seams rather than redeclaring them, for the same reason ``RunRequest``
+         *     does: the build stage writes files and can run shell, so ``write_region``, the allowlist and
+         *     the posture all govern something real here, and a field named ``max_steps`` must not mean two
+         *     different things on two routes.
+         */
+        LifecycleRunIn: {
+            /**
+             * Allow Host Exec
+             * @default false
+             */
+            allow_host_exec: boolean;
+            /** Allow Tools */
+            allow_tools?: string[] | null;
+            /** Attachments */
+            attachments?: string[];
+            /** Context Budget */
+            context_budget?: number | null;
+            /** Deny Tools */
+            deny_tools?: string[] | null;
+            /**
+             * Explorer
+             * @default false
+             */
+            explorer: boolean;
+            /**
+             * Fuse
+             * @default false
+             */
+            fuse: boolean;
+            /** Fusion Judge */
+            fusion_judge?: string | null;
+            /** Fusion Panel */
+            fusion_panel?: string[] | null;
+            /** Fusion Synthesizer */
+            fusion_synthesizer?: string | null;
+            /**
+             * Max Attempts
+             * @default 2
+             */
+            max_attempts: number;
+            /** Max Steps */
+            max_steps?: number | null;
+            /** Max Usd */
+            max_usd?: number | null;
+            /** Model */
+            model?: string | null;
+            posture?: components["schemas"]["Posture"] | null;
+            /** Profile */
+            profile?: ("economy" | "balanced" | "max") | null;
+            /** Provider */
+            provider?: string | null;
+            /** Provider Command */
+            provider_command?: string | null;
+            /**
+             * Repo Map
+             * @default false
+             */
+            repo_map: boolean;
+            roles?: components["schemas"]["RoleModels"] | null;
+            /** Task */
+            task: string;
+            /** Verify */
+            verify?: string | null;
+            /** Workspace */
+            workspace?: string | null;
+            /** Write Region */
+            write_region?: string[] | null;
+        };
         /** MaturityOut */
         MaturityOut: {
             /** Available */
@@ -5002,6 +5411,42 @@ export interface components {
             set: boolean;
         };
         /**
+         * RequirementOut
+         * @description One atomic requirement pulled out of the task.
+         *
+         *     ``kind`` is ``do`` (must happen), ``avoid`` (must not happen) or ``include`` (the result must
+         *     contain it). The three are kept apart because a weak model drops ``avoid`` and ``include``
+         *     first — "must do X" survives context growth and "don't do Y" quietly does not — and because
+         *     seeing them labelled is what lets a person notice the one they never asked for.
+         */
+        RequirementOut: {
+            /**
+             * Kind
+             * @default do
+             */
+            kind: string;
+            /** Text */
+            text: string;
+        };
+        /** RequirementsOut */
+        RequirementsOut: {
+            /** Items */
+            items: components["schemas"]["RequirementOut"][];
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /**
+         * RequirementsRequest
+         * @description Extract a task's requirements without running anything. One model call, no tools.
+         */
+        RequirementsRequest: {
+            /** Task */
+            task: string;
+        };
+        /**
          * ResourcesOut
          * @description What this machine is spending, with every gap left as a gap.
          *
@@ -5134,6 +5579,11 @@ export interface components {
             /** Fusion Synthesizer */
             fusion_synthesizer?: string | null;
             /**
+             * Gen Tests
+             * @default false
+             */
+            gen_tests: boolean;
+            /**
              * Max Attempts
              * @default 3
              */
@@ -5164,10 +5614,17 @@ export interface components {
             /** Provider Command */
             provider_command?: string | null;
             /**
+             * Replan
+             * @default false
+             */
+            replan: boolean;
+            /**
              * Repo Map
              * @default false
              */
             repo_map: boolean;
+            /** Requirements */
+            requirements?: components["schemas"]["RequirementOut"][] | null;
             roles?: components["schemas"]["RoleModels"] | null;
             /** Task */
             task: string;
@@ -5292,6 +5749,82 @@ export interface components {
             retirement_candidates: string[];
             /** Stats */
             stats: components["schemas"]["SkillStatOut"][];
+        };
+        /**
+         * SpecDraftIn
+         * @description Describe what you want; get a spec back. One model call, nothing written.
+         */
+        SpecDraftIn: {
+            /** Description */
+            description: string;
+            /** Workspace */
+            workspace?: string | null;
+        };
+        /** SpecDraftOut */
+        SpecDraftOut: {
+            /** Name */
+            name: string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            /**
+             * Refused Commands
+             * @default 0
+             */
+            refused_commands: number;
+            /** Refused Ids */
+            refused_ids?: string[];
+            /** Requirements */
+            requirements: components["schemas"]["SpecRequirementOut"][];
+        };
+        /**
+         * SpecRequirementOut
+         * @description One obligation in a drafted spec, in the two forms it has to exist in at once.
+         *
+         *     ``text`` is what the person approving reads; ``check``/``target`` is what actually runs. They
+         *     are shown together on purpose — a drafted spec whose sentence does not describe its check is
+         *     the failure this whole flow has to avoid, and the only way anyone can catch it is by seeing
+         *     both.
+         */
+        SpecRequirementOut: {
+            /** Check */
+            check: string;
+            /** Id */
+            id: string;
+            /**
+             * Required
+             * @default true
+             */
+            required: boolean;
+            /** Target */
+            target: string;
+            /**
+             * Text
+             * @default
+             */
+            text: string;
+        };
+        /**
+         * SpecWriteIn
+         * @description Write a reviewed spec into the project folder. No model call.
+         *
+         *     Separate from drafting so the requirements that land on disk are the ones the person kept,
+         *     not the ones the model proposed — the edit in between is the entire point of showing them.
+         */
+        SpecWriteIn: {
+            /** Name */
+            name: string;
+            /** Requirements */
+            requirements: components["schemas"]["SpecRequirementOut"][];
+            /** Workspace */
+            workspace?: string | null;
+        };
+        /** SpecWriteOut */
+        SpecWriteOut: {
+            /** Path */
+            path: string;
         };
         /** SubtaskOut */
         SubtaskOut: {
@@ -5652,6 +6185,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    design_agent_endpoint_api_agents_design_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentDesignIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentDesignOut"];
                 };
             };
             /** @description Validation Error */
@@ -6524,6 +7090,69 @@ export interface operations {
             };
         };
     };
+    cron_results_api_cron_results_get: {
+        parameters: {
+            query?: {
+                job_id?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CronResultOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cron_silence_api_cron_silence_get: {
+        parameters: {
+            query?: {
+                grace_minutes?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CronSilenceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     delete_cron_api_cron__job_id__delete: {
         parameters: {
             query?: never;
@@ -7377,6 +8006,70 @@ export interface operations {
             };
         };
     };
+    lifecycle_stream_api_lifecycle_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LifecycleRunIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_lifecycle_api_lifecycle__run_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CancelOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     lsp_diagnostics_api_lsp_diagnostics_post: {
         parameters: {
             query?: never;
@@ -8169,6 +8862,72 @@ export interface operations {
             };
         };
     };
+    draft_project_spec_api_projects_draft_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpecDraftIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpecDraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    write_project_spec_api_projects_spec_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpecWriteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpecWriteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_project_api_projects__project_id__get: {
         parameters: {
             query?: never;
@@ -8288,6 +9047,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectStateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    requirements_endpoint_api_requirements_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequirementsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequirementsOut"];
                 };
             };
             /** @description Validation Error */

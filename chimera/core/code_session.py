@@ -45,6 +45,13 @@ _log = get_logger("core.code_session")
 #: grow forever". 200 is roughly thirty tool-using turns.
 DEFAULT_MAX_MESSAGES = 200
 
+#: How many turn receipts a session keeps. Generous against ``DEFAULT_MAX_MESSAGES`` on purpose:
+#: a receipt is a few hundred bytes against a turn's several kilobytes of messages, and having more
+#: receipts than displayable turns is harmless — the extra ones simply have no exchange to attach
+#: to. Having FEWER would be the damaging direction, because tail-pairing would then leave the
+#: newest turns without the accounting somebody is most likely to want.
+MAX_RECEIPTS = 400
+
 
 class SupportsCodeRun(Protocol):
     """The agent loop, with the seams a coding turn needs: history in, live callbacks out."""
@@ -123,6 +130,21 @@ class CodeSession:
     Carrying a stale one here would pin both to whatever the first turn happened to be about.
     """
     max_messages: int = DEFAULT_MAX_MESSAGES
+    receipts: list[dict[str, Any]] = field(default_factory=list)
+    """One receipt per completed turn, oldest first — what the turn cost, what stopped it, what it
+    verified.
+
+    Kept beside the messages rather than inside them: ``messages`` is the model's own format and
+    goes to the provider verbatim, so a key of ours in there is a key some provider will one day
+    reject. Kept at all because the receipt is the app's answer to "what just happened and what did
+    it cost", and until now it existed only in the live stream — reopening a conversation showed
+    the words and threw away the accounting.
+
+    Paired with exchanges from the END, never by index from the start. Both lists are trimmed at
+    the front as a conversation grows, and the last receipt always belongs to the last turn;
+    counting forward would silently shift every receipt onto the wrong turn the first time a
+    conversation got long enough to trim.
+    """
 
     def send(
         self,
@@ -195,7 +217,23 @@ class CodeSession:
             "session_id": self.session_id,
             "workspace": self.workspace,
             "messages": [_as_dict(m) for m in self.messages],
+            "receipts": self.receipts[-MAX_RECEIPTS:],
         }
+
+    def remember_receipt(self, receipt: dict[str, Any]) -> None:
+        """Record what one finished turn cost. Bounded, and never raises.
+
+        A receipt is a record ABOUT a turn that already happened and was already paid for; failing
+        to store one must not be able to fail the turn, so a value that will not serialise is
+        dropped with a log rather than thrown.
+        """
+        try:
+            json.dumps(receipt)
+        except (TypeError, ValueError) as exc:
+            _log.debug("session %s: unserialisable receipt dropped (%s)", self.session_id, exc)
+            return
+        self.receipts.append(receipt)
+        del self.receipts[:-MAX_RECEIPTS]
 
 
 class CodeSessionStore:
@@ -244,6 +282,10 @@ class CodeSessionStore:
             session_id=session_id,
             workspace=str(data.get("workspace") or ""),
             messages=list(messages),
+            # Absent in every file written before receipts existed, and that is the ordinary case
+            # rather than a defect: an old conversation has no accounting to show, and saying so by
+            # showing none is right.
+            receipts=[r for r in data.get("receipts", []) if isinstance(r, dict)],
         )
 
     def list_ids(self) -> list[str]:

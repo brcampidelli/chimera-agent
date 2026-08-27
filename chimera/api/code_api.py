@@ -1064,6 +1064,10 @@ def register_code_api(
                     back" to someone who had been talking to it all day. A dashboard that cannot
                     fill up is worse than an absent one: it reports zero spend as a fact.
                     """
+                    # None on every path that did not verify — an unedited turn, an external
+                    # worker's turn, a turn whose workspace had no test command. Distinct from a
+                    # verdict of "none", which means we looked and there was nothing to run.
+                    verdict: dict[str, Any] | None = None
                     _log_usage(payload, session_id, live())
                     # Here rather than in either branch: both go through this function, and an
                     # external agent's turn is still a turn the user typed "remember that…" into.
@@ -1105,6 +1109,30 @@ def register_code_api(
                                 "command": command, "source": source, "state": state,
                                 "output": outcome.output[:4000], "revert_token": token,
                             })
+                            verdict = {
+                                "command": command, "source": source, "state": state,
+                                "output": outcome.output[:4000],
+                            }
+                    # Stored before it is announced, and stored HERE for the same reason usage is:
+                    # every path out of a turn comes through this function. The receipt is this
+                    # app's answer to "what just happened and what did it cost" — it says "price
+                    # unknown" instead of zero, separates "recalled 0 facts" from "we did not
+                    # look", and puts the stopping reason first. It existed only in the live
+                    # stream: reopening a conversation kept the words and threw away the
+                    # accounting, along with the verification verdict.
+                    #
+                    # `answer` is left out — it is already in the message list, and a receipt is
+                    # about the turn, not a second copy of it. `revert_token` is left out
+                    # deliberately: the undo offer is single-use and in-memory, so persisting one
+                    # would put a button on a reopened conversation that cannot do what it says.
+                    receipt = {k: v for k, v in payload.items() if k != "answer"}
+                    if verdict is not None:
+                        receipt["verified"] = verdict
+                    session.remember_receipt(receipt)
+                    try:
+                        store.save(session)
+                    except OSError as exc:  # noqa: BLE001 — a failed record must not fail the turn
+                        _log.debug("could not store the turn receipt: %s", exc)
                     emit("done", payload)
 
                 # Same swap the chat turn uses, under the same per-session lock: hand the agent the
@@ -1387,7 +1415,7 @@ def register_code_api(
         file as the ordinary first-turn case, and a screen that errors on a session someone just
         deleted in another window would be reporting a race as a fault.
         """
-        from chimera.api.code_replay import exchanges_from_messages
+        from chimera.api.code_replay import attach_receipts, exchanges_from_messages
 
         path = store._path(session_id)
         if not path.is_file():
@@ -1395,12 +1423,13 @@ def register_code_api(
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             messages = [m for m in data.get("messages", []) if isinstance(m, dict)]
+            receipts = [r for r in data.get("receipts", []) if isinstance(r, dict)]
         except (OSError, ValueError):
             return {"id": session_id, "workspace": "", "exchanges": []}
         return {
             "id": session_id,
             "workspace": str(data.get("workspace") or ""),
-            "exchanges": exchanges_from_messages(messages),
+            "exchanges": attach_receipts(exchanges_from_messages(messages), receipts),
         }
 
     @app.post(

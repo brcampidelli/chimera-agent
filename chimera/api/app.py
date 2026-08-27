@@ -46,6 +46,8 @@ from chimera.api.runs import load_runs
 from chimera.api.schemas import (
     AcceptanceOut,
     AgentDefOut,
+    AgentDesignIn,
+    AgentDesignOut,
     AgentIdentityOut,
     AgentsBatchOut,
     BatchCancelOut,
@@ -87,6 +89,9 @@ from chimera.api.schemas import (
     PlanOut,
     PoolAddIn,
     PoolWriteOut,
+    RequirementOut,
+    RequirementsOut,
+    RequirementsRequest,
     ResourcesOut,
     RunReceiptOut,
     SearchOut,
@@ -262,6 +267,36 @@ class RunRequest(CodeSeams):
     """An approved/edited plan (the raw text from the plan preview). When set, the run uses THIS plan
     verbatim instead of re-planning — the worker follows the exact steps the human reviewed. None =
     the run plans for itself as before."""
+    gen_tests: bool = False
+    """Turn the approved requirement checklist into EXECUTABLE pytest and gate on that.
+
+    Only does anything when there is no ``verify`` command AND a checklist came back: with a real
+    test command the tests are already the ground truth, and with no requirements there is nothing
+    to ground generation in. It writes a test file into the workspace, which is a side effect the
+    screen states rather than performs quietly.
+
+    The value is the true negative. Without it, a run with no verify command is graded by a model
+    reading its own answer, and that proxy is measured to rubber-stamp code that is wrong — a false
+    positive that looks exactly like success."""
+
+    replan: bool = False
+    """On a stall, rebuild the plan from the accumulated failure causes instead of nudging.
+
+    Off by default because it spends a planning call at the worst moment. When on, the run also
+    gets the looser stall matching: at the strict default two attempts failing from one cause with
+    different assertion text never match, so the stall is never detected and the setting would be
+    decoration (``bench/retry_lift``, intervention I2)."""
+
+    requirements: list[RequirementOut] | None = None
+    """The requirement checklist a person read and edited, from ``POST /api/requirements``.
+
+    When set, it does two jobs: the worker sees the list up front so it targets every constraint
+    from the first attempt, and the same list is graded at the end as an AND-gate, with the misses
+    fed back as directed feedback for the retry.
+
+    None means nobody was asked, and then no checklist runs — arming an acceptance gate on a list
+    the owner never saw would be the same failure the whole feature exists to fix, wearing the
+    opposite sign. An empty list is a different answer: reviewed, nothing to gate on."""
     model: str | None = None
     """The model slug the worker runs on. None = the configured default model (unchanged behaviour)."""
     fuse: bool = False
@@ -523,6 +558,58 @@ def build_api_app(
 
         return [a.model_dump() for a in load_agents(live_settings().home)]
 
+    @app.post("/api/agents/design", dependencies=[guard], response_model=AgentDesignOut)
+    async def design_agent_endpoint(req: AgentDesignIn) -> dict[str, Any]:
+        """Turn a sentence into a proposed agent. One model call; nothing is saved.
+
+        `chimera meta` has been able to do this for a long time and printed the result into a
+        table — the blueprint was designed, shown, and thrown away every single time. Here the
+        proposal lands in the registry form, which is the surface that already edits an agent, so
+        the review step is a form somebody was going to fill in anyway.
+
+        Reviewing is not a formality. Measured on three real descriptions, an agent asked only to
+        *say what is weak about a marketing text* was designed with ``edit_file`` — a tool that
+        rewrites files. Over-granting is the tendency, and the person reading the list is the one
+        who knows the agent was never meant to touch anything.
+        """
+
+        def work() -> dict[str, Any]:
+            import re
+
+            from chimera.ecosystem.meta_agent import MetaAgent
+            from chimera.providers import LLMGateway
+            from chimera.tools import default_registry
+
+            if not req.description.strip():
+                return {"note": "nothing was described"}
+            try:
+                blueprint = MetaAgent(
+                    LLMGateway(), allowed_tools=default_registry().names()
+                ).design(req.description)
+            except Exception as exc:  # noqa: BLE001 — a model hiccup is not a server error
+                _log.warning("agent design failed: %s", exc)
+                return {"note": "the design call did not complete"}
+            if blueprint is None:
+                return {"note": "no usable agent could be read from that description"}
+            slug = re.sub(r"[^a-z0-9]+", "-", blueprint.name.strip().lower()).strip("-")
+            return {
+                "id": slug,
+                "name": blueprint.name,
+                "instructions": blueprint.role_prompt,
+                "allowed_tools": list(blueprint.tools),
+                # An empty list is not "no tools" here — `AgentDef.allowed_tools` reads empty as NO
+                # RESTRICTION, the opposite of `Role.allowed_tools`. That inversion is how a
+                # subagent once ran the full loop outside its owner's denylist, so a design that
+                # named nothing says so instead of arriving as a silent grant of everything.
+                "note": (
+                    ""
+                    if blueprint.tools
+                    else "no tools were chosen — an empty list lets it use every tool"
+                ),
+            }
+
+        return await asyncio.get_running_loop().run_in_executor(None, work)
+
     @app.put("/api/agents/registry", dependencies=[guard], response_model=list[AgentDefOut])
     def upsert_agent_endpoint(agent: AgentDefOut) -> list[Any]:
         # Whole-record replace, not merge: a PUT that kept fields the caller omitted would make
@@ -780,6 +867,41 @@ def build_api_app(
             except Exception as exc:  # noqa: BLE001 — a model hiccup is an honest empty plan, never a 500
                 _log.warning("plan preview failed: %s", exc)
                 return {"steps": [], "text": "", "note": "the planner call did not complete"}
+
+        return await asyncio.get_running_loop().run_in_executor(None, work)
+
+    @app.post("/api/requirements", dependencies=[guard], response_model=RequirementsOut)
+    async def requirements_endpoint(req: RequirementsRequest) -> dict[str, Any]:
+        """Pull the task apart into atomic requirements, without running anything.
+
+        Sibling of ``/api/plan`` and the same shape: ONE tool-free model call, nothing touches the
+        workspace, and a model hiccup degrades to an empty list with a note rather than a 500.
+
+        The point is not the extraction — the loop has always been able to do that for itself. The
+        point is that somebody reads the list BEFORE the run and can correct it. Reading "include:
+        a contact form" is how a person notices they never said "with the menu", and whatever they
+        add becomes an acceptance criterion for free: the same list is the AND-gate at the end of
+        the run, with directed feedback on whatever it misses.
+        """
+
+        def work() -> dict[str, Any]:
+            from chimera.core.checklist import RequirementChecklist
+            from chimera.providers import LLMGateway
+
+            if not req.task.strip():
+                return {"items": [], "note": ""}
+            try:
+                items = RequirementChecklist(LLMGateway()).extract(req.task)
+            except Exception as exc:  # noqa: BLE001 — a model hiccup is not a server error
+                _log.warning("requirement extraction failed: %s", exc)
+                return {"items": [], "note": "the extraction call did not complete"}
+            # `extract` swallows its own failures and returns []. Empty means either "nothing to
+            # extract" or "it did not work", and the two read the same on a screen — so say so,
+            # rather than showing an empty checklist that looks like a task with no requirements.
+            return {
+                "items": [{"text": r.text, "kind": r.kind} for r in items],
+                "note": "" if items else "no requirements could be read from this task",
+            }
 
         return await asyncio.get_running_loop().run_in_executor(None, work)
 
@@ -1575,6 +1697,12 @@ def build_api_app(
     register_orchestration_api(
         app, guard, workspace, settings, live_settings=live_settings
     )
+    # /api/lifecycle — plan → build → test → review, one frame per stage. Registered here and not
+    # behind a flag for the same reason as above: `schema_dump` builds the app through this
+    # function, so a conditional route would be present at runtime and missing from the schema.
+    from chimera.api.lifecycle_api import register_lifecycle_api
+
+    register_lifecycle_api(app, guard, workspace, settings, live_settings=live_settings)
     # /v1/chat/completions — any OpenAI client or LLM benchmark harness can drive the agent loop.
     register_openai_compat(app, guard, manager)
 
@@ -1763,9 +1891,13 @@ def _build_solve_agent(
     repository), and ``allow_tools`` / ``deny_tools`` / ``write_region`` (what it is allowed to
     touch). With none set, the build is the plain single-model core loop.
 
-    Still deliberately absent, and still a real difference from the CLI: evolution, strong-verify,
-    contracts, checklists and the trust kernel. Those are not ceilings on an ordinary run — they are
-    separate machinery, and each would need its own surface before it meant anything here.
+    Still deliberately absent, and still a real difference from the CLI: strong-verify, completion
+    contracts and the trust kernel. Each would need its own surface before it meant anything here —
+    a contract in particular checks `file_exists` / `file_contains` / `answer_matches`, which are
+    the shapes the project Spec already offers through a screen somebody can read.
+
+    Evolution and checklists used to be on that list and are not any more: the learning seams are
+    passed below via ``evo.apply_to()``, and the checklist arrives as a list a person reviewed.
     """
     from chimera.core import (
         Agent,
@@ -1778,11 +1910,14 @@ def _build_solve_agent(
     from chimera.core import (
         AutonomousAgent as _AutonomousAgent,
     )
+    from chimera.core.checklist import RequirementChecklist
     from chimera.core.instructions import load as load_identity
     from chimera.core.instructions import render as render_identity
     from chimera.core.planner import Plan
     from chimera.core.runstate import RunCheckpointer
+    from chimera.core.spec_test import SpecTestGenerator
     from chimera.core.verify import CommandVerifier
+    from chimera.evolution.stagnation import StagnationDetector
     from chimera.providers import LLMGateway
 
     gateway = LLMGateway()
@@ -1958,6 +2093,31 @@ def _build_solve_agent(
         # because a paused run with no durable identity is one nobody can ever come back to.
         pause_on_taint=bool(req.thread_id and (req.pause_on_taint or posture.pause_on_taint)),
         pause_always=bool(req.thread_id and posture.pause_always),
+        # The requirement checklist, armed ONLY when a person sent one back. Both halves matter and
+        # they are different jobs: the worker sees the list up front so it targets every constraint
+        # from attempt one, and the same list is graded at the end as an AND-gate whose misses
+        # become directed feedback for the retry.
+        #
+        # `None` — nobody was asked — leaves both off. Extracting a list here and silently gating on
+        # it would arm an acceptance criterion its owner never read, which is the same failure this
+        # feature exists to fix wearing the opposite sign. An empty list is a different answer:
+        # reviewed, and there is nothing to gate on.
+        checklist=RequirementChecklist(gateway, req.model) if req.requirements is not None else None,
+        given_requirements=list(req.requirements) if req.requirements is not None else None,
+        # Spec-grounded tests, only where they replace something weaker. The loop itself requires
+        # no verifier and a non-empty requirement list before it uses this, so asking for it with
+        # a verify command set is a no-op rather than a conflict.
+        spec_test_generator=SpecTestGenerator(gateway, req.model) if req.gen_tests else None,
+        # ALWAYS, and free: no model call, just a comparison of successive failure signatures. The
+        # run had none, so every attempt that failed the same way as the last one was met with the
+        # same nudge and the loop refined a dead end for its whole attempt budget. Detecting it
+        # buys the cheap pivot on its own; `replan` is what upgrades the pivot into a new plan.
+        #
+        # The looser threshold is the point rather than a tuning choice: byte-identical matching
+        # misses two attempts failing from one cause with different assertion text, which is the
+        # common case, so the strict default would make this line do nothing.
+        stagnation=StagnationDetector(window=2, signature_similarity=0.8),
+        replan_on_stall=req.replan,
         config=AutonomousConfig(max_attempts=req.max_attempts),
     )
 

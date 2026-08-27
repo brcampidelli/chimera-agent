@@ -174,13 +174,27 @@ EXEMPT: dict[str, str] = {
     # sharing a method named `run` let the exemption cover `SolveLane` as well.
     # --- not an agent surface at all ---
     "chimera/api/app.py:build_api_app.tools_endpoint": "lists tool schemas; nothing is invoked",
+    # Same shape as the line above and safe for the same reason: the registry is built to read
+    # `.names()` — the list of tool names a designed agent may be restricted to — and is then
+    # discarded. No agent is handed it, nothing is invoked through it, and the design it feeds
+    # is a proposal that a person reviews before anything is saved. What the designed agent may
+    # actually run is decided later, by the governed surface that runs it.
+    "chimera/api/app.py:build_api_app.design_agent_endpoint.work": (
+        "reads tool NAMES for the design allowlist; no agent, nothing invoked"
+    ),
     "chimera/cli/main.py:tools": "prints the tool table",
     "chimera/cli/main.py:schema_bench": "benchmark harness, no deployment",
     "chimera/cli/main.py:sandbox_bench.factory": "benchmark harness, no deployment",
     "chimera/cli/main.py:evolve_tune": "offline tuning over recorded trajectories",
     "chimera/cli/main.py:meta": "designs an agent blueprint; does not run one",
     "chimera/core/agent.py:_default_skill_registry": "internal default, wrapped by whoever built it",
-    "chimera/orchestration/lifecycle.py:lifecycle_crew": "library constructor; the caller governs",
+    # The exemption used to say "the caller governs" while no caller did: the only one was the CLI,
+    # which passes the bare workspace registry. That is defensible in a terminal — the person
+    # running the command already has every capability the agent is being handed — and it is why
+    # the default stayed. The claim is now true of the surface that needed it: `lifecycle_crew`
+    # takes a `registry`, and `POST /api/lifecycle` passes `assemble_registry`'s output, which is
+    # pinned by `test_lifecycle_api.py::test_the_route_governs_the_registry_it_hands_the_crew`.
+    "chimera/orchestration/lifecycle.py:lifecycle_crew": "library constructor; the HTTP caller governs",
     "chimera/workflow/executors.py:build_executors.solve_step": "delegates to solve, governed there",
 }
 

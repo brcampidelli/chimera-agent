@@ -540,7 +540,17 @@ export function Conversation({
     void getCodeSession(resumeSession)
       .then((session) => {
         if (!live) return;
-        setExchanges(session.exchanges.map((e) => ({ ...e, done: null })));
+        // The receipt and the verdict come back with the turn now, so they are kept rather than
+        // wiped. `done: null` here used to be the honest thing to write — nothing stored one — and
+        // it stopped being honest the moment the server began storing them: it threw away the best
+        // thing this app produces on every reopened conversation.
+        setExchanges(
+          session.exchanges.map((e) => ({
+            ...e,
+            done: (e.done ?? null) as Exchange["done"],
+            verified: (e.verified ?? undefined) as Exchange["verified"],
+          })),
+        );
         setReplayed(true);
       })
       .catch(() => {

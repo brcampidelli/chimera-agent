@@ -6,9 +6,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+An eleven-lens audit read this application — 65,760 lines of Python, 41,782 of frontend — and
+produced 66 recommendations. Classified by their own diagnosis, 26 were *"exists and is switched
+off"* and 11 *"exists and is hidden"*: **56% of the work was wiring, not product.** The capability
+and the engineering were both high and verifiable. Almost nothing that was built had a door.
+
+Most of this release is doors. The rest is what testing each release candidate as a user turned up.
+
+### Added — the app can reach what it was built on
+
+- **The step budget was the one configuration this project's own bench published as sterile.**
+  `AgentConfig.max_steps` is 8 and no screen sent anything else. `bench/swe_bench/RESULTS.md` run 1
+  measured the scaffold at 8 steps, published **+0.0%** and called it "a starved agent"; run 2
+  changed that number and nothing else and got **+15.8%**, with the retraction reading "the cure was
+  the step budget". Every positive result this project has was measured at 30. The Code screen now
+  sends 40 — and a spend ceiling is armed with it, because raising the step budget in an app other
+  people install multiplies what an accident costs, and nothing was armed by default. Visible in the
+  box, because a limit nobody can see is a limit nobody can raise.
+- **Read the plan before anything is written.** `POST /api/plan` — one tool-free model call, no
+  tools, nothing touching the workspace — has been on the server since runs existed, and
+  `RunRequest.plan` has always executed an approved plan verbatim. The TypeScript helper had been
+  *deleted for having no caller*, with a test in this repository asserting its absence: the clearest
+  possible record that the capability existed and the product did not. The plan comes back editable,
+  because a plan you can only approve is a plan you can only agree with.
+- **The requirement checklist, read and corrected before the run.** `RequirementChecklist` extracts
+  a task's atomic requirements and grades coverage at the end; only `chimera solve --checklist`
+  reached it, and even there the extraction happened inside the run where nobody could see it.
+  `POST /api/requirements` returns the list beside the plan, editable. Whatever somebody adds becomes
+  an acceptance criterion for free — the same list is the AND-gate at the end, with the misses fed
+  back as directed feedback. The run is graded against the list the person **kept**: re-extracting
+  would make every edit decoration, and a re-derived list still looks reviewed.
+- **Describe a project instead of writing its YAML.** The project orchestrator plans, works one card
+  at a time and verifies each requirement mechanically, and its only door was a field asking for the
+  path of a spec file. Now: describe it, review what it will be judged on, start. Each requirement
+  is shown in both forms at once — the sentence a person reads and the check that actually runs.
+  `command` checks are refused: measured on three layman descriptions with no constraint at all,
+  **one draft in three emitted one**, and it was a shell pipeline with `$(pwd)`, a `||` fallback and
+  curl under a sentence reading only "the main page must open properly in a web browser".
+- **Describe a subagent in a sentence and keep it.** `chimera meta` has designed one from a
+  description for a long time, printed it into a table, and thrown it away every single time. The
+  proposal now lands in the registry form. Reviewing is not a formality: run against the real model,
+  an agent asked only to *say what is weak about a marketing text* came back holding `edit_file`.
+- **The SDLC lifecycle crew has a screen** — plan → build → test → review with verify-or-revert,
+  reachable only from a terminal until now. One frame per stage, because what it adds over an
+  ordinary run is that the stages are *visible*; delivered as one block at the end it is `solve`
+  with extra waiting.
+- **What the scheduled jobs answered.** Every dispatch has appended a line to `cron_results.jsonl`
+  since the daemon existed and the only code that touched that file was the code that wrote it — the
+  screen that creates a schedule promised to "save each result" and offered no way to read one.
+- **And what did not run.** Closing the window kills the scheduler; nothing said which jobs went
+  unrun because of it. `Scheduler.overdue` could always answer, and only `chimera cron doctor`
+  called it. The banner names each missed job and says why in one sentence, because nobody would
+  guess that the schedule lives inside the app.
+- **The run seams the CLI has had all along**: a repository map and an explorer for a project that
+  already exists (`repo_map` and `explorer` were declared on the request, defaulted to false, and
+  set by nothing on earth), re-plan on a stall, and spec-grounded test generation that turns the
+  approved checklist into executable pytest where there is no test command.
+- **The agent may ask.** The system prompt classified asking as failure, with no exception. Given
+  *"faz um site pra minha padaria"* it wrote five files in a stack nobody chose, for a bakery whose
+  name it never learned. Paired, same folder and model: with the exception, one step, no files, and
+  three short questions. The control matters more — a specific request still builds without asking.
+- **Preview what was made, and run commands per project.** The Runner panel executed on the host
+  with no gate while the agent was refused `pytest` to correct itself, with the screen saying "ask"
+  in a process where nobody is there to answer.
+- **MCP servers reach the coding surface.** You could add the GitHub server, press Test, watch it
+  prove itself live, and find the Code screen had no idea it existed: MCP tools were poured in at
+  exactly one place, the chat session factory. They now enter straight after the base registry and
+  BEFORE the denial list, so `restrict_registry`, the trust kernel and the taint ledger all reach
+  them — an MCP server is the most obvious way untrusted content arrives.
+- **A catalogue of MCP servers**, nine entries each checked against a primary source, each carrying
+  the runner it needs (checked against this machine's PATH before the entry is offered), the secrets
+  it asks for, and what contains it. The screen's only way in was transcribing a command and an
+  argument list from a vendor's page — an exercise with a silent failure mode, and the reason it
+  said "0 configured".
+
 You could not choose which model answered you. The endpoint accepted one all along.
 
-### Added
+### Added — choosing who argues, and what it costs
 
 - **Choose who answers, who grades and who writes a fused turn.** The engine has taken `panel` /
   `judge` / `synthesizer` per instance since it was written, and `Settings` has carried all three the
@@ -58,7 +132,59 @@ You could not choose which model answered you. The endpoint accepted one all alo
   nothing. A tool the app has no translation for falls back to the server's own words — the normal
   case for MCP, and for any tool newer than the translations. The note explaining the English used to
   say the descriptions stay English; it now says what is true, which is that the names do.
-### Fixed
+
+### Fixed — found by installing each release candidate and using it
+
+- **The agent's root was the app's own install folder.** `read_file(".env")` returned
+  `OPENROUTER_API_KEY=sk-or-v1-…` in full. Not a sandbox failure — a path outside the root is still
+  refused — the root itself was the folder holding the key. `resolve_app_workspace` falls back to
+  the process CWD and its own docstring names the environment step as the packaged-build answer;
+  nothing set it. **If you ran an installed build before this release, treat any key it could read
+  as exposed and rotate it.**
+- **A lost update was written, confirmed, and then silently overwritten.** A CI failure reading
+  `assert 49 == 50` on a pull request that touched none of it, passing on a rerun of the identical
+  commit. `locked()` degrades by design: when the OS refuses the lock it runs the body unlocked and
+  says so by yielding False, and nobody read the value. Twelve processes each adding twenty-five
+  learned skills, on Windows: 2–3 entered without the lock per run, 3–6 exclusion violations, 2–5
+  skills lost, and **no warning an operator would ever see**.
+- **Memory recall could not read three of the ten languages it ships in.** `[a-z0-9]+` tokenizes
+  `где находится проект`, `项目在哪里` and `プロジェクトはどこ` to `[]`. Russian, Chinese and
+  Japanese returned NOTHING, on every query, always — absent rather than degraded, and silently. And
+  accents did not lose information, they invented it: `"autenticação"` produced `['autentica', 'o']`,
+  every `-ção` manufacturing the one token that matches everything. Writing correct Portuguese made
+  recall worse.
+- **A fact knows which project it was learned in.** A note about one project was arriving as context
+  on ordinary coding requests in another — measured on a real install with exactly two facts in it.
+  That is not noise to tune away; it is the model being told something false about where it is. What
+  the agent learns while working in a folder is saved to that folder; what you type into the Memory
+  screen belongs everywhere, and so do persona facts.
+- **`defines` understood Python and nothing else.** Measured against twenty real definition forms it
+  matched **two**. On any JavaScript, TypeScript, Rust or Go project a `defines` requirement could
+  never be satisfied: the agent wrote the code, was told it had not finished, and looped to its
+  iteration ceiling before reporting failure over work that was correct. Fail-closed, and
+  indistinguishable from an agent that cannot code. The ten near-misses that must not match — a
+  call, an import, a re-export, `const NAME = 5` — are pinned alongside the twenty that must.
+- **A spec stored in the folder it judges satisfied itself.** Every `contains` target is a regex
+  searched across every text file, and each requirement's own `text` repeats the words its regex
+  looks for. On a real drafted spec, empty folder: **4 of 4 requirements satisfied, `aligned=True`** —
+  a project reporting itself finished having written nothing. True for every hand-written spec ever
+  committed at a repository root.
+- **A reopened conversation kept the words and threw away the accounting.** The turn receipt — which
+  says "price unknown" rather than zero, separates "recalled 0 facts" from "we did not look", and
+  puts the stopping reason first — lived only in the live stream, along with the verification
+  verdict on whatever each turn wrote.
+- **One configured MCP server was becoming two connections**, and the SDK the feature needs was
+  never shipped while the failure said something else.
+- **Four catalogue prices had drifted, one of them by seven times**, and a model withdrawn by its
+  provider was still being offered.
+- **A release cut died on any command whose output is not ASCII**, and a lock five releases stale
+  shipped with it.
+- **The desktop's accessibility, in eight passes.** 58 labels painted in a fill colour with a guard
+  that could not see them; nine more in a shape neither earlier rule could catch; code comments below
+  AA in both themes; a column that would not shrink painting over the activity panel; a toolbar
+  overflowing its column; the worker picker saying which one is chosen only in colour.
+
+### Fixed — the rest
 
 - **The benchmark suites prove they can measure something before a model is called.** Every task
   claims its test fails on the untouched workspace and passes once the work is done. The second half

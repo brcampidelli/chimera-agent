@@ -174,6 +174,41 @@ export const getPlan = (task: string, workspace?: string | null) =>
     body: JSON.stringify({ task, workspace: workspace || null }),
   });
 
+/** One atomic requirement pulled out of the task.
+ *
+ *  `kind` is `do` (must happen), `avoid` (must not happen) or `include` (the result must contain
+ *  it). Kept apart on the screen because a weak model drops `avoid` and `include` first, and
+ *  because seeing them labelled is what lets somebody spot the one they never asked for.
+ */
+export type TaskRequirement = { text: string; kind: string };
+
+/** Pull the task apart into requirements, without running anything. One model call, no tools.
+ *
+ *  The extraction is not the point — the loop could always do it for itself. The point is that
+ *  somebody reads the list BEFORE the run and can correct it, and whatever they add becomes an
+ *  acceptance criterion for free: the same list is the AND-gate at the end.
+ */
+export const getRequirements = (task: string) =>
+  json<{ items: TaskRequirement[]; note: string }>("/api/requirements", {
+    method: "POST",
+    body: JSON.stringify({ task }),
+  });
+
+/** Turn a sentence into a proposed agent. One model call; nothing is saved.
+ *
+ *  `chimera meta` could always do this and printed the result into a table — designed, shown, and
+ *  thrown away every time. The proposal lands in the registry form instead, which is the surface
+ *  that already edits an agent.
+ */
+export const designAgent = (description: string) =>
+  json<{
+    id: string;
+    name: string;
+    instructions: string;
+    allowed_tools: string[];
+    note: string;
+  }>("/api/agents/design", { method: "POST", body: JSON.stringify({ description }) });
+
 export const getGovernanceInjection = () =>
   json<InjectionReport>("/api/governance/injection");
 export const getGovernanceAudit = () => json<GovernanceAudit>("/api/governance/audit");
@@ -454,6 +489,54 @@ export const createCron = (
   },
 ) =>
   json<CronJob>("/api/cron", { method: "POST", body: JSON.stringify(body) });
+/** What the schedules answered, most recent first.
+ *
+ *  Every dispatch has appended a line to `cron_results.jsonl` since the daemon existed, and nothing
+ *  read it — so the screen that creates a schedule promised to save each result and offered no way
+ *  to see one. */
+export const getCronResults = (jobId?: string, limit = 20) => {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (jobId) params.set("job_id", jobId);
+  return json<CronResult[]>(`/api/cron/results?${params.toString()}`);
+};
+/** What the schedule is not telling you.
+ *
+ *  Two lists, never merged. `overdue` means nothing dispatched — on the desktop the daemon IS the
+ *  app, so the usual cause is that the window was closed when the job was due, and the fix is to
+ *  open it. `failing` means the job ran, on time, and lost; the fix is to change the job. A single
+ *  "problems" list would hide which of the two somebody is looking at.
+ */
+export interface CronSilence {
+  overdue: {
+    id: string;
+    name: string;
+    schedule: string;
+    due_at: number;
+    behind_seconds: number;
+  }[];
+  failing: {
+    id: string;
+    name: string;
+    consecutive_failures: number;
+    last_status: string;
+    last_error: string | null;
+  }[];
+  /** How late a job may be before it counts as missed. Shown, because a reader who cannot see the
+   *  threshold cannot tell a real gap from the clock. */
+  grace_seconds: number;
+}
+export const getCronSilence = () => json<CronSilence>("/api/cron/silence");
+
+export interface CronResult {
+  at: number;
+  job_id: string;
+  name: string;
+  action: string;
+  answer: string;
+  /** null when the job named no webhook — not the same as a delivery that failed. */
+  delivered: boolean | null;
+  delivery_detail: string;
+}
 export const enableCron = (id: string) => json<CronJob>(`/api/cron/${id}/enable`, { method: "POST" });
 export const disableCron = (id: string) =>
   json<CronJob>(`/api/cron/${id}/disable`, { method: "POST" });
@@ -595,6 +678,46 @@ export async function streamKanbanRun(
     }
   }
 }
+/** One obligation in a drafted spec, in both forms at once.
+ *
+ *  `text` is what the person approving reads; `check`/`target` is what actually runs. The screen
+ *  shows both, because a drafted spec whose sentence does not describe its check is the failure
+ *  this flow exists to avoid, and seeing them side by side is the only way to catch it.
+ */
+export type SpecRequirement = {
+  id: string;
+  text: string;
+  check: string;
+  target: string;
+  required: boolean;
+};
+export type SpecDraft = {
+  name: string;
+  requirements: SpecRequirement[];
+  refused_commands: number;
+  refused_ids: string[];
+  note: string;
+};
+/** Describe a project in plain language and get a spec back. One model call; nothing written. */
+export const draftSpec = (description: string, workspace?: string | null) =>
+  json<SpecDraft>("/api/projects/draft", {
+    method: "POST",
+    body: JSON.stringify({ description, workspace: workspace ?? null }),
+  });
+/** Write the reviewed spec into the project folder. No model call.
+ *
+ *  Takes what the caller passes, not what was drafted — the requirements somebody deleted on the
+ *  screen must be the requirements that never reach disk, or the review is decoration.
+ */
+export const writeSpec = (req: {
+  name: string;
+  requirements: SpecRequirement[];
+  workspace?: string | null;
+}) =>
+  json<{ path: string }>("/api/projects/spec", {
+    method: "POST",
+    body: JSON.stringify({ ...req, workspace: req.workspace ?? null }),
+  });
 export const getProjects = () => json<ProjectState[]>("/api/projects");
 export const startProject = (req: {
   spec: string;
@@ -623,6 +746,23 @@ export const denyProject = (id: string, card: string) =>
 
 export interface RunRequestInput {
   task: string;
+  /** The requirement checklist a person read and edited, or `null` when nobody was asked.
+   *
+   *  The two are different answers and both are sent as themselves. `null` runs no checklist at
+   *  all — arming an acceptance gate on a list its owner never saw would be the same failure the
+   *  feature exists to fix. `[]` means somebody read it and there is nothing to gate on. */
+  requirements?: TaskRequirement[] | null;
+  /** Learn its way around an existing project first: a repository map for the planner and a
+   *  read-only explorer tool for the worker. Two halves of one idea, so the screen offers one
+   *  control — nobody choosing between them would be choosing anything. */
+  repo_map?: boolean;
+  explorer?: boolean;
+  /** On a stall, rebuild the plan from the accumulated failure causes instead of nudging. */
+  replan?: boolean;
+  /** Turn the approved checklist into executable pytest and gate on that. Only meaningful with no
+   *  verify command and a non-empty reviewed list; the loop checks both, so sending it otherwise
+   *  is a no-op. Writes a test file into the workspace. */
+  gen_tests?: boolean;
   verify?: string | null;
   workspace?: string | null;
   max_attempts?: number;
@@ -757,6 +897,96 @@ function dispatchRun(frame: string, h: RunStreamHandlers): void {
   else if (event === "paused") h.onPaused?.(payload as unknown as PausedRun);
   else if (event === "error") h.onError?.(payload.message as string);
 }
+
+// --- SDLC lifecycle (plan -> build -> test -> review, streamed one stage at a time) ---
+
+export type LifecycleStage = { name: string; output: string; passed: boolean };
+export type LifecycleDone = { success: boolean; answer: string; cancelled: boolean };
+export type LifecycleHandlers = {
+  onRunId?: (id: string) => void;
+  onVerify?: (v: RunVerify) => void;
+  onStage?: (s: LifecycleStage) => void;
+  onDone?: (d: LifecycleDone) => void;
+  onError?: (message: string) => void;
+};
+export type LifecycleRequest = {
+  task: string;
+  verify?: string | null;
+  workspace?: string | null;
+  model?: string | null;
+  max_attempts?: number;
+  posture?: string;
+  max_usd?: number | null;
+};
+
+/** Run a task through the four stages, taking each frame as it lands.
+ *
+ *  A stage at a time and not one payload at the end, because being able to watch the test gate
+ *  fail is the only thing this has over an ordinary run. Collected and shown together, it would be
+ *  `solve` with several minutes of nothing first.
+ */
+export async function streamLifecycle(
+  req: LifecycleRequest,
+  handlers: LifecycleHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(apiUrl("/api/lifecycle"), {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(req),
+      signal,
+    });
+  } catch (err) {
+    handlers.onError?.(err instanceof Error ? err.message : "network error");
+    return;
+  }
+  if (!res.ok || !res.body) {
+    handlers.onError?.(await streamRefusal(res));
+    return;
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
+    let sep: number;
+    while ((sep = buffer.indexOf("\n\n")) !== -1) {
+      dispatchLifecycle(buffer.slice(0, sep), handlers);
+      buffer = buffer.slice(sep + 2);
+    }
+  }
+  if (buffer.trim()) dispatchLifecycle(buffer, handlers);
+}
+
+function dispatchLifecycle(frame: string, h: LifecycleHandlers): void {
+  let event = "message";
+  let data = "";
+  for (const line of frame.split("\n")) {
+    if (line.startsWith("event:")) event = line.slice(6).trim();
+    else if (line.startsWith("data:")) data += line.slice(5).trim();
+  }
+  if (!data) return;
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse(data);
+  } catch {
+    return;
+  }
+  if (event === "run") h.onRunId?.(payload.run_id as string);
+  else if (event === "verify") h.onVerify?.(payload as unknown as RunVerify);
+  else if (event === "stage") h.onStage?.(payload as unknown as LifecycleStage);
+  else if (event === "done") h.onDone?.(payload as unknown as LifecycleDone);
+  else if (event === "error") h.onError?.(payload.message as string);
+}
+
+/** Stop a lifecycle run. It halts BETWEEN stages — an in-flight model call is never interrupted,
+ *  and a build stopped halfway through writing files is worse than one that finished. */
+export const cancelLifecycle = (id: string) =>
+  json<{ ok: boolean }>(`/api/lifecycle/${encodeURIComponent(id)}/cancel`, { method: "POST" });
 
 // --- Code conversation (turns that edit, streamed) ---
 
@@ -1220,6 +1450,13 @@ export const getCodeSession = (sessionId: string) =>
       answer: string;
       tools: CodeToolEvent[];
       edits: { path: string; patch: string }[];
+      /** What the turn cost and what stopped it, as reported live. `null` on conversations older
+       *  than receipts — "no accounting was kept" and "it cost nothing" are different statements. */
+      done: CodeTurnDone | null;
+      /** The verdict on what the turn WROTE, without its revert token: the undo offer is
+       *  single-use and in memory, so a replayed one would be a button that cannot do what it
+       *  says. */
+      verified: Omit<CodeVerified, "revert_token"> | null;
     }[];
   }>(`/api/code/sessions/${encodeURIComponent(sessionId)}`);
 

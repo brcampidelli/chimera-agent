@@ -203,6 +203,19 @@ class CodeExchangeOut(BaseModel):
     answer: str
     tools: list[CodeToolOut]
     edits: list[dict[str, str]]
+    done: dict[str, Any] | None = None
+    """What the turn cost and what stopped it, as it was reported live.
+
+    Stored per turn since receipts existed and absent on every conversation older than that, which
+    is why it is nullable rather than defaulted to an empty object: "no accounting was kept for
+    this turn" and "this turn cost nothing" are different statements, and the screen already draws
+    them differently."""
+
+    verified: dict[str, Any] | None = None
+    """The verification verdict on what this turn WROTE, without its revert token.
+
+    The token is deliberately not persisted: the undo offer is single-use and lives in memory, so
+    replaying one would put a button on a reopened conversation that cannot do what it says."""
 
 
 class CodeSessionOut(BaseModel):
@@ -839,6 +852,21 @@ class CronJobOut(BaseModel):
     """A chat webhook URL the answer is posted to, or None to only write it to the result file."""
 
 
+class CronResultOut(BaseModel):
+    """One dispatch that produced an answer, for the Schedule screen."""
+
+    at: float
+    job_id: str
+    name: str
+    action: str
+    answer: str
+    delivered: bool | None = None
+    """None when the job named no webhook. Not the same as a delivery that failed, and the screen
+    has to be able to tell those apart — one is "nobody asked for delivery", the other is "we tried
+    and could not"."""
+    delivery_detail: str = ""
+
+
 class MessagingPlatformOut(BaseModel):
     """Per-platform messaging status: is a token set, is the adapter running, did it die."""
 
@@ -899,6 +927,121 @@ class KanbanCardIn(BaseModel):
 
 class KanbanMoveIn(BaseModel):
     column: str
+
+
+class CronLateOut(BaseModel):
+    id: str
+    name: str
+    schedule: str
+    due_at: float
+    """When it was supposed to run, as an epoch second — rendered in the reader's own zone."""
+
+    behind_seconds: float
+
+
+class CronFailingOut(BaseModel):
+    id: str
+    name: str
+    consecutive_failures: int
+    last_status: str
+    last_error: str | None = None
+
+
+class CronSilenceOut(BaseModel):
+    """What the schedule is not telling you: what never ran, and what ran and lost.
+
+    Two lists rather than one, because the responses have nothing in common. ``overdue`` means
+    nothing dispatched — that is about the daemon, and on the desktop the daemon is the app, so the
+    usual cause is that the app was closed when the job was due. ``failing`` means the job ran, on
+    time, and lost every time; that is about the job. A single "problems" list would merge the one
+    you fix by opening the app with the one you fix by rewriting the action.
+    """
+
+    overdue: list[CronLateOut]
+    failing: list[CronFailingOut]
+    grace_seconds: float
+    """How far past its time a job may be before it counts as missed.
+
+    Reported rather than assumed: "due four seconds ago" is a tick in progress, not a miss, and a
+    reader who cannot see the threshold cannot tell a real gap from the clock."""
+
+
+class AgentDesignIn(BaseModel):
+    """Describe an agent in a sentence. One model call; nothing is saved."""
+
+    description: str
+
+
+class AgentDesignOut(BaseModel):
+    """A proposed agent, in the shape the registry form already edits.
+
+    Deliberately the same field names as ``AgentDefOut`` so the screen can review a design in the
+    form it already has, rather than growing a second surface that has to be kept in step with the
+    first.
+    """
+
+    id: str = ""
+    name: str = ""
+    instructions: str = ""
+    allowed_tools: list[str] = Field(default_factory=list)
+    note: str = ""
+    """"" on success; a short reason in place of a 500 when the design did not come back."""
+
+
+class SpecRequirementOut(BaseModel):
+    """One obligation in a drafted spec, in the two forms it has to exist in at once.
+
+    ``text`` is what the person approving reads; ``check``/``target`` is what actually runs. They
+    are shown together on purpose — a drafted spec whose sentence does not describe its check is
+    the failure this whole flow has to avoid, and the only way anyone can catch it is by seeing
+    both.
+    """
+
+    id: str
+    text: str = ""
+    check: str
+    target: str
+    required: bool = True
+
+
+class SpecDraftIn(BaseModel):
+    """Describe what you want; get a spec back. One model call, nothing written."""
+
+    description: str
+    workspace: str | None = None
+
+
+class SpecDraftOut(BaseModel):
+    name: str
+    requirements: list[SpecRequirementOut]
+    refused_commands: int = 0
+    """How many ``command`` requirements the draft asked for and did not get.
+
+    A ``command`` check is a shell command run on this machine, and the drafter refuses to write
+    one — see ``chimera/orchestration/draft.py``. Reported rather than dropped quietly: the spec
+    now verifies less than the model intended, and its owner should know by how much."""
+
+    refused_ids: list[str] = Field(default_factory=list)
+    note: str = ""
+    """Empty when the draft worked. When it did not, the reason, in place of a 500."""
+
+
+class SpecWriteIn(BaseModel):
+    """Write a reviewed spec into the project folder. No model call.
+
+    Separate from drafting so the requirements that land on disk are the ones the person kept,
+    not the ones the model proposed — the edit in between is the entire point of showing them.
+    """
+
+    name: str
+    requirements: list[SpecRequirementOut]
+    workspace: str | None = None
+
+
+class SpecWriteOut(BaseModel):
+    path: str
+    """Where it landed, so the screen can start a project against it — and so its owner can find,
+    read and commit the file that decides when their project is done."""
 
 
 class ProjectStartIn(BaseModel):
@@ -1010,6 +1153,31 @@ class PlanOut(BaseModel):
     steps: list[str]  # the planner's concrete numbered steps (empty when the model produced none)
     text: str  # the same steps rendered as numbered lines — the seed for the editable preview
     note: str  # "" on success; a short, secret-free message when the planner call degraded (no 500)
+
+
+class RequirementOut(BaseModel):
+    """One atomic requirement pulled out of the task.
+
+    ``kind`` is ``do`` (must happen), ``avoid`` (must not happen) or ``include`` (the result must
+    contain it). The three are kept apart because a weak model drops ``avoid`` and ``include``
+    first — "must do X" survives context growth and "don't do Y" quietly does not — and because
+    seeing them labelled is what lets a person notice the one they never asked for.
+    """
+
+    text: str
+    kind: str = "do"
+
+
+class RequirementsRequest(BaseModel):
+    """Extract a task's requirements without running anything. One model call, no tools."""
+
+    task: str
+
+
+class RequirementsOut(BaseModel):
+    items: list[RequirementOut]
+    note: str = ""
+    """"" on success; a short message when the extraction degraded, in place of a 500."""
 
 
 # --- runs (autonomous run receipts) ---------------------------------------------------------------

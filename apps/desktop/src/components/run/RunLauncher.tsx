@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ListChecks, Loader2, Play, Square } from "lucide-react";
+import { ListChecks, Loader2, Play, Square, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { PausedRunCard } from "@/components/run/PausedRunCard";
 import { focusRing } from "@/components/ui/focus";
 import { NO_OVERRIDE, RolesBar, toRoleModels, type RoleOverride } from "@/components/code/RolesBar";
-import { getPlan, getPausedRuns, type Profile, type RunEvent } from "@/lib/api";
+import { getRequirements, type TaskRequirement, getPlan, getPausedRuns, type Profile, type RunEvent } from "@/lib/api";
 import { useRunSession } from "@/lib/run-session";
 import { useT, type TFunc } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -49,6 +49,17 @@ export function RunLauncher({
   // mid-edit — found by a test that tried to do exactly that. Opening is asking; closing is
   // Discard.
   const [planOpen, setPlanOpen] = useState(false);
+  // The requirement checklist, alongside the plan and read at the same moment. `null` means nobody
+  // has been asked and the run carries no checklist at all; `[]` means somebody read the list and
+  // deleted every line, which is a different statement and is sent as such.
+  const [reqs, setReqs] = useState<TaskRequirement[] | null>(null);
+  const [reqNote, setReqNote] = useState("");
+  // Three seams the CLI has always had and no screen sent. One control per idea rather than one
+  // per flag: `repo_map` and `explorer` are two halves of "help it find its way around a project
+  // that already exists", and nobody choosing between them would be choosing anything.
+  const [knowsRepo, setKnowsRepo] = useState(false);
+  const [genTests, setGenTests] = useState(false);
+  const [replan, setReplan] = useState(false);
   const [ws, setWs] = useState("");
   const [maxAttempts, setMaxAttempts] = useState(3);
   const [pauseOnTaint, setPauseOnTaint] = useState(false);
@@ -86,6 +97,18 @@ export function RunLauncher({
     // steps and skip planning entirely — so a correction made here is a correction the run cannot
     // undo by re-planning around it.
     plan: plan.trim() || null,
+    // The checklist as the person left it — not re-derived. Deleting a line here has to be a line
+    // the run is not graded against, or the review is decoration; and a list nobody was shown must
+    // never become an acceptance gate, which is why `null` travels as `null`.
+    requirements: reqs,
+    repo_map: knowsRepo,
+    explorer: knowsRepo,
+    replan,
+    // Only where it replaces something weaker. With a verify command the tests already are the
+    // ground truth, and with no reviewed checklist there is nothing to ground generation in — the
+    // loop checks both itself, so sending it anyway is a no-op rather than a conflict, and the
+    // screen simply does not offer it where it would be one.
+    gen_tests: genTests && !verify.trim() && (reqs?.length ?? 0) > 0,
   });
 
   function start() {
@@ -107,13 +130,43 @@ export function RunLauncher({
     setPlanning(true);
     setPlanNote("");
     setPlanOpen(true);
+    setReqNote("");
     try {
-      const p = await getPlan(task.trim(), workspace ?? (ws.trim() || null));
-      setPlan(p.text || "");
-      // The endpoint degrades to an empty plan with a note rather than failing, so an empty answer
-      // needs a sentence: a blank box would read as "it plans to do nothing".
-      if (!p.text) setPlanNote(p.note || t("runs.plan.empty"));
+      // Both texts, together and in parallel: they are read in one sitting, and it is holding the
+      // plan against the checklist that shows up what was never asked for. Two calls rather than
+      // one route doing both, so each still does one thing and a caller that wants only the plan
+      // pays for only the plan.
+      // Settled, not all: one failing must not take the other down. `Promise.all` rejects on the
+      // first rejection, so a checklist call that fell over discarded a perfectly good plan and
+      // reported the PLAN as failed — a broken half reporting the working half as broken.
+      const [p, r] = await Promise.allSettled([
+        getPlan(task.trim(), workspace ?? (ws.trim() || null)),
+        getRequirements(task.trim()),
+      ]);
+      // Neither half is trusted to have the shape its type promises. `allSettled` reports a
+      // resolved-with-nothing call as `fulfilled`, so reading through `.value` without checking
+      // throws INSIDE the handler — past the point where a rejection could be caught — and leaves
+      // the panel open, empty and silent. Caught by CI on a suite whose mock resolves to
+      // undefined, which is exactly what a stubbed or half-upgraded backend looks like.
+      const plan = p.status === "fulfilled" ? p.value : null;
+      if (plan && typeof plan.text === "string") {
+        setPlan(plan.text);
+        // The endpoint degrades to an empty plan with a note rather than failing, so an empty
+        // answer needs a sentence: a blank box would read as "it plans to do nothing".
+        if (!plan.text) setPlanNote(plan.note || t("runs.plan.empty"));
+      } else {
+        setPlanNote(t("runs.plan.failed"));
+      }
+      const got = r.status === "fulfilled" ? r.value : null;
+      if (got && Array.isArray(got.items)) {
+        setReqs(got.items);
+        if (!got.items.length) setReqNote(got.note || t("runs.reqs.empty"));
+      } else {
+        setReqNote(t("runs.reqs.empty"));
+      }
     } catch {
+      // Still here, and it has to be: `allSettled` removes the rejection but not every way this
+      // block can throw, and a preview that dies silently leaves a panel that never closes.
       setPlanNote(t("runs.plan.failed"));
     } finally {
       setPlanning(false);
@@ -161,6 +214,10 @@ export function RunLauncher({
                 setPlan("");
                 setPlanNote("");
                 setPlanOpen(false);
+                // Both, together. A run that carried an approved checklist alongside a discarded
+                // plan would be carrying half a review — and the half nobody meant to keep.
+                setReqs(null);
+                setReqNote("");
               }}
               disabled={running}
             >
@@ -178,6 +235,77 @@ export function RunLauncher({
             disabled={running}
           />
           <p className="text-xs text-muted-foreground">{t("runs.plan.hint")}</p>
+
+          {/* The checklist, under the plan and read in the same sitting. Holding one against the
+              other is what surfaces the thing nobody asked for: it is reading "include: a contact
+              form" that reminds somebody they never said "with the menu". */}
+          {reqs !== null || reqNote ? (
+            <div className="space-y-1 border-t border-hairline pt-2">
+              <p className="text-xs font-medium">{t("runs.reqs.title")}</p>
+              {reqNote ? <p className="text-xs text-warn-foreground">{reqNote}</p> : null}
+              <ul className="space-y-1">
+                {(reqs ?? []).map((r, i) => (
+                  // Keyed by position, not by content. Keying on the text destroys and rebuilds
+                  // the input on every keystroke: focus is lost after the first character and the
+                  // rest of what somebody types goes nowhere — on the one panel whose entire value
+                  // is being editable. Position IS the identity of a line in an editable list.
+                  <li key={i} className="flex items-start gap-1.5">
+                    {/* The kind, labelled. A weak model drops `avoid` and `include` first — "must
+                        do X" survives context growth and "don't do Y" quietly does not — so which
+                        kind a line is happens to be the most useful thing on it. */}
+                    <span className="mt-0.5 shrink-0 rounded-chip bg-surface-2 px-1 text-xs uppercase tracking-wide text-muted-foreground">
+                      {t(`runs.reqs.kind.${r.kind === "avoid" || r.kind === "include" ? r.kind : "do"}`)}
+                    </span>
+                    <input
+                      className={cn(fieldCls, "h-6 flex-1 px-1.5 text-xs")}
+                      aria-label={t("runs.reqs.line", { n: i + 1 })}
+                      value={r.text}
+                      onChange={(e) =>
+                        setReqs((prev) =>
+                          (prev ?? []).map((x, j) => (j === i ? { ...x, text: e.target.value } : x)),
+                        )
+                      }
+                      disabled={running}
+                    />
+                    <button
+                      type="button"
+                      aria-label={t("runs.reqs.drop", { text: r.text })}
+                      className={cn("mt-0.5 px-1 text-muted-foreground hover:text-bad", focusRing)}
+                      onClick={() => setReqs((prev) => (prev ?? []).filter((_, j) => j !== i))}
+                      disabled={running}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                className={cn("text-xs text-muted-foreground hover:text-foreground", focusRing)}
+                onClick={() => setReqs((prev) => [...(prev ?? []), { text: "", kind: "include" }])}
+                disabled={running}
+              >
+                + {t("runs.reqs.add")}
+              </button>
+              <p className="text-xs text-muted-foreground">{t("runs.reqs.hint")}</p>
+              {/* Offered only where it changes the verdict. With a test command already typed the
+                  tests ARE the ground truth; with no lines left there is nothing to ground the
+                  generation in. A control that does nothing teaches people not to read the ones
+                  that do. */}
+              {!verify.trim() && (reqs?.length ?? 0) > 0 ? (
+                <label className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={genTests}
+                    onChange={(e) => setGenTests(e.target.checked)}
+                    disabled={running}
+                  />
+                  <span>{t("runs.seams.genTests")}</span>
+                </label>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
       <input
@@ -229,6 +357,24 @@ export function RunLauncher({
             onChange={(e) => setMaxAttempts(Math.min(10, Math.max(1, Number(e.target.value) || 1)))}
             disabled={running}
           />
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={knowsRepo}
+            onChange={(e) => setKnowsRepo(e.target.checked)}
+            disabled={running}
+          />
+          {t("runs.seams.knowsRepo")}
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={replan}
+            onChange={(e) => setReplan(e.target.checked)}
+            disabled={running}
+          />
+          {t("runs.seams.replan")}
         </label>
         {/* Beside Run rather than instead of it. Someone who knows what they want should not have
             to click twice, and someone who does not should not have to find out by watching files
