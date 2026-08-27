@@ -190,17 +190,35 @@ class AgentLane:
         from chimera.core.registry import as_role
         from chimera.core.verify import CommandVerifier
         from chimera.evolution import build_evolution_context
-        from chimera.governance import restrict_registry
+        from chimera.governance import governed_profile, restrict_registry
         from chimera.providers import LLMGateway
         from chimera.tools import default_registry
 
         gateway = LLMGateway()
         settings = get_settings()
         role = as_role(self.agent)
-        # The SAME restriction the coding turn and the runs path use, not a second one that
-        # agrees with it until the day it does not. `Role.allowed_tools` and `restrict_registry`
-        # already share the convention: None keeps every tool, a list keeps only those.
-        registry = restrict_registry(default_registry(self.workspace), allow=role.allowed_tools)
+        # Governance FIRST, then the agent's own allowlist. Two different questions, and this lane
+        # was only asking the second one.
+        #
+        # `restrict_registry` narrows to what THIS agent declared. `governed_profile` applies what
+        # the OWNER decided: denylist, trust kernel, taint ledger, audit trail. The lane beside this
+        # one (`SolveLane`, same board, same screen) has taken the second since it existed, and its
+        # comment says why — an autonomous loop with shell, file writes and network, outside any of
+        # that, reachable from the Tasks screen.
+        #
+        # And `allowed_tools` defaults to `[]`, which `as_role` turns into `None`, which
+        # `restrict_registry` reads as "keep everything". So the ungoverned case was not the
+        # exotic one: it was every subagent registered without ticking tool boxes.
+        #
+        # Its own surface name, for the same reason `kanban-solve` has one: the audit log has to be
+        # able to say which entrance a run came through, and which agent it was.
+        registry, approvals = governed_profile(
+            default_registry(self.workspace),
+            settings=settings,
+            home=settings.home,
+            surface=f"kanban-agent:{self.agent.id}",
+        )
+        registry = restrict_registry(registry, allow=role.allowed_tools)
         worker = Agent(
             gateway,
             registry,
@@ -231,7 +249,12 @@ class AgentLane:
             config=AutonomousConfig(max_attempts=self.max_attempts),
         )
         result = auto.run(card.action)
-        return LaneResult(success=result.success, answer=result.answer)
+        # Same as `SolveLane`: a caller that throws the approvals away cannot tell "the job did its
+        # work" from "the job was not allowed to", and on a board nobody is watching, that
+        # difference is the whole report.
+        refused = _refusals(approvals)
+        answer = result.answer + ("\n\n" + refused if refused else "")
+        return LaneResult(success=result.success, answer=answer)
 
 
 def runners_for(

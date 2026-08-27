@@ -119,7 +119,12 @@ describe("Code — the conversation", () => {
     await user.click(await screen.findByRole("button", { name: /try to fix it/i }));
 
     await waitFor(() => expect(streamRun).toHaveBeenCalled());
-    expect(vi.mocked(streamRun).mock.calls[0][0]).toMatchObject({ task: "make the test pass" });
+    // The task carries BOTH: what failed, and what was asked for. It used to be the original
+    // message alone — the same words that produced the failure, handed back with no mention of it,
+    // while the output was rendered on screen right above the button the user pressed.
+    const task = (vi.mocked(streamRun).mock.calls[0][0] as { task: string }).task;
+    expect(task).toContain("make test");
+    expect(task).toContain("make the test pass");
   });
 
   it("forgets the conversation server-side when cleared", async () => {

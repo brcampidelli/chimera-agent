@@ -56,9 +56,26 @@ beforeEach(() => {
 });
 
 describe("SpendCeiling", () => {
+  it("starts armed, and clearing the box disarms it", async () => {
+    // It used to start at nothing, which was defensible while a turn could take 8 tool-calling
+    // steps. The Code screen now sends 40, and this app is installed by people who did not write
+    // it and will not read the settings before their first message.
+    //
+    // Armed AND visible: a limit nobody can see is a limit nobody can raise, so the number sits in
+    // the box rather than in a default somewhere in the backend.
+    const { onChange, field } = ceiling();
+
+    expect(Number((field as HTMLInputElement).value)).toBeGreaterThan(0);
+
+    await userEvent.clear(field);
+
+    expect(onChange).toHaveBeenLastCalledWith(null);
+  });
+
   it("arms the ceiling a person types", async () => {
     const { onChange, field } = ceiling();
 
+    await userEvent.clear(field);
     await userEvent.type(field, "0.5");
 
     expect(onChange).toHaveBeenLastCalledWith(0.5);
@@ -70,6 +87,7 @@ describe("SpendCeiling", () => {
     // leave the box showing a cap that is not there.
     const { onChange, field } = ceiling();
 
+    await userEvent.clear(field);
     await userEvent.type(field, "0");
 
     expect(onChange).toHaveBeenLastCalledWith(null);
@@ -82,6 +100,7 @@ describe("SpendCeiling", () => {
     // when the turn stops dead.
     const { field } = ceiling(UNPRICED);
 
+    await userEvent.clear(field);
     await userEvent.type(field, "1");
 
     expect(await screen.findByText(/no list price known for vendor\/brand-new/)).toBeInTheDocument();
@@ -90,6 +109,7 @@ describe("SpendCeiling", () => {
   it("stays quiet when this machine can price its model", async () => {
     const { field } = ceiling(PRICED);
 
+    await userEvent.clear(field);
     await userEvent.type(field, "1");
 
     await waitFor(() => expect(getDoctor).toHaveBeenCalled());
@@ -104,6 +124,7 @@ describe("SpendCeiling", () => {
     // so the warning was absent for the wrong reason and the assertion proved only that the query
     // was slow. Seeing the sentence first is what proves the data landed.
     const { field } = ceiling(UNPRICED);
+    await userEvent.clear(field);
     await userEvent.type(field, "1");
     expect(await screen.findByText(/no list price known/)).toBeInTheDocument();
 

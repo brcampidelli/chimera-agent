@@ -161,9 +161,17 @@ EXEMPT: dict[str, str] = {
         "tests/test_governance_on_the_api_path.py, because an exemption is prose and prose "
         "goes stale"
     ),
-    "chimera/kanban/lanes.py:AgentLane.run": (
-        "restrict_registry from the card's own role (fail-closed)"
-    ),
+    # `AgentLane.run` was exempted here on the grounds that `restrict_registry` from the card's own
+    # role was fail-closed. It was not: `AgentDef.allowed_tools` defaults to `[]`, `as_role` turns
+    # that into `None`, and `restrict_registry` reads `None` as "keep every tool". So the exemption
+    # covered the ordinary case — a subagent registered without ticking any tool boxes — and that
+    # subagent ran the full autonomous loop outside the owner's denylist, trust kernel, taint ledger
+    # and audit trail, on the same board where `SolveLane` beside it was governed.
+    #
+    # It now takes `governed_profile` first and narrows to the role second, so the exemption is
+    # gone rather than reworded. This is the SECOND time this file's exemption for that qualname
+    # hid an ungoverned surface: the note in `lanes.py` records the first, where three classes
+    # sharing a method named `run` let the exemption cover `SolveLane` as well.
     # --- not an agent surface at all ---
     "chimera/api/app.py:build_api_app.tools_endpoint": "lists tool schemas; nothing is invoked",
     "chimera/cli/main.py:tools": "prints the tool table",

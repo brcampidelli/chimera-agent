@@ -910,12 +910,24 @@ def register_orchestration_api(
             try:
                 from chimera.api.code_api import assemble_registry
                 from chimera.governance.ledger import SharedTaint
+                from chimera.orchestration.budget import SpendBudget, SpendCappedBackend
                 from chimera.orchestration.crew import IsolatedCrew, IsolatedWorker
                 from chimera.orchestration.roles import Role, RoleAgent
                 from chimera.providers import LLMGateway
 
                 live = read_settings()
                 gateway = backend_factory() if backend_factory is not None else LLMGateway()
+                # The ceiling the caller asked for. `CrewRunIn` inherits `max_usd` from `CodeSeams`,
+                # the schema documents it, the TypeScript client sends it — and nothing here read
+                # it. A crew is the more expensive of the two orchestration routes (N workers that
+                # each run a full tool-using loop, plus an optional top-model synthesis), so the
+                # route that ignored its ceiling was the route that needed one.
+                #
+                # Around the gateway, not through `AgentConfig.max_usd`, for the reason the
+                # hierarchy path gives: per-`Agent.run` budgets would hand each worker its own
+                # ceiling and leave the synthesis with none. One wrapper, every call.
+                if req.max_usd:
+                    gateway = SpendCappedBackend(gateway, SpendBudget(req.max_usd))
                 # ONE shared taint ledger for the whole crew, unlike `solve-batch`, which gives each
                 # task its own. These workers collaborate on a single task and merge into a single
                 # workspace, so untrusted content one of them read can reach the others through the
@@ -966,7 +978,17 @@ def register_orchestration_api(
                     should_stop=stop.is_set,
                     identity=_owner_instructions(live.home),
                 )
-                crew.run(req.task, ws, verify=req.verify, timeout=live.batch_timeout)
+                outcome = crew.run(req.task, ws, verify=req.verify, timeout=live.batch_timeout)
+                # On the Cost screen, for the same reason the hierarchy path is: this route spends N
+                # worker loops plus an optional synthesis and wrote nothing to the usage log, so the
+                # screen that answers "what has this cost me" left out the more expensive of the two
+                # orchestration routes entirely.
+                _record_run_spend(live.home, run_id, outcome)
+            except SpendExceeded as exc:
+                # The one failure the caller ASKED for. Reported with the numbers rather than as
+                # "the crew failed", which would describe a ceiling doing its job as a fault.
+                _log.info("crew run stopped on its spend ceiling: %s", exc)
+                emit("error", {"message": str(exc)})
             except Exception as exc:  # noqa: BLE001 -- surfaced to the client as an error frame
                 _log.warning("crew run failed: %s", exc)
                 emit("error", {"message": "the crew failed"})

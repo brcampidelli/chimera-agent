@@ -16,6 +16,7 @@ import {
   Loader2,
   MessageSquare,
   Network,
+  RotateCcw,
   Send,
   ShieldCheck,
   Square,
@@ -51,7 +52,7 @@ import {
   FusionCast,
   type Cast,
 } from "@/components/code/FusionCast";
-import { SpendCeiling } from "@/components/code/SpendCeiling";
+import { DEFAULT_SPEND_CEILING, SpendCeiling } from "@/components/code/SpendCeiling";
 import { decompose } from "@/lib/decompose";
 import {
   exchangeToMarkdown,
@@ -80,6 +81,25 @@ import { cn } from "@/lib/utils";
  *  budget so there is still room to compact into. */
 const CONTEXT_BUDGET = 0.6;
 
+/** How many tool-calling steps one turn may take.
+ *
+ *  `AgentConfig.max_steps` is 8, and no screen was sending anything else — so the app shipped on
+ *  the one setting this project has measured and published as sterile. `bench/swe_bench/RESULTS.md`
+ *  run 1 ran the scaffold at 8 steps and reported **+0.0%** lift, calling it "a starved agent: 8
+ *  tool-calling steps against a 250 MB repository". Run 2 changed that number and nothing else, and
+ *  the retraction says it plainly: "the cure was the step budget". Every positive result the
+ *  project has published — the +15.8% and the +9.8% out-of-sample replication — was measured at 30.
+ *
+ *  40 rather than 30: those runs were one-shot benchmark tasks, and a chat turn is asked to read a
+ *  project it has never seen, edit several files and run a check. The server clamps to 100, so this
+ *  is well inside what it will accept.
+ *
+ *  The ceiling is not a target. A turn that finishes in three steps still costs three — the tool
+ *  loop detector, the token budget and the dollar ceiling all still stop it early, and
+ *  `stopped_reason` tells the user which one did. What changes is that a turn with real work to do
+ *  is no longer cut off in the middle of it. */
+const MAX_STEPS = 40;
+
 /** One exchange. The assistant side carries what the agent DID (tools, edits) alongside what it
  *  said, because in a coding conversation the tool calls are the substance and the prose is the
  *  caption — a transcript that shows only the prose is a transcript of the wrong half. */
@@ -102,6 +122,32 @@ interface Exchange {
   abandoned?: boolean;
 }
 
+/** What "let the agent try to fix it" actually sends.
+ *
+ *  It used to send the user's original message again and nothing else — the same words that
+ *  produced the failure, handed back with no mention of the failure. The agent had to rediscover
+ *  what went wrong, if it noticed at all, and the likeliest outcome of asking for the same thing
+ *  twice is getting the same thing twice.
+ *
+ *  The exact output was on screen the whole time: `v.output` renders in a `<pre>` directly above
+ *  the button. The person could read the traceback that the agent was not being told about.
+ *
+ *  Bounded from the END, not the start. A failing suite can print megabytes and the assertion is at
+ *  the bottom; the head of that output is the part that scrolled past on every previous failure
+ *  too. Falls back to the original message when there is nothing to add, so a verdict with no
+ *  command and no output behaves exactly as before. */
+export function fixBrief(original: string, v: CodeVerified, t: TFunc): string {
+  const saida = (v.output ?? "").trim();
+  const cmd = (v.command ?? "").trim();
+  if (!saida && !cmd) return original;
+  const cauda = saida.length > 4000 ? `…\n${saida.slice(-4000)}` : saida;
+  return [
+    t("code.chat.verdict.fixBrief", { cmd: cmd || "?" }),
+    cauda ? `\n\n\`\`\`\n${cauda}\n\`\`\`` : "",
+    `\n\n${t("code.chat.verdict.fixOriginal")}\n${original}`,
+  ].join("");
+}
+
 /** What happened to the files after the turn finished writing them.
  *
  *  This is the sentence that made one button honest. Before it, Send edited your workspace and kept
@@ -114,17 +160,20 @@ interface Exchange {
  *  failing test. The other offer — hand the same text to the autonomous run, which retries — is how
  *  the multi-attempt path is reached now: as a consequence of a failure, not as a second button
  *  asking the user to guess in advance which kind of work this was. */
-function Verdict({
+export function Verdict({
   v,
+  original,
   undone,
   onUndo,
   onFix,
   t,
 }: {
   v: CodeVerified;
+  /** What the user asked for. Goes back with the failure so the fix attempt knows both. */
+  original: string;
   undone?: "ok" | "partial" | "gone";
   onUndo: () => void;
-  onFix: () => void;
+  onFix: (text: string) => void;
   t: TFunc;
 }) {
   const cmd = v.command ?? "";
@@ -188,7 +237,7 @@ function Verdict({
       ) : (
         <div className="flex flex-wrap gap-2">
           {undo}
-          <Button size="sm" variant="ghost" onClick={onFix}>
+          <Button size="sm" variant="ghost" onClick={() => onFix(fixBrief(original, v, t))}>
             <ShieldCheck className="h-3.5 w-3.5" /> {t("code.chat.verdict.fix")}
           </Button>
         </div>
@@ -513,7 +562,11 @@ export function Conversation({
    *  behaviour every earlier build had). Session-local like `provider` rather than persisted: a
    *  standing spend limit is a different promise from "cap this piece of work", and a ceiling that
    *  quietly stayed on from last week would stop a turn for a reason nobody remembers choosing. */
-  const [maxUsd, setMaxUsd] = useState<number | null>(null);
+  // Starts ARMED. See DEFAULT_SPEND_CEILING: the step ceiling this screen sends went from the
+  // library's 8 to 40, and an app other people install should not let a first message cost whatever
+  // a loop feels like. The box shows the number and clearing it disarms — a limit nobody can see is
+  // a limit nobody can raise.
+  const [maxUsd, setMaxUsd] = useState<number | null>(DEFAULT_SPEND_CEILING);
   const [attached, setAttached] = useState<Attachment[]>([]);
   // Same upload path the paperclip uses — see `useAttachmentUpload`. The button keeps its own
   // instance for its own spinner; what must not fork is how a file gets uploaded and how a failure
@@ -697,6 +750,9 @@ export function Conversation({
         // See CONTEXT_BUDGET. Sent on every turn because the agent is rebuilt per turn from this
         // request — a budget sent once is a budget that applied once.
         context_budget: CONTEXT_BUDGET,
+        // See MAX_STEPS. Same per-turn reason as the budget above, and they move together on
+        // purpose: more steps means more observations to hold.
+        max_steps: MAX_STEPS,
         // Same reason, and omitted rather than sent null when nothing is armed: the server refuses
         // a non-positive ceiling, so the only two things this field may ever carry are a real
         // ceiling and nothing at all.
@@ -948,6 +1004,28 @@ export function Conversation({
               <p className="mt-1 max-w-sm text-sm text-muted-foreground">
                 {t("code.chat.empty")}
               </p>
+              {/* Three things this screen can do, as buttons that fill the box rather than as a
+                  paragraph explaining that it can. An empty text field asks the user to already
+                  know what to ask for, and the commonest first message anyone writes to an agent is
+                  a bad one because nothing showed them the shape of a good one.
+                  They FILL the box rather than sending: the first thing someone does with an
+                  example is edit it, and a click that spends money before they have read it is a
+                  worse introduction than no examples at all. */}
+              <div className="mt-6 flex max-w-lg flex-wrap justify-center gap-2">
+                {["one", "two", "three"].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    className={cn(
+                      "rounded-chip border border-hairline bg-surface-2 px-3 py-1.5 text-left text-xs",
+                      "text-muted-foreground transition hover:border-accent hover:text-foreground",
+                    )}
+                    onClick={() => setDraft(t(`code.chat.example.${n}`))}
+                  >
+                    {t(`code.chat.example.${n}`)}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : null}
           {exchanges.map((e, i) => (
@@ -1038,6 +1116,18 @@ export function Conversation({
                       </pre>
                     </details>
                   ) : null}
+                  {/* The button the comment above has been describing since it was written — "the
+                      common case where the user only wants to retry" had no way to retry. A failed
+                      turn is usually a provider hiccup, a rate limit or a dropped connection, and
+                      the answer to all three is the same request again. Without this the text has
+                      to be retyped, and on a long prompt it is simply lost.
+                      Only on the LAST exchange: re-sending a message from the middle of a
+                      conversation would append it at the end, in a context that has moved on. */}
+                  {i === exchanges.length - 1 && !busy && !busyElsewhere ? (
+                    <Button size="sm" variant="ghost" onClick={() => send(true, e.you)}>
+                      <RotateCcw className="h-3.5 w-3.5" /> {t("common.retry")}
+                    </Button>
+                  ) : null}
                 </div>
               ) : null}
               {e.done?.fused ? (
@@ -1054,7 +1144,8 @@ export function Conversation({
                   v={e.verified}
                   undone={e.undone}
                   onUndo={() => void undo(i, e.verified?.revert_token ?? "")}
-                  onFix={() => onHandOff(e.you)}
+                  original={e.you}
+                  onFix={onHandOff}
                   t={t}
                 />
               ) : null}
@@ -1126,6 +1217,10 @@ export function Conversation({
             dragging && "ring-2 ring-accent",
           )}
           placeholder={t("code.chat.placeholder")}
+          // The cursor starts here. Someone who just opened the app is going to type; making them
+          // click the box first is a step that exists only because nobody removed it.
+          // eslint-disable-next-line jsx-a11y/no-autofocus
+          autoFocus
           value={draft}
           onChange={(ev) => setDraft(ev.target.value)}
           // Paste is the point. Taking a screenshot and pressing Ctrl+V is how people show a

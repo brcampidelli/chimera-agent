@@ -44,12 +44,24 @@ describe("Code — a spend ceiling for the turn", () => {
   const ask = (user: ReturnType<typeof userEvent.setup>, text: string) =>
     user.type(screen.getByPlaceholderText(/^Ask about this code/), `${text}{Enter}`);
 
-  it("sends no ceiling when none was armed", async () => {
-    // The inert default, asserted on the request rather than on the control: every conversation
-    // that existed before this field must send exactly what it sent before, and `max_usd: null`
-    // would be a new key for the server to interpret rather than the absence of one.
+  it("sends the default ceiling when the user has not touched the box", async () => {
+    // This used to assert the OPPOSITE — that a turn sends no ceiling at all — and that was right
+    // while a turn could take 8 tool-calling steps. The Code screen now sends 40, in an app other
+    // people install, so a first message must not be able to cost whatever a loop feels like.
     const user = await screen_();
 
+    await ask(user, "what is this?");
+
+    await waitFor(() => expect(streamCodeTurn).toHaveBeenCalled());
+    expect(vi.mocked(streamCodeTurn).mock.calls[0][0].max_usd).toBeGreaterThan(0);
+  });
+
+  it("sends no ceiling once the box is cleared", async () => {
+    // Clearing disarms, and the key disappears rather than going out as `max_usd: null` — which
+    // would be a new thing for the server to interpret rather than the absence of one.
+    const user = await screen_();
+
+    await user.clear(screen.getByRole("spinbutton", { name: /Ceiling/ }));
     await ask(user, "what is this?");
 
     await waitFor(() => expect(streamCodeTurn).toHaveBeenCalled());
@@ -60,6 +72,7 @@ describe("Code — a spend ceiling for the turn", () => {
     // The agent is rebuilt per turn from this request, so a ceiling sent once is a ceiling that
     // applied once — and the turn where it bites is the late one, never the first.
     const user = await screen_();
+    await user.clear(screen.getByRole("spinbutton", { name: /Ceiling/ }));
     await user.type(screen.getByRole("spinbutton", { name: /Ceiling/ }), "0.5");
 
     await ask(user, "first");
@@ -75,6 +88,7 @@ describe("Code — a spend ceiling for the turn", () => {
     // if the conversation does not hand it over the bar shows `~ $0.0123` against nothing — which
     // is exactly the state this item started from.
     const user = await screen_();
+    await user.clear(screen.getByRole("spinbutton", { name: /Ceiling/ }));
     await user.type(screen.getByRole("spinbutton", { name: /Ceiling/ }), "0.5");
 
     await ask(user, "what is this?");
