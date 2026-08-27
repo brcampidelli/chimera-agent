@@ -8,6 +8,7 @@ import { ErrorState } from "@/components/ui/async";
 import { focusRing } from "@/components/ui/focus";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { SpecDraft } from "@/components/tasks/SpecDraft";
 import { readWorkspace } from "@/lib/workspace";
 import type { ProjectState, TaskCard } from "@/lib/types";
 
@@ -387,7 +388,7 @@ export function Tasks({ embedded = false }: { embedded?: boolean } = {}) {
     refetchBoard();
   };
   const start = useMutation({
-    mutationFn: (spec: string) => startProject({ spec }),
+    mutationFn: (spec: string) => startProject({ spec, workspace: readWorkspace() || null }),
     onSuccess: refetchProjects,
   });
   // One call per iteration, and the button says so. A "run to completion" button over an endpoint
@@ -422,6 +423,10 @@ export function Tasks({ embedded = false }: { embedded?: boolean } = {}) {
         ) : !projects.data || projects.data.length === 0 ? (
           <>
             <StartProject onStart={(spec) => start.mutate(spec)} />
+            <SpecDraft
+              workspace={readWorkspace() || null}
+              onStarted={(spec) => start.mutate(spec)}
+            />
             <EmptyState text={t("tasks.projectsEmpty")} />
           </>
         ) : (
@@ -440,7 +445,13 @@ export function Tasks({ embedded = false }: { embedded?: boolean } = {}) {
           ))
         )}
         {projects.data && projects.data.length > 0 && (
-          <StartProject onStart={(spec) => start.mutate(spec)} />
+          <>
+            <StartProject onStart={(spec) => start.mutate(spec)} />
+            <SpecDraft
+              workspace={readWorkspace() || null}
+              onStarted={(spec) => start.mutate(spec)}
+            />
+          </>
         )}
       </Panel>
 

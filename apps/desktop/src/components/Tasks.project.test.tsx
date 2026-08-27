@@ -57,7 +57,14 @@ describe("Tasks — starting a project and moving it", () => {
     await user.click(screen.getByRole("button", { name: /Start a project/ }));
 
     await waitFor(() => expect(startProject).toHaveBeenCalledOnce());
-    expect(vi.mocked(startProject).mock.calls[0][0]).toEqual({ spec: "specs/parser.yaml" });
+    // The chosen project folder goes with it. Without that the project is checked against the
+    // app's default workspace while its spec describes the folder the user picked in Code — and
+    // the conversational drafter, which writes the spec into that same folder, would start a
+    // project that cannot see its own spec.
+    expect(vi.mocked(startProject).mock.calls[0][0]).toEqual({
+      spec: "specs/parser.yaml",
+      workspace: null,
+    });
   });
 
   it("advances a project one iteration at a time", async () => {

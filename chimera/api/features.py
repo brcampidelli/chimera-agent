@@ -44,6 +44,10 @@ from chimera.api.schemas import (
     MemoryProfileOut,
     ProjectDetailOut,
     ProjectStartIn,
+    SpecDraftIn,
+    SpecDraftOut,
+    SpecWriteIn,
+    SpecWriteOut,
     ProjectStateOut,
     RetiredOut,
     SkillsOut,
@@ -653,6 +657,72 @@ def register_features(
                 yield frame
 
         return EventSourceResponse(stream())
+
+    @app.post("/api/projects/draft", dependencies=[guard], response_model=SpecDraftOut)
+    async def draft_project_spec(req: SpecDraftIn) -> dict[str, Any]:
+        """Draft a spec from a plain-language description. One model call; nothing is written.
+
+        A token-spending path, which this module otherwise avoids — noted here rather than hidden,
+        the same way ``POST /api/kanban/run`` is. It earns the exception because the orchestrator
+        it feeds is the most capable thing in the app and its only door was a field asking for the
+        path of a YAML file: everyone who cannot write that YAML was standing outside it.
+
+        Drafting and writing are separate calls so the requirements that reach disk are the ones
+        the person kept. Reviewing them is not a formality — the spec is the acceptance authority,
+        so a requirement nobody understood is a project that finishes on a condition nobody chose.
+        """
+
+        def work() -> dict[str, Any]:
+            from chimera.orchestration.draft import DraftError, draft_spec
+            from chimera.providers import LLMGateway
+
+            try:
+                drafted = draft_spec(req.description, LLMGateway())
+            except DraftError as exc:
+                # An honest empty draft with the reason, never a 500: the description was the
+                # user's, and "I could not turn that into a spec" is a sentence they can act on.
+                return {"name": "", "requirements": [], "note": str(exc)}
+            except Exception as exc:  # noqa: BLE001 — a model hiccup is not a server error
+                _log.warning("spec draft failed: %s", exc)
+                return {"name": "", "requirements": [], "note": "the draft call did not complete"}
+            return {
+                "name": drafted.spec.name,
+                "requirements": [r.model_dump() for r in drafted.spec.requirements],
+                "refused_commands": drafted.refused_commands,
+                "refused_ids": list(drafted.refused_ids),
+                "note": "",
+            }
+
+        return await asyncio.get_running_loop().run_in_executor(None, work)
+
+    @app.post("/api/projects/spec", dependencies=[guard], response_model=SpecWriteOut)
+    def write_project_spec(req: SpecWriteIn) -> dict[str, Any]:
+        """Write a reviewed spec into the project folder. No model call.
+
+        ``command`` is refused here too, and not only in the drafter. The rule has to hold at the
+        boundary that creates the file, or it is bypassable by anyone who edits the JSON on the way
+        past — and a bug in the screen could write a shell command into the thing that judges the
+        project. Somebody who wants a ``command`` check writes the YAML themselves, which is a
+        different act: they chose the command.
+        """
+        from chimera.governance.drift import Requirement, Spec
+        from chimera.orchestration.draft import DraftError, write_spec
+
+        if any(r.check == "command" for r in req.requirements):
+            raise HTTPException(
+                status_code=400,
+                detail="a 'command' check runs a shell command; write that spec file yourself",
+            )
+        ws = Path(req.workspace).expanduser().resolve() if req.workspace else default_workspace
+        try:
+            spec = Spec(
+                name=req.name,
+                requirements=[Requirement.model_validate(r.model_dump()) for r in req.requirements],
+            )
+            path = write_spec(spec, ws)
+        except (DraftError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {"path": str(path)}
 
     @app.post("/api/projects", dependencies=[guard], response_model=ProjectStateOut)
     def start_project(req: ProjectStartIn) -> dict[str, Any]:

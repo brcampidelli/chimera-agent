@@ -6852,6 +6852,149 @@
         "title": "SkillsOut",
         "type": "object"
       },
+      "SpecDraftIn": {
+        "description": "Describe what you want; get a spec back. One model call, nothing written.",
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          }
+        },
+        "required": [
+          "description"
+        ],
+        "title": "SpecDraftIn",
+        "type": "object"
+      },
+      "SpecDraftOut": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "refused_commands": {
+            "default": 0,
+            "title": "Refused Commands",
+            "type": "integer"
+          },
+          "refused_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Refused Ids",
+            "type": "array"
+          },
+          "requirements": {
+            "items": {
+              "$ref": "#/components/schemas/SpecRequirementOut"
+            },
+            "title": "Requirements",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "requirements"
+        ],
+        "title": "SpecDraftOut",
+        "type": "object"
+      },
+      "SpecRequirementOut": {
+        "description": "One obligation in a drafted spec, in the two forms it has to exist in at once.\n\n``text`` is what the person approving reads; ``check``/``target`` is what actually runs. They\nare shown together on purpose \u2014 a drafted spec whose sentence does not describe its check is\nthe failure this whole flow has to avoid, and the only way anyone can catch it is by seeing\nboth.",
+        "properties": {
+          "check": {
+            "title": "Check",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "required": {
+            "default": true,
+            "title": "Required",
+            "type": "boolean"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          },
+          "text": {
+            "default": "",
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "check",
+          "target"
+        ],
+        "title": "SpecRequirementOut",
+        "type": "object"
+      },
+      "SpecWriteIn": {
+        "description": "Write a reviewed spec into the project folder. No model call.\n\nSeparate from drafting so the requirements that land on disk are the ones the person kept,\nnot the ones the model proposed \u2014 the edit in between is the entire point of showing them.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "requirements": {
+            "items": {
+              "$ref": "#/components/schemas/SpecRequirementOut"
+            },
+            "title": "Requirements",
+            "type": "array"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          }
+        },
+        "required": [
+          "name",
+          "requirements"
+        ],
+        "title": "SpecWriteIn",
+        "type": "object"
+      },
+      "SpecWriteOut": {
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "SpecWriteOut",
+        "type": "object"
+      },
       "SubtaskOut": {
         "properties": {
           "boundaries": {
@@ -10686,6 +10829,84 @@
           }
         },
         "summary": "Start Project"
+      }
+    },
+    "/api/projects/draft": {
+      "post": {
+        "description": "Draft a spec from a plain-language description. One model call; nothing is written.\n\nA token-spending path, which this module otherwise avoids \u2014 noted here rather than hidden,\nthe same way ``POST /api/kanban/run`` is. It earns the exception because the orchestrator\nit feeds is the most capable thing in the app and its only door was a field asking for the\npath of a YAML file: everyone who cannot write that YAML was standing outside it.\n\nDrafting and writing are separate calls so the requirements that reach disk are the ones\nthe person kept. Reviewing them is not a formality \u2014 the spec is the acceptance authority,\nso a requirement nobody understood is a project that finishes on a condition nobody chose.",
+        "operationId": "draft_project_spec_api_projects_draft_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpecDraftIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecDraftOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Draft Project Spec"
+      }
+    },
+    "/api/projects/spec": {
+      "post": {
+        "description": "Write a reviewed spec into the project folder. No model call.\n\n``command`` is refused here too, and not only in the drafter. The rule has to hold at the\nboundary that creates the file, or it is bypassable by anyone who edits the JSON on the way\npast \u2014 and a bug in the screen could write a shell command into the thing that judges the\nproject. Somebody who wants a ``command`` check writes the YAML themselves, which is a\ndifferent act: they chose the command.",
+        "operationId": "write_project_spec_api_projects_spec_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpecWriteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecWriteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Write Project Spec"
       }
     },
     "/api/projects/{project_id}": {

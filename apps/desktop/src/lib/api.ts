@@ -615,6 +615,46 @@ export async function streamKanbanRun(
     }
   }
 }
+/** One obligation in a drafted spec, in both forms at once.
+ *
+ *  `text` is what the person approving reads; `check`/`target` is what actually runs. The screen
+ *  shows both, because a drafted spec whose sentence does not describe its check is the failure
+ *  this flow exists to avoid, and seeing them side by side is the only way to catch it.
+ */
+export type SpecRequirement = {
+  id: string;
+  text: string;
+  check: string;
+  target: string;
+  required: boolean;
+};
+export type SpecDraft = {
+  name: string;
+  requirements: SpecRequirement[];
+  refused_commands: number;
+  refused_ids: string[];
+  note: string;
+};
+/** Describe a project in plain language and get a spec back. One model call; nothing written. */
+export const draftSpec = (description: string, workspace?: string | null) =>
+  json<SpecDraft>("/api/projects/draft", {
+    method: "POST",
+    body: JSON.stringify({ description, workspace: workspace ?? null }),
+  });
+/** Write the reviewed spec into the project folder. No model call.
+ *
+ *  Takes what the caller passes, not what was drafted — the requirements somebody deleted on the
+ *  screen must be the requirements that never reach disk, or the review is decoration.
+ */
+export const writeSpec = (req: {
+  name: string;
+  requirements: SpecRequirement[];
+  workspace?: string | null;
+}) =>
+  json<{ path: string }>("/api/projects/spec", {
+    method: "POST",
+    body: JSON.stringify({ ...req, workspace: req.workspace ?? null }),
+  });
 export const getProjects = () => json<ProjectState[]>("/api/projects");
 export const startProject = (req: {
   spec: string;

@@ -1666,6 +1666,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Draft Project Spec
+         * @description Draft a spec from a plain-language description. One model call; nothing is written.
+         *
+         *     A token-spending path, which this module otherwise avoids — noted here rather than hidden,
+         *     the same way ``POST /api/kanban/run`` is. It earns the exception because the orchestrator
+         *     it feeds is the most capable thing in the app and its only door was a field asking for the
+         *     path of a YAML file: everyone who cannot write that YAML was standing outside it.
+         *
+         *     Drafting and writing are separate calls so the requirements that reach disk are the ones
+         *     the person kept. Reviewing them is not a formality — the spec is the acceptance authority,
+         *     so a requirement nobody understood is a project that finishes on a condition nobody chose.
+         */
+        post: operations["draft_project_spec_api_projects_draft_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/spec": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Write Project Spec
+         * @description Write a reviewed spec into the project folder. No model call.
+         *
+         *     ``command`` is refused here too, and not only in the drafter. The rule has to hold at the
+         *     boundary that creates the file, or it is bypassable by anyone who edits the JSON on the way
+         *     past — and a bug in the screen could write a shell command into the thing that judges the
+         *     project. Somebody who wants a ``command`` check writes the YAML themselves, which is a
+         *     different act: they chose the command.
+         */
+        post: operations["write_project_spec_api_projects_spec_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}": {
         parameters: {
             query?: never;
@@ -5344,6 +5399,82 @@ export interface components {
             /** Stats */
             stats: components["schemas"]["SkillStatOut"][];
         };
+        /**
+         * SpecDraftIn
+         * @description Describe what you want; get a spec back. One model call, nothing written.
+         */
+        SpecDraftIn: {
+            /** Description */
+            description: string;
+            /** Workspace */
+            workspace?: string | null;
+        };
+        /** SpecDraftOut */
+        SpecDraftOut: {
+            /** Name */
+            name: string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            /**
+             * Refused Commands
+             * @default 0
+             */
+            refused_commands: number;
+            /** Refused Ids */
+            refused_ids?: string[];
+            /** Requirements */
+            requirements: components["schemas"]["SpecRequirementOut"][];
+        };
+        /**
+         * SpecRequirementOut
+         * @description One obligation in a drafted spec, in the two forms it has to exist in at once.
+         *
+         *     ``text`` is what the person approving reads; ``check``/``target`` is what actually runs. They
+         *     are shown together on purpose — a drafted spec whose sentence does not describe its check is
+         *     the failure this whole flow has to avoid, and the only way anyone can catch it is by seeing
+         *     both.
+         */
+        SpecRequirementOut: {
+            /** Check */
+            check: string;
+            /** Id */
+            id: string;
+            /**
+             * Required
+             * @default true
+             */
+            required: boolean;
+            /** Target */
+            target: string;
+            /**
+             * Text
+             * @default
+             */
+            text: string;
+        };
+        /**
+         * SpecWriteIn
+         * @description Write a reviewed spec into the project folder. No model call.
+         *
+         *     Separate from drafting so the requirements that land on disk are the ones the person kept,
+         *     not the ones the model proposed — the edit in between is the entire point of showing them.
+         */
+        SpecWriteIn: {
+            /** Name */
+            name: string;
+            /** Requirements */
+            requirements: components["schemas"]["SpecRequirementOut"][];
+            /** Workspace */
+            workspace?: string | null;
+        };
+        /** SpecWriteOut */
+        SpecWriteOut: {
+            /** Path */
+            path: string;
+        };
         /** SubtaskOut */
         SubtaskOut: {
             /**
@@ -8239,6 +8370,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectStateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    draft_project_spec_api_projects_draft_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpecDraftIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpecDraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    write_project_spec_api_projects_spec_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpecWriteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpecWriteOut"];
                 };
             };
             /** @description Validation Error */

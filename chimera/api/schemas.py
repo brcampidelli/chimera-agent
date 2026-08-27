@@ -916,6 +916,62 @@ class KanbanMoveIn(BaseModel):
     column: str
 
 
+class SpecRequirementOut(BaseModel):
+    """One obligation in a drafted spec, in the two forms it has to exist in at once.
+
+    ``text`` is what the person approving reads; ``check``/``target`` is what actually runs. They
+    are shown together on purpose — a drafted spec whose sentence does not describe its check is
+    the failure this whole flow has to avoid, and the only way anyone can catch it is by seeing
+    both.
+    """
+
+    id: str
+    text: str = ""
+    check: str
+    target: str
+    required: bool = True
+
+
+class SpecDraftIn(BaseModel):
+    """Describe what you want; get a spec back. One model call, nothing written."""
+
+    description: str
+    workspace: str | None = None
+
+
+class SpecDraftOut(BaseModel):
+    name: str
+    requirements: list[SpecRequirementOut]
+    refused_commands: int = 0
+    """How many ``command`` requirements the draft asked for and did not get.
+
+    A ``command`` check is a shell command run on this machine, and the drafter refuses to write
+    one — see ``chimera/orchestration/draft.py``. Reported rather than dropped quietly: the spec
+    now verifies less than the model intended, and its owner should know by how much."""
+
+    refused_ids: list[str] = Field(default_factory=list)
+    note: str = ""
+    """Empty when the draft worked. When it did not, the reason, in place of a 500."""
+
+
+class SpecWriteIn(BaseModel):
+    """Write a reviewed spec into the project folder. No model call.
+
+    Separate from drafting so the requirements that land on disk are the ones the person kept,
+    not the ones the model proposed — the edit in between is the entire point of showing them.
+    """
+
+    name: str
+    requirements: list[SpecRequirementOut]
+    workspace: str | None = None
+
+
+class SpecWriteOut(BaseModel):
+    path: str
+    """Where it landed, so the screen can start a project against it — and so its owner can find,
+    read and commit the file that decides when their project is done."""
+
+
 class ProjectStartIn(BaseModel):
     """Create a project from a spec.
 
