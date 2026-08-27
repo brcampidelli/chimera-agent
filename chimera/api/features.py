@@ -32,6 +32,7 @@ from chimera.api.schemas import (
     CronCreateIn,
     CronJobOut,
     CronResultOut,
+    CronSilenceOut,
     DeletedOut,
     KanbanCardIn,
     KanbanMoveIn,
@@ -488,6 +489,56 @@ def register_features(
             }
             for r in load_results(caminho, job_id=job_id, limit=max(1, min(200, limit)))
         ]
+
+    @app.get("/api/cron/silence", dependencies=[guard], response_model=CronSilenceOut)
+    def cron_silence(grace_minutes: float = 5.0) -> dict[str, Any]:
+        """Ask the schedule what it is not telling you.
+
+        Every other honesty mechanism in this project sits downstream of a run having happened —
+        the verifier judges a result, the receipt names who approved it. None of them gets a turn
+        when the run never occurred, and a schedule that produced no result reads exactly like a
+        schedule with nothing due. That distinction matters more now that the app shows results:
+        an empty row for a job that never fired and one for a job that answered nothing look the
+        same, and only one of them is a problem.
+
+        On the desktop the daemon IS the app, so the common cause of an overdue job is that the
+        window was closed when its time came. Nothing can watch while the process is down — a
+        crashed process cannot log its own crash — so this is a question, not a watcher, and it is
+        answered the moment anything asks.
+
+        Declared BEFORE `/api/cron/{job_id}`: FastAPI matches in declaration order, and the
+        parameterised route would otherwise take `silence` for a job id and 404 a path that exists.
+        """
+        import time
+
+        from chimera.scheduler.engine import Scheduler
+
+        grace = max(0.0, grace_minutes) * 60
+        sched = Scheduler(_cron_store())
+        now = time.time()
+        return {
+            "overdue": [
+                {
+                    "id": job.id,
+                    "name": job.name,
+                    "schedule": job.schedule,
+                    "due_at": job.next_run or 0.0,
+                    "behind_seconds": behind,
+                }
+                for job, behind in sched.overdue(now, grace=grace)
+            ],
+            "failing": [
+                {
+                    "id": job.id,
+                    "name": job.name,
+                    "consecutive_failures": job.consecutive_failures,
+                    "last_status": job.last_status or "",
+                    "last_error": job.last_error,
+                }
+                for job in sched.failing(at_least=1)
+            ],
+            "grace_seconds": grace,
+        }
 
     @app.post("/api/cron", dependencies=[guard], response_model=CronJobOut)
     def create_cron(body: CronCreateIn) -> dict[str, Any]:

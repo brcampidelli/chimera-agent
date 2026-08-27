@@ -7,6 +7,7 @@ import { getCron, getCronResults } from "@/lib/api";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", () => ({
+  getCronSilence: vi.fn(),
   getCron: vi.fn(),
   getCronResults: vi.fn(),
   createCron: vi.fn(),

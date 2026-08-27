@@ -929,6 +929,43 @@ class KanbanMoveIn(BaseModel):
     column: str
 
 
+class CronLateOut(BaseModel):
+    id: str
+    name: str
+    schedule: str
+    due_at: float
+    """When it was supposed to run, as an epoch second — rendered in the reader's own zone."""
+
+    behind_seconds: float
+
+
+class CronFailingOut(BaseModel):
+    id: str
+    name: str
+    consecutive_failures: int
+    last_status: str
+    last_error: str | None = None
+
+
+class CronSilenceOut(BaseModel):
+    """What the schedule is not telling you: what never ran, and what ran and lost.
+
+    Two lists rather than one, because the responses have nothing in common. ``overdue`` means
+    nothing dispatched — that is about the daemon, and on the desktop the daemon is the app, so the
+    usual cause is that the app was closed when the job was due. ``failing`` means the job ran, on
+    time, and lost every time; that is about the job. A single "problems" list would merge the one
+    you fix by opening the app with the one you fix by rewriting the action.
+    """
+
+    overdue: list[CronLateOut]
+    failing: list[CronFailingOut]
+    grace_seconds: float
+    """How far past its time a job may be before it counts as missed.
+
+    Reported rather than assumed: "due four seconds ago" is a tick in progress, not a miss, and a
+    reader who cannot see the threshold cannot tell a real gap from the clock."""
+
+
 class SpecRequirementOut(BaseModel):
     """One obligation in a drafted spec, in the two forms it has to exist in at once.
 

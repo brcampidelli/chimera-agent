@@ -2430,6 +2430,45 @@
         "title": "CronCreateIn",
         "type": "object"
       },
+      "CronFailingOut": {
+        "properties": {
+          "consecutive_failures": {
+            "title": "Consecutive Failures",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "last_status": {
+            "title": "Last Status",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "consecutive_failures",
+          "last_status"
+        ],
+        "title": "CronFailingOut",
+        "type": "object"
+      },
       "CronJobOut": {
         "properties": {
           "action": {
@@ -2546,6 +2585,39 @@
         "title": "CronJobOut",
         "type": "object"
       },
+      "CronLateOut": {
+        "properties": {
+          "behind_seconds": {
+            "title": "Behind Seconds",
+            "type": "number"
+          },
+          "due_at": {
+            "title": "Due At",
+            "type": "number"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "schedule": {
+            "title": "Schedule",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "schedule",
+          "due_at",
+          "behind_seconds"
+        ],
+        "title": "CronLateOut",
+        "type": "object"
+      },
       "CronResultOut": {
         "description": "One dispatch that produced an answer, for the Schedule screen.",
         "properties": {
@@ -2594,6 +2666,36 @@
           "answer"
         ],
         "title": "CronResultOut",
+        "type": "object"
+      },
+      "CronSilenceOut": {
+        "description": "What the schedule is not telling you: what never ran, and what ran and lost.\n\nTwo lists rather than one, because the responses have nothing in common. ``overdue`` means\nnothing dispatched \u2014 that is about the daemon, and on the desktop the daemon is the app, so the\nusual cause is that the app was closed when the job was due. ``failing`` means the job ran, on\ntime, and lost every time; that is about the job. A single \"problems\" list would merge the one\nyou fix by opening the app with the one you fix by rewriting the action.",
+        "properties": {
+          "failing": {
+            "items": {
+              "$ref": "#/components/schemas/CronFailingOut"
+            },
+            "title": "Failing",
+            "type": "array"
+          },
+          "grace_seconds": {
+            "title": "Grace Seconds",
+            "type": "number"
+          },
+          "overdue": {
+            "items": {
+              "$ref": "#/components/schemas/CronLateOut"
+            },
+            "title": "Overdue",
+            "type": "array"
+          }
+        },
+        "required": [
+          "overdue",
+          "failing",
+          "grace_seconds"
+        ],
+        "title": "CronSilenceOut",
         "type": "object"
       },
       "DecomposedOut": {
@@ -9178,6 +9280,47 @@
           }
         },
         "summary": "Cron Results"
+      }
+    },
+    "/api/cron/silence": {
+      "get": {
+        "description": "Ask the schedule what it is not telling you.\n\nEvery other honesty mechanism in this project sits downstream of a run having happened \u2014\nthe verifier judges a result, the receipt names who approved it. None of them gets a turn\nwhen the run never occurred, and a schedule that produced no result reads exactly like a\nschedule with nothing due. That distinction matters more now that the app shows results:\nan empty row for a job that never fired and one for a job that answered nothing look the\nsame, and only one of them is a problem.\n\nOn the desktop the daemon IS the app, so the common cause of an overdue job is that the\nwindow was closed when its time came. Nothing can watch while the process is down \u2014 a\ncrashed process cannot log its own crash \u2014 so this is a question, not a watcher, and it is\nanswered the moment anything asks.\n\nDeclared BEFORE `/api/cron/{job_id}`: FastAPI matches in declaration order, and the\nparameterised route would otherwise take `silence` for a job id and 404 a path that exists.",
+        "operationId": "cron_silence_api_cron_silence_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "grace_minutes",
+            "required": false,
+            "schema": {
+              "default": 5.0,
+              "title": "Grace Minutes",
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CronSilenceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cron Silence"
       }
     },
     "/api/cron/{job_id}": {

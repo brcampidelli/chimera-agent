@@ -484,6 +484,34 @@ export const getCronResults = (jobId?: string, limit = 20) => {
   if (jobId) params.set("job_id", jobId);
   return json<CronResult[]>(`/api/cron/results?${params.toString()}`);
 };
+/** What the schedule is not telling you.
+ *
+ *  Two lists, never merged. `overdue` means nothing dispatched — on the desktop the daemon IS the
+ *  app, so the usual cause is that the window was closed when the job was due, and the fix is to
+ *  open it. `failing` means the job ran, on time, and lost; the fix is to change the job. A single
+ *  "problems" list would hide which of the two somebody is looking at.
+ */
+export interface CronSilence {
+  overdue: {
+    id: string;
+    name: string;
+    schedule: string;
+    due_at: number;
+    behind_seconds: number;
+  }[];
+  failing: {
+    id: string;
+    name: string;
+    consecutive_failures: number;
+    last_status: string;
+    last_error: string | null;
+  }[];
+  /** How late a job may be before it counts as missed. Shown, because a reader who cannot see the
+   *  threshold cannot tell a real gap from the clock. */
+  grace_seconds: number;
+}
+export const getCronSilence = () => json<CronSilence>("/api/cron/silence");
+
 export interface CronResult {
   at: number;
   job_id: string;

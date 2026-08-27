@@ -8,6 +8,7 @@ import {
   enableCron,
   getCron,
   getCronResults,
+  getCronSilence,
   type CronResult,
 } from "@/lib/api";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
@@ -159,6 +160,11 @@ export function Cron({ embedded = false }: { embedded?: boolean } = {}) {
   // would otherwise open six requests to show six lines, and the file is read from its tail either
   // way. The newest answer per job is all a row needs; the rest is one click away.
   const results = useQuery({ queryKey: ["cron", "results"], queryFn: () => getCronResults() });
+  // What never ran. Asked rather than watched: on the desktop the scheduler lives inside the
+  // backend the window starts, so nothing is awake to notice a missed job while the app is closed —
+  // a crashed process cannot log its own crash. The question is answered the moment the screen
+  // opens, which is the moment somebody is there to read it.
+  const silence = useQuery({ queryKey: ["cron", "silence"], queryFn: getCronSilence });
   const latest = new Map<string, CronResult>();
   for (const r of results.data ?? []) if (!latest.has(r.job_id)) latest.set(r.job_id, r);
   const invalidate = () => qc.invalidateQueries({ queryKey: ["cron"] });
@@ -169,6 +175,29 @@ export function Cron({ embedded = false }: { embedded?: boolean } = {}) {
   return (
     <Screen title={t("cron.title")} icon={<Clock className="h-5 w-5" />} embedded={embedded}>
       <AddSchedule />
+      {/* Only the overdue half. The other one — ran on time, lost every time — already has a badge
+          on its own row, and saying it twice would dilute the half that nothing showed at all. */}
+      {silence.data && silence.data.overdue.length > 0 ? (
+        <div
+          className="mx-4 mb-3 rounded-chip border border-warn/40 bg-warn/5 p-3"
+          role="status"
+        >
+          <p className="text-sm font-medium">
+            {t("cron.missed.title", { n: silence.data.overdue.length })}
+          </p>
+          <ul className="mt-1 space-y-0.5">
+            {silence.data.overdue.map((j) => (
+              <li key={j.id} className="text-xs text-muted-foreground">
+                <span className="text-foreground">{j.name}</span> —{" "}
+                {t("cron.missed.late", { when: whenOf(j.due_at) })}
+              </li>
+            ))}
+          </ul>
+          {/* Why, in one sentence, because the cause is not something anyone would guess: the
+              schedule runs inside this app, so a schedule due while it was closed did not run. */}
+          <p className="mt-1.5 text-xs text-muted-foreground">{t("cron.missed.why")}</p>
+        </div>
+      ) : null}
       <Panel title={t("cron.jobs")}>
         {jobs.isError ? (
           <ErrorState error={jobs.error} onRetry={() => jobs.refetch()} />

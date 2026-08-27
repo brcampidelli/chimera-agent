@@ -8,6 +8,7 @@ import { WORKSPACE_KEY } from "@/lib/workspace";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", () => ({
+  getCronSilence: vi.fn(),
   getCron: vi.fn(),
   createCron: vi.fn(),
   enableCron: vi.fn(),

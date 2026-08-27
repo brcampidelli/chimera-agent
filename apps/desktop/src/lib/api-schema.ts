@@ -580,6 +580,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cron/silence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Cron Silence
+         * @description Ask the schedule what it is not telling you.
+         *
+         *     Every other honesty mechanism in this project sits downstream of a run having happened —
+         *     the verifier judges a result, the receipt names who approved it. None of them gets a turn
+         *     when the run never occurred, and a schedule that produced no result reads exactly like a
+         *     schedule with nothing due. That distinction matters more now that the app shows results:
+         *     an empty row for a job that never fired and one for a job that answered nothing look the
+         *     same, and only one of them is a problem.
+         *
+         *     On the desktop the daemon IS the app, so the common cause of an overdue job is that the
+         *     window was closed when its time came. Nothing can watch while the process is down — a
+         *     crashed process cannot log its own crash — so this is a question, not a watcher, and it is
+         *     answered the moment anything asks.
+         *
+         *     Declared BEFORE `/api/cron/{job_id}`: FastAPI matches in declaration order, and the
+         *     parameterised route would otherwise take `silence` for a job id and 404 a path that exists.
+         */
+        get: operations["cron_silence_api_cron_silence_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cron/{job_id}": {
         parameters: {
             query?: never;
@@ -3522,6 +3557,19 @@ export interface components {
             /** Workspace */
             workspace?: string | null;
         };
+        /** CronFailingOut */
+        CronFailingOut: {
+            /** Consecutive Failures */
+            consecutive_failures: number;
+            /** Id */
+            id: string;
+            /** Last Error */
+            last_error?: string | null;
+            /** Last Status */
+            last_status: string;
+            /** Name */
+            name: string;
+        };
         /** CronJobOut */
         CronJobOut: {
             /** Action */
@@ -3556,6 +3604,19 @@ export interface components {
             /** Workspace */
             workspace?: string | null;
         };
+        /** CronLateOut */
+        CronLateOut: {
+            /** Behind Seconds */
+            behind_seconds: number;
+            /** Due At */
+            due_at: number;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Schedule */
+            schedule: string;
+        };
         /**
          * CronResultOut
          * @description One dispatch that produced an answer, for the Schedule screen.
@@ -3578,6 +3639,24 @@ export interface components {
             job_id: string;
             /** Name */
             name: string;
+        };
+        /**
+         * CronSilenceOut
+         * @description What the schedule is not telling you: what never ran, and what ran and lost.
+         *
+         *     Two lists rather than one, because the responses have nothing in common. ``overdue`` means
+         *     nothing dispatched — that is about the daemon, and on the desktop the daemon is the app, so the
+         *     usual cause is that the app was closed when the job was due. ``failing`` means the job ran, on
+         *     time, and lost every time; that is about the job. A single "problems" list would merge the one
+         *     you fix by opening the app with the one you fix by rewriting the action.
+         */
+        CronSilenceOut: {
+            /** Failing */
+            failing: components["schemas"]["CronFailingOut"][];
+            /** Grace Seconds */
+            grace_seconds: number;
+            /** Overdue */
+            overdue: components["schemas"]["CronLateOut"][];
         };
         /** DecomposedOut */
         DecomposedOut: {
@@ -6917,6 +6996,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CronResultOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cron_silence_api_cron_silence_get: {
+        parameters: {
+            query?: {
+                grace_minutes?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CronSilenceOut"];
                 };
             };
             /** @description Validation Error */
