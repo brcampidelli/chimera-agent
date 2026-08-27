@@ -35,6 +35,7 @@ import {
   type RoleOverride,
 } from "@/components/code/RolesBar";
 import { SessionSidebar } from "@/components/code/SessionSidebar";
+import { HtmlPreview } from "@/components/code/HtmlPreview";
 import { ProjectPicker } from "@/components/code/ProjectPicker";
 import { useRunSession } from "@/lib/run-session";
 import { useT } from "@/lib/i18n";
@@ -92,6 +93,12 @@ function highlightFile(content: string, name: string): string {
  * navigation, and it needs nothing here anyway — an SVG is text, so the highlighted view already
  * shows it. */
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp"]);
+
+/** Whether this file is a page rather than code that happens to be markup. */
+function isHtmlPath(path: string): boolean {
+  const ext = path.includes(".") ? path.split(".").pop()!.toLowerCase() : "";
+  return ext === "html" || ext === "htm";
+}
 
 function isImagePath(path: string): boolean {
   const ext = path.includes(".") ? path.split(".").pop()!.toLowerCase() : "";
@@ -283,6 +290,10 @@ function Viewer({ workspace, path }: { workspace: string; path: string | null })
             // <img> pointed at one renders a broken-image icon, which claims a failure that did not
             // happen.
             <div className="px-4 py-6 text-sm text-muted-foreground">{t("code.binaryNote")}</div>
+          ) : path !== null && isHtmlPath(path) && q.data?.content ? (
+            // A page, as a page. Source is one click away inside the component — the toggle lives
+            // there because the preview is what someone opening an .html file came to see.
+            <HtmlPreview workspace={workspace} path={path} source={q.data.content} />
           ) : (
             <pre className="overflow-x-auto p-4 text-[12.5px] leading-relaxed">
               <code className="hljs bg-transparent" dangerouslySetInnerHTML={{ __html: html }} />
