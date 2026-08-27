@@ -265,6 +265,26 @@ class RunRequest(CodeSeams):
     """An approved/edited plan (the raw text from the plan preview). When set, the run uses THIS plan
     verbatim instead of re-planning — the worker follows the exact steps the human reviewed. None =
     the run plans for itself as before."""
+    gen_tests: bool = False
+    """Turn the approved requirement checklist into EXECUTABLE pytest and gate on that.
+
+    Only does anything when there is no ``verify`` command AND a checklist came back: with a real
+    test command the tests are already the ground truth, and with no requirements there is nothing
+    to ground generation in. It writes a test file into the workspace, which is a side effect the
+    screen states rather than performs quietly.
+
+    The value is the true negative. Without it, a run with no verify command is graded by a model
+    reading its own answer, and that proxy is measured to rubber-stamp code that is wrong — a false
+    positive that looks exactly like success."""
+
+    replan: bool = False
+    """On a stall, rebuild the plan from the accumulated failure causes instead of nudging.
+
+    Off by default because it spends a planning call at the worst moment. When on, the run also
+    gets the looser stall matching: at the strict default two attempts failing from one cause with
+    different assertion text never match, so the stall is never detected and the setting would be
+    decoration (``bench/retry_lift``, intervention I2)."""
+
     requirements: list[RequirementOut] | None = None
     """The requirement checklist a person read and edited, from ``POST /api/requirements``.
 
@@ -1817,9 +1837,13 @@ def _build_solve_agent(
     repository), and ``allow_tools`` / ``deny_tools`` / ``write_region`` (what it is allowed to
     touch). With none set, the build is the plain single-model core loop.
 
-    Still deliberately absent, and still a real difference from the CLI: evolution, strong-verify,
-    contracts, checklists and the trust kernel. Those are not ceilings on an ordinary run — they are
-    separate machinery, and each would need its own surface before it meant anything here.
+    Still deliberately absent, and still a real difference from the CLI: strong-verify, completion
+    contracts and the trust kernel. Each would need its own surface before it meant anything here —
+    a contract in particular checks `file_exists` / `file_contains` / `answer_matches`, which are
+    the shapes the project Spec already offers through a screen somebody can read.
+
+    Evolution and checklists used to be on that list and are not any more: the learning seams are
+    passed below via ``evo.apply_to()``, and the checklist arrives as a list a person reviewed.
     """
     from chimera.core import (
         Agent,
@@ -1837,7 +1861,9 @@ def _build_solve_agent(
     from chimera.core.instructions import render as render_identity
     from chimera.core.planner import Plan
     from chimera.core.runstate import RunCheckpointer
+    from chimera.core.spec_test import SpecTestGenerator
     from chimera.core.verify import CommandVerifier
+    from chimera.evolution.stagnation import StagnationDetector
     from chimera.providers import LLMGateway
 
     gateway = LLMGateway()
@@ -2024,6 +2050,20 @@ def _build_solve_agent(
         # reviewed, and there is nothing to gate on.
         checklist=RequirementChecklist(gateway, req.model) if req.requirements is not None else None,
         given_requirements=list(req.requirements) if req.requirements is not None else None,
+        # Spec-grounded tests, only where they replace something weaker. The loop itself requires
+        # no verifier and a non-empty requirement list before it uses this, so asking for it with
+        # a verify command set is a no-op rather than a conflict.
+        spec_test_generator=SpecTestGenerator(gateway, req.model) if req.gen_tests else None,
+        # ALWAYS, and free: no model call, just a comparison of successive failure signatures. The
+        # run had none, so every attempt that failed the same way as the last one was met with the
+        # same nudge and the loop refined a dead end for its whole attempt budget. Detecting it
+        # buys the cheap pivot on its own; `replan` is what upgrades the pivot into a new plan.
+        #
+        # The looser threshold is the point rather than a tuning choice: byte-identical matching
+        # misses two attempts failing from one cause with different assertion text, which is the
+        # common case, so the strict default would make this line do nothing.
+        stagnation=StagnationDetector(window=2, signature_similarity=0.8),
+        replan_on_stall=req.replan,
         config=AutonomousConfig(max_attempts=req.max_attempts),
     )
 

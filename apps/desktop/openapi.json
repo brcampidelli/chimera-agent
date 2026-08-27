@@ -6830,6 +6830,11 @@
             ],
             "title": "Fusion Synthesizer"
           },
+          "gen_tests": {
+            "default": false,
+            "title": "Gen Tests",
+            "type": "boolean"
+          },
           "max_attempts": {
             "default": 3,
             "title": "Max Attempts",
@@ -6937,6 +6942,11 @@
               }
             ],
             "title": "Provider Command"
+          },
+          "replan": {
+            "default": false,
+            "title": "Replan",
+            "type": "boolean"
           },
           "repo_map": {
             "default": false,

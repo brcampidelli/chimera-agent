@@ -5509,6 +5509,11 @@ export interface components {
             /** Fusion Synthesizer */
             fusion_synthesizer?: string | null;
             /**
+             * Gen Tests
+             * @default false
+             */
+            gen_tests: boolean;
+            /**
              * Max Attempts
              * @default 3
              */
@@ -5538,6 +5543,11 @@ export interface components {
             provider?: string | null;
             /** Provider Command */
             provider_command?: string | null;
+            /**
+             * Replan
+             * @default false
+             */
+            replan: boolean;
             /**
              * Repo Map
              * @default false

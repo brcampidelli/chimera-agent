@@ -737,6 +737,17 @@ export interface RunRequestInput {
    *  all — arming an acceptance gate on a list its owner never saw would be the same failure the
    *  feature exists to fix. `[]` means somebody read it and there is nothing to gate on. */
   requirements?: TaskRequirement[] | null;
+  /** Learn its way around an existing project first: a repository map for the planner and a
+   *  read-only explorer tool for the worker. Two halves of one idea, so the screen offers one
+   *  control — nobody choosing between them would be choosing anything. */
+  repo_map?: boolean;
+  explorer?: boolean;
+  /** On a stall, rebuild the plan from the accumulated failure causes instead of nudging. */
+  replan?: boolean;
+  /** Turn the approved checklist into executable pytest and gate on that. Only meaningful with no
+   *  verify command and a non-empty reviewed list; the loop checks both, so sending it otherwise
+   *  is a no-op. Writes a test file into the workspace. */
+  gen_tests?: boolean;
   verify?: string | null;
   workspace?: string | null;
   max_attempts?: number;

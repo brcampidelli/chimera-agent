@@ -54,6 +54,12 @@ export function RunLauncher({
   // deleted every line, which is a different statement and is sent as such.
   const [reqs, setReqs] = useState<TaskRequirement[] | null>(null);
   const [reqNote, setReqNote] = useState("");
+  // Three seams the CLI has always had and no screen sent. One control per idea rather than one
+  // per flag: `repo_map` and `explorer` are two halves of "help it find its way around a project
+  // that already exists", and nobody choosing between them would be choosing anything.
+  const [knowsRepo, setKnowsRepo] = useState(false);
+  const [genTests, setGenTests] = useState(false);
+  const [replan, setReplan] = useState(false);
   const [ws, setWs] = useState("");
   const [maxAttempts, setMaxAttempts] = useState(3);
   const [pauseOnTaint, setPauseOnTaint] = useState(false);
@@ -95,6 +101,14 @@ export function RunLauncher({
     // the run is not graded against, or the review is decoration; and a list nobody was shown must
     // never become an acceptance gate, which is why `null` travels as `null`.
     requirements: reqs,
+    repo_map: knowsRepo,
+    explorer: knowsRepo,
+    replan,
+    // Only where it replaces something weaker. With a verify command the tests already are the
+    // ground truth, and with no reviewed checklist there is nothing to ground generation in — the
+    // loop checks both itself, so sending it anyway is a no-op rather than a conflict, and the
+    // screen simply does not offer it where it would be one.
+    gen_tests: genTests && !verify.trim() && (reqs?.length ?? 0) > 0,
   });
 
   function start() {
@@ -274,6 +288,22 @@ export function RunLauncher({
                 + {t("runs.reqs.add")}
               </button>
               <p className="text-xs text-muted-foreground">{t("runs.reqs.hint")}</p>
+              {/* Offered only where it changes the verdict. With a test command already typed the
+                  tests ARE the ground truth; with no lines left there is nothing to ground the
+                  generation in. A control that does nothing teaches people not to read the ones
+                  that do. */}
+              {!verify.trim() && (reqs?.length ?? 0) > 0 ? (
+                <label className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={genTests}
+                    onChange={(e) => setGenTests(e.target.checked)}
+                    disabled={running}
+                  />
+                  <span>{t("runs.seams.genTests")}</span>
+                </label>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -327,6 +357,24 @@ export function RunLauncher({
             onChange={(e) => setMaxAttempts(Math.min(10, Math.max(1, Number(e.target.value) || 1)))}
             disabled={running}
           />
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={knowsRepo}
+            onChange={(e) => setKnowsRepo(e.target.checked)}
+            disabled={running}
+          />
+          {t("runs.seams.knowsRepo")}
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={replan}
+            onChange={(e) => setReplan(e.target.checked)}
+            disabled={running}
+          />
+          {t("runs.seams.replan")}
         </label>
         {/* Beside Run rather than instead of it. Someone who knows what they want should not have
             to click twice, and someone who does not should not have to find out by watching files
