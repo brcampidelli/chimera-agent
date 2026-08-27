@@ -65,6 +65,16 @@ export function DelegationSavings() {
         </p>
       )}
 
+      {/* When the two halves disagree, say WHY — in one line, and only then. More tokens on cheaper
+          models is fewer dollars, which is the entire point of routing by role; the code has known
+          that since it was written and said it in a comment, where the person reading the screen
+          cannot see it. Orange "5,229 more" sitting above green "$0.0199 saved" reads as a panel
+          contradicting itself, and a reader who concludes the number is broken has learned to
+          distrust the one screen built to be trusted. */}
+      {priced && tokens < 0 && usd > 0 ? (
+        <p className="text-xs text-muted-foreground">{t("orch.saving.cheaperModels")}</p>
+      ) : null}
+
       {summary.estimated_n ? (
         <p className="text-xs text-muted-foreground">
           {t("orch.saving.estimated", { n: summary.estimated_n, total: summary.n })}
