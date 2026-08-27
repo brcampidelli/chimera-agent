@@ -818,6 +818,96 @@ function dispatchRun(frame: string, h: RunStreamHandlers): void {
   else if (event === "error") h.onError?.(payload.message as string);
 }
 
+// --- SDLC lifecycle (plan -> build -> test -> review, streamed one stage at a time) ---
+
+export type LifecycleStage = { name: string; output: string; passed: boolean };
+export type LifecycleDone = { success: boolean; answer: string; cancelled: boolean };
+export type LifecycleHandlers = {
+  onRunId?: (id: string) => void;
+  onVerify?: (v: RunVerify) => void;
+  onStage?: (s: LifecycleStage) => void;
+  onDone?: (d: LifecycleDone) => void;
+  onError?: (message: string) => void;
+};
+export type LifecycleRequest = {
+  task: string;
+  verify?: string | null;
+  workspace?: string | null;
+  model?: string | null;
+  max_attempts?: number;
+  posture?: string;
+  max_usd?: number | null;
+};
+
+/** Run a task through the four stages, taking each frame as it lands.
+ *
+ *  A stage at a time and not one payload at the end, because being able to watch the test gate
+ *  fail is the only thing this has over an ordinary run. Collected and shown together, it would be
+ *  `solve` with several minutes of nothing first.
+ */
+export async function streamLifecycle(
+  req: LifecycleRequest,
+  handlers: LifecycleHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(apiUrl("/api/lifecycle"), {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(req),
+      signal,
+    });
+  } catch (err) {
+    handlers.onError?.(err instanceof Error ? err.message : "network error");
+    return;
+  }
+  if (!res.ok || !res.body) {
+    handlers.onError?.(await streamRefusal(res));
+    return;
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
+    let sep: number;
+    while ((sep = buffer.indexOf("\n\n")) !== -1) {
+      dispatchLifecycle(buffer.slice(0, sep), handlers);
+      buffer = buffer.slice(sep + 2);
+    }
+  }
+  if (buffer.trim()) dispatchLifecycle(buffer, handlers);
+}
+
+function dispatchLifecycle(frame: string, h: LifecycleHandlers): void {
+  let event = "message";
+  let data = "";
+  for (const line of frame.split("\n")) {
+    if (line.startsWith("event:")) event = line.slice(6).trim();
+    else if (line.startsWith("data:")) data += line.slice(5).trim();
+  }
+  if (!data) return;
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse(data);
+  } catch {
+    return;
+  }
+  if (event === "run") h.onRunId?.(payload.run_id as string);
+  else if (event === "verify") h.onVerify?.(payload as unknown as RunVerify);
+  else if (event === "stage") h.onStage?.(payload as unknown as LifecycleStage);
+  else if (event === "done") h.onDone?.(payload as unknown as LifecycleDone);
+  else if (event === "error") h.onError?.(payload.message as string);
+}
+
+/** Stop a lifecycle run. It halts BETWEEN stages — an in-flight model call is never interrupted,
+ *  and a build stopped halfway through writing files is worse than one that finished. */
+export const cancelLifecycle = (id: string) =>
+  json<{ ok: boolean }>(`/api/lifecycle/${encodeURIComponent(id)}/cancel`, { method: "POST" });
+
 // --- Code conversation (turns that edit, streamed) ---
 
 export interface CodeTurnInput {

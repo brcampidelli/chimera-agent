@@ -43,7 +43,10 @@ PACKAGE = pathlib.Path(__file__).resolve().parents[1] / "chimera"
 #: way: a list of things to CHECK fails open, and the site nobody added is the one that breaks.
 EXEMPT: dict[str, str] = {
     "chimera/workflow/executors.py:build_executors.solve_step": "delegates to solve, which sets it",
-    "chimera/orchestration/lifecycle.py:lifecycle_crew": "library constructor; the caller owns the root",
+    # `lifecycle_crew` was exempt as "the caller owns the root" and no caller set one, so the
+    # lifecycle worker was the one agent in the app that did not read the project's own AGENTS.md.
+    # It sets `project_root` now, which is why the entry is gone rather than reworded — and this
+    # gate is what noticed, on the same commit that gave the crew an HTTP surface.
     "chimera/cli/main.py:sandbox_bench.factory": "benchmark harness, not a user's repository",
     "chimera/cli/main.py:evolve_tune.__init__": "offline tuning over recorded trajectories",
 }

@@ -1093,6 +1093,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/lifecycle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lifecycle Stream
+         * @description Run one task through the four stages, reporting each as it lands.
+         *
+         *     SAFETY POSTURE: identical to ``POST /api/runs`` — the build writes files inside the
+         *     workspace and, if given, runs the caller's verify command there. Behind the bearer guard
+         *     and the loopback bind, through the governed registry, and never outside the workspace.
+         */
+        post: operations["lifecycle_stream_api_lifecycle_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lifecycle/{run_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Lifecycle
+         * @description Stop a run between stages. An unknown id is ``{ok: false}`` with a 200, not a 404 —
+         *     a run that already ended is exactly the state a stale Stop click lands on.
+         */
+        post: operations["cancel_lifecycle_api_lifecycle__run_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/lsp/diagnostics": {
         parameters: {
             query?: never;
@@ -4360,6 +4405,78 @@ export interface components {
             /** Status */
             status: string;
         };
+        /**
+         * LifecycleRunIn
+         * @description A run through plan → build → test → review.
+         *
+         *     Inherits the coding seams rather than redeclaring them, for the same reason ``RunRequest``
+         *     does: the build stage writes files and can run shell, so ``write_region``, the allowlist and
+         *     the posture all govern something real here, and a field named ``max_steps`` must not mean two
+         *     different things on two routes.
+         */
+        LifecycleRunIn: {
+            /**
+             * Allow Host Exec
+             * @default false
+             */
+            allow_host_exec: boolean;
+            /** Allow Tools */
+            allow_tools?: string[] | null;
+            /** Attachments */
+            attachments?: string[];
+            /** Context Budget */
+            context_budget?: number | null;
+            /** Deny Tools */
+            deny_tools?: string[] | null;
+            /**
+             * Explorer
+             * @default false
+             */
+            explorer: boolean;
+            /**
+             * Fuse
+             * @default false
+             */
+            fuse: boolean;
+            /** Fusion Judge */
+            fusion_judge?: string | null;
+            /** Fusion Panel */
+            fusion_panel?: string[] | null;
+            /** Fusion Synthesizer */
+            fusion_synthesizer?: string | null;
+            /**
+             * Max Attempts
+             * @default 2
+             */
+            max_attempts: number;
+            /** Max Steps */
+            max_steps?: number | null;
+            /** Max Usd */
+            max_usd?: number | null;
+            /** Model */
+            model?: string | null;
+            posture?: components["schemas"]["Posture"] | null;
+            /** Profile */
+            profile?: ("economy" | "balanced" | "max") | null;
+            /** Provider */
+            provider?: string | null;
+            /** Provider Command */
+            provider_command?: string | null;
+            /**
+             * Repo Map
+             * @default false
+             */
+            repo_map: boolean;
+            roles?: components["schemas"]["RoleModels"] | null;
+            /** Task */
+            task: string;
+            /** Verify */
+            verify?: string | null;
+            /** Workspace */
+            workspace?: string | null;
+            /** Write Region */
+            write_region?: string[] | null;
+        };
         /** MaturityOut */
         MaturityOut: {
             /** Available */
@@ -7578,6 +7695,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lifecycle_stream_api_lifecycle_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LifecycleRunIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_lifecycle_api_lifecycle__run_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CancelOut"];
                 };
             };
             /** @description Validation Error */

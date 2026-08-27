@@ -39,6 +39,8 @@ const DYNAMIC = [
   "crew.approach.",
   "crew.status.",
   "fusion.role.",
+  "lifecycle.stage.",
+  "lifecycle.status.",
   "model.reason.",
   "nav.",
   "orch.stage.",

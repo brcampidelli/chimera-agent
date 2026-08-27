@@ -180,7 +180,13 @@ EXEMPT: dict[str, str] = {
     "chimera/cli/main.py:evolve_tune": "offline tuning over recorded trajectories",
     "chimera/cli/main.py:meta": "designs an agent blueprint; does not run one",
     "chimera/core/agent.py:_default_skill_registry": "internal default, wrapped by whoever built it",
-    "chimera/orchestration/lifecycle.py:lifecycle_crew": "library constructor; the caller governs",
+    # The exemption used to say "the caller governs" while no caller did: the only one was the CLI,
+    # which passes the bare workspace registry. That is defensible in a terminal — the person
+    # running the command already has every capability the agent is being handed — and it is why
+    # the default stayed. The claim is now true of the surface that needed it: `lifecycle_crew`
+    # takes a `registry`, and `POST /api/lifecycle` passes `assemble_registry`'s output, which is
+    # pinned by `test_lifecycle_api.py::test_the_route_governs_the_registry_it_hands_the_crew`.
+    "chimera/orchestration/lifecycle.py:lifecycle_crew": "library constructor; the HTTP caller governs",
     "chimera/workflow/executors.py:build_executors.solve_step": "delegates to solve, governed there",
 }
 

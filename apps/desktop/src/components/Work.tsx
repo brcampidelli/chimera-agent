@@ -5,14 +5,21 @@ import { Orchestration } from "@/components/orchestration/Orchestration";
 import { Runs } from "@/components/Runs";
 import { GitPanel } from "@/components/code/GitPanel";
 import { WorthPanel } from "@/components/code/WorthPanel";
+import { Lifecycle } from "@/components/lifecycle/Lifecycle";
 import { Tabs, TabPanel } from "@/components/ui/tabs";
 import { useT } from "@/lib/i18n";
 import { useRoute } from "@/lib/router";
 import { readWorkspace } from "@/lib/workspace";
 
-type Tab = "run" | "git" | "worth" | "orchestration";
+type Tab = "run" | "git" | "worth" | "orchestration" | "lifecycle";
 
-const TABS = ["run", "git", "worth", "orchestration"] as const;
+/** The tab names the URL understands.
+ *
+ *  Exported so the deep-link test iterates THIS list instead of a copy of it. The union type and
+ *  this array are two declarations of one fact and the typechecker cannot relate them: adding the
+ *  fifth tab left `?tab=lifecycle` falling back to Runs, silently, with everything compiling.
+ */
+export const TABS = ["run", "git", "worth", "orchestration", "lifecycle"] as const;
 
 /** The tab named in the URL, or "run".
  *
@@ -64,6 +71,7 @@ export function Work() {
     { value: "git" as const, label: t("code.git.title") },
     { value: "worth" as const, label: t("code.worth.title") },
     { value: "orchestration" as const, label: t("nav.orchestration") },
+    { value: "lifecycle" as const, label: t("nav.lifecycle") },
   ];
 
   // `setParams` and not `navigate`: switching a tab replaces rather than pushes, so the back
@@ -104,6 +112,10 @@ export function Work() {
           ) : tab === "worth" ? (
             <div className="mx-auto max-w-5xl px-6 py-4">
               <WorthPanel workspace={workspace} />
+            </div>
+          ) : tab === "lifecycle" ? (
+            <div className="mx-auto max-w-5xl px-6 py-4">
+              <Lifecycle workspace={workspace} />
             </div>
           ) : (
             <div className="mx-auto max-w-5xl px-6 py-4">

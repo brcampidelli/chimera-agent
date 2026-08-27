@@ -2,7 +2,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { Work } from "@/components/Work";
+import { TABS, Work } from "@/components/Work";
 import { getFsTree, getGitStatus, getRuns, streamRun } from "@/lib/api";
 import { emptyTree, gitStatus } from "@/test/code-api-mock";
 import { renderWithProviders } from "@/test/utils";
@@ -32,7 +32,11 @@ describe("Work — the tab in the address", () => {
     window.location.hash = "";
   });
 
-  it.each(["git", "worth", "orchestration"])("opens on ?tab=%s", async (tab) => {
+  // Every tab, from the constant rather than a hand-kept copy. Adding the fifth tab is exactly
+  // how this broke the first time: the union type gained "lifecycle", `choose` wrote it into the
+  // URL, `TABS` did not list it, and the typechecker had nothing to say because they are two
+  // separate declarations of the same fact.
+  it.each(TABS.filter((x) => x !== "run"))("opens on ?tab=%s", async (tab) => {
     at(tab);
 
     renderWithProviders(<Work />);
@@ -45,6 +49,17 @@ describe("Work — the tab in the address", () => {
     );
     const selected = screen.getByRole("tab", { selected: true });
     expect(selected.textContent?.toLowerCase()).not.toBe("runs");
+  });
+
+  it("has a URL name for every tab it renders", async () => {
+    // The invariant, and the one the loop above cannot check: `it.each(TABS)` simply generates
+    // fewer cases when TABS loses an entry, so deleting "lifecycle" from it made the suite SMALLER
+    // and still green. Counting the rendered controls against the list fails in both directions —
+    // a tab with no URL name, and a URL name with no tab.
+    at("");
+    renderWithProviders(<Work />);
+
+    expect(await screen.findAllByRole("tab")).toHaveLength(TABS.length);
   });
 
   it("falls back to Runs for a tab name that is not one", async () => {

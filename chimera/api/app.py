@@ -1575,6 +1575,12 @@ def build_api_app(
     register_orchestration_api(
         app, guard, workspace, settings, live_settings=live_settings
     )
+    # /api/lifecycle — plan → build → test → review, one frame per stage. Registered here and not
+    # behind a flag for the same reason as above: `schema_dump` builds the app through this
+    # function, so a conditional route would be present at runtime and missing from the schema.
+    from chimera.api.lifecycle_api import register_lifecycle_api
+
+    register_lifecycle_api(app, guard, workspace, settings, live_settings=live_settings)
     # /v1/chat/completions — any OpenAI client or LLM benchmark harness can drive the agent loop.
     register_openai_compat(app, guard, manager)
 

@@ -4408,6 +4408,255 @@
         "title": "LibraryImportOut",
         "type": "object"
       },
+      "LifecycleRunIn": {
+        "description": "A run through plan \u2192 build \u2192 test \u2192 review.\n\nInherits the coding seams rather than redeclaring them, for the same reason ``RunRequest``\ndoes: the build stage writes files and can run shell, so ``write_region``, the allowlist and\nthe posture all govern something real here, and a field named ``max_steps`` must not mean two\ndifferent things on two routes.",
+        "properties": {
+          "allow_host_exec": {
+            "default": false,
+            "title": "Allow Host Exec",
+            "type": "boolean"
+          },
+          "allow_tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allow Tools"
+          },
+          "attachments": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Attachments",
+            "type": "array"
+          },
+          "context_budget": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Budget"
+          },
+          "deny_tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deny Tools"
+          },
+          "explorer": {
+            "default": false,
+            "title": "Explorer",
+            "type": "boolean"
+          },
+          "fuse": {
+            "default": false,
+            "title": "Fuse",
+            "type": "boolean"
+          },
+          "fusion_judge": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fusion Judge"
+          },
+          "fusion_panel": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fusion Panel"
+          },
+          "fusion_synthesizer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fusion Synthesizer"
+          },
+          "max_attempts": {
+            "default": 2,
+            "title": "Max Attempts",
+            "type": "integer"
+          },
+          "max_steps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Steps"
+          },
+          "max_usd": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Usd"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "posture": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Posture"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "enum": [
+                  "economy",
+                  "balanced",
+                  "max"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "provider_command": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Command"
+          },
+          "repo_map": {
+            "default": false,
+            "title": "Repo Map",
+            "type": "boolean"
+          },
+          "roles": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleModels"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          },
+          "verify": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verify"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          },
+          "write_region": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Write Region"
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "title": "LifecycleRunIn",
+        "type": "object"
+      },
       "MaturityOut": {
         "properties": {
           "available": {
@@ -9907,6 +10156,83 @@
           }
         },
         "summary": "Run Kanban"
+      }
+    },
+    "/api/lifecycle": {
+      "post": {
+        "description": "Run one task through the four stages, reporting each as it lands.\n\nSAFETY POSTURE: identical to ``POST /api/runs`` \u2014 the build writes files inside the\nworkspace and, if given, runs the caller's verify command there. Behind the bearer guard\nand the loopback bind, through the governed registry, and never outside the workspace.",
+        "operationId": "lifecycle_stream_api_lifecycle_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LifecycleRunIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Lifecycle Stream"
+      }
+    },
+    "/api/lifecycle/{run_id}/cancel": {
+      "post": {
+        "description": "Stop a run between stages. An unknown id is ``{ok: false}`` with a 200, not a 404 \u2014\na run that already ended is exactly the state a stale Stop click lands on.",
+        "operationId": "cancel_lifecycle_api_lifecycle__run_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Lifecycle"
       }
     },
     "/api/lsp/diagnostics": {
