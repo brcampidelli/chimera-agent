@@ -21,6 +21,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/agents/design": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Design Agent Endpoint
+         * @description Turn a sentence into a proposed agent. One model call; nothing is saved.
+         *
+         *     `chimera meta` has been able to do this for a long time and printed the result into a
+         *     table — the blueprint was designed, shown, and thrown away every single time. Here the
+         *     proposal lands in the registry form, which is the surface that already edits an agent, so
+         *     the review step is a form somebody was going to fill in anyway.
+         *
+         *     Reviewing is not a formality. Measured on three real descriptions, an agent asked only to
+         *     *say what is weak about a marketing text* was designed with ``edit_file`` — a tool that
+         *     rewrites files. Over-granting is the tendency, and the person reading the list is the one
+         *     who knows the agent was never meant to touch anything.
+         */
+        post: operations["design_agent_endpoint_api_agents_design_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/agents/registry": {
         parameters: {
             query?: never;
@@ -2460,6 +2490,46 @@ export interface components {
              * @default
              */
             name: string;
+        };
+        /**
+         * AgentDesignIn
+         * @description Describe an agent in a sentence. One model call; nothing is saved.
+         */
+        AgentDesignIn: {
+            /** Description */
+            description: string;
+        };
+        /**
+         * AgentDesignOut
+         * @description A proposed agent, in the shape the registry form already edits.
+         *
+         *     Deliberately the same field names as ``AgentDefOut`` so the screen can review a design in the
+         *     form it already has, rather than growing a second surface that has to be kept in step with the
+         *     first.
+         */
+        AgentDesignOut: {
+            /** Allowed Tools */
+            allowed_tools?: string[];
+            /**
+             * Id
+             * @default
+             */
+            id: string;
+            /**
+             * Instructions
+             * @default
+             */
+            instructions: string;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
         };
         /**
          * AgentIdentityOut
@@ -6115,6 +6185,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    design_agent_endpoint_api_agents_design_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentDesignIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentDesignOut"];
                 };
             };
             /** @description Validation Error */

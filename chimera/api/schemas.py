@@ -966,6 +966,28 @@ class CronSilenceOut(BaseModel):
     reader who cannot see the threshold cannot tell a real gap from the clock."""
 
 
+class AgentDesignIn(BaseModel):
+    """Describe an agent in a sentence. One model call; nothing is saved."""
+
+    description: str
+
+
+class AgentDesignOut(BaseModel):
+    """A proposed agent, in the shape the registry form already edits.
+
+    Deliberately the same field names as ``AgentDefOut`` so the screen can review a design in the
+    form it already has, rather than growing a second surface that has to be kept in step with the
+    first.
+    """
+
+    id: str = ""
+    name: str = ""
+    instructions: str = ""
+    allowed_tools: list[str] = Field(default_factory=list)
+    note: str = ""
+    """"" on success; a short reason in place of a 500 when the design did not come back."""
+
+
 class SpecRequirementOut(BaseModel):
     """One obligation in a drafted spec, in the two forms it has to exist in at once.
 

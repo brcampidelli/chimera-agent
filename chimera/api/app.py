@@ -46,6 +46,8 @@ from chimera.api.runs import load_runs
 from chimera.api.schemas import (
     AcceptanceOut,
     AgentDefOut,
+    AgentDesignIn,
+    AgentDesignOut,
     AgentIdentityOut,
     AgentsBatchOut,
     BatchCancelOut,
@@ -555,6 +557,58 @@ def build_api_app(
         from chimera.core.registry import load as load_agents
 
         return [a.model_dump() for a in load_agents(live_settings().home)]
+
+    @app.post("/api/agents/design", dependencies=[guard], response_model=AgentDesignOut)
+    async def design_agent_endpoint(req: AgentDesignIn) -> dict[str, Any]:
+        """Turn a sentence into a proposed agent. One model call; nothing is saved.
+
+        `chimera meta` has been able to do this for a long time and printed the result into a
+        table — the blueprint was designed, shown, and thrown away every single time. Here the
+        proposal lands in the registry form, which is the surface that already edits an agent, so
+        the review step is a form somebody was going to fill in anyway.
+
+        Reviewing is not a formality. Measured on three real descriptions, an agent asked only to
+        *say what is weak about a marketing text* was designed with ``edit_file`` — a tool that
+        rewrites files. Over-granting is the tendency, and the person reading the list is the one
+        who knows the agent was never meant to touch anything.
+        """
+
+        def work() -> dict[str, Any]:
+            import re
+
+            from chimera.ecosystem.meta_agent import MetaAgent
+            from chimera.providers import LLMGateway
+            from chimera.tools import default_registry
+
+            if not req.description.strip():
+                return {"note": "nothing was described"}
+            try:
+                blueprint = MetaAgent(
+                    LLMGateway(), allowed_tools=default_registry().names()
+                ).design(req.description)
+            except Exception as exc:  # noqa: BLE001 — a model hiccup is not a server error
+                _log.warning("agent design failed: %s", exc)
+                return {"note": "the design call did not complete"}
+            if blueprint is None:
+                return {"note": "no usable agent could be read from that description"}
+            slug = re.sub(r"[^a-z0-9]+", "-", blueprint.name.strip().lower()).strip("-")
+            return {
+                "id": slug,
+                "name": blueprint.name,
+                "instructions": blueprint.role_prompt,
+                "allowed_tools": list(blueprint.tools),
+                # An empty list is not "no tools" here — `AgentDef.allowed_tools` reads empty as NO
+                # RESTRICTION, the opposite of `Role.allowed_tools`. That inversion is how a
+                # subagent once ran the full loop outside its owner's denylist, so a design that
+                # named nothing says so instead of arriving as a silent grant of everything.
+                "note": (
+                    ""
+                    if blueprint.tools
+                    else "no tools were chosen — an empty list lets it use every tool"
+                ),
+            }
+
+        return await asyncio.get_running_loop().run_in_executor(None, work)
 
     @app.put("/api/agents/registry", dependencies=[guard], response_model=list[AgentDefOut])
     def upsert_agent_endpoint(agent: AgentDefOut) -> list[Any]:

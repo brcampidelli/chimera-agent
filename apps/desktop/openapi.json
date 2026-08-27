@@ -90,6 +90,54 @@
         "title": "AgentDefOut",
         "type": "object"
       },
+      "AgentDesignIn": {
+        "description": "Describe an agent in a sentence. One model call; nothing is saved.",
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          }
+        },
+        "required": [
+          "description"
+        ],
+        "title": "AgentDesignIn",
+        "type": "object"
+      },
+      "AgentDesignOut": {
+        "description": "A proposed agent, in the shape the registry form already edits.\n\nDeliberately the same field names as ``AgentDefOut`` so the screen can review a design in the\nform it already has, rather than growing a second surface that has to be kept in step with the\nfirst.",
+        "properties": {
+          "allowed_tools": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Tools",
+            "type": "array"
+          },
+          "id": {
+            "default": "",
+            "title": "Id",
+            "type": "string"
+          },
+          "instructions": {
+            "default": "",
+            "title": "Instructions",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "title": "AgentDesignOut",
+        "type": "object"
+      },
       "AgentIdentityOut": {
         "description": "Who the agent is, in the words of the person who runs it.\n\nReturned on write as well as on read, and deliberately not an echo of what was sent: the free\ntext is capped, so a caller that pasted more than the budget must see what the agent will\nactually be told rather than what they typed.",
         "properties": {
@@ -8187,6 +8235,45 @@
           }
         },
         "summary": "Agents Stream"
+      }
+    },
+    "/api/agents/design": {
+      "post": {
+        "description": "Turn a sentence into a proposed agent. One model call; nothing is saved.\n\n`chimera meta` has been able to do this for a long time and printed the result into a\ntable \u2014 the blueprint was designed, shown, and thrown away every single time. Here the\nproposal lands in the registry form, which is the surface that already edits an agent, so\nthe review step is a form somebody was going to fill in anyway.\n\nReviewing is not a formality. Measured on three real descriptions, an agent asked only to\n*say what is weak about a marketing text* was designed with ``edit_file`` \u2014 a tool that\nrewrites files. Over-granting is the tendency, and the person reading the list is the one\nwho knows the agent was never meant to touch anything.",
+        "operationId": "design_agent_endpoint_api_agents_design_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentDesignIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentDesignOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Design Agent Endpoint"
       }
     },
     "/api/agents/registry": {

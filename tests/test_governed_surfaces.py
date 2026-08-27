@@ -174,6 +174,14 @@ EXEMPT: dict[str, str] = {
     # sharing a method named `run` let the exemption cover `SolveLane` as well.
     # --- not an agent surface at all ---
     "chimera/api/app.py:build_api_app.tools_endpoint": "lists tool schemas; nothing is invoked",
+    # Same shape as the line above and safe for the same reason: the registry is built to read
+    # `.names()` — the list of tool names a designed agent may be restricted to — and is then
+    # discarded. No agent is handed it, nothing is invoked through it, and the design it feeds
+    # is a proposal that a person reviews before anything is saved. What the designed agent may
+    # actually run is decided later, by the governed surface that runs it.
+    "chimera/api/app.py:build_api_app.design_agent_endpoint.work": (
+        "reads tool NAMES for the design allowlist; no agent, nothing invoked"
+    ),
     "chimera/cli/main.py:tools": "prints the tool table",
     "chimera/cli/main.py:schema_bench": "benchmark harness, no deployment",
     "chimera/cli/main.py:sandbox_bench.factory": "benchmark harness, no deployment",

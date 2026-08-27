@@ -194,6 +194,21 @@ export const getRequirements = (task: string) =>
     body: JSON.stringify({ task }),
   });
 
+/** Turn a sentence into a proposed agent. One model call; nothing is saved.
+ *
+ *  `chimera meta` could always do this and printed the result into a table — designed, shown, and
+ *  thrown away every time. The proposal lands in the registry form instead, which is the surface
+ *  that already edits an agent.
+ */
+export const designAgent = (description: string) =>
+  json<{
+    id: string;
+    name: string;
+    instructions: string;
+    allowed_tools: string[];
+    note: string;
+  }>("/api/agents/design", { method: "POST", body: JSON.stringify({ description }) });
+
 export const getGovernanceInjection = () =>
   json<InjectionReport>("/api/governance/injection");
 export const getGovernanceAudit = () => json<GovernanceAudit>("/api/governance/audit");
