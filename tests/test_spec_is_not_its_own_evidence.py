@@ -33,6 +33,24 @@ requirements:
 """
 
 
+#: Verbatim from a draft the model produced through the real routes, for *"quero uma pagina
+#: simples da minha padaria, com o cardapio e o horario que a gente abre"*. Kept exactly as it
+#: came: a hand-written example is weaker evidence than the thing that actually happened.
+RASCUNHO_REAL = """name: padaria-website
+requirements:
+- id: menu-section
+  text: Deve haver uma seção mostrando o cardápio com produtos e preços
+  check: contains
+  target: cardápio|Cardápio|menu|Menu
+  required: true
+- id: opening-hours
+  text: Deve mostrar os horários de funcionamento da padaria
+  check: contains
+  target: horário|Horário|funcionamento|Funcionamento
+  required: true
+"""
+
+
 @pytest.fixture
 def spec_no_projeto(tmp_path: Path) -> tuple[Spec, Path]:
     (tmp_path / "projeto.spec.yaml").write_text(YAML, encoding="utf-8")
@@ -64,6 +82,35 @@ def test_o_codigo_de_verdade_ainda_satisfaz(spec_no_projeto) -> None:
     spec, ws = spec_no_projeto
     (ws / "index.html").write_text("<h1>Padaria Aurora</h1>", encoding="utf-8")
     assert check_drift(spec, ws).aligned
+
+
+def test_um_rascunho_real_era_satisfeito_INTEIRO_por_si_mesmo(tmp_path: Path) -> None:
+    """Verbatim from a draft the model wrote for *"quero uma pagina simples da minha padaria, com o
+    cardapio e o horario que a gente abre"*, through the real routes.
+
+    Measured on this file, empty folder, both arms, the only difference being whether the spec's
+    own file is scanned:
+
+        before   4/4 satisfied   aligned=True    <- reports done, nothing written
+        after    0/4 satisfied   aligned=False
+
+    Four out of four. Not a corner case: a drafted requirement's `text` is written in the language
+    of the request and its `target` is a regex over the words of that same request, so the two match
+    each other by construction. Kept verbatim rather than paraphrased — a hand-written example is
+    weaker evidence than the thing that actually happened.
+    """
+    spec_file = tmp_path / "padaria-website.spec.yaml"
+    spec_file.write_text(RASCUNHO_REAL, encoding="utf-8")
+    spec = load_spec(spec_file)
+
+    assert not check_drift(spec, tmp_path).aligned
+
+    # The control on the same file: real content still satisfies it, so the exclusion narrowed the
+    # scan by exactly one file rather than breaking the gate.
+    (tmp_path / "index.html").write_text(
+        "<h1>Cardápio</h1><p>Horário: 7h às 19h</p>", encoding="utf-8"
+    )
+    assert check_drift(spec, tmp_path).aligned
 
 
 def test_uma_spec_construida_na_memoria_varre_tudo(tmp_path: Path) -> None:
