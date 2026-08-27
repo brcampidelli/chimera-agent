@@ -1315,6 +1315,18 @@
             "title": "Answer",
             "type": "string"
           },
+          "done": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Done"
+          },
           "edits": {
             "items": {
               "additionalProperties": {
@@ -1331,6 +1343,18 @@
             },
             "title": "Tools",
             "type": "array"
+          },
+          "verified": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified"
           },
           "you": {
             "title": "You",

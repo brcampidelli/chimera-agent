@@ -120,3 +120,32 @@ def exchanges_from_messages(messages: list[dict[str, Any]]) -> list[dict[str, An
             waiting["ok"] = not observation.startswith("error:")
 
     return exchanges
+
+
+def attach_receipts(
+    exchanges: list[dict[str, Any]], receipts: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Give each replayed exchange the receipt of the turn it was.
+
+    **Paired from the END.** Both lists are cut at the FRONT as a conversation grows — messages by
+    ``trim_to_a_safe_boundary``, receipts by their own cap — and the last receipt always belongs to
+    the last turn. Counting forward from index 0 would look right on every short conversation and
+    then, the first time one grew past its limit, shift every receipt silently onto the wrong turn.
+    A misattributed receipt is worse than an absent one: it reports somebody else's cost, taint and
+    verdict as this turn's, with nothing on screen to suggest anything is wrong.
+
+    Exchanges beyond what the receipts cover keep ``done: None``, which the screen already renders
+    as "no accounting for this one" — the honest answer for a conversation older than the receipts.
+    """
+    out = [dict(e) for e in exchanges]
+    for e in out:
+        e.setdefault("done", None)
+        e.setdefault("verified", None)
+    for offset in range(1, min(len(out), len(receipts)) + 1):
+        receipt = dict(receipts[-offset])
+        # `verified` travels beside the receipt rather than inside it: the screen renders the two
+        # in different places, and folding one into the other would make the verdict look like a
+        # cost line.
+        out[-offset]["verified"] = receipt.pop("verified", None)
+        out[-offset]["done"] = receipt
+    return out

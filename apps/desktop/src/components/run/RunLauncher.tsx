@@ -129,20 +129,31 @@ export function RunLauncher({
         getPlan(task.trim(), workspace ?? (ws.trim() || null)),
         getRequirements(task.trim()),
       ]);
-      if (p.status === "fulfilled") {
-        setPlan(p.value.text || "");
+      // Neither half is trusted to have the shape its type promises. `allSettled` reports a
+      // resolved-with-nothing call as `fulfilled`, so reading through `.value` without checking
+      // throws INSIDE the handler — past the point where a rejection could be caught — and leaves
+      // the panel open, empty and silent. Caught by CI on a suite whose mock resolves to
+      // undefined, which is exactly what a stubbed or half-upgraded backend looks like.
+      const plan = p.status === "fulfilled" ? p.value : null;
+      if (plan && typeof plan.text === "string") {
+        setPlan(plan.text);
         // The endpoint degrades to an empty plan with a note rather than failing, so an empty
         // answer needs a sentence: a blank box would read as "it plans to do nothing".
-        if (!p.value.text) setPlanNote(p.value.note || t("runs.plan.empty"));
+        if (!plan.text) setPlanNote(plan.note || t("runs.plan.empty"));
       } else {
         setPlanNote(t("runs.plan.failed"));
       }
-      if (r.status === "fulfilled") {
-        setReqs(r.value.items);
-        if (!r.value.items.length) setReqNote(r.value.note || t("runs.reqs.empty"));
+      const got = r.status === "fulfilled" ? r.value : null;
+      if (got && Array.isArray(got.items)) {
+        setReqs(got.items);
+        if (!got.items.length) setReqNote(got.note || t("runs.reqs.empty"));
       } else {
         setReqNote(t("runs.reqs.empty"));
       }
+    } catch {
+      // Still here, and it has to be: `allSettled` removes the rejection but not every way this
+      // block can throw, and a preview that dies silently leaves a panel that never closes.
+      setPlanNote(t("runs.plan.failed"));
     } finally {
       setPlanning(false);
     }

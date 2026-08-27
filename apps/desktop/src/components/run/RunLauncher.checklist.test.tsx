@@ -127,6 +127,23 @@ describe("the requirement checklist", () => {
     expect((vi.mocked(streamRun).mock.calls[0][0] as { requirements: unknown }).requirements).toBeNull();
   });
 
+  it("survives a requirements call that resolves with nothing", async () => {
+    // Found by CI, not locally: `Promise.allSettled` reports a resolved-with-nothing call as
+    // `fulfilled`, so reading through `.value` threw inside the handler — past any catch — and
+    // left the panel open, empty and silent. A local `npm test` did not fail on the unhandled
+    // rejection and CI did, which is precisely why this is pinned rather than trusted to types.
+    vi.mocked(getRequirements).mockResolvedValue(undefined as never);
+    renderWithProviders(<RunLauncher />);
+    await userEvent.type(screen.getByLabelText(/task/i), "x");
+    await userEvent.click(screen.getByRole("button", { name: /see the plan/i }));
+
+    // The plan still arrives — one half falling over must not take the other down.
+    expect(await screen.findByDisplayValue(/1\. faça/)).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: /^run$/i }));
+    await waitFor(() => expect(streamRun).toHaveBeenCalled());
+    expect((vi.mocked(streamRun).mock.calls[0][0] as { requirements: unknown }).requirements).toBeNull();
+  });
+
   it("says nothing was read rather than showing an empty list", async () => {
     // An empty checklist reads as "this task has no requirements", which is a claim nobody made.
     vi.mocked(getRequirements).mockResolvedValue({ items: [], note: "" } as never);

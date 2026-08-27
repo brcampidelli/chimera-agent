@@ -203,6 +203,19 @@ class CodeExchangeOut(BaseModel):
     answer: str
     tools: list[CodeToolOut]
     edits: list[dict[str, str]]
+    done: dict[str, Any] | None = None
+    """What the turn cost and what stopped it, as it was reported live.
+
+    Stored per turn since receipts existed and absent on every conversation older than that, which
+    is why it is nullable rather than defaulted to an empty object: "no accounting was kept for
+    this turn" and "this turn cost nothing" are different statements, and the screen already draws
+    them differently."""
+
+    verified: dict[str, Any] | None = None
+    """The verification verdict on what this turn WROTE, without its revert token.
+
+    The token is deliberately not persisted: the undo offer is single-use and lives in memory, so
+    replaying one would put a button on a reopened conversation that cannot do what it says."""
 
 
 class CodeSessionOut(BaseModel):

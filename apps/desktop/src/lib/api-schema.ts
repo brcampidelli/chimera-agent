@@ -3050,12 +3050,20 @@ export interface components {
         CodeExchangeOut: {
             /** Answer */
             answer: string;
+            /** Done */
+            done?: {
+                [key: string]: unknown;
+            } | null;
             /** Edits */
             edits: {
                 [key: string]: string;
             }[];
             /** Tools */
             tools: components["schemas"]["CodeToolOut"][];
+            /** Verified */
+            verified?: {
+                [key: string]: unknown;
+            } | null;
             /** You */
             you: string;
         };

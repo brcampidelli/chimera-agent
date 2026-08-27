@@ -1396,6 +1396,13 @@ export const getCodeSession = (sessionId: string) =>
       answer: string;
       tools: CodeToolEvent[];
       edits: { path: string; patch: string }[];
+      /** What the turn cost and what stopped it, as reported live. `null` on conversations older
+       *  than receipts — "no accounting was kept" and "it cost nothing" are different statements. */
+      done: CodeTurnDone | null;
+      /** The verdict on what the turn WROTE, without its revert token: the undo offer is
+       *  single-use and in memory, so a replayed one would be a button that cannot do what it
+       *  says. */
+      verified: Omit<CodeVerified, "revert_token"> | null;
     }[];
   }>(`/api/code/sessions/${encodeURIComponent(sessionId)}`);
 
