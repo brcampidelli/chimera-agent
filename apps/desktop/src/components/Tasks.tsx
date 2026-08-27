@@ -215,6 +215,22 @@ function Board({
                   {c.verify && <Badge tone="accent">{t("tasks.verified")}</Badge>}
                   {c.risk === "high" && <Badge tone="bad">{t("tasks.highRisk")}</Badge>}
                 </div>
+                {/* What the lane answered. It has been on the wire since `TaskCardOut` had a
+                    `result` field and this screen never rendered it, so a board could work every
+                    card it had and show only that they had moved column — the outcome of the run
+                    was in the response, discarded on arrival.
+                    Folded, because an answer can be long and a board is a board: the summary line
+                    keeps the card the size of a card, and the full text is one click away. */}
+                {c.result ? (
+                  <details className="mt-1.5 text-xs">
+                    <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                      {t("tasks.result")}
+                    </summary>
+                    <div className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-chip bg-surface-2 p-2 text-muted-foreground">
+                      {c.result}
+                    </div>
+                  </details>
+                ) : null}
                 <div className="mt-1.5 flex items-center gap-1 opacity-0 focus-within:opacity-100 group-hover/card:opacity-100">
                   <select
                     className="field h-6 flex-1 px-1 text-xs"

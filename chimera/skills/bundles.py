@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -115,8 +116,48 @@ def bundles_root(home: Path) -> Path:
 # Fetching
 
 
+#: Attempts per file, and the pause between them.
+#:
+#: A skill is N files and every one is a separate connection, so a link that drops a fraction of
+#: them does not fail a fraction of installs — it fails almost all of the big ones. Measured on one
+#: real machine: `raw.githubusercontent.com` reset 17% of connections while `api.github.com` reset
+#: none, which is 83% of installs succeeding at one file and 23% at eight. The 54-file skill in this
+#: catalogue had no chance at all, and the error told the user their network was unreachable, which
+#: was true of that one connection and not of anything they could act on.
+#:
+#: Only transport failures are retried. A 404 will be a 404 next time, and repeating a 403 spends
+#: the same anonymous budget that caused it.
+FETCH_ATTEMPTS = 3
+FETCH_BACKOFF_S = 0.4
+
+
 def _get(url: str, *, accept: str = "application/vnd.github+json",
          limit: int = MAX_FILE_BYTES) -> bytes:
+    """One bounded GET against an allowlisted host, retried on a dropped connection."""
+    ultima: BundleError | None = None
+    for tentativa in range(FETCH_ATTEMPTS):
+        try:
+            return _get_once(url, accept=accept, limit=limit)
+        except _TransportError as exc:
+            ultima = BundleError(
+                f"could not reach the source after {FETCH_ATTEMPTS} attempts: {exc.original}"
+            )
+            if tentativa < FETCH_ATTEMPTS - 1:
+                time.sleep(FETCH_BACKOFF_S * (tentativa + 1))
+    assert ultima is not None  # the loop runs at least once
+    raise ultima
+
+
+class _TransportError(Exception):
+    """A connection that failed in a way another attempt might survive. Never leaves this module."""
+
+    def __init__(self, original: Exception) -> None:
+        super().__init__(str(original))
+        self.original = original
+
+
+def _get_once(url: str, *, accept: str = "application/vnd.github+json",
+              limit: int = MAX_FILE_BYTES) -> bytes:
     """One bounded GET against an allowlisted host."""
     from urllib.parse import urlparse
 
@@ -153,8 +194,13 @@ def _get(url: str, *, accept: str = "application/vnd.github+json",
                 "downloads. Try again later, or set GITHUB_TOKEN."
             ) from exc
         raise BundleError(f"the source answered {exc.code}") from exc
-    except Exception as exc:  # noqa: BLE001 -- surfaced with the URL that failed
-        raise BundleError(f"could not reach the source: {exc}") from exc
+    except BundleError:
+        raise
+    except Exception as exc:  # noqa: BLE001 -- the caller decides whether to try again
+        # Transport, not protocol: a reset connection, a DNS blip, a timeout. `_get` retries these
+        # and turns the last one into a BundleError; anything above this line is an answer the
+        # server gave, and answers do not change on a second ask.
+        raise _TransportError(exc) from exc
 
 
 def _tree(repo: str, path: str, ref: str) -> list[dict[str, Any]]:

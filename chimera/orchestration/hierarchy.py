@@ -99,10 +99,27 @@ _SYNTH_SYSTEM = (
 )
 
 # Write/edit intent markers -> sequential_write (multi-agent parallelism loses here).
+#
+# The Portuguese half was written in the imperative-formal register a spec is written in — "escreva",
+# "implemente", "modifique" — and people do not talk to an app that way. "faz um site pra minha
+# padaria" carries no marker at all, so the commonest kind of request in the language the interface
+# defaults to was classified as a READ and sent to be split across parallel workers that cannot
+# write. The forms below are the ones people actually type: first person ("quero", "preciso"),
+# spoken imperative ("faz", "monta"), and the polite imperative already here.
+#
+# Deliberately not stemming: a substring rule is what the English half uses, and "cria" matching
+# inside "criatura" is a mistake that sends one read task down the write path, while missing "faz"
+# sends every spoken request down the wrong one. The costs are not symmetric.
 _WRITE_MARKERS = (
     "write ", "create ", "edit ", "modify ", "fix ", "refactor", "implement",
     "delete ", "rename ", "install ", "deploy", "commit", "patch ",
     "escreva", "crie ", "edite", "modifique", "corrija", "implemente", "instale",
+    # spoken imperative
+    "faz ", "faça", "cria ", "monta", "monte", "gera ", "gere ", "muda ", "mude",
+    "arruma", "arrume", "ajusta", "ajuste", "adiciona", "adicione", "apaga", "apague",
+    "remove ", "remova", "refatora", "refatore", "renomeia", "renomeie", "instala ",
+    # first person: the way a request usually opens
+    "quero ", "preciso ", "gostaria de ", "me faz", "me faça", "pode fazer", "pode criar",
 )
 _READ_MARKERS = (
     "research", "compare", "summarize", "summarise", "analyze", "analyse", "review ",

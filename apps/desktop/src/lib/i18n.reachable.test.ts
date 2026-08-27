@@ -29,6 +29,7 @@ const DYNAMIC = [
   "catalog.reason.",
   "catalog.state.",
   "fusion.aggregation.",
+  "code.chat.example.",
   "code.posture.approval.",
   "code.posture.reach.",
   "code.posture.saysPause.",
