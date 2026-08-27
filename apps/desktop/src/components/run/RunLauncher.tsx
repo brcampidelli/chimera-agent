@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Play, Square } from "lucide-react";
+import { ListChecks, Loader2, Play, Square } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { PausedRunCard } from "@/components/run/PausedRunCard";
 import { focusRing } from "@/components/ui/focus";
 import { NO_OVERRIDE, RolesBar, toRoleModels, type RoleOverride } from "@/components/code/RolesBar";
-import { getPausedRuns, type Profile, type RunEvent } from "@/lib/api";
+import { getPlan, getPausedRuns, type Profile, type RunEvent } from "@/lib/api";
 import { useRunSession } from "@/lib/run-session";
 import { useT, type TFunc } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -39,6 +39,16 @@ export function RunLauncher({
   const run = useRunSession();
   const [task, setTask] = useState("");
   const [verify, setVerify] = useState("");
+  // The plan the user has read, and possibly rewritten. Empty means "plan for yourself", which is
+  // what every run did before this and still does when nobody asks to see it first.
+  const [plan, setPlan] = useState("");
+  const [planning, setPlanning] = useState(false);
+  const [planNote, setPlanNote] = useState("");
+  // Whether the panel is open, which is NOT the same as whether it has text in it. Deriving the
+  // panel from the content meant that clearing the box to rewrite the plan made the box disappear
+  // mid-edit — found by a test that tried to do exactly that. Opening is asking; closing is
+  // Discard.
+  const [planOpen, setPlanOpen] = useState(false);
   const [ws, setWs] = useState("");
   const [maxAttempts, setMaxAttempts] = useState(3);
   const [pauseOnTaint, setPauseOnTaint] = useState(false);
@@ -72,6 +82,10 @@ export function RunLauncher({
     profile,
     roles: toRoleModels(roles),
     profile_source: touched ? "user" : "system",
+    // The plan the user approved, verbatim. `RunRequest.plan` makes the run follow these exact
+    // steps and skip planning entirely — so a correction made here is a correction the run cannot
+    // undo by re-planning around it.
+    plan: plan.trim() || null,
   });
 
   function start() {
@@ -80,6 +94,30 @@ export function RunLauncher({
     // an unthreaded run is the cheaper, unchanged path.
     const threadId = pauseOnTaint ? `run-${Date.now().toString(36)}` : null;
     run.start(request(threadId), { onDone: invalidate });
+  }
+
+  /** Ask what it intends to do, before it does any of it.
+   *
+   *  One tool-free model call. Nothing is written, nothing is run, and the steps come back as text
+   *  the user can rewrite — which is the only moment in a run where a correction costs nothing.
+   *  After the first edit the whole run follows the human's version.
+   */
+  async function preview() {
+    if (!task.trim() || planning || running) return;
+    setPlanning(true);
+    setPlanNote("");
+    setPlanOpen(true);
+    try {
+      const p = await getPlan(task.trim(), workspace ?? (ws.trim() || null));
+      setPlan(p.text || "");
+      // The endpoint degrades to an empty plan with a note rather than failing, so an empty answer
+      // needs a sentence: a blank box would read as "it plans to do nothing".
+      if (!p.text) setPlanNote(p.note || t("runs.plan.empty"));
+    } catch {
+      setPlanNote(t("runs.plan.failed"));
+    } finally {
+      setPlanning(false);
+    }
   }
 
   /** Carry out a recorded verdict. Recording it did not conclude the run — this does. */
@@ -112,6 +150,36 @@ export function RunLauncher({
         onChange={(e) => setTask(e.target.value)}
         disabled={running}
       />
+      {planOpen ? (
+        <div className="space-y-1.5 rounded-chip border border-accent/40 bg-accent/5 p-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-medium">{t("runs.plan.title")}</span>
+            <button
+              type="button"
+              className={cn("text-xs text-muted-foreground hover:text-foreground", focusRing)}
+              onClick={() => {
+                setPlan("");
+                setPlanNote("");
+                setPlanOpen(false);
+              }}
+              disabled={running}
+            >
+              {t("runs.plan.discard")}
+            </button>
+          </div>
+          {planNote ? <p className="text-xs text-warn-foreground">{planNote}</p> : null}
+          {/* Editable, which is the entire point. A plan you can only approve is a plan you can
+              only agree with, and the person reading it is the one who knows what was left out. */}
+          <textarea
+            className={cn(fieldCls, "min-h-[96px] resize-y py-2 font-mono text-xs")}
+            aria-label={t("runs.plan.title")}
+            value={plan}
+            onChange={(e) => setPlan(e.target.value)}
+            disabled={running}
+          />
+          <p className="text-xs text-muted-foreground">{t("runs.plan.hint")}</p>
+        </div>
+      ) : null}
       <input
         className={cn(fieldCls, "h-9 font-mono text-xs")}
         placeholder={t("runs.verifyPlaceholder")}
@@ -162,6 +230,25 @@ export function RunLauncher({
             disabled={running}
           />
         </label>
+        {/* Beside Run rather than instead of it. Someone who knows what they want should not have
+            to click twice, and someone who does not should not have to find out by watching files
+            change. The label says what it costs: one call, no tools, nothing written. */}
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!task.trim() || running || planning}
+          onClick={() => void preview()}
+        >
+          {planning ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" /> {t("runs.plan.working")}
+            </>
+          ) : (
+            <>
+              <ListChecks className="h-4 w-4" /> {t("runs.plan.show")}
+            </>
+          )}
+        </Button>
         <Button size="sm" disabled={!task.trim() || running} onClick={start}>
           {running ? (
             <>

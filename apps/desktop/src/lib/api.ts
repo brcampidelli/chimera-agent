@@ -158,6 +158,22 @@ export const getUsage = () => json<UsageSummary>("/api/usage");
 // caller with no project selected means and what this endpoint has always done.
 export const getRuns = (workspace?: string) =>
   json<RunReceipt[]>(`/api/runs${workspace ? `?workspace=${encodeURIComponent(workspace)}` : ""}`);
+/** What the agent intends to do, before it does any of it.
+ *
+ *  One tool-free model call: no edits, no tools, nothing touches the workspace. The steps come back
+ *  as text so a person can read them, change them, and hand the corrected version to the run —
+ *  `RunRequest.plan` executes an approved plan verbatim instead of planning again.
+ *
+ *  This helper existed once and was deleted for having no caller, which was the honest thing to do
+ *  at the time: the capability was on the server, documented, typed, and reachable from nothing.
+ *  It comes back with the button that uses it.
+ */
+export const getPlan = (task: string, workspace?: string | null) =>
+  json<{ steps: string[]; text: string; note: string }>("/api/plan", {
+    method: "POST",
+    body: JSON.stringify({ task, workspace: workspace || null }),
+  });
+
 export const getGovernanceInjection = () =>
   json<InjectionReport>("/api/governance/injection");
 export const getGovernanceAudit = () => json<GovernanceAudit>("/api/governance/audit");
