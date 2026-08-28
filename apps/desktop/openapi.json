@@ -7001,6 +7001,11 @@
             "title": "Repo Map",
             "type": "boolean"
           },
+          "require_diff": {
+            "default": false,
+            "title": "Require Diff",
+            "type": "boolean"
+          },
           "requirements": {
             "anyOf": [
               {

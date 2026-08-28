@@ -60,6 +60,7 @@ export function RunLauncher({
   const [knowsRepo, setKnowsRepo] = useState(false);
   const [genTests, setGenTests] = useState(false);
   const [replan, setReplan] = useState(false);
+  const [requireDiff, setRequireDiff] = useState(false);
   const [ws, setWs] = useState("");
   const [maxAttempts, setMaxAttempts] = useState(3);
   const [pauseOnTaint, setPauseOnTaint] = useState(false);
@@ -104,6 +105,7 @@ export function RunLauncher({
     repo_map: knowsRepo,
     explorer: knowsRepo,
     replan,
+    require_diff: requireDiff,
     // Only where it replaces something weaker. With a verify command the tests already are the
     // ground truth, and with no reviewed checklist there is nothing to ground generation in — the
     // loop checks both itself, so sending it anyway is a no-op rather than a conflict, and the
@@ -378,6 +380,15 @@ export function RunLauncher({
             disabled={running}
           />
           {t("runs.seams.replan")}
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={requireDiff}
+            onChange={(e) => setRequireDiff(e.target.checked)}
+            disabled={running}
+          />
+          {t("runs.seams.requireDiff")}
         </label>
         {/* Beside Run rather than instead of it. Someone who knows what they want should not have
             to click twice, and someone who does not should not have to find out by watching files
