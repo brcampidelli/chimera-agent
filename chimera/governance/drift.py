@@ -16,6 +16,7 @@ a verifier: pass it to ``solve --verify`` to make the spec the executable ground
 
 from __future__ import annotations
 
+import contextlib
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -71,26 +72,80 @@ class DriftReport:
     results: list[RequirementResult]
 
 
-def _scannable(workspace: Path, skip: Path | None) -> Iterator[Path]:
+#: Extensions a spec can be written in. ``yaml.safe_load`` reads JSON too, so both are candidates.
+_SPEC_SUFFIXES = frozenset({".yaml", ".yml", ".json"})
+
+
+def _is_spec_shaped(data: object) -> bool:
+    """Whether a parsed document is a spec — decided by shape, not by filename.
+
+    Deliberately narrow: a name, a non-empty requirement list, and every entry carrying the two
+    fields the drift gate actually reads. A project's ordinary YAML does not look like this, and
+    excluding a file that is not a spec would weaken the scan rather than correct it.
+    """
+    if not isinstance(data, dict) or not isinstance(data.get("name"), str):
+        return False
+    requirements = data.get("requirements")
+    if not isinstance(requirements, list) or not requirements:
+        return False
+    return all(isinstance(r, dict) and "check" in r and "target" in r for r in requirements)
+
+
+def _spec_files(workspace: Path, source: Path | None) -> frozenset[Path]:
+    """Every file under ``workspace`` that is ITSELF a spec, plus ``source`` wherever it lives.
+
+    Skipping only the spec being checked was half a fix. A spec repeats, in its ``text`` and
+    ``target`` fields, the very words its ``contains`` regexes look for, so any spec left in the
+    folder is evidence for itself. Measured: with one spec the guard reports 0/5 satisfied on an
+    empty project, and **copying that spec to a second filename takes it to 5/5, aligned**, with
+    still not a line of code written. That second file is not hypothetical — the drafting flow
+    derives the filename from the project slug, so redrafting with a slightly different name
+    produces it through the ordinary path.
+
+    Shape, not filename, because a rule that trusts the name is a rule an unlucky rename defeats.
+    """
+    import yaml
+
+    found: set[Path] = set()
+    if source is not None:
+        with contextlib.suppress(OSError):
+            found.add(source.resolve())
+    for path in workspace.rglob("*"):
+        if path.is_dir() or path.suffix.lower() not in _SPEC_SUFFIXES:
+            continue
+        if any(part in _IGNORE_DIRS for part in path.relative_to(workspace).parts):
+            continue
+        try:
+            if path.stat().st_size > _MAX_FILE_BYTES:
+                continue
+            data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, yaml.YAMLError):
+            continue
+        if _is_spec_shaped(data):
+            with contextlib.suppress(OSError):
+                found.add(path.resolve())
+    return frozenset(found)
+
+
+def _scannable(workspace: Path, skip: frozenset[Path]) -> Iterator[Path]:
     """Every file the checks are allowed to read. One place, so ``skip`` cannot be honoured by one
     check and forgotten by another — the positive and negative scans disagreeing about what counts
     as evidence would be worse than either rule alone."""
-    ignore = skip.resolve() if skip else None
     for path in workspace.rglob("*"):
         if path.is_dir():
             continue
         if any(part in _IGNORE_DIRS for part in path.relative_to(workspace).parts):
             continue
-        if ignore is not None:
+        if skip:
             try:
-                if path.resolve() == ignore:
+                if path.resolve() in skip:
                     continue
             except OSError:
                 pass
         yield path
 
 
-def _iter_text(workspace: Path, skip: Path | None = None) -> Iterator[str]:
+def _iter_text(workspace: Path, skip: frozenset[Path] = frozenset()) -> Iterator[str]:
     for path in _scannable(workspace, skip):
         try:
             if path.stat().st_size > _MAX_FILE_BYTES:
@@ -100,12 +155,12 @@ def _iter_text(workspace: Path, skip: Path | None = None) -> Iterator[str]:
             continue
 
 
-def _present(workspace: Path, pattern: str, skip: Path | None = None) -> bool:
+def _present(workspace: Path, pattern: str, skip: frozenset[Path] = frozenset()) -> bool:
     regex = re.compile(pattern)
     return any(regex.search(text) for text in _iter_text(workspace, skip))
 
 
-def _scan_absent(workspace: Path, pattern: str, skip: Path | None = None) -> tuple[bool, list[str]]:
+def _scan_absent(workspace: Path, pattern: str, skip: frozenset[Path] = frozenset()) -> tuple[bool, list[str]]:
     """For a negative (``absent``) check: return (pattern_found, unscannable_files).
 
     ``_iter_text`` silently skips oversized (> 1 MB) and undecodable files. For a POSITIVE check
@@ -166,12 +221,12 @@ def _defines_pattern(name: str) -> re.Pattern[str]:
     )
 
 
-def _defined(workspace: Path, name: str, skip: Path | None = None) -> bool:
+def _defined(workspace: Path, name: str, skip: frozenset[Path] = frozenset()) -> bool:
     regex = _defines_pattern(name)
     return any(regex.search(text) for text in _iter_text(workspace, skip))
 
 
-def _check(requirement: Requirement, workspace: Path, skip: Path | None = None) -> tuple[bool, str]:
+def _check(requirement: Requirement, workspace: Path, skip: frozenset[Path] = frozenset()) -> tuple[bool, str]:
     if requirement.check == "defines":
         ok = _defined(workspace, requirement.target, skip)
         return ok, "" if ok else f"'{requirement.target}' is not defined"
@@ -200,10 +255,13 @@ def _check(requirement: Requirement, workspace: Path, skip: Path | None = None) 
 def check_drift(spec: Spec, workspace: Path) -> DriftReport:
     """Check the workspace against the spec; ``aligned`` is False if anything drifted."""
     root = Path(workspace).resolve()
+    # Computed ONCE per report, not per requirement: it walks the tree and parses candidates, and
+    # every check below asks the same question about the same files.
+    skip = _spec_files(root, spec.source)
     results: list[RequirementResult] = []
     aligned = True
     for requirement in spec.requirements:
-        ok, detail = _check(requirement, root, spec.source)
+        ok, detail = _check(requirement, root, skip)
         results.append(RequirementResult(requirement.id, ok, detail))
         if requirement.required and not ok:
             aligned = False
