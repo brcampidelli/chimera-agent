@@ -589,6 +589,21 @@ class AutonomousAgent:
             for part in (spine, repo_ctx, lessons, card_ctx, facts_ctx, playbook_ctx, requirements_ctx)
             if part
         )
+        #: What the JUDGE is allowed to hold the work to — the agreed criteria, and nothing else.
+        #:
+        #: The worker's context and the reviewer's used to be the same string, and that turned
+        #: everything advisory into something enforceable. Measured on a real run: a globally-scoped
+        #: memory fact naming another project's path ("the Cafe Aurora test project lives in
+        #: Desktop/teste-chimera/…") reached the reviewer, which then failed a run for not putting
+        #: that path in a README nobody had asked to contain it. The attempt's own diff proves the
+        #: file was written; verify-or-revert then deleted it, and with one attempt there was no
+        #: retry. Correct work destroyed on a criterion nobody agreed to.
+        #:
+        #: `requirements_ctx` stays because it IS the agreement — a checklist somebody read and
+        #: edited before the run. Everything else is material for the worker to USE: recalled facts,
+        #: distilled lessons, skill cards, the playbook, the repository map, file bodies read before
+        #: the work. Useful to think with; not a contract to be judged against.
+        judge_context = requirements_ctx
         # how many times this task pattern has already succeeded / failed (before this
         # run) — the recurrence signals that gate auto-skill-evolution (a pattern card on
         # recurring success, an anti-pattern card on recurring failure)
@@ -731,7 +746,7 @@ class AutonomousAgent:
             probe_proxy: bool | None = None
             proxy_fb = ""
             if self.probe_log is not None and self.manager is not None:
-                probe_proxy, proxy_fb = self._review(task, answer, context)
+                probe_proxy, proxy_fb = self._review(task, answer, judge_context)
             if verifier_active:
                 ok = verified
                 if verified:
@@ -739,9 +754,9 @@ class AutonomousAgent:
                 elif probe_proxy is not None:
                     approved, fb = probe_proxy, proxy_fb
                 else:
-                    approved, fb = self._review(task, answer, context)
+                    approved, fb = self._review(task, answer, judge_context)
             else:
-                approved, fb = self._review(task, answer, context)
+                approved, fb = self._review(task, answer, judge_context)
                 ok = approved
             # Record the paired observation for PROBE: arm = which worker ran, proxy = the cheap
             # manager verdict, reward = the verified outcome (only with a real verifier + manager).
