@@ -175,6 +175,31 @@ You could not choose which model answered you. The endpoint accepted one all alo
   exception, so the wait is bounded and the waiter is a daemon. Unattended, the refusal is the
   documented `ask` behaviour and says how to proceed; in the Code screen, choosing the
   workspace-and-shell reach ungates it as it always did.
+- **`--gen-tests` threw the work away on any machine without pytest, and the receipt blamed a test.**
+  Asked for a file with a function in it, the run wrote the file, generated a test for it, and came
+  back `verified: false · reverted: true · evidence: "verifier"` over
+  `python.exe: No module named pytest`. `python -m pytest` with no pytest installed exits **1** —
+  the same code every runner uses for "your tests failed" — so the 5/127 no-verdict codes never saw
+  it, and `program_missing` correctly answered that the *binary* was there. It is the same class of
+  bug the 127 handling exists to prevent, arriving through the `-m` door. The message is matched
+  here, where it was rightly refused for `cmd.exe`, because it comes from Python's own runpy rather
+  than a localised shell — and only in its unquoted form, so a traceback from code under test
+  failing to import stays a failure. **A second defect sat on top of it:** `SpecTestVerifier` wrapped
+  the runner's result and dropped `abstained`, so fixing only the first would have turned a wrong
+  failure into a confident wrong pass, `evidence: "verifier"` and all. The audience is the point —
+  spec-test generation exists for the person who is not a Python developer, so "pytest is not
+  installed" is the expected state of their machine, not an edge case.
+- **Two specs in a folder, and the project passed with nothing built.** The drift gate searches every
+  `contains` regex across every text file, and a spec repeats in its own `text` and `target` fields
+  the words those regexes look for — so a spec sitting in the folder it judges is evidence for
+  itself. That was found and fixed by excluding the spec being checked. Only that one file: measured
+  on an empty folder, one spec reports **0/5 satisfied**, and the same spec copied to a second
+  filename reports **5/5, aligned**. Nor is the second file hypothetical — the drafting flow derives
+  the filename from the project slug, so changing your mind about the name produces it through the
+  ordinary path. Now a file that is itself a spec is never evidence that a spec is satisfied,
+  decided by shape rather than filename, because a rule that trusts the name is a rule a rename
+  defeats. Ordinary project YAML is still scanned: a gate that excluded too much would be
+  unsatisfiable, which is not a stricter gate but a broken one.
 - **The agent's root was the app's own install folder.** `read_file(".env")` returned
   `OPENROUTER_API_KEY=sk-or-v1-…` in full. Not a sandbox failure — a path outside the root is still
   refused — the root itself was the folder holding the key. `resolve_app_workspace` falls back to
