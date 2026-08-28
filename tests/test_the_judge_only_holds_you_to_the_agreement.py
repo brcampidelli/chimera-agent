@@ -37,13 +37,34 @@ def test_the_reviewer_is_given_the_judge_context() -> None:
     verifier-failed path and the no-verifier path — and one left on the worker's context is a leak
     that only shows up on whichever branch nobody exercised."""
     source = _run_source()
-    assert source.count("self._review(task, answer, judge_context)") == 3
+    # `attempt_judge_context` is `judge_context` plus what THIS attempt changed on disk — the
+    # agreement, plus evidence about the answer. The name changed when the diff was added; the
+    # property did not, and the assertion that matters is the negative one below.
+    assert source.count("self._review(task, answer, attempt_judge_context)") == 3
     assert "self._review(task, answer, context)" not in source
+    assert "self._review(task, answer, judge_context)" not in source
 
 
 def test_the_judge_context_is_the_agreement_and_nothing_else() -> None:
     source = _run_source()
     assert "judge_context = requirements_ctx" in source
+
+
+def test_what_the_attempt_changed_is_added_as_evidence_not_as_a_criterion() -> None:
+    """The one thing allowed to join the agreement, and why it is not a widening of it.
+
+    A recalled fact from another project can make something enforceable that nobody agreed to —
+    that is the leak this file exists for. A diff cannot: it describes what the answer is a claim
+    ABOUT, so it can only stop the reviewer being wrong about whether the work happened. Which it
+    was, on the shipped build, five times out of five, while the receipt beside it read
+    ``diff_productive: true``.
+    """
+    source = _run_source()
+    assert "attempt_judge_context = (" in source
+    line = source[source.index("attempt_judge_context = (") :][:400]
+    assert "judge_context" in line and "evidence_ctx" in line
+    for advisory in ("facts_ctx", "card_ctx", "playbook_ctx", "repo_ctx", "lessons"):
+        assert advisory not in line, f"{advisory} rejoined the judge through the evidence line"
 
 
 def test_the_worker_still_gets_everything() -> None:

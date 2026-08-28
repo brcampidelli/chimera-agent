@@ -297,6 +297,11 @@ class AutonomousResult:
     stopped_reason: str = ""  # why the loop ended early; "cancelled" on a cooperative stop, else ""
 
 
+#: Char budget for the diff bodies handed to the reviewer. Enough to show what a small edit did
+#: without turning every review into a second copy of the repository.
+_JUDGE_DIFF_CHARS = 4000
+
+
 class AutonomousAgent:
     """Runs a task autonomously with planning, supervision and verify-or-revert."""
 
@@ -741,13 +746,86 @@ class AutonomousAgent:
             # authoritative — treat this attempt as if there were no verifier, so the Manager review
             # and the coverage checklist still run instead of accepting on an empty non-block.
             verifier_active = self.verifier is not None and not abstained
+
+            # MOVED UP, ahead of the review. It used to be computed after every gate had already
+            # voted, which left the reviewer judging the answer's PROSE with no way to know what
+            # the attempt did to the disk. Nothing between here and the old position writes to the
+            # workspace — the contract, the coverage checklist and the strong verifier all read
+            # text — so the numbers are identical. They are simply available in time to be
+            # evidence instead of only a description.
+            # Diff-gate (nanobot "Dream"): certify what the attempt *actually* changed from the
+            # real workspace snapshot, BEFORE any revert — the machine truth, not the model's claim.
+            # Computed BEFORE the Attempt is finalized so --require-diff can act on it: the gate has to
+            # be able to fail the attempt, not just describe it after the verdict is already sealed.
+            diff_productive: bool | None = None
+            diff_summary: str | None = None
+            diffs: list[FileDiff] = []
+            if snapshot is not None and self.guard is not None:
+                from chimera.evolution.diff_gate import diff_snapshots, unified_diffs
+
+                after = self.guard.snapshot()  # one capture feeds both the summary and the per-file diffs
+                last_after = after  # remember for --keep-workspace (restored after the loop if it fails)
+                # `--gen-tests` writes its test file INTO the workspace, and it does so between the
+                # two snapshots (`_verify()` runs above). Left in, the verifier's own artifact counts
+                # as the run's work: `is_productive` becomes True on every attempt, so `--require-diff`
+                # — the gate that exists because SWE-bench run 1 returned 11/19 empty patches — can
+                # never fire while tests are being generated. With `--diff-feedback` it is worse than
+                # inert: the retry is handed the test file under "you already tried this and FAILED",
+                # feedback about an edit the model did not make.
+                after = _without_verifier_artifacts(after)
+                pdiff = diff_snapshots(snapshot, after)
+                diff_productive = pdiff.is_productive
+                diff_summary = pdiff.audit_summary()
+                diffs = unified_diffs(snapshot, after)  # real diffs, BEFORE any revert below
+
+            # What the attempt actually did, handed to the reviewer as EVIDENCE.
+            #
+            # The reviewer receives `(task, answer, context)` and has never seen the diff, the
+            # transcript or a single file — a fact tests/test_success_gate.py had already written
+            # down without drawing the consequence. Measured on rc39: four runs, five attempts,
+            # five rejections, every one for work the receipt's own `diff_summary` proves was done.
+            # One verbatim, "the README.md must be physically created, not merely described as
+            # created", on an attempt whose receipt reads `diff: +1 new (README.md)` and
+            # `diff_productive: true`. Under verify-or-revert the file was then deleted, and the
+            # failure was distilled into a permanent anti-pattern card — so the hallucination
+            # outlived the run that produced it.
+            #
+            # This is evidence, NOT a criterion, and that distinction is the whole point of the
+            # narrowing above: a recalled fact from another project can make something enforceable
+            # that nobody agreed to, while a diff can only describe what the answer is a claim
+            # ABOUT. It cannot add a requirement; it can only stop the reviewer being wrong about
+            # whether the work happened.
+            evidence_ctx = ""
+            if diff_summary:
+                bodies: list[str] = []
+                budget = _JUDGE_DIFF_CHARS
+                for file_diff in diffs:
+                    if budget <= 0:
+                        break
+                    body = file_diff.patch[:budget]
+                    budget -= len(body)
+                    bodies.append("--- " + file_diff.path + "\n" + body)
+                evidence_ctx = (
+                    "<<what-this-attempt-changed-on-disk>>\n"
+                    + diff_summary
+                    + "\n"
+                    + "\n".join(bodies)
+                    + "\n<<end>>"
+                )
+            # No branch for "measured and nothing changed": `audit_summary()` already says
+            # `diff: no productive change`, so that case arrives through the line above with the
+            # distinction intact. A second branch for it would have been dead code — written, and
+            # caught by the test that asserted the wrong sentence.
+            attempt_judge_context = (
+                (judge_context + "\n\n" + evidence_ctx).strip() if evidence_ctx else judge_context
+            )
             # PROBE proxy (M18-5): in probe mode compute the cheap manager judgment even on a passing
             # attempt, so the logged (proxy, reward) pair is unbiased; reused below → no extra call.
             probe_proxy: bool | None = None
             proxy_fb = ""
             proxy_abstained = False
             if self.probe_log is not None and self.manager is not None:
-                probe_proxy, proxy_fb, proxy_abstained = self._review(task, answer, judge_context)
+                probe_proxy, proxy_fb, proxy_abstained = self._review(task, answer, attempt_judge_context)
             # Whether a manager actually judged THIS attempt, as opposed to being configured. Only
             # a real judgment may be named as one in the receipt below.
             review_abstained = True
@@ -760,9 +838,9 @@ class AutonomousAgent:
                 elif probe_proxy is not None:
                     approved, fb, review_abstained = probe_proxy, proxy_fb, proxy_abstained
                 else:
-                    approved, fb, review_abstained = self._review(task, answer, judge_context)
+                    approved, fb, review_abstained = self._review(task, answer, attempt_judge_context)
             else:
-                approved, fb, review_abstained = self._review(task, answer, judge_context)
+                approved, fb, review_abstained = self._review(task, answer, attempt_judge_context)
                 # An abstaining reviewer is the only gate here and just declined to be one. Letting
                 # `ok` ride on it would decide the attempt on a non-answer; the contract, coverage
                 # and diff gates below still run and can still fail it.
@@ -824,31 +902,6 @@ class AutonomousAgent:
                         "result is likely wrong or incomplete. Reconsider and fix it."
                     )
                     fb = f"{fb}\n\n{detail}" if fb else detail
-
-            # Diff-gate (nanobot "Dream"): certify what the attempt *actually* changed from the
-            # real workspace snapshot, BEFORE any revert — the machine truth, not the model's claim.
-            # Computed BEFORE the Attempt is finalized so --require-diff can act on it: the gate has to
-            # be able to fail the attempt, not just describe it after the verdict is already sealed.
-            diff_productive: bool | None = None
-            diff_summary: str | None = None
-            diffs: list[FileDiff] = []
-            if snapshot is not None and self.guard is not None:
-                from chimera.evolution.diff_gate import diff_snapshots, unified_diffs
-
-                after = self.guard.snapshot()  # one capture feeds both the summary and the per-file diffs
-                last_after = after  # remember for --keep-workspace (restored after the loop if it fails)
-                # `--gen-tests` writes its test file INTO the workspace, and it does so between the
-                # two snapshots (`_verify()` runs above). Left in, the verifier's own artifact counts
-                # as the run's work: `is_productive` becomes True on every attempt, so `--require-diff`
-                # — the gate that exists because SWE-bench run 1 returned 11/19 empty patches — can
-                # never fire while tests are being generated. With `--diff-feedback` it is worse than
-                # inert: the retry is handed the test file under "you already tried this and FAILED",
-                # feedback about an edit the model did not make.
-                after = _without_verifier_artifacts(after)
-                pdiff = diff_snapshots(snapshot, after)
-                diff_productive = pdiff.is_productive
-                diff_summary = pdiff.audit_summary()
-                diffs = unified_diffs(snapshot, after)  # real diffs, BEFORE any revert below
 
             # --require-diff: for a code task, an answer that changed nothing is not a success, however
             # convincing its prose. Without this the diff-gate is a passive observer — with no verifier
