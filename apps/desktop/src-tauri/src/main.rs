@@ -366,6 +366,14 @@ fn start_sidecar(paths: &Paths, wanted: u16, budget: Budget) -> Result<Backend, 
         .arg(&port_file)
         .env("CHIMERA_HOME", data_dir.join("data"))
         .env("CHIMERA_WORKSPACE", &workspace_dir)
+        // The backend inherits no stdin, because there is nobody on the other end of it. Inherited,
+        // and combined with the CREATE_NO_WINDOW below, Windows hands the child a console with no
+        // window: `isatty()` reports a terminal, the host-exec gate believes it, and the first
+        // command the agent chose to run blocks on a confirmation prompt drawn where no human can
+        // see it — permanently, cancel included. The backend now also declares this for itself, and
+        // both halves stay: this one makes the file descriptor tell the truth, that one makes the
+        // answer independent of the file descriptor.
+        .stdin(Stdio::null())
         .stderr(Stdio::piped());
     hide_console(&mut cmd);
     let mut child = cmd

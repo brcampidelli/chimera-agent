@@ -35,6 +35,23 @@ def _model_provider_keys() -> list[str]:
 
 
 @pytest.fixture(autouse=True)
+def _nobody_has_declared_the_terminal_dead() -> Iterator[None]:
+    """Clear the process-wide "no human here" flag between tests.
+
+    ``build_api_app`` sets it, and it is deliberately process-wide — the fact it records is a fact
+    about the process. That makes it leak across tests in one session, and the leak is silent and
+    directional: every test after the first API test would see the headless answer. The TTY
+    auto-detection tests assert the *interactive* one, so without this they pass or fail on
+    collection order, which is the kind of failure that shows up in CI and nowhere else.
+    """
+    import chimera.sandbox.confirm as confirm_mod
+
+    confirm_mod._no_human_surface = None
+    yield
+    confirm_mod._no_human_surface = None
+
+
+@pytest.fixture(autouse=True)
 def _no_dotenv(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     config = dict(Settings.model_config)
     config["env_file"] = None
