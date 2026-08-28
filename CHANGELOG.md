@@ -135,6 +135,26 @@ You could not choose which model answered you. The endpoint accepted one all alo
 
 ### Fixed — found by installing each release candidate and using it
 
+- **The installed app stopped forever the first time the agent chose to run a command.** Not slow —
+  stopped: no frame, no error, no timeout, and `cancel` answering `{"ok": true}` indefinitely about a
+  run that could not be stopped. Three threads of the shipped build were parked in `typer.confirm`,
+  reading a stdin nobody was writing to. The host-exec gate decides between asking and refusing with
+  `sys.stdin.isatty()`, and the desktop shell spawns the frozen sidecar under `CREATE_NO_WINDOW` —
+  which Windows honours by giving the child a console **with no window**. stdin is a character
+  device, `isatty()` says yes, and there is no one there. So the gate drew a confirmation prompt
+  where no human could see it and waited for an answer that could never come. Reachable from the
+  Code screen, `/api/runs`, the lifecycle screen and every cron job. Present since the console was
+  hidden, roughly thirty-five releases ago, and the first thing a new user hits.
+  **`code_api.py` had already written the correct invariant down** — *"this surface has no terminal,
+  so its `ask` has always been a refusal"* — while the code went on inferring it from a file
+  descriptor and getting the opposite answer: a comment asserting what the code did not do. Three
+  things now hold instead. Serving HTTP declares that no human is present, once, at the top of
+  `build_api_app`, so no surface has to remember. The desktop shell hands the backend
+  `Stdio::null()`, so the file descriptor stops lying. And a prompt that is somehow still reached
+  can no longer block forever — `except Exception` never caught this, because blocking is not an
+  exception, so the wait is bounded and the waiter is a daemon. Unattended, the refusal is the
+  documented `ask` behaviour and says how to proceed; in the Code screen, choosing the
+  workspace-and-shell reach ungates it as it always did.
 - **`--gen-tests` threw the work away on any machine without pytest, and the receipt blamed a test.**
   Asked for a file with a function in it, the run wrote the file, generated a test for it, and came
   back `verified: false · reverted: true · evidence: "verifier"` over

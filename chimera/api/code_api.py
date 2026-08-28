@@ -447,8 +447,13 @@ def assemble_registry(
 
     # Whether a mounted shell tool may run on the host, decided per request rather than only per
     # install. `resolve_host_exec_confirm` answers None for "no gate", a refusal for `deny`, and a
-    # terminal prompt for `ask` — and this surface has no terminal, so its `ask` has always been a
-    # refusal. Passing None is what lets a project someone opened commands for actually run them.
+    # terminal prompt for `ask` — and this surface has no terminal, so its `ask` resolves to a
+    # refusal. That last clause used to be a claim rather than a fact: the resolver decided from
+    # `sys.stdin.isatty()`, which in the packaged desktop reports a terminal (a console with no
+    # window, courtesy of CREATE_NO_WINDOW), so `ask` drew a prompt nobody could see and blocked
+    # this request thread forever. `declare_no_human_here`, called once in `build_api_app`, is what
+    # makes the sentence true. Passing None is what lets a project someone opened commands for
+    # actually run them.
     #
     # BOTH locks, and never against the owner's `deny`. The reach lock is read from the resolved
     # posture rather than from the reach string: `deny_tools` is what actually removes the tools, so

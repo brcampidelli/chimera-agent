@@ -109,6 +109,7 @@ from chimera.core.agent import ToolActivity
 from chimera.core.events import AgentEvent, EventSink
 from chimera.interface import ChatSession
 from chimera.providers.gateway import SupportsComplete
+from chimera.sandbox.confirm import declare_no_human_here
 from chimera.telemetry import get_logger
 
 if TYPE_CHECKING:
@@ -434,6 +435,14 @@ def build_api_app(
     ``solve_agent_factory`` builds the per-run autonomous agent; it defaults to the real LLM-backed
     builder and is injectable so the run endpoint is testable without a provider (see tests).
     """
+    # Serving HTTP means the caller is a client, not somebody watching this process's terminal.
+    # Asking that terminal to approve a command a remote request wants to run would be the wrong
+    # question even if a person were there — and in the packaged desktop nobody is: the sidecar is
+    # spawned with CREATE_NO_WINDOW, gets a console with no window, and `isatty()` cheerfully says
+    # there is a terminal. Every host command then blocked its request thread on a prompt drawn
+    # where no one could see it. Declared here, once, so no surface has to remember.
+    declare_no_human_here("http api")
+
     settings_override = settings
     settings = settings or get_settings()
     workspace = (workspace or Path.cwd()).expanduser().resolve()
