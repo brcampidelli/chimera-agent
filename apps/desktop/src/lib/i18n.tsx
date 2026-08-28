@@ -444,6 +444,7 @@ const en: Dict = {
   "tasks.approvePlan": "Approve plan",
   "tasks.deny": "Deny",
   "tasks.specPath": "path to a spec file",
+  "orch.saving.cheaperModels": "More tokens, fewer dollars: the work went to cheaper models. Both numbers are right.",
   "registry.describe": "Describe one",
   "registry.designIt": "Design it",
   "registry.describePlaceholder": "what should this agent do? e.g. read my drafts and say what is weak, without changing anything",
@@ -875,7 +876,7 @@ const en: Dict = {
   "code.posture.saysPause.always": "Stops for your sign-off before finishing.",
   "code.posture.saysPause.tainted":
     "Stops for your sign-off if it read untrusted content.",
-  "code.posture.saysPause.never": "Never stops to ask.",
+  "code.posture.saysPause.never": "Never pauses for your sign-off.",
   "code.posture.fellBack":
     "A container was configured, but none is running — this is your machine.",
   "code.posture.unguarded":
@@ -1685,6 +1686,7 @@ const pt: Dict = {
   "tasks.approvePlan": "Aprovar plano",
   "tasks.deny": "Negar",
   "tasks.specPath": "caminho de um arquivo de spec",
+  "orch.saving.cheaperModels": "Mais tokens, menos dinheiro: o trabalho foi para modelos mais baratos. Os dois números estão certos.",
   "registry.describe": "Descrever um",
   "registry.designIt": "Desenhar",
   "registry.describePlaceholder": "o que este agente deve fazer? ex.: ler meus rascunhos e dizer o que está fraco, sem mexer em nada",
@@ -2121,7 +2123,7 @@ const pt: Dict = {
   "code.posture.saysPause.always": "Para e espera seu aval antes de concluir.",
   "code.posture.saysPause.tainted":
     "Para e espera seu aval se tiver lido conteúdo não confiável.",
-  "code.posture.saysPause.never": "Nunca para para perguntar.",
+  "code.posture.saysPause.never": "Nunca para para pedir seu aval.",
   "code.posture.fellBack":
     "Um contêiner foi configurado, mas nenhum está rodando — esta é a sua máquina.",
   "code.posture.unguarded":
@@ -2938,6 +2940,7 @@ const es: Dict = {
   "tasks.approvePlan": "Aprobar plan",
   "tasks.deny": "Denegar",
   "tasks.specPath": "ruta a un archivo de spec",
+  "orch.saving.cheaperModels": "Más tokens, menos dinero: el trabajo fue a modelos más baratos. Ambos números son correctos.",
   "registry.describe": "Describir uno",
   "registry.designIt": "Diseñar",
   "registry.describePlaceholder": "¿qué debe hacer este agente? p. ej.: leer mis borradores y decir qué está flojo, sin tocar nada",
@@ -3379,7 +3382,7 @@ const es: Dict = {
     "Se detiene y espera tu visto bueno antes de terminar.",
   "code.posture.saysPause.tainted":
     "Se detiene y espera tu visto bueno si leyó contenido no confiable.",
-  "code.posture.saysPause.never": "Nunca se detiene a preguntar.",
+  "code.posture.saysPause.never": "Nunca se detiene a pedir tu visto bueno.",
   "code.posture.fellBack":
     "Se configuró un contenedor, pero no hay ninguno en marcha — esta es tu máquina.",
   "code.posture.unguarded":
@@ -4203,6 +4206,7 @@ const fr: Dict = {
   "tasks.approvePlan": "Approuver le plan",
   "tasks.deny": "Refuser",
   "tasks.specPath": "chemin vers un fichier de spec",
+  "orch.saving.cheaperModels": "Plus de jetons, moins d'argent : le travail est allé à des modèles moins chers. Les deux chiffres sont justes.",
   "registry.describe": "En décrire un",
   "registry.designIt": "Concevoir",
   "registry.describePlaceholder": "que doit faire cet agent ? ex. : lire mes brouillons et dire ce qui est faible, sans rien modifier",
@@ -4649,7 +4653,7 @@ const fr: Dict = {
     "S'arrête et attend votre validation avant de conclure.",
   "code.posture.saysPause.tainted":
     "S'arrête et attend votre validation s'il a lu du contenu non fiable.",
-  "code.posture.saysPause.never": "Ne s'arrête jamais pour demander.",
+  "code.posture.saysPause.never": "Ne s'arrête jamais pour votre validation.",
   "code.posture.fellBack":
     "Un conteneur était configuré, mais aucun ne tourne — c'est votre machine.",
   "code.posture.unguarded":
@@ -5475,6 +5479,7 @@ const de: Dict = {
   "tasks.approvePlan": "Plan genehmigen",
   "tasks.deny": "Ablehnen",
   "tasks.specPath": "Pfad zu einer Spec-Datei",
+  "orch.saving.cheaperModels": "Mehr Tokens, weniger Geld: die Arbeit ging an günstigere Modelle. Beide Zahlen stimmen.",
   "registry.describe": "Einen beschreiben",
   "registry.designIt": "Entwerfen",
   "registry.describePlaceholder": "Was soll dieser Agent tun? z. B.: meine Entwürfe lesen und sagen, was schwach ist, ohne etwas zu ändern",
@@ -5919,7 +5924,7 @@ const de: Dict = {
     "Hält vor dem Abschluss an und wartet auf deine Freigabe.",
   "code.posture.saysPause.tainted":
     "Hält an und wartet auf deine Freigabe, wenn es nicht vertrauenswürdige Inhalte gelesen hat.",
-  "code.posture.saysPause.never": "Hält nie an, um zu fragen.",
+  "code.posture.saysPause.never": "Hält nie für Ihre Freigabe an.",
   "code.posture.fellBack":
     "Ein Container war konfiguriert, läuft aber nicht — das ist dein Rechner.",
   "code.posture.unguarded":
@@ -6714,6 +6719,7 @@ const zh: Dict = {
   "tasks.approvePlan": "批准计划",
   "tasks.deny": "拒绝",
   "tasks.specPath": "spec 文件路径",
+  "orch.saving.cheaperModels": "token 更多，花费更少：工作交给了更便宜的模型。两个数字都是对的。",
   "registry.describe": "描述一个",
   "registry.designIt": "生成设计",
   "registry.describePlaceholder": "这个代理要做什么？例如：读我的草稿并指出哪里弱，但不改动任何东西",
@@ -7124,7 +7130,7 @@ const zh: Dict = {
   "code.posture.saysShell.refused": "主机上的命令被拒绝。",
   "code.posture.saysPause.always": "完成前停下等待你签字。",
   "code.posture.saysPause.tainted": "如果读过不可信内容，会停下等待你签字。",
-  "code.posture.saysPause.never": "从不停下询问。",
+  "code.posture.saysPause.never": "从不为你的批准而暂停。",
   "code.posture.fellBack": "配置了容器，但没有一个在运行——这是你的机器。",
   "code.posture.unguarded":
     "这个对话读了不可信内容之后没有任何标记，所以它之后仍然能写文件。到设置里打开聊天防护来改变这一点。",
@@ -7931,6 +7937,7 @@ const ja: Dict = {
   "tasks.approvePlan": "計画を承認",
   "tasks.deny": "拒否",
   "tasks.specPath": "spec ファイルのパス",
+  "orch.saving.cheaperModels": "トークンは多く、費用は少なく：作業を安いモデルに回したためです。どちらの数字も正しいです。",
   "registry.describe": "説明して作る",
   "registry.designIt": "設計する",
   "registry.describePlaceholder": "このエージェントに何をさせますか？例：下書きを読んで弱い点を指摘する、何も変更せずに",
@@ -8367,7 +8374,7 @@ const ja: Dict = {
   "code.posture.saysPause.always": "完了前に停止して承認を待ちます。",
   "code.posture.saysPause.tainted":
     "信頼できない内容を読んだ場合は停止して承認を待ちます。",
-  "code.posture.saysPause.never": "確認のために停止することはありません。",
+  "code.posture.saysPause.never": "承認のために停止することはありません。",
   "code.posture.fellBack":
     "コンテナが設定されていますが、動いていません — これはあなたのマシンです。",
   "code.posture.unguarded":
@@ -9187,6 +9194,7 @@ const it: Dict = {
   "tasks.approvePlan": "Approva il piano",
   "tasks.deny": "Nega",
   "tasks.specPath": "percorso di un file spec",
+  "orch.saving.cheaperModels": "Più token, meno denaro: il lavoro è andato a modelli più economici. Entrambi i numeri sono corretti.",
   "registry.describe": "Descrivine uno",
   "registry.designIt": "Progetta",
   "registry.describePlaceholder": "cosa deve fare questo agente? es.: leggere le mie bozze e dire cosa è debole, senza toccare nulla",
@@ -9629,7 +9637,7 @@ const it: Dict = {
     "Si ferma e aspetta il tuo via libera prima di concludere.",
   "code.posture.saysPause.tainted":
     "Si ferma e aspetta il tuo via libera se ha letto contenuti non affidabili.",
-  "code.posture.saysPause.never": "Non si ferma mai a chiedere.",
+  "code.posture.saysPause.never": "Non si ferma mai per la tua approvazione.",
   "code.posture.fellBack":
     "Era configurato un container, ma nessuno è in esecuzione — questa è la tua macchina.",
   "code.posture.unguarded":
@@ -10448,6 +10456,7 @@ const pl: Dict = {
   "tasks.approvePlan": "Zatwierdź plan",
   "tasks.deny": "Odmów",
   "tasks.specPath": "ścieżka do pliku spec",
+  "orch.saving.cheaperModels": "Więcej tokenów, mniej pieniędzy: praca trafiła do tańszych modeli. Obie liczby są poprawne.",
   "registry.describe": "Opisz jednego",
   "registry.designIt": "Zaprojektuj",
   "registry.describePlaceholder": "co ma robić ten agent? np.: czytać moje szkice i mówić, co jest słabe, niczego nie zmieniając",
@@ -10887,7 +10896,7 @@ const pl: Dict = {
     "Zatrzymuje się i czeka na twoją zgodę przed zakończeniem.",
   "code.posture.saysPause.tainted":
     "Zatrzymuje się i czeka na twoją zgodę, jeśli czytał niezaufane treści.",
-  "code.posture.saysPause.never": "Nigdy nie zatrzymuje się, by zapytać.",
+  "code.posture.saysPause.never": "Nigdy nie zatrzymuje się po twoją zgodę.",
   "code.posture.fellBack":
     "Skonfigurowano kontener, ale żaden nie działa — to twój komputer.",
   "code.posture.unguarded":
@@ -11706,6 +11715,7 @@ const ru: Dict = {
   "tasks.approvePlan": "Утвердить план",
   "tasks.deny": "Отклонить",
   "tasks.specPath": "путь к файлу спецификации",
+  "orch.saving.cheaperModels": "Больше токенов, меньше денег: работа ушла на более дешёвые модели. Обе цифры верны.",
   "registry.describe": "Описать",
   "registry.designIt": "Спроектировать",
   "registry.describePlaceholder": "что должен делать этот агент? например: читать мои черновики и говорить, что слабо, ничего не меняя",
@@ -12149,7 +12159,7 @@ const ru: Dict = {
     "Останавливается за вашим согласием перед завершением.",
   "code.posture.saysPause.tainted":
     "Останавливается за вашим согласием, если прочитал недоверенное содержимое.",
-  "code.posture.saysPause.never": "Никогда не останавливается, чтобы спросить.",
+  "code.posture.saysPause.never": "Никогда не останавливается ради вашего одобрения.",
   "code.posture.fellBack":
     "Контейнер был настроен, но ни один не запущен — это ваша машина.",
   "code.posture.unguarded":

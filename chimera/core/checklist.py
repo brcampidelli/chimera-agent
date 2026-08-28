@@ -34,7 +34,9 @@ _EXTRACT_SYSTEM = (
     '{"items": [{"text": "...", "kind": "do|avoid|include"}]}. Each item is ONE checkable '
     'requirement: "do" = an action that must happen, "avoid" = something that must NOT happen, '
     '"include" = something the output must contain. Split compound requirements; keep each atomic '
-    "and literal. Do NOT solve the task. Output ONLY the JSON object."
+    "and literal. Write each `text` in the SAME LANGUAGE as the task — this list is read by the "
+    "person who wrote that task, and a checklist somebody cannot read is a checklist they cannot "
+    "correct. Do NOT solve the task. Output ONLY the JSON object."
 )
 _GRADE_SYSTEM = (
     "You grade whether an answer meets each requirement. Given the requirements and the answer, "

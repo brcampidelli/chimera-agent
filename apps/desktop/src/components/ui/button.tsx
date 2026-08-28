@@ -37,7 +37,10 @@ export const Button = forwardRef<HTMLButtonElement, Props>(
     <button
       ref={ref}
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-chip font-medium transition-all duration-150",
+        // `whitespace-nowrap`: a button is a target, and a label broken across three lines inside a
+        // pill stops looking like one. Measured on the running app — "Ver o plano antes" wrapped
+        // to three lines the moment two checkboxes were added to its row.
+        "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-chip font-medium transition-all duration-150",
         "focus-visible:outline-none focus-visible:shadow-glow",
         "disabled:cursor-not-allowed",
         variants[variant],

@@ -345,7 +345,10 @@ export function RunLauncher({
           disabled={running}
         />
       </div>
-      <div className="flex items-center gap-3">
+      {/* `flex-wrap`: this row grew two checkboxes and a second button, and without wrapping the
+          last item is squeezed until its label breaks. Reflowing is the behaviour that survives the
+          next control somebody adds — and the next translation, which may be longer than this one. */}
+      <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
           {t("runs.maxAttempts")}
           <input
