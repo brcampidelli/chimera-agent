@@ -26,6 +26,12 @@ class Review:
 
     approved: bool
     feedback: str = ""
+    #: The Manager was asked and produced nothing readable, so this is not a verdict. Mirrors
+    #: ``AutonomousAgent._verify``'s ``abstained``: the caller must fall back to its other gates
+    #: rather than treat it as either answer. ``approved`` is True alongside it because a reviewer
+    #: that did not review must not veto — the same reasoning already written into ``_manager_ran``
+    #: for the case where no reviewer exists at all.
+    abstained: bool = False
 
 
 class Manager:
@@ -68,6 +74,11 @@ class Manager:
 
         dims = cascade_dimensions(model_judge(self.backend, self.model))
         result = evaluate_cascade(proposed, task, dims)
+        if result.overall is None:
+            # Not one dimension came back readable. There is no verdict to give, and the old code
+            # gave one anyway: every dimension scored 0.0, overall 0.0, below any threshold, work
+            # rejected and — under verify-or-revert — deleted, because a model replied in prose.
+            return Review(approved=True, abstained=True)
         if result.overall >= self.rubric_threshold:
             return Review(approved=True)
         worst = min(result.scores, key=lambda name: result.scores[name]) if result.scores else "?"
@@ -76,6 +87,10 @@ class Manager:
             f"Weakest dimension: {worst} ({score:.2f}); overall {result.overall:.2f} "
             f"< {self.rubric_threshold:.2f}. Strengthen that aspect."
         )
+        if result.unscored:
+            # Say what the grade could not see. A partial rubric read as a whole one is how a
+            # rejection based on one dimension passes for a rejection based on three.
+            feedback += " (Not graded, judge unreadable: " + ", ".join(result.unscored) + ".)"
         return Review(approved=False, feedback=feedback)
 
     @staticmethod
@@ -86,6 +101,17 @@ class Manager:
         and a strict prefix match misreads those as rejections — which, under
         verify-or-revert, would revert correct work. So we strip leading markup and,
         failing a clean prefix, scan the whole reply (REVISE wins over APPROVED).
+
+        Prose holding neither word stays a revision on purpose: *"This is wrong because X"* is a
+        rejection that merely missed the format, and there is a test in this repository defending
+        exactly that. An **empty** reply is the different case, and it used to take the same branch
+        — rejected, with the empty string as its own justification. Nothing distinguished "the
+        provider returned nothing" from "the work is bad", and under verify-or-revert the second
+        reading deletes the work. A blank reply now abstains.
+
+        What is deliberately *not* claimed: a refusal or an error string phrased as a sentence is
+        still read as a revision, because nothing here can tell it from real dissatisfaction. That
+        residue is narrower than what it replaced, and it is written down rather than papered over.
         """
         cleaned = verdict.lstrip("*_#>-` \t\r\n")
         upper = cleaned.upper()
@@ -101,4 +127,6 @@ class Manager:
             return Review(approved=False, feedback=tail.strip() or verdict)
         if "APPROVED" in full:
             return Review(approved=True)
+        if not cleaned.strip(" \t\r\n*_#>-`"):
+            return Review(approved=True, abstained=True)
         return Review(approved=False, feedback=verdict)
