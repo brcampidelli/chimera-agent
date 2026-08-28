@@ -483,7 +483,7 @@ def assemble_registry(
     # Pooled per process rather than connected here: this function runs once per TURN and once per
     # worker in a fan-out, so connecting per call would spawn a container per message.
     pool = mcp_pool.connectors(settings)
-    if pool is not None:
+    if pool is not None and not settings.mcp_defer:
         pool.into_tool_registry(registry)
     # Union, never replace: a posture, an explicit denylist and the deployment's own denylist are
     # three ways of saying "not this tool", and letting one overwrite another means the strictest of
@@ -510,6 +510,21 @@ def assemble_registry(
     # an owner's ceiling must not be raisable by a request at all. And unlike `spawn_subagent`, this
     # tool does not inherit the restricted registry — it builds its own read-only set internally, so
     # letting it through was granting a capability, not just a name.
+    # Registered AFTER the filter, and carrying the lists with it — for exactly the reason the
+    # explorer below documents about itself, only more so. Deferral takes the servers' N names out
+    # of the registry, so the restriction filter has nothing left to match: a denylist naming an MCP
+    # tool would silently stop removing it while one proxy could still reach every one of them.
+    if pool is not None and settings.mcp_defer:
+        from chimera.integrations.mcp_defer import register_deferred_mcp
+
+        register_deferred_mcp(
+            pool,
+            registry,
+            denied=frozenset(denied),
+            # The DEPLOYMENT ceiling only, never the request's own list — same asymmetry the
+            # explorer applies: a caller may narrow itself, and may not raise an owner's ceiling.
+            allowed=frozenset(settings.tool_allowlist) if settings.tool_allowlist else None,
+        )
     explorer_ok = ExploreRepositoryTool.name not in denied and (
         not settings.tool_allowlist or ExploreRepositoryTool.name in settings.tool_allowlist
     )

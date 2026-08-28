@@ -67,6 +67,14 @@ _DOCUMENT_ARGS = frozenset(
         "body",  # send_email: the message body.
         "text",  # echo; browser(action=type) — a password is typed through this one; text_to_speech.
         "spec",  # render_chart: a Vega-Lite document, whose `data.values` can embed a whole dataset.
+        # mcp_call: the argument object, transmitted whole to a server this project did not write.
+        #
+        # A body and NOT a nested one, deliberately. `_NESTED_DOCUMENT_ARGS` walks in and elides the
+        # keys it recognises — which works for `edit_batch`, whose key names are ours. An MCP server
+        # names its own parameters, so nothing here would match `api_token` or `password`, and
+        # walking in would print them. The tool name stays as the identifier, so the audit line
+        # still says WHAT was called; only the payload becomes a character count.
+        "arguments",
     }
 )
 
