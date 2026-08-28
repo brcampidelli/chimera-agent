@@ -149,4 +149,14 @@ class SpecTestVerifier:
             return VerificationResult(True, f"spec-test: could not write tests ({exc})", abstained=True)
         runner = CommandVerifier(self.command.format(file=_TEST_FILE), self.workspace, timeout=self.timeout)
         result = runner.verify()
-        return VerificationResult(result.passed, f"spec-grounded tests ({_TEST_FILE}):\n{result.output}")
+        # `abstained` is carried, not dropped. Every other exit from this method decides carefully
+        # between passing and abstaining, and then this line — the one path where a real command
+        # ran — threw the distinction away: an abstention arrives here as `passed=True`, so a run
+        # that could not be checked came out as `evidence="verifier"`, a receipt naming a test that
+        # never reached a verdict. Fixing the runner without this line would have made that worse,
+        # by turning a wrong failure into a confident wrong pass.
+        return VerificationResult(
+            result.passed,
+            f"spec-grounded tests ({_TEST_FILE}):\n{result.output}",
+            abstained=result.abstained,
+        )

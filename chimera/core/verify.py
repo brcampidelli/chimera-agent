@@ -8,6 +8,7 @@ runs a command (tests, a build, a linter) and treats exit code 0 as success — 
 from __future__ import annotations
 
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -120,6 +121,38 @@ def program_missing(command: str, workspace: Path | str | None = None) -> bool:
     return shutil.which(program) is None and shutil.which(program, path=str(root)) is None
 
 
+def module_missing(command: str, output: str) -> bool:
+    """True when ``command`` ran a module with ``-m`` and the interpreter said it does not exist.
+
+    :func:`program_missing` asks whether the *binary* is there. This is the same question one level
+    in: ``python -m pytest`` on a machine without pytest finds the binary perfectly well, exits **1**
+    — indistinguishable from "your tests failed" — and prints ``No module named pytest``. Spec-test
+    generation hard-codes exactly that command, and its audience is the person who is not a Python
+    developer, so on their machine the generated test "failed", the attempt was reverted, and the
+    receipt recorded a test failure that never ran. The same class of bug the 127 handling exists to
+    prevent, arriving through the ``-m`` door.
+
+    Matching the message is sound HERE where it was not sound for ``cmd.exe``: this text comes from
+    Python's own runpy, not from a localised shell, and it is the same string on every platform.
+
+    Two discriminations keep a real failure from being reinterpreted, which is the dangerous
+    direction. The module name must be the one the command actually asked for. And the interpreter's
+    unquoted ``No module named pytest`` is required — a traceback from code *under test* failing to
+    import says ``No module named 'pytest'``, with quotes, and must stay a failure.
+    """
+    try:
+        tokens = shlex.split(command, posix=False)
+    except ValueError:
+        return False
+    try:
+        module = tokens[tokens.index("-m") + 1].strip("\"'")
+    except (ValueError, IndexError):
+        return False
+    if not module:
+        return False
+    return re.search(rf"No module named {re.escape(module)}(?![\w'\"])", output) is not None
+
+
 
 @dataclass
 class VerificationResult:
@@ -179,6 +212,12 @@ class CommandVerifier:
             # autonomous loop already demotes an abstention to the no-verifier path, so `evidence`
             # correctly stops being "verifier". We could not check it; we do not claim we did, and we
             # do not punish the work for our own inability.
+            return VerificationResult(True, output, abstained=True)
+        if proc.returncode != 0 and module_missing(self.command, output):
+            # `python -m <tool>` where the tool is not installed: the binary exists, the exit code is
+            # 1, and only the message distinguishes it from a test that failed. Checked after a
+            # non-zero exit for the same reason as the Windows arm below — a command that ran and
+            # genuinely failed must never be reinterpreted as an abstention.
             return VerificationResult(True, output, abstained=True)
         if proc.returncode != 0 and os.name == "nt" and program_missing(self.command, self.workspace):
             # The Windows half of the same abstention. Checked only after a non-zero exit, so a
