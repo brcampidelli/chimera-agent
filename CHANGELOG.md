@@ -265,6 +265,19 @@ You could not choose which model answered you. The endpoint accepted one all alo
 
 ### Fixed — the rest
 
+- **The most expensive route in the app reported nothing on the Cost screen.** `_record_run_spend`
+  reads `outcome.receipts` and returns immediately when that list is empty; `IsolatedCrewResult` had
+  `transcript`, `conflicts`, `merged`, `failures`, `rejected` and `summary`, and no `receipts`. So
+  every crew run took the early return, and the screen that answers "what has this cost me" showed
+  zero for the one route that starts N tool-using agents at once. Two things kept it alive: the
+  comment beside the call said the opposite — that the route now appears on the screen — and the
+  test covering the recorder used a stand-in class **with** a `receipts` attribute, so it exercised
+  a contract the shipped object did not fulfil. A fake more capable than the real thing tests the
+  fake. The crew now meters **per worker**, because a crew is justified by "N attempts, the test
+  picks the winner" and that trade is only accountable if you can see what each attempt cost —
+  including the rejected and the crashed ones, which cost exactly as much as the one that won. A
+  worker that never called a model is left out rather than filed at 0.00, and a model the pricer
+  does not know arrives as *unknown* rather than as free.
 - **The reviewer judged a paragraph and called it judging the work.** `Manager.review` receives
   `(task, answer, context)` and had never seen the diff, the transcript or a single file — stated in
   this repository's own test docstrings for months without the consequence being drawn. Measured on

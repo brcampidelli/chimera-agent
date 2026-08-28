@@ -49,6 +49,10 @@ class MeteredBackend:
         self.calls = 0
         self.prompt_tokens = 0
         self.completion_tokens = 0
+        #: The model that most recently ANSWERED through this meter, for callers that have to name
+        #: one on a receipt. Recorded here because here is the only place it is known: the caller
+        #: asks for a slug and a cascade, a failover or a fusion panel may answer on another.
+        self.last_model = ""
         self._usd = 0.0
         self._unpriced = 0
         self._lock = threading.Lock()
@@ -112,6 +116,8 @@ class MeteredBackend:
             self.calls += 1
             self.prompt_tokens += prompt
             self.completion_tokens += completion
+            if model:
+                self.last_model = model
             if usd is None:
                 self._unpriced += 1
             else:
