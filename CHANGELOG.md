@@ -206,6 +206,22 @@ You could not choose which model answered you. The endpoint accepted one all alo
 
 ### Fixed — the rest
 
+- **The reviewer judged a paragraph and called it judging the work.** `Manager.review` receives
+  `(task, answer, context)` and had never seen the diff, the transcript or a single file — stated in
+  this repository's own test docstrings for months without the consequence being drawn. Measured on
+  the shipped rc39: four runs, five attempts, **five rejections**, every one for work the receipt
+  beside it proves was done. The cleanest reads *"the README.md must be physically created, not
+  merely described as created"* on an attempt whose receipt carries
+  `diff: +1 new (README.md)` and `diff_productive: true` — the refutation of the stated reason,
+  filed with the rejection. Under verify-or-revert the file was then deleted; and the failure was
+  distilled into a permanent anti-pattern skill card, so the hallucination outlived the run that
+  produced it. The reviewer is now shown what the attempt changed on disk, which meant moving the
+  diff computation ahead of the review — it used to run after every gate had already voted, so the
+  machine truth existed only as a description of a verdict already sealed. **Evidence, not
+  criterion**, and the distinction is load-bearing: a recalled fact from another project can make
+  something enforceable that nobody agreed to, which is the leak the previous release closed, while
+  a diff can only describe what the answer is a claim *about*. It cannot add a requirement; it can
+  only stop the reviewer being wrong about whether the work happened.
 - **A judge that could not read scored the work zero, and the work was deleted for it.**
   `model_judge` asks a model for a number in [0, 1] and returned `0.0` whenever the reply held
   none — a refusal, an empty completion, a provider error string, an answer in the wrong language.
