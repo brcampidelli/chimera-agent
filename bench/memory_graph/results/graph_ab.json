@@ -1,0 +1,171 @@
+{
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "k": 3,
+  "slices": {
+    "multihop": {
+      "slice": "multihop",
+      "n": 120,
+      "distinct_entities": 40,
+      "baseline_rate": 0.175,
+      "graph_rate": 0.4167,
+      "budget_rate": 0.7917,
+      "delta_vs_baseline": {
+        "n": 120,
+        "baseline_rate": 0.175,
+        "treatment_rate": 0.4167,
+        "delta": 0.2417,
+        "discordant": {
+          "baseline_only": 0,
+          "treatment_only": 29
+        },
+        "diff_ci": [
+          0.1851,
+          0.2417
+        ],
+        "significant": true
+      },
+      "delta_vs_budget": {
+        "n": 120,
+        "baseline_rate": 0.7917,
+        "treatment_rate": 0.4167,
+        "delta": -0.375,
+        "discordant": {
+          "baseline_only": 47,
+          "treatment_only": 2
+        },
+        "diff_ci": [
+          -0.3991,
+          -0.2963
+        ],
+        "significant": true
+      },
+      "per_seed_delta": {
+        "42": 0.275,
+        "43": 0.2,
+        "44": 0.25
+      },
+      "seed_sd": 0.0382,
+      "expected_seed_spread": 0.0553,
+      "activation_rate": 0.975,
+      "injected_per_turn": 1.692,
+      "injected_useful_per_turn": 0.425,
+      "injection_precision": 0.2512,
+      "alpha_cut_losses": 78,
+      "facts_per_turn_baseline": 3.0,
+      "facts_per_turn_graph": 6.0
+    },
+    "single": {
+      "slice": "single",
+      "n": 120,
+      "distinct_entities": 40,
+      "baseline_rate": 1.0,
+      "graph_rate": 1.0,
+      "budget_rate": 1.0,
+      "delta_vs_baseline": {
+        "n": 120,
+        "baseline_rate": 1.0,
+        "treatment_rate": 1.0,
+        "delta": 0.0,
+        "discordant": {
+          "baseline_only": 0,
+          "treatment_only": 0
+        },
+        "diff_ci": [
+          0.0,
+          0.0
+        ],
+        "significant": false
+      },
+      "delta_vs_budget": {
+        "n": 120,
+        "baseline_rate": 1.0,
+        "treatment_rate": 1.0,
+        "delta": 0.0,
+        "discordant": {
+          "baseline_only": 0,
+          "treatment_only": 0
+        },
+        "diff_ci": [
+          0.0,
+          0.0
+        ],
+        "significant": false
+      },
+      "per_seed_delta": {
+        "42": 0.0,
+        "43": 0.0,
+        "44": 0.0
+      },
+      "seed_sd": 0.0,
+      "expected_seed_spread": 0.0,
+      "activation_rate": 0.975,
+      "injected_per_turn": 1.842,
+      "injected_useful_per_turn": 0.0,
+      "injection_precision": 0.0,
+      "alpha_cut_losses": 0,
+      "facts_per_turn_baseline": 3.0,
+      "facts_per_turn_graph": 6.0
+    },
+    "traverse": {
+      "slice": "traverse",
+      "n": 120,
+      "distinct_entities": 40,
+      "baseline_rate": 0.0,
+      "graph_rate": 0.0,
+      "budget_rate": 0.0,
+      "delta_vs_baseline": {
+        "n": 120,
+        "baseline_rate": 0.0,
+        "treatment_rate": 0.0,
+        "delta": 0.0,
+        "discordant": {
+          "baseline_only": 0,
+          "treatment_only": 0
+        },
+        "diff_ci": [
+          0.0,
+          0.0
+        ],
+        "significant": false
+      },
+      "delta_vs_budget": {
+        "n": 120,
+        "baseline_rate": 0.0,
+        "treatment_rate": 0.0,
+        "delta": 0.0,
+        "discordant": {
+          "baseline_only": 0,
+          "treatment_only": 0
+        },
+        "diff_ci": [
+          0.0,
+          0.0
+        ],
+        "significant": false
+      },
+      "per_seed_delta": {
+        "42": 0.0,
+        "43": 0.0,
+        "44": 0.0
+      },
+      "seed_sd": 0.0,
+      "expected_seed_spread": 0.0,
+      "activation_rate": 0.975,
+      "injected_per_turn": 1.692,
+      "injected_useful_per_turn": 0.0,
+      "injection_precision": 0.0,
+      "alpha_cut_losses": 63,
+      "facts_per_turn_baseline": 3.0,
+      "facts_per_turn_graph": 6.0
+    }
+  },
+  "pooled_injection_precision": 0.1203,
+  "gate": {
+    "pass": false,
+    "why": "injection precision 12.0% < 33.0% (junk facts per useful one)"
+  }
+}

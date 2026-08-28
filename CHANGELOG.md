@@ -80,6 +80,26 @@ Most of this release is doors. The rest is what testing each release candidate a
   argument list from a vendor's page — an exercise with a silent failure mode, and the reason it
   said "0 configured".
 
+- **The memory graph was measured for the first time, and the answer is uncomfortable.** The layer
+  has fed real recall since June and had no bench: `memory_bench.py` never mentioned it, and its
+  unit tests checked extraction and persistence — that the module works, never that the feature
+  pays. `bench/memory_graph/` is the missing arm, pre-registered before anything ran, deterministic
+  and offline. It **helps**: multi-hop recall goes 17.5% → 41.7%, +24.2 pp, CI excluding zero across
+  three seeds. It is also **the worst available way to spend what it costs**: `recall_facts` only
+  ever *adds* facts, so the graph arm puts six in the prompt where the baseline puts three — and
+  handing those same six slots to plain keyword search (`memory_k = 6`, a one-character change)
+  reaches **79.2%**. Gate: **FAIL**, on cost, not on lift — pooled injection precision 12.0% against
+  a registered floor of 33%, about seven junk facts per useful one. Two mechanisms explain it: the
+  layer never traverses an edge (`traverse` is 0/120 in all three arms), and its whole shortfall is
+  the alphabetical cut — the candidate set contained both needed facts in **all 120** items and it
+  still missed 70, because `sorted(entities())` then `facts[:k]` throws away what it is holding.
+  Published as a FAIL rather than tuned into a pass; what to do about it is a product decision, and
+  the bench now has the arms to measure any of the three answers.
+- **And the bench found the argument for paired measurement, with a number under it.** Two runs of
+  the *same* seed disagreed: `MemoryManager.add` mints a `uuid4` and the ranker breaks ties on it,
+  so under a neutral query those ids **are** the baseline's choice. The absolute rate moved 9.2 pp
+  between two runs of one measurement; the paired delta moved 0.9 pp.
+
 You could not choose which model answered you. The endpoint accepted one all along.
 
 ### Added — choosing who argues, and what it costs
@@ -186,6 +206,32 @@ You could not choose which model answered you. The endpoint accepted one all alo
 
 ### Fixed — the rest
 
+- **A judge that could not read scored the work zero, and the work was deleted for it.**
+  `model_judge` asks a model for a number in [0, 1] and returned `0.0` whenever the reply held
+  none — a refusal, an empty completion, a provider error string, an answer in the wrong language.
+  That is the same output as a judge which read the work and failed it, and nothing anywhere
+  recorded which had happened. `Manager(use_rubric=True)` compares that score against a threshold,
+  `0.0` loses to every threshold, and under verify-or-revert the workspace is restored: correct
+  work thrown away because a model replied in prose. `None` now means *unread*; an unread dimension
+  leaves **both** sides of the weighted mean — scoring it zero charges the answer for the judge's
+  failure, and leaving it in the denominator does the same thing more quietly — and a cascade whose
+  judge went silent no longer gates the dimensions after it. A dimension the cascade *did* gate
+  still stays in the denominator, because that penalty is what a gate is for.
+- **The same shape, one layer up, on the path that is on by default.** `_parse_verdict` ended in
+  "reject, with the reply as its own justification", so an **empty** review was a rejection whose
+  stated reason was the empty string — while the docstring immediately above it already named that
+  exact harm ("would revert correct work") as the thing it existed to prevent. A blank verdict now
+  abstains. Prose without the keyword stays a revision, deliberately: *"this is wrong because X"* is
+  a rejection that merely missed the format, and there is a test here defending it. What is still
+  not claimed: a refusal phrased as a sentence reads as a revision, because nothing can tell it from
+  real dissatisfaction. That residue is narrower than what it replaced, and it is written down
+  rather than papered over.
+- **A reviewer that abstained is no longer named as the authority that approved.** Fixing the two
+  above without this would have traded a silent rejection for a false receipt: `evidence` read
+  `"manager"` on the strength of a manager being *configured*, which is the fabrication-by-omission
+  `_manager_ran` was written to stop, one step further along. A PROBE pair is no longer logged for
+  an abstaining proxy either — silence recorded as 0 or 1 is a non-answer entering the data as a
+  judgment about the arm.
 - **The benchmark suites prove they can measure something before a model is called.** Every task
   claims its test fails on the untouched workspace and passes once the work is done. The second half
   was measured on every run; the first was assumed — and a task where it is false hands every arm a

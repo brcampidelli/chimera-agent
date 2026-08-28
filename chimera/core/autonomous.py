@@ -745,22 +745,38 @@ class AutonomousAgent:
             # attempt, so the logged (proxy, reward) pair is unbiased; reused below → no extra call.
             probe_proxy: bool | None = None
             proxy_fb = ""
+            proxy_abstained = False
             if self.probe_log is not None and self.manager is not None:
-                probe_proxy, proxy_fb = self._review(task, answer, judge_context)
+                probe_proxy, proxy_fb, proxy_abstained = self._review(task, answer, judge_context)
+            # Whether a manager actually judged THIS attempt, as opposed to being configured. Only
+            # a real judgment may be named as one in the receipt below.
+            review_abstained = True
             if verifier_active:
                 ok = verified
                 if verified:
+                    # Nobody was asked — the verifier already decided. `abstained` stays True
+                    # because it means "no manager judged", and here none did.
                     approved, fb = True, ""
                 elif probe_proxy is not None:
-                    approved, fb = probe_proxy, proxy_fb
+                    approved, fb, review_abstained = probe_proxy, proxy_fb, proxy_abstained
                 else:
-                    approved, fb = self._review(task, answer, judge_context)
+                    approved, fb, review_abstained = self._review(task, answer, judge_context)
             else:
-                approved, fb = self._review(task, answer, judge_context)
-                ok = approved
+                approved, fb, review_abstained = self._review(task, answer, judge_context)
+                # An abstaining reviewer is the only gate here and just declined to be one. Letting
+                # `ok` ride on it would decide the attempt on a non-answer; the contract, coverage
+                # and diff gates below still run and can still fail it.
+                ok = True if review_abstained else approved
             # Record the paired observation for PROBE: arm = which worker ran, proxy = the cheap
             # manager verdict, reward = the verified outcome (only with a real verifier + manager).
-            if self.probe_log is not None and verifier_active and probe_proxy is not None:
+            # An abstaining proxy is not a cheap verdict, it is no verdict; logging it as 0/1 would
+            # put the reviewer's silence into the pair as if it were a judgment about the arm.
+            if (
+                self.probe_log is not None
+                and verifier_active
+                and probe_proxy is not None
+                and not proxy_abstained
+            ):
                 arm = "escalate" if worker is self.escalate_worker else "worker"
                 self.probe_log.record(
                     arm=arm, proxy=1.0 if probe_proxy else 0.0, reward=1.0 if verified else 0.0
@@ -856,13 +872,17 @@ class AutonomousAgent:
                 )
                 fb = f"{fb}\n\n{detail}" if fb else detail
 
+            # A manager that was asked and answered nothing readable is, for the receipt, the same
+            # as no manager: it did not approve anything. Naming it would be the fabrication-by-
+            # omission that `_manager_ran` was written to stop, one step further along.
+            manager_judged = self._manager_ran() and not review_abstained
             if verifier_active:
                 evidence = "verifier"
             elif diff_productive:
                 # "diff+manager" claims two authorities. With no manager configured the only real
                 # one is the diff, and saying so is the difference between a receipt and a label.
-                evidence = "diff+manager" if self._manager_ran() else "diff"
-            elif ok and self._manager_ran():
+                evidence = "diff+manager" if manager_judged else "diff"
+            elif ok and manager_judged:
                 evidence = "manager"
             else:
                 # Includes the case that used to read "manager": approved by nobody, because nobody
@@ -1278,14 +1298,16 @@ class AutonomousAgent:
             project=str(self.workspace) if self.workspace else None,
         )
 
-    def _review(self, task: str, answer: str, context: str) -> tuple[bool, str]:
-        """Approval and feedback. Approves vacuously when there is no manager — see
-        :meth:`_manager_ran`, which is what stops that vacuum being labelled as a review."""
+    def _review(self, task: str, answer: str, context: str) -> tuple[bool, str, bool]:
+        """Returns (approved, feedback, abstained). ``abstained`` = nobody actually judged — either
+        no manager is configured, or the one configured replied with nothing readable. Same shape
+        and same meaning as :meth:`_verify`'s third value, and for the same reason: the caller must
+        fall back to its other gates instead of reading a non-answer as either answer."""
         if not self._manager_ran():
-            return True, ""
+            return True, "", True
         assert self.manager is not None
         review = self.manager.review(task, answer, context=context)
-        return review.approved, review.feedback
+        return review.approved, review.feedback, review.abstained
 
     def _manager_ran(self) -> bool:
         """Whether a manager actually looked at this attempt.

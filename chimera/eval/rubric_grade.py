@@ -76,12 +76,23 @@ class GradedOutcome:
     weighted: float = 0.0
     passed: bool = False
     failed_required: list[str] = field(default_factory=list)
+    #: Criteria whose scorer could not be read. Kept apart from ``failed_required`` on purpose:
+    #: "the grader did not answer" and "the answer missed this" are different facts, and merging
+    #: them is what let judge flakiness read as a failing answer.
+    unscored: list[str] = field(default_factory=list)
+    #: Whether this is a grade at all. False when nothing could be scored, or when a *required*
+    #: criterion could not be read — a required criterion is the one the outcome is void without,
+    #: so an unreadable one leaves an absence rather than a verdict. ``passed`` is False either
+    #: way, but only this field says whether that False means anything.
+    determinate: bool = True
 
     def summary(self) -> dict[str, object]:
         return {
             "weighted": round(self.weighted, 4),
             "passed": self.passed,
+            "determinate": self.determinate,
             "failed_required": list(self.failed_required),
+            "unscored": list(self.unscored),
             "scores": {k: round(v, 4) for k, v in self.scores.items()},
         }
 
@@ -95,13 +106,23 @@ class RubricGrader:
     def grade(self, task: str, answer: str, rubric: Rubric) -> GradedOutcome:
         """Score each criterion, compute the weighted outcome, and apply the required-criteria veto."""
         if not rubric.criteria:
-            return GradedOutcome(weighted=0.0, passed=False)
+            return GradedOutcome(weighted=0.0, passed=False, determinate=False)
         scores: dict[str, float] = {}
         failed_required: list[str] = []
+        unscored: list[str] = []
+        unreadable_required = False
         total_weight = 0.0
         weighted_sum = 0.0
         for criterion in rubric.criteria:
-            score = _clamp(self.scorer(answer, task, criterion.text))
+            raw = self.scorer(answer, task, criterion.text)
+            if raw is None:
+                # Out of both sums. Charging the answer for a criterion the grader could not read
+                # would put the grader's flakiness into the answer's score, where an A/B would read
+                # it as a difference between the arms.
+                unscored.append(criterion.text)
+                unreadable_required = unreadable_required or criterion.required
+                continue
+            score = _clamp(raw)
             scores[criterion.text] = score
             weight = max(0.0, criterion.weight)
             total_weight += weight
@@ -109,9 +130,17 @@ class RubricGrader:
             if criterion.required and score < rubric.required_gate:
                 failed_required.append(criterion.text)
         weighted = weighted_sum / total_weight if total_weight else 0.0
-        passed = weighted >= rubric.pass_threshold and not failed_required
+        determinate = bool(scores) and not unreadable_required
+        # An indeterminate outcome does not pass — but it does not count as a failure either, and
+        # ``determinate`` is what tells the two apart.
+        passed = determinate and weighted >= rubric.pass_threshold and not failed_required
         return GradedOutcome(
-            scores=scores, weighted=weighted, passed=passed, failed_required=failed_required
+            scores=scores,
+            weighted=weighted,
+            passed=passed,
+            failed_required=failed_required,
+            unscored=unscored,
+            determinate=determinate,
         )
 
 
@@ -126,6 +155,15 @@ def model_grader(backend: object, model: str | None = None) -> RubricGrader:
 
 def grade_batch(
     grader: RubricGrader, rubric: Rubric, items: list[tuple[str, str]]
-) -> list[bool]:
-    """Grade many (task, answer) pairs into the boolean pass/fail trials the A/B engine consumes."""
-    return [grader.grade(task, answer, rubric).passed for task, answer in items]
+) -> list[bool | None]:
+    """Grade many (task, answer) pairs into the pass/fail trials the A/B engine consumes.
+
+    ``None`` marks an item the grader could not read — not a trial. Positions are preserved rather
+    than compacted, because the honest A/B is **paired**: dropping an item from one arm and not the
+    other misaligns every pair after it. A caller drops the pair, never one side of it.
+    """
+    trials: list[bool | None] = []
+    for task, answer in items:
+        outcome = grader.grade(task, answer, rubric)
+        trials.append(outcome.passed if outcome.determinate else None)
+    return trials
