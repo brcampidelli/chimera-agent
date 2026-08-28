@@ -883,7 +883,11 @@ class AutonomousAgent:
             # opinion on top of them. (Requirements are still injected up front, so the worker targets
             # them from attempt 1 regardless.)
             if ok and self.checklist is not None and requirements and not verifier_active:
-                misses = self.checklist.grade(task, answer, requirements)
+                # The same evidence the reviewer gets, for the same reason. This gate runs only
+                # when there is no active verifier — which is exactly what an abstaining one
+                # produces — so it inherits the decisive vote precisely when the tests could not
+                # speak, and grading prose there deletes work the diff proves was done.
+                misses = self.checklist.grade(task, answer, requirements, evidence=evidence_ctx)
                 if misses:
                     ok = False
                     detail = "Requirements not covered:\n" + "\n".join(f"- {m}" for m in misses)
