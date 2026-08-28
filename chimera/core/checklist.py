@@ -39,10 +39,13 @@ _EXTRACT_SYSTEM = (
     "correct. Do NOT solve the task. Output ONLY the JSON object."
 )
 _GRADE_SYSTEM = (
-    "You grade whether an answer meets each requirement. Given the requirements and the answer, "
+    "You grade whether an answer meets each requirement. Given the requirements, the answer, and — "
+    "when it is present — a section showing what the work changed on disk, "
     'output {"items": [{"text": "<requirement>", "met": true|false}]} with one entry per '
-    "requirement, in order. Judge only what the answer actually shows; if a requirement is not "
-    "clearly satisfied, mark it false. Output ONLY the JSON object."
+    "requirement, in order. Judge what the WORK shows, not only what the answer says: a requirement "
+    "satisfied by the changed files is met even when the answer does not restate it. If neither the "
+    "answer nor the changes clearly satisfy a requirement, mark it false. Output ONLY the JSON "
+    "object."
 )
 
 
@@ -92,12 +95,38 @@ class RequirementChecklist:
             _log.warning("checklist extract failed, continuing without it: %s", exc)
             return []
 
-    def grade(self, task: str, answer: str, requirements: list[Requirement]) -> list[str]:
-        """Return the texts of the requirements the answer does NOT meet (empty on failure)."""
+    def grade(
+        self,
+        task: str,
+        answer: str,
+        requirements: list[Requirement],
+        *,
+        evidence: str = "",
+    ) -> list[str]:
+        """Return the texts of the requirements the work does NOT meet (empty on failure).
+
+        ``evidence`` is what the attempt changed on disk. Without it this graded the answer's
+        **prose**, which is the same blindness the reviewer had and it cost the same thing:
+        measured on the installed rc40, a run wrote
+
+            +def somar(a, b):
+            +    return a + b
+
+        against the requirement *"somar(a, b) devolve a + b"*, and this grader returned
+        "Requirements not covered". Under verify-or-revert the file was deleted. The reviewer had
+        just been given the diff; this gate had not, and it runs precisely when the reviewer's
+        verdict is no longer decisive — with no active verifier — so the two fixes met here.
+
+        Evidence, not criterion, on the same terms as the reviewer's: the diff describes what the
+        answer is a claim about. It cannot add a requirement to the list, which is the whole point
+        of the list being the one the person kept.
+        """
         if not requirements:
             return []
         listing = "\n".join(f"- [{r.kind}] {r.text}" for r in requirements)
         prompt = f"Requirements:\n{listing}\n\n<<answer>>\n{answer}\n<<end-answer>>"
+        if evidence:
+            prompt = f"{prompt}\n\n{evidence}"
         try:
             result = self.backend.complete(
                 [Message(role="system", content=_GRADE_SYSTEM), Message(role="user", content=prompt)],

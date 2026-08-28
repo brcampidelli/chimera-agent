@@ -74,7 +74,7 @@ class _RecordingChecklist:
     def extract(self, task: str) -> list[Requirement]:
         return [Requirement(text="include the error code")]
 
-    def grade(self, task: str, answer: str, requirements: list[Requirement]) -> list[str]:
+    def grade(self, task: str, answer: str, requirements: list[Requirement], *, evidence: str = "") -> list[str]:
         self.graded += 1
         return ["include the error code"] if self.graded == 1 else []
 
@@ -115,7 +115,7 @@ class _TwoReqChecklist:
     def extract(self, task: str) -> list[Requirement]:
         return [Requirement(text="support lowercase input"), Requirement(text="raise on empty")]
 
-    def grade(self, task: str, answer: str, requirements: list[Requirement]) -> list[str]:
+    def grade(self, task: str, answer: str, requirements: list[Requirement], *, evidence: str = "") -> list[str]:
         return []  # everything covered, so the run succeeds on attempt 1
 
 
@@ -126,7 +126,7 @@ class _GradeCountingChecklist:
     def extract(self, task: str) -> list[Requirement]:
         return [Requirement(text="do the thing")]
 
-    def grade(self, task: str, answer: str, requirements: list[Requirement]) -> list[str]:
+    def grade(self, task: str, answer: str, requirements: list[Requirement], *, evidence: str = "") -> list[str]:
         self.grades += 1
         return []
 

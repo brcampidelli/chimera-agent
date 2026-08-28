@@ -88,11 +88,28 @@ def test_recalled_facts_never_reach_the_judge() -> None:
 def test_the_checklist_grader_could_not_have_written_that_feedback() -> None:
     """Pinned because it is what makes the diagnosis a conclusion rather than a guess: the grader's
     prompt is built from the requirement list and the answer, so a path present in neither could
-    not have come from it. If this prompt ever grows a context argument, the elimination above
-    stops holding and this file's reasoning needs redoing."""
+    not have come from it.
+
+    The prompt has since grown one more input, which the docstring here warned would happen and
+    said would need re-doing. Re-done: it takes the attempt's **diff** and nothing else. The
+    elimination therefore still holds for the class of leak this file is about — a fact recalled
+    from another project cannot reach this grader, because the only thing added is a description of
+    what this attempt wrote. What would break it is `context`, or anything derived from it, and the
+    call site is asserted below.
+    """
     from chimera.core.checklist import RequirementChecklist
 
     grade = inspect.getsource(RequirementChecklist.grade)
     assert 'prompt = f"Requirements:\\n{listing}\\n\\n<<answer>>\\n{answer}\\n<<end-answer>>"' in grade
+    assert 'prompt = f"{prompt}\\n\\n{evidence}"' in grade
     # `task` is a parameter it accepts and deliberately does not put in the prompt.
     assert "{task}" not in grade
+
+
+def test_the_grader_is_handed_the_diff_and_nothing_else() -> None:
+    """The other half of the elimination above, at the call site rather than in the prompt."""
+    source = _run_source()
+    call = next(ln for ln in source.splitlines() if "self.checklist.grade(" in ln)
+    assert "evidence=evidence_ctx" in call
+    for advisory in ("context", "facts_ctx", "card_ctx", "playbook_ctx", "repo_ctx", "lessons"):
+        assert f"evidence={advisory}" not in call, f"{advisory} became enforceable through the grader"

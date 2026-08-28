@@ -155,6 +155,20 @@ You could not choose which model answered you. The endpoint accepted one all alo
 
 ### Fixed — found by installing each release candidate and using it
 
+- **The coverage checklist graded prose too, and deleted the file that satisfied the requirement.**
+  Found by driving the release that had just fixed the same blindness one gate over. A run with
+  `--gen-tests` on a machine without pytest: the requirement was *"somar(a, b) devolve a + b"*, the
+  diff was `+def somar(a, b):` / `+    return a + b`, and the feedback was **"Requirements not
+  covered"**. Three things had to line up and they did — the spec-test verifier **abstained**
+  correctly because pytest was missing, abstention demotes the attempt to the no-verifier path,
+  and that is exactly what makes this gate decisive. It was still reading the answer's prose, which
+  said only "Pronto.", so verify-or-revert removed the two lines that met the requirement. The
+  reviewer had been given the diff one release earlier; this gate had not, and the two fixes met
+  here. Same evidence, same terms: it describes what the answer is a claim about and cannot add a
+  requirement — the list stays the one the person kept. The grader's instruction changed with it,
+  because *"judge only what the answer actually shows"* is the rule that produced the miss, and
+  handing the model a diff while still telling it to ignore everything but the prose would have
+  shipped as a fix and changed nothing.
 - **The installed app stopped forever the first time the agent chose to run a command.** Not slow —
   stopped: no frame, no error, no timeout, and `cancel` answering `{"ok": true}` indefinitely about a
   run that could not be stopped. Three threads of the shipped build were parked in `typer.confirm`,
