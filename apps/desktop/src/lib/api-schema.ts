@@ -6254,13 +6254,14 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json — reading the body with a JSON parser fails on the first line. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": unknown;
+                    "text/event-stream": string;
                 };
             };
             /** @description Validation Error */
@@ -6512,13 +6513,14 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json — reading the body with a JSON parser fails on the first line. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": unknown;
+                    "text/event-stream": string;
                 };
             };
             /** @description Validation Error */
@@ -6821,13 +6823,14 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json — reading the body with a JSON parser fails on the first line. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": unknown;
+                    "text/event-stream": string;
                 };
             };
             /** @description Validation Error */
@@ -7439,13 +7442,14 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json — reading the body with a JSON parser fails on the first line. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": unknown;
+                    "text/event-stream": string;
                 };
             };
             /** @description Validation Error */
@@ -8082,13 +8086,14 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json — reading the body with a JSON parser fails on the first line. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": unknown;
+                    "text/event-stream": string;
                 };
             };
             /** @description Validation Error */
@@ -8115,13 +8120,14 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json — reading the body with a JSON parser fails on the first line. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": unknown;
+                    "text/event-stream": string;
                 };
             };
             /** @description Validation Error */
@@ -8662,13 +8668,14 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json — reading the body with a JSON parser fails on the first line. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": unknown;
+                    "text/event-stream": string;
                 };
             };
             /** @description Validation Error */
@@ -8715,13 +8722,14 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json — reading the body with a JSON parser fails on the first line. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": unknown;
+                    "text/event-stream": string;
                 };
             };
             /** @description Validation Error */
@@ -9253,13 +9261,14 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json — reading the body with a JSON parser fails on the first line. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": unknown;
+                    "text/event-stream": string;
                 };
             };
             /** @description Validation Error */

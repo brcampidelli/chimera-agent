@@ -34,6 +34,7 @@ from sse_starlette.sse import EventSourceResponse
 from starlette.concurrency import run_in_threadpool
 
 from chimera.api.code_api import CodeSeams
+from chimera.api.sse import SSE_RESPONSE
 from chimera.orchestration import runlog
 from chimera.orchestration.budget import SpendExceeded
 from chimera.orchestration.events import OrchEvent
@@ -746,7 +747,7 @@ def register_orchestration_api(
         # frames arrive over the SSE endpoint below; nothing here is fabricated data.
         return OrchestrationFramesOut().model_dump()
 
-    @app.post("/api/orchestration/hierarchy", dependencies=[guard])
+    @app.post("/api/orchestration/hierarchy", dependencies=[guard], responses=SSE_RESPONSE)
     async def hierarchy_stream(req: HierarchyRunIn) -> EventSourceResponse:
         """Run a hierarchy, streamed frame by frame.
 
@@ -854,7 +855,7 @@ def register_orchestration_api(
         return EventSourceResponse(events())
 
 
-    @app.post("/api/orchestration/crew", dependencies=[guard])
+    @app.post("/api/orchestration/crew", dependencies=[guard], responses=SSE_RESPONSE)
     async def crew_stream(req: CrewRunIn) -> EventSourceResponse:
         """Run N roles against ONE task, each in its own worktree, and merge what passes.
 

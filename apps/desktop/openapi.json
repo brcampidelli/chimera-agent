@@ -8288,9 +8288,14 @@
             "content": {
               "application/json": {
                 "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
               }
             },
-            "description": "Successful Response"
+            "description": "Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json \u2014 reading the body with a JSON parser fails on the first line."
           },
           "422": {
             "content": {
@@ -8592,9 +8597,14 @@
             "content": {
               "application/json": {
                 "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
               }
             },
-            "description": "Successful Response"
+            "description": "Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json \u2014 reading the body with a JSON parser fails on the first line."
           },
           "422": {
             "content": {
@@ -8973,9 +8983,14 @@
             "content": {
               "application/json": {
                 "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
               }
             },
-            "description": "Successful Response"
+            "description": "Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json \u2014 reading the body with a JSON parser fails on the first line."
           },
           "422": {
             "content": {
@@ -9741,9 +9756,14 @@
             "content": {
               "application/json": {
                 "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
               }
             },
-            "description": "Successful Response"
+            "description": "Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json \u2014 reading the body with a JSON parser fails on the first line."
           },
           "422": {
             "content": {
@@ -10559,9 +10579,14 @@
             "content": {
               "application/json": {
                 "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
               }
             },
-            "description": "Successful Response"
+            "description": "Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json \u2014 reading the body with a JSON parser fails on the first line."
           },
           "422": {
             "content": {
@@ -10596,9 +10621,14 @@
             "content": {
               "application/json": {
                 "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
               }
             },
-            "description": "Successful Response"
+            "description": "Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json \u2014 reading the body with a JSON parser fails on the first line."
           },
           "422": {
             "content": {
@@ -11239,9 +11269,14 @@
             "content": {
               "application/json": {
                 "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
               }
             },
-            "description": "Successful Response"
+            "description": "Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json \u2014 reading the body with a JSON parser fails on the first line."
           },
           "422": {
             "content": {
@@ -11295,9 +11330,14 @@
             "content": {
               "application/json": {
                 "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
               }
             },
-            "description": "Successful Response"
+            "description": "Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json \u2014 reading the body with a JSON parser fails on the first line."
           },
           "422": {
             "content": {
@@ -11955,9 +11995,14 @@
             "content": {
               "application/json": {
                 "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
               }
             },
-            "description": "Successful Response"
+            "description": "Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json \u2014 reading the body with a JSON parser fails on the first line."
           },
           "422": {
             "content": {

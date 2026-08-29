@@ -104,6 +104,7 @@ from chimera.api.schemas import (
     VersionOut,
 )
 from chimera.api.sessions import SessionManager, SessionStore
+from chimera.api.sse import SSE_RESPONSE
 from chimera.api.usage import UsageRecord, append_usage, load_usage, summarize_usage
 from chimera.config import Settings, get_settings
 from chimera.core.agent import ToolActivity
@@ -422,6 +423,56 @@ def _require_token() -> Callable[[Request], None]:
             raise HTTPException(status_code=401, detail="unauthorized")
 
     return check
+
+
+def _persist_crashed_run(
+    home: object, run_id: str, req: object, workspace: object, agent: object, cause: BaseException
+) -> None:
+    """Leave a row for a run that died mid-flight, so its spend is not invisible.
+
+    A completed run persists its own receipt from inside the agent. A CRASHED one never reaches
+    that line, so the money it spent getting to the crash left no trace anywhere: not in
+    `runs.jsonl`, not on the Cost screen, not in the answer. Measured on a real failure: a run
+    listed the directory, was refused a shell command, wrote a 2,210-character module, and then
+    ended as four words with no row behind them.
+
+    Written by hand rather than through `build_receipt`, and wrapped again: this runs on the path
+    where something already went wrong, and a crash reporter that can crash reports nothing.
+    """
+    try:
+        import json as _json
+        from pathlib import Path as _Path
+
+        attempts = list(getattr(agent, "attempts", None) or [])
+        rows = [
+            {
+                "index": int(getattr(a, "index", 0) or 0),
+                "success": bool(getattr(a, "success", False)),
+                "prompt_tokens": int(getattr(a, "prompt_tokens", 0) or 0),
+                "completion_tokens": int(getattr(a, "completion_tokens", 0) or 0),
+                "usd": getattr(a, "usd", None),
+                "model": str(getattr(a, "model", "") or ""),
+            }
+            for a in attempts
+        ]
+        row = {
+            "ts": datetime.now(UTC).isoformat(),
+            "task": str(getattr(req, "task", "") or "")[:2000],
+            "success": False,
+            "workspace": str(workspace),
+            "run_id": run_id,
+            # The two fields that make this row readable as what it is, rather than as a run that
+            # merely failed its verifier.
+            "crashed": True,
+            "crash_reason": f"{type(cause).__name__}: {cause}"[:500],
+            "attempts": rows,
+        }
+        log = _Path(str(home)) / "runs.jsonl"
+        log.parent.mkdir(parents=True, exist_ok=True)
+        with log.open("a", encoding="utf-8") as handle:
+            handle.write(_json.dumps(row, ensure_ascii=True) + "\n")
+    except Exception as exc:  # noqa: BLE001 — never let the reporter fail the report
+        _log.warning("crashed-run receipt not written: %s", exc)
 
 
 def build_api_app(
@@ -975,7 +1026,7 @@ def build_api_app(
 
         return await asyncio.get_running_loop().run_in_executor(None, work)
 
-    @app.post("/api/runs", dependencies=[guard])
+    @app.post("/api/runs", dependencies=[guard], responses=SSE_RESPONSE)
     async def run_stream(req: RunRequest) -> EventSourceResponse:
         # In-app trigger for an autonomous run (`chimera solve` semantics), streamed live as SSE.
         # SAFETY POSTURE: this executes file-writing and (if given) a user-supplied shell verify
@@ -1020,9 +1071,11 @@ def build_api_app(
         emit("verify", {"command": _verify_cmd, "source": _verify_src})
 
         def work() -> None:
+            auto = None
             try:
                 auto = solve_factory(req, ws, on_event, live_settings(), cancel.is_set)
                 # The receipt persists itself via the agent's run_log at run() — no extra write here.
+                # On the CRASH path it does not, which is what the except block below is for.
                 result = auto.run(req.task, thread_id=req.thread_id)
                 if getattr(result, "paused", False):
                     # The run stopped BEFORE finalizing and is parked under its thread. Its own frame,
@@ -1049,8 +1102,21 @@ def build_api_app(
                     },
                 )
             except Exception as exc:  # noqa: BLE001 — surfaced to the client as an error event
-                _log.warning("run failed: %s", exc)
-                emit("error", {"message": "the run failed"})
+                # "the run failed" was the whole message, and it was the whole message for a run
+                # that had already written a file and paid for the calls that wrote it. Four words,
+                # no cause, and nothing in the run log — so the Cost screen could not see the spend
+                # either. A user watching that had no way to tell a dead provider from a bad task.
+                #
+                # The exception TYPE is the half that identifies the failure and cannot carry a
+                # secret; the message is bounded and appended because without it "RuntimeError" is
+                # only marginally better than "failed".
+                _log.warning("run failed: %s: %s", type(exc).__name__, exc, exc_info=True)
+                emit("error", {
+                    "message": "the run failed",
+                    "reason": f"{type(exc).__name__}: {exc}"[:400],
+                    "run_id": run_id,
+                })
+                _persist_crashed_run(settings.home, run_id, req, ws, auto, exc)
             finally:
                 _run_cancels.pop(run_id, None)  # done (or crashed): the run is no longer cancellable
                 loop.call_soon_threadsafe(queue.put_nowait, None)  # sentinel: end of stream
@@ -1124,7 +1190,7 @@ def build_api_app(
         # fabricated results. The real batch arrives over POST /api/agents's ``batch_done`` frame.
         return {"results": [], "conflicts": [], "merged": 0, "is_repo": False}
 
-    @app.post("/api/agents", dependencies=[guard])
+    @app.post("/api/agents", dependencies=[guard], responses=SSE_RESPONSE)
     async def agents_stream(req: AgentsRequest) -> EventSourceResponse:
         # In-app "Agent Manager": run SEVERAL coding tasks concurrently, EACH in its own git worktree
         # (``chimera solve-batch`` semantics), streamed live as SSE. Same safety posture as POST /api/runs
@@ -1532,7 +1598,7 @@ def build_api_app(
 
         return snapshot().as_dict()
 
-    @app.post("/api/fs/exec", dependencies=[guard])
+    @app.post("/api/fs/exec", dependencies=[guard], responses=SSE_RESPONSE)
     async def fs_exec_stream(req: ExecRequest) -> EventSourceResponse:
         # HONEST command-runner (NOT an interactive terminal): each call is a FRESH subprocess — cwd/env
         # do NOT persist between commands. Streams combined stdout+stderr line by line on the local
@@ -1675,7 +1741,7 @@ def build_api_app(
     def delete_session(session_id: str) -> dict[str, bool]:
         return {"deleted": manager.delete(session_id)}
 
-    @app.post("/api/chat/stream", dependencies=[guard])
+    @app.post("/api/chat/stream", dependencies=[guard], responses=SSE_RESPONSE)
     async def chat_stream(req: ChatRequest) -> EventSourceResponse:
         session_id = req.session_id or manager.new()
         session = manager.get(session_id)

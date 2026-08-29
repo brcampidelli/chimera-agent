@@ -67,6 +67,7 @@ from chimera.api.schemas import (
     TranscriptOut,
     VisionOut,
 )
+from chimera.api.sse import SSE_RESPONSE
 from chimera.api.worth import WorthReport, summarize_worth
 from chimera.telemetry import get_logger
 
@@ -941,7 +942,7 @@ def register_code_api(
             agent.run_state.open_file = (req.open_file, "")
         return agent, ledger
 
-    @app.post("/api/code/turn", dependencies=[guard])
+    @app.post("/api/code/turn", dependencies=[guard], responses=SSE_RESPONSE)
     async def code_turn(req: CodeTurnRequest) -> EventSourceResponse:
         # SAFETY POSTURE: identical to the run endpoint — file writes and shell inside ``ws``, behind
         # the bearer guard and the localhost bind, scoped by whatever seams the caller declared.

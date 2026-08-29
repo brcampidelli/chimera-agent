@@ -54,6 +54,7 @@ from chimera.api.schemas import (
     SpecWriteOut,
     TaskCardOut,
 )
+from chimera.api.sse import SSE_RESPONSE
 from chimera.config import get_settings
 from chimera.telemetry import get_logger
 
@@ -631,7 +632,7 @@ def register_features(
         board = KanbanBoard(get_settings().home / "kanban.json")
         return {"deleted": board.remove(card_id)}
 
-    @app.post("/api/kanban/run", dependencies=[guard])
+    @app.post("/api/kanban/run", dependencies=[guard], responses=SSE_RESPONSE)
     async def run_kanban(req: KanbanRunIn) -> EventSourceResponse:
         """Dispatch backlog cards through their lanes, streamed as each one finishes.
 

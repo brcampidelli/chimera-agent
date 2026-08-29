@@ -33,6 +33,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from chimera.api.code_api import CodeSeams, assemble_registry, resolve_steps
 from chimera.api.schemas import CancelOut
+from chimera.api.sse import SSE_RESPONSE
 from chimera.config import Settings
 from chimera.telemetry import get_logger
 
@@ -84,7 +85,7 @@ def register_lifecycle_api(
     """
     read_settings = live_settings or (lambda: settings)
 
-    @app.post("/api/lifecycle", dependencies=[guard])
+    @app.post("/api/lifecycle", dependencies=[guard], responses=SSE_RESPONSE)
     async def lifecycle_stream(req: LifecycleRunIn) -> EventSourceResponse:
         """Run one task through the four stages, reporting each as it lands.
 
