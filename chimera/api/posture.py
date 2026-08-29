@@ -216,7 +216,10 @@ def describe(
         if isolated:
             shell = "isolated"
         else:
-            fell_back = (settings.sandbox or "local").lower() != "local"
+            # Anything but an explicit `local` asked for a boundary and did not get one. Under the
+            # `auto` default this is how a Windows user — where no OS sandbox exists — is told that
+            # their commands run on the host, on every posture read rather than once at startup.
+            fell_back = (settings.sandbox or "auto").lower() != "local"
             posture_env = (settings.host_exec or "ask").lower()
             # `ask` is honest about being unanswerable here: the server has no terminal, so the
             # confirm resolves to a refusal rather than to a prompt nobody will ever see.
