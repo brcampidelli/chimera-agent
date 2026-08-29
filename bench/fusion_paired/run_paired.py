@@ -32,6 +32,7 @@ import shutil
 import subprocess
 import sys
 import time
+from datetime import UTC, datetime
 from importlib.metadata import version
 from pathlib import Path
 
@@ -188,7 +189,7 @@ def run_solve(task: dict, ws: Path, flags: list[str], seed: int, timeout: int) -
     return {"exit": code, "tail": tail, "seconds": round(time.monotonic() - began, 1)}
 
 
-def read_cost(home: Path, workspace: Path) -> dict[str, float | None]:
+def read_cost(home: Path, workspace: Path, since: str = "") -> dict[str, float | None]:
     """What this cell spent, joined by WORKSPACE rather than by a window of time.
 
     Two things were wrong before, and the smoke run made both visible at once by printing
@@ -202,6 +203,13 @@ def read_cost(home: Path, workspace: Path) -> dict[str, float | None]:
     The window itself was the third: it compared an ISO timestamp against `str(time.time())` as
     strings. The workspace path is unique per cell and is recorded on the row, so the join is exact
     and no clock is involved.
+
+    ``since`` is the ISO-UTC instant this run began, and it is not optional in practice. The
+    workspace path repeats between runs — the pilot reuses `screen_<model>/<task>` — so the join
+    alone silently ADDS every earlier run of the same cell. It was caught by the pilot itself: a
+    screen cell read 86,983 prompt tokens where the smoke run of the same cell had measured 43,219,
+    which is the smoke plus the pilot. ISO-UTC timestamps compare correctly as strings, and the
+    earlier version's bug was comparing one against ``str(time.time())``, not the comparison itself.
 
     ``usd`` follows the all-or-nothing rule and is None when any joined attempt is unpriced — here
     that is the frontier models, which the local catalogue does not price. ``tokens_known`` is False
@@ -224,6 +232,8 @@ def read_cost(home: Path, workspace: Path) -> dict[str, float | None]:
             continue
         if str(row.get("workspace", "")).replace(chr(92), "/").split("workspaces/")[-1] != needle:
             continue
+        if since and str(row.get("ts", "")) < since:
+            continue  # an earlier run of the SAME cell: its cost is not this run's
         for attempt in row.get("attempts") or []:
             joined += 1
             prompt += int(attempt.get("prompt_tokens") or 0)
@@ -240,9 +250,9 @@ def read_cost(home: Path, workspace: Path) -> dict[str, float | None]:
     }
 
 
-def _sum_costs(home: Path, forks: list[Path]) -> dict:
+def _sum_costs(home: Path, forks: list[Path], since: str) -> dict:
     """Arm B pays for every sample it took, so a cell's cost is the sum over its forks."""
-    parts = [read_cost(home, fork) for fork in forks]
+    parts = [read_cost(home, fork, since) for fork in forks]
     usd: float | None = 0.0
     for part in parts:
         if part["usd"] is None:
@@ -261,7 +271,9 @@ def _sum_costs(home: Path, forks: list[Path]) -> dict:
     }
 
 
-def run_cell(task: dict, arm: str, seed: int, root: Path, timeout: int, home: Path) -> dict:
+def run_cell(
+    task: dict, arm: str, seed: int, root: Path, timeout: int, home: Path, since: str
+) -> dict:
     """One (task, arm, seed). Arm B is N solves from the SAME fork; the gate keeps the first pass.
 
     Each sample starts from a fresh workspace on purpose. Letting sample 2 inherit sample 1's edits
@@ -281,7 +293,7 @@ def run_cell(task: dict, arm: str, seed: int, root: Path, timeout: int, home: Pa
         if independent_pytest(task, ws):
             passed = True
             break  # the gate keeps the first that passes; the rest are not paid for
-    cost = _sum_costs(home, forks)
+    cost = _sum_costs(home, forks, since)
     return {
         "task": task["id"],
         "arm": arm,
@@ -298,7 +310,7 @@ def run_cell(task: dict, arm: str, seed: int, root: Path, timeout: int, home: Pa
 
 
 def run_screen(
-    tasks: list[dict], seed: int, root: Path, timeout: int, home: Path, journal
+    tasks: list[dict], seed: int, root: Path, timeout: int, home: Path, journal, since: str
 ) -> dict[str, int]:
     """The gross-failure screen from ADDENDUM-01: one pass of arm C per panel member.
 
@@ -320,7 +332,7 @@ def run_screen(
             hits += int(ok)
             row = {
                 "task": task["id"], "arm": f"screen:{model}", "seed": seed, "passed": ok,
-                "samples_paid": 1, "seconds": outcome["seconds"], **read_cost(home, ws),
+                "samples_paid": 1, "seconds": outcome["seconds"], **read_cost(home, ws, since),
                 "prereg": prereg_sha(), "chimera_version": version("chimera-agent"), "model": model,
             }
             journal.write(json.dumps(row, ensure_ascii=False) + "\n")
@@ -415,11 +427,16 @@ def main() -> None:
     ])
     print("apparatus: every task's test fails on the untouched workspace")
 
+    # The instant this run began, in the same ISO-UTC shape the receipts carry. Every cost join is
+    # scoped by it, because the workspace path repeats between runs and the join alone would add the
+    # previous run of the same cell to this one.
+    since = datetime.now(UTC).isoformat()
+
     rows: list[dict] = []
     with JOURNAL.open("a", encoding="utf-8") as journal:
         if not args.full:
             print("\nscreen (ADDENDUM-01): one pass of arm C per panel member")
-            scored = run_screen(tasks, seeds[0], work, args.timeout, home, journal)
+            scored = run_screen(tasks, seeds[0], work, args.timeout, home, journal, since)
             dead = [m for m, hits in scored.items() if hits == 0]
             if SINGLE_MODEL in dead:
                 print(f"\nSTOP: {SINGLE_MODEL} solved 0/{len(tasks)}. That is a broken ruler, not a "
@@ -431,7 +448,7 @@ def main() -> None:
         for task in tasks:
             for seed in seeds:
                 for arm in ARMS:
-                    row = run_cell(task, arm, seed, work, args.timeout, home)
+                    row = run_cell(task, arm, seed, work, args.timeout, home, since)
                     rows.append(row)
                     journal.write(json.dumps(row, ensure_ascii=False) + "\n")
                     journal.flush()

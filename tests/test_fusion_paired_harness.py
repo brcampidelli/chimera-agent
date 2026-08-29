@@ -137,6 +137,33 @@ def test_the_addendum_is_stamped_beside_the_preregistration() -> None:
 
 # --------------------------------------------------------------------------- the accounting
 
+def test_an_earlier_run_of_the_same_cell_is_not_charged_to_this_one(tmp_path: Path) -> None:
+    """The workspace path repeats between runs — the pilot reuses `screen_<model>/<task>` — so the
+    join alone ADDS every earlier run of the same cell to this one.
+
+    Caught by the pilot itself: a screen cell read 86,983 prompt tokens where the smoke run of the
+    same cell had measured 43,219, which is the smoke plus the pilot. A cost that grows every time
+    you re-run is the kind of number that looks like a measurement.
+    """
+    run = _runner()
+    (tmp_path / "runs.jsonl").write_text(
+        json.dumps({"ts": "2026-08-01T00:00:00+00:00",
+                    "workspace": "/tmp/workspaces/w/C_single_s42_0/t1",
+                    "attempts": [{"prompt_tokens": 900, "completion_tokens": 90, "usd": 0.9}]}) + chr(10)
+        + json.dumps({"ts": "2026-08-28T00:00:00+00:00",
+                      "workspace": "/tmp/workspaces/w/C_single_s42_0/t1",
+                      "attempts": [{"prompt_tokens": 100, "completion_tokens": 10, "usd": 0.1}]}) + chr(10),
+        encoding="utf-8",
+    )
+    where = Path("/tmp/workspaces/w/C_single_s42_0/t1")
+
+    scoped = run.read_cost(tmp_path, where, "2026-08-27T00:00:00+00:00")
+    unscoped = run.read_cost(tmp_path, where)
+
+    assert scoped["prompt_tokens"] == 100, "an earlier run of the same cell was charged to this one"
+    assert unscoped["prompt_tokens"] == 1000, "the guard is the scope, not a change of file"
+
+
 def _runs_log(tmp_path: Path, *attempts: dict, workspace: str = "w/A_fusion_s42_0/t1") -> Path:
     """A `runs.jsonl` shaped like the one a CLI solve writes: the receipt is on the ATTEMPT."""
     (tmp_path / "runs.jsonl").write_text(
@@ -212,7 +239,9 @@ def test_arm_b_pays_for_every_sample_it_took(tmp_path: Path) -> None:
         }) + "\n" for i in range(3)
     ), encoding="utf-8")
 
-    cost = run._sum_costs(tmp_path, [Path(f"/tmp/workspaces/B_repeat_s42_{i}/t1") for i in range(3)])
+    cost = run._sum_costs(
+        tmp_path, [Path(f"/tmp/workspaces/B_repeat_s42_{i}/t1") for i in range(3)], ""
+    )
 
     assert cost["prompt_tokens"] == 300 and cost["completion_tokens"] == 30
     assert cost["usd"] == pytest.approx(0.03)
