@@ -65,6 +65,9 @@ _ANY_NUMBER = re.compile(r"-?\d[\d,]*\.?\d*")
 #: moment the model changes, and it stops silently.
 _MIN_EXTRACTION = 0.90
 
+#: The registered sample. A run with `--sample k < this` measures a PREFIX of it, never a new draw.
+_REGISTERED_SAMPLE = 120
+
 
 def prereg_sha() -> str:
     path = HERE / "PREREGISTRATION.md"
@@ -108,7 +111,12 @@ def logic_items(sample: int, seed: int) -> list[dict]:
         if classify_task_type([{"role": "user", "content": row["question"]}]) == "logic"
     ]
     rows.sort(key=lambda r: r["question"])  # a stable order before the seeded draw
-    return random.Random(seed).sample(rows, min(sample, len(rows)))
+    # Draw the FULL registered sample once and slice it, so a smaller run is a PREFIX of a larger
+    # one. Drawing `sample(rows, k)` directly gives a different set for every k, which would make
+    # the cache useless the moment the sample grew — and would let a re-draw quietly become a
+    # second roll of the same die.
+    drawn = random.Random(seed).sample(rows, min(_REGISTERED_SAMPLE, len(rows)))
+    return drawn[:sample]
 
 
 def gold(row: dict) -> str:
