@@ -55,6 +55,7 @@ site/
 bench/local_lift/results/
 bench/fusion_paired/results/
 bench/fusion_aggregate/results/
+bench/cost_routing/results/
 bench/llm_benchmarks/results/
 bench/llm_benchmarks/data/   # downloaded HumanEval/GSM8K (their own licences; fetched on demand)
 
