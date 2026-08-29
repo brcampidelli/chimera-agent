@@ -80,4 +80,24 @@ class CronJob(BaseModel):
 
     Recorded on the job rather than read at dispatch on purpose: the answer must not depend on which
     project the user happened to have open at 7am."""
+    verify: str = ""
+    """Shell command that decides whether a dispatch KEPT its work. Empty = no gate.
+
+    This is what turns a scheduled job into a run the harness governs. With it set, the dispatch
+    snapshots the workspace, runs the job, runs this command in that folder, and **reverts the
+    workspace when it fails** — the same verify-or-revert every other surface has had and the one
+    that runs most often did not.
+
+    Opt-in, and it has to be. Most scheduled jobs are reports: summarise the day, check a price,
+    post to a channel. Those change no files, and a gate that fails a run for changing no files
+    would break every one of them — which is exactly the shape of a defect this project measured on
+    its own release. So a job without a `verify` keeps today's behaviour and gains only the
+    accounting; a job that edits code opts into the gate by naming the command that proves it.
+    """
+    max_attempts: int = 1
+    """How many times one dispatch may try. 1 keeps today's behaviour: one shot, no retry.
+
+    Above 1, a failed attempt is retried with the failure fed back — worth setting only alongside
+    `verify`, because without a gate nothing can tell a failed attempt from a finished one.
+    """
     metadata: dict[str, Any] = Field(default_factory=dict)

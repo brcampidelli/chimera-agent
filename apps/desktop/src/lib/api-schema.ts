@@ -5623,6 +5623,11 @@ export interface components {
              * @default false
              */
             repo_map: boolean;
+            /**
+             * Require Diff
+             * @default false
+             */
+            require_diff: boolean;
             /** Requirements */
             requirements?: components["schemas"]["RequirementOut"][] | null;
             roles?: components["schemas"]["RoleModels"] | null;

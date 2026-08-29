@@ -44,6 +44,28 @@ Most of this release is doors. The rest is what testing each release candidate a
   resolved backend, with an exact type check rather than `isinstance`, because `OsSandbox`
   subclasses `LocalSandbox` to reuse its process handling.
 
+### Added — the surface that runs most often is governed now, and half a measured lift is armable
+
+- **The scheduled run had no harness at all.** `chimera solve`, the Code screen and `POST /api/runs`
+  all wrap the worker in the autonomous loop — snapshot, verify, revert, retry, receipt. The cron
+  dispatch called `agent.run(job.action)` directly, so the path that fires unattended every day, for
+  months, was the only one with no gate, no rollback, no retry and **no entry in `runs.jsonl`**.
+  Nothing was watching the thing that runs when nobody is watching. A job now declares `verify` (the
+  command that proves its work) and `max_attempts`, and the dispatch runs the same loop everything
+  else does. **The gate is opt-in, and that is the design rather than a caution:** most scheduled
+  jobs are reports that change no files, and the diff gate fails an attempt that changed no file —
+  arming it for everyone would fail every report job with *"this task requires editing code"*, which
+  is a defect this project already measured on its own release. With no guard the diff gate cannot
+  fire at all, so a report job behaves exactly as it did and gains only the accounting. The usage row
+  sums **every** attempt rather than the last, because a retry costs more than one and reporting one
+  would understate exactly the configuration that costs most.
+- **`require_diff` can be armed from the app.** It existed only as a CLI flag, which made it
+  unreachable from every screen — and it is not a minor one: this project's own SWE-bench
+  decomposition attributes **half** the measured scaffold lift to it (+4.9pp of +9.8pp), because a
+  passing test proves nothing about a patch that is empty, and run 1 of that bench returned 11 empty
+  patches out of 19. Off by default and stated as a choice: it is right for a code task and wrong for
+  a question, so the caller says which this is rather than the loop guessing.
+
 ### Added — MCP can be opened instead of handed over
 
 - **Every connected server's full schema was re-sent on every step of every turn.** A handful of
