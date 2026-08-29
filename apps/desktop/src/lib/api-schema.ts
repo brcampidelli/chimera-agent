@@ -3620,10 +3620,20 @@ export interface components {
             action: string;
             /** Deliver To */
             deliver_to?: string | null;
+            /**
+             * Max Attempts
+             * @default 1
+             */
+            max_attempts: number;
             /** Name */
             name: string;
             /** Schedule */
             schedule: string;
+            /**
+             * Verify
+             * @default
+             */
+            verify: string;
             /** Workspace */
             workspace?: string | null;
         };
@@ -3663,6 +3673,11 @@ export interface components {
             last_run: number | null;
             /** Last Status */
             last_status?: string | null;
+            /**
+             * Max Attempts
+             * @default 1
+             */
+            max_attempts: number;
             /** Name */
             name: string;
             /** Next Run */
@@ -3671,6 +3686,11 @@ export interface components {
             schedule: string;
             /** Trigger */
             trigger: string;
+            /**
+             * Verify
+             * @default
+             */
+            verify: string;
             /** Workspace */
             workspace?: string | null;
         };
@@ -5242,6 +5262,12 @@ export interface components {
              * @default
              */
             external_agent: string;
+            /**
+             * Fell Back Reason
+             * @default
+             * @enum {string}
+             */
+            fell_back_reason: "" | "no_container" | "no_os_sandbox";
             /**
              * Fell Back To Host
              * @default false

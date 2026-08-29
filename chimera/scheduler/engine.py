@@ -76,7 +76,19 @@ class Scheduler:
         created_by: CreatedBy = "human",
         workspace: str | None = None,
         deliver_to: str | None = None,
+        verify: str = "",
+        max_attempts: int = 1,
     ) -> CronJob:
+        """Register a job fired by a cron expression.
+
+        verify: Shell command that decides whether this job's dispatch KEPT its work; empty means
+            no gate, which is today's behaviour. Accepted here rather than only on the model
+            because a field nothing can set is a field nobody has: `CronJob` has carried `verify`
+            and `max_attempts` since the harness landed, and neither the HTTP route nor the CLI
+            could write them, so the gate could never arm for any user.
+        max_attempts: How many times one dispatch may try. Worth raising only alongside `verify` —
+            without a gate nothing can tell a failed attempt from a finished one.
+        """
         if not croniter.is_valid(cron_expr):
             raise ValueError(f"invalid cron expression: {cron_expr!r}")
         job = CronJob(
@@ -92,6 +104,8 @@ class Scheduler:
             next_run=_next_after(cron_expr, now),
             workspace=workspace,
             deliver_to=deliver_to,
+            verify=verify,
+            max_attempts=max(1, max_attempts),
         )
         self.store.add(job)
         return job
@@ -103,7 +117,19 @@ class Scheduler:
         action: str,
         *,
         created_by: CreatedBy = "human",
+        verify: str = "",
+        max_attempts: int = 1,
     ) -> CronJob:
+        """Register a job fired by a named event.
+
+        verify: Shell command that decides whether this job's dispatch KEPT its work; empty means
+            no gate, which is today's behaviour. Accepted here rather than only on the model
+            because a field nothing can set is a field nobody has: `CronJob` has carried `verify`
+            and `max_attempts` since the harness landed, and neither the HTTP route nor the CLI
+            could write them, so the gate could never arm for any user.
+        max_attempts: How many times one dispatch may try. Worth raising only alongside `verify` —
+            without a gate nothing can tell a failed attempt from a finished one.
+        """
         job = CronJob(
             id=uuid.uuid4().hex[:8],
             name=name,
@@ -112,6 +138,8 @@ class Scheduler:
             action=action,
             created_by=created_by,
             enabled=created_by != "agent",  # agent-created triggers start disabled (same invariant)
+            verify=verify,
+            max_attempts=max(1, max_attempts),
         )
         self.store.add(job)
         return job
@@ -123,8 +151,22 @@ class Scheduler:
         action: str,
         *,
         created_by: CreatedBy = "human",
+        verify: str = "",
+        max_attempts: int = 1,
     ) -> CronJob:
-        """Register a job fired by an inbound HTTP POST to ``/webhook/<hook>``."""
+        """Register a job fired by an inbound HTTP POST to ``/webhook/<hook>``.
+
+        A webhook job is the one most likely to edit code on somebody else's schedule, so it takes
+        the gate for the same reason a cron does.
+
+        verify: Shell command that decides whether this job's dispatch KEPT its work; empty means
+            no gate, which is today's behaviour. Accepted here rather than only on the model
+            because a field nothing can set is a field nobody has: `CronJob` has carried `verify`
+            and `max_attempts` since the harness landed, and neither the HTTP route nor the CLI
+            could write them, so the gate could never arm for any user.
+        max_attempts: How many times one dispatch may try. Worth raising only alongside `verify` —
+            without a gate nothing can tell a failed attempt from a finished one.
+        """
         job = CronJob(
             id=uuid.uuid4().hex[:8],
             name=name,
@@ -132,6 +174,8 @@ class Scheduler:
             schedule=hook,
             action=action,
             created_by=created_by,
+            verify=verify,
+            max_attempts=max(1, max_attempts),
         )
         self.store.add(job)
         return job

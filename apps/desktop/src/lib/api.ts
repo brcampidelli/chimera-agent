@@ -486,6 +486,11 @@ export const createCron = (
     action: string;
     workspace?: string | null;
     deliver_to?: string | null;
+    /** The gate. Empty means the job runs ungoverned, which is what every job did before this
+     *  field could be sent: `CronJob` has carried `verify` since the harness landed and neither
+     *  this route nor the CLI could write it, so the gate could never arm for anybody. */
+    verify?: string;
+    max_attempts?: number;
   },
 ) =>
   json<CronJob>("/api/cron", { method: "POST", body: JSON.stringify(body) });
@@ -1294,9 +1299,19 @@ export interface PostureFacts {
   workspace: string;
   shell: "none" | "isolated" | "host" | "asks" | "refused";
   pauses: "always" | "tainted" | "never";
-  // True when the shell would run on this machine while the config asked for a container. The one
+  // True when the shell would run on this machine while the config asked for a boundary. The one
   // case where the honest answer contradicts the user's setup, so it is never folded into `shell`.
   fell_back_to_host: boolean;
+  /** WHY it fell back, because there are two reasons and they need different sentences.
+   *
+   *  `no_container` is the original: a container was configured and no daemon answered, so "start
+   *  Docker" is advice that works. `no_os_sandbox` is the `auto` default on a machine with no
+   *  kernel mechanism — Windows, or a Linux that refuses unprivileged user namespaces — where
+   *  naming a container is simply false and starting one is not what the user set up.
+   *
+   *  Optional because a server older than the field sends the flag without it; the screen reads a
+   *  missing reason as the container case, which is what those servers meant. */
+  fell_back_reason?: "" | "no_container" | "no_os_sandbox";
   // True when this surface has NO taint ledger: nothing marks the conversation after it reads
   // untrusted content, so the tools that would otherwise start refusing keep working. The default
   // for a chat, deliberately — and therefore something the sentence has to admit.

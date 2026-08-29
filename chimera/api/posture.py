@@ -141,6 +141,10 @@ Shell = Literal["none", "isolated", "host", "asks", "refused"]
 Pauses = Literal["always", "tainted", "never"]
 
 
+#: Why the shell would run on this machine. "" when it would not.
+FellBackReason = Literal["", "no_container", "no_os_sandbox"]
+
+
 class PostureFacts(BaseModel):
     """What is true right now, for the UI to render as one sentence.
 
@@ -158,6 +162,14 @@ class PostureFacts(BaseModel):
     #: is the one case where the honest answer contradicts what the user set up, and silently
     #: honouring the config here is exactly how "I thought it was sandboxed" happens.
     fell_back_to_host: bool = False
+    #: WHY the fall-back happened, because there are now two reasons and they need different
+    #: sentences. ``"no_container"`` is the original: a Docker sandbox was configured and no daemon
+    #: answered, so "start Docker" is advice that works. ``"no_os_sandbox"`` is the `auto` default on
+    #: a machine with no kernel mechanism — Windows, or a Linux that refuses unprivileged user
+    #: namespaces — where starting Docker is not what the user set up and telling them a container
+    #: was configured is simply false. The screen was saying the container sentence in both cases,
+    #: which reached the right conclusion by the wrong reason and sent people to fix the wrong thing.
+    fell_back_reason: FellBackReason = ""
     #: True when this surface has NO taint ledger — nothing marks the run after it reads untrusted
     #: content, so the tools that would otherwise start refusing keep working. Reported because the
     #: default is the permissive one (``CHIMERA_GUARD_CHAT`` is off), and a permissive default that
@@ -207,6 +219,7 @@ def describe(
 
     shell: Shell = "none"
     fell_back = False
+    fell_back_reason: FellBackReason = ""
     if not (EXEC_TOOLS & set(resolved.deny_tools)):
         isolated = False
         try:
@@ -219,7 +232,15 @@ def describe(
             # Anything but an explicit `local` asked for a boundary and did not get one. Under the
             # `auto` default this is how a Windows user — where no OS sandbox exists — is told that
             # their commands run on the host, on every posture read rather than once at startup.
-            fell_back = (settings.sandbox or "auto").lower() != "local"
+            configured = (settings.sandbox or "auto").lower()
+            fell_back = configured != "local"
+            # A container was named and did not answer, versus no kernel mechanism exists here at
+            # all. Both end on this machine; only one of them is fixed by starting a daemon.
+            fell_back_reason = (
+                "no_container" if configured in {"docker", "container", "podman"}
+                else "no_os_sandbox" if fell_back
+                else ""
+            )
             posture_env = (settings.host_exec or "ask").lower()
             # `ask` is honest about being unanswerable here: the server has no terminal, so the
             # confirm resolves to a refusal rather than to a prompt nobody will ever see.
@@ -235,6 +256,7 @@ def describe(
             else "never"
         ),
         fell_back_to_host=fell_back,
+        fell_back_reason=fell_back_reason,
         unguarded=not guarded,
         external_agent=external_agent,
     )

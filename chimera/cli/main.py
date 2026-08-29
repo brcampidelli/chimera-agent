@@ -4768,20 +4768,44 @@ def cron_add(
     action: str = typer.Argument(..., help="What to do (task description / skill)."),
     event: bool = typer.Option(False, "--event", help="Treat SCHEDULE as an event name."),
     webhook: bool = typer.Option(False, "--webhook", help="Fire on POST /webhook/<SCHEDULE> (needs 'chimera serve')."),
+    verify: str = typer.Option(
+        "", "--verify",
+        help="Gate: shell command run in the job's folder after the dispatch (exit 0 to keep the "
+             "work, non-zero to revert it). Empty = no gate, which is the previous behaviour.",
+    ),
+    max_attempts: int = typer.Option(
+        1, "--max-attempts",
+        help="Attempts per dispatch. Worth raising only with --verify: without a gate nothing can "
+             "tell a failed attempt from a finished one.",
+    ),
 ) -> None:
-    """Add a cron, event- or webhook-triggered job."""
+    """Add a cron, event- or webhook-triggered job.
+
+    `--verify` is what turns a scheduled job into a run the harness governs. `CronJob` has carried
+    the field since the harness landed and nothing could write it — not this command, not the HTTP
+    route — so for every user the gate was permanently unarmed.
+    """
     import time
 
     from chimera.scheduler import Scheduler
 
     sched = Scheduler(_cron_store())
+    # Passed by name rather than unpacked from a dict: a `**kwargs` here type-erases both fields,
+    # and these are exactly the two that decide whether the run is governed.
     if webhook:
-        job = sched.schedule_webhook(name, schedule, action)
+        job = sched.schedule_webhook(
+            name, schedule, action, verify=verify, max_attempts=max_attempts
+        )
     elif event:
-        job = sched.schedule_event(name, schedule, action)
+        job = sched.schedule_event(
+            name, schedule, action, verify=verify, max_attempts=max_attempts
+        )
     else:
         try:
-            job = sched.schedule_cron(name, schedule, action, now=time.time())
+            job = sched.schedule_cron(
+                name, schedule, action, now=time.time(),
+                verify=verify, max_attempts=max_attempts,
+            )
         except ValueError as exc:
             console.print(f"[red]{exc}[/red]")
             raise typer.Exit(code=1) from exc

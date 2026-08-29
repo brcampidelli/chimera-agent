@@ -45,6 +45,10 @@ describe("Cron — create a schedule from the UI", () => {
           // And where its answer goes. Null is "only the result file", which is what every
           // schedule did before this field was wired to anything: see Cron.deliver.test.tsx.
           deliver_to: null,
+          // The gate, empty because this test left the field alone — which is the default and
+          // keeps the previous behaviour. See Cron.verify.test.tsx for the other half.
+          verify: "",
+          max_attempts: 1,
         },
         expect.anything(), // react-query passes a context object as the 2nd arg
       ),

@@ -147,6 +147,10 @@ export function postureFacts(over: Partial<PostureFacts> = {}): PostureFacts {
     shell: "none",
     pauses: "tainted",
     fell_back_to_host: false,
+    // WHY it fell back, when it did. "" is the honest default for a fixture that did not fall back
+    // at all, and the component treats an absent reason as the container case — which is what a
+    // server that predates this field meant.
+    fell_back_reason: "",
     external_agent: "",
     // The coding turn is always assembled with the ledger, so the fixture's default is the guarded
     // case. A test that wants the unguarded chat has to ask for it — which is the right way round:

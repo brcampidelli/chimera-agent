@@ -850,6 +850,11 @@ class CronJobOut(BaseModel):
     packaged build is the install directory, so the screen says so rather than leaving it blank."""
     deliver_to: str | None = None
     """A chat webhook URL the answer is posted to, or None to only write it to the result file."""
+    verify: str = ""
+    """The gate, echoed back so the screen can show whether this job has one. A job with an empty
+    `verify` runs ungoverned by design, and that is worth reading on the row rather than inferring
+    from its absence."""
+    max_attempts: int = 1
 
 
 class CronResultOut(BaseModel):
@@ -886,6 +891,17 @@ class CronCreateIn(BaseModel):
     that omits it gets the process root, which is the previous behaviour."""
     deliver_to: str | None = None
     """Optional chat webhook (Discord or Slack) the answer is posted to when the job fires."""
+    verify: str = ""
+    """Shell command that decides whether a dispatch KEPT its work; empty means no gate.
+
+    `CronJob` has carried this since the harness landed and no caller could write it — not this
+    route, not `chimera cron add` — so for every user `verify` was always empty, the gate could
+    never arm, and the scheduled run kept the accounting half of that change and none of the rest.
+    A field nothing can set is a field nobody has.
+    """
+    max_attempts: int = 1
+    """How many times one dispatch may try. Worth raising only alongside `verify`: without a gate
+    nothing can tell a failed attempt from a finished one."""
 
 
 # --- tasks (kanban + projects) --------------------------------------------------------------------
