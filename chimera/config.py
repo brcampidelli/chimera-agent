@@ -264,6 +264,15 @@ class Settings(BaseSettings):
     # restart to take effect. MCP tool output is untrusted (the `untrusted_output` flag flows to
     # governance). Configure servers with `chimera mcp add` or the desktop MCP screen. ---
     mcp_autoload: bool = Field(default=False, validation_alias="CHIMERA_MCP_AUTOLOAD")
+    # Reach MCP tools on demand (mcp_list / mcp_describe / mcp_call) instead of declaring every
+    # server's full schema on every step of every turn. The comparable product that measured this
+    # reported -46.9% of total agent tokens.
+    #
+    # OFF by default, and the reason is the half nobody measured: the saving is in tokens and the
+    # risk is in selection accuracy, because a model that must search for a tool may choose worse
+    # than one handed the list. `chimera.integrations.mcp_defer.describe_saving` reports the first
+    # half on your own servers; until the second half is measured here, this stays a choice.
+    mcp_defer: bool = Field(default=False, validation_alias="CHIMERA_MCP_DEFER")
 
     # --- Auto-fuse error-sensitive turns in solve/crew without an explicit --fuse.
     # Off by default (fusion costs 2-3x); when on, the cost-aware router still keeps

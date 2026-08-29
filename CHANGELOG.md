@@ -66,6 +66,32 @@ Most of this release is doors. The rest is what testing each release candidate a
   patches out of 19. Off by default and stated as a choice: it is right for a code task and wrong for
   a question, so the caller says which this is rather than the loop guessing.
 
+### Added — MCP can be opened instead of handed over
+
+- **Every connected server's full schema was re-sent on every step of every turn.** A handful of
+  servers is a few thousand tokens on a call that may not touch any of them; a catalogue is a
+  standing tax on the whole session. `CHIMERA_MCP_DEFER=on` replaces N tool declarations with three:
+  `mcp_list` (what exists, one line each), `mcp_describe` (one schema, when the agent has chosen)
+  and `mcp_call` (run it). The comparable product that measured this reported **−46.9% of total
+  agent tokens** in a significant A/B.
+  **Off by default, and the reason is the half nobody measured.** The saving is in tokens and the
+  risk is in selection accuracy — a model that has to search for a tool may choose worse than one
+  handed the list, and this project has rules against turning things on by conviction.
+  `describe_saving` reports the first half **on your own `mcp.json`**, because −46.9% was measured
+  on somebody else's harness with somebody else's servers, and the only number that says anything
+  about your session is the one taken from your machine.
+  Two properties are not optional and are tested hardest. **Denial is re-applied inside the proxy:**
+  the restriction filter matches registry names, and after deferral the servers' names are not in
+  the registry — so a denylist naming an MCP tool would silently stop removing it while one proxy
+  could still reach every one of them. That is the same hole `ExploreRepositoryTool` documents about
+  itself for being registered after the filter, and worse here because one tool reaches everything.
+  And a refusal **never says whether the name exists**, so the proxy cannot become an oracle for
+  what an owner's denylist contains. `mcp_call` is marked untrusted-output unconditionally, because
+  the taint layer reads that flag before anyone knows which tool will be called.
+  The argument object is classified as a **document body** rather than a nested one: `edit_batch`
+  can be walked into because its key names are ours, and an MCP server names its own parameters — so
+  walking in would print an `api_token` that nothing here knows to elide.
+
 ### Added — the app can reach what it was built on
 
 - **The step budget was the one configuration this project's own bench published as sterile.**

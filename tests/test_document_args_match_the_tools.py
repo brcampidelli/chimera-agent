@@ -45,6 +45,9 @@ from chimera.tools.base import Tool
 #: accident, which is the criterion `_DOCUMENT_ARGS` exists to serve.
 _IDENTIFIERS = frozenset({
     "action",
+    # `mcp_call`/`mcp_describe`: which server tool. The identity of the action — an audit line
+    # reading "called <120 chars>" would record that something happened and nothing about what.
+    "tool",
     # `skill_view`: which installed skill, and which file inside it. Both name a thing; the file's
     # CONTENT comes back in the result, which is where the untrusted-output marker lives.
     "file_path",

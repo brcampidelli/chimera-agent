@@ -1789,7 +1789,15 @@ def desktop_app(
         live = get_settings()
         registry = default_registry(workspace_path)
         if mcp_connectors is not None:
-            mcp_connectors.into_tool_registry(registry)  # MCP tools alongside the builtins
+            if live.mcp_defer:
+                # Three access tools instead of every server's full schema on every step. Read from
+                # `live` rather than the boot snapshot for the same reason as everything else here:
+                # a toggle flipped since launch should reach the next conversation.
+                from chimera.integrations.mcp_defer import register_deferred_mcp
+
+                register_deferred_mcp(mcp_connectors, registry)
+            else:
+                mcp_connectors.into_tool_registry(registry)  # MCP tools alongside the builtins
         # AFTER the MCP tools, for the same reason the guard below is: a denylist that covers only
         # the tools we wrote is not a denylist. CHIMERA_TOOL_ALLOWLIST/_DENYLIST reached `chimera
         # run` and `chimera solve` and nothing else, so an owner who fenced their agent in `.env`
