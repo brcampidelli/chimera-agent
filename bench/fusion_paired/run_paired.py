@@ -300,6 +300,13 @@ def run_cell(
         "seed": seed,
         "passed": passed,
         "samples_paid": len(attempts),
+        # Kept because the pilot needed them and did not have them: on one task all three arms
+        # joined no receipt, two of them after SUCCEEDING, and the diagnosis had to be done by
+        # reading the workspace off disk. A cell whose cost is unknown must at least say what it
+        # did — 124 is the timeout, and a tail is the difference between "the model failed" and
+        # "the clock ran out".
+        "exits": [a["exit"] for a in attempts],
+        "tail": (attempts[-1]["tail"] if attempts else "")[-600:],
         "seconds": sum(a["seconds"] for a in attempts),
         **cost,
         "prereg": prereg_sha(),
@@ -466,6 +473,12 @@ def main() -> None:
             cells = [r for r in rows if r["arm"] == arm]
             if not cells:
                 continue
+            timeouts = sum(1 for r in cells if 124 in (r.get("exits") or []))
+            if timeouts:
+                # An asymmetric timeout does not lower an arm's score, it invalidates the
+                # comparison: "could not do it" and "ran out of clock" become one number.
+                print(f"  {arm:<9} TIMEOUTS: {timeouts} of {len(cells)} cells hit the wall. Any "
+                      "delta against this arm is a clock artifact until the wall moves.")
             tok = sum(int(r["prompt_tokens"] or 0) + int(r["completion_tokens"] or 0) for r in cells)
             paid = sum(int(r["samples_paid"]) for r in cells)
             money = sum(r["usd"] or 0.0 for r in cells)

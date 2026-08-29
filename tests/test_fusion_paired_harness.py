@@ -269,6 +269,22 @@ def test_an_arm_that_read_no_receipt_blocks_the_full_run_estimate() -> None:
     assert 'r.get("tokens_known", True)' in source
 
 
+def test_a_cell_records_what_it_did_so_a_blank_receipt_is_diagnosable() -> None:
+    """The pilot needed this and did not have it: on one task all three arms joined no receipt, two
+    of them after SUCCEEDING, and the diagnosis had to be done by reading the workspace off disk.
+
+    Exit 124 is the timeout, and it is a different outcome from a wrong answer. The learning-lift
+    series had to write this rule after run 7a, when "the agent could not do it" and "the clock ran
+    out" were still the same number.
+    """
+    source = (REPO / "bench/fusion_paired/run_paired.py").read_text(encoding="utf-8")
+
+    assert '"exits": [a["exit"] for a in attempts]' in source
+    assert '"tail":' in source
+    assert "TIMEOUTS:" in source, "an arm that hit the wall must say so beside its score"
+    assert "clock artifact" in source
+
+
 # --------------------------------------------------------------------------- the report
 
 def _rows(**passes: list[bool]) -> list[dict]:
