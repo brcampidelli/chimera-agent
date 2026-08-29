@@ -38,7 +38,18 @@ def test_a_desktop_run_carries_the_learning_seams(tmp_path: Path) -> None:
     assert agent.memory is not None
     assert agent.experience is not None
     assert agent.playbook is not None
-    assert agent.auto_evolver is not None
+    # A cunhagem segue a leitura desde que as duas metades passaram a se olhar. O que este arquivo
+    # existe para segurar e' a PARIDADE — o terminal e o app tem de terminar no mesmo estado — e
+    # ela continua de pe: os dois deixam de cunhar quando o agente nao pode reler.
+    assert agent.auto_evolver is None
+
+
+def test_ligar_a_leitura_devolve_a_cunhagem_ao_app(tmp_path: Path, monkeypatch: Any) -> None:
+    """E a paridade vale nos dois sentidos: quem liga a leitura volta a cunhar PELO APP tambem,
+    sem precisar descobrir um segundo interruptor."""
+    monkeypatch.setenv("CHIMERA_SKILL_CARDS", "1")
+
+    assert _agent(tmp_path).auto_evolver is not None
 
 
 def test_trajectory_collection_stays_off(tmp_path: Path) -> None:

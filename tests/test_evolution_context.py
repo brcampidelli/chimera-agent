@@ -42,10 +42,35 @@ def test_factory_builds_default_seams(tmp_path: Path) -> None:
     assert isinstance(ctx.experience, ExperienceBuffer)
     assert ctx.trajectories is None
     assert ctx.cards is None
-    # evolve_skills defaults True -> an evolver is built
-    assert isinstance(ctx.auto_evolver, AutoSkillEvolver)
+    # E com os cartoes ilegiveis, NAO se cunha. `evolve_skills` continua True por padrao; o que
+    # mudou e' que ele deixou de ser suficiente sozinho. Cunhar custa uma proposta, uma validacao e
+    # um teste de fumaca por tarefa recorrente — e no caminho do painel, uma proposta por modelo
+    # mais uma sondagem em nove — para produzir cartao que este mesmo contexto acabou de decidir
+    # que ninguem vai ler (`ctx.cards is None`, duas linhas acima).
+    assert ctx.auto_evolver is None
     assert ctx.memory is None
     assert ctx.playbook is None
+
+
+def test_ler_cartoes_e_o_que_liga_a_cunhagem(tmp_path: Path) -> None:
+    """A metade que faltava. Ligar a leitura religa a escrita, sem mais nenhum interruptor."""
+    ctx = build_evolution_context(
+        _settings(CHIMERA_SKILL_CARDS="1"), _FakeGateway(), "m", home=tmp_path
+    )
+
+    assert ctx.cards is not None
+    assert isinstance(ctx.auto_evolver, AutoSkillEvolver)
+
+
+def test_da_para_colecionar_de_proposito(tmp_path: Path) -> None:
+    """Uma pessoa ainda le' os cartoes na tela de Conhecimento, entao juntar uma biblioteca de
+    proposito continua possivel — o que deixou de existir e' pagar por ela sem pedir."""
+    ctx = build_evolution_context(
+        _settings(CHIMERA_MINT_UNREADABLE_SKILLS="1"), _FakeGateway(), "m", home=tmp_path
+    )
+
+    assert ctx.cards is None
+    assert isinstance(ctx.auto_evolver, AutoSkillEvolver)
 
 
 def test_evolve_skills_false_disables_evolver(tmp_path: Path) -> None:

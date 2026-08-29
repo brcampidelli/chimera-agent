@@ -55,6 +55,9 @@ def test_the_evolver_is_built_with_it(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr("chimera.evolution.context.AutoSkillEvolver", _Spy)
     monkeypatch.setenv("CHIMERA_SKILL_MIN_TRANSFER", "0.25")
+    # A cunhagem passou a seguir a leitura, e este teste e' sobre o valor CHEGAR ao construtor —
+    # nao sobre quando ele e' chamado. Ligar os cartoes aqui mantem o teste sobre o que ele testa.
+    monkeypatch.setenv("CHIMERA_SKILL_CARDS", "1")
 
     from chimera.evolution.context import build_evolution_context
 

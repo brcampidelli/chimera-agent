@@ -307,6 +307,19 @@ class Settings(BaseSettings):
     skill_cards_couple_read: bool = Field(
         default=False, validation_alias="CHIMERA_SKILL_CARDS_READ"
     )
+    #: Mint learned skills even when the agent cannot read them back. OFF, and that is the point.
+    #:
+    #: Reading is opt-in because it was MEASURED and did not clear its gate (`bench/skillcard`:
+    #: +16.7pp, CI includes zero, +300% tokens). Minting was never coupled to it, so the default
+    #: install paid for a proposal call, a validation and a smoke test — and on the panel path a
+    #: proposal per panel model plus a nine-model transfer probe — to produce cards nothing in the
+    #: loop would ever read. Four projects run end to end minted 14 of them and used 0.
+    #:
+    #: A person can still browse them on the Knowledge screen, which is why this exists at all
+    #: rather than the write being deleted: set it to keep collecting a library on purpose.
+    mint_unreadable_skills: bool = Field(
+        default=False, validation_alias="CHIMERA_MINT_UNREADABLE_SKILLS"
+    )
 
     # --- ACE playbook curation from errors (Level-2 P3): when curating the playbook after a run,
     # feed the curator the actual error evidence — the failing verifier output and the diff that

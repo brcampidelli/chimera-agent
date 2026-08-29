@@ -28,12 +28,16 @@ from chimera.evolution.experience import ExperienceBuffer
 from chimera.evolution.playbook import Playbook
 from chimera.evolution.skill_store import SkillStore
 from chimera.governance.validator import SkillValidator
+from chimera.telemetry import get_logger
 
 if TYPE_CHECKING:
     from chimera.config import Settings
     from chimera.ecosystem.trajectory import TrajectoryCollector
     from chimera.governance.audit import AuditLog
     from chimera.providers.gateway import SupportsComplete
+
+
+_log = get_logger("evolution.context")
 
 
 @dataclass
@@ -122,7 +126,21 @@ def build_evolution_context(
     else:
         use_cards = settings.skill_cards
     auto_evolver: AutoSkillEvolver | None = None
-    if evolve_skills:
+    # Reading and writing were decided next to each other, in this function, and never compared.
+    # Minting costs a proposal call, a validation and a smoke test on every recurring task — and on
+    # the panel path a proposal per panel model plus a nine-model transfer probe. With reading off,
+    # every one of those buys a card the loop cannot retrieve.
+    #
+    # Reading stays off because it was measured, not because it was forgotten (`bench/skillcard`:
+    # +16.7pp, CI includes zero, +300% tokens — the registered gate failed). So the half to change
+    # is the writing, and the escape hatch is explicit for the person who wants a library anyway.
+    mint = use_cards or settings.mint_unreadable_skills
+    if evolve_skills and not mint:
+        _log.debug(
+            "skill minting skipped: the agent cannot read cards back "
+            "(CHIMERA_SKILL_CARDS=0). Set CHIMERA_MINT_UNREADABLE_SKILLS=1 to collect anyway."
+        )
+    if evolve_skills and mint:
         auto_evolver = AutoSkillEvolver(
             SkillEvolver(gateway, model),
             SkillStore(home / "skills.json"),
