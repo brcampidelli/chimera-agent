@@ -26,6 +26,8 @@ from chimera.memory.manager import MemoryManager
 from chimera.orchestration.comms import AgentMessage, consolidate, render
 from chimera.orchestration.events import OrchEvent, OrchEventSink
 from chimera.orchestration.isolation import run_isolated
+from chimera.orchestration.metering import MeteredBackend
+from chimera.orchestration.receipts import DelegationReceipt
 from chimera.orchestration.roles import Role, RoleAgent
 from chimera.providers.gateway import SupportsComplete
 from chimera.telemetry import get_logger
@@ -157,10 +159,45 @@ class IsolatedCrewResult:
     failures: dict[str, str] = field(default_factory=dict)  # worker crashed
     rejected: dict[str, str] = field(default_factory=dict)  # ran but failed verification -> not merged
     summary: str = ""  # supervisor's unified report (empty unless a supervisor is set)
+    #: One priced receipt per worker. The API's spend recorder reads ``outcome.receipts`` and this
+    #: field did not exist, so it took its early return on every crew run and the most expensive
+    #: route in the app reported nothing on the Cost screen — while the comment beside the call
+    #: said the opposite. Present for rejected and failed workers too: a discarded attempt cost
+    #: exactly as much as a kept one, and a cost report that only counts successes is an advert.
+    receipts: list[DelegationReceipt] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
         return not self.failures and not self.rejected and not self.conflicts
+
+
+def _receipts_from(metered: list[tuple[str, MeteredBackend]]) -> list[DelegationReceipt]:
+    """One receipt per worker that actually called a model.
+
+    A worker with no calls is left out rather than filed as a zero: it was cancelled before it
+    started or crashed on its way in, and a zero-dollar row invites the reader to conclude that a
+    worker ran for free.
+
+    ``usd`` is carried through as ``None`` when the meter could not price a call, never as 0.0.
+    That is the meter's own rule and it matters more here than anywhere: the spend recorder sums
+    these into the Cost screen, and an unpriced model silently counted as free would understate the
+    total in exactly the direction that flatters the configuration which used it.
+    """
+    receipts: list[DelegationReceipt] = []
+    for name, meter in metered:
+        if meter.calls == 0:
+            continue
+        receipts.append(
+            DelegationReceipt(
+                task_id=name,
+                tier="mid",
+                model=meter.last_model,
+                prompt_tokens=meter.prompt_tokens,
+                completion_tokens=meter.completion_tokens,
+                usd=meter.usd,
+            )
+        )
+    return receipts
 
 
 class IsolatedCrew:
@@ -231,7 +268,16 @@ class IsolatedCrew:
         worker that didn't crash merges (subject to conflict detection).
         """
 
+        # One meter per worker, built HERE — `make_unit` runs on this thread while the units are
+        # assembled, so nothing below ever mutates this list concurrently. A single shared meter
+        # would total the crew correctly and lose which worker spent what, which is the number that
+        # makes "N attempts, the test picks the winner" an accountable trade rather than a slogan.
+        metered: list[tuple[str, MeteredBackend]] = []
+
         def make_unit(worker: IsolatedWorker) -> Callable[[Path], WorkerOutcome]:
+            meter = MeteredBackend(worker.backend or self.backend, label=worker.role.name)
+            metered.append((worker.role.name, meter))
+
             def run_worker(ws: Path) -> WorkerOutcome:
                 name = worker.role.name
                 if self.should_stop is not None and self.should_stop():
@@ -251,7 +297,7 @@ class IsolatedCrew:
                 try:
                     agent = RoleAgent(
                         worker.role,
-                        worker.backend or self.backend,
+                        meter,
                         tools=worker.tools(ws),
                         max_steps=worker.max_steps,
                         identity=self.identity,
@@ -346,6 +392,7 @@ class IsolatedCrew:
             merged=batch.merged,
             failures=failures,
             rejected=rejected,
+            receipts=_receipts_from(metered),
         )
         # What each worker actually produced, emitted here and not from inside `run_worker`,
         # because here is where it exists: `run_isolated` reads each worktree's changed files as
