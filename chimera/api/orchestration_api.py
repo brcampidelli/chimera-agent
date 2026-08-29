@@ -983,6 +983,12 @@ def register_orchestration_api(
                 # worker loops plus an optional synthesis and wrote nothing to the usage log, so the
                 # screen that answers "what has this cost me" left out the more expensive of the two
                 # orchestration routes entirely.
+                #
+                # And this comment described the intention for months while the call did nothing:
+                # `_record_run_spend` reads `outcome.receipts` and returns early when it is empty,
+                # and `IsolatedCrewResult` had no such field. The recorder was correct, the call was
+                # correct, and between them there was no receipt to pass. It is filled now, one per
+                # worker, by `IsolatedCrew.run`.
                 _record_run_spend(live.home, run_id, outcome)
             except SpendExceeded as exc:
                 # The one failure the caller ASKED for. Reported with the numbers rather than as

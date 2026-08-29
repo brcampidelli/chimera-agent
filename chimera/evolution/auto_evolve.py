@@ -16,11 +16,13 @@ non-destructive; the gates above keep it honest rather than guarding against har
 
 from __future__ import annotations
 
+import hashlib
 import string
 from typing import TYPE_CHECKING
 
 from chimera.eval.anytime import best_possible_wilson, wilson_lower_best_of
 from chimera.evolution.evolver import SkillEvolver
+from chimera.evolution.holdout import HoldoutGate, HoldoutVerdict
 from chimera.evolution.learned_skill import LearnedSkill
 from chimera.evolution.skill_store import SkillStore
 from chimera.governance.validator import SkillValidator
@@ -31,6 +33,17 @@ if TYPE_CHECKING:
     from chimera.governance.audit import AuditLog
 
 _log = get_logger("evolution.auto")
+
+
+def _task_id(task: str) -> str:
+    """A stable identity for a TASK, so the holdout can exclude the one the skill came from.
+
+    Hashed rather than slugged: a slug of the first few words collides across tasks that open the
+    same way ("fix the failing test in ..."), and a collision here does not fail loudly — it
+    silently excludes a case that should have been scored, shrinking the holdout toward the
+    unmeasured verdict without anything saying so.
+    """
+    return hashlib.sha256(" ".join(task.split()).encode("utf-8")).hexdigest()[:16]
 
 
 def _placeholders(template: str) -> list[str]:
@@ -52,6 +65,7 @@ class AutoSkillEvolver:
         accept_mode: str = "point",
         provisional: bool = False,
         audit: AuditLog | None = None,
+        holdout: HoldoutGate | None = None,
     ) -> None:
         self.evolver = evolver
         self.store = store
@@ -66,6 +80,12 @@ class AutoSkillEvolver:
         # single-model proposal. Falls back to single-model when unset.
         self.collective = collective
         self.min_transfer = min_transfer
+        # Opt-in, and off changes nothing: without a gate this class behaves exactly as it did.
+        # What it adds is the axis the other two gates do not have — the smoke test runs the
+        # candidate on its OWN task and checks the output is non-empty, and `min_transfer` varies
+        # the MODEL while holding that same task fixed. Neither asks whether the skill works on a
+        # task it has never seen. See `chimera/evolution/holdout.py`.
+        self.holdout = holdout
         # "point" (raw pass fraction) or "wilson" (lower confidence bound on the
         # fraction) — the honesty upgrade that stops a lucky small-sample pass counting.
         self.accept_mode = accept_mode
@@ -114,6 +134,53 @@ class AutoSkillEvolver:
             _log.debug("skill %s born PROVISIONAL (on measured probation)", skill.name)
         self.store.add(skill)
         return skill
+
+    def _clears_holdout(self, candidate: LearnedSkill, task: str) -> bool:
+        """False only when the holdout RAN and the candidate failed it.
+
+        An unmeasured holdout does not reject — there is nothing to reject on — but it does not pass
+        silently either: the skill is stored with its status recorded so "checked and cleared" and
+        "never checked" stay different facts. `chimera/eval/transfer.py` set the same rule for the
+        promotion path: an honest "promoted without a transfer check", never a silent pass.
+        """
+        if self.holdout is None:
+            return True
+        verdict = self.holdout.evaluate(candidate, minted_from=_task_id(task))
+        if not verdict.measured:
+            _log.info("auto-skill %s stored WITHOUT a holdout check: %s",
+                      candidate.name, verdict.reason)
+            self._record_holdout(candidate, verdict, kept=True)
+            return True
+        if not self.holdout.accepts(verdict):
+            _log.info("discarded auto-skill %s: %s", candidate.name, verdict.summary())
+            self._record_holdout(candidate, verdict, kept=False)
+            return False
+        self._record_holdout(candidate, verdict, kept=True)
+        return True
+
+    def _record_holdout(
+        self, candidate: LearnedSkill, verdict: HoldoutVerdict, *, kept: bool
+    ) -> None:
+        """Write the verdict to the audit log, kept or not.
+
+        The REJECTED ones are the half worth keeping: a gate whose rejection rate is zero is a gate
+        that supports nothing built on top of it, and there is no way to notice that from the skills
+        that survived it.
+        """
+        if self.audit is None:
+            return
+        self.audit.record(
+            "skill_holdout",
+            {
+                "name": candidate.name,
+                "kept": kept,
+                "measured": verdict.measured,
+                "passed": verdict.passed,
+                "total": verdict.total,
+                "excluded": verdict.excluded,
+                "errors": len(verdict.errors),
+            },
+        )
 
     def maybe_evolve(
         self, task: str, solution: str, prior_successes: int, *, tainted: bool = False
@@ -194,6 +261,10 @@ class AutoSkillEvolver:
             _log.debug("discarded auto-skill %s (failed smoke test)", candidate.name)
             return None
 
+        # Gate 3 — black-box holdout: does it work on a task it was not minted from?
+        if not self._clears_holdout(candidate, task):
+            return None
+
         self._mark_and_store(candidate, tainted=tainted)
         _log.debug("kept auto-skill %s", candidate.name)
         return candidate
@@ -239,6 +310,12 @@ class AutoSkillEvolver:
                 best, best_score, best_frac = candidate, score, frac
         if best is None or best_score < self.min_transfer:
             _log.debug("no transferable auto-skill kept (best gate=%.2f)", best_score)
+            return None
+        # Gate 3 — black-box holdout. It has to be here as well as on the single path, and for a
+        # sharper reason: the score above is the best of k candidates, so the winner's advantage is
+        # partly the winner's curse. Asking it about a task it has never seen is the one question
+        # that picking the best of k cannot flatter.
+        if not self._clears_holdout(best, task):
             return None
         self._mark_and_store(best, tainted=tainted)
         _log.debug("kept collective auto-skill %s (frac=%.2f gate=%.2f)", best.name, best_frac, best_score)

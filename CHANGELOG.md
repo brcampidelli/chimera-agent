@@ -13,6 +13,37 @@ and the engineering were both high and verifiable. Almost nothing that was built
 
 Most of this release is doors. The rest is what testing each release candidate as a user turned up.
 
+### Added — the kernel holds the boundary now, where there is a kernel that will
+
+- **The default sandbox is no longer the host.** `SECURITY.md` said it plainly — the `local`
+  sandbox is not isolated — so the shipped boundary between a command the model chose and the
+  machine was the governance kernel plus a confirmation prompt. A prompt is a boundary a tired
+  person waves through and an injected instruction routes around. The default is now `auto`:
+  **Seatbelt** on macOS with a `(deny default)` profile, **bubblewrap** on Linux with
+  `--unshare-net --unshare-pid --unshare-ipc --cap-drop ALL` over a read-only bind of `/`. Network
+  off, writes confined to the working directory and the temp dir.
+  **Windows gets nothing, and says so.** The mechanism there is a restricted token plus network
+  filters — native work this does not attempt, and approximating it would be worse than its
+  absence, because a boundary that is believed and missing is more dangerous than one known to be
+  missing. Same for a Linux kernel that refuses unprivileged user namespaces: the binary is
+  installed, the syscall fails, and the honest report is *unavailable*.
+  Two properties carry the weight. **Availability is probed with the same command line the sandbox
+  actually uses**, so a rejected flag set reports unavailable instead of certifying a sandbox that
+  then fails every command. And **`is_isolated()` is true only where the wrapper really applied** —
+  it is what the host-exec gate reads, so a machine without a boundary keeps its confirmation
+  prompt rather than losing it to a claim nothing enforces.
+  ⚠️ Stated rather than implied: the machine this was written on has neither `bwrap` nor
+  `sandbox-exec` and no permission to install one, so the flag set and the profile are asserted by
+  content and not by execution. That is exactly why the probe runs the real argv.
+- **And the change caught a second bug on its way in.** `run_streamed` decided whether to stream
+  live output by reading `settings.sandbox != "local"` — correct only while `local` was the
+  default. Flipping the default sent every machine down the one-shot path and cost live output and
+  Stop. Fixing it by loosening the check would have been worse than the regression: streaming
+  spawns its *own* process, so on a machine that does have a kernel sandbox it would have run the
+  command around the wrapper while every screen still said "sandboxed". The branch now asks the
+  resolved backend, with an exact type check rather than `isinstance`, because `OsSandbox`
+  subclasses `LocalSandbox` to reuse its process handling.
+
 ### Added — the surface that runs most often is governed now, and half a measured lift is armable
 
 - **The scheduled run had no harness at all.** `chimera solve`, the Code screen and `POST /api/runs`
@@ -287,6 +318,19 @@ You could not choose which model answered you. The endpoint accepted one all alo
 
 ### Fixed — the rest
 
+- **The most expensive route in the app reported nothing on the Cost screen.** `_record_run_spend`
+  reads `outcome.receipts` and returns immediately when that list is empty; `IsolatedCrewResult` had
+  `transcript`, `conflicts`, `merged`, `failures`, `rejected` and `summary`, and no `receipts`. So
+  every crew run took the early return, and the screen that answers "what has this cost me" showed
+  zero for the one route that starts N tool-using agents at once. Two things kept it alive: the
+  comment beside the call said the opposite — that the route now appears on the screen — and the
+  test covering the recorder used a stand-in class **with** a `receipts` attribute, so it exercised
+  a contract the shipped object did not fulfil. A fake more capable than the real thing tests the
+  fake. The crew now meters **per worker**, because a crew is justified by "N attempts, the test
+  picks the winner" and that trade is only accountable if you can see what each attempt cost —
+  including the rejected and the crashed ones, which cost exactly as much as the one that won. A
+  worker that never called a model is left out rather than filed at 0.00, and a model the pricer
+  does not know arrives as *unknown* rather than as free.
 - **The reviewer judged a paragraph and called it judging the work.** `Manager.review` receives
   `(task, answer, context)` and had never seen the diff, the transcript or a single file — stated in
   this repository's own test docstrings for months without the consequence being drawn. Measured on

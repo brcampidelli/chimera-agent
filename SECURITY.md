@@ -122,9 +122,21 @@ environment** when you grant autonomy:
 - **Human-in-the-loop** — agent-proposed crons are created **disabled**, pending approval.
 - **Audit log** — governance decisions and evolution changes are recorded.
 
-Treat secrets as server-only. **The default `local` sandbox is not isolated** — for untrusted
-or autonomous work run with `CHIMERA_SANDBOX=docker` (ephemeral, network-off by default),
-ideally in a throwaway account or VM rather than your main one.
+Treat secrets as server-only. **The default `auto` sandbox asks the kernel to hold the boundary**
+— Seatbelt on macOS, bubblewrap on Linux — with the network off and writes confined to the working
+directory and the temp dir. Where the platform offers nothing it says so once, at startup, and runs
+on the host: **Windows has no OS sandbox here** (the mechanism there is a restricted token plus
+network filters, which is native work this does not attempt), and a Linux kernel that refuses
+unprivileged user namespaces cannot run bubblewrap even when the binary is installed.
+
+Availability is probed with the same command line the sandbox actually uses, so a rejected flag set
+reports *unavailable* rather than certifying a sandbox that then fails every command. And
+`is_isolated()` — which is what the host-exec gate reads — is true only where the wrapper really
+applied, so a machine without a boundary keeps its confirmation prompt instead of losing it to a
+claim nothing enforces.
+
+For untrusted or autonomous work on a machine with no OS sandbox, run with `CHIMERA_SANDBOX=docker`
+(ephemeral, network-off by default), ideally in a throwaway account or VM rather than your main one.
 
 **Host execution is gated by default, including unattended.** Because most installs have no Docker, a
 command the model chooses to run would otherwise execute on your machine. `CHIMERA_HOST_EXEC=ask` (the

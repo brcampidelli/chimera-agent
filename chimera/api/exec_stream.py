@@ -105,14 +105,26 @@ def run_streamed(
     root = Path(workspace).resolve()
     resolved = resolve_exec_cwd(root, cwd)  # raises ValueError on escape — before any process starts
 
-    mode = (settings.sandbox or "local").lower()
-    if mode != "local":
-        # Honor isolation: don't host-exec. Run one-shot in the configured sandbox and deliver the
-        # whole output at once — no line streaming (that's the local-only path).
-        from chimera.sandbox import get_sandbox
+    # Decided from the RESOLVED backend, not from the setting string. Streaming spawns its own
+    # process, which is equivalent to the configured sandbox only when that sandbox adds nothing to
+    # a plain host process. `type(...) is` and not `isinstance`, deliberately: `OsSandbox` subclasses
+    # `LocalSandbox` to reuse its process handling, and an `isinstance` check would stream — running
+    # the command with this function's own Popen and quietly stepping around the kernel wrapper the
+    # user is relying on.
+    #
+    # This branch used to read `settings.sandbox != "local"`. That was correct only while `local`
+    # was the default; the day the default became `auto`, every machine took the one-shot path and
+    # lost live output and Stop — which is how these lines came to be rewritten.
+    from chimera.sandbox import get_sandbox
+    from chimera.sandbox.local import LocalSandbox
 
-        result = get_sandbox(settings).run(command, timeout=int(max(1, timeout)), cwd=resolved)
-        on_line(f"(sandbox={mode}: output shown on completion)")
+    backend = get_sandbox(settings)
+    if type(backend) is not LocalSandbox:
+        # Honor isolation: don't host-exec. Run one-shot in the configured sandbox and deliver the
+        # whole output at once — no line streaming (that's the unsandboxed-host path only).
+        result = backend.run(command, timeout=int(max(1, timeout)), cwd=resolved)
+        label = "docker" if type(backend).__name__ == "DockerSandbox" else "os"
+        on_line(f"(sandbox={label}: output shown on completion)")
         out = result.output
         if len(out) > _MAX_STREAM_CHARS:
             out = out[:_MAX_STREAM_CHARS] + "\n[output truncated]"
