@@ -1230,9 +1230,20 @@ class AutonomousAgent:
     def _persist_receipt(self, result: AutonomousResult, task: str) -> None:
         """Append a run receipt recording how this finished run PROVED its work (read-only evidence).
 
-        Best-effort: persisting a receipt must NEVER break or fail a run, so any error (disk,
-        serialization) is swallowed with a debug log. Reads the verify command off the verifier when
-        it exposes one (``CommandVerifier.command``); ``None`` for a run with no executable verifier.
+        Best-effort in the sense that it must NEVER break or fail a run — but not silent, and not
+        all-or-nothing. Both of those were true until a bench caught it: on one task, three runs in
+        a row wrote no row at all and TWO OF THEM HAD SUCCEEDED, with the work still on disk and its
+        test passing. A receipt that failed to serialise disappeared behind a `debug` line, which no
+        user and no bench ever sees, and it disappeared BY TASK rather than at random — so every
+        consumer of these rows, the Cost screen included, undercounted systematically and quietly.
+
+        So a failure now (a) logs at WARNING with the reason, and (b) falls back to a minimal row
+        that still carries the tokens and the workspace. A run whose full proof trail cannot be
+        serialised is still a run that cost money, and the cost is the part nothing else can
+        reconstruct.
+
+        Reads the verify command off the verifier when it exposes one (``CommandVerifier.command``);
+        ``None`` for a run with no executable verifier.
         """
         if self.run_log is None:
             return
@@ -1252,7 +1263,48 @@ class AutonomousAgent:
             )
             append_run(self.run_log, receipt)
         except Exception as exc:  # noqa: BLE001 — receipt persistence is best-effort, never fatal
-            _log.debug("run receipt skipped: %s", exc)
+            _log.warning("run receipt failed to persist (%s: %s); writing a minimal row instead",
+                         type(exc).__name__, exc)
+            self._persist_minimal_receipt(result, task, exc)
+
+    def _persist_minimal_receipt(
+        self, result: AutonomousResult, task: str, cause: Exception
+    ) -> None:
+        """The fallback: the tokens and the outcome, with none of the fields that can fail.
+
+        Written by hand rather than through ``build_receipt`` on purpose — the builder is what just
+        raised, so re-entering it would lose the row for the same reason twice. Everything here is a
+        primitive, and the whole thing is wrapped again because a fallback that can itself throw is
+        not a fallback.
+        """
+        try:
+            import json as _json
+
+            row = {
+                "ts": datetime.now(UTC).isoformat(),
+                "task": str(task)[:2000],
+                "success": bool(getattr(result, "success", False)),
+                "workspace": str(self.workspace) if self.workspace else "",
+                "partial": True,
+                "partial_reason": f"{type(cause).__name__}: {cause}"[:500],
+                "attempts": [
+                    {
+                        "index": int(getattr(a, "index", 0) or 0),
+                        "success": bool(getattr(a, "success", False)),
+                        "prompt_tokens": int(getattr(a, "prompt_tokens", 0) or 0),
+                        "completion_tokens": int(getattr(a, "completion_tokens", 0) or 0),
+                        "usd": getattr(a, "usd", None),
+                        "model": str(getattr(a, "model", "") or ""),
+                    }
+                    for a in getattr(result, "attempts", None) or []
+                ],
+            }
+            assert self.run_log is not None
+            self.run_log.parent.mkdir(parents=True, exist_ok=True)
+            with self.run_log.open("a", encoding="utf-8") as handle:
+                handle.write(_json.dumps(row, ensure_ascii=True) + "\n")
+        except Exception as exc:  # noqa: BLE001 — still never fatal
+            _log.warning("minimal run receipt also failed: %s", exc)
 
     def _save_checkpoint(
         self,
