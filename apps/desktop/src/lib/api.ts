@@ -759,6 +759,10 @@ export interface RunRequestInput {
   explorer?: boolean;
   /** On a stall, rebuild the plan from the accumulated failure causes instead of nudging. */
   replan?: boolean;
+  /** Fail an attempt that changed no file, even when the verifier passed. Half of this project's
+   *  own measured scaffold lift (+4.9pp of +9.8pp) — a passing test proves nothing about an empty
+   *  patch. Right for a code task, wrong for a question, so the caller says which this is. */
+  require_diff?: boolean;
   /** Turn the approved checklist into executable pytest and gate on that. Only meaningful with no
    *  verify command and a non-empty reviewed list; the loop checks both, so sending it otherwise
    *  is a no-op. Writes a test file into the workspace. */

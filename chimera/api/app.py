@@ -280,6 +280,20 @@ class RunRequest(CodeSeams):
     reading its own answer, and that proxy is measured to rubber-stamp code that is wrong — a false
     positive that looks exactly like success."""
 
+    require_diff: bool = False
+    """Fail an attempt that changed no file, even when the verifier passed.
+
+    Armable from the app for the first time. It existed only as `--require-diff` on the CLI, which
+    made it unreachable from every screen — and it is not a minor flag: this project's own
+    SWE-bench decomposition attributes **half** of the measured scaffold lift to it (+4.9pp of
+    +9.8pp), because a passing test proves nothing about a patch that is empty. Run 1 of that bench
+    returned 11 empty patches out of 19.
+
+    Off by default, and deliberately: it is right for a code task and wrong for a question. A run
+    asked to explain an architecture changes no files and is not thereby a failure, which is why
+    this is a field the caller sets rather than a rule the loop infers.
+    """
+
     replan: bool = False
     """On a stall, rebuild the plan from the accumulated failure causes instead of nudging.
 
@@ -2127,6 +2141,9 @@ def _build_solve_agent(
         # common case, so the strict default would make this line do nothing.
         stagnation=StagnationDetector(window=2, signature_similarity=0.8),
         replan_on_stall=req.replan,
+        # Half the scaffold lift this project measured, unreachable from any screen until now
+        # because it lived only as a CLI flag.
+        require_diff=req.require_diff,
         config=AutonomousConfig(max_attempts=req.max_attempts),
     )
 

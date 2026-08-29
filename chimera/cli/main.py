@@ -1958,18 +1958,64 @@ def _start_cron_daemon(
                 trace_path=settings.home / "scheduler" / "cron_traces.jsonl",
             ),
         )
-        result = agent.run(job.action)
+        # THE HARNESS, on the surface that runs most often and had none of it.
+        #
+        # `chimera solve`, the Code screen and the run endpoint all wrap the worker in the
+        # autonomous loop — snapshot, verify, revert, retry, receipt. Cron called `agent.run`
+        # directly, so the path that fires unattended every day, for months, was the only one with
+        # no gate, no rollback, no retry and no entry in `runs.jsonl`. Nothing was watching the
+        # thing that runs when nobody is watching.
+        #
+        # The guard and the verifier are armed ONLY when the job declares a `verify`, and that is
+        # the whole design rather than a caution. `unverified_and_unchanged` fails an attempt that
+        # changed no file, and most scheduled jobs are reports that change no files — arming it for
+        # everyone would fail every report job with "this task requires editing code", which is a
+        # defect this project has already measured on its own release. With no guard the diff gate
+        # cannot fire (`diff_productive` stays None), so a report job behaves exactly as it did and
+        # gains only the receipt.
+        from chimera.core import AutonomousAgent, AutonomousConfig, WorkspaceGuard
+        from chimera.core.verify import CommandVerifier
+
+        gated = bool(job.verify.strip())
+        loop = AutonomousAgent(
+            agent,
+            planner=None,
+            manager=None,
+            verifier=CommandVerifier(job.verify, job_root) if gated else None,
+            guard=WorkspaceGuard(job_root) if gated else None,
+            config=AutonomousConfig(
+                max_attempts=max(1, job.max_attempts),
+                use_planner=False,
+                # Unchanged: cron has never had a reviewer, and adding one would spend a model call
+                # per dispatch to grade prose nobody asked to be graded.
+                use_manager=False,
+            ),
+            # The receipt. `runs.jsonl` is what the Runs screen reads, and a job that has fired
+            # nightly for a month left nothing there to read.
+            run_log=settings.home / "runs.jsonl",
+        )
+        result = loop.run(job.action)
+        # Summed across attempts rather than read off one: with `max_attempts > 1` a dispatch can
+        # pay for several, and reporting the last one would understate the cost of exactly the
+        # configuration that costs most. `usd` follows the all-or-nothing rule used everywhere else
+        # — one unpriced attempt makes the total unknown, never smaller.
+        attempts = result.attempts or []
+        usd_values = [a.usd for a in attempts]
         append_usage(
             usage_path,
             UsageRecord(
                 ts=datetime.now(UTC).isoformat(),
                 # `run_id` in the session field is what joins this row to the trace line and to the
                 # job: three records, one run, one key.
-                session_id=f"cron:{job.id}:{result.run_id}",
-                model=result.model,
-                prompt_tokens=result.prompt_tokens,
-                completion_tokens=result.completion_tokens,
-                usd=result.usd,
+                session_id=f"cron:{job.id}:{attempts[-1].run_id if attempts else ''}",
+                # The model that ANSWERED, falling back to the one asked for. `model` is optional on
+                # this path (None = the settings default), so the empty string is the last resort —
+                # a usage row with no model is still a usage row, and inventing a name would be
+                # worse than leaving the field blank.
+                model=(attempts[-1].model if attempts else None) or model or "",
+                prompt_tokens=sum(int(a.prompt_tokens or 0) for a in attempts),
+                completion_tokens=sum(int(a.completion_tokens or 0) for a in attempts),
+                usd=None if any(v is None for v in usd_values) else sum(v or 0.0 for v in usd_values),
             ),
         )
         # Said out loud, on the job, every time. A governance decision that only exists inside an
