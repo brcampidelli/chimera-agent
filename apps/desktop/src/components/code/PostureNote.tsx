@@ -120,9 +120,16 @@ export function PostureNote({
         // The one case where the honest answer contradicts what the user set up. Pre-emptive on
         // purpose: telling someone their sandbox was not running AFTER a shell command already ran
         // on their machine is a report, not a warning.
+        //
+        // Which sentence depends on WHY. "A container was configured, but none is running" was the
+        // only one there was, and once the default became `auto` it started appearing on machines
+        // where nobody configured a container and no daemon would help — right conclusion, invented
+        // reason, and it sent people to start Docker to fix something Docker does not fix.
         <p className="flex items-start gap-1.5 text-xs text-bad-foreground">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          {t("code.posture.fellBack")}
+          {facts.data.fell_back_reason === "no_os_sandbox"
+            ? t("code.posture.fellBackNoSandbox")
+            : t("code.posture.fellBack")}
         </p>
       ) : null}
     </div>

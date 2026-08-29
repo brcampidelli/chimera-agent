@@ -2450,12 +2450,22 @@
             ],
             "title": "Deliver To"
           },
+          "max_attempts": {
+            "default": 1,
+            "title": "Max Attempts",
+            "type": "integer"
+          },
           "name": {
             "title": "Name",
             "type": "string"
           },
           "schedule": {
             "title": "Schedule",
+            "type": "string"
+          },
+          "verify": {
+            "default": "",
+            "title": "Verify",
             "type": "string"
           },
           "workspace": {
@@ -2584,6 +2594,11 @@
             ],
             "title": "Last Status"
           },
+          "max_attempts": {
+            "default": 1,
+            "title": "Max Attempts",
+            "type": "integer"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -2605,6 +2620,11 @@
           },
           "trigger": {
             "title": "Trigger",
+            "type": "string"
+          },
+          "verify": {
+            "default": "",
+            "title": "Verify",
             "type": "string"
           },
           "workspace": {
@@ -6167,6 +6187,16 @@
           "external_agent": {
             "default": "",
             "title": "External Agent",
+            "type": "string"
+          },
+          "fell_back_reason": {
+            "default": "",
+            "enum": [
+              "",
+              "no_container",
+              "no_os_sandbox"
+            ],
+            "title": "Fell Back Reason",
             "type": "string"
           },
           "fell_back_to_host": {

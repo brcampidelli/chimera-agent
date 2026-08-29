@@ -81,6 +81,10 @@ def _job_dict(job: Any) -> dict[str, Any]:
         "created_by": job.created_by,
         "workspace": job.workspace,
         "deliver_to": job.deliver_to,
+        # Echoed so a row can say whether this job is gated. Read off the job with a default rather
+        # than assumed present: the store holds jobs written before these fields existed.
+        "verify": getattr(job, "verify", "") or "",
+        "max_attempts": int(getattr(job, "max_attempts", 1) or 1),
     }
 
 
@@ -555,6 +559,8 @@ def register_features(
                 created_by="human",
                 workspace=body.workspace,
                 deliver_to=body.deliver_to,
+                verify=body.verify,
+                max_attempts=body.max_attempts,
             )
         except ValueError as exc:  # an invalid cron expression is a client error, not a 500
             raise HTTPException(status_code=400, detail=str(exc)) from exc

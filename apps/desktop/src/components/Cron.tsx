@@ -64,11 +64,13 @@ function AddSchedule() {
   const [schedule, setSchedule] = useState("0 7 * * *");
   const [action, setAction] = useState("");
   const [deliverTo, setDeliverTo] = useState("");
+  const [verify, setVerify] = useState("");
   const create = useMutation({
     mutationFn: createCron,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["cron"] });
       setName("");
+      setVerify("");
       setAction("");
       setDeliverTo("");
     },
@@ -125,6 +127,18 @@ function AddSchedule() {
           value={deliverTo}
           onChange={(e) => setDeliverTo(e.target.value)}
         />
+        {/* The gate, and it is optional for the reason the placeholder says. Most schedules are
+            reports that change no files, and a gate that fails a run for changing no file would
+            break every one of them. But a job that EDITS code had no way to opt in: the field
+            existed on the model, the dispatch armed the loop only when it was set, and nothing
+            anywhere could set it — not this screen, not `chimera cron add`. */}
+        <input
+          className="field w-full px-3 py-2 font-mono text-xs"
+          placeholder={t("cron.add.verify")}
+          aria-label={t("cron.add.verify")}
+          value={verify}
+          onChange={(e) => setVerify(e.target.value)}
+        />
         <div className="flex items-center justify-between gap-3 pt-0.5">
           <span className="text-xs text-muted-foreground">{t("cron.add.hint")}</span>
           <Button
@@ -139,6 +153,11 @@ function AddSchedule() {
                 action,
                 workspace: readWorkspace() || null,
                 deliver_to: deliverTo.trim() || null,
+                verify: verify.trim(),
+                // Two attempts only when there is a gate to decide between them: without one,
+                // nothing can tell a failed attempt from a finished one, so a retry would just
+                // do the work twice and keep the second answer.
+                max_attempts: verify.trim() ? 2 : 1,
               })
             }
             disabled={!canSubmit}

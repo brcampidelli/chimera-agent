@@ -407,6 +407,8 @@ const en: Dict = {
   "cron.add.action": "what should Chimera do? (e.g. summarise my unread email)",
   "cron.add.when": "when — cron: minute hour day month weekday",
   "cron.add.deliver": "Discord or Slack webhook URL (optional)",
+  "cron.add.verify":
+    "test command that proves the work (optional) — empty means no gate",
   "cron.deliversTo": "delivers to {host}",
   "cron.lastAnswer": "Answered {when}",
   "cron.deliveryFailed": "delivery failed",
@@ -880,7 +882,9 @@ const en: Dict = {
   "code.posture.saysPause.never": "Never pauses for your sign-off.",
   "code.posture.fellBack":
     "A container was configured, but none is running — this is your machine.",
-  "code.posture.unguarded":
+    "code.posture.fellBackNoSandbox":
+    "No OS sandbox is available here, so commands would run on this machine.",
+"code.posture.unguarded":
     "Nothing marks this conversation after it reads untrusted content, so it can still write files afterwards. Turn on the chat guard in Settings to change that.",
   "code.posture.unknown": "Could not determine what this posture means here.",
   "code.roles.title": "Models by role",
@@ -1649,6 +1653,8 @@ const pt: Dict = {
     "o que o Chimera deve fazer? (ex.: resumir meus e-mails não lidos)",
   "cron.add.when": "quando — cron: minuto hora dia mês dia-da-semana",
   "cron.add.deliver": "URL de webhook do Discord ou Slack (opcional)",
+  "cron.add.verify":
+    "comando de teste que prova o trabalho (opcional) — vazio = sem portão",
   "cron.deliversTo": "entrega em {host}",
   "cron.lastAnswer": "Respondeu {when}",
   "cron.deliveryFailed": "entrega falhou",
@@ -2128,7 +2134,9 @@ const pt: Dict = {
   "code.posture.saysPause.never": "Nunca para para pedir seu aval.",
   "code.posture.fellBack":
     "Um contêiner foi configurado, mas nenhum está rodando — esta é a sua máquina.",
-  "code.posture.unguarded":
+    "code.posture.fellBackNoSandbox":
+    "Não há sandbox de sistema disponível aqui, então os comandos rodariam nesta máquina.",
+"code.posture.unguarded":
     "Nada marca esta conversa depois que ela lê conteúdo não confiável, então ela ainda pode escrever arquivos em seguida. Ligue a proteção do chat em Ajustes para mudar isso.",
   "code.posture.unknown":
     "Não deu para determinar o que esta postura significa aqui.",
@@ -2569,6 +2577,8 @@ const es: Dict = {
     "¿qué debería hacer Chimera? (p. ej. resume mis correos sin leer)",
   "cron.add.when": "cuándo — cron: minuto hora día mes día-semana",
   "cron.add.deliver": "URL de webhook de Discord o Slack (opcional)",
+  "cron.add.verify":
+    "comando de prueba que demuestra el trabajo (opcional) — vacío = sin puerta",
   "cron.deliversTo": "entrega en {host}",
   "cron.lastAnswer": "Respondió {when}",
   "cron.deliveryFailed": "la entrega falló",
@@ -3388,7 +3398,9 @@ const es: Dict = {
   "code.posture.saysPause.never": "Nunca se detiene a pedir tu visto bueno.",
   "code.posture.fellBack":
     "Se configuró un contenedor, pero no hay ninguno en marcha — esta es tu máquina.",
-  "code.posture.unguarded":
+    "code.posture.fellBackNoSandbox":
+    "Aquí no hay sandbox del sistema disponible, así que los comandos se ejecutarían en esta máquina.",
+"code.posture.unguarded":
     "Nada marca esta conversación después de leer contenido no confiable, así que puede seguir escribiendo archivos. Activa la protección del chat en Ajustes para cambiarlo.",
   "code.posture.unknown":
     "No se pudo determinar qué significa esta postura aquí.",
@@ -3832,6 +3844,8 @@ const fr: Dict = {
     "que doit faire Chimera ? (par ex. résume mes e-mails non lus)",
   "cron.add.when": "quand — cron : minute heure jour mois jour-semaine",
   "cron.add.deliver": "URL de webhook Discord ou Slack (facultatif)",
+  "cron.add.verify":
+    "commande de test qui prouve le travail (facultatif) — vide = sans garde",
   "cron.deliversTo": "livre sur {host}",
   "cron.lastAnswer": "Répondu {when}",
   "cron.deliveryFailed": "l'envoi a échoué",
@@ -4660,7 +4674,9 @@ const fr: Dict = {
   "code.posture.saysPause.never": "Ne s'arrête jamais pour votre validation.",
   "code.posture.fellBack":
     "Un conteneur était configuré, mais aucun ne tourne — c'est votre machine.",
-  "code.posture.unguarded":
+    "code.posture.fellBackNoSandbox":
+    "Aucun bac à sable système n'est disponible ici, les commandes s'exécuteraient donc sur cette machine.",
+"code.posture.unguarded":
     "Rien ne marque cette conversation après qu'elle a lu du contenu non fiable : elle peut donc encore écrire des fichiers. Activez la protection du chat dans les Réglages pour changer cela.",
   "code.posture.unknown":
     "Impossible de déterminer ce que cette posture signifie ici.",
@@ -5106,6 +5122,8 @@ const de: Dict = {
     "Was soll Chimera tun? (z. B. fasse meine ungelesenen E-Mails zusammen)",
   "cron.add.when": "wann — cron: Minute Stunde Tag Monat Wochentag",
   "cron.add.deliver": "Discord- oder Slack-Webhook-URL (optional)",
+  "cron.add.verify":
+    "Testbefehl, der die Arbeit belegt (optional) — leer = kein Gate",
   "cron.deliversTo": "liefert an {host}",
   "cron.lastAnswer": "Geantwortet {when}",
   "cron.deliveryFailed": "Zustellung fehlgeschlagen",
@@ -5932,7 +5950,9 @@ const de: Dict = {
   "code.posture.saysPause.never": "Hält nie für Ihre Freigabe an.",
   "code.posture.fellBack":
     "Ein Container war konfiguriert, läuft aber nicht — das ist dein Rechner.",
-  "code.posture.unguarded":
+    "code.posture.fellBackNoSandbox":
+    "Hier ist keine Betriebssystem-Sandbox verfügbar, daher würden Befehle auf diesem Rechner laufen.",
+"code.posture.unguarded":
     "Nichts markiert diese Unterhaltung, nachdem sie nicht vertrauenswürdige Inhalte gelesen hat — sie kann danach weiterhin Dateien schreiben. Schalte den Chat-Schutz in den Einstellungen ein, um das zu ändern.",
   "code.posture.unknown":
     "Konnte nicht ermitteln, was diese Haltung hier bedeutet.",
@@ -6374,6 +6394,8 @@ const zh: Dict = {
   "cron.add.action": "要 Chimera 做什么？（例如：总结我的未读邮件）",
   "cron.add.when": "何时 —— cron：分 时 日 月 周",
   "cron.add.deliver": "Discord 或 Slack 的 webhook 链接（可选）",
+  "cron.add.verify":
+    "证明工作完成的测试命令（可选）—— 留空则无门禁",
   "cron.deliversTo": "发送到 {host}",
   "cron.lastAnswer": "{when} 的回答",
   "cron.deliveryFailed": "发送失败",
@@ -7138,7 +7160,9 @@ const zh: Dict = {
   "code.posture.saysPause.tainted": "如果读过不可信内容，会停下等待你签字。",
   "code.posture.saysPause.never": "从不为你的批准而暂停。",
   "code.posture.fellBack": "配置了容器，但没有一个在运行——这是你的机器。",
-  "code.posture.unguarded":
+    "code.posture.fellBackNoSandbox":
+    "此处没有可用的操作系统沙箱，因此命令将在这台机器上运行。",
+"code.posture.unguarded":
     "这个对话读了不可信内容之后没有任何标记，所以它之后仍然能写文件。到设置里打开聊天防护来改变这一点。",
   "code.posture.unknown": "无法判断这个姿态在这里意味着什么。",
   "code.roles.title": "按角色分配模型",
@@ -7572,6 +7596,8 @@ const ja: Dict = {
   "cron.add.action": "Chimera に何をさせますか？（例：未読メールを要約して）",
   "cron.add.when": "いつ — cron: 分 時 日 月 曜日",
   "cron.add.deliver": "Discord または Slack の webhook URL（任意）",
+  "cron.add.verify":
+    "作業を検証するテストコマンド（任意）— 空ならゲートなし",
   "cron.deliversTo": "{host} に届けます",
   "cron.lastAnswer": "{when} の回答",
   "cron.deliveryFailed": "配信に失敗",
@@ -8384,7 +8410,9 @@ const ja: Dict = {
   "code.posture.saysPause.never": "承認のために停止することはありません。",
   "code.posture.fellBack":
     "コンテナが設定されていますが、動いていません — これはあなたのマシンです。",
-  "code.posture.unguarded":
+    "code.posture.fellBackNoSandbox":
+    "このマシンでは OS のサンドボックスが使えないため、コマンドはこの端末上で実行されます。",
+"code.posture.unguarded":
     "この会話は信頼できない内容を読んだあとも何の印も付かないため、その後もファイルを書けます。設定でチャットの保護を有効にすると変わります。",
   "code.posture.unknown":
     "この姿勢がここで何を意味するか判定できませんでした。",
@@ -9162,6 +9190,8 @@ const it: Dict = {
     "cosa dovrebbe fare Chimera? (es. riassumi le mie email non lette)",
   "cron.add.when": "quando — cron: minuto ora giorno mese giorno-settimana",
   "cron.add.deliver": "URL webhook di Discord o Slack (facoltativo)",
+  "cron.add.verify":
+    "comando di test che dimostra il lavoro (opzionale) — vuoto = nessun gate",
   "cron.deliversTo": "consegna su {host}",
   "cron.lastAnswer": "Ha risposto {when}",
   "cron.deliveryFailed": "consegna fallita",
@@ -9648,7 +9678,9 @@ const it: Dict = {
   "code.posture.saysPause.never": "Non si ferma mai per la tua approvazione.",
   "code.posture.fellBack":
     "Era configurato un container, ma nessuno è in esecuzione — questa è la tua macchina.",
-  "code.posture.unguarded":
+    "code.posture.fellBackNoSandbox":
+    "Qui non è disponibile alcuna sandbox di sistema, quindi i comandi verrebbero eseguiti su questa macchina.",
+"code.posture.unguarded":
     "Niente contrassegna questa conversazione dopo che ha letto contenuti non attendibili, quindi può ancora scrivere file. Attiva la protezione della chat nelle Impostazioni per cambiarlo.",
   "code.posture.unknown":
     "Non è stato possibile determinare cosa significhi questa postura qui.",
@@ -10427,6 +10459,8 @@ const pl: Dict = {
     "co Chimera ma zrobić? (np. streść moje nieprzeczytane maile)",
   "cron.add.when": "kiedy — cron: minuta godzina dzień miesiąc dzień-tygodnia",
   "cron.add.deliver": "Adres webhooka Discord lub Slack (opcjonalnie)",
+  "cron.add.verify":
+    "polecenie testowe potwierdzające pracę (opcjonalnie) — puste = bez bramki",
   "cron.deliversTo": "wysyła na {host}",
   "cron.lastAnswer": "Odpowiedź {when}",
   "cron.deliveryFailed": "wysyłka nie powiodła się",
@@ -10908,7 +10942,9 @@ const pl: Dict = {
   "code.posture.saysPause.never": "Nigdy nie zatrzymuje się po twoją zgodę.",
   "code.posture.fellBack":
     "Skonfigurowano kontener, ale żaden nie działa — to twój komputer.",
-  "code.posture.unguarded":
+    "code.posture.fellBackNoSandbox":
+    "Nie ma tu dostępnej piaskownicy systemowej, więc polecenia działałyby na tej maszynie.",
+"code.posture.unguarded":
     "Nic nie oznacza tej rozmowy po tym, jak przeczyta niezaufaną treść, więc nadal może zapisywać pliki. Włącz ochronę czatu w Ustawieniach, żeby to zmienić.",
   "code.posture.unknown": "Nie udało się ustalić, co ta postawa tutaj oznacza.",
   "code.roles.title": "Modele wg roli",
@@ -11687,6 +11723,8 @@ const ru: Dict = {
     "что должна сделать Chimera? (например, кратко изложить непрочитанную почту)",
   "cron.add.when": "когда — cron: минута час день месяц день_недели",
   "cron.add.deliver": "URL вебхука Discord или Slack (необязательно)",
+  "cron.add.verify":
+    "команда теста, подтверждающая работу (необязательно) — пусто = без ворот",
   "cron.deliversTo": "отправляет в {host}",
   "cron.lastAnswer": "Ответ от {when}",
   "cron.deliveryFailed": "доставка не удалась",
@@ -12172,7 +12210,9 @@ const ru: Dict = {
   "code.posture.saysPause.never": "Никогда не останавливается ради вашего одобрения.",
   "code.posture.fellBack":
     "Контейнер был настроен, но ни один не запущен — это ваша машина.",
-  "code.posture.unguarded":
+    "code.posture.fellBackNoSandbox":
+    "Здесь нет доступной песочницы ОС, поэтому команды выполнялись бы на этой машине.",
+"code.posture.unguarded":
     "Ничто не помечает этот разговор после чтения недоверенного содержимого, поэтому он и дальше может записывать файлы. Включите защиту чата в настройках, чтобы это изменить.",
   "code.posture.unknown":
     "Не удалось определить, что здесь означает этот режим.",

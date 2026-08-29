@@ -486,6 +486,11 @@ export const createCron = (
     action: string;
     workspace?: string | null;
     deliver_to?: string | null;
+    /** The gate. Empty means the job runs ungoverned, which is what every job did before this
+     *  field could be sent: `CronJob` has carried `verify` since the harness landed and neither
+     *  this route nor the CLI could write it, so the gate could never arm for anybody. */
+    verify?: string;
+    max_attempts?: number;
   },
 ) =>
   json<CronJob>("/api/cron", { method: "POST", body: JSON.stringify(body) });
