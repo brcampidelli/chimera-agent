@@ -249,6 +249,17 @@ def arms_free(rows: list[dict]) -> dict[str, list[bool]]:
     return out
 
 
+def fired_text(row: dict) -> bool:
+    """Did the shipped vote produce an answer at all on this item?
+
+    `majority` returning None does not mean the vote was wrong — it means the branch DECLINED and
+    the turn fell through to judge -> synthesiser. Scoring only correctness merges "inert" with
+    "harmful", which are opposite conclusions drawn from the same 0%.
+    """
+    texts = [a["content"] for a in row["answers"] if not a.get("error") and a["content"]]
+    return majority(texts) is not None if texts else False
+
+
 def extraction_rate(rows: list[dict]) -> float:
     """The share of live panel answers that carried the registered ANSWER: line."""
     total = ok = 0
@@ -297,11 +308,31 @@ def main() -> None:
     for name, hits in sorted(free.items()):
         print(f"  {name:<34} {sum(hits) / len(hits):6.1%}  ({sum(hits)}/{len(hits)})")
 
-    headroom = (sum(free["oracle"]) - sum(free["vote"])) / len(rows) * 100
-    print(f"\nHEADROOM (oracle - vote) = {headroom:+.1f} pp")
+    # How often the shipped vote FIRED at all, kept apart from how often it was right. Merging the
+    # two would report "declined to vote, so synthesis decided" and "voted and got it wrong" as one
+    # number, and they are opposite facts about the branch: the first says the feature is inert,
+    # the second says it is harmful. Only this line says which of the two a 0% was.
+    fired = sum(fired_text(row) for row in rows)
+    print(f"\n  vote_text FIRED on {fired}/{len(rows)} = {fired / len(rows):.1%} of items")
+    print("  (a vote that does not fire falls through to judge -> synthesiser: inert rather "
+          "than harmful, and it pays for the two calls the branch exists to avoid)")
+
     print(
         format_report(
-            compare_paired(free["vote"], free["oracle"], baseline_name="vote", treatment_name="oracle")
+            compare_paired(
+                free["vote_text"], free["vote_answer"],
+                baseline_name="vote_text", treatment_name="vote_answer",
+            )
+        )
+    )
+    headroom = (sum(free["oracle"]) - sum(free["vote_answer"])) / len(rows) * 100
+    print(f"HEADROOM (oracle - vote_answer) = {headroom:+.1f} pp")
+    print(
+        format_report(
+            compare_paired(
+                free["vote_answer"], free["oracle"],
+                baseline_name="vote_answer", treatment_name="oracle",
+            )
         )
     )
 

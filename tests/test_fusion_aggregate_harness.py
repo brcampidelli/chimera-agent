@@ -202,6 +202,33 @@ def test_the_union_keeps_the_cluster_of_one() -> None:
     assert any("42" in candidate for candidate in kept)
 
 
+def test_the_report_reads_no_arm_that_no_longer_exists() -> None:
+    """The `vote` key survived the `vote_text` / `vote_answer` split in the report block, and the
+    patch that should have removed it asserted nothing and silently did nothing.
+
+    The run got all the way to the end of stage 2, printed every arm, and then raised
+    `KeyError: 'vote'`. That is the GOOD version of the failure — a stale key that still resolved
+    would have reported one arm under the other's name.
+    """
+    source = (REPO / "bench/fusion_aggregate/run_aggregate.py").read_text(encoding="utf-8")
+
+    assert 'free["vote"]' not in source, "the report reads an arm that arms_free no longer produces"
+    assert 'free["vote_answer"]' in source and 'free["vote_text"]' in source
+
+
+def test_how_often_the_vote_fired_is_reported_apart_from_how_often_it_was_right() -> None:
+    """0% correct has two opposite readings. `majority` returning None means the branch DECLINED and
+    the turn fell through to judge -> synthesiser — inert. Voting and being wrong would be harmful.
+    Only the firing rate separates them, and the measured answer was 0/40: inert."""
+    run = _runner()
+    agreeing = _row("72", "One way: 72.\nANSWER: 72", "Another way entirely: 72.\nANSWER: 72")
+
+    assert run.fired_text(agreeing) is False, "the shipped vote fired where it never does"
+    assert "FIRED on" in (REPO / "bench/fusion_aggregate/run_aggregate.py").read_text(
+        encoding="utf-8"
+    )
+
+
 def test_the_paid_arm_is_measured_against_the_FIXED_vote() -> None:
     """Fixing the clustering and adding a validator are two interventions. Measuring them together
     would credit the validator with the fix — `§2g` in the form that flatters the proposal."""
