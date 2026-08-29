@@ -395,8 +395,15 @@ class Settings(BaseSettings):
     # --- Default iCalendar feed for the calendar_events reference tool ---
     calendar_ics_url: str | None = Field(default=None, validation_alias="CHIMERA_CALENDAR_ICS_URL")
 
-    # --- Execution sandbox for the shell tool (local = host, docker = isolated) ---
-    sandbox: str = Field(default="local", validation_alias="CHIMERA_SANDBOX")
+    # --- Execution sandbox for the shell tool ---
+    # `auto` (default): the platform's kernel sandbox where there is one — Seatbelt on macOS,
+    # bubblewrap on Linux — and the host with a warning where there is not (Windows, and any Linux
+    # whose kernel refuses the user namespace). `local` is the explicit opt-out to the host, `os`
+    # forces the attempt, `docker` is the isolated container.
+    #
+    # This default used to be `local`. That meant the shipped boundary was a confirmation prompt,
+    # which is a boundary a person can wave through and an injected instruction cannot be stopped by.
+    sandbox: str = Field(default="auto", validation_alias="CHIMERA_SANDBOX")
     sandbox_image: str = Field(
         default="python:3.12-slim", validation_alias="CHIMERA_SANDBOX_IMAGE"
     )

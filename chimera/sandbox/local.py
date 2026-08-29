@@ -50,14 +50,26 @@ class LocalSandbox:
         """The local sandbox runs on the host — no isolation from it."""
         return False
 
+    def _command_argv(self, command: str, cwd: Path | None) -> tuple[list[str] | str, bool]:
+        """What to hand ``Popen``, and whether it needs a shell. Runs the command as typed.
+
+        The seam :class:`~chimera.sandbox.os_sandbox.OsSandbox` overrides to wrap the same command
+        in the platform's kernel sandbox. It exists so that everything below — the timeout that
+        kills the whole process tree, the secret-scrubbed environment, the non-interactive
+        overrides — is written once. Each of those is a correctness fix with its own history, and a
+        sandbox backend that copied them would be a second place for that history to rot.
+        """
+        return (command, True)
+
     def run(self, command: str, *, timeout: int = 60, cwd: Path | None = None) -> SandboxResult:
         posix = os.name == "posix"
+        target, use_shell = self._command_argv(command, cwd)
         # start_new_session puts the command in its own process GROUP so a timeout can kill the whole
         # tree (killpg), not just the shell — otherwise a forked grandchild survives the timeout and
         # can even hold the stdout pipe open, hanging the reap past the deadline.
         proc = subprocess.Popen(
-            command,
-            shell=True,
+            target,
+            shell=use_shell,
             cwd=cwd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

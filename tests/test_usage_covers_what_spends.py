@@ -69,15 +69,31 @@ def test_a_failure_to_log_never_takes_the_run_down(tmp_path: Path) -> None:
 
 
 def test_an_orchestration_run_lands_on_the_cost_screen(tmp_path: Path) -> None:
+    """Asserted against the REAL result type, not a stand-in.
+
+    This test passed for months while the crew route recorded nothing, because the `_Outcome` it
+    used had a `receipts` attribute and `IsolatedCrewResult` did not. The fake satisfied a contract
+    the shipped object could not, so the test measured the fake. Using the real class is what makes
+    the contract binding: delete the field and this stops compiling into a passing run.
+    """
     from chimera.api.orchestration_api import _record_run_spend
+    from chimera.orchestration.crew import IsolatedCrewResult
+    from chimera.orchestration.receipts import DelegationReceipt
 
-    class _Outcome:
-        receipts = [
-            _Receipt("t/model", 1000, 200, 0.01),
-            _Receipt("m/model", 500, 300, 0.002),
+    outcome = IsolatedCrewResult(
+        receipts=[
+            DelegationReceipt(
+                task_id="a", tier="mid", model="t/model",
+                prompt_tokens=1000, completion_tokens=200, usd=0.01,
+            ),
+            DelegationReceipt(
+                task_id="b", tier="mid", model="m/model",
+                prompt_tokens=500, completion_tokens=300, usd=0.002,
+            ),
         ]
+    )
 
-    _record_run_spend(tmp_path, "run_7", _Outcome())
+    _record_run_spend(tmp_path, "run_7", outcome)
 
     rows = load_usage(tmp_path / "usage.jsonl")
     assert len(rows) == 1

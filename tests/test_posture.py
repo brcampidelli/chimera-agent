@@ -420,7 +420,24 @@ def test_a_host_exec_deny_is_reported_as_refused_not_as_running(tmp_path: Any, m
 
     facts = describe(Posture(reach="workspace_shell", approval="never"), tmp_path, settings)
     assert facts.shell == "refused"
-    assert not facts.fell_back_to_host  # nothing fell back — local was what was asked for
+    # Under the `auto` default something DID fall back: a boundary was intended and this machine
+    # has none. That is the fact a Windows user most needs on the screen, so it is reported.
+    assert facts.fell_back_to_host
+
+
+def test_choosing_the_host_on_purpose_is_not_a_fallback(tmp_path: Any, monkeypatch: Any) -> None:
+    """The control for the line above. `fell_back_to_host` means "a boundary was intended and is
+    missing"; someone who selected `local` intended the host and should not be told they lost
+    something they never asked for."""
+    monkeypatch.setattr(
+        "chimera.sandbox.confirm.sandbox_is_isolated", lambda _s: False, raising=True
+    )
+    settings = Settings(  # type: ignore[call-arg]
+        CHIMERA_HOME=str(tmp_path), CHIMERA_HOST_EXEC="deny", CHIMERA_SANDBOX="local"
+    )
+
+    facts = describe(Posture(reach="workspace_shell", approval="never"), tmp_path, settings)
+    assert not facts.fell_back_to_host
 
 
 def test_a_conversation_turn_reports_that_it_cannot_pause(tmp_path: Any) -> None:
