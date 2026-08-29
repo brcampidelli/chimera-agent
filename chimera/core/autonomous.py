@@ -238,6 +238,14 @@ class Attempt:
     verify_output: str = ""
     diff_summary: str = ""
     diffs: list[FileDiff] = field(default_factory=list)  # real per-file unified diffs (pre-revert)
+    #: Onde o trabalho revertido foi guardado inteiro, ou "" quando nao houve reversao.
+    #:
+    #: `diffs` acima existe e nao serve para recuperar nada: o recibo corta cada patch em 4.000
+    #: caracteres. Medido numa corrida real — um `index.html` de 581 linhas virou um souvenir
+    #: truncado, e era a UNICA copia. A reversao estava certa (o verificador reprovou), mas a
+    #: tentativa que a produziu tinha custado 374 mil tokens e o nucleo dela passava todos os
+    #: testes; o que se perdeu nao foi trabalho ruim, foi trabalho quase pronto.
+    discarded_at: str = ""
     #: What actually decided this attempt: "verifier" (a command exited 0), "diff+manager" (files
     #: changed and an LLM approved the answer), "manager" (an LLM approved prose, nothing else
     #: checked), or "none". A receipt that says "success" without saying on whose authority invites
@@ -980,6 +988,10 @@ class AutonomousAgent:
             attempt.model = str(getattr(agent_result, "model", "") or "")
             self._emit(_ev_result(index, ok, detail=(fb or vout)[:200]))
             if not ok and snapshot is not None and self.guard is not None:
+                # Antes de apagar, guardar. `restore` e' a decisao certa — o verificador reprovou —
+                # mas ela e' irreversivel, e sem esta linha a unica copia do que a tentativa
+                # escreveu passa a ser o patch cortado em 4.000 caracteres dentro do recibo.
+                attempt.discarded_at = self._preserve_discarded(attempt, index)
                 self.guard.restore(snapshot)
                 attempt.reverted = True
 
@@ -1226,6 +1238,40 @@ class AutonomousAgent:
         result = AutonomousResult(answer=answer, success=True, attempts=attempts, plan=plan)
         self._persist_receipt(result, task)
         return result
+
+    def _preserve_discarded(self, attempt: Attempt, index: int) -> str:
+        """Escreve o diff INTEIRO da tentativa em disco e devolve o caminho, ou "" se nada houver.
+
+        Fora do `runs.jsonl` de proposito: aquele arquivo e' lido inteiro por varias telas e o corte
+        em 4.000 caracteres existe para ele nao inchar. Os dois requisitos — log limitado e trabalho
+        recuperavel — so' convivem se forem arquivos diferentes.
+
+        Melhor esforco em todos os sentidos: um erro aqui nao pode impedir a reversao, que e' a
+        parte que mantem o workspace consistente.
+        """
+        if not attempt.diffs or self.run_log is None:
+            return ""
+        try:
+            # O id vem da tentativa, que ja o leu do worker algumas linhas acima — o agente nao tem um.
+            destino = (
+                self.run_log.parent / "discarded" / f"{attempt.run_id or 'run'}-{index}.diff"
+            )
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            corpo = [
+                f"# tentativa {index} revertida: o verificador reprovou",
+                f"# {len(attempt.diffs)} arquivo(s); isto e' o que estava escrito antes da reversao",
+                "",
+            ]
+            for d in attempt.diffs:
+                corpo.append(f"--- {getattr(d, 'path', '?')}")
+                corpo.append(str(getattr(d, "patch", "") or ""))
+                corpo.append("")
+            destino.write_text("\n".join(corpo), encoding="utf-8")
+            _log.info("trabalho revertido guardado em %s", destino)
+            return str(destino)
+        except Exception as exc:  # noqa: BLE001 — guardar nunca pode impedir reverter
+            _log.warning("nao consegui guardar o trabalho revertido: %s", exc)
+            return ""
 
     def _persist_receipt(self, result: AutonomousResult, task: str) -> None:
         """Append a run receipt recording how this finished run PROVED its work (read-only evidence).
