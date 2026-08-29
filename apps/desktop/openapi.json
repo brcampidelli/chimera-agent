@@ -7136,6 +7136,40 @@
         "title": "SandboxCfgOut",
         "type": "object"
       },
+      "SandboxStateOut": {
+        "description": "Whether a command the model chooses can reach this machine, and if it can, why.\n\nOn the Security screen because that is the one screen a person opens to ask what protects them,\nand until now it answered about prompt injection and the audit log and said nothing about the\nboundary around execution. The posture line above the composer does say it \u2014 but only after\nchoosing a project and turning commands on, which is exactly the moment it is too late to be\nreading about it for the first time.",
+        "properties": {
+          "backend": {
+            "title": "Backend",
+            "type": "string"
+          },
+          "configured": {
+            "title": "Configured",
+            "type": "string"
+          },
+          "isolated": {
+            "title": "Isolated",
+            "type": "boolean"
+          },
+          "platform": {
+            "default": "",
+            "title": "Platform",
+            "type": "string"
+          },
+          "reason": {
+            "default": "",
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "configured",
+          "backend",
+          "isolated"
+        ],
+        "title": "SandboxStateOut",
+        "type": "object"
+      },
       "SearchHitOut": {
         "description": "One matching line.",
         "properties": {
@@ -10265,6 +10299,24 @@
           }
         },
         "summary": "Governance Injection Endpoint"
+      }
+    },
+    "/api/governance/sandbox": {
+      "get": {
+        "operationId": "governance_sandbox_endpoint_api_governance_sandbox_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SandboxStateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Governance Sandbox Endpoint"
       }
     },
     "/api/health": {

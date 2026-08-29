@@ -24,6 +24,7 @@ import type {
   SearchResult,
   Benchmarks,
   GovernanceAudit,
+  SandboxState,
   InjectionReport,
   CatalogEntry,
   LibraryCard,
@@ -212,6 +213,9 @@ export const designAgent = (description: string) =>
 export const getGovernanceInjection = () =>
   json<InjectionReport>("/api/governance/injection");
 export const getGovernanceAudit = () => json<GovernanceAudit>("/api/governance/audit");
+/** Whether a command the model chooses can reach this machine. Probed live rather than read off the
+ *  config: asking for a sandbox and getting one are different facts. */
+export const getSandboxState = () => json<SandboxState>("/api/governance/sandbox");
 export const getTools = () => json<Tools>("/api/tools");
 
 // --- Filesystem (read-only tree + file viewer for the Code screen) ---

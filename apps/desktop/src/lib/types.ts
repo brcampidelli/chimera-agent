@@ -96,6 +96,7 @@ export type GitRevertResult = Schemas["GitRevertOut"];
 export type GitInitResult = Schemas["GitInitOut"];
 export type InjectionReport = Schemas["InjectionReportOut"];
 export type GovernanceAudit = Schemas["GovernanceAuditOut"];
+export type SandboxState = Schemas["SandboxStateOut"];
 export type ToolInfo = Schemas["ToolInfoOut"];
 export type Tools = Schemas["ToolsOut"];
 export type Maturity = Schemas["MaturityOut"];
