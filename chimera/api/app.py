@@ -94,6 +94,7 @@ from chimera.api.schemas import (
     RequirementsRequest,
     ResourcesOut,
     RunReceiptOut,
+    SandboxStateOut,
     SearchOut,
     SessionDetailOut,
     SessionMetaOut,
@@ -856,6 +857,52 @@ def build_api_app(
         # unread smoke alarm detects fire.
         return {
             "events": events, "count": len(events), "populated": bool(events), "chain": chain
+        }
+
+    @app.get("/api/governance/sandbox", dependencies=[guard], response_model=SandboxStateOut)
+    def governance_sandbox_endpoint() -> dict[str, Any]:
+        # Probed live rather than read off the config, and probed with the SAME command line the
+        # sandbox actually uses: a kernel that refuses unprivileged user namespaces has bwrap
+        # installed and failing, and a config that says `auto` on Windows resolves to no boundary
+        # at all. Reporting the setting here would report an intention, and the question the screen
+        # asks is what is TRUE.
+        import platform as _platform
+
+        from chimera.sandbox import get_sandbox
+        from chimera.sandbox.confirm import sandbox_is_isolated
+        from chimera.sandbox.os_sandbox import (
+            bubblewrap_available,
+            seatbelt_available,
+            unavailable_reason,
+        )
+
+        live = live_settings()
+        configured = (live.sandbox or "auto").lower()
+        try:
+            isolated = sandbox_is_isolated(get_sandbox(live))
+        except Exception:  # noqa: BLE001 — an unbuildable sandbox is a host sandbox, the safe read
+            isolated = False
+        if isolated:
+            backend = (
+                "docker" if configured == "docker"
+                else "seatbelt" if seatbelt_available()
+                else "bubblewrap" if bubblewrap_available()
+                else "isolated"
+            )
+        else:
+            backend = "host"
+        return {
+            "configured": configured,
+            "backend": backend,
+            "isolated": isolated,
+            # `unavailable_reason` speaks about the OS sandbox. A Docker install that fell back has
+            # a different cause, so it gets its own sentence rather than borrowing a wrong one.
+            "reason": "" if isolated else (
+                "A container was configured and none answered." if configured == "docker"
+                else "" if configured == "local"
+                else unavailable_reason()
+            ),
+            "platform": _platform.system(),
         }
 
     @app.get("/api/maturity", dependencies=[guard], response_model=MaturityOut)

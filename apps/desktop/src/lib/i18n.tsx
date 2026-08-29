@@ -1001,6 +1001,18 @@ const en: Dict = {
     "Still get through even defended (honest gap)",
   "governance.injection.note":
     "Measures defense-in-depth of an already-injected agent (synthetic corpus, no model) — not the model's susceptibility to being injected.",
+    "governance.sandbox.title":
+    "Commands on this machine",
+  "governance.sandbox.isolated":
+    "Commands run inside a kernel sandbox: no network, and writes confined to the working folder.",
+  "governance.sandbox.host":
+    "Commands would run on this machine — no kernel sandbox applies here.",
+  "governance.sandbox.stillApplies":
+    "The governance kernel, the write region and the confirmation prompt still apply — they are not a jail.",
+  "governance.sandbox.configured":
+    "asked for: {value}",
+  "governance.sandbox.backend":
+    "actually: {value}",
   "governance.audit.title": "Audit log",
   "governance.audit.intact":
     "chain intact",
@@ -2254,6 +2266,18 @@ const pt: Dict = {
   "governance.injection.leaksNote": "Passam mesmo com defesa (lacuna honesta)",
   "governance.injection.note":
     "Mede defesa-em-profundidade de um agente já injetado (corpus sintético, sem modelo) — não a suscetibilidade do modelo a ser injetado.",
+    "governance.sandbox.title":
+    "Comandos nesta máquina",
+  "governance.sandbox.isolated":
+    "Os comandos rodam dentro de um sandbox do kernel: sem rede, e escritas presas à pasta de trabalho.",
+  "governance.sandbox.host":
+    "Os comandos rodariam nesta máquina — nenhum sandbox de kernel se aplica aqui.",
+  "governance.sandbox.stillApplies":
+    "O kernel de governança, a região de escrita e o pedido de confirmação continuam valendo — eles não são uma jaula.",
+  "governance.sandbox.configured":
+    "pedido: {value}",
+  "governance.sandbox.backend":
+    "de fato: {value}",
   "governance.audit.title": "Registro de auditoria",
   "governance.audit.intact":
     "cadeia íntegra",
@@ -3519,6 +3543,18 @@ const es: Dict = {
     "Pasan incluso con defensa (brecha honesta)",
   "governance.injection.note":
     "Mide la defensa en profundidad de un agente ya inyectado (corpus sintético, sin modelo) — no la susceptibilidad del modelo a ser inyectado.",
+    "governance.sandbox.title":
+    "Comandos en esta máquina",
+  "governance.sandbox.isolated":
+    "Los comandos se ejecutan en un sandbox del kernel: sin red y con escrituras limitadas a la carpeta de trabajo.",
+  "governance.sandbox.host":
+    "Los comandos se ejecutarían en esta máquina: aquí no se aplica ningún sandbox del kernel.",
+  "governance.sandbox.stillApplies":
+    "El kernel de gobernanza, la región de escritura y la confirmación siguen vigentes: no son una jaula.",
+  "governance.sandbox.configured":
+    "solicitado: {value}",
+  "governance.sandbox.backend":
+    "en realidad: {value}",
   "governance.audit.title": "Registro de auditoría",
   "governance.audit.intact":
     "cadena íntegra",
@@ -4796,6 +4832,18 @@ const fr: Dict = {
     "Passent même avec défense (faille honnête)",
   "governance.injection.note":
     "Mesure la défense en profondeur d'un agent déjà injecté (corpus synthétique, sans modèle) — pas la susceptibilité du modèle à être injecté.",
+    "governance.sandbox.title":
+    "Commandes sur cette machine",
+  "governance.sandbox.isolated":
+    "Les commandes s'exécutent dans un bac à sable du noyau : sans réseau, écritures limitées au dossier de travail.",
+  "governance.sandbox.host":
+    "Les commandes s'exécuteraient sur cette machine — aucun bac à sable du noyau ne s'applique ici.",
+  "governance.sandbox.stillApplies":
+    "Le noyau de gouvernance, la région d'écriture et la confirmation s'appliquent toujours — ce n'est pas une prison.",
+  "governance.sandbox.configured":
+    "demandé : {value}",
+  "governance.sandbox.backend":
+    "en réalité : {value}",
   "governance.audit.title": "Journal d'audit",
   "governance.audit.intact":
     "chaîne intacte",
@@ -6072,6 +6120,18 @@ const de: Dict = {
     "Kommen selbst mit Abwehr durch (ehrliche Lücke)",
   "governance.injection.note":
     "Misst die tiefengestaffelte Abwehr eines bereits injizierten Agenten (synthetischer Korpus, kein Modell) — nicht die Anfälligkeit des Modells, injiziert zu werden.",
+    "governance.sandbox.title":
+    "Befehle auf diesem Rechner",
+  "governance.sandbox.isolated":
+    "Befehle laufen in einer Kernel-Sandbox: kein Netzwerk, Schreibzugriffe auf den Arbeitsordner begrenzt.",
+  "governance.sandbox.host":
+    "Befehle würden auf diesem Rechner laufen — hier greift keine Kernel-Sandbox.",
+  "governance.sandbox.stillApplies":
+    "Governance-Kernel, Schreibbereich und Bestätigung gelten weiterhin — ein Gefängnis sind sie nicht.",
+  "governance.sandbox.configured":
+    "angefordert: {value}",
+  "governance.sandbox.backend":
+    "tatsächlich: {value}",
   "governance.audit.title": "Audit-Protokoll",
   "governance.audit.intact":
     "Kette intakt",
@@ -7275,6 +7335,18 @@ const zh: Dict = {
   "governance.injection.leaksNote": "即使有防御仍能通过（诚实披露的缺口）",
   "governance.injection.note":
     "衡量已被注入的智能体的纵深防御（合成语料，无模型）——并非模型被注入的易感性。",
+    "governance.sandbox.title":
+    "本机上的命令",
+  "governance.sandbox.isolated":
+    "命令在内核沙箱中运行：没有网络，写入仅限工作目录。",
+  "governance.sandbox.host":
+    "命令将在这台机器上运行——此处不适用内核沙箱。",
+  "governance.sandbox.stillApplies":
+    "治理内核、写入范围和确认提示仍然生效——但它们不是牢笼。",
+  "governance.sandbox.configured":
+    "请求：{value}",
+  "governance.sandbox.backend":
+    "实际：{value}",
   "governance.audit.title": "审计日志",
   "governance.audit.intact":
     "链条完整",
@@ -8530,6 +8602,18 @@ const ja: Dict = {
   "governance.injection.leaksNote": "防御ありでも通過する（正直なギャップ）",
   "governance.injection.note":
     "すでに注入されたエージェントの多層防御を測定します（合成コーパス、モデルなし）— モデルが注入されやすさそのものではありません。",
+    "governance.sandbox.title":
+    "このマシンでのコマンド",
+  "governance.sandbox.isolated":
+    "コマンドはカーネルのサンドボックス内で実行されます。ネットワークなし、書き込みは作業フォルダーに限定。",
+  "governance.sandbox.host":
+    "コマンドはこの端末上で実行されます。ここではカーネルのサンドボックスは適用されません。",
+  "governance.sandbox.stillApplies":
+    "ガバナンスカーネル、書き込み範囲、確認プロンプトは引き続き有効です。ただし牢屋ではありません。",
+  "governance.sandbox.configured":
+    "要求: {value}",
+  "governance.sandbox.backend":
+    "実際: {value}",
   "governance.audit.title": "監査ログ",
   "governance.audit.intact":
     "連鎖は無傷",
@@ -9800,6 +9884,18 @@ const it: Dict = {
     "Passano ancora anche con la difesa attiva (lacuna dichiarata onestamente)",
   "governance.injection.note":
     "Misura la difesa in profondità di un agente già iniettato (corpus sintetico, nessun modello) — non la suscettibilità del modello a essere iniettato.",
+    "governance.sandbox.title":
+    "Comandi su questa macchina",
+  "governance.sandbox.isolated":
+    "I comandi vengono eseguiti in una sandbox del kernel: niente rete, scritture limitate alla cartella di lavoro.",
+  "governance.sandbox.host":
+    "I comandi verrebbero eseguiti su questa macchina: qui non si applica alcuna sandbox del kernel.",
+  "governance.sandbox.stillApplies":
+    "Il kernel di governance, la regione di scrittura e la conferma restano attivi: non sono una prigione.",
+  "governance.sandbox.configured":
+    "richiesto: {value}",
+  "governance.sandbox.backend":
+    "in realtà: {value}",
   "governance.audit.title": "Registro di audit",
   "governance.audit.intact":
     "catena integra",
@@ -11063,6 +11159,18 @@ const pl: Dict = {
     "Nadal przechodzą nawet przy włączonej obronie (uczciwie wskazana luka)",
   "governance.injection.note":
     "Mierzy obronę w głąb agenta już zainfekowanego (korpus syntetyczny, bez modelu) — a nie podatność modelu na zainfekowanie.",
+    "governance.sandbox.title":
+    "Polecenia na tej maszynie",
+  "governance.sandbox.isolated":
+    "Polecenia działają w piaskownicy jądra: bez sieci, zapisy ograniczone do folderu roboczego.",
+  "governance.sandbox.host":
+    "Polecenia działałyby na tej maszynie — nie obowiązuje tu żadna piaskownica jądra.",
+  "governance.sandbox.stillApplies":
+    "Jądro nadzoru, obszar zapisu i pytanie o zgodę nadal obowiązują — nie są więzieniem.",
+  "governance.sandbox.configured":
+    "żądano: {value}",
+  "governance.sandbox.backend":
+    "faktycznie: {value}",
   "governance.audit.title": "Dziennik audytu",
   "governance.audit.intact":
     "łańcuch nienaruszony",
@@ -12332,6 +12440,18 @@ const ru: Dict = {
     "Всё равно проходят даже при защите (честный пробел)",
   "governance.injection.note":
     "Измеряет глубину защиты уже внедрённого агента (синтетический корпус, без модели) — а не подверженность самой модели внедрению.",
+    "governance.sandbox.title":
+    "Команды на этой машине",
+  "governance.sandbox.isolated":
+    "Команды выполняются в песочнице ядра: без сети, запись ограничена рабочей папкой.",
+  "governance.sandbox.host":
+    "Команды выполнялись бы на этой машине — песочница ядра здесь не применяется.",
+  "governance.sandbox.stillApplies":
+    "Ядро управления, область записи и запрос подтверждения продолжают действовать — но это не тюрьма.",
+  "governance.sandbox.configured":
+    "запрошено: {value}",
+  "governance.sandbox.backend":
+    "фактически: {value}",
   "governance.audit.title": "Журнал аудита",
   "governance.audit.intact":
     "цепочка цела",

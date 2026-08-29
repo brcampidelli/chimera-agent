@@ -880,6 +880,30 @@ class MessagingPlatformOut(BaseModel):
     error: str | None = None
 
 
+class SandboxStateOut(BaseModel):
+    """Whether a command the model chooses can reach this machine, and if it can, why.
+
+    On the Security screen because that is the one screen a person opens to ask what protects them,
+    and until now it answered about prompt injection and the audit log and said nothing about the
+    boundary around execution. The posture line above the composer does say it — but only after
+    choosing a project and turning commands on, which is exactly the moment it is too late to be
+    reading about it for the first time.
+    """
+
+    configured: str
+    """What the install asked for: ``auto`` (the default), ``docker``, ``local``, ``none``."""
+    backend: str
+    """What would actually run a command here: ``seatbelt``, ``bubblewrap``, ``docker``, ``host``."""
+    isolated: bool
+    """True only when a kernel boundary really applies. Never inferred from `configured` — asking
+    for a sandbox and getting one are different facts, and conflating them is how "I thought it was
+    sandboxed" happens."""
+    reason: str = ""
+    """Why not, in a sentence a person can act on. Empty when it IS isolated."""
+    platform: str = ""
+    """The OS, because the answer is different on each and the reason names it."""
+
+
 class CronCreateIn(BaseModel):
     """Create a scheduled job from the UI (the CLI's `chimera cron add`, over HTTP)."""
 

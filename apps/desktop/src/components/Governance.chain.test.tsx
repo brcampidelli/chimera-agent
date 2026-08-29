@@ -7,6 +7,9 @@ import { renderWithProviders } from "@/test/utils";
 vi.mock("@/lib/api", () => ({
   getGovernanceAudit: vi.fn(),
   getGovernanceInjection: vi.fn(),
+  // The screen gained an execution-boundary panel; a mock missing it makes the whole screen throw,
+  // which is this file's tests failing about something they are not testing.
+  getSandboxState: vi.fn(),
 }));
 
 /**

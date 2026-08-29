@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { ShieldCheck } from "lucide-react";
-import { getGovernanceAudit, getGovernanceInjection } from "@/lib/api";
+import { Lock, ShieldCheck, ShieldOff } from "lucide-react";
+import { getGovernanceAudit, getGovernanceInjection, getSandboxState } from "@/lib/api";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
 import { ErrorState } from "@/components/ui/async";
 import { useT, type TFunc } from "@/lib/i18n";
-import type { GovernanceAudit, InjectionReport } from "@/lib/types";
+import type { GovernanceAudit, InjectionReport, SandboxState } from "@/lib/types";
 
 type CategoryRow = InjectionReport["by_category"][number];
 type AttackRow = InjectionReport["attacks"][number];
@@ -214,13 +214,81 @@ function AuditPanel({ data, t }: { data: GovernanceAudit; t: TFunc }) {
   );
 }
 
+/** Whether a command the model chooses can reach this machine.
+ *
+ *  This screen is the one a person opens to ask what protects them, and it answered about prompt
+ *  injection and the audit log while saying nothing about the boundary around EXECUTION — the thing
+ *  those two are defending. The posture line above the composer does say it, but only after picking
+ *  a project and turning commands on, which is the moment it is already too late to be learning it.
+ *
+ *  The unisolated state is deliberately not styled as an error. On Windows there is no OS sandbox at
+ *  all and that is a documented, permanent fact rather than something the user did wrong; painting
+ *  it red every time the screen opens would train people to ignore the one colour that should mean
+ *  something. It is `warn`, it names the reason, and it says what still applies.
+ */
+function SandboxPanel({ data, t }: { data: SandboxState; t: TFunc }) {
+  return (
+    <Panel title={t("governance.sandbox.title")}>
+      <div className="flex items-start gap-3 px-4 py-4">
+        {data.isolated ? (
+          <Lock className="mt-0.5 h-4 w-4 shrink-0 text-ok" />
+        ) : (
+          <ShieldOff className="mt-0.5 h-4 w-4 shrink-0 text-warn-foreground" />
+        )}
+        <div className="flex flex-col gap-1.5">
+          <span className="text-sm text-foreground">
+            {data.isolated ? t("governance.sandbox.isolated") : t("governance.sandbox.host")}
+          </span>
+          {data.reason && (
+            <span className="text-xs text-muted-foreground">{data.reason}</span>
+          )}
+          {/* What still applies when the kernel boundary does not. Without this the panel reads as
+              "you have nothing", and the kernel, the write region and the confirmation prompt are
+              not nothing — they are simply not a jail. */}
+          {!data.isolated && (
+            <span className="text-xs text-muted-foreground">
+              {t("governance.sandbox.stillApplies")}
+            </span>
+          )}
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <Badge>{t("governance.sandbox.configured", { value: data.configured })}</Badge>
+            <Badge>{t("governance.sandbox.backend", { value: data.backend })}</Badge>
+            {data.platform && <Badge>{data.platform}</Badge>}
+          </div>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+
 export function Governance({ embedded = false }: { embedded?: boolean } = {}) {
   const t = useT();
   const injection = useQuery({ queryKey: ["governance-injection"], queryFn: getGovernanceInjection });
+  // Probed on every open rather than cached: a Docker daemon that died since the last look has to
+  // change the answer, not be served from a cache — the same rule the posture endpoint follows.
+  const sandbox = useQuery({
+    queryKey: ["governance-sandbox"], queryFn: getSandboxState, staleTime: 0, gcTime: 0,
+  });
   const audit = useQuery({ queryKey: ["governance-audit"], queryFn: getGovernanceAudit });
 
   return (
     <Screen title={t("governance.title")} icon={<ShieldCheck className="h-5 w-5" />} embedded={embedded}>
+      {/* First on the screen on purpose: it is the widest of the three. The injection score is
+          about one class of attack and the audit log is about what already happened; this is about
+          whether anything at all stands between a chosen command and the filesystem. */}
+      {sandbox.isError ? (
+        <Panel title={t("governance.sandbox.title")}>
+          <ErrorState error={sandbox.error} onRetry={() => sandbox.refetch()} />
+        </Panel>
+      ) : sandbox.isLoading || !sandbox.data ? (
+        <Panel title={t("governance.sandbox.title")}>
+          <Spinner />
+        </Panel>
+      ) : (
+        <SandboxPanel data={sandbox.data} t={t} />
+      )}
+
       {injection.isError ? (
         <Panel title={t("governance.injection.title")}>
           <ErrorState error={injection.error} onRetry={() => injection.refetch()} />

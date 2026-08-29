@@ -1043,6 +1043,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/governance/sandbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Governance Sandbox Endpoint */
+        get: operations["governance_sandbox_endpoint_api_governance_sandbox_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -5676,6 +5693,34 @@ export interface components {
             mode: string;
         };
         /**
+         * SandboxStateOut
+         * @description Whether a command the model chooses can reach this machine, and if it can, why.
+         *
+         *     On the Security screen because that is the one screen a person opens to ask what protects them,
+         *     and until now it answered about prompt injection and the audit log and said nothing about the
+         *     boundary around execution. The posture line above the composer does say it — but only after
+         *     choosing a project and turning commands on, which is exactly the moment it is too late to be
+         *     reading about it for the first time.
+         */
+        SandboxStateOut: {
+            /** Backend */
+            backend: string;
+            /** Configured */
+            configured: string;
+            /** Isolated */
+            isolated: boolean;
+            /**
+             * Platform
+             * @default
+             */
+            platform: string;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+        };
+        /**
          * SearchHitOut
          * @description One matching line.
          */
@@ -7806,6 +7851,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InjectionReportOut"];
+                };
+            };
+        };
+    };
+    governance_sandbox_endpoint_api_governance_sandbox_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxStateOut"];
                 };
             };
         };
