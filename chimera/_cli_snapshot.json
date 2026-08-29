@@ -936,7 +936,7 @@
       "commands": [
         {
           "deprecated": false,
-          "help": "Add a cron, event- or webhook-triggered job.",
+          "help": "Add a cron, event- or webhook-triggered job.\n\n`--verify` is what turns a scheduled job into a run the harness governs. `CronJob` has carried\nthe field since the harness landed and nothing could write it \u2014 not this command, not the HTTP\nroute \u2014 so for every user the gate was permanently unarmed.",
           "hidden": false,
           "name": "add",
           "params": [
@@ -989,6 +989,28 @@
               ],
               "required": false,
               "type": "boolean"
+            },
+            {
+              "default": "''",
+              "help": "Gate: shell command run in the job's folder after the dispatch (exit 0 to keep the work, non-zero to revert it). Empty = no gate, which is the previous behaviour.",
+              "kind": "option",
+              "name": "verify",
+              "opts": [
+                "--verify"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "default": "1",
+              "help": "Attempts per dispatch. Worth raising only with --verify: without a gate nothing can tell a failed attempt from a finished one.",
+              "kind": "option",
+              "name": "max_attempts",
+              "opts": [
+                "--max-attempts"
+              ],
+              "required": false,
+              "type": "int"
             }
           ],
           "path": "cron add"
