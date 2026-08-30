@@ -17,6 +17,7 @@ Every dependency is injectable, so the whole loop is testable without a network.
 
 from __future__ import annotations
 
+import copy
 import inspect
 import re
 from collections.abc import Callable
@@ -57,6 +58,7 @@ from chimera.evolution.experience import ExperienceBuffer, Outcome, format_lesso
 from chimera.evolution.playbook import Playbook
 from chimera.evolution.stagnation import StagnationDetector
 from chimera.evolution.trace_probe import anti_pattern_hint
+from chimera.orchestration.budget import SpendBudget, SpendCappedBackend, SpendExceeded
 from chimera.telemetry import get_logger
 
 _log = get_logger("core.autonomous")
@@ -466,7 +468,9 @@ class AutonomousAgent:
             )
         )
 
-    def _run_worker(self, worker: Worker, prompt: str) -> AgentResult:
+    def _run_worker(
+        self, worker: Worker, prompt: str, *, spend: SpendBudget | None = None
+    ) -> AgentResult:
         """Run the worker, passing the live callbacks it actually supports and a sink exists for.
 
         Backward-compatible in both directions: with no event sink the call is the bare
@@ -487,6 +491,12 @@ class AutonomousAgent:
         kwargs: dict[str, Any] = {}
         if self.should_stop is not None and "should_stop" in accepted:
             kwargs["should_stop"] = self.should_stop
+        # NOT an event either, and passed for the same reason `should_stop` is: without it every
+        # attempt builds its own ceiling from the same `max_usd` and the run's real limit becomes
+        # `max_usd * max_attempts`. A worker that predates the parameter is called without it and
+        # keeps the old per-attempt behaviour rather than failing.
+        if spend is not None and "spend" in accepted:
+            kwargs["spend"] = spend
         if self.on_event is not None:
             if "on_edit" in accepted:
                 kwargs["on_edit"] = self._emit_edit
@@ -498,6 +508,41 @@ class AutonomousAgent:
             return worker.run(prompt, **kwargs)
         except TypeError:  # signature lied (e.g. **kwargs-only) — fall back to the plain call
             return worker.run(prompt)
+
+    def _run_budget(self) -> SpendBudget | None:
+        """One ceiling for this whole run, read off the worker that will spend the money.
+
+        Duck-typed on the worker for the same reason `_seed_run_state` is: `Worker` is a protocol,
+        and an implementation that carries no `config.max_usd` simply has no ceiling to share — it
+        then behaves exactly as before, building its own per-call budget if it has one.
+        """
+        cap = getattr(getattr(self.worker, "config", None), "max_usd", None)
+        return SpendBudget(cap) if cap else None
+
+    def _capped_manager(self, spend: SpendBudget | None) -> Manager | None:
+        """The reviewer, drawing on the run's money instead of on nothing.
+
+        The reviewer is a model call per attempt and it sat outside every ceiling: a run given a
+        cap still paid for reviews after reaching it. The ceiling goes around the BACKEND, once —
+        the shape `SpendCappedBackend` was written for, and the reason it refuses rather than
+        merely records.
+
+        A COPY, never a wrapper installed on `self.manager`: this one is per-run today, and a
+        mutation would make this run's spending follow a shared reviewer into the next one.
+
+        `copy.copy` rather than `Manager(...)`, and the difference is not style. Rebuilding the
+        class from its fields silently discards a subclass and every overridden `review` — the
+        reviewer would keep its name and lose its behaviour, which is the kind of substitution
+        nothing downstream can detect. A reviewer with no `backend` to wrap is returned untouched.
+        """
+        if spend is None or self.manager is None:
+            return self.manager
+        inner = getattr(self.manager, "backend", None)
+        if inner is None:
+            return self.manager
+        capped = copy.copy(self.manager)
+        capped.backend = SpendCappedBackend(inner, spend)
+        return capped
 
     def _seed_run_state(self, worker: Worker, task: str, plan: Plan | None) -> None:
         """Tell the worker what it was asked and which plan it is on, in the fields that mean those.
@@ -694,6 +739,17 @@ class AutonomousAgent:
         # rejected it and rolled the tree back. Between-attempt reverts still happen (each attempt stays
         # independent); only the final on-disk state is restored to this on a failed run.
         last_after = None
+        # ONE ceiling for the whole run, not one per attempt. `Agent.run` builds a `SpendBudget`
+        # from `AgentConfig.max_usd` and this loop calls `run` once per attempt, so a three-attempt
+        # run used to get three separate ceilings — measured: a run asking for $0.000002 spent
+        # $0.0129 and every attempt started again at zero. Same reasoning as `SpendCappedBackend`,
+        # which already says it for fan-outs: the money is the RUN's, so the budget is the run's.
+        spend = self._run_budget()
+        # The reviewer draws on the same money. It is a model call the user pays for, made once per
+        # attempt, and it was outside every ceiling — so a capped run still paid for reviews after
+        # the cap. Wrapped, never mutated: the Manager is per-run here, but a wrapper installed on
+        # a shared one would leak this run's spending into the next.
+        manager = self._capped_manager(spend)
         for index in range(start_index, self.config.max_attempts + 1):
             # Cooperative cancel (checked BEFORE the attempt starts): an in-flight model call can't be
             # interrupted, so a stop request halts the loop here — after the previous attempt finished,
@@ -724,7 +780,7 @@ class AutonomousAgent:
             # returns at its next step boundary.
             if self.should_stop is not None and self.should_stop():
                 return self._finalize_cancelled(task, attempts, plan, thread_id)
-            agent_result = self._run_worker(worker, prompt)
+            agent_result = self._run_worker(worker, prompt, spend=spend)
             # A worker that cut itself short produced a PARTIAL attempt, and verifying, reviewing and
             # scoring one is worse than useless: those are model calls the user has already asked us
             # not to make, spent to judge work that stopped halfway — and the failing verdict would
@@ -737,6 +793,14 @@ class AutonomousAgent:
             # `max_attempts=1`, return a run with no attempts at all.
             if getattr(agent_result, "stopped_reason", "") == "cancelled":
                 return self._finalize_cancelled(task, attempts, plan, thread_id)
+            # Same argument as the comment above, for the other reason a worker cuts itself short.
+            # A worker that stopped because the money ran out has produced a partial attempt, and
+            # verifying, reviewing and RETRYING it are exactly "model calls the user has already
+            # asked us not to make" — measured: three attempts ran under a cap the first call had
+            # already passed, and each one paid for a reviewer to criticise a worker that was only
+            # saying it had hit the limit.
+            if getattr(agent_result, "stopped_reason", "") in ("spend", "budget"):
+                return self._finalize_capped(task, attempts, plan, thread_id, agent_result.answer)
             answer = agent_result.answer
             # Surface a degrading trajectory where a person will see it, not only in the trace. It
             # is advisory: the attempt is judged on its result as always, and the run continues.
@@ -833,7 +897,9 @@ class AutonomousAgent:
             proxy_fb = ""
             proxy_abstained = False
             if self.probe_log is not None and self.manager is not None:
-                probe_proxy, proxy_fb, proxy_abstained = self._review(task, answer, attempt_judge_context)
+                probe_proxy, proxy_fb, proxy_abstained = self._review(
+                    task, answer, attempt_judge_context, manager=manager
+                )
             # Whether a manager actually judged THIS attempt, as opposed to being configured. Only
             # a real judgment may be named as one in the receipt below.
             review_abstained = True
@@ -846,9 +912,13 @@ class AutonomousAgent:
                 elif probe_proxy is not None:
                     approved, fb, review_abstained = probe_proxy, proxy_fb, proxy_abstained
                 else:
-                    approved, fb, review_abstained = self._review(task, answer, attempt_judge_context)
+                    approved, fb, review_abstained = self._review(
+                        task, answer, attempt_judge_context, manager=manager
+                    )
             else:
-                approved, fb, review_abstained = self._review(task, answer, attempt_judge_context)
+                approved, fb, review_abstained = self._review(
+                    task, answer, attempt_judge_context, manager=manager
+                )
                 # An abstaining reviewer is the only gate here and just declined to be one. Letting
                 # `ok` ride on it would decide the attempt on a non-answer; the contract, coverage
                 # and diff gates below still run and can still fail it.
@@ -1188,6 +1258,35 @@ class AutonomousAgent:
         self._persist_receipt(result, task)
         return result
 
+    def _finalize_capped(
+        self,
+        task: str,
+        attempts: list[Attempt],
+        plan: Plan | None,
+        thread_id: str | None,
+        answer: str,
+    ) -> AutonomousResult:
+        """The money ran out: return what was bought, and stop buying.
+
+        Shaped on `_finalize_cancelled`, not on the exhaustion path, and the difference is the
+        point: running out of money is not evidence the approach was wrong, so this distils no
+        anti-pattern card and credits no card failure. The run did what it was told to do with the
+        money it was given.
+
+        The worker's own message is the answer, because it names WHICH ceiling and what it had
+        spent — "the run failed" for a run that simply reached its cap is the four-word ending this
+        release spent its time removing.
+        """
+        self._emit(_ev_status("stopped on budget"))
+        self._clear_checkpoint(thread_id)
+        last = answer or (attempts[-1].answer if attempts else "")
+        self._emit(_ev_final(False, last))
+        result = AutonomousResult(
+            answer=last, success=False, attempts=attempts, plan=plan, stopped_reason="spend"
+        )
+        self._persist_receipt(result, task)
+        return result
+
     def _finalize_success(
         self,
         task: str,
@@ -1453,15 +1552,29 @@ class AutonomousAgent:
             project=str(self.workspace) if self.workspace else None,
         )
 
-    def _review(self, task: str, answer: str, context: str) -> tuple[bool, str, bool]:
+    def _review(
+        self, task: str, answer: str, context: str, *, manager: Manager | None = None
+    ) -> tuple[bool, str, bool]:
         """Returns (approved, feedback, abstained). ``abstained`` = nobody actually judged — either
         no manager is configured, or the one configured replied with nothing readable. Same shape
         and same meaning as :meth:`_verify`'s third value, and for the same reason: the caller must
         fall back to its other gates instead of reading a non-answer as either answer."""
         if not self._manager_ran():
             return True, "", True
-        assert self.manager is not None
-        review = self.manager.review(task, answer, context=context)
+        # `manager` is the same reviewer wrapped in the run's ceiling; `self.manager` is the bare
+        # one. `_manager_ran` still asks the field, because whether a reviewer EXISTS is a fact
+        # about the agent and must not change with whether a budget was set.
+        reviewer = manager if manager is not None else self.manager
+        assert reviewer is not None
+        try:
+            review = reviewer.review(task, answer, context=context)
+        except SpendExceeded:
+            # The ceiling refused the reviewer's call. ABSTAINED, not rejected: a reviewer that was
+            # never allowed to look has not judged, and reading its silence as a veto would revert
+            # work the money had already bought. The run ends on the next pass at no cost — the
+            # worker draws on this same budget, so its first call is refused before it is made.
+            _log.info("review skipped: the run reached its dollar ceiling")
+            return True, "", True
         return review.approved, review.feedback, review.abstained
 
     def _manager_ran(self) -> bool:

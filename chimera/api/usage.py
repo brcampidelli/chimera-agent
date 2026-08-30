@@ -8,6 +8,7 @@ separately, so an unknown price can never be laundered into a fake $0.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -86,6 +87,61 @@ def record_spend(
         )
     except Exception as exc:  # noqa: BLE001 -- see the docstring
         _log.debug("usage logging skipped: %s", exc)
+
+
+#: Marks a record reconstructed from a run receipt. Chat writes a bare session id and the
+#: orchestrator writes ``orchestration:``, so the three namespaces cannot collide — which is what
+#: keeps the merge below from counting the same money twice without needing to check.
+RUN_SESSION_PREFIX = "run:"
+
+
+def usage_from_runs(path: Path) -> list[UsageRecord]:
+    """One record per ATTEMPT of every autonomous run, so the Cost screen counts them too.
+
+    ``record_spend`` has exactly two callers — a chat turn and an orchestration run — and the
+    autonomous run path is not one of them. Runs write their receipts to ``runs.jsonl`` instead,
+    which the Cost screen never read: measured in the desktop app, a day with $0.0270 of runs
+    showed a total that stopped at the previous day. The screen answered "how much have I spent"
+    with a number that was confidently too low, and too low by exactly the most expensive kind of
+    work the app does.
+
+    Read here rather than ALSO written there: two writers of one number drift, and the receipt is
+    already the record. ``usd`` is the attempt's own total — ``overhead_usd`` is a share of it, not
+    an addition — and stays None when the price is unknown, which `summarize_usage` counts as an
+    unpriced turn rather than laundering into $0.
+    """
+    path = Path(path)
+    if not path.exists():
+        return []
+    out: list[UsageRecord] = []
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except ValueError:
+            _log.warning("skipping malformed run record line")
+            continue
+        if not isinstance(row, dict):
+            continue
+        run_ts = str(row.get("ts") or "")
+        for attempt in row.get("attempts") or []:
+            if not isinstance(attempt, dict):
+                continue
+            usd = attempt.get("usd")
+            out.append(
+                UsageRecord(
+                    ts=run_ts,
+                    # The attempt carries the run id; the run row itself does not.
+                    session_id=RUN_SESSION_PREFIX + str(attempt.get("run_id") or run_ts),
+                    model=str(attempt.get("model") or ""),
+                    prompt_tokens=int(attempt.get("prompt_tokens") or 0),
+                    completion_tokens=int(attempt.get("completion_tokens") or 0),
+                    usd=float(usd) if isinstance(usd, int | float) else None,
+                    tools=len(attempt.get("tool_names") or []),
+                )
+            )
+    return out
 
 
 def load_usage(path: Path) -> list[UsageRecord]:
@@ -176,7 +232,13 @@ def summarize_usage(records: list[UsageRecord]) -> dict[str, Any]:
         "totals": totals,
         "by_day": sorted(by_day.values(), key=lambda d: d["day"]),
         "by_model": sorted(by_model.values(), key=lambda m: m["turns"], reverse=True),
-        "by_session": sorted(by_session.values(), key=lambda s: s["turns"], reverse=True)[:20],
+        # Ties broken by SPEND, not by input order. Nearly every session is one turn, so the
+        # old key left the order to whichever log was concatenated first — and runs are
+        # appended last, which would have kept the most expensive work out of the panel
+        # that exists to show where the money went.
+        "by_session": sorted(
+            by_session.values(), key=lambda s: (s["turns"], s["usd"]), reverse=True
+        )[:20],
         "cache_hit_pct": cache_hit_pct,
         "route_mix": route_mix,
     }

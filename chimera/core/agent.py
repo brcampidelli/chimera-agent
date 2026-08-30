@@ -399,6 +399,7 @@ class Agent:
         history: list[MessageLike] | None = None,
         images: list[str] | None = None,
         should_stop: Callable[[], bool] | None = None,
+        spend: SpendBudget | None = None,
     ) -> AgentResult:
         """Run the tool loop. ``on_token`` streams model text deltas as they arrive (when the backend
         supports it); ``on_tool`` fires once per tool call with its outcome. ``on_edit`` fires with
@@ -475,7 +476,13 @@ class Agent:
         # Per RUN, not per Agent: the same Agent object serves several runs (a conversation, a
         # scheduler dispatching jobs), and a cap that carried across them would refuse the second
         # task because the first one used its allowance.
-        spend = SpendBudget(self.config.max_usd) if self.config.max_usd else None
+        #
+        # Unless the CALLER owns one. `AutonomousAgent` calls this once per ATTEMPT, so a budget
+        # built here gave a three-attempt run three separate ceilings: measured, a run asking for
+        # $0.000002 spent $0.0129 and the loop never noticed. A caller that spans several `run`
+        # calls passes its own, and every attempt then draws on the same money.
+        if spend is None and self.config.max_usd:
+            spend = SpendBudget(self.config.max_usd)
         steplog = StepLog()
         nudged = False
         loop_detector = ToolLoopDetector() if self.config.detect_tool_loops else None
