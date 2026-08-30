@@ -21,6 +21,7 @@ from typing import Any
 from chimera.api.usage import (
     RUN_SESSION_PREFIX,
     UsageRecord,
+    _already_counted,
     append_usage,
     load_usage,
     summarize_usage,
@@ -106,8 +107,13 @@ def test_overhead_is_a_share_of_the_price_not_an_addition(tmp_path: Path) -> Non
 
 
 def test_a_run_and_a_chat_turn_stay_separate_sessions(tmp_path: Path) -> None:
-    """The merge counts each side once because the id namespaces cannot overlap: chat writes a bare
-    session id, orchestration writes ``orchestration:``, runs write ``run:``."""
+    """Two different sessions stay two rows in the panel.
+
+    This used to be cited as the reason the merge could not double-count, and that argument was
+    wrong: id namespaces not colliding says nothing about the same WORK being written to both
+    files under different names, which is exactly what a scheduled run does. The property this
+    checks is the grouping — see the dedupe tests below for the one that actually protects money.
+    """
     append_usage(tmp_path / "usage.jsonl", UsageRecord(ts="2026-08-30T00:00:00+00:00",
                                                        session_id="r1", model="m", usd=1.0))
 
@@ -117,6 +123,85 @@ def test_a_run_and_a_chat_turn_stay_separate_sessions(tmp_path: Path) -> None:
     sessions = {s["session_id"] for s in summary["by_session"]}
     assert sessions == {"r1", RUN_SESSION_PREFIX + "r1"}
     assert summary["totals"]["turns"] == 2
+
+
+# --- the same work must not be billed twice ------------------------------------------------------
+
+
+def test_a_scheduled_run_written_to_both_logs_is_counted_once(tmp_path: Path) -> None:
+    """The measured defect: a scheduled run writes a usage row keyed ``cron:<job>:<run_id>`` AND a
+    receipt carrying the same ``run_id``. Four of them on a real install — $0.0449 billed twice.
+    """
+    append_usage(tmp_path / "usage.jsonl", UsageRecord(
+        ts="2026-08-30T14:39:43+00:00", session_id="cron:c8b9a2e3:32002e09", model="m", usd=0.01085,
+        prompt_tokens=19000, completion_tokens=412,
+    ))
+    turnos = load_usage(tmp_path / "usage.jsonl")
+    runs = _write_runs(tmp_path, _run_row(run_id="32002e09", usd=0.01085))
+
+    summary = summarize_usage(turnos + usage_from_runs(runs, already=_already_counted(turnos)))
+
+    assert summary["totals"]["turns"] == 1, "the same run was counted from both logs"
+    assert round(summary["totals"]["usd"], 6) == 0.01085
+
+
+def test_without_the_join_it_really_would_be_billed_twice(tmp_path: Path) -> None:
+    """The control. Without it, the assertion above could pass because the fixture never overlapped
+    — and this test file's first version passed for exactly that kind of reason."""
+    append_usage(tmp_path / "usage.jsonl", UsageRecord(
+        ts="2026-08-30T14:39:43+00:00", session_id="cron:c8b9a2e3:32002e09", model="m", usd=0.01085,
+    ))
+    turnos = load_usage(tmp_path / "usage.jsonl")
+    runs = _write_runs(tmp_path, _run_row(run_id="32002e09", usd=0.01085))
+
+    sem_juncao = summarize_usage(turnos + usage_from_runs(runs))
+
+    assert sem_juncao["totals"]["turns"] == 2
+    assert round(sem_juncao["totals"]["usd"], 6) == 0.0217
+
+
+def test_a_bare_chat_session_is_never_read_as_a_run_id(tmp_path: Path) -> None:
+    """The dangerous direction. A chat turn writes a bare 32-hex session id and no receipt; reading
+    one as a run id would silently DROP a real charge, and under-counting money must never happen
+    by accident."""
+    append_usage(tmp_path / "usage.jsonl", UsageRecord(
+        ts="2026-08-30T00:00:00+00:00", session_id="32002e09", model="m", usd=1.0,
+    ))
+    turnos = load_usage(tmp_path / "usage.jsonl")
+    runs = _write_runs(tmp_path, _run_row(run_id="32002e09", usd=0.5))
+
+    summary = summarize_usage(turnos + usage_from_runs(runs, already=_already_counted(turnos)))
+
+    assert summary["totals"]["turns"] == 2, "a real charge was dropped"
+    assert round(summary["totals"]["usd"], 6) == 1.5
+
+
+def test_an_ordinary_run_is_still_counted(tmp_path: Path) -> None:
+    """The other half: a run that is NOT in the usage log has to survive the join."""
+    turnos = load_usage(tmp_path / "usage.jsonl")
+    runs = _write_runs(tmp_path, _run_row(run_id="nunca-visto", usd=0.02))
+
+    summary = summarize_usage(turnos + usage_from_runs(runs, already=_already_counted(turnos)))
+
+    assert round(summary["totals"]["usd"], 6) == 0.02
+
+
+def test_the_route_joins_them_too(tmp_path: Path) -> None:
+    """Through HTTP, because a join the endpoint does not perform is a join nobody performs."""
+    from tests.test_api import _client  # noqa: PLC0415
+
+    client = _client(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir(parents=True, exist_ok=True)
+    append_usage(home / "usage.jsonl", UsageRecord(
+        ts="2026-08-30T14:39:43+00:00", session_id="cron:j1:abc123", model="m", usd=0.01,
+    ))
+    _write_runs(home, _run_row(run_id="abc123", usd=0.01))
+
+    body = client.get("/api/usage").json()
+
+    assert body["totals"]["turns"] == 1
+    assert round(body["totals"]["usd"], 6) == 0.01
 
 
 # --- it survives a bad file --------------------------------------------------------------------

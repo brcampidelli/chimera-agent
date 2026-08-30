@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -9,7 +10,29 @@ from pydantic import BaseModel, Field
 Trigger = Literal["cron", "event", "webhook"]
 CreatedBy = Literal["human", "agent"]
 
-DispatchStatus = Literal["ok", "error", "timeout", "budget"]
+DispatchStatus = Literal["ok", "error", "timeout", "budget", "rejected"]
+"""How a dispatch ended.
+
+``rejected`` is the one that is not an error: the job RAN, produced work, and its own verify
+command threw that work away. Nothing broke, so none of the exception paths fire — which is
+exactly why it needed its own name. Measured on a real install: a nightly job whose gate rejected
+every attempt and reverted every file reported ``ok`` with ``consecutive_failures: 0``, so the
+Automation screen showed a green row over a job that had produced nothing, and the silence alarm
+never saw it either. A gate that works and cannot be seen to have fired is not a signal."""
+
+
+@dataclass(frozen=True)
+class JobOutcome:
+    """What a dispatch has to say about the job it just ran.
+
+    ``ok=False`` means the work was REJECTED by the job's own gate, not that anything failed. A
+    caller with no verdict to give — one running a job that declared no gate — returns a bare
+    string instead and is read as ``ok``: absence of a verdict is not a failure, the same rule the
+    reviewer and the verifier already follow when they abstain.
+    """
+
+    answer: str
+    ok: bool = True
 """What happened on the last dispatch — which is not the same question as whether one happened.
 
 ``last_run`` records the ATTEMPT: the scheduler sets it outside the try/except on purpose, so a job

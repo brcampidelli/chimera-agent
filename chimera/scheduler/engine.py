@@ -23,8 +23,8 @@ _log = get_logger("scheduler.engine")
 
 
 def _dispatch_bounded(
-    job: CronJob, dispatch: Callable[[CronJob], None], timeout: float | None
-) -> None:
+    job: CronJob, dispatch: Callable[[CronJob], DispatchStatus | None], timeout: float | None
+) -> DispatchStatus | None:
     """Run ``dispatch(job)``, raising :class:`TimeoutError` if it overruns ``timeout``.
 
     ``None`` runs it inline (the previous, unbounded behaviour) so nothing pays for a thread when
@@ -36,7 +36,7 @@ def _dispatch_bounded(
     at interpreter exit no matter what ``shutdown(wait=False)`` says, so a stuck job let the tick
     finish and then held the process open until it unstuck. See :mod:`chimera.concurrency`.
     """
-    call_with_deadline(lambda: dispatch(job), timeout)
+    return call_with_deadline(lambda: dispatch(job), timeout)
 
 
 def _next_after(cron_expr: str, after_epoch: float) -> float:
@@ -188,7 +188,7 @@ class Scheduler:
             if job.enabled and job.trigger == "webhook" and job.schedule == hook
         ]
 
-    def fire_webhook(self, hook: str, now: float, dispatch: Callable[[CronJob], None]) -> list[CronJob]:
+    def fire_webhook(self, hook: str, now: float, dispatch: Callable[[CronJob], DispatchStatus | None]) -> list[CronJob]:
         """Dispatch every job registered for ``hook`` (an inbound webhook). Returns those run."""
         ran: list[CronJob] = []
         for job in self.jobs_for_webhook(hook):
@@ -287,7 +287,7 @@ class Scheduler:
     def run_due(
         self,
         now: float,
-        dispatch: Callable[[CronJob], None],
+        dispatch: Callable[[CronJob], DispatchStatus | None],
         *,
         job_timeout: float | None = None,
     ) -> list[CronJob]:
@@ -307,8 +307,18 @@ class Scheduler:
             # has failed on every tick for a month look healthy: `last_run` is a minute ago, because
             # the attempt happened, and nothing anywhere said the attempt lost.
             try:
-                _dispatch_bounded(job, dispatch, job_timeout)
-                self._record(job, "ok", None)
+                veredito = _dispatch_bounded(job, dispatch, job_timeout)
+                # `rejected` is not an error and reaches here without an exception: the job ran,
+                # the work it produced failed the job's own verify command, and the workspace was
+                # reverted. Recorded as its own outcome because "ok" for that is the state that
+                # made a nightly job look healthy while producing nothing for a month.
+                if veredito == "rejected":
+                    self._record(
+                        job, "rejected",
+                        "the job ran and its verify command rejected the work, which was reverted",
+                    )
+                else:
+                    self._record(job, veredito or "ok", None)
             except TimeoutError:
                 _log.warning(
                     "cron job %s (%s) exceeded %ss and was abandoned; the schedule continues",
@@ -341,7 +351,7 @@ class Scheduler:
         else:
             job.consecutive_failures += 1
 
-    def fire_event(self, event: str, now: float, dispatch: Callable[[CronJob], None]) -> list[CronJob]:
+    def fire_event(self, event: str, now: float, dispatch: Callable[[CronJob], DispatchStatus | None]) -> list[CronJob]:
         """Dispatch every job registered for ``event``. Returns those run."""
         ran: list[CronJob] = []
         for job in self.jobs_for_event(event):

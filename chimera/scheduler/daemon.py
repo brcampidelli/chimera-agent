@@ -14,12 +14,15 @@ import time
 from collections.abc import Callable
 
 from chimera.scheduler.engine import Scheduler
-from chimera.scheduler.models import CronJob
+from chimera.scheduler.models import CronJob, DispatchStatus, JobOutcome
 from chimera.telemetry import get_logger
 
 _log = get_logger("scheduler.daemon")
 
-Dispatch = Callable[[CronJob], None]
+Dispatch = Callable[[CronJob], "DispatchStatus | None"]
+"""A dispatch may report how the job ended. ``None`` means "nothing to report", which the
+engine reads as ``ok`` — every dispatch written before this returns None and keeps its
+meaning, so the new outcome costs nothing to the callers that have no verdict to give."""
 
 
 def make_agent_dispatch(
@@ -27,7 +30,7 @@ def make_agent_dispatch(
     on_result: Callable[[CronJob, str], None] | None = None,
     *,
     delivery_retries: int = 2,
-    run_job: Callable[[CronJob], str] | None = None,
+    run_job: Callable[[CronJob], JobOutcome | str] | None = None,
 ) -> Dispatch:
     """Build a dispatch that runs a job's ``action`` through ``run_task`` (task -> answer).
 
@@ -43,17 +46,27 @@ def make_agent_dispatch(
     so it's easy to test and to wire.
     """
 
-    def dispatch(job: CronJob) -> None:
-        answer = run_job(job) if run_job is not None else run_task(job.action)
-        _log.info("cron '%s' ran -> %s", job.name, (answer or "").replace("\n", " ")[:200])
+    def dispatch(job: CronJob) -> DispatchStatus | None:
+        bruto = run_job(job) if run_job is not None else run_task(job.action)
+        # A bare string is a caller with no verdict — a job that declared no gate has nothing
+        # that could reject it — and is read as `ok`, which is what every caller meant before.
+        outcome = bruto if isinstance(bruto, JobOutcome) else JobOutcome(str(bruto or ''))
+        answer = outcome.answer
+        status: DispatchStatus | None = None if outcome.ok else "rejected"
+        _log.info(
+            "cron '%s' ran%s -> %s",
+            job.name,
+            " (its gate rejected the work)" if status else "",
+            (answer or "").replace('\\n', " ")[:200],
+        )
         if on_result is None:
-            return
+            return status
         last_exc: Exception | None = None
         for attempt in range(1, delivery_retries + 2):
             try:
                 on_result(job, answer)
                 _log.info("cron '%s' result delivered (attempt %d)", job.name, attempt)
-                return
+                return status
             except Exception as exc:  # noqa: BLE001 — retry, then give up loudly
                 last_exc = exc
                 _log.warning("cron '%s' delivery attempt %d failed: %s", job.name, attempt, exc)
@@ -63,6 +76,7 @@ def make_agent_dispatch(
             delivery_retries + 1,
             last_exc,
         )
+        return status
 
     return dispatch
 
