@@ -63,6 +63,10 @@ from chimera.telemetry import get_logger
 
 _log = get_logger("core.autonomous")
 
+#: Per side of a remembered fact — the task's opening line and the answer's. A fact is
+#: recalled into a later run's context, so its size is a recurring cost, not a one-off.
+_FACT_CHARS = 160
+
 # --diff-feedback wording and bound. Fixed in bench/retry_lift/PREREGISTRATION.md BEFORE the run that
 # measures it, because framing and truncation are the most temptingly tunable knobs in the whole
 # experiment — "it didn't work, let me reword the prompt" is how a null becomes a fabricated win.
@@ -1540,13 +1544,28 @@ class AutonomousAgent:
         """
         if self.memory is None:
             return
-        snippet = next((line.strip() for line in answer.splitlines() if line.strip()), "")[:160]
-        fact = f"Accomplished: {task}" + (f" — {snippet}" if snippet else "")
+        # The task's OPENING LINE, bounded — the same treatment the answer already got, and for
+        # the same reason. A memory fact is meant to be recalled; the whole request is a
+        # transcript. Measured on a real install: four facts of 630-950 characters, each one an
+        # entire project brief followed by an entire answer, sitting in the context budget of every
+        # later run in that folder. The same four under this rule are 31-36 characters of task.
+        #
+        # First line rather than a prefix of the whole: a brief opens with what it wants and
+        # continues with how, so the opening line is the part that identifies it — and a prefix
+        # cut at 160 lands mid-sentence in the middle of the instructions.
+        head = next((line.strip() for line in task.splitlines() if line.strip()), "")[:_FACT_CHARS]
+        snippet = next(
+            (line.strip() for line in answer.splitlines() if line.strip()), ""
+        )[:_FACT_CHARS]
+        fact = f"Accomplished: {head}" + (f" — {snippet}" if snippet else "")
         # Scoped to the folder the work happened in. "Accomplished: <task>" is about THIS
         # codebase, and a note from one project arriving as context in another is the noise this
         # exists to stop. A run with no workspace has no project and stays global.
         self.memory.remember(
             fact,
+            # Keyed on the FULL task, never on the shortened head: two briefs that open the same
+            # way — "Leia BRIEF.md e construa…" was four of them — are different work, and a key
+            # built from the head would fold them into one entry that overwrites itself.
             key=f"solve:{_slug(task)}",
             provenance="tainted" if tainted else "clean",
             project=str(self.workspace) if self.workspace else None,

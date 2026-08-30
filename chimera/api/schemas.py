@@ -783,6 +783,14 @@ class SkillStatOut(BaseModel):
 class SkillsOut(BaseModel):
     stats: list[SkillStatOut]
     retirement_candidates: list[str]
+    cards_read: bool = False
+    """Whether a run actually retrieves these cards — ``CHIMERA_SKILL_CARDS``, off by default.
+
+    Without it the screen lists cards marked *active* with ``0 uses`` and no explanation, and the
+    only available reading is that the agent tried them and they were useless. The truth is that
+    nothing consulted them: reading was measured (+16.7pp, a confidence interval including zero,
+    +300% tokens) and left off. A count of zero means two very different things depending on this
+    flag, and the screen was showing the count without the flag."""
 
 
 class ApprovedOut(BaseModel):
@@ -880,6 +888,16 @@ class MessagingPlatformOut(BaseModel):
     error: str | None = None
 
 
+#: Why no kernel boundary applies. The OS causes come from `chimera.sandbox.os_sandbox`;
+#: ``no_container`` is this layer's own — a Docker install whose container never answered has a
+#: different cause from a machine with no OS sandbox, and borrowing the wrong sentence for it would
+#: send someone to install bubblewrap over a Docker daemon that is simply not running.
+SandboxReason = Literal[
+    "", "windows", "bwrap_missing", "userns_refused", "seatbelt_missing", "unsupported_os",
+    "no_container",
+]
+
+
 class SandboxStateOut(BaseModel):
     """Whether a command the model chooses can reach this machine, and if it can, why.
 
@@ -899,7 +917,16 @@ class SandboxStateOut(BaseModel):
     for a sandbox and getting one are different facts, and conflating them is how "I thought it was
     sandboxed" happens."""
     reason: str = ""
-    """Why not, in a sentence a person can act on. Empty when it IS isolated."""
+    """Why not, in a sentence a person can act on. Empty when it IS isolated.
+
+    ENGLISH, always, and the fallback rather than the display value — see ``reason_code``."""
+    reason_code: SandboxReason = ""
+    """Which cause, for a screen to say in its reader's language.
+
+    The app ships in ten languages and this panel was printing the server's English sentence beside
+    its own translated prose, on the one screen a person opens to learn what protects them. Same
+    shape and same reason as ``PostureFacts.fell_back_reason``. A client that meets a code it does
+    not know falls back to ``reason``: a new cause must degrade to English, never to silence."""
     platform: str = ""
     """The OS, because the answer is different on each and the reason names it."""
 

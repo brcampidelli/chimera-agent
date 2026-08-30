@@ -101,3 +101,42 @@ describe("Cron — the gate", () => {
     expect(field).toHaveAttribute("placeholder", expect.stringMatching(/no gate/i));
   });
 });
+
+describe("Cron — a job that has a gate says so", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCreateCron.mockResolvedValue({} as never);
+  });
+
+  function job(over: Record<string, unknown> = {}) {
+    return {
+      id: "j1", name: "nightly tests", trigger: "cron", schedule: "0 4 * * *",
+      action: "run the tests", enabled: true, next_run: 1, last_run: null,
+      last_status: null, last_error: null, consecutive_failures: 0,
+      created_by: "human", workspace: "/w", deliver_to: null,
+      verify: "", max_attempts: 1, ...over,
+    } as never;
+  }
+
+  it("shows the command that judges the job", async () => {
+    // Found by creating one through the API and reading the list: the gate round-tripped and the
+    // card said nothing about it, so a checked job and an unchecked one were the same row — and
+    // the gate is what decides whether the work is kept at all.
+    mockGetCron.mockResolvedValue([job({ verify: "python -m pytest -q", max_attempts: 2 })]);
+
+    renderWithProviders(<Cron />);
+
+    expect(await screen.findByText(/python -m pytest -q/)).toBeTruthy();
+  });
+
+  it("says nothing at all when there is no gate", async () => {
+    // The absence has to be legible too. A row that always shows a gate line — empty, or reading
+    // "none" — trains people to stop reading it, and then the one that matters is invisible.
+    mockGetCron.mockResolvedValue([job({ verify: "" })]);
+
+    renderWithProviders(<Cron />);
+
+    await screen.findByText(/nightly tests/);
+    expect(screen.queryByText(/gated by/i)).toBeNull();
+  });
+});

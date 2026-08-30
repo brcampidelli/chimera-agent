@@ -46,7 +46,7 @@ function card(over: Record<string, unknown> = {}) {
 describe("Skills — the curated library", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(getSkills).mockResolvedValue({ stats: [], retirement_candidates: [] } as never);
+    vi.mocked(getSkills).mockResolvedValue({ stats: [], retirement_candidates: [], cards_read: true } as never);
     vi.mocked(getSkillLibrary).mockResolvedValue([
       card(),
       card({ name: "chimera-thin-vertical-slice", description: "One slice end to end.", stage: "build" }),

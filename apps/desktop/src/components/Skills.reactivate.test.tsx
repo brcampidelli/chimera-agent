@@ -52,7 +52,7 @@ describe("a retired skill can be put back to work", () => {
   it("offers a way back, and it is not the approve-a-stranger wording", async () => {
     vi.mocked(getSkills).mockResolvedValue({
       stats: [stat({ status: "retired" })],
-      retirement_candidates: [],
+      retirement_candidates: [], cards_read: true,
     });
     renderWithProviders(<Skills />);
 
@@ -72,7 +72,7 @@ describe("a retired skill can be put back to work", () => {
     // put "Reactivate" beside every active skill on the screen.
     vi.mocked(getSkills).mockResolvedValue({
       stats: [stat({ status: "active" })],
-      retirement_candidates: [],
+      retirement_candidates: [], cards_read: true,
     });
     renderWithProviders(<Skills />);
 
@@ -87,7 +87,7 @@ describe("a retired skill can be put back to work", () => {
     // tainted, and one the user retired themselves. The words must not swap.
     vi.mocked(getSkills).mockResolvedValue({
       stats: [stat({ status: "pending" })],
-      retirement_candidates: [],
+      retirement_candidates: [], cards_read: true,
     });
     renderWithProviders(<Skills />);
 

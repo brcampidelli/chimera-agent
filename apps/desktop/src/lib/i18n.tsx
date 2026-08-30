@@ -390,6 +390,8 @@ const en: Dict = {
   "skills.status.provisional": "provisional",
   "skills.status.pending": "pending",
   "skills.status.retired": "retired",
+  "skills.notRead":
+    "Reading these during a run is off, so nothing consults them — a count of zero here is not a verdict on the card.",
   "skills.learned": "Learned skills",
   "skills.retire": "Retire",
   "skills.reactivate": "Reactivate",
@@ -409,6 +411,7 @@ const en: Dict = {
   "cron.add.deliver": "Discord or Slack webhook URL (optional)",
   "cron.add.verify":
     "test command that proves the work (optional) — empty means no gate",
+  "cron.gatedBy": "gated by {command}",
   "cron.deliversTo": "delivers to {host}",
   "cron.lastAnswer": "Answered {when}",
   "cron.deliveryFailed": "delivery failed",
@@ -1009,6 +1012,18 @@ const en: Dict = {
     "Commands would run on this machine — no kernel sandbox applies here.",
   "governance.sandbox.stillApplies":
     "The governance kernel, the write region and the confirmation prompt still apply — they are not a jail.",
+  "governance.sandbox.why.windows":
+    "Windows has no OS sandbox in Chimera: the mechanism there is a restricted token plus network filters, which is native work this does not attempt. Set CHIMERA_SANDBOX=docker for a real boundary.",
+  "governance.sandbox.why.bwrap_missing":
+    "bubblewrap is not installed (apt install bubblewrap), so commands run on this machine.",
+  "governance.sandbox.why.userns_refused":
+    "bubblewrap is installed, but this kernel refuses to unshare a user namespace — common inside containers and on hardened kernels — so commands run on this machine.",
+  "governance.sandbox.why.seatbelt_missing":
+    "sandbox-exec is missing, so commands run on this machine.",
+  "governance.sandbox.why.unsupported_os":
+    "No OS sandbox is implemented for this system, so commands run on this machine.",
+  "governance.sandbox.why.no_container":
+    "A container was configured and none answered.",
   "governance.sandbox.configured":
     "asked for: {value}",
   "governance.sandbox.backend":
@@ -1647,6 +1662,8 @@ const pt: Dict = {
   "skills.status.provisional": "provisória",
   "skills.status.pending": "pendente",
   "skills.status.retired": "aposentada",
+  "skills.notRead":
+    "A leitura destes cartões durante uma execução está desligada, então nada os consulta — um zero aqui não é um veredito sobre o cartão.",
   "skills.learned": "Habilidades aprendidas",
   "skills.retire": "Aposentar",
   "skills.reactivate": "Reativar",
@@ -1667,6 +1684,7 @@ const pt: Dict = {
   "cron.add.deliver": "URL de webhook do Discord ou Slack (opcional)",
   "cron.add.verify":
     "comando de teste que prova o trabalho (opcional) — vazio = sem portão",
+  "cron.gatedBy": "com portão: {command}",
   "cron.deliversTo": "entrega em {host}",
   "cron.lastAnswer": "Respondeu {when}",
   "cron.deliveryFailed": "entrega falhou",
@@ -2274,6 +2292,18 @@ const pt: Dict = {
     "Os comandos rodariam nesta máquina — nenhum sandbox de kernel se aplica aqui.",
   "governance.sandbox.stillApplies":
     "O kernel de governança, a região de escrita e o pedido de confirmação continuam valendo — eles não são uma jaula.",
+  "governance.sandbox.why.windows":
+    "O Windows não tem sandbox de sistema no Chimera: o mecanismo lá é um token restrito mais filtros de rede, trabalho nativo que este projeto não tenta. Use CHIMERA_SANDBOX=docker para ter uma fronteira de verdade.",
+  "governance.sandbox.why.bwrap_missing":
+    "O bubblewrap não está instalado (apt install bubblewrap), então os comandos rodam nesta máquina.",
+  "governance.sandbox.why.userns_refused":
+    "O bubblewrap está instalado, mas este kernel recusa separar um namespace de usuário — comum dentro de contêineres e em kernels endurecidos — então os comandos rodam nesta máquina.",
+  "governance.sandbox.why.seatbelt_missing":
+    "O sandbox-exec não foi encontrado, então os comandos rodam nesta máquina.",
+  "governance.sandbox.why.unsupported_os":
+    "Não há sandbox de sistema implementado para este sistema, então os comandos rodam nesta máquina.",
+  "governance.sandbox.why.no_container":
+    "Um contêiner foi configurado e nenhum respondeu.",
   "governance.sandbox.configured":
     "pedido: {value}",
   "governance.sandbox.backend":
@@ -2603,6 +2633,7 @@ const es: Dict = {
   "cron.add.deliver": "URL de webhook de Discord o Slack (opcional)",
   "cron.add.verify":
     "comando de prueba que demuestra el trabajo (opcional) — vacío = sin puerta",
+  "cron.gatedBy": "con puerta: {command}",
   "cron.deliversTo": "entrega en {host}",
   "cron.lastAnswer": "Respondió {when}",
   "cron.deliveryFailed": "la entrega falló",
@@ -2938,6 +2969,8 @@ const es: Dict = {
   "skills.status.provisional": "provisional",
   "skills.status.pending": "pendiente",
   "skills.status.retired": "retirada",
+  "skills.notRead":
+    "La lectura de estas tarjetas durante una ejecución está desactivada, así que nada las consulta: un cero aquí no es un veredicto sobre la tarjeta.",
   "skills.learned": "Habilidades aprendidas",
   "skills.retire": "Retirar",
   "skills.reactivate": "Reactivar",
@@ -3551,6 +3584,18 @@ const es: Dict = {
     "Los comandos se ejecutarían en esta máquina: aquí no se aplica ningún sandbox del kernel.",
   "governance.sandbox.stillApplies":
     "El kernel de gobernanza, la región de escritura y la confirmación siguen vigentes: no son una jaula.",
+  "governance.sandbox.why.windows":
+    "Windows no tiene sandbox del sistema en Chimera: el mecanismo allí es un token restringido más filtros de red, trabajo nativo que este proyecto no intenta. Usa CHIMERA_SANDBOX=docker para tener una frontera real.",
+  "governance.sandbox.why.bwrap_missing":
+    "bubblewrap no está instalado (apt install bubblewrap), así que los comandos se ejecutan en esta máquina.",
+  "governance.sandbox.why.userns_refused":
+    "bubblewrap está instalado, pero este kernel se niega a separar un espacio de nombres de usuario —habitual dentro de contenedores y en kernels endurecidos—, así que los comandos se ejecutan en esta máquina.",
+  "governance.sandbox.why.seatbelt_missing":
+    "Falta sandbox-exec, así que los comandos se ejecutan en esta máquina.",
+  "governance.sandbox.why.unsupported_os":
+    "No hay sandbox del sistema implementado para este sistema, así que los comandos se ejecutan en esta máquina.",
+  "governance.sandbox.why.no_container":
+    "Se configuró un contenedor y ninguno respondió.",
   "governance.sandbox.configured":
     "solicitado: {value}",
   "governance.sandbox.backend":
@@ -3882,6 +3927,7 @@ const fr: Dict = {
   "cron.add.deliver": "URL de webhook Discord ou Slack (facultatif)",
   "cron.add.verify":
     "commande de test qui prouve le travail (facultatif) — vide = sans garde",
+  "cron.gatedBy": "vérifié par {command}",
   "cron.deliversTo": "livre sur {host}",
   "cron.lastAnswer": "Répondu {when}",
   "cron.deliveryFailed": "l'envoi a échoué",
@@ -4220,6 +4266,8 @@ const fr: Dict = {
   "skills.status.provisional": "provisoire",
   "skills.status.pending": "en attente",
   "skills.status.retired": "retirée",
+  "skills.notRead":
+    "La lecture de ces fiches pendant une exécution est désactivée, donc rien ne les consulte — un zéro ici n'est pas un verdict sur la fiche.",
   "skills.learned": "Compétences apprises",
   "skills.retire": "Retirer",
   "skills.reactivate": "Réactiver",
@@ -4840,6 +4888,18 @@ const fr: Dict = {
     "Les commandes s'exécuteraient sur cette machine — aucun bac à sable du noyau ne s'applique ici.",
   "governance.sandbox.stillApplies":
     "Le noyau de gouvernance, la région d'écriture et la confirmation s'appliquent toujours — ce n'est pas une prison.",
+  "governance.sandbox.why.windows":
+    "Windows n'a pas de bac à sable système dans Chimera : le mécanisme y repose sur un jeton restreint et des filtres réseau, un travail natif que ce projet ne tente pas. Utilisez CHIMERA_SANDBOX=docker pour une vraie frontière.",
+  "governance.sandbox.why.bwrap_missing":
+    "bubblewrap n'est pas installé (apt install bubblewrap), donc les commandes s'exécutent sur cette machine.",
+  "governance.sandbox.why.userns_refused":
+    "bubblewrap est installé, mais ce noyau refuse de détacher un espace de noms utilisateur — fréquent dans les conteneurs et sur les noyaux durcis — donc les commandes s'exécutent sur cette machine.",
+  "governance.sandbox.why.seatbelt_missing":
+    "sandbox-exec est absent, donc les commandes s'exécutent sur cette machine.",
+  "governance.sandbox.why.unsupported_os":
+    "Aucun bac à sable système n'est implémenté pour ce système, donc les commandes s'exécutent sur cette machine.",
+  "governance.sandbox.why.no_container":
+    "Un conteneur a été configuré et aucun n'a répondu.",
   "governance.sandbox.configured":
     "demandé : {value}",
   "governance.sandbox.backend":
@@ -5172,6 +5232,7 @@ const de: Dict = {
   "cron.add.deliver": "Discord- oder Slack-Webhook-URL (optional)",
   "cron.add.verify":
     "Testbefehl, der die Arbeit belegt (optional) — leer = kein Gate",
+  "cron.gatedBy": "geprüft durch {command}",
   "cron.deliversTo": "liefert an {host}",
   "cron.lastAnswer": "Geantwortet {when}",
   "cron.deliveryFailed": "Zustellung fehlgeschlagen",
@@ -5510,6 +5571,8 @@ const de: Dict = {
   "skills.status.provisional": "vorläufig",
   "skills.status.pending": "ausstehend",
   "skills.status.retired": "stillgelegt",
+  "skills.notRead":
+    "Das Lesen dieser Karten während eines Laufs ist ausgeschaltet, also zieht sie niemand heran — eine Null hier ist kein Urteil über die Karte.",
   "skills.learned": "Erlernte Fähigkeiten",
   "skills.retire": "Zurückziehen",
   "skills.reactivate": "Reaktivieren",
@@ -6128,6 +6191,18 @@ const de: Dict = {
     "Befehle würden auf diesem Rechner laufen — hier greift keine Kernel-Sandbox.",
   "governance.sandbox.stillApplies":
     "Governance-Kernel, Schreibbereich und Bestätigung gelten weiterhin — ein Gefängnis sind sie nicht.",
+  "governance.sandbox.why.windows":
+    "Windows hat in Chimera keine Betriebssystem-Sandbox: Der Mechanismus dort besteht aus einem eingeschränkten Token plus Netzwerkfiltern — native Arbeit, die dieses Projekt nicht unternimmt. Nutze CHIMERA_SANDBOX=docker für eine echte Grenze.",
+  "governance.sandbox.why.bwrap_missing":
+    "bubblewrap ist nicht installiert (apt install bubblewrap), daher laufen Befehle auf diesem Rechner.",
+  "governance.sandbox.why.userns_refused":
+    "bubblewrap ist installiert, aber dieser Kernel verweigert einen eigenen User-Namespace — üblich in Containern und auf gehärteten Kerneln — daher laufen Befehle auf diesem Rechner.",
+  "governance.sandbox.why.seatbelt_missing":
+    "sandbox-exec fehlt, daher laufen Befehle auf diesem Rechner.",
+  "governance.sandbox.why.unsupported_os":
+    "Für dieses System ist keine Betriebssystem-Sandbox implementiert, daher laufen Befehle auf diesem Rechner.",
+  "governance.sandbox.why.no_container":
+    "Ein Container war konfiguriert und keiner hat geantwortet.",
   "governance.sandbox.configured":
     "angefordert: {value}",
   "governance.sandbox.backend":
@@ -6456,6 +6531,7 @@ const zh: Dict = {
   "cron.add.deliver": "Discord 或 Slack 的 webhook 链接（可选）",
   "cron.add.verify":
     "证明工作完成的测试命令（可选）—— 留空则无门禁",
+  "cron.gatedBy": "由 {command} 把关",
   "cron.deliversTo": "发送到 {host}",
   "cron.lastAnswer": "{when} 的回答",
   "cron.deliveryFailed": "发送失败",
@@ -6769,6 +6845,8 @@ const zh: Dict = {
   "skills.status.provisional": "暂定",
   "skills.status.pending": "待定",
   "skills.status.retired": "已停用",
+  "skills.notRead":
+    "运行期间读取这些卡片的功能已关闭，因此没有任何环节会参考它们——这里的零并不是对卡片的评价。",
   "skills.learned": "已学技能",
   "skills.retire": "停用",
   "skills.reactivate": "重新启用",
@@ -7343,6 +7421,18 @@ const zh: Dict = {
     "命令将在这台机器上运行——此处不适用内核沙箱。",
   "governance.sandbox.stillApplies":
     "治理内核、写入范围和确认提示仍然生效——但它们不是牢笼。",
+  "governance.sandbox.why.windows":
+    "Chimera 在 Windows 上没有操作系统级沙箱：那里的机制是受限令牌加网络过滤器，属于本项目未涉足的原生开发。设置 CHIMERA_SANDBOX=docker 可获得真正的边界。",
+  "governance.sandbox.why.bwrap_missing":
+    "未安装 bubblewrap（apt install bubblewrap），因此命令在本机上运行。",
+  "governance.sandbox.why.userns_refused":
+    "已安装 bubblewrap，但此内核拒绝分离用户命名空间——在容器中和加固内核上很常见——因此命令在本机上运行。",
+  "governance.sandbox.why.seatbelt_missing":
+    "缺少 sandbox-exec，因此命令在本机上运行。",
+  "governance.sandbox.why.unsupported_os":
+    "本系统没有实现操作系统级沙箱，因此命令在本机上运行。",
+  "governance.sandbox.why.no_container":
+    "已配置容器，但没有任何容器响应。",
   "governance.sandbox.configured":
     "请求：{value}",
   "governance.sandbox.backend":
@@ -7670,6 +7760,7 @@ const ja: Dict = {
   "cron.add.deliver": "Discord または Slack の webhook URL（任意）",
   "cron.add.verify":
     "作業を検証するテストコマンド（任意）— 空ならゲートなし",
+  "cron.gatedBy": "{command} で検証",
   "cron.deliversTo": "{host} に届けます",
   "cron.lastAnswer": "{when} の回答",
   "cron.deliveryFailed": "配信に失敗",
@@ -8002,6 +8093,8 @@ const ja: Dict = {
   "skills.status.provisional": "暫定",
   "skills.status.pending": "保留中",
   "skills.status.retired": "廃止",
+  "skills.notRead":
+    "実行中にこれらのカードを読み込む機能はオフになっているため、どこからも参照されません。ここのゼロはカードへの評価ではありません。",
   "skills.learned": "習得したスキル",
   "skills.retire": "引退",
   "skills.reactivate": "再有効化",
@@ -8610,6 +8703,18 @@ const ja: Dict = {
     "コマンドはこの端末上で実行されます。ここではカーネルのサンドボックスは適用されません。",
   "governance.sandbox.stillApplies":
     "ガバナンスカーネル、書き込み範囲、確認プロンプトは引き続き有効です。ただし牢屋ではありません。",
+  "governance.sandbox.why.windows":
+    "Chimera には Windows 用の OS サンドボックスがありません。Windows での仕組みは制限付きトークンとネットワークフィルターで、本プロジェクトが手を出していないネイティブ実装です。本当の境界が必要なら CHIMERA_SANDBOX=docker を指定してください。",
+  "governance.sandbox.why.bwrap_missing":
+    "bubblewrap がインストールされていないため（apt install bubblewrap）、コマンドはこのマシン上で実行されます。",
+  "governance.sandbox.why.userns_refused":
+    "bubblewrap はインストールされていますが、このカーネルがユーザー名前空間の分離を拒否しています（コンテナ内や強化カーネルでよくあります）。そのためコマンドはこのマシン上で実行されます。",
+  "governance.sandbox.why.seatbelt_missing":
+    "sandbox-exec が見つからないため、コマンドはこのマシン上で実行されます。",
+  "governance.sandbox.why.unsupported_os":
+    "このシステム向けの OS サンドボックスは実装されていないため、コマンドはこのマシン上で実行されます。",
+  "governance.sandbox.why.no_container":
+    "コンテナが設定されていましたが、どれも応答しませんでした。",
   "governance.sandbox.configured":
     "要求: {value}",
   "governance.sandbox.backend":
@@ -9256,6 +9361,8 @@ const it: Dict = {
   "skills.status.provisional": "provvisoria",
   "skills.status.pending": "in attesa",
   "skills.status.retired": "ritirata",
+  "skills.notRead":
+    "La lettura di queste schede durante un'esecuzione è disattivata, quindi nulla le consulta: uno zero qui non è un verdetto sulla scheda.",
   "skills.learned": "Skill apprese",
   "skills.retire": "Ritira",
   "skills.reactivate": "Riattiva",
@@ -9276,6 +9383,7 @@ const it: Dict = {
   "cron.add.deliver": "URL webhook di Discord o Slack (facoltativo)",
   "cron.add.verify":
     "comando di test che dimostra il lavoro (opzionale) — vuoto = nessun gate",
+  "cron.gatedBy": "verificato da {command}",
   "cron.deliversTo": "consegna su {host}",
   "cron.lastAnswer": "Ha risposto {when}",
   "cron.deliveryFailed": "consegna fallita",
@@ -9892,6 +10000,18 @@ const it: Dict = {
     "I comandi verrebbero eseguiti su questa macchina: qui non si applica alcuna sandbox del kernel.",
   "governance.sandbox.stillApplies":
     "Il kernel di governance, la regione di scrittura e la conferma restano attivi: non sono una prigione.",
+  "governance.sandbox.why.windows":
+    "Windows non ha una sandbox di sistema in Chimera: il meccanismo lì è un token limitato più filtri di rete, lavoro nativo che questo progetto non tenta. Usa CHIMERA_SANDBOX=docker per avere un confine vero.",
+  "governance.sandbox.why.bwrap_missing":
+    "bubblewrap non è installato (apt install bubblewrap), quindi i comandi girano su questa macchina.",
+  "governance.sandbox.why.userns_refused":
+    "bubblewrap è installato, ma questo kernel rifiuta di separare un namespace utente — comune nei container e sui kernel irrigiditi — quindi i comandi girano su questa macchina.",
+  "governance.sandbox.why.seatbelt_missing":
+    "sandbox-exec non è presente, quindi i comandi girano su questa macchina.",
+  "governance.sandbox.why.unsupported_os":
+    "Nessuna sandbox di sistema è implementata per questo sistema, quindi i comandi girano su questa macchina.",
+  "governance.sandbox.why.no_container":
+    "Un container era configurato e nessuno ha risposto.",
   "governance.sandbox.configured":
     "richiesto: {value}",
   "governance.sandbox.backend":
@@ -10537,6 +10657,8 @@ const pl: Dict = {
   "skills.status.provisional": "tymczasowa",
   "skills.status.pending": "oczekująca",
   "skills.status.retired": "wycofana",
+  "skills.notRead":
+    "Czytanie tych kart podczas uruchomienia jest wyłączone, więc nic z nich nie korzysta — zero nie jest tu oceną karty.",
   "skills.learned": "Wyuczone umiejętności",
   "skills.retire": "Wycofaj",
   "skills.reactivate": "Przywróć",
@@ -10557,6 +10679,7 @@ const pl: Dict = {
   "cron.add.deliver": "Adres webhooka Discord lub Slack (opcjonalnie)",
   "cron.add.verify":
     "polecenie testowe potwierdzające pracę (opcjonalnie) — puste = bez bramki",
+  "cron.gatedBy": "bramkowane przez {command}",
   "cron.deliversTo": "wysyła na {host}",
   "cron.lastAnswer": "Odpowiedź {when}",
   "cron.deliveryFailed": "wysyłka nie powiodła się",
@@ -11167,6 +11290,18 @@ const pl: Dict = {
     "Polecenia działałyby na tej maszynie — nie obowiązuje tu żadna piaskownica jądra.",
   "governance.sandbox.stillApplies":
     "Jądro nadzoru, obszar zapisu i pytanie o zgodę nadal obowiązują — nie są więzieniem.",
+  "governance.sandbox.why.windows":
+    "Windows nie ma w Chimerze piaskownicy systemowej: mechanizm tam to token o ograniczonych uprawnieniach plus filtry sieciowe — natywna praca, której ten projekt nie podejmuje. Ustaw CHIMERA_SANDBOX=docker, aby mieć prawdziwą granicę.",
+  "governance.sandbox.why.bwrap_missing":
+    "bubblewrap nie jest zainstalowany (apt install bubblewrap), więc polecenia działają na tej maszynie.",
+  "governance.sandbox.why.userns_refused":
+    "bubblewrap jest zainstalowany, ale to jądro odmawia wydzielenia przestrzeni nazw użytkownika — częste w kontenerach i na utwardzonych jądrach — więc polecenia działają na tej maszynie.",
+  "governance.sandbox.why.seatbelt_missing":
+    "Brakuje sandbox-exec, więc polecenia działają na tej maszynie.",
+  "governance.sandbox.why.unsupported_os":
+    "Dla tego systemu nie zaimplementowano piaskownicy systemowej, więc polecenia działają na tej maszynie.",
+  "governance.sandbox.why.no_container":
+    "Kontener został skonfigurowany i żaden nie odpowiedział.",
   "governance.sandbox.configured":
     "żądano: {value}",
   "governance.sandbox.backend":
@@ -11813,6 +11948,8 @@ const ru: Dict = {
   "skills.status.provisional": "предварительный",
   "skills.status.pending": "ожидает",
   "skills.status.retired": "выведен",
+  "skills.notRead":
+    "Чтение этих карточек во время запуска выключено, поэтому к ним никто не обращается — ноль здесь не приговор карточке.",
   "skills.learned": "Усвоенные навыки",
   "skills.retire": "Вывести из обращения",
   "skills.reactivate": "Вернуть в работу",
@@ -11833,6 +11970,7 @@ const ru: Dict = {
   "cron.add.deliver": "URL вебхука Discord или Slack (необязательно)",
   "cron.add.verify":
     "команда теста, подтверждающая работу (необязательно) — пусто = без ворот",
+  "cron.gatedBy": "проверяется командой {command}",
   "cron.deliversTo": "отправляет в {host}",
   "cron.lastAnswer": "Ответ от {when}",
   "cron.deliveryFailed": "доставка не удалась",
@@ -12448,6 +12586,18 @@ const ru: Dict = {
     "Команды выполнялись бы на этой машине — песочница ядра здесь не применяется.",
   "governance.sandbox.stillApplies":
     "Ядро управления, область записи и запрос подтверждения продолжают действовать — но это не тюрьма.",
+  "governance.sandbox.why.windows":
+    "В Windows у Chimera нет песочницы уровня ОС: механизм там — ограниченный токен плюс сетевые фильтры, нативная работа, за которую этот проект не берётся. Задайте CHIMERA_SANDBOX=docker, чтобы получить настоящую границу.",
+  "governance.sandbox.why.bwrap_missing":
+    "bubblewrap не установлен (apt install bubblewrap), поэтому команды выполняются на этой машине.",
+  "governance.sandbox.why.userns_refused":
+    "bubblewrap установлен, но это ядро отказывается выделить пользовательское пространство имён — обычное дело в контейнерах и на укреплённых ядрах — поэтому команды выполняются на этой машине.",
+  "governance.sandbox.why.seatbelt_missing":
+    "sandbox-exec отсутствует, поэтому команды выполняются на этой машине.",
+  "governance.sandbox.why.unsupported_os":
+    "Для этой системы песочница уровня ОС не реализована, поэтому команды выполняются на этой машине.",
+  "governance.sandbox.why.no_container":
+    "Контейнер был настроен, и ни один не ответил.",
   "governance.sandbox.configured":
     "запрошено: {value}",
   "governance.sandbox.backend":

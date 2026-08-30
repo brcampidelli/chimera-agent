@@ -227,6 +227,12 @@ function AuditPanel({ data, t }: { data: GovernanceAudit; t: TFunc }) {
  *  something. It is `warn`, it names the reason, and it says what still applies.
  */
 function SandboxPanel({ data, t }: { data: SandboxState; t: TFunc }) {
+  // `t` returns the key itself when it has no entry, so an unknown code would print
+  // "governance.sandbox.why.something" at the reader. Compare against the key to detect that and
+  // fall through to the server's English instead.
+  const reasonKey = data.reason_code ? `governance.sandbox.why.${data.reason_code}` : "";
+  const translated = reasonKey ? t(reasonKey) : "";
+  const reasonText = translated === reasonKey ? "" : translated;
   return (
     <Panel title={t("governance.sandbox.title")}>
       <div className="flex items-start gap-3 px-4 py-4">
@@ -239,8 +245,15 @@ function SandboxPanel({ data, t }: { data: SandboxState; t: TFunc }) {
           <span className="text-sm text-foreground">
             {data.isolated ? t("governance.sandbox.isolated") : t("governance.sandbox.host")}
           </span>
-          {data.reason && (
-            <span className="text-xs text-muted-foreground">{data.reason}</span>
+          {/* The CODE decides the sentence, not the server's prose. This app ships in ten
+              languages and this line arrived in English beside translated text — on the one
+              screen a person opens to learn what protects them, which is the worst place to
+              be unreadable. `data.reason` stays the fallback: a cause this build has no
+              translation for must still say something, and English beats blank. */}
+          {(reasonText || data.reason) && (
+            <span className="text-xs text-muted-foreground">
+              {reasonText || data.reason}
+            </span>
           )}
           {/* What still applies when the kernel boundary does not. Without this the panel reads as
               "you have nothing", and the kernel, the write region and the confirmation prompt are

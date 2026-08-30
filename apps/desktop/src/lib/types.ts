@@ -16,6 +16,13 @@ export type MemoryItem = Schemas["MemoryItemOut"];
 export type MemoryLayers = Schemas["MemoryLayersOut"];
 export type MemoryProfile = Schemas["MemoryProfileOut"];
 export type SkillStat = Schemas["SkillStatOut"];
+/** The whole `GET /api/skills` body, from the generated schema rather than spelled out at
+ *  the call site. A hand-written shape there silently stops at whatever the backend had the
+ *  day it was typed — this repo has already shipped one field that reached the schema, the
+ *  generated types and the drift gate, and never the screen, because a local type shadowed
+ *  it. Only `npm run build` catches that: vitest does not typecheck, and the drift gate
+ *  compares generated types to the schema, where there was never any drift. */
+export type SkillsResponse = Schemas["SkillsOut"];
 /** One curated skill card that ships in the box, as opposed to a `SkillStat`, which is one the
  *  agent distilled from the user's own runs. `body` is empty in the list and filled on detail. */
 export type LibraryCard = Schemas["LibraryCardOut"];

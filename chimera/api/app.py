@@ -935,7 +935,7 @@ def build_api_app(
         from chimera.sandbox.os_sandbox import (
             bubblewrap_available,
             seatbelt_available,
-            unavailable_reason,
+            unavailable_cause,
         )
 
         live = live_settings()
@@ -953,17 +953,29 @@ def build_api_app(
             )
         else:
             backend = "host"
+        if isolated:
+            reason_code, reason = "", ""
+        elif configured == "docker":
+            reason_code, reason = "no_container", "A container was configured and none answered."
+        elif configured == "local":
+            # Asked for the host and got the host: nothing failed, so there is nothing to explain.
+            reason_code, reason = "", ""
+        else:
+            reason_code, reason = unavailable_cause()
         return {
             "configured": configured,
             "backend": backend,
             "isolated": isolated,
-            # `unavailable_reason` speaks about the OS sandbox. A Docker install that fell back has
+            # `unavailable_cause` speaks about the OS sandbox. A Docker install that fell back has
             # a different cause, so it gets its own sentence rather than borrowing a wrong one.
-            "reason": "" if isolated else (
-                "A container was configured and none answered." if configured == "docker"
-                else "" if configured == "local"
-                else unavailable_reason()
-            ),
+            #
+            # The CODE is what the screen reads: this app is translated into ten languages, and a
+            # panel that relays an English sentence from the server explains the machine's boundary
+            # in a language its reader may not have. The sentence rides along as the fallback for a
+            # client that does not know the code yet — a new cause must degrade to English, never
+            # to silence.
+            "reason": reason,
+            "reason_code": reason_code,
             "platform": _platform.system(),
         }
 

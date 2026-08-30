@@ -118,3 +118,64 @@ describe("Governance — the execution boundary", () => {
     expect(screen.queryByText(/would run on this machine/i)).not.toBeInTheDocument();
   });
 });
+
+describe("Governance — the reason is said in the reader's language", () => {
+  it("translates the CAUSE instead of relaying the server's English", async () => {
+    // Measured in the shipped app: the panel printed "Windows has no OS sandbox in Chimera…" in
+    // English on a Portuguese UI, one line below its own translated prose. The sentence came
+    // straight from the API, and only the code can be translated.
+    mockSandbox.mockResolvedValue(state({
+      reason_code: "windows",
+      reason: "Windows has no OS sandbox in Chimera: the mechanism there is a restricted token.",
+    }));
+
+    renderWithProviders(<Governance />);
+
+    expect(await screen.findByText(/Set CHIMERA_SANDBOX=docker for a real boundary/)).toBeTruthy();
+    expect(screen.queryByText(/restricted token\.$/)).toBeNull();
+  });
+
+  it("falls back to the server's sentence for a cause it has no translation for", async () => {
+    // A new cause must degrade to English, never to a blank line or to a raw i18n key. This is the
+    // half that lets the backend add a reason without shipping the frontend on the same day.
+    mockSandbox.mockResolvedValue(state({
+      reason_code: "a_cause_this_build_never_heard_of",
+      reason: "Something specific the server knows and this build does not.",
+    }));
+
+    renderWithProviders(<Governance />);
+
+    expect(await screen.findByText(/Something specific the server knows/)).toBeTruthy();
+    expect(screen.queryByText(/governance\.sandbox\.why/)).toBeNull();
+  });
+
+  it("says nothing about a cause when the sandbox IS isolated", async () => {
+    mockSandbox.mockResolvedValue(state({
+      isolated: true, backend: "bubblewrap", reason: "", reason_code: "", platform: "Linux",
+    }));
+
+    renderWithProviders(<Governance />);
+
+    await screen.findByText(/kernel sandbox/);
+    expect(screen.queryByText(/run on this machine\./)).toBeNull();
+  });
+});
+
+describe("Governance — the defect exactly as it was seen", () => {
+  it("says the reason in Portuguese on a Portuguese interface", async () => {
+    // The report, reproduced: `lang="pt"`, the surrounding prose translated, and this one line in
+    // English because it came from the server. Rendering only in English cannot show that — the
+    // sentence would look correct in every assertion while being wrong for the person reading it.
+    localStorage.setItem("chimera.lang", "pt");
+    mockSandbox.mockResolvedValue(state({
+      reason_code: "windows",
+      reason: "Windows has no OS sandbox in Chimera: the mechanism there is a restricted token.",
+    }));
+
+    renderWithProviders(<Governance />);
+
+    expect(await screen.findByText(/fronteira de verdade/)).toBeTruthy();
+    expect(screen.queryByText(/Windows has no OS sandbox/)).toBeNull();
+    localStorage.removeItem("chimera.lang");
+  });
+});
