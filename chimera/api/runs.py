@@ -13,6 +13,7 @@ guard supplies the types for static checking only.
 
 from __future__ import annotations
 
+import os
 import threading
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -231,6 +232,38 @@ def append_run(path: Path, receipt: RunReceipt) -> None:
         handle.write(line)
 
 
+def same_folder(a: str, b: str) -> bool:
+    """Whether two spellings name the same folder, without touching the disk.
+
+    ``==`` on the raw strings was the filter, and on Windows one folder has several spellings.
+    Measured in the app: two runs started with forward slashes returned nothing when the list asked
+    for the same folder spelled with the OS separator. The runs were recorded correctly and simply
+    never appeared under their own project — which reads as the app having lost them.
+
+    ``normpath`` settles the separator, a trailing one, and any ``.``/``..``; ``normcase`` settles
+    the case, and only where the platform says case is not significant — on POSIX it is the
+    identity, so two folders differing in case stay two folders.
+
+    Deliberately NOT ``resolve()``: that reads the filesystem, follows symlinks and would make a
+    list of receipts depend on which of them still exist on disk.
+    """
+    return os.path.normcase(os.path.normpath(a)) == os.path.normcase(os.path.normpath(b))
+
+
+def _in_project(receipt_workspace: str, workspace: str) -> bool:
+    """Whether a receipt belongs to the project being asked for.
+
+    ``""`` is a query in its own right, not "no filter": it asks for the receipts that have NO
+    workspace, which is the only way to reach them once any filter is applied. Comparing it as a
+    path would break that — ``normpath("")`` is ``"."``, so an unattributed receipt would answer to
+    a query for the current directory and, worse, ``""`` would stop finding the receipts it exists
+    to find.
+    """
+    if not workspace:
+        return not receipt_workspace
+    return bool(receipt_workspace) and same_folder(receipt_workspace, workspace)
+
+
 def load_runs(path: Path, *, workspace: str | None = None) -> list[RunReceipt]:
     """Load persisted run receipts; malformed lines are skipped.
 
@@ -240,7 +273,8 @@ def load_runs(path: Path, *, workspace: str | None = None) -> list[RunReceipt]:
     A receipt with no workspace is NOT included in a filtered result. It predates the field or came
     from an agent built without one, and there is no honest way to place it: showing it under
     whichever project happens to be open is fabricated evidence in the one view whose job is to say
-    what a configuration was worth, and it would be fabricated differently for each reader.
+    what a configuration was worth, and it would be fabricated differently for each reader. It is
+    still reachable by asking for ``""`` — see :func:`_in_project`.
     """
     path = Path(path)
     if not path.exists():
@@ -254,6 +288,6 @@ def load_runs(path: Path, *, workspace: str | None = None) -> list[RunReceipt]:
         except ValueError:  # pragma: no cover - defensive
             _log.warning("skipping malformed run receipt line")
             continue
-        if workspace is None or receipt.workspace == workspace:
+        if workspace is None or _in_project(receipt.workspace, workspace):
             out.append(receipt)
     return out

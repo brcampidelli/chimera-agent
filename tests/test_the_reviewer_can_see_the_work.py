@@ -138,5 +138,5 @@ def test_the_diff_is_measured_before_the_review_runs(tmp_path: Path) -> None:
 
     source = inspect.getsource(AutonomousAgent.run)
     assert source.index("diffs = unified_diffs(") < source.index(
-        "self._review(task, answer, attempt_judge_context)"
+        "task, answer, attempt_judge_context"
     ), "the diff is computed after the review again, so the evidence is always empty"

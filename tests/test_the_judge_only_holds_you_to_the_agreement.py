@@ -40,7 +40,11 @@ def test_the_reviewer_is_given_the_judge_context() -> None:
     # `attempt_judge_context` is `judge_context` plus what THIS attempt changed on disk — the
     # agreement, plus evidence about the answer. The name changed when the diff was added; the
     # property did not, and the assertion that matters is the negative one below.
-    assert source.count("self._review(task, answer, attempt_judge_context)") == 3
+    # Matched on the ARGUMENT, not on one exact call shape: the call now also carries the run's
+    # capped reviewer and wraps across lines, and an anchor that pins the formatting fails on a
+    # change that leaves the property it guards untouched.
+    assert source.count("self._review(") == 3
+    assert source.count("task, answer, attempt_judge_context") == 3
     assert "self._review(task, answer, context)" not in source
     assert "self._review(task, answer, judge_context)" not in source
 

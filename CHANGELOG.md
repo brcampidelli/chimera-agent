@@ -234,6 +234,40 @@ You could not choose which model answered you. The endpoint accepted one all alo
 
 ### Fixed — found by installing each release candidate and using it
 
+- **A dollar ceiling was a per-ATTEMPT ceiling, and the reviewer was under none.** `max_usd` reads
+  as "this run may spend $X". `Agent.run` built the budget from it and the autonomous loop calls
+  `run` once per attempt, so the real limit was `max_usd × max_attempts`. Measured by asking the
+  app for **$0.000002** with three attempts: it spent **$0.0129**, each attempt started again at
+  zero, and the sentence it printed — *"spend cap reached: $0.0037"* — was one attempt's counter,
+  3.5× smaller than its own receipt. Worse, reaching the cap did not stop anything: attempts 2 and
+  3 ran anyway, each paying a reviewer to criticise a worker whose entire answer was that it had
+  hit a spending limit. The budget now belongs to the run, every attempt draws on the same money,
+  and hitting the ceiling ends the run with the reason instead of buying two more rounds. The
+  reviewer is inside it too — it is a model call per attempt and it was outside every ceiling —
+  wrapped by copy, never rebuilt from its fields, because rebuilding keeps a reviewer's name and
+  discards any overridden `review`. A reviewer the ceiling refuses **abstains**: it never looked,
+  and reading its silence as a veto would let verify-or-revert delete work the money already
+  bought.
+
+- **The Cost screen showed 6% of what had been spent.** `record_spend` writes `usage.jsonl` and has
+  exactly two callers, a chat turn and an orchestration run. Runs are neither: they write receipts
+  to `runs.jsonl`, which that screen never read. Measured on a real install: the headline read
+  **$0.2574** where the logs together say **$4.0897**, and the "by day" list stopped at the
+  previous day while runs were happening. The screen now reads both — reading the receipts that
+  already exist rather than writing the number in a second place, because two writers of one figure
+  drift. The session panel keeps 20 rows and nearly every session is one turn, so its tie broke on
+  input order; runs are concatenated last, which would have pushed every one of them off the panel
+  whose whole subject is where the money went. Ties now break on spend.
+
+- **A run was invisible in the folder it ran in.** The project filter compared raw strings, and on
+  Windows one folder has several spellings: two runs started with forward slashes returned nothing
+  when the list asked for the same folder spelled with the OS separator. They were recorded
+  correctly the whole time, which is what makes it read as the app having lost them. Compared as
+  paths now — separator, trailing separator, `.`/`..`, and case where the platform says case is not
+  significant. Deliberately not `resolve()`: that reads the filesystem, and a list of receipts must
+  not depend on which projects still exist on disk. Asking for `""` still finds the runs that have
+  no project at all — it is a query, not an absent filter, and it is the only door to them.
+
 - **The coverage checklist graded prose too, and deleted the file that satisfied the requirement.**
   Found by driving the release that had just fixed the same blindness one gate over. A run with
   `--gen-tests` on a machine without pytest: the requirement was *"somar(a, b) devolve a + b"*, the
