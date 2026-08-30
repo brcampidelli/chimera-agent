@@ -7160,6 +7160,20 @@
             "default": "",
             "title": "Reason",
             "type": "string"
+          },
+          "reason_code": {
+            "default": "",
+            "enum": [
+              "",
+              "windows",
+              "bwrap_missing",
+              "userns_refused",
+              "seatbelt_missing",
+              "unsupported_os",
+              "no_container"
+            ],
+            "title": "Reason Code",
+            "type": "string"
           }
         },
         "required": [
@@ -7400,6 +7414,11 @@
       },
       "SkillsOut": {
         "properties": {
+          "cards_read": {
+            "default": false,
+            "title": "Cards Read",
+            "type": "boolean"
+          },
           "retirement_candidates": {
             "items": {
               "type": "string"

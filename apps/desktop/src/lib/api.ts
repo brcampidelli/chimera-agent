@@ -41,7 +41,7 @@ import type {
   PoolWrite,
   ProjectState,
   RunReceipt,
-  SkillStat,
+  SkillsResponse,
   TaskCard,
   Tools,
   UsageSummary,
@@ -429,8 +429,7 @@ export const deleteMemory = (id: string) =>
   json<{ deleted: boolean }>(`/api/memory/${id}`, { method: "DELETE" });
 
 // --- Skills ---
-export const getSkills = () =>
-  json<{ stats: SkillStat[]; retirement_candidates: string[] }>("/api/skills");
+export const getSkills = () => json<SkillsResponse>("/api/skills");
 export const approveSkill = (name: string) =>
   json<{ approved: boolean }>(`/api/skills/${name}/approve`, { method: "POST" });
 export const retireSkill = (name: string) =>

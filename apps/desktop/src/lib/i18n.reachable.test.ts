@@ -39,6 +39,11 @@ const DYNAMIC = [
   "crew.approach.",
   "crew.status.",
   "fusion.role.",
+  // `` t(`governance.sandbox.why.${data.reason_code}`) `` — the Security screen says WHY no
+  // kernel boundary applies, in the reader's language rather than relaying the server's
+  // English. The codes come from `chimera.sandbox.os_sandbox.UnavailableCode` plus the API
+  // layer's own `no_container`.
+  "governance.sandbox.why.",
   "lifecycle.stage.",
   "runs.reqs.kind.",
   "lifecycle.status.",

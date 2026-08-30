@@ -278,6 +278,17 @@ export function Cron({ embedded = false }: { embedded?: boolean } = {}) {
                     </div>
                   </details>
                 ) : null}
+                {/* A job with a gate and a job without one looked identical, and the gate is what
+                    decides whether the work is KEPT: without it the run accepts its own answer,
+                    with it a failing command reverts the workspace. Somebody reading this list to
+                    ask "is this job checked?" had no way to tell, and the field is set on a form
+                    they may not have filled in themselves. Shown as the command, because "verified"
+                    alone would not say what was run. */}
+                {j.verify && (
+                  <div className="mt-0.5 truncate text-xs text-muted-foreground" title={j.verify}>
+                    {t("cron.gatedBy", { command: j.verify })}
+                  </div>
+                )}
                 {/* The HOST, never the URL. A webhook URL is a credential — anyone who reads it off
                     a shared screen can post into that channel — and the host is what answers the
                     question the row is asking: where does this end up? */}

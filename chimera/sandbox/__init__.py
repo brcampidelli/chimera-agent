@@ -20,7 +20,12 @@ from typing import TYPE_CHECKING
 from chimera.sandbox.base import Sandbox, SandboxResult
 from chimera.sandbox.docker import DockerSandbox
 from chimera.sandbox.local import LocalSandbox
-from chimera.sandbox.os_sandbox import OsSandbox, os_sandbox_available, unavailable_reason
+from chimera.sandbox.os_sandbox import (
+    OsSandbox,
+    os_sandbox_available,
+    unavailable_cause,
+    unavailable_reason,
+)
 from chimera.telemetry import get_logger
 
 if TYPE_CHECKING:
@@ -86,5 +91,6 @@ __all__ = [
     "OsSandbox",
     "get_sandbox",
     "os_sandbox_available",
+    "unavailable_cause",
     "unavailable_reason",
 ]

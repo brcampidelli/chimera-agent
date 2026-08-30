@@ -43,7 +43,7 @@ afterEach(() => {
 function stubEmpty() {
   getMemory.mockResolvedValue([]);
   getMemoryLayers.mockResolvedValue({ layers: [], total: 0 });
-  getSkills.mockResolvedValue({ stats: [], retirement_candidates: [] });
+  getSkills.mockResolvedValue({ stats: [], retirement_candidates: [], cards_read: true });
   getMemoryProfile.mockResolvedValue({ profile: "", persona: [] });
 }
 

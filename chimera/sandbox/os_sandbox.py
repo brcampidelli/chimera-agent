@@ -34,6 +34,7 @@ import shutil
 import subprocess
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from chimera.sandbox.local import LocalSandbox
 from chimera.telemetry import get_logger
@@ -97,27 +98,48 @@ def os_sandbox_available() -> bool:
     return seatbelt_available() or bubblewrap_available()
 
 
-def unavailable_reason() -> str:
-    """Why not, in one sentence a person can act on. Empty when a sandbox IS available."""
+#: Machine-readable causes, so a screen can say this in the reader's language instead of relaying
+#: an English sentence from a server. Same shape and same reason as ``PostureFacts.fell_back_reason``:
+#: the app is translated into ten languages and the Security screen was printing this one in English
+#: beside its own translated prose, which reads as the panel not knowing what it is looking at.
+UnavailableCode = Literal[
+    "", "windows", "bwrap_missing", "userns_refused", "seatbelt_missing", "unsupported_os"
+]
+
+
+def unavailable_cause() -> tuple[UnavailableCode, str]:
+    """Why there is no OS sandbox, as ``(code, sentence)``. ``("", "")`` when one IS available.
+
+    One function returns both so they cannot drift: a code and a sentence maintained separately
+    eventually disagree, and the disagreement surfaces as a screen confidently explaining the wrong
+    cause. The sentence stays the fallback for a reader whose client does not know the code yet.
+    """
     if os_sandbox_available():
-        return ""
+        return "", ""
     system = platform.system()
     if system == "Windows":
-        return (
+        return "windows", (
             "Windows has no OS sandbox in Chimera: the mechanism there is a restricted token plus "
             "network filters, which is native work this does not attempt. Use CHIMERA_SANDBOX=docker "
             "for a real boundary."
         )
     if system == "Linux":
         if shutil.which("bwrap") is None:
-            return "bubblewrap is not installed (apt install bubblewrap), so commands run on the host."
-        return (
+            return "bwrap_missing", (
+                "bubblewrap is not installed (apt install bubblewrap), so commands run on the host."
+            )
+        return "userns_refused", (
             "bubblewrap is installed but this kernel refuses to unshare a user namespace "
             "(common in containers and on hardened kernels), so commands run on the host."
         )
     if system == "Darwin":
-        return f"{_SEATBELT} is missing, so commands run on the host."
-    return f"no OS sandbox is implemented for {system!r}, so commands run on the host."
+        return "seatbelt_missing", f"{_SEATBELT} is missing, so commands run on the host."
+    return "unsupported_os", f"no OS sandbox is implemented for {system!r}, so commands run on the host."
+
+
+def unavailable_reason() -> str:
+    """Why not, in one sentence a person can act on. Empty when a sandbox IS available."""
+    return unavailable_cause()[1]
 
 
 def _writable_roots(cwd: Path | None) -> list[Path]:

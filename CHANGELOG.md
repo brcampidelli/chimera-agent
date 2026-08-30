@@ -234,6 +234,38 @@ You could not choose which model answered you. The endpoint accepted one all alo
 
 ### Fixed — found by installing each release candidate and using it
 
+- **The Security screen explained the machine's boundary in English, on a Portuguese interface.**
+  Everything around it was translated; the one sentence that says WHY no kernel sandbox applies came
+  from the server verbatim and was printed as it arrived. That sentence is the substance of the
+  panel, on the one screen a person opens to learn what protects them. The endpoint now reports a
+  cause **code** beside the sentence — the shape `PostureFacts.fell_back_reason` already used — and
+  the screen says it in the reader's language, in all ten. The English rides along as the fallback:
+  a cause a client has never heard of has to degrade to English, never to a blank line. Code and
+  sentence are produced by one function so they cannot drift into a screen confidently explaining
+  the wrong cause.
+
+- **A scheduled job with a gate looked exactly like one without.** The `verify` field could be set
+  on the form and then vanished: the card showed the schedule, the task and the folder, and nothing
+  about the command that decides whether the work is **kept**. Created one through the API with
+  `python -m pytest -q` and the word "pytest" appeared nowhere on the screen afterwards. The card
+  names the gate now, and stays silent when there is none — a row that always shows a gate line
+  trains people to stop reading it.
+
+- **Fourteen learned cards, all marked ACTIVE, all reading `0 uses`.** The available reading is that
+  the agent tried them and they were useless. Nothing consulted them: retrieval is off by default
+  because it was measured (+16.7pp, a confidence interval including zero, +300% tokens) and left
+  off. A count of zero means two different things depending on that flag, and the screen was showing
+  the count without the flag. `GET /api/skills` reports it now and the panel explains the zero —
+  and stays quiet when reading IS on, because then zero really is a verdict on the card.
+
+- **A memory "fact" was the whole request plus the whole answer.** Four of them on a real install,
+  630–950 characters each, filed as semantic facts and recalled into the context of every later run
+  in that folder. The answer side was already bounded to 160 characters; the task side was not, and
+  the task is the long half. A fact is now the task's **opening line**, bounded — a brief opens with
+  what it wants and continues with how, so 769 characters became 34. The dedup key still hashes the
+  full task: four real briefs opened with "Leia BRIEF.md e construa…", and keying on the shortened
+  head would fold them into one entry that overwrites itself.
+
 - **A dollar ceiling was a per-ATTEMPT ceiling, and the reviewer was under none.** `max_usd` reads
   as "this run may spend $X". `Agent.run` built the budget from it and the autonomous loop calls
   `run` once per attempt, so the real limit was `max_usd × max_attempts`. Measured by asking the

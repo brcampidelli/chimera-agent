@@ -307,7 +307,13 @@ def register_features(
     @app.get("/api/skills", dependencies=[guard], response_model=SkillsOut)
     def list_skills() -> dict[str, Any]:
         store = _skill_store()
-        return {"stats": store.stats(), "retirement_candidates": store.retirement_candidates()}
+        return {
+            "stats": store.stats(),
+            "retirement_candidates": store.retirement_candidates(),
+            # Live, not the process default: this is a setting a person can change, and a screen
+            # explaining why a count is zero must explain the state the app is actually in.
+            "cards_read": bool(getattr(get_settings(), "skill_cards", False)),
+        }
 
     @app.post("/api/skills/{name}/approve", dependencies=[guard], response_model=ApprovedOut)
     def approve_skill(name: str) -> dict[str, bool]:

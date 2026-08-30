@@ -174,7 +174,18 @@ export function Skills({ embedded = false }: { embedded?: boolean } = {}) {
         ) : rows.length === 0 ? (
           <EmptyState text={t("skills.empty")} />
         ) : (
-          rows.map((s) => (
+          <>
+            {/* Why every count below is zero. Without this the list reads as "the agent tried
+                these and they did not help", when in fact nothing consulted them: retrieval is
+                off by default because it was measured and did not earn its tokens. A card marked
+                ACTIVE beside `0 uses` invites exactly the wrong conclusion, and the person who
+                draws it goes looking for a bug in the cards. */}
+            {skills.data?.cards_read === false && (
+              <div className="px-4 pb-1 pt-3 text-xs text-muted-foreground">
+                {t("skills.notRead")}
+              </div>
+            )}
+            {rows.map((s) => (
             <div key={s.name} className="flex items-center gap-3 px-4 py-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
@@ -222,7 +233,8 @@ export function Skills({ embedded = false }: { embedded?: boolean } = {}) {
                 )}
               </div>
             </div>
-          ))
+            ))}
+          </>
         )}
       </Panel>
 

@@ -5719,6 +5719,12 @@ export interface components {
              * @default
              */
             reason: string;
+            /**
+             * Reason Code
+             * @default
+             * @enum {string}
+             */
+            reason_code: "" | "windows" | "bwrap_missing" | "userns_refused" | "seatbelt_missing" | "unsupported_os" | "no_container";
         };
         /**
          * SearchHitOut
@@ -5821,6 +5827,11 @@ export interface components {
         };
         /** SkillsOut */
         SkillsOut: {
+            /**
+             * Cards Read
+             * @default false
+             */
+            cards_read: boolean;
             /** Retirement Candidates */
             retirement_candidates: string[];
             /** Stats */
