@@ -17,6 +17,7 @@ non-destructive; the gates above keep it honest rather than guarding against har
 from __future__ import annotations
 
 import hashlib
+import re
 import string
 from typing import TYPE_CHECKING
 
@@ -50,6 +51,28 @@ def _placeholders(template: str) -> list[str]:
     return [field for _, field, _, _ in string.Formatter().parse(template) if field]
 
 
+def _assinatura(skill: object) -> set[str]:
+    """As palavras que dizem o que uma skill FAZ, sem o nome.
+
+    O nome e' a parte que menos ajuda: tres cartoes para "pagina HTML de arquivo unico a partir de
+    um brief" sairam com tres nomes diferentes (`build_standalone_html_from_brief`,
+    `brief_to_offline_single_file_page`, `offline_single_file_html_from_brief`) e o mesmo conteudo.
+    Comparar descricao + gatilho + acao pega isso; comparar nome nao pega nada.
+    """
+    partes = " ".join(
+        str(getattr(skill, campo, "") or "")
+        for campo in ("description", "trigger", "do", "prompt_template")
+    ).lower()
+    return {t for t in re.findall(r"[a-zà-ÿ]{4,}", partes)}
+
+
+def _semelhanca(a: set[str], b: set[str]) -> float:
+    """Jaccard. Sem modelo e sem embedding: o custo de deduplicar nao pode ser outra chamada paga."""
+    if not a or not b:
+        return 0.0
+    return len(a & b) / len(a | b)
+
+
 class AutoSkillEvolver:
     """Proposes, gates and stores a learned skill when a task recurs."""
 
@@ -66,6 +89,7 @@ class AutoSkillEvolver:
         provisional: bool = False,
         audit: AuditLog | None = None,
         holdout: HoldoutGate | None = None,
+        dedupe_at: float = 0.72,
     ) -> None:
         self.evolver = evolver
         self.store = store
@@ -80,6 +104,11 @@ class AutoSkillEvolver:
         # single-model proposal. Falls back to single-model when unset.
         self.collective = collective
         self.min_transfer = min_transfer
+        #: Acima disto, um candidato e' considerado o mesmo cartao que um ja' guardado e nao entra.
+        #: Quatro projetos produziram tres cartoes quase identicos para a mesma tarefa porque nada
+        #: olhava a biblioteca antes de escrever nela. Guardar 3 ou 300 e' identico se nenhum e'
+        #: lido; guardar 3 iguais e' pior que guardar 1, porque o proximo recall tem de escolher.
+        self.dedupe_at = dedupe_at
         # Opt-in, and off changes nothing: without a gate this class behaves exactly as it did.
         # What it adds is the axis the other two gates do not have — the smoke test runs the
         # candidate on its OWN task and checks the output is non-empty, and `min_transfer` varies
@@ -112,6 +141,24 @@ class AutoSkillEvolver:
                 "below min_transfer=%.2f. Lower min_transfer, enlarge the panel, or use 'point'.",
                 n, n, ceiling, k, self.min_transfer,
             )
+
+    def _duplicata(self, candidato: LearnedSkill) -> str | None:
+        """O nome do cartao ja' guardado que diz a mesma coisa, ou None.
+
+        So' compara com cartoes do MESMO `kind`: um anti-padrao que descreve o mesmo assunto de um
+        padrao nao e' duplicata dele — um diz "faca assim" e o outro "nao faca assim", e colapsar os
+        dois apagaria metade do par.
+        """
+        alvo = _assinatura(candidato)
+        if len(alvo) < 4:
+            return None  # assinatura curta demais para afirmar semelhanca de nada
+        for nome in self.store.names():
+            outro = self.store.get(nome)
+            if outro is None or getattr(outro, "kind", "") != getattr(candidato, "kind", ""):
+                continue
+            if _semelhanca(alvo, _assinatura(outro)) >= self.dedupe_at:
+                return str(nome)
+        return None
 
     def _mark_and_store(self, skill: LearnedSkill, *, tainted: bool) -> LearnedSkill:
         """Store a skill with anti-poisoning provenance (Zombie Agents defense).
@@ -157,6 +204,14 @@ class AutoSkillEvolver:
             return False
         self._record_holdout(candidate, verdict, kept=True)
         return True
+
+    def _record_dedupe(self, novo: str, igual: str) -> None:
+        """Uma deduplicacao silenciosa e' a mesma classe de silencio que este projeto passa o dia
+        consertando: sem esta linha, "nao aprendeu nada" e "aprendeu e foi descartado por ja' saber"
+        sao o mesmo nada no log."""
+        if self.audit is None:
+            return
+        self.audit.record("skill_dedupe", {"discarded": novo, "same_as": igual})
 
     def _record_holdout(
         self, candidate: LearnedSkill, verdict: HoldoutVerdict, *, kept: bool
@@ -249,6 +304,10 @@ class AutoSkillEvolver:
         if candidate.name in self.store:
             _log.debug("auto-skill %s already exists; skipping", candidate.name)
             return None
+        if (igual := self._duplicata(candidate)) is not None:
+            _log.info("auto-skill %s descartada: diz o mesmo que %s", candidate.name, igual)
+            self._record_dedupe(candidate.name, igual)
+            return None
 
         # Gate 1 — governance: reject an unsafe proposal before it ever runs.
         if self.validator is not None and not self.validator.validate(candidate.to_dict()).accepted:
@@ -308,6 +367,10 @@ class AutoSkillEvolver:
             )
             if score > best_score:
                 best, best_score, best_frac = candidate, score, frac
+        if best is not None and (igual := self._duplicata(best)) is not None:
+            _log.info("auto-skill coletiva %s descartada: diz o mesmo que %s", best.name, igual)
+            self._record_dedupe(best.name, igual)
+            return None
         if best is None or best_score < self.min_transfer:
             _log.debug("no transferable auto-skill kept (best gate=%.2f)", best_score)
             return None
