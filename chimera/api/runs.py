@@ -44,6 +44,13 @@ class FileDiffReceipt(BaseModel):
 class AttemptReceipt(BaseModel):
     """One attempt's proof: whether it verified, whether it was reverted, and what it changed."""
 
+    discarded_at: str = ""
+    """Where the reverted work was written IN FULL, or "" when nothing was reverted.
+
+    `diffs` below is bounded at 4,000 chars per patch so this file stays readable, and that bound
+    makes it a souvenir rather than a recovery: measured on a real run, a 581-line `index.html` was
+    reverted and the clipped patch was the only copy left of it."""
+
     index: int = 0
     verified: bool = False
     reverted: bool = False
@@ -194,6 +201,7 @@ def build_receipt(
             prompt_tokens=int(getattr(a, "prompt_tokens", 0) or 0),
             completion_tokens=int(getattr(a, "completion_tokens", 0) or 0),
             model=str(getattr(a, "model", "") or ""),
+            discarded_at=str(getattr(a, "discarded_at", "") or ""),
         )
         for a in result.attempts
     ]
