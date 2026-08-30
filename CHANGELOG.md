@@ -234,6 +234,41 @@ You could not choose which model answered you. The endpoint accepted one all alo
 
 ### Fixed — found by installing each release candidate and using it
 
+- **A run that hit its dollar cap recorded no spending at all.** Introduced by the cap fix one
+  release earlier and found by re-running the same experiment against it: the run stopped
+  correctly, said *"spend cap reached: $0.0030"*, and left a receipt reading `usd: null,
+  attempts: []`. The attempt that reached the ceiling is the one that CALLED a model — that is how
+  it reached it — and returning before the loop's bookkeeping dropped the only record of the money.
+  The Cost screen, which reads those attempts, then showed a paid run as free. A cap that hides its
+  own spending is worse than no cap: the number it exists to protect is the number it erased. The
+  stopped attempt is now recorded with its tokens, its price and the model that answered.
+
+- **The Cost screen billed every scheduled run twice.** Also introduced one release earlier. A
+  scheduled job writes a usage row keyed `cron:<job>:<run_id>` *and* a run receipt carrying the same
+  `run_id`; the merge added both. Measured on a real install: four nightly runs, **$0.0449** counted
+  twice, and a headline of $4.1792 where the truth is $4.1344. The argument that shipped it was that
+  the id namespaces cannot collide — true, and the wrong property: the collision is not between two
+  ids, it is the same WORK written to two files under different names. Only the run id joins them,
+  so only the run id can separate them. Read from compound ids alone, because a bare session id is a
+  chat turn that writes no receipt, and reading one as a run id would silently drop a real charge.
+
+- **Every scheduled run was invisible in the folder it ran in.** The scheduled loop was given its
+  run log and not its workspace — the guard and the tools were rooted in the job's folder, the loop
+  was not — so each receipt was written with an empty workspace. A receipt with no workspace is
+  deliberately excluded from every filtered list, which made each one unfindable from the only
+  screen that would look. The previous fix here went half the distance: the receipt existed and
+  could not be found.
+
+- **A scheduled job whose gate rejected everything reported `ok`.** Found by letting a real job fire
+  with a verify command written to fail: two attempts, both judged by the verifier, every file
+  reverted — and a green row with `consecutive_failures: 0`. The dispatch returned only the answer
+  string, so the run's success never reached the schedule. Every existing outcome (`error`,
+  `timeout`, `budget`) arrives by exception, and this one does not: nothing breaks, which is exactly
+  why it needed its own name. `rejected` is now a dispatch status, it counts as a failure, and the
+  silence alarm — which reads that counter — can finally see it. A dispatch with no verdict still
+  means `ok`: a job that declared no gate has nothing that could reject it, and absence of a verdict
+  is not a failure.
+
 - **The Security screen explained the machine's boundary in English, on a Portuguese interface.**
   Everything around it was translated; the one sentence that says WHY no kernel sandbox applies came
   from the server verbatim and was printed as it arrived. That sentence is the substance of the

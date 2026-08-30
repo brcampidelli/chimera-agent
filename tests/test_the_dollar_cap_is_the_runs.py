@@ -61,6 +61,23 @@ class _StoppedOnSpendWorker:
         )
 
 
+class _SpendingStoppedWorker:
+    """Stopped on spend, and carrying the usage of the call that got it there."""
+
+    def __init__(self) -> None:
+        self.config = _Config(5.0)
+
+    def run(self, task: str, **kwargs: Any) -> AgentResult:
+        r = AgentResult(
+            answer="spend cap reached: $0.0052 of $0.0000", steps=1, stopped_reason="spend"
+        )
+        r.usd = 0.005197
+        r.prompt_tokens = 8870
+        r.completion_tokens = 193
+        r.model = "openrouter/deepseek/deepseek-chat-v3.1"
+        return r
+
+
 class _OldWorker:
     """Predates the parameter: its ``run`` takes no ``spend``, and must still be callable."""
 
@@ -190,6 +207,36 @@ def test_a_worker_stopped_on_money_is_not_reviewed_and_not_retried() -> None:
     assert manager.calls == 0, "a reviewer was paid to judge a worker that never worked"
     assert result.success is False
     assert result.stopped_reason == "spend"
+
+
+def test_the_run_that_hit_the_cap_records_what_it_spent() -> None:
+    """A cap that hides its own spending is worse than no cap.
+
+    Measured on the shipped fix: the run stopped correctly and its receipt read
+    ``usd: null, attempts: []`` while the answer said *"spend cap reached: $0.0030"*. The attempt
+    that reached the ceiling had called a model — that is HOW it reached it — and returning before
+    the loop's bookkeeping dropped the only record of the money. The Cost screen, which reads those
+    attempts, then showed a paid run as free.
+    """
+    worker = _StoppedOnSpendWorker()
+
+    result = _auto(worker, _CountingManager(), 3).run("do the task")
+
+    assert len(result.attempts) == 1, "the attempt that spent the money left no record"
+    assert result.attempts[0].index == 1
+
+
+def test_the_recorded_attempt_carries_the_tokens_it_used() -> None:
+    """Not just a row: the row has to hold the numbers, or the receipt is a placeholder."""
+    worker = _SpendingStoppedWorker()
+
+    result = _auto(worker, _CountingManager(), 2).run("do the task")
+
+    attempt = result.attempts[0]
+    assert attempt.prompt_tokens == 8870
+    assert attempt.completion_tokens == 193
+    assert attempt.usd == 0.005197
+    assert attempt.model == "openrouter/deepseek/deepseek-chat-v3.1"
 
 
 def test_the_ending_says_which_ceiling_and_what_it_had_spent() -> None:

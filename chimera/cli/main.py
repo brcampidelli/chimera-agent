@@ -2001,6 +2001,13 @@ def _start_cron_daemon(
             # The receipt. `runs.jsonl` is what the Runs screen reads, and a job that has fired
             # nightly for a month left nothing there to read.
             run_log=settings.home / "runs.jsonl",
+            # And the folder it happened in, or the receipt is unreadable from the only screen
+            # that would look for it. The guard and the tools were rooted here already; the LOOP
+            # was not, so every scheduled receipt was written with an empty workspace — and a
+            # receipt with no workspace is deliberately excluded from every filtered list, which
+            # made each one invisible in the project it ran in. The fix above went half the
+            # distance: the receipt existed and could not be found.
+            workspace=job_root,
         )
         result = loop.run(job.action)
         # Summed across attempts rather than read off one: with `max_attempts > 1` a dispatch can

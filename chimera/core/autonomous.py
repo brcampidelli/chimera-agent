@@ -804,7 +804,9 @@ class AutonomousAgent:
             # already passed, and each one paid for a reviewer to criticise a worker that was only
             # saying it had hit the limit.
             if getattr(agent_result, "stopped_reason", "") in ("spend", "budget"):
-                return self._finalize_capped(task, attempts, plan, thread_id, agent_result.answer)
+                return self._finalize_capped(
+                    task, attempts, plan, thread_id, agent_result, index
+                )
             answer = agent_result.answer
             # Surface a degrading trajectory where a person will see it, not only in the trace. It
             # is advisory: the attempt is judged on its result as always, and the run continues.
@@ -1268,7 +1270,8 @@ class AutonomousAgent:
         attempts: list[Attempt],
         plan: Plan | None,
         thread_id: str | None,
-        answer: str,
+        agent_result: AgentResult,
+        index: int,
     ) -> AutonomousResult:
         """The money ran out: return what was bought, and stop buying.
 
@@ -1281,9 +1284,32 @@ class AutonomousAgent:
         spent — "the run failed" for a run that simply reached its cap is the four-word ending this
         release spent its time removing.
         """
+        # The stopped attempt is RECORDED, not dropped. It called a model — that is how the cap was
+        # reached — and returning here before the normal bookkeeping left a receipt reading
+        # `usd: null, attempts: []` for a run that had just spent money. Measured on a real run:
+        # the answer said "spend cap reached: $0.0030" while the receipt reported nothing, so the
+        # Cost screen showed a paid run as free. A cap that hides its own spending is worse than
+        # no cap: the number it exists to protect is the number it erases.
+        from chimera.orchestration.metering import add_usd
+
+        over_usd, over_prompt, over_completion = (
+            self.meter.take() if self.meter is not None else (0.0, 0, 0)
+        )
+        parcial = Attempt(index, agent_result.answer, False, False, False, False)
+        parcial.usd = add_usd(getattr(agent_result, "usd", None), over_usd)
+        parcial.overhead_usd = over_usd
+        parcial.prompt_tokens = int(getattr(agent_result, "prompt_tokens", 0) or 0) + over_prompt
+        parcial.completion_tokens = (
+            int(getattr(agent_result, "completion_tokens", 0) or 0) + over_completion
+        )
+        parcial.model = str(getattr(agent_result, "model", "") or "")
+        parcial.run_id = str(getattr(agent_result, "run_id", "") or "")
+        parcial.evidence = "none"
+        attempts = [*attempts, parcial]
+
         self._emit(_ev_status("stopped on budget"))
         self._clear_checkpoint(thread_id)
-        last = answer or (attempts[-1].answer if attempts else "")
+        last = agent_result.answer or (attempts[-1].answer if attempts else "")
         self._emit(_ev_final(False, last))
         result = AutonomousResult(
             answer=last, success=False, attempts=attempts, plan=plan, stopped_reason="spend"

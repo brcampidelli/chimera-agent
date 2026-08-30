@@ -95,7 +95,31 @@ def record_spend(
 RUN_SESSION_PREFIX = "run:"
 
 
-def usage_from_runs(path: Path) -> list[UsageRecord]:
+def _already_counted(records: list[UsageRecord]) -> set[str]:
+    """Run ids that ``usage.jsonl`` ALREADY accounts for, so the merge cannot bill them twice.
+
+    The scheduled path writes both: a usage row keyed ``cron:<job>:<run_id>`` *and* a run receipt
+    carrying the same ``run_id``. Measured on a real install — four nightly runs, ~$0.049, counted
+    once in each file and therefore twice on the Cost screen.
+
+    The first version of this merge argued that the id NAMESPACES cannot collide, which is true and
+    was the wrong property: the collision is not between two ids, it is the same WORK written to
+    two files under different names. Only the run id joins them, so only the run id can separate
+    them.
+
+    Read from compound ids alone (``a:b:<run_id>``). A bare session id is a chat turn, which writes
+    no receipt — treating one as a run id could silently drop a real charge, and under-counting
+    money is the direction that must never happen by accident.
+    """
+    seen: set[str] = set()
+    for r in records:
+        partes = str(r.session_id or "").split(":")
+        if len(partes) >= 2 and partes[-1]:
+            seen.add(partes[-1])
+    return seen
+
+
+def usage_from_runs(path: Path, *, already: set[str] | None = None) -> list[UsageRecord]:
     """One record per ATTEMPT of every autonomous run, so the Cost screen counts them too.
 
     ``record_spend`` has exactly two callers — a chat turn and an orchestration run — and the
@@ -113,6 +137,7 @@ def usage_from_runs(path: Path) -> list[UsageRecord]:
     path = Path(path)
     if not path.exists():
         return []
+    contadas = already or set()
     out: list[UsageRecord] = []
     for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
         if not line.strip():
@@ -127,6 +152,10 @@ def usage_from_runs(path: Path) -> list[UsageRecord]:
         run_ts = str(row.get("ts") or "")
         for attempt in row.get("attempts") or []:
             if not isinstance(attempt, dict):
+                continue
+            # Skipped, not zeroed: this attempt is already in the other log, and a zero row would
+            # still count a turn that has been counted.
+            if str(attempt.get("run_id") or "") in contadas:
                 continue
             usd = attempt.get("usd")
             out.append(
