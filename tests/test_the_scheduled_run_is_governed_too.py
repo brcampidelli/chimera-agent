@@ -32,9 +32,17 @@ from chimera.providers import CompletionResult
 
 
 def _dispatch_source() -> str:
-    from chimera.cli import main
+    """The scheduled dispatch's source.
 
-    return inspect.getsource(main._start_cron_daemon)
+    It moved out of the CLI command into `chimera/scheduler/job_runner.py`, precisely so that these
+    properties could be checked by RUNNING it — see
+    `tests/test_the_scheduled_dispatch_can_be_driven.py`, which now covers the receipt, the gate and
+    the verdict by driving a real job. What is asserted here is what remains structural: which
+    classes the path is built from.
+    """
+    from chimera.scheduler import job_runner
+
+    return inspect.getsource(job_runner.make_run_job)
 
 
 # --------------------------------------------------------------------------- the job declares it

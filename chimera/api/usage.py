@@ -139,40 +139,43 @@ def usage_from_runs(path: Path, *, already: set[str] | None = None) -> list[Usag
         return []
     contadas = already or set()
     out: list[UsageRecord] = []
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():  # noqa: PLR1702
-        if not line.strip():
-            continue
-        try:
-            row = json.loads(line)
-        except ValueError:
-            _log.warning("skipping malformed run record line")
-            continue
-        if not isinstance(row, dict):
-            continue
-        run_ts = str(row.get("ts") or "")
-        tentativas = [a for a in (row.get("attempts") or []) if isinstance(a, dict)]
-        # The WHOLE run, not the one attempt whose id matched. A scheduled dispatch writes ONE
-        # usage row holding the total across every attempt, keyed by the LAST attempt's id — so
-        # skipping only that attempt left the earlier ones to be added on top of a total that
-        # already contained them. Measured on a real job: two attempts of $0.004247 and $0.006598
-        # against a $0.010845 row, counted as $0.015092. The first version of this join fixed half
-        # the double-count and the arithmetic said so.
-        if any(str(a.get("run_id") or "") in contadas for a in tentativas):
-            continue
-        for attempt in tentativas:
-            usd = attempt.get("usd")
-            out.append(
-                UsageRecord(
-                    ts=run_ts,
-                    # The attempt carries the run id; the run row itself does not.
-                    session_id=RUN_SESSION_PREFIX + str(attempt.get("run_id") or run_ts),
-                    model=str(attempt.get("model") or ""),
-                    prompt_tokens=int(attempt.get("prompt_tokens") or 0),
-                    completion_tokens=int(attempt.get("completion_tokens") or 0),
-                    usd=float(usd) if isinstance(usd, int | float) else None,
-                    tools=len(attempt.get("tool_names") or []),
+    # Streamed for the reason spelled out in `chimera.api.runs.load_runs`: the whole-file read
+    # peaks at four times the file, and this is the same file.
+    with path.open(encoding="utf-8", errors="replace") as arquivo:
+        for line in arquivo:
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except ValueError:
+                _log.warning("skipping malformed run record line")
+                continue
+            if not isinstance(row, dict):
+                continue
+            run_ts = str(row.get("ts") or "")
+            tentativas = [a for a in (row.get("attempts") or []) if isinstance(a, dict)]
+            # The WHOLE run, not the one attempt whose id matched. A scheduled dispatch writes ONE
+            # usage row holding the total across every attempt, keyed by the LAST attempt's id — so
+            # skipping only that attempt left the earlier ones to be added on top of a total that
+            # already contained them. Measured on a real job: two attempts of $0.004247 and $0.006598
+            # against a $0.010845 row, counted as $0.015092. The first version of this join fixed half
+            # the double-count and the arithmetic said so.
+            if any(str(a.get("run_id") or "") in contadas for a in tentativas):
+                continue
+            for attempt in tentativas:
+                usd = attempt.get("usd")
+                out.append(
+                    UsageRecord(
+                        ts=run_ts,
+                        # The attempt carries the run id; the run row itself does not.
+                        session_id=RUN_SESSION_PREFIX + str(attempt.get("run_id") or run_ts),
+                        model=str(attempt.get("model") or ""),
+                        prompt_tokens=int(attempt.get("prompt_tokens") or 0),
+                        completion_tokens=int(attempt.get("completion_tokens") or 0),
+                        usd=float(usd) if isinstance(usd, int | float) else None,
+                        tools=len(attempt.get("tool_names") or []),
+                    )
                 )
-            )
     return out
 
 
@@ -182,13 +185,15 @@ def load_usage(path: Path) -> list[UsageRecord]:
     if not path.exists():
         return []
     out: list[UsageRecord] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        try:
-            out.append(UsageRecord.model_validate_json(line))
-        except ValueError:  # pragma: no cover - defensive
-            _log.warning("skipping malformed usage record line")
+    # Streamed for the same reason as the run log above.
+    with path.open(encoding="utf-8", errors="replace") as arquivo:
+        for line in arquivo:
+            if not line.strip():
+                continue
+            try:
+                out.append(UsageRecord.model_validate_json(line))
+            except ValueError:  # pragma: no cover - defensive
+                _log.warning("skipping malformed usage record line")
     return out
 
 

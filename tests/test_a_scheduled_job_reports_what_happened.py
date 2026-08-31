@@ -18,7 +18,6 @@ Free: no model call, no network.
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 from typing import Any
 
@@ -138,80 +137,15 @@ def test_an_exception_is_still_an_error_not_a_rejection(tmp_path: Path) -> None:
     assert job.last_status == "error"
 
 
-# --- the receipt says where it ran --------------------------------------------------------------
-
-
-def test_the_scheduled_loop_is_given_the_folder_it_runs_in() -> None:
-    """A wiring assertion, because the defect was wiring: the guard and the tools were rooted in the
-    job's folder and the LOOP was not, so `_persist_receipt` wrote an empty workspace.
-
-    Asserted on the source because the closure lives inside a CLI command and cannot be reached
-    from a test — and asserting nothing was how it shipped.
-    """
-    fonte = Path("chimera/cli/main.py").read_text(encoding="utf-8")
-    bloco = re.search(
-        r"run_log=settings\.home / \"runs\.jsonl\",(.{0,900}?)\)\n", fonte, re.S
-    )
-
-    assert bloco, "the scheduled loop no longer names its run log — this test is looking at nothing"
-    # An ARGUMENT, not the substring. Commenting the line out leaves `workspace=job_root` in the
-    # file, and a substring check passes over it — measured: that sabotage walked straight through
-    # the first version of this assertion.
-    linhas = [linha.strip() for linha in bloco.group(1).splitlines()]
-
-    assert "workspace=job_root," in linhas, (
-        "the scheduled receipt is written without a workspace, so it is unfindable from the "
-        "project it ran in"
-    )
-
-
-def _corpo_do_run_job() -> str:
-    """The source of the closure that actually runs a scheduled job.
-
-    Bounded to the function rather than searched across the file: `return result.answer` appears
-    elsewhere for a different command, and a whole-file search would find that one and report the
-    wiring as present while the scheduled path returned a bare string.
-    """
-    fonte = Path("chimera/cli/main.py").read_text(encoding="utf-8")
-    inicio = fonte.index("def run_job(job: CronJob)")
-    return fonte[inicio : fonte.index("def run_task(", inicio)]
-
-
-def test_the_scheduled_job_actually_reports_its_verdict() -> None:
-    """The half that shipped missing, and the reason it shipped missing.
-
-    ``JobOutcome``, the ``rejected`` status and the engine branch that records it were all added
-    together — and the one line that FEEDS them was not. A bare string is read as ``ok``, so a job
-    whose gate rejected every attempt and reverted every file still showed a green row. Measured
-    twice on a real install: once before the outcome type existed, and once after.
-
-    The tests that were supposed to cover it injected a ``JobOutcome`` straight into the dispatch,
-    which is every part of the path except the only place that produces one — a guard outside the
-    flow, wearing the name of the thing it was not checking.
-    """
-    corpo = _corpo_do_run_job()
-    linhas = [linha.strip() for linha in corpo.splitlines()]
-
-    assert "return result.answer" not in linhas, (
-        "the scheduled path returns a bare answer, which the dispatch reads as ok — the verdict "
-        "never reaches the schedule"
-    )
-    assert "return JobOutcome(result.answer, ok=bool(result.success))" in linhas
-
-
-def test_an_ungated_job_reports_no_verdict_at_all() -> None:
-    """Without a gate there is nothing that could reject the work, and ``success`` then reflects
-    gates this path does not run — reporting it would turn every ungated job into a failure."""
-    corpo = _corpo_do_run_job()
-
-    assert "if not gated:" in corpo
-    assert "return JobOutcome(result.answer)" in [linha.strip() for linha in corpo.splitlines()]
-
-
-def test_the_folder_comes_from_the_job_not_the_process() -> None:
-    """`job_root` is the job's own folder falling back to the process root. Passing `workspace`
-    (the process one) instead would attribute every scheduled run to whatever folder the daemon
-    happened to start in — misattribution, which is worse than the empty string it replaces."""
-    fonte = Path("chimera/cli/main.py").read_text(encoding="utf-8")
-
-    assert "job_root = Path(job.workspace).expanduser() if job.workspace else workspace" in fonte
+# --- the receipt says where it ran, and the verdict is real ---------------------------------------
+#
+# These four properties used to be asserted HERE, against the source text of `chimera/cli/main.py`,
+# because `run_job` was a closure inside a CLI command and nothing could call it. That is the
+# fallback for a property with no reachable behaviour, and it is a poor one: one of those
+# assertions passed with the line COMMENTED OUT, because the substring was still in the file.
+#
+# `make_run_job` is importable now, so all four are checked by RUNNING it — the verdict it returns,
+# the folder it names, the money it logs and the daily cap it honours. See
+# `tests/test_the_scheduled_dispatch_can_be_driven.py`. Nothing was dropped; it moved from reading
+# the code to driving it, which is the only version of these checks that could have caught the two
+# defects that shipped.

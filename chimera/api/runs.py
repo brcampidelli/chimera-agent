@@ -280,14 +280,20 @@ def load_runs(path: Path, *, workspace: str | None = None) -> list[RunReceipt]:
     if not path.exists():
         return []
     out: list[RunReceipt] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        try:
-            receipt = RunReceipt.model_validate_json(line)
-        except ValueError:  # pragma: no cover - defensive
-            _log.warning("skipping malformed run receipt line")
-            continue
-        if workspace is None or _in_project(receipt.workspace, workspace):
-            out.append(receipt)
+    # Line by line, not `read_text().splitlines()`. Measured on a 5.5 MB log of 1000 receipts: the
+    # whole-file read peaks at 22 MB — four times the file, because the raw bytes, the decoded
+    # string and the list of lines are all alive at once — against 0.1 MB streaming. Three routes
+    # read this file and a receipt embeds its diffs, so the log grows at ~5.6 KB a run and the
+    # multiplier travels with it. The parse time is NOT the problem: 1000 receipts parse in 24 ms.
+    with path.open(encoding="utf-8", errors="replace") as arquivo:
+        for line in arquivo:
+            if not line.strip():
+                continue
+            try:
+                receipt = RunReceipt.model_validate_json(line)
+            except ValueError:  # pragma: no cover - defensive
+                _log.warning("skipping malformed run receipt line")
+                continue
+            if workspace is None or _in_project(receipt.workspace, workspace):
+                out.append(receipt)
     return out
