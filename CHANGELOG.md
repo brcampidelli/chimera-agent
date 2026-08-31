@@ -234,6 +234,25 @@ You could not choose which model answered you. The endpoint accepted one all alo
 
 ### Fixed — found by installing each release candidate and using it
 
+- **The `rejected` outcome was never wired to anything.** Added in the previous release together
+  with its dispatch status, its engine branch and its tests — and the one line that FEEDS it was
+  not changed. `run_job` still returned a bare answer string, which the dispatch reads as `ok`, so
+  a scheduled job whose gate rejected every attempt and reverted every file kept showing a green
+  row with `consecutive_failures: 0`. Measured twice on a real install: once before the outcome
+  type existed, and once after it existed and changed nothing.
+  The tests that were meant to cover it injected a `JobOutcome` straight into the dispatch — every
+  part of the path except the only place that produces one. A guard outside the flow, wearing the
+  name of the thing it was not checking. The producer now returns the verdict, and only for a job
+  that declared a gate: without one there is nothing that could reject the work, and `success`
+  there reflects gates this path does not run.
+
+- **The double-billing join fixed half the double-billing.** A scheduled dispatch writes ONE usage
+  row holding the total across every attempt, keyed by the LAST attempt's id. Skipping only the
+  attempt whose id matched left the earlier ones to be added on top of a total that already
+  contained them: two attempts of $0.004247 and $0.006598 against a $0.010845 row were counted as
+  $0.015092. Found by arithmetic — two deliberate actions should have moved the total by $0.0116
+  and it moved by $0.0267. A run any of whose attempts is already counted is now skipped whole.
+
 - **A run that hit its dollar cap recorded no spending at all.** Introduced by the cap fix one
   release earlier and found by re-running the same experiment against it: the run stopped
   correctly, said *"spend cap reached: $0.0030"*, and left a receipt reading `usd: null,

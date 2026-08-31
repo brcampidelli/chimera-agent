@@ -1902,13 +1902,14 @@ def _start_cron_daemon(
     from chimera.orchestration.budget import BudgetExceeded
     from chimera.scheduler import CronDaemon, CronJob, Scheduler, make_agent_dispatch
     from chimera.scheduler.delivery import make_deliver
+    from chimera.scheduler.models import JobOutcome
     from chimera.tools import default_registry
 
     scheduler = Scheduler(_cron_store())
     settings = get_settings()
     usage_path = settings.home / "usage.jsonl"
 
-    def run_job(job: CronJob) -> str:
+    def run_job(job: CronJob) -> JobOutcome:
         """One dispatch, inside whatever the money allows.
 
         Three things happen here that did not before. The DAILY cap is checked before the job is
@@ -2045,7 +2046,17 @@ def _start_cron_daemon(
                 f"[yellow]cron '{job.name}': governance touched {touched} action(s) — "
                 f"{detail}[/yellow]"
             )
-        return result.answer
+        # The VERDICT, not just the answer. Returning a bare string is read as `ok` by the
+        # dispatch, and that is how a job whose gate rejected every attempt and reverted every
+        # file showed a green row with zero failures — measured twice, once before the outcome
+        # type existed and once after, because the type was added and this line was not changed.
+        #
+        # Only when the job declared a gate. Without one there is nothing that could reject the
+        # work, `success` then reflects gates this path does not run, and reporting it would turn
+        # every ungated job into a failure. Absence of a verdict is not a failure.
+        if not gated:
+            return JobOutcome(result.answer)
+        return JobOutcome(result.answer, ok=bool(result.success))
 
     def run_task(task: str) -> str:
         """The job-less fallback. Governed too — it is reachable, and "reachable but forgotten" is

@@ -139,7 +139,7 @@ def usage_from_runs(path: Path, *, already: set[str] | None = None) -> list[Usag
         return []
     contadas = already or set()
     out: list[UsageRecord] = []
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():  # noqa: PLR1702
         if not line.strip():
             continue
         try:
@@ -150,13 +150,16 @@ def usage_from_runs(path: Path, *, already: set[str] | None = None) -> list[Usag
         if not isinstance(row, dict):
             continue
         run_ts = str(row.get("ts") or "")
-        for attempt in row.get("attempts") or []:
-            if not isinstance(attempt, dict):
-                continue
-            # Skipped, not zeroed: this attempt is already in the other log, and a zero row would
-            # still count a turn that has been counted.
-            if str(attempt.get("run_id") or "") in contadas:
-                continue
+        tentativas = [a for a in (row.get("attempts") or []) if isinstance(a, dict)]
+        # The WHOLE run, not the one attempt whose id matched. A scheduled dispatch writes ONE
+        # usage row holding the total across every attempt, keyed by the LAST attempt's id — so
+        # skipping only that attempt left the earlier ones to be added on top of a total that
+        # already contained them. Measured on a real job: two attempts of $0.004247 and $0.006598
+        # against a $0.010845 row, counted as $0.015092. The first version of this join fixed half
+        # the double-count and the arithmetic said so.
+        if any(str(a.get("run_id") or "") in contadas for a in tentativas):
+            continue
+        for attempt in tentativas:
             usd = attempt.get("usd")
             out.append(
                 UsageRecord(
