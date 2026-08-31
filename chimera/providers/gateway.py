@@ -328,7 +328,7 @@ class LLMGateway:
             value = getattr(self.settings, field, None)
             if value and not os.environ.get(env_var):
                 os.environ[env_var] = value
-        # Point LiteLLM's Ollama provider at the configured local server (default localhost:11434), so
+        # Point LiteLLM's Ollama provider at the configured local server (default 127.0.0.1:11434), so
         # `CHIMERA_DEFAULT_MODEL=ollama/llama3` works out of the box — and a remote Ollama is one env var away.
         ollama_base = getattr(self.settings, "ollama_base_url", "") or ""
         if ollama_base and not os.environ.get("OLLAMA_API_BASE"):

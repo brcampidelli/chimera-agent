@@ -22,7 +22,7 @@ chimera agent "Summarise this file in 3 bullets" -w .
 
 I to wszystko — bez `OPENROUTER_API_KEY`, bez chmury. Brama poświadczeń rozpoznaje `ollama/…`
 (oraz `ollama_chat/…`) jako lokalny runtime i przepuszcza go. Jeśli Ollama działa gdzie indziej,
-ustaw `CHIMERA_OLLAMA_BASE_URL=http://host:11434` (domyślnie `http://localhost:11434`).
+ustaw `CHIMERA_OLLAMA_BASE_URL=http://host:11434` (domyślnie `http://127.0.0.1:11434`).
 
 Modele lokalne są mniejsze, więc jest to *słabszy* koniec zakresu
 [goldilocks](../bench/local_lift/RESULTS.md) — dobrze pasuje do `chimera solve` (plan +

@@ -23,7 +23,7 @@ chimera agent "Summarise this file in 3 bullets" -w .
 
 C'est tout — pas de `OPENROUTER_API_KEY`, pas de cloud. La barrière d'identifiants reconnaît
 `ollama/…` (et `ollama_chat/…`) comme un runtime local et laisse passer. Si Ollama tourne
-ailleurs, définissez `CHIMERA_OLLAMA_BASE_URL=http://host:11434` (`http://localhost:11434` par
+ailleurs, définissez `CHIMERA_OLLAMA_BASE_URL=http://host:11434` (`http://127.0.0.1:11434` par
 défaut).
 
 Les modèles locaux sont plus petits, donc c'est l'extrémité *faible* de la plage

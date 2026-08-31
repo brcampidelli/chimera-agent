@@ -36,9 +36,16 @@ def test_non_local_model_still_requires_a_key(monkeypatch: Any) -> None:
 
 def test_ollama_base_url_is_exported_to_env(monkeypatch: Any) -> None:
     # Building the gateway points LiteLLM's Ollama provider at the configured local server.
+    #
+    # Compared against the setting rather than a literal, deliberately. What this test is for is the
+    # WIRING — that whatever is configured reaches LiteLLM — and spelling the default out here made
+    # it a second copy of a value that lives in `config.py`. The two then have to be changed in step,
+    # and the day they were not, this failed for a reason that had nothing to do with the export.
+    from chimera.config import Settings
+
     monkeypatch.delenv("OLLAMA_API_BASE", raising=False)
     LLMGateway()  # __init__ exports the base URL
-    assert os.environ.get("OLLAMA_API_BASE") == "http://localhost:11434"
+    assert os.environ.get("OLLAMA_API_BASE") == Settings().ollama_base_url
 
 
 def test_existing_ollama_api_base_is_not_overwritten(monkeypatch: Any) -> None:

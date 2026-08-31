@@ -22,7 +22,7 @@ chimera agent "Summarise this file in 3 bullets" -w .
 
 Tutto qui — niente `OPENROUTER_API_KEY`, niente cloud. Il gate delle credenziali riconosce
 `ollama/…` (e `ollama_chat/…`) come runtime locale e lo lascia passare. Se Ollama gira altrove,
-imposta `CHIMERA_OLLAMA_BASE_URL=http://host:11434` (default `http://localhost:11434`).
+imposta `CHIMERA_OLLAMA_BASE_URL=http://host:11434` (default `http://127.0.0.1:11434`).
 
 I modelli locali sono più piccoli, quindi questo è l'estremo *debole* della fascia
 [goldilocks](../bench/local_lift/RESULTS.md) — adatto a `chimera solve` (il piano +

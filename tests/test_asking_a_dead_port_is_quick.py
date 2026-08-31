@@ -28,7 +28,13 @@ from typing import Any
 import httpx
 import pytest
 
-from chimera.providers.ollama import DEFAULT_TIMEOUT_S, LOCAL_CONNECT_TIMEOUT_S, installed_models
+from chimera.config import Settings
+from chimera.providers.ollama import (
+    DEFAULT_TIMEOUT_S,
+    LOCAL_CONNECT_TIMEOUT_S,
+    _connect_budget,
+    installed_models,
+)
 
 
 def _capture(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
@@ -149,3 +155,43 @@ def test_what_the_probe_reports_did_not_change(monkeypatch: pytest.MonkeyPatch) 
     assert found.reachable is True
     assert found.models == ()
     assert found.reason == ""
+
+
+def test_the_shipped_default_names_an_address_and_not_a_name() -> None:
+    """`127.0.0.1`, not `localhost`, and the difference is measurable rather than stylistic.
+
+    Both mean this machine. But `localhost` is a NAME, and it resolves to two addresses — `::1` and
+    `127.0.0.1` — so a client with nothing to connect to tries them in turn and waits twice for the
+    same answer. Measured through `installed_models` on Windows: **530 ms** through the name against
+    **265 ms** through the address, for an identical verdict.
+
+    This is asserted rather than left as a comment because the two spellings look interchangeable,
+    and the one that reads as tidier is the slower one. Ollama's own default is `127.0.0.1:11434`,
+    so the specific address is also the more accurate description of what it binds.
+    """
+    padrao = Settings.model_fields["ollama_base_url"].default
+    assert padrao == "http://127.0.0.1:11434"
+    assert "localhost" not in padrao
+
+
+def test_the_shipped_default_is_one_of_the_urls_that_gets_the_short_budget() -> None:
+    """The default and the fast path have to agree, and nothing else checks that they do.
+
+    A default pointing somewhere `_connect_budget` does not recognise as this machine would keep the
+    full two seconds while every comment in the module claims otherwise — the change would look
+    applied and do nothing.
+    """
+    padrao = Settings.model_fields["ollama_base_url"].default
+    assert _connect_budget(padrao, DEFAULT_TIMEOUT_S) == LOCAL_CONNECT_TIMEOUT_S
+
+
+def test_a_url_the_user_set_is_not_overridden_by_the_new_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Changing a default must not reach into an install that already made this decision.
+
+    Someone running Ollama elsewhere — another host, another port, IPv6 on purpose — set this in
+    `.env` or on the Settings screen. A default is what applies when nothing was chosen, and that
+    boundary is the whole reason changing one is safe."""
+    monkeypatch.setenv("CHIMERA_OLLAMA_BASE_URL", "http://[::1]:11434")
+    assert Settings().ollama_base_url == "http://[::1]:11434"
