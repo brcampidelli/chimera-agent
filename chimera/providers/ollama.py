@@ -19,9 +19,11 @@ same shape and for the same reason as :class:`~chimera.api.posture.PostureFacts`
 languages, and a server that returned English prose would make the one line explaining why a feature
 is unavailable the one line the user cannot read.
 
-**The timeout is short and deliberate.** This is asked from a settings panel, and the configured URL
-may point at a machine that is off, asleep, or on the other side of a VPN. A settings row that hangs
-for thirty seconds is worse than one that says "nothing answered at this URL" in two.
+**The timeout is short and deliberate, and CONNECTING is budgeted apart from ANSWERING.** This is
+asked from a settings panel, and the configured URL may point at a machine that is off, asleep, or
+on the other side of a VPN. A settings row that hangs for thirty seconds is worse than one that says
+"nothing answered at this URL" in two. The split exists because those two waits have nothing in
+common on a machine with no Ollama: see :data:`LOCAL_CONNECT_TIMEOUT_S`.
 """
 
 from __future__ import annotations
@@ -36,6 +38,25 @@ _log = get_logger("providers.ollama")
 #: Seconds to wait for the tag list. Long enough for a local daemon that has to page itself back in,
 #: short enough that a URL pointing at a machine that is off does not freeze the settings row asking.
 DEFAULT_TIMEOUT_S = 2.0
+
+#: Seconds allowed to OPEN the connection when the URL names this machine.
+#:
+#: A port on this machine either has something listening on it or it does not, and the kernel knows
+#: which without asking anyone. Measured on Windows: a loopback port that IS listening accepts in at
+#: most 16 ms over 30 attempts, while a port with nothing behind it takes **2.04 s** to come back
+#: refused — and `localhost` resolves to both `::1` and `127.0.0.1`, so httpx pays that twice, for
+#: 4.2 s of waiting to learn something the first millisecond already settled.
+#:
+#: So the connect gets its own budget, fifteen times the slowest accept ever observed, and the read
+#: keeps the full one — a daemon that is listening but slow to answer is a different situation and
+#: still gets its time. Measured through this function, paired on one machine: **2,012 ms -> 530 ms**
+#: for `localhost` and **2,010 ms -> 265 ms** for `127.0.0.1` (one stack, so the wait is paid once),
+#: against **15 ms -> 14 ms** for a URL where something answers — same verdict in all three.
+#:
+#: Deliberately NOT applied to a remote URL. An Ollama across a VPN can legitimately need longer than
+#: this to accept, and reporting it unreachable to save a fraction of a second would be a lie about
+#: the user's machine — the exact failure the rest of this module exists to avoid.
+LOCAL_CONNECT_TIMEOUT_S = 0.25
 
 #: Why no list came back. ``""`` when one did — including when it was empty, which is an answer.
 Reason = Literal["", "no_url", "unreachable", "http_error", "not_ollama"]
@@ -57,6 +78,26 @@ class InstalledModels:
     reason: Reason = ""
 
 
+def _connect_budget(base_url: str, timeout_s: float) -> float:
+    """How long to spend opening the connection, which is not how long to spend waiting for a reply.
+
+    Loopback only. Everything else keeps the caller's budget, because a slow accept from a machine
+    across a network is normal and calling it unreachable would invent a fact about that machine.
+    """
+    from urllib.parse import urlsplit
+
+    try:
+        host = (urlsplit(base_url).hostname or "").lower()
+    except ValueError:  # a URL malformed enough that even splitting it fails
+        return timeout_s
+    on_this_machine = host == "localhost" or host == "::1" or host.startswith("127.")
+    if not on_this_machine:
+        return timeout_s
+    # `min`, not the constant: a caller who asked for a 50ms probe must not be handed a connect
+    # budget five times longer than the whole thing it asked for.
+    return min(LOCAL_CONNECT_TIMEOUT_S, timeout_s)
+
+
 def installed_models(base_url: str, *, timeout_s: float = DEFAULT_TIMEOUT_S) -> InstalledModels:
     """Ask the Ollama at ``base_url`` what it has pulled. Never raises.
 
@@ -73,21 +114,23 @@ def installed_models(base_url: str, *, timeout_s: float = DEFAULT_TIMEOUT_S) -> 
     except ImportError:  # pragma: no cover — httpx is a hard dependency
         return InstalledModels(base, False, reason="unreachable")
 
-    # The deadline bounds the WHOLE probe, not each connection attempt.
+    # Two bounds, because two different things can be slow and only one of them is interesting.
     #
-    # `timeout_s` is httpx's per-operation budget, and `localhost` resolves to both `::1` and
-    # `127.0.0.1`. When nothing is listening, neither refuses on every stack — so httpx tries them
-    # in turn and pays the full timeout each. Measured live: 4.4s against the 2.0s this module's
-    # own docstring promises, on every machine WITHOUT Ollama, which is most of them. And it is
-    # paid by the model picker as a whole, because listing calls this.
+    # The connect budget (see `LOCAL_CONNECT_TIMEOUT_S`) is what makes the common case fast: on a
+    # machine with no Ollama, `localhost` resolves to both `::1` and `127.0.0.1` and neither refuses
+    # promptly, so httpx tries them in turn and pays the connect budget twice.
     #
-    # An abandoned probe keeps running on its daemon thread and its answer is discarded — the same
-    # contract every other deadline here has, and harmless for a GET that changes nothing.
+    # The deadline behind it bounds the WHOLE probe, and still earns its place: it is the only thing
+    # covering a server that ACCEPTS and then never answers, which no per-operation timeout catches
+    # if the socket keeps dribbling bytes. An abandoned probe keeps running on its daemon thread and
+    # its answer is discarded — the same contract every other deadline here has, and harmless for a
+    # GET that changes nothing.
     from chimera.concurrency import call_with_deadline
 
+    budget = httpx.Timeout(timeout_s, connect=_connect_budget(base, timeout_s))
     try:
         response = call_with_deadline(
-            lambda: httpx.get(f"{base}/api/tags", timeout=timeout_s), timeout_s
+            lambda: httpx.get(f"{base}/api/tags", timeout=budget), timeout_s
         )
     except Exception as exc:  # noqa: BLE001 — an absent Ollama is a normal state, not a 500
         _log.debug("ollama tag list failed at %s: %s", base, exc)
