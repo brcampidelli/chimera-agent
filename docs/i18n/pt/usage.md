@@ -60,7 +60,7 @@ quando é curto demais para acionar o gate de tamanho.
 **Provedores, fallback & self-hosted.** Qualquer slug `provider/model` do LiteLLM
 funciona (`openai/…`, `anthropic/…`, `gemini/…`, `ollama/…`, `openrouter/…`, …). Para um
 servidor self-hosted / compatível com OpenAI (Ollama, vLLM), defina `CHIMERA_API_BASE`
-(ex.: `http://localhost:11434` com `CHIMERA_DEFAULT_MODEL=ollama/llama3`). Defina
+(ex.: `http://127.0.0.1:11434` com `CHIMERA_DEFAULT_MODEL=ollama/llama3`). Defina
 `CHIMERA_FALLBACK_MODELS` (separado por vírgula) para trocar para outro modelo se o
 primário der erro. Em `chat`/`tui`, `/model <slug>` troca o modelo no meio da sessão.
 

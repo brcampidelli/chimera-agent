@@ -118,7 +118,9 @@ class Settings(BaseSettings):
     stability_api_key: str | None = Field(default=None, validation_alias="STABILITY_API_KEY")
     elevenlabs_api_key: str | None = Field(default=None, validation_alias="ELEVENLABS_API_KEY")
     spotify_client_id: str | None = Field(default=None, validation_alias="SPOTIFY_CLIENT_ID")
-    spotify_client_secret: str | None = Field(default=None, validation_alias="SPOTIFY_CLIENT_SECRET")
+    spotify_client_secret: str | None = Field(
+        default=None, validation_alias="SPOTIFY_CLIENT_SECRET"
+    )
 
     # --- Default single model (Tier 1 / cheap tasks) ---
     #
@@ -296,7 +298,9 @@ class Settings(BaseSettings):
     # least ``min_overlap`` query terms (so a task with no strong match pays ZERO extra tokens instead
     # of dragging in ~irrelevant cards), and cap each card at ``max_lines``. These crush the token
     # overhead that failed the skillcard flip gate; see bench/skillcard/RESULTS.md.
-    skill_cards_min_overlap: int = Field(default=2, validation_alias="CHIMERA_SKILL_CARDS_MIN_OVERLAP")
+    skill_cards_min_overlap: int = Field(
+        default=2, validation_alias="CHIMERA_SKILL_CARDS_MIN_OVERLAP"
+    )
     skill_cards_max_lines: int = Field(default=3, validation_alias="CHIMERA_SKILL_CARDS_MAX_LINES")
     # M19-A1 flip-point: when on, card READING couples to skill EVOLVING (a run that can mint a
     # skill also reads the retrieved ones), instead of the independent `skill_cards` toggle. Stays
@@ -360,11 +364,17 @@ class Settings(BaseSettings):
     compact_schemas: bool = Field(default=False, validation_alias="CHIMERA_COMPACT_SCHEMAS")
 
     # --- Messaging bot tokens (only needed for the matching `chimera serve --<platform>`) ---
-    discord_bot_token: str | None = Field(default=None, validation_alias="CHIMERA_DISCORD_BOT_TOKEN")
-    telegram_bot_token: str | None = Field(default=None, validation_alias="CHIMERA_TELEGRAM_BOT_TOKEN")
+    discord_bot_token: str | None = Field(
+        default=None, validation_alias="CHIMERA_DISCORD_BOT_TOKEN"
+    )
+    telegram_bot_token: str | None = Field(
+        default=None, validation_alias="CHIMERA_TELEGRAM_BOT_TOKEN"
+    )
     slack_bot_token: str | None = Field(default=None, validation_alias="CHIMERA_SLACK_BOT_TOKEN")
     slack_app_token: str | None = Field(default=None, validation_alias="CHIMERA_SLACK_APP_TOKEN")
-    whatsapp_access_token: str | None = Field(default=None, validation_alias="CHIMERA_WHATSAPP_ACCESS_TOKEN")
+    whatsapp_access_token: str | None = Field(
+        default=None, validation_alias="CHIMERA_WHATSAPP_ACCESS_TOKEN"
+    )
     whatsapp_phone_number_id: str | None = Field(
         default=None, validation_alias="CHIMERA_WHATSAPP_PHONE_NUMBER_ID"
     )
@@ -417,9 +427,7 @@ class Settings(BaseSettings):
     # This default used to be `local`. That meant the shipped boundary was a confirmation prompt,
     # which is a boundary a person can wave through and an injected instruction cannot be stopped by.
     sandbox: str = Field(default="auto", validation_alias="CHIMERA_SANDBOX")
-    sandbox_image: str = Field(
-        default="python:3.12-slim", validation_alias="CHIMERA_SANDBOX_IMAGE"
-    )
+    sandbox_image: str = Field(default="python:3.12-slim", validation_alias="CHIMERA_SANDBOX_IMAGE")
     # Keep `<think>` blocks in the answer instead of filtering them out.
     #
     # Off by default because a reasoning block in `message.content` is never what the caller asked
@@ -551,8 +559,20 @@ class Settings(BaseSettings):
     # Base URL for a local Ollama server. A model like `ollama/llama3` runs on your machine with no
     # API key — set this only if Ollama listens somewhere other than the default. Reinforces the
     # fully-local, self-hostable path: `CHIMERA_DEFAULT_MODEL=ollama/llama3` and no key needed.
+    #
+    # `127.0.0.1`, NOT `localhost`, and the difference is measurable rather than stylistic. The two
+    # are the same machine, but `localhost` is a NAME that resolves to two addresses — `::1` and
+    # `127.0.0.1` — so a client with nothing to connect to tries both in turn and waits twice.
+    # Measured on Windows, where a loopback port with nothing behind it takes 2.04 s to come back
+    # refused: 530 ms through `localhost` against 265 ms through `127.0.0.1`, for the identical
+    # answer. Ollama's own default is `127.0.0.1:11434`, so this names what it actually binds.
+    #
+    # The cost of being specific: an Ollama told to listen on `[::1]` only — which takes deliberately
+    # setting `OLLAMA_HOST` — is no longer found at the default. That is a URL in Settings and the
+    # message names it ("nothing answered at http://127.0.0.1:11434"), so the failure explains its
+    # own fix. A value you set, by env or by the Settings screen, is untouched by this.
     ollama_base_url: str = Field(
-        default="http://localhost:11434", validation_alias="CHIMERA_OLLAMA_BASE_URL"
+        default="http://127.0.0.1:11434", validation_alias="CHIMERA_OLLAMA_BASE_URL"
     )
 
     # Inline completion in the editor: the model asked what comes after the cursor, and the hard
@@ -677,7 +697,8 @@ class Settings(BaseSettings):
         if word and word not in _POSTURE_WORDS:
             _log.warning(
                 "CHIMERA_APPROVAL=%r is not one of %s; ignoring it (no posture floor is stated).",
-                word, ", ".join(sorted(_POSTURE_WORDS)),
+                word,
+                ", ".join(sorted(_POSTURE_WORDS)),
             )
             return ""
         return word
@@ -700,8 +721,11 @@ class Settings(BaseSettings):
             )
             return "ask"
         if word not in _GOVERNANCE_WORDS:
-            _log.warning("CHIMERA_APPROVAL_MODE=%r is not one of %s; falling back to 'ask'.",
-                         word, ", ".join(sorted(_GOVERNANCE_WORDS)))
+            _log.warning(
+                "CHIMERA_APPROVAL_MODE=%r is not one of %s; falling back to 'ask'.",
+                word,
+                ", ".join(sorted(_GOVERNANCE_WORDS)),
+            )
             return "ask"
         return word
 

@@ -60,7 +60,7 @@ protección de la fusión incluso cuando es demasiado corto para activar la barr
 **Proveedores, fallback y auto-alojado.** Cualquier slug `provider/model` de LiteLLM funciona
 (`openai/…`, `anthropic/…`, `gemini/…`, `ollama/…`, `openrouter/…`, …). Para un servidor
 auto-alojado / compatible con OpenAI (Ollama, vLLM) configura `CHIMERA_API_BASE` (p. ej.
-`http://localhost:11434` con `CHIMERA_DEFAULT_MODEL=ollama/llama3`). Configura
+`http://127.0.0.1:11434` con `CHIMERA_DEFAULT_MODEL=ollama/llama3`). Configura
 `CHIMERA_FALLBACK_MODELS` (separado por comas) para conmutar a otro modelo si el primario
 falla. En `chat`/`tui`, `/model <slug>` cambia el modelo a mitad de sesión.
 

@@ -22,7 +22,7 @@ chimera agent "Summarise this file in 3 bullets" -w .
 
 Вот и всё — ни `OPENROUTER_API_KEY`, ни облака. Проверка учётных данных распознаёт `ollama/…` (и
 `ollama_chat/…`) как локальную среду и пропускает. Если Ollama работает на другой машине, задайте
-`CHIMERA_OLLAMA_BASE_URL=http://host:11434` (по умолчанию `http://localhost:11434`).
+`CHIMERA_OLLAMA_BASE_URL=http://host:11434` (по умолчанию `http://127.0.0.1:11434`).
 
 Локальные модели меньше, поэтому это *слабый* конец диапазона
 [золотой середины](../bench/local_lift/RESULTS.md) — хорошо подходит для `chimera solve` (план и

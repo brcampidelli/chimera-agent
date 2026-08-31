@@ -60,7 +60,7 @@ krótki krok dostaje ochronę fuzji nawet wtedy, gdy jest za krótki, by uruchom
 **Providerzy, fallback i self-hosted.** Działa dowolny slug LiteLLM `provider/model`
 (`openai/…`, `anthropic/…`, `gemini/…`, `ollama/…`, `openrouter/…`, …). Dla serwera
 self-hosted / zgodnego z OpenAI (Ollama, vLLM) ustaw `CHIMERA_API_BASE`
-(np. `http://localhost:11434` z `CHIMERA_DEFAULT_MODEL=ollama/llama3`). Ustaw
+(np. `http://127.0.0.1:11434` z `CHIMERA_DEFAULT_MODEL=ollama/llama3`). Ustaw
 `CHIMERA_FALLBACK_MODELS` (rozdzielone przecinkami), by przełączyć się na inny model, gdy
 podstawowy zawiedzie. W `chat`/`tui`, `/model <slug>` przełącza model w trakcie sesji.
 

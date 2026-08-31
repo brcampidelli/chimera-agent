@@ -21,7 +21,7 @@ chimera agent "Summarise this file in 3 bullets" -w .
 
 就这么简单——不需要 `OPENROUTER_API_KEY`，也不涉及云端。凭据检查会把 `ollama/…`（以及
 `ollama_chat/…`）识别为本地运行时并直接放行。如果 Ollama 运行在别处，设置
-`CHIMERA_OLLAMA_BASE_URL=http://host:11434`（默认是 `http://localhost:11434`）。
+`CHIMERA_OLLAMA_BASE_URL=http://host:11434`（默认是 `http://127.0.0.1:11434`）。
 
 本地模型体量更小，因此这属于[适度区间（goldilocks）](../bench/local_lift/RESULTS.md)里*偏弱*
 的一端——很适合 `chimera solve`（规划 + 验证或回滚能帮到一个较弱的模型），也适合追求离线隐私

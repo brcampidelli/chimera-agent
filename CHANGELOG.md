@@ -267,6 +267,17 @@ You could not choose which model answered you. The endpoint accepted one all alo
   than 250 ms to accept, and reporting it unreachable to collect a fraction of a second would be
   inventing a fact about someone's network — the exact failure the rest of that module exists to
   avoid. Anything that is not `localhost`, `::1` or the `127/8` block keeps the budget it had.
+- **And the default address changed with it: `127.0.0.1`, not `localhost`.** The two mean the same
+  machine, but one is a *name* and it resolves to two addresses — `::1` and `127.0.0.1` — so a client
+  with nothing to connect to tries them in turn and waits twice for the same answer. Naming the
+  address halves what is left: **530 ms → 265 ms**, measured through the same function, for an
+  identical verdict. It is also the more accurate description, since `127.0.0.1:11434` is what
+  Ollama itself binds by default.
+  The cost of being specific, stated rather than buried: an Ollama told to listen on `[::1]` only —
+  which takes deliberately setting `OLLAMA_HOST` — is no longer found at the default. That address
+  is a field on the Settings screen and the failure names it (*"nothing answered at
+  http://127.0.0.1:11434"*), so it explains its own fix. **A value you already set is untouched**:
+  a default is what applies when nothing was chosen, whether it came from `.env` or the screen.
 - **The folder of reverted work had no ceiling.** Every attempt a verify command rejects writes its
   full diff to `discarded/`, which is what makes that work recoverable — and nothing ever removed
   one. Measured: 3 files in one session, 7 eighteen hours later, ~2 KB each, growing forever. Small

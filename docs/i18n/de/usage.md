@@ -62,7 +62,7 @@ er zu kurz ist, um das Längen-Gate auszulösen.
 **Provider, Fallback & selbst gehostet.** Jeder LiteLLM-`provider/model`-Slug
 funktioniert (`openai/…`, `anthropic/…`, `gemini/…`, `ollama/…`, `openrouter/…`,
 …). Für einen selbst gehosteten / OpenAI-kompatiblen Server (Ollama, vLLM)
-`CHIMERA_API_BASE` setzen (z. B. `http://localhost:11434` mit
+`CHIMERA_API_BASE` setzen (z. B. `http://127.0.0.1:11434` mit
 `CHIMERA_DEFAULT_MODEL=ollama/llama3`). `CHIMERA_FALLBACK_MODELS`
 (kommagetrennt) setzen, um bei einem Fehler des primären Modells auf ein anderes
 auszuweichen. In `chat`/`tui` wechselt `/model <slug>` das Modell mitten in der
