@@ -247,6 +247,26 @@ You could not choose which model answered you. The endpoint accepted one all alo
   provider that is down already answers with its own reason, and re-asking it on every screen open
   turns one slow answer into a burst of them.
 
+- **Asking the local Ollama what it has pulled cost two seconds, on the machines with no Ollama.**
+  The Settings screen asks every time a model picker mounts — deliberately uncached, because a tag
+  pulled in a terminal thirty seconds ago is the one the user came there to select. So the cost was
+  paid over and over, and it was the last slow route left in the app.
+  Why it was slow is not what it looks like. Measured on Windows: a loopback port with something
+  listening accepts in **at most 16 ms over 30 attempts**; the same port with nothing behind it takes
+  **2.04 s to come back refused** — not to time out, to be *actively refused*. And `localhost`
+  resolves to `::1` as well as `127.0.0.1`, so httpx pays it on each in turn: **4.2 s**, capped by
+  the module's outer deadline at 2.0, to learn something the first millisecond had already settled.
+  None of that is reducible per attempt — the first fix tried, a TCP pre-check, would have paid the
+  identical 2.04 s. What is separable is **opening** the connection from **waiting for a reply**, and
+  they now have separate budgets: 250 ms to connect, fifteen times the slowest accept ever observed
+  here, while the read keeps the full two seconds so a daemon that is listening but slow to answer
+  still gets its time. Measured through the real module, paired on the same machine: **2,012 ms →
+  530 ms** for the default URL, **2,010 ms → 265 ms** for `127.0.0.1`, and **15 ms → 14 ms** against
+  something that answers — with an identical verdict in all three.
+  **The short budget is for this machine only.** An Ollama across a VPN can legitimately need longer
+  than 250 ms to accept, and reporting it unreachable to collect a fraction of a second would be
+  inventing a fact about someone's network — the exact failure the rest of that module exists to
+  avoid. Anything that is not `localhost`, `::1` or the `127/8` block keeps the budget it had.
 - **The folder of reverted work had no ceiling.** Every attempt a verify command rejects writes its
   full diff to `discarded/`, which is what makes that work recoverable — and nothing ever removed
   one. Measured: 3 files in one session, 7 eighteen hours later, ~2 KB each, growing forever. Small
