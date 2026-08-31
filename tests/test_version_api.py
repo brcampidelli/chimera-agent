@@ -19,17 +19,19 @@ import chimera.api.version_api as version_api
 @pytest.fixture(autouse=True)
 def _clear_cache() -> Any:
     """Reset the module-level GitHub cache before AND after each test (it persists across the process)."""
-    version_api._cache = None
+    version_api._cache.clear()
     yield
-    version_api._cache = None
+    version_api._cache.clear()
 
 
 # --- pure version comparison -----------------------------------------------------------------------
 
 
 def test_parse_version_parses_clean_tuples() -> None:
-    assert version_api._parse_version("0.30.0") == (0, 30, 0)
-    assert version_api._parse_version("1.2.3") == (1, 2, 3)
+    # Five elements now, not three: the fourth orders a final release above its candidates and the
+    # fifth is the candidate number. See `test_a_prerelease_hears_about_updates.py`.
+    assert version_api._parse_version("0.30.0") == (0, 30, 0, 1, 0)
+    assert version_api._parse_version("1.2.3") == (1, 2, 3, 1, 0)
 
 
 def test_parse_version_rejects_non_numeric() -> None:
@@ -58,7 +60,7 @@ def test_is_newer_false_when_either_side_unparseable() -> None:
 def test_update_available_true_when_github_is_newer(monkeypatch: Any) -> None:
     monkeypatch.setattr(chimera, "__version__", "0.30.0")
     monkeypatch.setattr(
-        version_api, "_fetch_latest", lambda: ("0.31.0", "https://example.test/releases/0.31.0")
+        version_api, "_fetch_latest", lambda **_: ("0.31.0", "https://example.test/releases/0.31.0")
     )
     out = version_api.check_version()
     assert out["version"] == "0.30.0"
@@ -69,7 +71,7 @@ def test_update_available_true_when_github_is_newer(monkeypatch: Any) -> None:
 
 def test_update_not_available_when_equal(monkeypatch: Any) -> None:
     monkeypatch.setattr(chimera, "__version__", "0.31.0")
-    monkeypatch.setattr(version_api, "_fetch_latest", lambda: ("0.31.0", "https://example.test/r"))
+    monkeypatch.setattr(version_api, "_fetch_latest", lambda **_: ("0.31.0", "https://example.test/r"))
     out = version_api.check_version()
     assert out["update_available"] is False
     assert out["notes_url"] is None  # nothing to link to when there's no update
@@ -77,7 +79,7 @@ def test_update_not_available_when_equal(monkeypatch: Any) -> None:
 
 def test_update_not_available_when_local_is_newer(monkeypatch: Any) -> None:
     monkeypatch.setattr(chimera, "__version__", "0.32.0")
-    monkeypatch.setattr(version_api, "_fetch_latest", lambda: ("0.31.0", "https://example.test/r"))
+    monkeypatch.setattr(version_api, "_fetch_latest", lambda **_: ("0.31.0", "https://example.test/r"))
     out = version_api.check_version()
     assert out["update_available"] is False
     assert out["latest"] == "0.31.0"  # honestly reported, just not an "update"
@@ -86,7 +88,7 @@ def test_update_not_available_when_local_is_newer(monkeypatch: Any) -> None:
 def test_fetch_failure_degrades_to_null_latest(monkeypatch: Any) -> None:
     # A fetch failure (mocked here as a return of (None, None)) → no update signal, a clean dict.
     monkeypatch.setattr(chimera, "__version__", "0.30.0")
-    monkeypatch.setattr(version_api, "_fetch_latest", lambda: (None, None))
+    monkeypatch.setattr(version_api, "_fetch_latest", lambda **_: (None, None))
     out = version_api.check_version()
     assert out == {
         "version": "0.30.0",
@@ -110,7 +112,7 @@ def test_check_version_caches_and_does_not_refetch(monkeypatch: Any) -> None:
     monkeypatch.setattr(chimera, "__version__", "0.30.0")
     calls = {"n": 0}
 
-    def _counted() -> tuple[str | None, str | None]:
+    def _counted(**_: object) -> tuple[str | None, str | None]:
         calls["n"] += 1
         return "0.31.0", "https://example.test/r"
 
@@ -222,7 +224,7 @@ def test_cached_latest_serves_from_cache_then_refetches_once_the_ttl_expires(
     monkeypatch.setattr(version_api.time, "monotonic", lambda: clock["t"])
     calls = {"n": 0}
 
-    def _fetch() -> tuple[str | None, str | None]:
+    def _fetch(**_: object) -> tuple[str | None, str | None]:
         calls["n"] += 1
         return f"0.{calls['n']}.0", "https://e.test/r"
 

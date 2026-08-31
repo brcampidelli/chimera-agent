@@ -257,6 +257,41 @@ You could not choose which model answered you. The endpoint accepted one all alo
   and a reverted attempt from last month is not something anyone comes back for. The path stays in
   the old receipt after its file goes — a dangling pointer to work gone for months is a smaller
   cost than a folder with no bound, and it is the only one of the two anyone can see.
+- **An app on a release candidate was told about nothing at all.** Two causes, stacked, either one
+  enough on its own: `_parse_version("0.48.0rc46")` returned None because every dot-separated
+  segment had to be digits, so every comparison answered False — not a newer candidate, not even
+  the final `0.48.0`; and `/releases/latest` excludes prereleases by GitHub's own definition, so
+  the newest thing the check could ever report was the last stable. Measured on a real install
+  running rc46: `latest: "0.47.0", update_available: false`. With forty-six candidates in this
+  series that is the common case, not the edge.
+  A stable install is still never offered a candidate — someone on 0.47.0 did not opt into a
+  prerelease track — and the two questions have separate cache slots, because one slot would serve
+  a stable install the candidate list. The newest is chosen by parsed version rather than by the
+  list's order: GitHub sorts by creation date, and a patch cut after a candidate would otherwise be
+  announced as the newer of the two. The comparison is written here rather than taken from
+  `packaging`, which is not a declared dependency of this project: a version check that breaks a
+  clean install is worse than one that understands two shapes.
+
+- **The run log was read whole, four times over.** `read_text().splitlines()` on a 5.5 MB log of
+  1000 receipts peaks at **22 MB** — the raw bytes, the decoded string and the list of lines are
+  all alive at once — and three routes read that same file. Streamed line by line it peaks at
+  **0.1 MB**. The time was never the problem and the first framing of this said otherwise: 1000
+  receipts parse in 24 ms either way, and streaming is marginally *faster* at 20.5 ms. (A first
+  attempt to measure that reported streaming as twice as slow, because `tracemalloc` was left
+  running during the timing.)
+
+### Changed — the scheduled dispatch can be driven
+
+- **`run_job` moved out of the CLI command into `chimera/scheduler/job_runner.py`.** It was a
+  149-line closure inside a Typer command, so nothing could call it — which is the reason two
+  defects reached users through it: the verdict it returns and the workspace it names are both
+  produced there, and the tests that stood in for it handed a `JobOutcome` straight to the part
+  that RECORDS one. Every step of the path except the step that was broken.
+  It is a factory now, taking what it used to capture, and eleven tests drive it end to end with a
+  fake backend: the gate's verdict, the folder on the receipt, the daily cap's refusal, the usage
+  row that sums every attempt, and the reviewer that must not exist. The source-text assertions
+  that stood in for those are gone — one of them used to pass with the line **commented out**,
+  because the substring was still in the file.
 
 - **The `rejected` outcome was never wired to anything.** Added in the previous release together
   with its dispatch status, its engine branch and its tests — and the one line that FEEDS it was
