@@ -234,6 +234,30 @@ You could not choose which model answered you. The endpoint accepted one all alo
 
 ### Fixed — found by installing each release candidate and using it
 
+- **The model picker re-fetched its whole catalogue on every open.** Measured on a real install:
+  **2,136 ms** for a 94 KB network round trip, paid again every time the Settings screen opened, and
+  the only slow route in the app — the other 42 answered in under 220 ms. Cached for ten minutes,
+  which is far shorter than the rate at which a model catalogue changes and long enough that a
+  screen opened twice in a session is instant the second time.
+  Keyed on everything the answer depends on — the requested provider, the set of configured
+  providers, the API base and the default model — so a changed key or a changed default invalidates
+  it instead of being served the previous machine's list. Per app instance rather than a module
+  global: two installs pointed at different providers must not read each other's catalogue, and one
+  test must not inherit another's. Failures are cached too, exactly as the version check does: a
+  provider that is down already answers with its own reason, and re-asking it on every screen open
+  turns one slow answer into a burst of them.
+
+- **The folder of reverted work had no ceiling.** Every attempt a verify command rejects writes its
+  full diff to `discarded/`, which is what makes that work recoverable — and nothing ever removed
+  one. Measured: 3 files in one session, 7 eighteen hours later, ~2 KB each, growing forever. Small
+  today, and the shape nobody notices until it is a problem.
+  Bounded on BOTH axes — 500 files and 50 MB — because either alone can be defeated: a count alone
+  lets one enormous diff fill a disk, a size alone lets thousands of tiny ones fill an inode table.
+  Oldest first, deliberately: recovering work you were just doing is the whole point of the folder,
+  and a reverted attempt from last month is not something anyone comes back for. The path stays in
+  the old receipt after its file goes — a dangling pointer to work gone for months is a smaller
+  cost than a folder with no bound, and it is the only one of the two anyone can see.
+
 - **The `rejected` outcome was never wired to anything.** Added in the previous release together
   with its dispatch status, its engine branch and its tests — and the one line that FEEDS it was
   not changed. `run_job` still returned a bare answer string, which the dispatch reads as `ok`, so
