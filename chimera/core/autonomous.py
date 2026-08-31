@@ -316,6 +316,49 @@ class AutonomousResult:
 _JUDGE_DIFF_CHARS = 4000
 
 
+#: How much reverted work is kept, and it is a bound on BOTH axes because either alone can be
+#: defeated. A count alone lets one enormous diff fill a disk; a size alone lets thousands of tiny
+#: ones fill an inode table. Measured on a real install: 7 files in 18 hours at ~2 KB each, one per
+#: reverted attempt, growing forever — small today and unbounded, which is the shape nobody notices
+#: until it is a problem.
+_DISCARDED_MAX_FILES = 500
+_DISCARDED_MAX_BYTES = 50 * 1024 * 1024
+
+
+def _podar_descartados(pasta: Path) -> int:
+    """Keep the newest reverted diffs, drop the oldest, and return how many were dropped.
+
+    Oldest first, deliberately: recovering work you were just doing is the whole point of the
+    folder, and a reverted attempt from last month is not something anyone comes back for. The path
+    stays in the old receipt after its file goes — a dangling pointer to work gone for months is a
+    smaller cost than a folder with no ceiling, and it is the only one of the two anyone can see.
+
+    Best-effort like the write it follows: failing to prune must never be why a revert fails.
+    """
+    try:
+        arquivos = sorted(
+            (f for f in pasta.glob("*.diff") if f.is_file()), key=lambda f: f.stat().st_mtime
+        )
+        total = sum(f.stat().st_size for f in arquivos)
+    except OSError as exc:  # pragma: no cover - defensive
+        _log.debug("nao consegui listar os descartados para poda: %s", exc)
+        return 0
+    removidos = 0
+    for f in arquivos:
+        if len(arquivos) - removidos <= _DISCARDED_MAX_FILES and total <= _DISCARDED_MAX_BYTES:
+            break
+        try:
+            tamanho = f.stat().st_size
+            f.unlink()
+            total -= tamanho
+            removidos += 1
+        except OSError as exc:  # pragma: no cover - defensive
+            _log.debug("nao consegui remover %s: %s", f, exc)
+    if removidos:
+        _log.info("descartados: %d arquivo(s) antigo(s) removido(s)", removidos)
+    return removidos
+
+
 class AutonomousAgent:
     """Runs a task autonomously with planning, supervision and verify-or-revert."""
 
@@ -1397,6 +1440,7 @@ class AutonomousAgent:
                 corpo.append("")
             destino.write_text("\n".join(corpo), encoding="utf-8")
             _log.info("trabalho revertido guardado em %s", destino)
+            _podar_descartados(destino.parent)
             return str(destino)
         except Exception as exc:  # noqa: BLE001 — guardar nunca pode impedir reverter
             _log.warning("nao consegui guardar o trabalho revertido: %s", exc)

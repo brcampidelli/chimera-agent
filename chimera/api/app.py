@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
+import time
 import uuid
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
@@ -764,6 +765,15 @@ def build_api_app(
             "reason": found.reason,
         }
 
+    #: Answers to `/api/models`, by what the answer depends on. Per app instance rather than a
+    #: module global: a test builds its own app and must not inherit another test's catalogue.
+    _models_cache: dict[tuple[Any, ...], tuple[float, dict[str, Any]]] = {}
+    #: Ten minutes. The Settings screen fetches this on every open and the call is a 94 KB network
+    #: round trip — measured at 2.1 seconds, every time, on the only slow route in the app. Model
+    #: catalogues change on the order of weeks, so ten minutes is far shorter than the thing it is
+    #: caching and long enough that a screen opened twice in a session is instant the second time.
+    _MODELS_TTL = 600.0
+
     @app.get("/api/models", dependencies=[guard], response_model=ModelsOut)
     async def models_endpoint(provider: str | None = None) -> dict[str, Any]:
         """The models a request may name, so choosing one stops being a memory test.
@@ -783,6 +793,20 @@ def build_api_app(
         from chimera.providers.listing import available_models
 
         settings_now = live_settings()
+        # Everything the answer depends on, so a changed key or a changed default invalidates it
+        # rather than being served the previous machine's list. The keys are what decide WHICH
+        # catalogues are listed, and `default_model` rides in the payload — a cache keyed on the
+        # provider alone would keep showing the old default after someone changed it.
+        chave = (
+            provider or "",
+            tuple(sorted(settings_now.configured_providers())),
+            getattr(settings_now, "api_base", None),
+            settings_now.default_model,
+        )
+        agora = time.monotonic()
+        guardado = _models_cache.get(chave)
+        if guardado is not None and agora - guardado[0] < _MODELS_TTL:
+            return guardado[1]
 
         def resolve() -> dict[str, Any]:
             listing = available_models(settings_now, provider=provider)
@@ -793,7 +817,12 @@ def build_api_app(
                 "reason": listing.reason,
             }
 
-        return await asyncio.get_running_loop().run_in_executor(None, resolve)
+        resposta = await asyncio.get_running_loop().run_in_executor(None, resolve)
+        # Failures are cached too, exactly as the version check does: a provider that is down
+        # already answers with its own `reason`, and re-asking it on every screen open turns one
+        # slow answer into a burst of them.
+        _models_cache[chave] = (agora, resposta)
+        return resposta
 
     # --- Messaging: reach the user on Discord/Telegram, controlled from the UI --------------------
     @app.get("/api/messaging", dependencies=[guard], response_model=dict[str, MessagingPlatformOut])
