@@ -165,6 +165,49 @@ def test_the_scheduled_loop_is_given_the_folder_it_runs_in() -> None:
     )
 
 
+def _corpo_do_run_job() -> str:
+    """The source of the closure that actually runs a scheduled job.
+
+    Bounded to the function rather than searched across the file: `return result.answer` appears
+    elsewhere for a different command, and a whole-file search would find that one and report the
+    wiring as present while the scheduled path returned a bare string.
+    """
+    fonte = Path("chimera/cli/main.py").read_text(encoding="utf-8")
+    inicio = fonte.index("def run_job(job: CronJob)")
+    return fonte[inicio : fonte.index("def run_task(", inicio)]
+
+
+def test_the_scheduled_job_actually_reports_its_verdict() -> None:
+    """The half that shipped missing, and the reason it shipped missing.
+
+    ``JobOutcome``, the ``rejected`` status and the engine branch that records it were all added
+    together — and the one line that FEEDS them was not. A bare string is read as ``ok``, so a job
+    whose gate rejected every attempt and reverted every file still showed a green row. Measured
+    twice on a real install: once before the outcome type existed, and once after.
+
+    The tests that were supposed to cover it injected a ``JobOutcome`` straight into the dispatch,
+    which is every part of the path except the only place that produces one — a guard outside the
+    flow, wearing the name of the thing it was not checking.
+    """
+    corpo = _corpo_do_run_job()
+    linhas = [linha.strip() for linha in corpo.splitlines()]
+
+    assert "return result.answer" not in linhas, (
+        "the scheduled path returns a bare answer, which the dispatch reads as ok — the verdict "
+        "never reaches the schedule"
+    )
+    assert "return JobOutcome(result.answer, ok=bool(result.success))" in linhas
+
+
+def test_an_ungated_job_reports_no_verdict_at_all() -> None:
+    """Without a gate there is nothing that could reject the work, and ``success`` then reflects
+    gates this path does not run — reporting it would turn every ungated job into a failure."""
+    corpo = _corpo_do_run_job()
+
+    assert "if not gated:" in corpo
+    assert "return JobOutcome(result.answer)" in [linha.strip() for linha in corpo.splitlines()]
+
+
 def test_the_folder_comes_from_the_job_not_the_process() -> None:
     """`job_root` is the job's own folder falling back to the process root. Passing `workspace`
     (the process one) instead would attribute every scheduled run to whatever folder the daemon

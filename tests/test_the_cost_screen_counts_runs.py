@@ -160,6 +160,47 @@ def test_without_the_join_it_really_would_be_billed_twice(tmp_path: Path) -> Non
     assert round(sem_juncao["totals"]["usd"], 6) == 0.0217
 
 
+def test_a_scheduled_run_with_SEVERAL_attempts_is_counted_once(tmp_path: Path) -> None:
+    """The half the first join missed, in the exact shape it was measured.
+
+    A scheduled dispatch writes ONE usage row holding the total across every attempt, keyed by the
+    LAST attempt's id. Skipping only the matching attempt left the earlier ones to be added on top
+    of a total that already contained them: two attempts of $0.004247 and $0.006598 against a
+    $0.010845 row came out as $0.015092.
+    """
+    append_usage(tmp_path / "usage.jsonl", UsageRecord(
+        ts="2026-08-31T02:02:30+00:00", session_id="cron:8e9681d2:e0e62070", model="m",
+        usd=0.010845,
+    ))
+    turnos = load_usage(tmp_path / "usage.jsonl")
+    runs = _write_runs(tmp_path, _run_row(
+        run_id="0c2854db", usd=0.004247,
+        extra_attempts=[{"index": 2, "run_id": "e0e62070", "model": "m",
+                         "prompt_tokens": 10, "completion_tokens": 1, "usd": 0.006598}],
+    ))
+
+    summary = summarize_usage(turnos + usage_from_runs(runs, already=_already_counted(turnos)))
+
+    assert summary["totals"]["turns"] == 1, "an earlier attempt was added on top of its own total"
+    assert round(summary["totals"]["usd"], 6) == 0.010845
+
+
+def test_a_run_none_of_whose_attempts_are_counted_survives_whole(tmp_path: Path) -> None:
+    """The control for the rule above: skipping the WHOLE run is right only when the run is
+    already counted. A run the usage log has never seen must keep every attempt."""
+    turnos = load_usage(tmp_path / "usage.jsonl")
+    runs = _write_runs(tmp_path, _run_row(
+        run_id="aaa", usd=0.01,
+        extra_attempts=[{"index": 2, "run_id": "bbb", "model": "m",
+                         "prompt_tokens": 10, "completion_tokens": 1, "usd": 0.02}],
+    ))
+
+    summary = summarize_usage(turnos + usage_from_runs(runs, already=_already_counted(turnos)))
+
+    assert summary["totals"]["turns"] == 2
+    assert round(summary["totals"]["usd"], 6) == 0.03
+
+
 def test_a_bare_chat_session_is_never_read_as_a_run_id(tmp_path: Path) -> None:
     """The dangerous direction. A chat turn writes a bare 32-hex session id and no receipt; reading
     one as a run id would silently DROP a real charge, and under-counting money must never happen
