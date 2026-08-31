@@ -278,6 +278,26 @@ You could not choose which model answered you. The endpoint accepted one all alo
   is a field on the Settings screen and the failure names it (*"nothing answered at
   http://127.0.0.1:11434"*), so it explains its own fix. **A value you already set is untouched**:
   a default is what applies when nothing was chosen, whether it came from `.env` or the screen.
+- **A file whose accents arrived as `u00ed` instead of `í` now gets refused.** A model writing
+  Portuguese prose emits an escape for each accented character. When the backslash does not survive
+  the trip, what lands is welded into the word — and *nothing downstream notices*, because the file
+  is still valid UTF-8, still valid HTML, and every check passes. A person opens the page and reads
+  **Utensu00edlios**.
+  Found by using the app, not by reading it. An agent built a marketplace in one run: four files,
+  three carrying their accents correctly and the fourth with **zero** accented characters and 23
+  orphan sequences. The verify command passed and the diff gate accepted the work.
+  `write_file` already refuses a full overwrite that does not parse — `.py` by AST, `.json` by
+  `json.loads`, with `allow_invalid` as the way past. This is the same idea for a defect no parser
+  can see, and it needs **two** conditions, since either alone misfires: three or more orphan
+  sequences, and *fewer real non-ASCII characters than orphans* — the signal is not that escapes
+  appear, it is that they appear **instead of** what they encode.
+  The narrowing was measured, not reasoned. A first version accepted any code point of a textual
+  Unicode category and fired on **79 of 32,655 files in this repository**, because `succeeded`
+  contains `uccee`, those are all hex digits, and U+CCEE is a CJK ideograph. Restricted to the
+  ranges a lost backslash plausibly produces in Latin-script text: **0 of 33,066**, with the real
+  defect still caught. `succeeded` is now a test, with the reason written down.
+  Its own message, deliberately — the content parses, so reporting it as "not valid html" would
+  name the wrong problem and send the next attempt hunting a syntax error that is not there.
 - **The folder of reverted work had no ceiling.** Every attempt a verify command rejects writes its
   full diff to `discarded/`, which is what makes that work recoverable — and nothing ever removed
   one. Measured: 3 files in one session, 7 eighteen hours later, ~2 KB each, growing forever. Small
