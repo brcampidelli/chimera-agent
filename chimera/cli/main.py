@@ -4728,6 +4728,70 @@ def cron_disable(job_id: str = typer.Argument(..., help="The job id to disable."
     console.print(f"[green]disabled[/green] {job_id}")
 
 
+@cron_app.command("fire")
+def cron_fire(
+    event: str = typer.Argument(..., help="The event name to fire (as given to `cron add --event`)."),
+    model: str = typer.Option(None, "--model", "-m", help="Model for the dispatched jobs."),
+    max_steps: int = typer.Option(6, "--max-steps", help="Max tool-calling steps per job."),
+    workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root for tools."),
+) -> None:
+    """Run every job registered for an event.
+
+    Event jobs had no dispatcher. `cron add --event deploy` accepted the job and `cron list` showed
+    it enabled, but nothing in the package ever called `fire_event` — so the job simply never ran,
+    and its silence was indistinguishable from that of a job whose time had not come. The cron
+    trigger has the daemon and the webhook trigger has the webhook server; this is the third one's.
+
+    Meant to be called from wherever the event actually happens — a git hook, a deploy step, a CI
+    job. Dispatch is the same one the daemon uses, so a fired job behaves exactly like a scheduled
+    one: same agent, same spend caps, same receipt.
+    """
+    import time
+
+    from chimera.providers import LLMGateway
+    from chimera.scheduler import Scheduler, make_agent_dispatch
+    from chimera.scheduler.delivery import make_deliver
+    from chimera.scheduler.job_runner import make_run_job
+
+    scheduler = Scheduler(_cron_store())
+    if not scheduler.jobs_for_event(event):
+        # Louder than an empty run: a typo in an event name is the likeliest way to sit waiting for
+        # something that will never happen, and "0 jobs" printed in green reads like success.
+        console.print(f"[yellow]no enabled job registered for event {event!r}[/yellow]")
+        raise typer.Exit(code=1)
+
+    settings = get_settings()
+    run_job = make_run_job(
+        settings=settings,
+        backend=LLMGateway(),
+        workspace=Path(workspace).resolve(),
+        model=model,
+        max_steps=max_steps,
+        usage_path=settings.home / "usage.jsonl",
+        warn=lambda linha: console.print(f"[yellow]{linha}[/yellow]"),
+    )
+    # Through `make_agent_dispatch`, not straight to `fire_event`. It is what turns a `JobOutcome`
+    # into the status the scheduler records — so a gate that rejected the work reads as `rejected`
+    # rather than as success — and it is where delivery happens. Without it a fired job would run,
+    # be recorded as ok whatever its gate said, and deliver nothing: a second dispatch path that
+    # quietly behaves differently from the daemon's is worse than no second path.
+    def _sem_job(_task: str) -> str:  # pragma: no cover - unreachable while run_job is given
+        raise AssertionError("cron fire always has the job; run_task should never be reached")
+
+    deliver = make_deliver(
+        settings.home / "scheduler" / "cron_results.jsonl",
+        warn=lambda linha: console.print(f"[yellow]{linha}[/yellow]"),
+    )
+    ran = scheduler.fire_event(
+        event, time.time(), make_agent_dispatch(_sem_job, deliver, run_job=run_job)
+    )
+    for job in ran:
+        cor = "green" if job.last_status == "ok" else "red"
+        console.print(f"[{cor}]{job.last_status}[/{cor}] {job.name} ({job.id})")
+        if job.last_error:
+            console.print(f"  {job.last_error}")
+
+
 @cron_app.command("learn")
 def cron_learn(
     min_occurrences: int = typer.Option(3, "--min", help="Min repeats to propose."),

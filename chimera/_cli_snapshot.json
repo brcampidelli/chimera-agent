@@ -1075,6 +1075,59 @@
         },
         {
           "deprecated": false,
+          "help": "Run every job registered for an event.\n\nEvent jobs had no dispatcher. `cron add --event deploy` accepted the job and `cron list` showed\nit enabled, but nothing in the package ever called `fire_event` \u2014 so the job simply never ran,\nand its silence was indistinguishable from that of a job whose time had not come. The cron\ntrigger has the daemon and the webhook trigger has the webhook server; this is the third one's.\n\nMeant to be called from wherever the event actually happens \u2014 a git hook, a deploy step, a CI\njob. Dispatch is the same one the daemon uses, so a fired job behaves exactly like a scheduled\none: same agent, same spend caps, same receipt.",
+          "hidden": false,
+          "name": "fire",
+          "params": [
+            {
+              "help": "The event name to fire (as given to `cron add --event`).",
+              "kind": "argument",
+              "name": "event",
+              "opts": [
+                "event"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "Model for the dispatched jobs.",
+              "kind": "option",
+              "name": "model",
+              "opts": [
+                "--model",
+                "-m"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "default": "6",
+              "help": "Max tool-calling steps per job.",
+              "kind": "option",
+              "name": "max_steps",
+              "opts": [
+                "--max-steps"
+              ],
+              "required": false,
+              "type": "int"
+            },
+            {
+              "default": "'.'",
+              "help": "Workspace root for tools.",
+              "kind": "option",
+              "name": "workspace",
+              "opts": [
+                "--workspace",
+                "-w"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "cron fire"
+        },
+        {
+          "deprecated": false,
           "help": "Propose crons from recurring tasks and create the ones you confirm.\n\nEach proposal is shown for explicit confirmation (the human-in-the-loop approval\nthat keeps automation creation under control); confirmed jobs are validated and\ncreated enabled. ``--yes`` confirms all (use deliberately).",
           "hidden": false,
           "name": "learn",

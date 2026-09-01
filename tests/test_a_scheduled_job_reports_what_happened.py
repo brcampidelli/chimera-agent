@@ -45,8 +45,13 @@ def _depois(sched: Scheduler, dispatch: Any) -> CronJob:
 
     Read back rather than kept: the scheduler works on instances it loads from the store, so a
     local `CronJob` is a different object and would still hold the state from before the tick.
+
+    The due time is read from the job, not written as 60.0. Schedules carry a per-job offset now,
+    so a `* * * * *` job is due a few seconds past the minute — and the guard below is what turned
+    that into a legible failure instead of six tests quietly measuring nothing.
     """
-    ran = sched.run_due(60.0, dispatch)
+    devido = (sched.store.list()[0].next_run or 0.0) + 1
+    ran = sched.run_due(devido, dispatch)
     assert ran, "the job was not due, so nothing here is measuring a dispatch"
     return sched.store.list()[0]
 
