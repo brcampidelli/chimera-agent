@@ -28,7 +28,7 @@ import pytest
 
 pytest.importorskip("croniter")
 
-from chimera.scheduler.engine import Scheduler  # noqa: E402
+from chimera.scheduler.engine import FAIL_LIMIT, Scheduler  # noqa: E402
 from chimera.scheduler.models import CronJob  # noqa: E402
 from chimera.scheduler.store import CronStore  # noqa: E402
 
@@ -197,9 +197,15 @@ def test_the_latest_comes_first(tmp_path: Path) -> None:
 def test_a_job_that_ran_and_failed_every_time_is_not_overdue_but_is_failing(tmp_path: Path) -> None:
     """The pair that is the whole point.
 
-    This job is dispatched on time, forever, and has never once succeeded. `overdue` says nothing —
-    correctly, the schedule is being honoured — and it is exactly the job somebody needs to hear
-    about. The two questions do not overlap and neither one alone is enough.
+    This job is dispatched on time and has never once succeeded. `overdue` says nothing — correctly,
+    the schedule is being honoured — and it is exactly the job somebody needs to hear about. The two
+    questions do not overlap and neither one alone is enough.
+
+    Written as "forever" and asserting twenty-four straight failures. That world no longer exists:
+    the failure brake switches a job off at `FAIL_LIMIT`, so the fifth dispatch is the last one. The
+    point survives the change and gets sharper — a braked job is STILL in `failing()`, and that is
+    the exception `disabled_by` exists for. Filtering the report on `enabled` alone would have made
+    the brake hide its own findings in the one place someone looks for them.
     """
     sched = _scheduler(tmp_path)
     job = _hourly(sched, "brief", 0.0)
@@ -212,10 +218,11 @@ def test_a_job_that_ran_and_failed_every_time_is_not_overdue_but_is_failing(tmp_
         agora = sched.store.get(job.id).next_run or agora
         sched.run_due(agora, explode)
 
+    parado = sched.store.get(job.id)
     assert sched.overdue(agora + 60, grace=HOUR) == [], "the schedule was honoured"
-    falhando = sched.failing(at_least=5)
-    assert [j.id for j in falhando] == [job.id]
-    assert sched.store.get(job.id).consecutive_failures == 24
+    assert [j.id for j in sched.failing(at_least=5)] == [job.id], "a braked job is still reported"
+    assert parado.consecutive_failures == FAIL_LIMIT
+    assert parado.enabled is False and parado.disabled_by == "brake"
 
 
 def test_a_healthy_job_is_in_neither_list(tmp_path: Path) -> None:

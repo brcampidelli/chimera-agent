@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 from uuid import uuid4
 
+from chimera.core.state_format import report
 from chimera.scheduler.models import CronJob
 from chimera.telemetry import get_logger
 
@@ -20,6 +21,10 @@ class CronStore:
         self.path = Path(path)
         self._jobs: dict[str, CronJob] = {}
         self._mtime: float | None = None
+        #: True when the file exists and NOTHING in it validated — a format from another version
+        #: rather than a corrupt file. A stale store refuses to write, because it does not know what
+        #: the file holds and this one is read by a daemon and rewritten by the next mutation.
+        self.stale = False
         self.load()
 
     def _read_disk(self) -> dict[str, CronJob] | None:
@@ -39,13 +44,23 @@ class CronStore:
             _log.warning("cron store root is not a JSON list, keeping current jobs")
             return None
         jobs: dict[str, CronJob] = {}
+        pulados = 0
         for item in raw:
             try:
                 job = CronJob.model_validate(item)
             except ValueError as exc:
-                _log.warning("skipping malformed cron entry: %s", exc)
+                _log.debug("malformed cron entry: %s", exc)
+                pulados += 1
                 continue
             jobs[job.id] = job
+        # Every entry rejected is a file written by another version, not a corrupt one — and `None`
+        # is already this method's word for "could not read it", which `load` handles by keeping
+        # what it has. Returning `{}` instead put an empty crontab in memory, and the next `add` or
+        # `remove` wrote that emptiness to disk. On the daemon that happens within a minute.
+        if report(kept=len(jobs), skipped=pulados, what="cron entry", path=self.path):
+            self.stale = True
+            return None
+        self.stale = False
         return jobs
 
     def load(self) -> None:
@@ -93,6 +108,14 @@ class CronStore:
             self._jobs.setdefault(jid, job)  # only ADD unknown jobs; never clobber our own updates
 
     def save(self) -> None:
+        if self.stale:
+            # Refused, loudly. A store that could not read the file does not know what the file
+            # holds, and writing what it thinks it holds is how an upgrade empties a crontab.
+            _log.error(
+                "refusing to write %s: it was not read successfully (a format from another version)",
+                self.path,
+            )
+            return
         self.path.parent.mkdir(parents=True, exist_ok=True)
         data = [job.model_dump() for job in self._jobs.values()]
         # Atomic write (unique temp + replace): the crontab is safety-critical — a plain write_text

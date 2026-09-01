@@ -209,4 +209,32 @@ def resolve_host_exec_confirm(
     # posture == "ask" (or anything unrecognised → treat as ask, the safe default)
     if interactive is None:
         interactive = _human_can_answer()
-    return _prompt if interactive else _make_headless_deny()
+    return _skip_what_only_reads(_prompt if interactive else _make_headless_deny())
+
+
+def _skip_what_only_reads(ask: HostExecConfirm) -> HostExecConfirm:
+    """Approve a command that can be PROVED to change nothing, without asking.
+
+    Only under ``ask``. ``deny`` means no host execution at all and stays absolute — somebody who
+    set it did not ask for a list of exceptions.
+
+    The reason this is worth a module: `ask` prompted for `ls` and `git status` exactly as it
+    prompts for `rm -rf /`, which in a working session is dozens of questions an hour about commands
+    that cannot change anything. The only outlet that pressure has is
+    ``CHIMERA_HOST_EXEC=allow`` — and a gate people switch off protects nothing. Asking too often is
+    not the cautious failure it looks like.
+
+    The classifier is an allowlist that refuses on any doubt, so a wrong answer here is a prompt,
+    never an execution. It does not replace `policy.py`: that one still sees every command,
+    including these.
+    """
+
+    def confirm(command: str) -> bool:
+        from chimera.tools.readonly import is_provably_readonly
+
+        if is_provably_readonly(command):
+            _log.debug("host-exec: %s reads only; not asking", command[:120])
+            return True
+        return ask(command)
+
+    return confirm

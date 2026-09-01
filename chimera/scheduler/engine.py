@@ -7,6 +7,7 @@ A separate runner (CLI/daemon) supplies the real clock.
 
 from __future__ import annotations
 
+import hashlib
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -20,6 +21,46 @@ from chimera.scheduler.store import CronStore
 from chimera.telemetry import get_logger
 
 _log = get_logger("scheduler.engine")
+
+#: Consecutive failures after which a job is switched off.
+#:
+#: The counter was already exact — ``_record`` deliberately excludes a budget refusal, because the
+#: job never ran — and nothing acted on it: ``disable()`` had two callers and both are a person.
+#: So a job that started failing at 02:00 kept firing every tick until somebody read a table. The
+#: daily spend cap bounds the money but is the wrong instrument: it stops after paying, not on
+#: detecting.
+#:
+#: Five rather than two: a provider hiccup is not a broken job, and switching one off for a
+#: transient error is its own outage. This is a brake and not a delete — ``last_status``,
+#: ``last_error`` and the counter all survive, and ``cron enable`` puts the job back.
+FAIL_LIMIT = 5
+
+#: Share of a schedule's own interval that a job may be delayed, and the ceiling on that delay.
+#:
+#: Bounded twice on purpose. The fraction keeps a job written ``* * * * *`` from sliding past the
+#: next minute — an offset larger than the interval does not make a job late, it silently makes it
+#: a two-minute job. The absolute cap keeps a daily job from inheriting a tenth of a day: "every
+#: morning · 7h" firing at half past nine is a different promise from the one the screen made.
+JITTER_FRAC = 0.1
+JITTER_CAP_S = 300.0
+
+
+def _jitter(key: str, period: float) -> float:
+    """A stable offset in ``[0, min(JITTER_FRAC * period, JITTER_CAP_S))`` derived from ``key``.
+
+    Derived, not drawn. A random offset is redrawn on every restart, so the spread a deployment
+    converged on is lost each time the container comes up, and two jobs that happened to collide
+    keep colliding on a new pair of numbers. A hash of the id gives the same job the same slot
+    forever and different jobs different slots, with nothing stored.
+
+    An empty key means no offset, which is what keeps every caller that does not ask for a spread
+    on exactly the arithmetic it had.
+    """
+    if not key or period <= 0:
+        return 0.0
+    span = min(JITTER_FRAC * period, JITTER_CAP_S)
+    fraction = int(hashlib.sha256(key.encode("utf-8")).hexdigest()[:8], 16) / 0x1_0000_0000
+    return fraction * span
 
 
 def _dispatch_bounded(
@@ -39,7 +80,7 @@ def _dispatch_bounded(
     return call_with_deadline(lambda: dispatch(job), timeout)
 
 
-def _next_after(cron_expr: str, after_epoch: float) -> float:
+def _next_after(cron_expr: str, after_epoch: float, *, jitter_key: str = "") -> float:
     """The next epoch matching ``cron_expr``, read in the machine's own time zone.
 
     ``0 7 * * *`` means seven in the morning where the machine is, which is what every crontab has
@@ -55,16 +96,59 @@ def _next_after(cron_expr: str, after_epoch: float) -> float:
     local offset of a pre-1970 instant raises ``OSError: [Errno 22]``. The scheduler's own tests
     pass ``now=60``, so the naive form took the whole Windows suite down — on Linux and on WSL it is
     fine, which is why it reached CI. An aware datetime converts by arithmetic and never asks.
+
+    ``jitter_key`` spreads jobs that share a boundary. Dispatch is sequential, so fifteen jobs
+    written ``0 * * * *`` do not merely run slowly at ``:00`` — they delay every later tick behind
+    them. The offset only ever DELAYS, and is bounded by the schedule's own interval (see
+    :func:`_jitter`); an empty key returns the exact boundary, unchanged.
     """
     base = datetime.fromtimestamp(after_epoch, tz=UTC).astimezone()
-    return float(croniter(cron_expr, base).get_next(float))
+    ticker = croniter(cron_expr, base)
+    nxt = float(ticker.get_next(float))
+    if not jitter_key:
+        return nxt
+    # The interval is measured from the schedule itself rather than assumed, so `*/5` and `0 7 * * *`
+    # each get an offset proportional to what they actually promise.
+    period = float(ticker.get_next(float)) - nxt
+    return nxt + _jitter(jitter_key, period)
 
 
 class Scheduler:
     """Creates, lists and dispatches scheduled jobs over a :class:`CronStore`."""
 
-    def __init__(self, store: CronStore) -> None:
+    def __init__(
+        self, store: CronStore, *, fail_limit: int = FAIL_LIMIT, jitter: bool = True
+    ) -> None:
+        if fail_limit < 1:
+            # A limit of zero switches off a job that has never failed, which reads as "the
+            # scheduler is broken" to everyone. Refusing here is louder than a job that vanishes on
+            # its first tick.
+            raise ValueError(f"fail_limit must be at least 1, got {fail_limit}")
         self.store = store
+        self.fail_limit = fail_limit
+        #: Off for a caller that needs the exact boundary — a market open, a report due at midnight.
+        #: A spread that cannot be switched off is a spread people work around.
+        self.jitter = jitter
+
+    def _jitter_key(self, job: CronJob) -> str:
+        return job.id if self.jitter else ""
+
+    def _brake(self, job: CronJob) -> None:
+        """Switch a job off once it has failed ``fail_limit`` times in a row.
+
+        Called after the outcome is recorded, on every dispatch path. No delivery from here: the
+        engine takes no clock and no I/O, and the decision is visible everywhere the counter already
+        is — ``cron list``, ``cron doctor`` and ``/api/features`` all read this job.
+        """
+        if not job.enabled or job.consecutive_failures < self.fail_limit:
+            return
+        job.enabled = False
+        job.disabled_by = "brake"
+        _log.error(
+            "cron job %s (%s) switched off after %d consecutive failures; last error: %s",
+            job.name, job.id, job.consecutive_failures, job.last_error or "(none recorded)",
+        )
+        self.store.add(job)
 
     def schedule_cron(
         self,
@@ -91,8 +175,11 @@ class Scheduler:
         """
         if not croniter.is_valid(cron_expr):
             raise ValueError(f"invalid cron expression: {cron_expr!r}")
+        # Minted before the job, because the job's own id is what its schedule offset is derived
+        # from — the first `next_run` has to land in the same slot every later one will.
+        job_id = uuid.uuid4().hex[:8]
         job = CronJob(
-            id=uuid.uuid4().hex[:8],
+            id=job_id,
             name=name,
             trigger="cron",
             schedule=cron_expr,
@@ -101,7 +188,7 @@ class Scheduler:
             # Defend the "self-learned crons start disabled" invariant at the boundary, not just in
             # the learner: an agent-created cron must not fire until a human enables it.
             enabled=created_by != "agent",
-            next_run=_next_after(cron_expr, now),
+            next_run=_next_after(cron_expr, now, jitter_key=job_id if self.jitter else ""),
             workspace=workspace,
             deliver_to=deliver_to,
             verify=verify,
@@ -248,11 +335,18 @@ class Scheduler:
         is recent, the daemon is alive, the schedule is advancing — and every dispatch has lost.
         Told apart from :meth:`overdue` because the responses have nothing in common: one says look
         at the daemon, the other says look at the job.
+
+        A job the brake switched off is still reported, and that exception is the whole reason
+        ``disabled_by`` exists. Filtering on ``enabled`` alone would make the brake hide its own
+        findings in the one place someone goes to look for them: the most broken job on the machine
+        would be the only one missing from the list of broken jobs. A job a PERSON paused stays out
+        — they know.
         """
         return [
             job
             for job in self.store.list()
-            if job.enabled and job.consecutive_failures >= at_least
+            if (job.enabled or job.disabled_by == "brake")
+            and job.consecutive_failures >= at_least
         ]
 
     def jobs_for_event(self, event: str) -> list[CronJob]:
@@ -267,21 +361,30 @@ class Scheduler:
         """Enable a job; for cron jobs, (re)compute the next run from ``now``."""
         job = self.store.get(job_id)
         job.enabled = True
+        # The counter is cleared here and only here: re-enabling is somebody saying they dealt with
+        # the cause, and leaving it at the limit would switch the job off again on its next failure
+        # rather than after five — turning the brake into a one-strike rule for anything it has
+        # ever caught.
+        job.consecutive_failures = 0
+        job.disabled_by = ""
         if job.trigger == "cron":
-            job.next_run = _next_after(job.schedule, now)
+            job.next_run = _next_after(job.schedule, now, jitter_key=self._jitter_key(job))
         self.store.add(job)
         return job
 
     def disable(self, job_id: str) -> CronJob:
+        """Switch a job off by hand. Recorded as a human decision, so `failing()` stays quiet about
+        it — the person who paused it does not need a report telling them it is paused."""
         job = self.store.get(job_id)
         job.enabled = False
+        job.disabled_by = "human"
         self.store.add(job)
         return job
 
     def mark_ran(self, job: CronJob, now: float) -> None:
         job.last_run = now
         if job.trigger == "cron":
-            job.next_run = _next_after(job.schedule, now)
+            job.next_run = _next_after(job.schedule, now, jitter_key=self._jitter_key(job))
         self.store.add(job)
 
     def run_due(
@@ -335,6 +438,7 @@ class Scheduler:
                 _log.warning("cron job %s failed: %s", job.id, exc)
                 self._record(job, "error", f"{type(exc).__name__}: {exc}")
             self.mark_ran(job, now)
+            self._brake(job)
             ran.append(job)
         return ran
 
@@ -352,13 +456,32 @@ class Scheduler:
             job.consecutive_failures += 1
 
     def fire_event(self, event: str, now: float, dispatch: Callable[[CronJob], DispatchStatus | None]) -> list[CronJob]:
-        """Dispatch every job registered for ``event``. Returns those run."""
+        """Dispatch every job registered for ``event``. Returns those run.
+
+        Records the outcome, exactly as the cron path does. It used to swallow it: a bare
+        ``try/except`` around the dispatch and a log line, with no ``_record``. So an event job's
+        failures never touched ``last_status``, ``last_error`` or ``consecutive_failures`` — it
+        reported as healthy forever, which is the state the cron path's own comment says made a job
+        that had failed every tick for a month look fine, and the failure brake reads that counter.
+        """
         ran: list[CronJob] = []
         for job in self.jobs_for_event(event):
             try:
-                dispatch(job)
-            except Exception as exc:
+                veredito = dispatch(job)
+                if veredito == "rejected":
+                    self._record(
+                        job, "rejected",
+                        "the job ran and its verify command rejected the work, which was reverted",
+                    )
+                else:
+                    self._record(job, veredito or "ok", None)
+            except BudgetExceeded as exc:
+                _log.warning("event job %s refused on budget: %s", job.name, exc)
+                self._record(job, "budget", str(exc))
+            except Exception as exc:  # a failing job must not break the dispatcher
                 _log.warning("event job %s failed: %s", job.id, exc)
+                self._record(job, "error", f"{type(exc).__name__}: {exc}")
             self.mark_ran(job, now)
+            self._brake(job)
             ran.append(job)
         return ran

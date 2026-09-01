@@ -20,6 +20,7 @@ instead of an error.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sqlite3
@@ -160,13 +161,24 @@ class ChunkStore:
         self._conn.commit()
         return len(rows)
 
-    def embed_missing(self, embed: EmbedFn, *, limit: int = 100_000) -> int:
+    def embed_missing(self, embed: EmbedFn, *, limit: int = 100_000, embedder: str = "") -> int:
         """Embed the chunks that have no vector yet. Returns how many were embedded.
 
         Resumable by construction: a run that dies halfway leaves the vectors it wrote, and the next
         call picks up the rest. Nothing here retries a failed batch — a provider that is down should
         surface as "some chunks are not embedded" rather than as a loop nobody can stop.
+
+        ``embedder`` names the model producing the vectors, and changing it invalidates every vector
+        already stored. Nothing detected that: `embed_missing` only touches `WHERE vector IS NULL`,
+        so old vectors of the old dimension stayed forever; `_cosine` returns 0.0 when the lengths
+        differ, the `score > 0` filter then drops every one of them, and `stats()` kept counting
+        them as embedded. The index reported healthy and returned nothing. The `meta` table this
+        checks against existed with three accessors and no callers.
         """
+        # BEFORE selecting what is pending. Checking after the first batch does nothing in the
+        # case that matters — an index that is fully embedded has no pending rows, so the loop never
+        # runs and the stale vectors stay stale forever.
+        self._align_embedder(embed, embedder)
         pending = self._conn.execute(
             "SELECT ident, text FROM chunks WHERE vector IS NULL LIMIT ?", (limit,)
         ).fetchall()
@@ -175,6 +187,8 @@ class ChunkStore:
             batch = pending[start : start + EMBED_BATCH]
             try:
                 vectors = embed([row["text"] for row in batch])
+                if start == 0 and vectors and embedder:
+                    self._record_embedder(embedder, len(vectors[0]))
             except Exception as exc:  # noqa: BLE001 — a dead embedder is a degraded index, not a crash
                 _log.warning("embedding failed after %d chunks: %s", done, exc)
                 break
@@ -188,6 +202,48 @@ class ChunkStore:
             self._conn.commit()
             done += len(batch)
         return done
+
+    def _record_embedder(self, embedder: str, dimension: int) -> None:
+        """Store the signature of whatever produced the vectors now in the table."""
+        self.set_meta("embedder", f"{embedder}:{dimension}")
+
+    def _align_embedder(self, embed: EmbedFn, embedder: str) -> None:
+        """Drop every stored vector when the embedder that would produce them has changed.
+
+        Derived artefacts are not migrated, they are rebuilt: there is no conversion from one
+        model's vector space to another's. Keeping the old ones costs a silent, permanent recall
+        failure — `_cosine` returns 0.0 on a length mismatch, the `score > 0` filter drops them all,
+        and `stats()` goes on counting them as embedded. Dropping them costs one re-embed, in the
+        log, which is the honest price of changing embedder.
+
+        The signature is name AND dimension, so a provider that resizes a model under the same slug
+        is caught too — the case nobody would think to look for. Learning the dimension costs one
+        embed of one short string, and only when a signature was already recorded: an index built
+        before this field existed has no signature and is left exactly as it is, because treating an
+        unknown as a mismatch would throw away every existing index on upgrade.
+        """
+        anterior = self.get_meta("embedder")
+        if not embedder or not anterior:
+            return
+        try:
+            sonda = embed(["x"])
+        except Exception as exc:  # noqa: BLE001 — a dead embedder must not empty the index
+            _log.warning("could not check the embedder signature: %s", exc)
+            return
+        if not sonda:
+            return
+        assinatura = f"{embedder}:{len(sonda[0])}"
+        if anterior == assinatura:
+            return
+        apagados = self._conn.execute(
+            "UPDATE chunks SET vector = NULL WHERE vector IS NOT NULL"
+        ).rowcount
+        self._conn.commit()
+        _log.warning(
+            "embedder changed (%s -> %s); dropped %d vectors, they will be rebuilt",
+            anterior, assinatura, apagados,
+        )
+        self.set_meta("embedder", assinatura)
 
     def set_meta(self, key: str, value: str) -> None:
         self._conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", (key, value))
@@ -293,8 +349,15 @@ def default_index_path(home: Path, workspace: Path) -> Path:
 
     Not inside the workspace: an index file in someone's repository is a file they have to gitignore
     and a diff they have to explain, for a cache they did not ask to store there.
+
+    The digest is a real hash, not the builtin. ``hash()`` of a ``str`` is salted per process, so
+    this returned a DIFFERENT filename in every interpreter — and each `chimera find` is a new one.
+    The index was therefore never found: every run built a fresh empty database, re-embedded the
+    whole corpus, and left the last one on disk as a file nothing would open again. Nothing errored;
+    the command worked every time, by doing all of the work every time.
     """
-    digest = str(abs(hash(str(Path(workspace).resolve()))))[:16]
+    key = str(Path(workspace).resolve())
+    digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
     return Path(home) / "rag" / f"{Path(workspace).name}-{digest}.sqlite3"
 
 

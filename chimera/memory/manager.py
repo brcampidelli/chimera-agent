@@ -9,9 +9,11 @@ memory-merge (which must never overwrite existing history blindly).
 from __future__ import annotations
 
 import re
+import time
 import uuid
 from collections.abc import Callable
 
+from chimera.core.redact import redact
 from chimera.memory.models import EVERY_PROJECT, MemoryItem, MemoryKind
 from chimera.memory.semantic import EmbedFn, SemanticIndex
 from chimera.memory.store import MemoryBackend
@@ -27,8 +29,18 @@ def _normalize(text: str) -> str:
 class MemoryManager:
     """Curates a :class:`MemoryStore`."""
 
-    def __init__(self, store: MemoryBackend, *, embed: EmbedFn | None = None) -> None:
+    def __init__(
+        self,
+        store: MemoryBackend,
+        *,
+        embed: EmbedFn | None = None,
+        clock: Callable[[], float] = time.time,
+    ) -> None:
         self.store = store
+        #: Injected so a test can write a fact at a chosen time. `failover.py` takes its clock the
+        #: same way, and for the same reason: a timestamp nothing can control is a timestamp nothing
+        #: can assert.
+        self._clock = clock
         # Opt-in semantic recall: when an embedder is supplied, ``search`` ranks by cosine
         # similarity (bridges paraphrases keyword search can't). Absent/failing embedder ->
         # the keyword/FTS path always remains as a fallback.
@@ -61,6 +73,7 @@ class MemoryManager:
             source=source,
             provenance=provenance,
             project=project,
+            created_at=self._clock(),
         )
         self.store.add(item)
         return item
@@ -100,6 +113,16 @@ class MemoryManager:
         from a tainted run also taints the stored item (poison must not launder itself
         into a previously clean fact).
         """
+        # Masked BEFORE the duplicate check, not after: the same fact written twice differs before
+        # masking and matches after, so redacting later would store it twice. And masked here rather
+        # than at the two call sites — `ChatSession` and the desktop turn both parse "remember
+        # that …" and hand the text over, and the next writer would be one forgotten call from the
+        # same hole.
+        #
+        # Memory is the surface with the longest reach: a fact written today is read back into the
+        # system prompt of every matching conversation from now on, and nothing re-reads it to
+        # notice. `redact` is narrow on purpose, which matters more here than anywhere else.
+        content = redact(content)
         duplicate = self._find_duplicate(content, key)
         if duplicate is None:
             return "ADD", self.add(

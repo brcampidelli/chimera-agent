@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Protocol
 
 from chimera.core.filelock import atomic_write_text, exclusively, read_text
+from chimera.core.state_format import report
 from chimera.memory.models import MemoryItem, MemoryKind
 from chimera.telemetry import get_logger
 
@@ -50,6 +51,8 @@ class MemoryStore:
         # processes) are serialised by the file lock instead — always taken second, so the ordering
         # is consistent and there is no cycle to deadlock on.
         self._lock = threading.RLock()
+        #: True when the file exists and NOTHING in it validated — see :mod:`chimera.core.state_format`.
+        self.stale = False
         self.load()
 
     def load(self) -> None:
@@ -71,18 +74,34 @@ class MemoryStore:
         if not isinstance(raw, list):
             _log.warning("memory store at %s is not a list; ignoring", self.path)
             return
+        pulados = 0
         for item in raw:
             # Skip a single malformed record (hand-edit, schema drift, truncated last object) instead
             # of aborting the whole load — one bad entry must not lose every other memory.
             try:
                 obj = MemoryItem.model_validate(item)
             except ValueError as exc:
-                _log.warning("skipping malformed memory record: %s", exc)
+                _log.debug("malformed memory record: %s", exc)
+                pulados += 1
                 continue
             self._items[obj.id] = obj
+        # All of them rejected is a file from another version, and this store is rewritten in full on
+        # every add. Refusing to write is the difference between "these facts did not load" and
+        # "these facts are gone".
+        self.stale = report(
+            kept=len(self._items), skipped=pulados, what="memory record", path=self.path
+        )
 
     def _write(self) -> None:
         """Serialise the current items to disk atomically. Assumes the caller holds the locks."""
+        if self.stale:
+            # A store that could not read the file does not know what the file holds. Writing what
+            # it thinks it holds turns "these facts did not load" into "these facts are gone".
+            _log.error(
+                "refusing to write %s: it was not read successfully (a format from another version)",
+                self.path,
+            )
+            return
         data = [item.model_dump() for item in self._items.values()]
         atomic_write_text(self.path, json.dumps(data, indent=2))
 

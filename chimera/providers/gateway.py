@@ -30,6 +30,7 @@ from chimera.providers.failover import (
     RecoveryAction,
     action_for,
     classify,
+    trace_of,
 )
 from chimera.providers.prompt_cache import apply_cache_control
 from chimera.providers.thinking import ThinkFilter, strip_think
@@ -116,6 +117,22 @@ class CompletionResult(BaseModel):
     """Prompt-cache HITS the provider reported (billed at the read rate). None = unknown."""
     cache_write_tokens: int | None = None
     """Prompt-cache WRITES the provider reported (billed at the write rate). None = unknown."""
+    finish_reason: str = ""
+    """Why the provider stopped generating, verbatim: ``stop`` | ``length`` | ``tool_calls`` | …
+
+    Empty means the provider reported nothing, which is NOT the same as "it finished" — the same
+    three-state rule ``cache_read_tokens`` follows two fields up. Nothing here read this field until
+    now, and a response cut off at the output ceiling therefore arrived 200 OK and indistinguishable
+    from a complete one."""
+
+    truncated: bool = False
+    """True when generation stopped because it ran out of room, rather than because it was done.
+
+    Its own field because the consequences are structural, not cosmetic: a cut response can carry a
+    half-written tool-call argument, or lose the call entirely — and the loop then blames the model
+    for an empty-argument failure, or for "describing a plan instead of acting", when the sentence
+    was severed mid-word."""
+
     route_meta: dict[str, Any] | None = Field(default=None, repr=False)
     """Optional per-call fusion/cascade trace (UI-ready JSON). None for a plain single-model call."""
     raw: dict[str, Any] | None = Field(default=None, repr=False)
@@ -150,7 +167,11 @@ def _to_message_dicts(messages: list[MessageLike]) -> list[dict[str, Any]]:
         if not images:
             # No images to fold in — but drop the key if it is present-and-empty, since no provider
             # knows it and an empty list is not worth a round trip's risk.
-            out.append({k: v for k, v in message.items() if k != "images"} if "images" in message else message)
+            out.append(
+                {k: v for k, v in message.items() if k != "images"}
+                if "images" in message
+                else message
+            )
             continue
         out.append(
             Message(
@@ -225,23 +246,32 @@ class CredentialRejectedError(MissingCredentialsError):
 def _credential_error(exc: BaseException) -> CredentialRejectedError | None:
     """Translate a spent-all-credentials failure into an actionable error, or ``None`` if unrelated.
 
-    Only AUTH and RATE_LIMIT qualify. Both mean "your credentials are the problem": a rejected key,
-    or one whose quota/credit is gone. Everything else (a provider outage, a bad model slug, a
-    context overflow) keeps its original exception, because the original text is the useful part.
+    Only AUTH, NO_CREDIT and RATE_LIMIT qualify. All three mean "your credentials are the problem":
+    a rejected key, an empty balance, or a quota that is gone for now. Everything else (a provider
+    outage, a bad model slug, a context overflow) keeps its original exception, because the original
+    text is the useful part.
+
+    NO_CREDIT is separate from RATE_LIMIT because the two sentences a person needs are different, and
+    the wrong one wastes their night: a rate limit resets on its own, an empty account does not. It
+    used to land in UNKNOWN, which returns None here — so the single most likely failure for a
+    prepaid provider was the one that surfaced as a raw exception with no advice at all.
     """
     reason = classify(exc)
     if reason is FailoverReason.AUTH:
         what = "Every configured provider key was rejected (401/403)."
         fix = "Check the key is correct and still active"
+    elif reason is FailoverReason.NO_CREDIT:
+        what = "Every configured provider key is out of credit (402)."
+        fix = "Top up the account, or add a key billed to another one — waiting will not clear this"
     elif reason is FailoverReason.RATE_LIMIT:
-        what = "Every configured provider key is rate-limited or out of credit."
-        fix = "Wait for the limit to reset, top up the account, or add another key"
+        what = "Every configured provider key is rate-limited."
+        fix = "Wait for the limit to reset, or add another key"
     else:
         return None
     return CredentialRejectedError(
         f"{what} {fix} — the relevant variables are {list(_KEY_ENV_VARS.values())} "
-        "(or use a local model, e.g. CHIMERA_DEFAULT_MODEL=ollama/llama3, which needs no key). "
-        f"Provider said: {exc}"
+        "(or use a local model, e.g. CHIMERA_DEFAULT_MODEL=ollama/llama3, which needs no key)."
+        f"{trace_of(exc).as_suffix()} Provider said: {exc}"
     )
 
 
@@ -285,7 +315,9 @@ class LLMGateway:
     def __init__(self, settings: Settings | None = None) -> None:
         self._settings_override = settings
         self._rotators: dict[str, _KeyRotator] = {}
-        self._rotators_lock = threading.Lock()  # the fusion panel calls _key_order from many threads
+        self._rotators_lock = (
+            threading.Lock()
+        )  # the fusion panel calls _key_order from many threads
         # M15-C2: per-credential cooldown pool — a rate-limited/revoked key is rested, not hammered.
         self._cred_pool = CredentialPool()
         self._cache: CompletionCache | None = None
@@ -511,11 +543,26 @@ class LLMGateway:
                     last_exc = exc
                     reason = classify(exc)
                     action = action_for(reason)
-                    if api_key and reason in (FailoverReason.AUTH, FailoverReason.RATE_LIMIT,
-                                              FailoverReason.OVERLOADED, FailoverReason.TIMEOUT,
-                                              FailoverReason.UNKNOWN):
+                    if api_key and reason in (
+                        FailoverReason.AUTH,
+                        FailoverReason.RATE_LIMIT,
+                        FailoverReason.OVERLOADED,
+                        FailoverReason.TIMEOUT,
+                        FailoverReason.UNKNOWN,
+                    ):
                         self._cred_pool.penalize(api_key, reason)  # rest this credential
-                    _log.warning("model %s failed (%s -> %s): %s", candidate, reason.value, action.value, exc)
+                    # The provider's own identifiers go in the line, not just our verdict. Without
+                    # them "my call failed" is unanswerable by a support desk, and they are the one
+                    # part of a failed response safe to quote back — minted by the provider, never
+                    # containing anything we sent.
+                    _log.warning(
+                        "model %s failed (%s -> %s)%s: %s",
+                        candidate,
+                        reason.value,
+                        action.value,
+                        trace_of(exc).as_suffix(),
+                        exc,
+                    )
                     if action is RecoveryAction.ABORT:
                         raise  # context-overflow / content-policy: another key/model won't help
                     if action is RecoveryAction.FALLBACK_MODEL:
@@ -574,7 +621,6 @@ class LLMGateway:
             messages.append(Message(role="system", content=system))
         messages.append(Message(role="user", content=prompt))
         return self.complete(messages, model=model).content
-
 
     def _think_filter(self) -> ThinkFilter | None:
         """A fresh filter per call, or None when the user asked to keep the tags.
@@ -650,46 +696,54 @@ class LLMGateway:
         ``tool_calls``. Like :meth:`stream`, this is one direct call: NO fallback chain and NO cache
         (both meaningless for a live stream). Callers that need those keep using :meth:`complete`.
         """
-        import litellm  # lazy: heavy import, keep CLI startup fast
-
         resolved = self._resolve_model(model)
         self._require_credentials(resolved)
         call_kwargs = dict(self._provider_kwargs(), **kwargs)
         keys = self._key_order(resolved.split("/", 1)[0])
         if keys:
             call_kwargs["api_key"] = keys[0]
-        response = litellm.completion(
-            model=resolved,
-            messages=_to_message_dicts(messages),
-            temperature=temperature,
-            max_tokens=max_tokens,
-            tools=tools,
-            stream=True,
-            stream_options={"include_usage": True},  # ask the provider for a final usage chunk
-            # A native anthropic/gemini model (or a strict api_base) can reject the unknown
-            # stream_options param; drop_params lets LiteLLM strip what a provider doesn't support so
-            # the stream still runs (usage just comes back unknown) rather than erroring the whole turn.
-            drop_params=True,
-            **call_kwargs,
-        )
         content: list[str] = []
         tool_acc: dict[int, dict[str, Any]] = {}
         usage: dict[str, int | None] = {}
+        finish_reason = ""
         think = self._think_filter()
-        for chunk in response:
-            text = _delta_text(chunk)
-            if text:
-                # Filtered BEFORE it is accumulated, not only before it is displayed. The reasoning
-                # would otherwise stay in `content`, which is what goes back into the message list
-                # for the next turn — so it would be hidden from the user and still paid for, every
-                # turn, forever.
-                shown = think.feed(text) if think else text
-                if shown:
-                    content.append(shown)
-                    if on_delta is not None:
-                        on_delta(shown)
-            _delta_tool_calls(chunk, tool_acc)
-            _accumulate_stream_usage(chunk, usage)
+        try:
+            response = self._stream_once(
+                model=resolved,
+                messages=_to_message_dicts(messages),
+                temperature=temperature,
+                max_tokens=max_tokens,
+                tools=tools,
+                stream=True,
+                stream_options={"include_usage": True},  # ask the provider for a final usage chunk
+                # A native anthropic/gemini model (or a strict api_base) can reject the unknown
+                # stream_options param; drop_params lets LiteLLM strip what a provider doesn't support so
+                # the stream still runs (usage just comes back unknown) rather than erroring the whole turn.
+                drop_params=True,
+                **call_kwargs,
+            )
+            for chunk in response:
+                razao = self._consume_chunk(chunk, content, tool_acc, usage, think, on_delta)
+                if razao:
+                    finish_reason = razao
+        except Exception as exc:
+            # The one recovery this path gets, and the bound on it is the whole design.
+            #
+            # `complete` walks candidates and rotates keys; this called the provider once with
+            # `keys[0]` and gave up — on the surface the product spends its time, because the coding
+            # turn streams by default. A 429 that `complete` survives killed the turn outright.
+            #
+            # Refused once anything has been shown: falling back then means replaying text the
+            # reader already read, or splicing another model's continuation onto a half sentence.
+            # Before the first delta nothing was shown and a retry is invisible. Once only, because
+            # `complete` has its own chain and a fallback that can fall back is a loop in disguise.
+            if content or tool_acc or action_for(classify(exc)) is RecoveryAction.ABORT:
+                raise
+            _log.warning("stream failed before any output (%s); falling back to a batch call", exc)
+            return self.complete(
+                messages, model=model, temperature=temperature, max_tokens=max_tokens, tools=tools,
+                **kwargs,
+            )
         if think:
             tail = think.flush()
             if tail:
@@ -704,7 +758,48 @@ class LLMGateway:
             completion_tokens=usage.get("completion_tokens"),
             cache_read_tokens=usage.get("cache_read_tokens"),
             cache_write_tokens=usage.get("cache_write_tokens"),
+            finish_reason=finish_reason,
+            truncated=finish_reason == "length",
         )
+
+    @staticmethod
+    def _stream_once(**kwargs: Any) -> Any:
+        """The single streaming provider call, as its own seam.
+
+        Extracted so the recovery around it can be driven by a test without a network — the reason
+        the missing fallback survived this long is that nothing could reach the failure.
+        """
+        import litellm  # lazy: heavy import, keep CLI startup fast
+
+        return litellm.completion(**kwargs)
+
+    def _consume_chunk(
+        self,
+        chunk: Any,
+        content: list[str],
+        tool_acc: dict[int, dict[str, Any]],
+        usage: dict[str, Any],
+        think: ThinkFilter | None,
+        on_delta: Callable[[str], None] | None,
+    ) -> str:
+        """Fold one streamed chunk into the accumulating result; return its stop reason, if any."""
+        text = _delta_text(chunk)
+        if text:
+            # Filtered BEFORE it is accumulated, not only before it is displayed. The reasoning
+            # would otherwise stay in `content`, which is what goes back into the message list
+            # for the next turn — so it would be hidden from the user and still paid for, every
+            # turn, forever.
+            shown = think.feed(text) if think else text
+            if shown:
+                content.append(shown)
+                if on_delta is not None:
+                    on_delta(shown)
+        _delta_tool_calls(chunk, tool_acc)
+        _accumulate_stream_usage(chunk, usage)
+        # Returned rather than written into `usage`: that dict holds token counts, and a string in
+        # it types as `int | None` everywhere it is read. The stop reason arrives on the terminal
+        # chunk, not in the usage block, and it is what tells a truncated stream from a short one.
+        return _delta_finish_reason(chunk)
 
     def embed(self, texts: list[str], *, model: str | None = None) -> list[list[float]]:
         """Embed a batch of texts into vectors (one call), for semantic memory recall.
@@ -733,6 +828,7 @@ class LLMGateway:
         tool_calls: list[ToolCall] | None = None
         prompt_tokens: int | None = None
         completion_tokens: int | None = None
+        finish_reason = _delta_finish_reason(response)  # same shape on a batch choice
         try:
             message = response.choices[0].message
             # Non-streaming lands here, and a local model reasons in tags whether or not anyone is
@@ -757,6 +853,8 @@ class LLMGateway:
             completion_tokens=completion_tokens,
             cache_read_tokens=cache_read_tokens,
             cache_write_tokens=cache_write_tokens,
+            finish_reason=finish_reason,
+            truncated=finish_reason == "length",
         )
 
     @staticmethod
@@ -792,7 +890,12 @@ class LLMGateway:
                     if isinstance(loaded, dict):
                         arguments = loaded
                 except json.JSONDecodeError:
-                    _log.warning("could not parse tool arguments: %r", raw_args)
+                    # DROPPED, not served with `arguments={}`. The append used to sit outside this
+                    # handler, so `{"path": "src/ap` — an argument string the provider cut in half —
+                    # became a call with no arguments, which ran, failed, and was counted against the
+                    # model as a repeat. An unparseable argument string is a call we did not receive.
+                    _log.warning("dropping tool call with unparseable arguments: %r", raw_args)
+                    continue
             elif isinstance(raw_args, dict):
                 arguments = raw_args
             parsed.append(
@@ -845,6 +948,18 @@ def _delta_tool_calls(chunk: Any, acc: dict[int, dict[str, Any]]) -> None:
                 slot["arguments"] += str(args)
 
 
+def _delta_finish_reason(chunk: Any) -> str:
+    """The stop reason a chunk or a batch response carries, or "".
+
+    One function for both shapes because both put it in the same place — `choices[0].finish_reason`
+    — and two readings of one field is how one of them quietly stops handling a provider.
+    """
+    try:
+        return str(getattr(chunk.choices[0], "finish_reason", "") or "")
+    except (AttributeError, IndexError, TypeError):
+        return ""
+
+
 def _finalize_stream_tool_calls(acc: dict[int, dict[str, Any]]) -> list[ToolCall] | None:
     """Turn accumulated tool-call fragments into ``ToolCall``s (JSON-parsing the arguments)."""
     if not acc:
@@ -862,7 +977,10 @@ def _finalize_stream_tool_calls(acc: dict[int, dict[str, Any]]) -> list[ToolCall
                 if isinstance(loaded, dict):
                     arguments = loaded
             except json.JSONDecodeError:
-                _log.warning("could not parse streamed tool arguments: %r", raw)
+                # Same rule as the batch path, and the duplication is why it needed saying twice:
+                # a half-received argument string is a call we did not get, not a call with none.
+                _log.warning("dropping streamed tool call with unparseable arguments: %r", raw)
+                continue
         calls.append(ToolCall(id=slot.get("id") or "", name=slot["name"], arguments=arguments))
     return calls or None
 

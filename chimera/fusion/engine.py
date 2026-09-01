@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from chimera.config import get_settings
+from chimera.core.redact import redact
 from chimera.providers.gateway import CompletionResult, Message, MessageLike, SupportsComplete
 from chimera.telemetry import get_logger
 
@@ -88,7 +89,9 @@ class FusionTrace:
     final: str
     usage: list[StageUsage] = field(default_factory=list)
     early_stopped: bool = False  # selective mode: probe agreed, panel+judge short-circuited
-    aggregation: Literal["synth", "vote"] = "synth"  # task-typed routing: synthesize vs majority-vote
+    aggregation: Literal["synth", "vote"] = (
+        "synth"  # task-typed routing: synthesize vs majority-vote
+    )
 
     def successful_panel(self) -> list[PanelResponse]:
         return [r for r in self.panel if r.error is None]
@@ -211,9 +214,7 @@ class FusionConfig:
     @classmethod
     def from_settings(cls) -> FusionConfig:
         s = get_settings()
-        mode: Literal["full", "selective"] = (
-            "selective" if s.fusion_mode == "selective" else "full"
-        )
+        mode: Literal["full", "selective"] = "selective" if s.fusion_mode == "selective" else "full"
         return cls(
             panel=list(s.fusion_panel),
             judge=s.fusion_judge,
@@ -237,7 +238,8 @@ def _content_text(content: object) -> str:
         return content
     if isinstance(content, list):
         return " ".join(
-            str(p.get("text", "")) for p in content
+            str(p.get("text", ""))
+            for p in content
             if isinstance(p, dict) and p.get("type") == "text"
         ).strip()
     return str(content) if content else ""
@@ -317,7 +319,9 @@ class FusionEngine:
 
     def _aggregate(
         self, messages: list[MessageLike], panel: list[PanelResponse]
-    ) -> tuple[str, str, Literal["synth", "vote"], CompletionResult | None, CompletionResult | None]:
+    ) -> tuple[
+        str, str, Literal["synth", "vote"], CompletionResult | None, CompletionResult | None
+    ]:
         """Aggregate the panel into a final answer, routing by task type when enabled.
 
         Returns ``(judge_analysis, final, aggregation, judge_result, synth_result)``. For a
@@ -422,7 +426,9 @@ class FusionEngine:
             _log.warning(
                 "fusion ignores model=%r — a panel has no single model. The panel actually running "
                 "is %s (judge=%s). Set FusionConfig.panel to choose.",
-                model, self.config.panel, self.config.judge,
+                model,
+                self.config.panel,
+                self.config.judge,
             )
         trace = self.run(messages)
         route_meta = {
@@ -479,7 +485,15 @@ class FusionEngine:
                 )
             except Exception as exc:  # one model failing must not sink the panel
                 _log.warning("panel model %s failed: %s", model, exc)
-                return PanelResponse(model=model, error=str(exc))
+                # Redacted and bounded, because this one is SERVED: it rides `route_meta` out to the
+                # desktop app and to `/v1/chat/completions`, and it was the only error surface in the
+                # app with no limit at all — one message per panel model, verbatim. A provider's
+                # error body is its own prose and can quote our prompt back at us.
+                #
+                # Kept as text rather than reduced to a category: which model said what is the reason
+                # anyone reads a fusion trace, and `FailoverReason` alone would flatten five distinct
+                # failures into one word. The first 200 characters carry the sentence that matters.
+                return PanelResponse(model=model, error=redact(str(exc))[:200])
 
         workers = max(1, min(self.config.max_workers, len(panel_models)))
         with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -494,7 +508,9 @@ class FusionEngine:
             if r.error is None
         )
         if not answers:
-            return CompletionResult(content="No panel answers were produced.", model=self.config.judge)
+            return CompletionResult(
+                content="No panel answers were produced.", model=self.config.judge
+            )
         user = f"Task and context:\n{_conversation_text(messages)}\n\nCandidate answers:\n{answers}"
         return self.backend.complete(
             [Message(role="system", content=_JUDGE_SYSTEM), Message(role="user", content=user)],
@@ -525,7 +541,10 @@ class FusionEngine:
             f"Agreeing answers:\n{joined}"
         )
         return self.backend.complete(
-            [Message(role="system", content=_SYNTH_AGREED_SYSTEM), Message(role="user", content=user)],
+            [
+                Message(role="system", content=_SYNTH_AGREED_SYSTEM),
+                Message(role="user", content=user),
+            ],
             model=self.config.synthesizer,
             temperature=self.config.temperature,
         )

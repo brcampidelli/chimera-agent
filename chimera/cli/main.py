@@ -424,8 +424,19 @@ def context_curve_cmd(
 @app.command()
 def doctor(
     fix: bool = typer.Option(False, "--fix", help="Auto-repair safe setup issues (state dir, .env scaffold)."),
+    probe: bool = typer.Option(
+        False, "--probe", help="Actually call the provider once, instead of trusting the key's name."
+    ),
 ) -> None:
-    """Check the environment and configuration. With --fix, repair safe setup issues."""
+    """Check the environment and configuration. With --fix, repair safe setup issues.
+
+    `--probe` is off by default and that is deliberate: `doctor` should stay instant, offline and
+    free. What it buys when you ask for it is the difference between a claim and a measurement —
+    "Ready" below is an assertion about the NAME of an environment variable, so a revoked key, an
+    account with no credit, or a value pasted with a trailing space all pass it and fail on the
+    first real call. The argument for measuring is already written in `config_api.pricing_capability`
+    a few files over: the time to find out is while reading the doctor, not when a 3 a.m. cron stalls.
+    """
     settings = get_settings()
 
     if fix:
@@ -440,6 +451,7 @@ def doctor(
     # paying LiteLLM's import to check is worth it — and where an unavailable LiteLLM has to degrade
     # to saying nothing, never to a warning that might be wrong. The five with settings fields are
     # never questioned; only what was discovered from the environment.
+    from chimera.core import state_version
     from chimera.providers.discovery import generic_providers, litellm_known
 
     discovered = generic_providers()
@@ -456,6 +468,18 @@ def doctor(
     table.add_row("Python", platform.python_version())
     table.add_row("Platform", platform.platform())
     table.add_row("Home (state dir)", str(settings.home))
+    # WHICH version wrote that directory, which nothing recorded until now: ~27 artefacts live under
+    # it and not one carried a version, so every question about an upgrade was answered by guessing.
+    # Stamped here rather than at import: `doctor` is the command whose job is to know the state of
+    # this machine, and stamping from a library import would write to disk on `import chimera`.
+    marca = state_version.stamp(settings.home)
+    if not marca.known:
+        estado = "[yellow]not recorded before now[/yellow]"
+    elif marca.chimera_version == __version__:
+        estado = marca.chimera_version
+    else:
+        estado = f"[yellow]{marca.chimera_version} -> {__version__}[/yellow]"
+    table.add_row("State written by", estado)
     table.add_row("Default model", settings.default_model)
     table.add_row(
         "Configured providers",
@@ -493,8 +517,28 @@ def doctor(
         )
     console.print(caps)
 
-    if providers:
-        console.print("[green]Ready[/green] — at least one provider key is configured.")
+    if providers and probe:
+        # One token, on the default model, through the same gateway a real run uses — including its
+        # failover, so "the primary is down and a fallback answered" reads as ready, which it is.
+        from chimera.providers import LLMGateway
+
+        try:
+            LLMGateway().quick("ok", model=settings.default_model)
+        except Exception as exc:  # noqa: BLE001 — every provider failure is an answer here
+            from chimera.core.redact import redact
+
+            console.print(
+                f"[red]Not ready[/red] — the provider refused: {redact(str(exc))[:300]}"
+            )
+        else:
+            console.print(
+                f"[green]Ready[/green] — {settings.default_model} answered a live call."
+            )
+    elif providers:
+        console.print(
+            "[green]Ready[/green] — at least one provider key is configured "
+            "[dim](a name, not a call — use --probe to check)[/dim]."
+        )
     else:
         console.print(
             Panel.fit(
@@ -4560,6 +4604,54 @@ def migrate(
 
 # --- cron subcommands ---------------------------------------------------------
 
+@app.command()
+def approve(
+    request_id: str = typer.Argument(None, help="The id from the message. Omit to list what is waiting."),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Approve it."),
+    no: bool = typer.Option(False, "--no", "-n", help="Refuse it."),
+) -> None:
+    """Answer a decision the agent is waiting on, from anywhere.
+
+    Without a terminal the approval gate collapsed to a refusal: `ask` degraded to `deny`, so every
+    REVIEW verdict on the VPS, in a container or under cron was a no, and the mandate that says
+    "confirm before billing, before a destructive migration, before touching RLS" had nothing to
+    confirm with. The question is written down and sent to wherever this deployment delivers; this
+    is how it gets answered.
+
+    Silence is still a refusal — a question times out. That is deliberate: a gate that reads silence
+    as consent produces a record of an approval nobody gave.
+    """
+    from chimera.governance.pending import answer as responder
+    from chimera.governance.pending import pending as esperando
+
+    home = Path(get_settings().home)
+    if not request_id:
+        aguardando = esperando(home)
+        if not aguardando:
+            console.print("[dim]nothing is waiting for a decision[/dim]")
+            return
+        tabela = Table(title="Waiting for you")
+        tabela.add_column("id")
+        tabela.add_column("waiting")
+        tabela.add_column("why")
+        tabela.add_column("action")
+        for p in aguardando:
+            tabela.add_row(p.id, f"{p.age_seconds / 60:.0f} min", p.reason[:40], p.action[:60])
+        console.print(tabela)
+        console.print("[dim]answer with: chimera approve <id> --yes | --no[/dim]")
+        return
+
+    if yes == no:
+        # Both or neither. An approval this important must be typed, never inferred from a default:
+        # whichever way the default fell, half the answers would be the one nobody chose.
+        console.print("[yellow]say which: --yes or --no[/yellow]")
+        raise typer.Exit(code=1)
+    if not responder(home, request_id, yes):
+        console.print(f"[yellow]no question waiting with id {request_id}[/yellow]")
+        raise typer.Exit(code=1)
+    console.print(f"[green]{'approved' if yes else 'refused'}[/green] {request_id}")
+
+
 cron_app = typer.Typer(help="Manage scheduled jobs (crons and event SOPs).", no_args_is_help=True)
 app.add_typer(cron_app, name="cron")
 
@@ -4750,52 +4842,68 @@ def cron_disable(job_id: str = typer.Argument(..., help="The job id to disable."
     console.print(f"[green]disabled[/green] {job_id}")
 
 
-@app.command()
-def approve(
-    request_id: str = typer.Argument(None, help="The id from the message. Omit to list what is waiting."),
-    yes: bool = typer.Option(False, "--yes", "-y", help="Approve it."),
-    no: bool = typer.Option(False, "--no", "-n", help="Refuse it."),
+@cron_app.command("fire")
+def cron_fire(
+    event: str = typer.Argument(..., help="The event name to fire (as given to `cron add --event`)."),
+    model: str = typer.Option(None, "--model", "-m", help="Model for the dispatched jobs."),
+    max_steps: int = typer.Option(6, "--max-steps", help="Max tool-calling steps per job."),
+    workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root for tools."),
 ) -> None:
-    """Answer a decision the agent is waiting on, from anywhere.
+    """Run every job registered for an event.
 
-    Without a terminal the approval gate collapsed to a refusal: `ask` degraded to `deny`, so every
-    REVIEW verdict on the VPS, in a container or under cron was a no, and the mandate that says
-    "confirm before billing, before a destructive migration, before touching RLS" had nothing to
-    confirm with. The question is written down and sent to wherever this deployment delivers; this
-    is how it gets answered.
+    Event jobs had no dispatcher. `cron add --event deploy` accepted the job and `cron list` showed
+    it enabled, but nothing in the package ever called `fire_event` — so the job simply never ran,
+    and its silence was indistinguishable from that of a job whose time had not come. The cron
+    trigger has the daemon and the webhook trigger has the webhook server; this is the third one's.
 
-    Silence is still a refusal — a question times out. That is deliberate: a gate that reads silence
-    as consent produces a record of an approval nobody gave.
+    Meant to be called from wherever the event actually happens — a git hook, a deploy step, a CI
+    job. Dispatch is the same one the daemon uses, so a fired job behaves exactly like a scheduled
+    one: same agent, same spend caps, same receipt.
     """
-    from chimera.governance.pending import answer as responder
-    from chimera.governance.pending import pending as esperando
+    import time
 
-    home = Path(get_settings().home)
-    if not request_id:
-        aguardando = esperando(home)
-        if not aguardando:
-            console.print("[dim]nothing is waiting for a decision[/dim]")
-            return
-        tabela = Table(title="Waiting for you")
-        tabela.add_column("id")
-        tabela.add_column("waiting")
-        tabela.add_column("why")
-        tabela.add_column("action")
-        for p in aguardando:
-            tabela.add_row(p.id, f"{p.age_seconds / 60:.0f} min", p.reason[:40], p.action[:60])
-        console.print(tabela)
-        console.print("[dim]answer with: chimera approve <id> --yes | --no[/dim]")
-        return
+    from chimera.providers import LLMGateway
+    from chimera.scheduler import Scheduler, make_agent_dispatch
+    from chimera.scheduler.delivery import make_deliver
+    from chimera.scheduler.job_runner import make_run_job
 
-    if yes == no:
-        # Both or neither. An approval this important must be typed, never inferred from a default:
-        # whichever way the default fell, half the answers would be the one nobody chose.
-        console.print("[yellow]say which: --yes or --no[/yellow]")
+    scheduler = Scheduler(_cron_store())
+    if not scheduler.jobs_for_event(event):
+        # Louder than an empty run: a typo in an event name is the likeliest way to sit waiting for
+        # something that will never happen, and "0 jobs" printed in green reads like success.
+        console.print(f"[yellow]no enabled job registered for event {event!r}[/yellow]")
         raise typer.Exit(code=1)
-    if not responder(home, request_id, yes):
-        console.print(f"[yellow]no question waiting with id {request_id}[/yellow]")
-        raise typer.Exit(code=1)
-    console.print(f"[green]{'approved' if yes else 'refused'}[/green] {request_id}")
+
+    settings = get_settings()
+    run_job = make_run_job(
+        settings=settings,
+        backend=LLMGateway(),
+        workspace=Path(workspace).resolve(),
+        model=model,
+        max_steps=max_steps,
+        usage_path=settings.home / "usage.jsonl",
+        warn=lambda linha: console.print(f"[yellow]{linha}[/yellow]"),
+    )
+    # Through `make_agent_dispatch`, not straight to `fire_event`. It is what turns a `JobOutcome`
+    # into the status the scheduler records — so a gate that rejected the work reads as `rejected`
+    # rather than as success — and it is where delivery happens. Without it a fired job would run,
+    # be recorded as ok whatever its gate said, and deliver nothing: a second dispatch path that
+    # quietly behaves differently from the daemon's is worse than no second path.
+    def _sem_job(_task: str) -> str:  # pragma: no cover - unreachable while run_job is given
+        raise AssertionError("cron fire always has the job; run_task should never be reached")
+
+    deliver = make_deliver(
+        settings.home / "scheduler" / "cron_results.jsonl",
+        warn=lambda linha: console.print(f"[yellow]{linha}[/yellow]"),
+    )
+    ran = scheduler.fire_event(
+        event, time.time(), make_agent_dispatch(_sem_job, deliver, run_job=run_job)
+    )
+    for job in ran:
+        cor = "green" if job.last_status == "ok" else "red"
+        console.print(f"[{cor}]{job.last_status}[/{cor}] {job.name} ({job.id})")
+        if job.last_error:
+            console.print(f"  {job.last_error}")
 
 
 @cron_app.command("learn")

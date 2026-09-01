@@ -94,6 +94,44 @@ export class ApiError extends Error {
   }
 }
 
+
+/** Read an SSE body frame by frame, and say whether the stream ENDED or was CUT.
+ *
+ *  Eight loops did this inline, and every one of them read `{ value, done }` with no `try` around
+ *  it and no check afterwards. A connection dropped mid-stream either threw an unhandled rejection
+ *  or — worse, and this is the common case — surfaced as `done: true`, so the loop exited exactly as
+ *  it does on a clean finish. The client could not tell a turn that finished from a turn whose
+ *  server went away, and `onError` never fired for the second.
+ *
+ *  Returns the reason the read failed, or `null` for a stream that ended on its own terms. Nothing
+ *  here judges whether a TERMINAL FRAME arrived — that is each caller's contract, not the
+ *  transport's.
+ */
+async function readFrames(
+  body: ReadableStream<Uint8Array>,
+  onFrame: (frame: string) => void,
+): Promise<string | null> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
+      let sep: number;
+      while ((sep = buffer.indexOf("\n\n")) !== -1) {
+        onFrame(buffer.slice(0, sep));
+        buffer = buffer.slice(sep + 2);
+      }
+    }
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err);
+  }
+  if (buffer.trim()) onFrame(buffer);
+  return null;
+}
+
 /** The reason a request was refused, when the server gave one.
  *
  *  Every refusal in this app used to reach the screen as "400 Bad Request" — the status line,
@@ -656,35 +694,27 @@ export async function streamKanbanRun(
     handlers.onError?.(await streamRefusal(res));
     return;
   }
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
-    let sep: number;
-    while ((sep = buffer.indexOf("\n\n")) !== -1) {
-      const block = buffer.slice(0, sep);
-      buffer = buffer.slice(sep + 2);
-      let event = "";
-      let payload = "";
-      for (const line of block.split("\n")) {
-        if (line.startsWith("event:")) event = line.slice(6).trim();
-        else if (line.startsWith("data:")) payload += line.slice(5).trim();
-      }
-      if (!payload) continue;
-      try {
-        const data = JSON.parse(payload);
-        if (event === "card") handlers.onCard?.(data as DispatchOutcome);
-        else if (event === "conflict") handlers.onConflict?.((data as { paths: string[] }).paths);
-        else if (event === "done") handlers.onDone?.(data as { worked: number; error?: string });
-      } catch {
-        // A frame we cannot parse is one frame lost, not a broken dispatch: the board is the
-        // source of truth and a refetch will show what actually happened.
-      }
+  const cut = await readFrames(res.body, (block) => {
+    let event = "";
+    let payload = "";
+    for (const line of block.split("\n")) {
+      if (line.startsWith("event:")) event = line.slice(6).trim();
+      else if (line.startsWith("data:")) payload += line.slice(5).trim();
     }
-  }
+    if (!payload) return;
+    try {
+      const data = JSON.parse(payload);
+      if (event === "card") handlers.onCard?.(data as DispatchOutcome);
+      else if (event === "conflict") handlers.onConflict?.((data as { paths: string[] }).paths);
+      else if (event === "done") handlers.onDone?.(data as { worked: number; error?: string });
+    } catch {
+      // A frame we cannot parse is one frame lost, not a broken dispatch: the board is the
+      // source of truth and a refetch will show what actually happened.
+    }
+  });
+  // A cut connection reads as `done` on this API, so without this the dispatch ended exactly as it
+  // does on success — silently, over a board nobody knew was stale.
+  if (cut) handlers.onDone?.({ worked: 0, error: cut });
 }
 /** One obligation in a drafted spec, in both forms at once.
  *
@@ -872,20 +902,8 @@ export async function streamRun(
     handlers.onError?.(await streamRefusal(res));
     return;
   }
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
-    let sep: number;
-    while ((sep = buffer.indexOf("\n\n")) !== -1) {
-      dispatchRun(buffer.slice(0, sep), handlers);
-      buffer = buffer.slice(sep + 2);
-    }
-  }
-  if (buffer.trim()) dispatchRun(buffer, handlers);
+  const cut = await readFrames(res.body, (frame) => dispatchRun(frame, handlers));
+  if (cut) handlers.onError?.(cut);
 }
 
 function dispatchRun(frame: string, h: RunStreamHandlers): void {
@@ -958,20 +976,8 @@ export async function streamLifecycle(
     handlers.onError?.(await streamRefusal(res));
     return;
   }
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
-    let sep: number;
-    while ((sep = buffer.indexOf("\n\n")) !== -1) {
-      dispatchLifecycle(buffer.slice(0, sep), handlers);
-      buffer = buffer.slice(sep + 2);
-    }
-  }
-  if (buffer.trim()) dispatchLifecycle(buffer, handlers);
+  const cut = await readFrames(res.body, (frame) => dispatchLifecycle(frame, handlers));
+  if (cut) handlers.onError?.(cut);
 }
 
 function dispatchLifecycle(frame: string, h: LifecycleHandlers): void {
@@ -1248,20 +1254,8 @@ export async function streamCodeTurn(
     handlers.onError?.(await streamRefusal(res));
     return;
   }
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
-    let sep: number;
-    while ((sep = buffer.indexOf("\n\n")) !== -1) {
-      dispatchCodeTurn(buffer.slice(0, sep), handlers);
-      buffer = buffer.slice(sep + 2);
-    }
-  }
-  if (buffer.trim()) dispatchCodeTurn(buffer, handlers);
+  const cut = await readFrames(res.body, (frame) => dispatchCodeTurn(frame, handlers));
+  if (cut) handlers.onError?.(cut);
 }
 
 function dispatchCodeTurn(frame: string, h: CodeTurnHandlers): void {
@@ -1621,20 +1615,8 @@ export async function streamAgents(
     handlers.onError?.(await streamRefusal(res));
     return;
   }
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
-    let sep: number;
-    while ((sep = buffer.indexOf("\n\n")) !== -1) {
-      dispatchAgents(buffer.slice(0, sep), handlers);
-      buffer = buffer.slice(sep + 2);
-    }
-  }
-  if (buffer.trim()) dispatchAgents(buffer, handlers);
+  const cut = await readFrames(res.body, (frame) => dispatchAgents(frame, handlers));
+  if (cut) handlers.onError?.(cut);
 }
 
 function dispatchAgents(frame: string, h: AgentsStreamHandlers): void {
@@ -1708,20 +1690,8 @@ export async function streamExec(
     handlers.onError?.(await streamRefusal(res));
     return;
   }
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
-    let sep: number;
-    while ((sep = buffer.indexOf("\n\n")) !== -1) {
-      dispatchExec(buffer.slice(0, sep), handlers);
-      buffer = buffer.slice(sep + 2);
-    }
-  }
-  if (buffer.trim()) dispatchExec(buffer, handlers);
+  const cut = await readFrames(res.body, (frame) => dispatchExec(frame, handlers));
+  if (cut) handlers.onError?.(cut);
 }
 
 /** Stop a running command AND everything it started.
@@ -1885,20 +1855,8 @@ export async function streamHierarchy(
     handlers.onError?.(await streamRefusal(res));
     return;
   }
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
-    let sep: number;
-    while ((sep = buffer.indexOf("\n\n")) !== -1) {
-      dispatchHierarchy(buffer.slice(0, sep), handlers);
-      buffer = buffer.slice(sep + 2);
-    }
-  }
-  if (buffer.trim()) dispatchHierarchy(buffer, handlers);
+  const cut = await readFrames(res.body, (frame) => dispatchHierarchy(frame, handlers));
+  if (cut) handlers.onError?.(cut);
 }
 
 function dispatchHierarchy(frame: string, h: HierarchyStreamHandlers): void {
@@ -1981,18 +1939,6 @@ export async function streamCrew(
     handlers.onError?.(await streamRefusal(res));
     return;
   }
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
-    let sep: number;
-    while ((sep = buffer.indexOf("\n\n")) !== -1) {
-      dispatchHierarchy(buffer.slice(0, sep), handlers);
-      buffer = buffer.slice(sep + 2);
-    }
-  }
-  if (buffer.trim()) dispatchHierarchy(buffer, handlers);
+  const cut = await readFrames(res.body, (frame) => dispatchHierarchy(frame, handlers));
+  if (cut) handlers.onError?.(cut);
 }
