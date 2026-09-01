@@ -839,7 +839,10 @@ class AutonomousAgent:
             # whole — discarding it would throw away a finished piece of work and, with
             # `max_attempts=1`, return a run with no attempts at all.
             if getattr(agent_result, "stopped_reason", "") == "cancelled":
-                return self._finalize_cancelled(task, attempts, plan, thread_id)
+                return self._finalize_cancelled(
+                    task, attempts, plan, thread_id,
+                    agent_result=agent_result, index=index, snapshot=snapshot,
+                )
             # Same argument as the comment above, for the other reason a worker cuts itself short.
             # A worker that stopped because the money ran out has produced a partial attempt, and
             # verifying, reviewing and RETRYING it are exactly "model calls the user has already
@@ -1288,6 +1291,10 @@ class AutonomousAgent:
         attempts: list[Attempt],
         plan: Plan | None,
         thread_id: str | None,
+        *,
+        agent_result: Any = None,
+        index: int = 0,
+        snapshot: Any = None,
     ) -> AutonomousResult:
         """Cooperative stop: the caller asked to cancel between attempts. Return a well-formed result
         (``success=False``, ``stopped_reason="cancelled"``) carrying the attempts completed so far.
@@ -1296,16 +1303,64 @@ class AutonomousAgent:
         was wrong, so it does NOT distill an anti-pattern card or credit a card failure (unlike the
         budget-exhausted return above). The checkpoint is cleared — a user-cancelled run is terminal,
         not resumable — and a receipt is persisted, mirroring the exhaustion path's construction.
+
+        ``agent_result`` is the attempt that was cut short, when there is one. Two of the three cancel
+        sites fire before any model call and pass nothing; the third fires with a worker that already
+        ran, and dropping THAT one was the defect. Its sibling :meth:`_finalize_capped` carries the
+        measurement in a comment: a receipt reading ``usd: null, attempts: []`` for a run that had
+        just spent money showed a paid run as free on the Cost screen.
+
+        ``snapshot`` lets the partial attempt record what it wrote. The files are NOT reverted —
+        whoever pressed Stop may want the work, and `guard.restore` only runs on the verified path —
+        so `reverted: false` with `diffs: []` read as "it changed nothing" about a workspace that had
+        changed. Recording is the fix; reverting would destroy work somebody may have wanted.
         """
+        if agent_result is not None:
+            attempts = [*attempts, self._partial_attempt(agent_result, index, snapshot)]
         self._emit(_ev_status("cancelled"))
         self._clear_checkpoint(thread_id)
-        last = attempts[-1].answer if attempts else ""
+        last = (getattr(agent_result, "answer", "") or "") or (attempts[-1].answer if attempts else "")
         self._emit(_ev_final(False, last))
         result = AutonomousResult(
             answer=last, success=False, attempts=attempts, plan=plan, stopped_reason="cancelled"
         )
         self._persist_receipt(result, task)
         return result
+
+    def _partial_attempt(self, agent_result: Any, index: int, snapshot: Any = None) -> Attempt:
+        """An attempt that was cut short: what it cost, and what it left on disk.
+
+        Shared by the two stop paths, because the bookkeeping is the same and having it in one of
+        them was how the other went without it for so long. The meter is drained here — the overhead
+        it holds belongs to this attempt and would otherwise be billed to whatever runs next.
+        """
+        from chimera.orchestration.metering import add_usd
+
+        over_usd, over_prompt, over_completion = (
+            self.meter.take() if self.meter is not None else (0.0, 0, 0)
+        )
+        parcial = Attempt(index, getattr(agent_result, "answer", "") or "", False, False, False, False)
+        parcial.usd = add_usd(getattr(agent_result, "usd", None), over_usd)
+        parcial.overhead_usd = over_usd
+        parcial.prompt_tokens = int(getattr(agent_result, "prompt_tokens", 0) or 0) + over_prompt
+        parcial.completion_tokens = (
+            int(getattr(agent_result, "completion_tokens", 0) or 0) + over_completion
+        )
+        parcial.model = str(getattr(agent_result, "model", "") or "")
+        parcial.run_id = str(getattr(agent_result, "run_id", "") or "")
+        parcial.evidence = "none"
+        if snapshot is not None and self.guard is not None:
+            # Measured, not assumed, and the same call the verified path makes. `diff_productive:
+            # null` for an attempt that wrote a file is precisely the claim that field exists to
+            # prevent.
+            from chimera.evolution.diff_gate import diff_snapshots, unified_diffs
+
+            depois = _without_verifier_artifacts(self.guard.snapshot())
+            pdiff = diff_snapshots(snapshot, depois)
+            parcial.diff_productive = pdiff.is_productive
+            parcial.diff_summary = pdiff.audit_summary()
+            parcial.diffs = unified_diffs(snapshot, depois)
+        return parcial
 
     def _finalize_capped(
         self,
@@ -1333,22 +1388,10 @@ class AutonomousAgent:
         # the answer said "spend cap reached: $0.0030" while the receipt reported nothing, so the
         # Cost screen showed a paid run as free. A cap that hides its own spending is worse than
         # no cap: the number it exists to protect is the number it erases.
-        from chimera.orchestration.metering import add_usd
-
-        over_usd, over_prompt, over_completion = (
-            self.meter.take() if self.meter is not None else (0.0, 0, 0)
-        )
-        parcial = Attempt(index, agent_result.answer, False, False, False, False)
-        parcial.usd = add_usd(getattr(agent_result, "usd", None), over_usd)
-        parcial.overhead_usd = over_usd
-        parcial.prompt_tokens = int(getattr(agent_result, "prompt_tokens", 0) or 0) + over_prompt
-        parcial.completion_tokens = (
-            int(getattr(agent_result, "completion_tokens", 0) or 0) + over_completion
-        )
-        parcial.model = str(getattr(agent_result, "model", "") or "")
-        parcial.run_id = str(getattr(agent_result, "run_id", "") or "")
-        parcial.evidence = "none"
-        attempts = [*attempts, parcial]
+        # Through the shared helper, which was extracted FROM this block. Leaving the copy here
+        # would restore the condition that let the cancel path fall behind: the same bookkeeping
+        # written twice, corrected once.
+        attempts = [*attempts, self._partial_attempt(agent_result, index)]
 
         self._emit(_ev_status("stopped on budget"))
         self._clear_checkpoint(thread_id)
