@@ -41,9 +41,46 @@ NOSSOS = (
     re.compile(r"/opt/data\b"),
 )
 
-#: A wheel legitimately contains this project's own documentation, and this project documents its
-#: own redaction patterns. A file whose whole job is to describe a secret's shape is not a leak.
+#: A last-resort path list, for scanning an artifact with no repository beside it. When the
+#: repository IS available, `_do_ultimo_commit` below subsumes this: these three are committed
+#: source like any other. A file whose whole job is to describe a secret's shape is not a leak.
 ISENTOS = ("chimera/core/redact.py", "scripts/scan_artifact.py", "scripts/pr_intent_scan.py")
+
+
+def _do_ultimo_commit(nome: str, bruto: bytes, repo: Path | None) -> bool:
+    """Whether this member is byte-identical to a file in the checked-out repository.
+
+    The scope this module claims in its own docstring is *what is assembled after the last commit*.
+    Committed source is covered by `gitleaks`, which runs on the same tree with `fetch-depth: 0` and
+    reads the history as well. Scanning it here a second time buys nothing and costs the gate its
+    credibility: on the first release it ever guarded, it stopped the publish on twenty-nine hits,
+    every one of them a fake key inside a test whose subject IS what a key looks like. You cannot
+    assert that `sk-…` is masked without writing something that matches `sk-…`.
+
+    The alternative was to keep extending `ISENTOS` — eight test files that day, more the next. That
+    is a path allowlist, and a path allowlist is exactly the hole you do not want in the files most
+    likely to hold a real key one day.
+
+    This is narrower than it looks, and that is the point: the comparison is on BYTES, so a member
+    at a path that exists in the repository but with different content is still read. To get a
+    credential past this you would have to commit it, and `gitleaks` fails the build when you do.
+    With no repository to compare against, nothing is skipped.
+    """
+    if repo is None:
+        return False
+    caminho = nome.replace("\\", "/")
+    # An sdist wraps everything in `<name>-<version>/`; a wheel's members are already repo-relative.
+    candidatos = [caminho, caminho.partition("/")[2]]
+    for c in candidatos:
+        if not c:
+            continue
+        arquivo = repo / c
+        try:
+            if arquivo.is_file() and arquivo.read_bytes() == bruto:
+                return True
+        except OSError:
+            continue
+    return False
 
 
 def _members(archive: Path) -> list[tuple[str, bytes]]:
@@ -60,11 +97,18 @@ def _members(archive: Path) -> list[tuple[str, bytes]]:
         return saida
 
 
-def scan(archive: Path) -> list[str]:
-    """Every line of ``archive`` that carries something that must not be published."""
+def scan(archive: Path, repo: Path | None = None) -> list[str]:
+    """Every line of ``archive`` that carries something that must not be published.
+
+    ``repo`` is the checked-out tree the artifact was built from. Members identical to a file in it
+    came from the last commit and are `gitleaks`' scope, not this one; pass ``None`` to read
+    everything, which is what happens when the artifact is scanned on its own.
+    """
     achados: list[str] = []
     for nome, bruto in _members(archive):
         if any(isento in nome.replace("\\", "/") for isento in ISENTOS):
+            continue
+        if _do_ultimo_commit(nome, bruto, repo):
             continue
         try:
             texto = bruto.decode("utf-8")
@@ -81,11 +125,23 @@ def scan(archive: Path) -> list[str]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("archives", nargs="+", type=Path)
+    parser.add_argument(
+        "--repo",
+        type=Path,
+        default=Path(__file__).resolve().parents[1],
+        help="the checked-out tree this was built from; members identical to a file in it are "
+        "`gitleaks`' scope, not this one. Point it at a directory that does not exist to read "
+        "everything.",
+    )
     args = parser.parse_args(argv)
+
+    repo = args.repo if args.repo and args.repo.is_dir() else None
+    if repo is None:
+        print("note: no repository to compare against — reading every member", file=sys.stderr)
 
     total = 0
     for archive in args.archives:
-        achados = scan(archive)
+        achados = scan(archive, repo)
         total += len(achados)
         for a in achados:
             print(f"[leak] {archive.name} :: {a}")
