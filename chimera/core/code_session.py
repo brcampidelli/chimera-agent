@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from chimera.core.agent import AgentResult, ToolActivity
+from chimera.core.redact import redact
 from chimera.providers.gateway import MessageLike
 from chimera.telemetry import get_logger
 
@@ -257,9 +258,20 @@ class CodeSessionStore:
         return self.root / f"{safe}.json"
 
     def save(self, session: CodeSession) -> None:
+        # Written through `redact`, the same way `steplog.py` has always written its trace, and for
+        # the same reason: this file keeps every tool observation of the conversation, and a tool
+        # that failed reports back the provider's own error body. That body has been measured to
+        # carry an echoed fragment of the prompt and the provider's internal routing trace.
+        #
+        # The cost, stated rather than hidden: this store is read BACK to continue a conversation, so
+        # a credential a user pasted into the chat comes back as `[redacted]` after a restart. Within
+        # the turn nothing changes — the messages are in memory unmasked — and a key does not belong
+        # in a transcript that outlives the session anyway. The patterns are narrow by design (six
+        # credential shapes plus this process's own environment secrets), so ordinary code and prose
+        # pass through untouched.
         path = self._path(session.session_id)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(session.to_dict()), encoding="utf-8")
+        path.write_text(redact(json.dumps(session.to_dict())), encoding="utf-8")
 
     def load(self, session_id: str, agent: SupportsCodeRun) -> CodeSession:
         """Return the stored session, or a fresh one under that id if there is nothing stored.
@@ -311,23 +323,27 @@ class CodeSessionStore:
                 data = json.loads(path.read_text(encoding="utf-8"))
                 messages = [m for m in data.get("messages", []) if isinstance(m, dict)]
             except (OSError, ValueError) as exc:
-                _log.warning("code session %s unreadable, omitted from the list: %s", path.stem, exc)
+                _log.warning(
+                    "code session %s unreadable, omitted from the list: %s", path.stem, exc
+                )
                 continue
             title = ""
             for message in messages:
                 if message.get("role") == "user":
                     title = _title_of(str(message.get("content") or ""))
                     break
-            out.append({
-                "id": str(data.get("session_id") or path.stem),
-                "title": title,
-                "workspace": str(data.get("workspace") or ""),
-                # Turns, not messages: a user asking twice is two turns, but the transcript between
-                # them holds every tool call the agent made, and counting those would report a
-                # number that grows with the agent's verbosity rather than with the conversation.
-                "turns": sum(1 for m in messages if m.get("role") == "user"),
-                "updated_at": path.stat().st_mtime,
-            })
+            out.append(
+                {
+                    "id": str(data.get("session_id") or path.stem),
+                    "title": title,
+                    "workspace": str(data.get("workspace") or ""),
+                    # Turns, not messages: a user asking twice is two turns, but the transcript between
+                    # them holds every tool call the agent made, and counting those would report a
+                    # number that grows with the agent's verbosity rather than with the conversation.
+                    "turns": sum(1 for m in messages if m.get("role") == "user"),
+                    "updated_at": path.stat().st_mtime,
+                }
+            )
         out.sort(key=lambda m: float(m["updated_at"]), reverse=True)
         return out
 

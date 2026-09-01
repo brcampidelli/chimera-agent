@@ -1,0 +1,100 @@
+"""The publish step opened the wheel and read only its file list.
+
+`publish.yml` already does `zipfile.ZipFile(...).namelist()` — to assert one entry is present. The
+bytes were never looked at.
+
+`gitleaks` covers the git history, with `fetch-depth: 0`, and that is the right scope for the
+source. It does not cover what `hatch_build.py` force-includes, nor `apps/desktop/dist` built by an
+earlier job and downloaded here as an artifact, nor the PyInstaller binary in the desktop release —
+all assembled AFTER the last commit and shipped to everyone.
+
+This project has paid for that gap twice already: an OpenRouter key in plain text, and a PassaPro
+token in cleartext in the ops repository. Neither was in a wheel, and neither needed to be for the
+next one to be.
+
+The patterns are the ones `chimera.core.redact` already carries, imported rather than rewritten: a
+second list drifts from the first, and the first is the one with tests.
+"""
+
+from __future__ import annotations
+
+import zipfile
+from pathlib import Path
+
+import pytest
+
+from scripts.scan_artifact import scan
+
+
+def _wheel(tmp_path: Path, **arquivos: str) -> Path:
+    caminho = tmp_path / "pacote-0.1-py3-none-any.whl"
+    with zipfile.ZipFile(caminho, "w") as z:
+        for nome, conteudo in arquivos.items():
+            z.writestr(nome.replace("__", "/"), conteudo)
+    return caminho
+
+
+VAZAMENTOS = [
+    ("chimera__x.py", 'CHAVE = "sk-proj-AAAAAAAAAAAAAAAAAAAAAA"\n', "uma chave de API"),
+    ("chimera__y.py", 'TOKEN = "ghp_' + "B" * 30 + '"\n', "um token do GitHub"),
+    ("chimera__z.json", '{"auth": "Bearer AbCdEfGhIjKlMnOpQrStUvWxYz01"}\n', "um bearer"),
+    ("chimera__ops.py", 'HOST = "srv1666151.hstgr.cloud"\n', "o host da VPS"),
+    ("chimera__ops2.py", 'CHAVE_SSH = "~/.ssh/hermes_mcp"\n', "o nome da chave SSH"),
+    ("_desktop_dist__app.js", 'const k="sk-proj-AAAAAAAAAAAAAAAAAAAAAA";\n', "no bundle do app"),
+]
+
+
+@pytest.mark.parametrize(("nome", "conteudo", "porque"), VAZAMENTOS)
+def test_a_secret_in_the_wheel_is_found(tmp_path: Path, nome: str, conteudo: str, porque: str) -> None:
+    assert scan(_wheel(tmp_path, **{nome: conteudo})), porque
+
+
+def test_it_says_which_file_and_which_line(tmp_path: Path) -> None:
+    """A gate that says "something leaked" and stops there sends whoever is releasing on a hunt
+    through a zip. The release is exactly when nobody has time for that."""
+    # Keyword names map `__` to `/`, so a third pair turns the EXTENSION into a directory
+    # (`chimera/x/py`), the member is skipped for having no suffix, and the scanner reports
+    # nothing — a fixture that quietly proved the opposite of what it was written to prove.
+    caminho = _wheel(tmp_path, **{"chimera__x.py": "ok\nok\nCHAVE = 'sk-proj-AAAAAAAAAAAAAAAAAAAAAA'\n"})
+
+    achado = scan(caminho)[0]
+
+    assert "chimera/x.py" in achado
+    assert ":3:" in achado
+
+
+# --------------------------------------------------------------- what must not be flagged
+
+
+LIMPO = {
+    "chimera__core.py": "def somar(a: int, b: int) -> int:\n    return a + b\n",
+    "chimera__cfg.py": 'CHAVE = os.environ["OPENROUTER_API_KEY"]\n',
+    "chimera__doc.md": "Set `OPENROUTER_API_KEY` in your environment.\n",
+    "_desktop_dist__app.js": 'const t=document.getElementById("app");\n',
+    "pacote-0.1.dist-info__METADATA": "Name: chimera-agent\nVersion: 0.1\n",
+}
+
+
+def test_an_ordinary_wheel_passes(tmp_path: Path) -> None:
+    """A release gate that fails on a clean build is a release gate somebody deletes."""
+    assert scan(_wheel(tmp_path, **LIMPO)) == []
+
+
+def test_the_redaction_module_is_exempt(tmp_path: Path) -> None:
+    """A wheel carries this project's own source, and this project's source DESCRIBES the shapes of
+    secrets. A file whose whole job is to say what a key looks like is not a key."""
+    fonte = (Path(__file__).resolve().parents[1] / "chimera" / "core" / "redact.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert scan(_wheel(tmp_path, chimera__core__redact__py=fonte)) == []
+
+
+def test_a_binary_member_is_skipped(tmp_path: Path) -> None:
+    """Reading a PNG for credential shapes is how a scanner earns a reputation for crying at noise,
+    and a scanner nobody believes is one that gets removed."""
+    caminho = tmp_path / "p.whl"
+    with zipfile.ZipFile(caminho, "w") as z:
+        z.writestr("chimera/logo.png", bytes(range(256)) * 8)
+
+    assert scan(caminho) == []

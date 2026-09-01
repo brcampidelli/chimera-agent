@@ -290,13 +290,25 @@ class AuditLog:
         raise AssertionError("unreachable: the last attempt always writes")
 
     def entries(self) -> list[dict[str, Any]]:
+        """Every entry that parses, in order.
+
+        Per line, not per file. This was a list comprehension around a bare `json.loads`, so one
+        truncated line — the ordinary outcome of a crash during an append — made the whole log
+        unreadable, including the entries written BEFORE the crash, which are the ones an incident
+        needs. A line that does not parse is one entry lost, and `verify()` will report the chain
+        break at that point, which is the honest answer.
+        """
         if not self.path.exists():
             return []
-        return [
-            json.loads(line)
-            for line in self.path.read_text(encoding="utf-8").splitlines()
-            if line.strip()
-        ]
+        saida: list[dict[str, Any]] = []
+        for numero, line in enumerate(self.path.read_text(encoding="utf-8").splitlines(), 1):
+            if not line.strip():
+                continue
+            try:
+                saida.append(json.loads(line))
+            except ValueError:
+                _log.warning("unreadable audit line %d in %s", numero, self.path)
+        return saida
 
     def verify(self, entries: list[dict[str, Any]] | None = None) -> ChainCheck:
         """Walk the chain and report the first break.

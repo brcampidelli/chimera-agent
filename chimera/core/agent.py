@@ -259,7 +259,13 @@ class AgentResult:
 
     answer: str
     steps: int
-    stopped_reason: str  # "final" | "max_steps" | "tool_loop" | "budget" | "spend" | "cancelled"
+    stopped_reason: str
+    """Why the loop ended: ``final`` | ``max_steps`` | ``tool_loop`` | ``budget`` | ``spend`` |
+    ``cancelled`` | ``context_stuck``.
+
+    ``context_stuck`` is its own value rather than folded into ``max_steps`` because the two need
+    opposite responses: one is a ceiling to raise, the other is a conversation that has nothing left
+    to compact and has to be started over."""
     transcript: list[MessageLike] = field(default_factory=list)
     tool_calls_made: int = 0
     # Token/cost accounting, summed across every model call in the run (0 when the backend reported
@@ -491,6 +497,10 @@ class Agent:
         # stopping, re-planning and force-compacting are all plausible answers and we have no
         # evidence about which one helps, so choosing here would bake in an unmeasured assumption.
         drift_reported = False
+        #: Set when compaction runs out of room while the prompt is still over the threshold. The
+        #: loop leaves through the same final turn `max_steps` uses, under its own reason: "raise
+        #: the ceiling" and "start a new conversation" are opposite advice.
+        contexto_travado: str | None = None
 
         for step in range(1, self.config.max_steps + 1):
             # Cooperative cancel, checked once per step. A model call in flight cannot be
@@ -592,6 +602,29 @@ class Agent:
                         "compacted at %d tokens (threshold %d of %d-token window)",
                         result.prompt_tokens, self._budget.threshold, self._budget.window,
                     )
+                else:
+                    # `compact`'s own docstring asks for this and nothing implemented it: "callers
+                    # should treat a no-op as 'this did not help' rather than retrying into the same
+                    # wall". A guard written in prose and not in code is the shape that has cost
+                    # this project before.
+                    #
+                    # Nothing left to compact and still over the threshold means the NEXT call sends
+                    # the same oversized prompt, costs the same money, and returns the same count.
+                    # The loop used to do that until `max_steps` — a full model call per step, all
+                    # of them unable to succeed. Stopping here answers with what the run has, under
+                    # its own reason, because "raise the step ceiling" and "start a new
+                    # conversation" are opposite advice.
+                    _log.warning(
+                        "context is stuck at %d tokens (threshold %d) and there is nothing left to "
+                        "compact; answering with what the run has",
+                        result.prompt_tokens, self._budget.threshold,
+                    )
+                    # The content of the call that just returned IS "what the run has": the
+                    # assistant message is only appended further down, on the branch this break
+                    # skips, so scanning the transcript afterwards finds the PREVIOUS step's answer
+                    # or nothing at all.
+                    contexto_travado = result.content
+                    break
             if not result.tool_calls:
                 # Narrate-instead-of-act guard: if asked to insist on action, push a described-but-
                 # unexecuted plan back once instead of accepting it as done. Only once, so a genuine
@@ -628,14 +661,18 @@ class Agent:
                 observation = self._run_tool(call.name, call.arguments)
                 if on_edit is not None and edit_before is not None:
                     self._emit_edit(edit_before, on_edit)
+                # A refusal is not a success. This read `not startswith("error:")`, so a
+                # governance or taint gate declining to run the tool produced `ok=True` — the
+                # screen drew a tick, the receipt counted a completed call, and the model,
+                # reading an ordinary-looking observation, answered "Done. I force-pushed the
+                # branch to origin as requested" for a command that never ran. Measured, on
+                # this loop, with the real kernel.
+                #
+                # Computed OUTSIDE the `on_tool` block, because the loop breaker below needs the
+                # same answer: it used to be told only that the call repeated, so a tool stonewalled
+                # by a gate ended the run with words that blamed the model for it.
+                ran = not observation.startswith("error:") and not is_refusal(observation)
                 if on_tool is not None:
-                    # A refusal is not a success. This read `not startswith("error:")`, so a
-                    # governance or taint gate declining to run the tool produced `ok=True` — the
-                    # screen drew a tick, the receipt counted a completed call, and the model,
-                    # reading an ordinary-looking observation, answered "Done. I force-pushed the
-                    # branch to origin as requested" for a command that never ran. Measured, on
-                    # this loop, with the real kernel.
-                    ran = not observation.startswith("error:") and not is_refusal(observation)
                     on_tool(ToolActivity(call.name, call.arguments, ran, observation))
                 record.tools.append(tool_record(call.name, call.arguments, observation))
                 messages.append(
@@ -643,7 +680,7 @@ class Agent:
                 )
                 answered.add(call.id)
                 if loop_detector is not None:
-                    verdict = loop_detector.record(call.name, call.arguments, observation)
+                    verdict = loop_detector.record(call.name, call.arguments, observation, ok=ran)
                     if verdict.tripped:
                         tripped = verdict.reason
                         break
@@ -680,6 +717,15 @@ class Agent:
                 messages.append({"role": "assistant", "content": final.content})
                 return self._result(final.content, step, "tool_loop", messages, tool_calls_made,
                                     tool_names, usage, final.model, steplog=steplog, task=task)
+
+        if contexto_travado is not None:
+            # No further model call. The prompt that just came back over budget is the prompt the
+            # next one would send, so asking again would cost exactly what the last call cost and
+            # fail the same way — which is the loop this break exists to end.
+            messages.append({"role": "assistant", "content": contexto_travado})
+            return self._result(contexto_travado, step, "context_stuck", messages, tool_calls_made,
+                                tool_names, usage, self.config.model or "", steplog=steplog,
+                                task=task)
 
         # Budget exhausted: ask once more, without tools, for a final answer.
         final = self._step([*messages, {"role": "user", "content": "Provide your final answer now."}], spend=spend,

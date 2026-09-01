@@ -424,8 +424,19 @@ def context_curve_cmd(
 @app.command()
 def doctor(
     fix: bool = typer.Option(False, "--fix", help="Auto-repair safe setup issues (state dir, .env scaffold)."),
+    probe: bool = typer.Option(
+        False, "--probe", help="Actually call the provider once, instead of trusting the key's name."
+    ),
 ) -> None:
-    """Check the environment and configuration. With --fix, repair safe setup issues."""
+    """Check the environment and configuration. With --fix, repair safe setup issues.
+
+    `--probe` is off by default and that is deliberate: `doctor` should stay instant, offline and
+    free. What it buys when you ask for it is the difference between a claim and a measurement —
+    "Ready" below is an assertion about the NAME of an environment variable, so a revoked key, an
+    account with no credit, or a value pasted with a trailing space all pass it and fail on the
+    first real call. The argument for measuring is already written in `config_api.pricing_capability`
+    a few files over: the time to find out is while reading the doctor, not when a 3 a.m. cron stalls.
+    """
     settings = get_settings()
 
     if fix:
@@ -440,6 +451,7 @@ def doctor(
     # paying LiteLLM's import to check is worth it — and where an unavailable LiteLLM has to degrade
     # to saying nothing, never to a warning that might be wrong. The five with settings fields are
     # never questioned; only what was discovered from the environment.
+    from chimera.core import state_version
     from chimera.providers.discovery import generic_providers, litellm_known
 
     discovered = generic_providers()
@@ -456,6 +468,18 @@ def doctor(
     table.add_row("Python", platform.python_version())
     table.add_row("Platform", platform.platform())
     table.add_row("Home (state dir)", str(settings.home))
+    # WHICH version wrote that directory, which nothing recorded until now: ~27 artefacts live under
+    # it and not one carried a version, so every question about an upgrade was answered by guessing.
+    # Stamped here rather than at import: `doctor` is the command whose job is to know the state of
+    # this machine, and stamping from a library import would write to disk on `import chimera`.
+    marca = state_version.stamp(settings.home)
+    if not marca.known:
+        estado = "[yellow]not recorded before now[/yellow]"
+    elif marca.chimera_version == __version__:
+        estado = marca.chimera_version
+    else:
+        estado = f"[yellow]{marca.chimera_version} -> {__version__}[/yellow]"
+    table.add_row("State written by", estado)
     table.add_row("Default model", settings.default_model)
     table.add_row(
         "Configured providers",
@@ -493,8 +517,28 @@ def doctor(
         )
     console.print(caps)
 
-    if providers:
-        console.print("[green]Ready[/green] — at least one provider key is configured.")
+    if providers and probe:
+        # One token, on the default model, through the same gateway a real run uses — including its
+        # failover, so "the primary is down and a fallback answered" reads as ready, which it is.
+        from chimera.providers import LLMGateway
+
+        try:
+            LLMGateway().quick("ok", model=settings.default_model)
+        except Exception as exc:  # noqa: BLE001 — every provider failure is an answer here
+            from chimera.core.redact import redact
+
+            console.print(
+                f"[red]Not ready[/red] — the provider refused: {redact(str(exc))[:300]}"
+            )
+        else:
+            console.print(
+                f"[green]Ready[/green] — {settings.default_model} answered a live call."
+            )
+    elif providers:
+        console.print(
+            "[green]Ready[/green] — at least one provider key is configured "
+            "[dim](a name, not a call — use --probe to check)[/dim]."
+        )
     else:
         console.print(
             Panel.fit(
@@ -3319,7 +3363,12 @@ def solve(
         # calls refused on any run that read something external — the gate was never too strict,
         # there was nothing behind it. `ask` degrades to `deny` without a terminal, and every
         # decision is recorded so a refused run can be told apart from an idle one.
-        approve = approver_for(settings.approval_mode, approvals)
+        # `home=` is what lets `ask` reach somebody who is not at this keyboard. Without it the
+        # posture degraded to `deny` on every unattended surface — the VPS, a container, cron — so
+        # the three-state gate had two states there and the mandate ("confirm before billing, before
+        # a destructive migration, before touching RLS") had nothing to confirm with. Silence still
+        # refuses; the question just gets asked now.
+        approve = approver_for(settings.approval_mode, approvals, home=settings.home)
         if guard:
             from chimera.governance import TrustKernel, govern_registry
 
@@ -3722,12 +3771,29 @@ def crew_isolated(
     # independent, so sharing there would only false-block; that's why it's crew-only.)
     ledgers: dict[str, Any] = {}
     shared_taint = SharedTaint()
+    # The approval half of the same argument the shared taint makes two comments up. These workers
+    # collaborate on ONE task, so a decision about that task is one decision — and they run in
+    # parallel, so without sharing they asked N times at the same moment onto one terminal, where
+    # two prompts interleave into a question nobody can answer correctly.
+    #
+    # Neither the CLI nor the API ever passed an approver here at all, which meant a REVIEW verdict
+    # inside a crew worker was refused by nobody having been asked. `approve=` below is the first
+    # time this path has one.
+    from chimera.governance import approver_for
+    from chimera.governance.shared_approval import SharedApprovals
+
+    aprovacoes = SharedApprovals(
+        approver_for(settings.approval_mode, home=settings.home)
+    )
 
     def make_factory(wname: str) -> Callable[[Path], Any]:
         def factory(ws: Path) -> Any:
             ledger = TaintLedger(shared=shared_taint)
             ledgers[wname] = ledger
-            return ledger_registry(default_registry(ws), ledger, narrow_on_taint=taint)
+            return ledger_registry(
+                default_registry(ws), ledger,
+                approve=aprovacoes.approver(), narrow_on_taint=taint,
+            )
 
         return factory
 
@@ -4538,6 +4604,122 @@ def migrate(
 
 # --- cron subcommands ---------------------------------------------------------
 
+@app.command()
+def approve(
+    request_id: str = typer.Argument(None, help="The id from the message. Omit to list what is waiting."),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Approve it."),
+    no: bool = typer.Option(False, "--no", "-n", help="Refuse it."),
+) -> None:
+    """Answer a decision the agent is waiting on, from anywhere.
+
+    Without a terminal the approval gate collapsed to a refusal: `ask` degraded to `deny`, so every
+    REVIEW verdict on the VPS, in a container or under cron was a no, and the mandate that says
+    "confirm before billing, before a destructive migration, before touching RLS" had nothing to
+    confirm with. The question is written down and sent to wherever this deployment delivers; this
+    is how it gets answered.
+
+    Silence is still a refusal — a question times out. That is deliberate: a gate that reads silence
+    as consent produces a record of an approval nobody gave.
+    """
+    from chimera.governance.pending import answer as responder
+    from chimera.governance.pending import pending as esperando
+
+    home = Path(get_settings().home)
+    if not request_id:
+        aguardando = esperando(home)
+        if not aguardando:
+            console.print("[dim]nothing is waiting for a decision[/dim]")
+            return
+        tabela = Table(title="Waiting for you")
+        tabela.add_column("id")
+        tabela.add_column("waiting")
+        tabela.add_column("why")
+        tabela.add_column("action")
+        for p in aguardando:
+            tabela.add_row(p.id, f"{p.age_seconds / 60:.0f} min", p.reason[:40], p.action[:60])
+        console.print(tabela)
+        console.print("[dim]answer with: chimera approve <id> --yes | --no[/dim]")
+        return
+
+    if yes == no:
+        # Both or neither. An approval this important must be typed, never inferred from a default:
+        # whichever way the default fell, half the answers would be the one nobody chose.
+        console.print("[yellow]say which: --yes or --no[/yellow]")
+        raise typer.Exit(code=1)
+    if not responder(home, request_id, yes):
+        console.print(f"[yellow]no question waiting with id {request_id}[/yellow]")
+        raise typer.Exit(code=1)
+    console.print(f"[green]{'approved' if yes else 'refused'}[/green] {request_id}")
+
+
+secrets_app = typer.Typer(help="Keep provider keys in the OS vault instead of a file.", no_args_is_help=True)
+app.add_typer(secrets_app, name="secrets")
+
+
+@secrets_app.command("list")
+def secrets_list() -> None:
+    """What the OS vault holds — names only, never values.
+
+    Printing a secret would put it in this terminal's scrollback, in any screenshot of it, and in
+    whatever recorded the session, which undoes the reason for having a vault.
+    """
+    from chimera.config_vault import available, stored
+
+    if not available():
+        console.print(
+            "[yellow]no OS vault on this machine[/yellow] — install the extra with "
+            r"[bold]pip install 'chimera-agent\[secrets]'[/bold], or keep using .env "
+            "(a container or a headless server usually has no keychain, and that is fine)."
+        )
+        return
+    guardados = stored()
+    if not guardados:
+        console.print("[dim]the vault holds no Chimera credentials[/dim]")
+        return
+    for nome in guardados:
+        console.print(f"  {nome}")
+    console.print("[dim]values are never printed[/dim]")
+
+
+@secrets_app.command("set")
+def secrets_set(
+    name: str = typer.Argument(..., help="e.g. OPENROUTER_API_KEY"),
+    value: str = typer.Option(None, "--value", help="Omit to be prompted without echo."),
+) -> None:
+    """Put one credential in the OS vault.
+
+    Prompted without echo by default, and that is not politeness: a key typed as an argument lands
+    in the shell history of every machine it is typed on, which is the kind of file this command
+    exists to stop using.
+    """
+    from chimera.config_vault import STORABLE, available, store
+
+    if name.upper() not in STORABLE:
+        console.print(f"[yellow]{name} is not a credential this vault stores[/yellow]")
+        console.print("[dim]storable: " + ", ".join(STORABLE) + "[/dim]")
+        raise typer.Exit(code=1)
+    if not available():
+        console.print("[yellow]no OS vault on this machine[/yellow] — see `chimera secrets list`.")
+        raise typer.Exit(code=1)
+    if value is None:
+        value = typer.prompt(f"{name.upper()}", hide_input=True)
+    if not store(name, value):
+        console.print("[red]the vault refused to store it[/red] (locked, or the prompt was cancelled)")
+        raise typer.Exit(code=1)
+    console.print(f"[green]stored[/green] {name.upper()} — the environment still wins over it")
+
+
+@secrets_app.command("rm")
+def secrets_rm(name: str = typer.Argument(..., help="The credential to forget.")) -> None:
+    """Remove one credential from the OS vault."""
+    from chimera.config_vault import forget
+
+    if not forget(name):
+        console.print(f"[yellow]{name.upper()} was not in the vault[/yellow]")
+        raise typer.Exit(code=1)
+    console.print(f"[green]forgot[/green] {name.upper()}")
+
+
 cron_app = typer.Typer(help="Manage scheduled jobs (crons and event SOPs).", no_args_is_help=True)
 app.add_typer(cron_app, name="cron")
 
@@ -4728,72 +4910,68 @@ def cron_disable(job_id: str = typer.Argument(..., help="The job id to disable."
     console.print(f"[green]disabled[/green] {job_id}")
 
 
-secrets_app = typer.Typer(help="Keep provider keys in the OS vault instead of a file.", no_args_is_help=True)
-app.add_typer(secrets_app, name="secrets")
-
-
-@secrets_app.command("list")
-def secrets_list() -> None:
-    """What the OS vault holds — names only, never values.
-
-    Printing a secret would put it in this terminal's scrollback, in any screenshot of it, and in
-    whatever recorded the session, which undoes the reason for having a vault.
-    """
-    from chimera.config_vault import available, stored
-
-    if not available():
-        console.print(
-            "[yellow]no OS vault on this machine[/yellow] — install the extra with "
-            r"[bold]pip install 'chimera-agent\[secrets]'[/bold], or keep using .env "
-            "(a container or a headless server usually has no keychain, and that is fine)."
-        )
-        return
-    guardados = stored()
-    if not guardados:
-        console.print("[dim]the vault holds no Chimera credentials[/dim]")
-        return
-    for nome in guardados:
-        console.print(f"  {nome}")
-    console.print("[dim]values are never printed[/dim]")
-
-
-@secrets_app.command("set")
-def secrets_set(
-    name: str = typer.Argument(..., help="e.g. OPENROUTER_API_KEY"),
-    value: str = typer.Option(None, "--value", help="Omit to be prompted without echo."),
+@cron_app.command("fire")
+def cron_fire(
+    event: str = typer.Argument(..., help="The event name to fire (as given to `cron add --event`)."),
+    model: str = typer.Option(None, "--model", "-m", help="Model for the dispatched jobs."),
+    max_steps: int = typer.Option(6, "--max-steps", help="Max tool-calling steps per job."),
+    workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root for tools."),
 ) -> None:
-    """Put one credential in the OS vault.
+    """Run every job registered for an event.
 
-    Prompted without echo by default, and that is not politeness: a key typed as an argument lands
-    in the shell history of every machine it is typed on, which is the kind of file this command
-    exists to stop using.
+    Event jobs had no dispatcher. `cron add --event deploy` accepted the job and `cron list` showed
+    it enabled, but nothing in the package ever called `fire_event` — so the job simply never ran,
+    and its silence was indistinguishable from that of a job whose time had not come. The cron
+    trigger has the daemon and the webhook trigger has the webhook server; this is the third one's.
+
+    Meant to be called from wherever the event actually happens — a git hook, a deploy step, a CI
+    job. Dispatch is the same one the daemon uses, so a fired job behaves exactly like a scheduled
+    one: same agent, same spend caps, same receipt.
     """
-    from chimera.config_vault import STORABLE, available, store
+    import time
 
-    if name.upper() not in STORABLE:
-        console.print(f"[yellow]{name} is not a credential this vault stores[/yellow]")
-        console.print("[dim]storable: " + ", ".join(STORABLE) + "[/dim]")
-        raise typer.Exit(code=1)
-    if not available():
-        console.print("[yellow]no OS vault on this machine[/yellow] — see `chimera secrets list`.")
-        raise typer.Exit(code=1)
-    if value is None:
-        value = typer.prompt(f"{name.upper()}", hide_input=True)
-    if not store(name, value):
-        console.print("[red]the vault refused to store it[/red] (locked, or the prompt was cancelled)")
-        raise typer.Exit(code=1)
-    console.print(f"[green]stored[/green] {name.upper()} — the environment still wins over it")
+    from chimera.providers import LLMGateway
+    from chimera.scheduler import Scheduler, make_agent_dispatch
+    from chimera.scheduler.delivery import make_deliver
+    from chimera.scheduler.job_runner import make_run_job
 
-
-@secrets_app.command("rm")
-def secrets_rm(name: str = typer.Argument(..., help="The credential to forget.")) -> None:
-    """Remove one credential from the OS vault."""
-    from chimera.config_vault import forget
-
-    if not forget(name):
-        console.print(f"[yellow]{name.upper()} was not in the vault[/yellow]")
+    scheduler = Scheduler(_cron_store())
+    if not scheduler.jobs_for_event(event):
+        # Louder than an empty run: a typo in an event name is the likeliest way to sit waiting for
+        # something that will never happen, and "0 jobs" printed in green reads like success.
+        console.print(f"[yellow]no enabled job registered for event {event!r}[/yellow]")
         raise typer.Exit(code=1)
-    console.print(f"[green]forgot[/green] {name.upper()}")
+
+    settings = get_settings()
+    run_job = make_run_job(
+        settings=settings,
+        backend=LLMGateway(),
+        workspace=Path(workspace).resolve(),
+        model=model,
+        max_steps=max_steps,
+        usage_path=settings.home / "usage.jsonl",
+        warn=lambda linha: console.print(f"[yellow]{linha}[/yellow]"),
+    )
+    # Through `make_agent_dispatch`, not straight to `fire_event`. It is what turns a `JobOutcome`
+    # into the status the scheduler records — so a gate that rejected the work reads as `rejected`
+    # rather than as success — and it is where delivery happens. Without it a fired job would run,
+    # be recorded as ok whatever its gate said, and deliver nothing: a second dispatch path that
+    # quietly behaves differently from the daemon's is worse than no second path.
+    def _sem_job(_task: str) -> str:  # pragma: no cover - unreachable while run_job is given
+        raise AssertionError("cron fire always has the job; run_task should never be reached")
+
+    deliver = make_deliver(
+        settings.home / "scheduler" / "cron_results.jsonl",
+        warn=lambda linha: console.print(f"[yellow]{linha}[/yellow]"),
+    )
+    ran = scheduler.fire_event(
+        event, time.time(), make_agent_dispatch(_sem_job, deliver, run_job=run_job)
+    )
+    for job in ran:
+        cor = "green" if job.last_status == "ok" else "red"
+        console.print(f"[{cor}]{job.last_status}[/{cor}] {job.name} ({job.id})")
+        if job.last_error:
+            console.print(f"  {job.last_error}")
 
 
 @cron_app.command("learn")

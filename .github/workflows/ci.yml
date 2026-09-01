@@ -202,6 +202,21 @@ jobs:
       # The same idea one layer out: the documentation site renders the command reference from
       # this dump, so a new command with no help text, or a renamed flag, must not reach a
       # published page describing the CLI as it was last release.
+      # What a diff BRINGS IN, which nothing else here asks. `gitleaks` runs over the full history
+      # and the three CVE audits watch what is installed — every one of them asks whether something
+      # is getting OUT, or whether a dependency is known-bad. This repository is public, takes pull
+      # requests from anyone, and auto-merges by policy: a line adding a `curl` to a URL shortener
+      # inside `.github/workflows/` or `install.sh` passes lint, mypy, pytest, gitleaks and all
+      # three audits without touching a thing any of them look at.
+      #
+      # `--fail-on high`, not `medium`: these are heuristics with legitimate uses, and a gate that
+      # stops a build over a shortened link in a comment is a gate somebody switches off.
+      - name: What this diff brings in
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          uv run python scripts/pr_intent_scan.py --base "origin/${{ github.base_ref }}" --fail-on high
+
       - name: Regenerate the CLI snapshot
         run: uv run python -m chimera.cli.schema_dump > chimera/_cli_snapshot.json
 

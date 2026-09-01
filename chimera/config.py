@@ -672,6 +672,53 @@ class Settings(BaseSettings):
         default_factory=list, validation_alias="CHIMERA_TOOL_DENYLIST"
     )
 
+    @field_validator("api_base", mode="after")
+    @classmethod
+    def _api_base_is_local_or_encrypted(cls, value: str | None) -> str | None:
+        """Refuse a cleartext endpoint that is not this machine.
+
+        Every configured provider key is exported to the environment for LiteLLM to see, and this
+        value is applied to EVERY call — so pointing it at a third party sends whichever key that
+        provider matches to them. That is a footgun rather than an exploit, since somebody typed the
+        value, and the field exists for exactly the case that is safe: a self-hosted server on
+        loopback, where nothing crosses a network.
+
+        Plain HTTP to another host is the one reading with no legitimate version: a bearer token in
+        cleartext, to somewhere else. TLS is fine, loopback is fine, and unset — the ordinary case —
+        is untouched.
+
+        Compared after parsing, never by substring. `"localhost" in url` accepts
+        `http://evil.localhost.com`, and a check anyone can defeat by registering a domain is not a
+        check. A URL that will not parse is refused rather than assumed local: a string no parser
+        understands must not pass a guard whose whole job is to decide where it points.
+        """
+        if not value:
+            return value
+        import ipaddress
+        from urllib.parse import urlsplit
+
+        try:
+            parts = urlsplit(value)
+            scheme, host = parts.scheme.lower(), (parts.hostname or "").lower()
+        except ValueError:
+            scheme, host = "", ""
+        if scheme == "https":
+            return value
+        # Parsed as an address, not matched as a prefix. `host.startswith("127.")` was the first
+        # version of this line and it accepts `127.0.0.1.atacante.com` — the same substring mistake
+        # the docstring above warns about, made two lines below the warning.
+        try:
+            local = ipaddress.ip_address(host).is_loopback
+        except ValueError:
+            local = host == "localhost"
+        if not local:
+            raise ValueError(
+                f"CHIMERA_API_BASE={value!r} sends every provider key you have configured, in "
+                "cleartext, to a host that is not this machine. Use https://, or a loopback "
+                "address (127.0.0.1 / localhost) for a self-hosted server."
+            )
+        return value
+
     @field_validator("approval", mode="before")
     @classmethod
     def _approval_is_a_posture_word(cls, value: object) -> object:

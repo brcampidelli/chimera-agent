@@ -16,6 +16,7 @@ Run `chimera <command> --help` for the full text of any entry.
 | [`agent`](#agent) | Run the ReAct agent loop with native tools. Requires a provider key. |
 | [`agents`](#agents) | The agents you dispatch work to — as distinct from the one you converse with. |
 | [`app`](#app) | Run the Chimera Desktop app: the HTTP+SSE API + the built React UI (needs the 'desktop' extra). |
+| [`approve`](#approve) | Answer a decision the agent is waiting on, from anywhere. |
 | [`assist`](#assist) | Your daily-driver assistant: cheap by default, escalates when it must. |
 | [`bench`](#bench) | Run the continuous-evolution benchmark on a demo task set. Requires a key. |
 | [`bench-compare`](#bench-compare) | Report the honest A/B delta (+95% CI) between two benchmark result files. |
@@ -181,6 +182,32 @@ chimera app
 | `--cron` | Fire scheduled jobs while the app is open (proactivity). Default: the CHIMERA_APP_CRON setting (on). --no-cron makes the app purely reactive. |  |
 | `--open` | Open the app in your browser. | `True` |
 | `--emit-port-file` | Write the final http://host:port URL to this file once bound (for a parent/sidecar). |  |
+
+## approve
+
+Answer a decision the agent is waiting on, from anywhere.
+
+Without a terminal the approval gate collapsed to a refusal: `ask` degraded to `deny`, so every
+REVIEW verdict on the VPS, in a container or under cron was a no, and the mandate that says
+"confirm before billing, before a destructive migration, before touching RLS" had nothing to
+confirm with. The question is written down and sent to wherever this deployment delivers; this
+is how it gets answered.
+
+Silence is still a refusal — a question times out. That is deliberate: a gate that reads silence
+as consent produces a record of an approval nobody gave.
+
+```bash
+chimera approve [REQUEST_ID]
+```
+
+| Argument | |
+| --- | --- |
+| `REQUEST_ID` | The id from the message. Omit to list what is waiting. |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--yes`, `-y` | Approve it. |  |
+| `--no`, `-n` | Refuse it. |  |
 
 ## assist
 
@@ -412,6 +439,13 @@ chimera deliver REQUEST
 
 Check the environment and configuration. With --fix, repair safe setup issues.
 
+`--probe` is off by default and that is deliberate: `doctor` should stay instant, offline and
+free. What it buys when you ask for it is the difference between a claim and a measurement —
+"Ready" below is an assertion about the NAME of an environment variable, so a revoked key, an
+account with no credit, or a value pasted with a trailing space all pass it and fail on the
+first real call. The argument for measuring is already written in `config_api.pricing_capability`
+a few files over: the time to find out is while reading the doctor, not when a 3 a.m. cron stalls.
+
 ```bash
 chimera doctor
 ```
@@ -419,6 +453,7 @@ chimera doctor
 | Option | | Default |
 | --- | --- | --- |
 | `--fix` | Auto-repair safe setup issues (state dir, .env scaffold). |  |
+| `--probe` | Actually call the provider once, instead of trusting the key's name. |  |
 
 ## drift
 

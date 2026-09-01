@@ -87,5 +87,13 @@ jobs:
           WHL=$(ls dist/*.whl)
           python -c "import zipfile,sys; ns=zipfile.ZipFile(sys.argv[1]).namelist(); assert 'chimera/_desktop_dist/index.html' in ns, 'desktop UI missing from wheel'; print('OK: desktop UI bundled in', sys.argv[1])" "$WHL"
 
+      # The CONTENT, not only the file list. `gitleaks` covers the git history, which is the right
+      # scope for the source — it does not cover what `hatch_build.py` force-includes, nor the
+      # desktop bundle an earlier job built and this one downloaded, both assembled after the last
+      # commit and shipped to everyone. Reuses `chimera.core.redact`'s patterns rather than a second
+      # list, because a second list drifts from the first and the first is the one with tests.
+      - name: Nothing that looks like a credential in what we publish
+        run: python scripts/scan_artifact.py dist/*.whl dist/*.tar.gz
+
       - name: Publish to PyPI (Trusted Publishing — no token)
         uses: pypa/gh-action-pypi-publish@release/v1

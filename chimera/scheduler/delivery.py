@@ -12,7 +12,7 @@ is the difference between a feature every user of a desktop app can turn on and 
 of the app has set up.
 
 **The URL is a credential.** Whoever holds it can post into that channel, so it is never logged in
-full — :func:`redact` is used on every path that reports a failure.
+full — :func:`webhook_host_only` is used on every path that reports a failure.
 """
 
 from __future__ import annotations
@@ -100,8 +100,14 @@ def make_deliver(
     return deliver
 
 
-def redact(url: str) -> str:
-    """A webhook URL with its secret path removed, safe to put in a log or an error message."""
+def webhook_host_only(url: str) -> str:
+    """A webhook URL with its secret path removed, safe to put in a log or an error message.
+
+    Named `redact` until it collided with :func:`chimera.core.redact.redact`, which takes arbitrary
+    text and masks credentials inside it. Two functions with one name and different contracts is how
+    a caller reaches for the wrong one — and the wrong one here would leave the whole path in the
+    log, because a webhook URL has no credential SHAPE in it: the path IS the secret.
+    """
     try:
         parts = urllib.parse.urlparse(url)
     except ValueError:
@@ -159,8 +165,8 @@ def deliver_to_webhook(url: str, text: str, *, timeout: float = TIMEOUT_S) -> De
         # The body carries the reason (bad token, unknown channel, rate limit) and is worth keeping,
         # but it is written by a remote service — bounded before it goes anywhere near a log line.
         detalhe = (exc.read().decode("utf-8", "replace") or "")[:200].strip()
-        _log.warning("delivery to %s refused: HTTP %s", redact(url), exc.code)
+        _log.warning("delivery to %s refused: HTTP %s", webhook_host_only(url), exc.code)
         return Delivered(False, f"HTTP {exc.code}: {detalhe}" if detalhe else f"HTTP {exc.code}")
     except Exception as exc:  # noqa: BLE001 — a chat outage must not fail a job that worked
-        _log.warning("delivery to %s failed: %s", redact(url), type(exc).__name__)
+        _log.warning("delivery to %s failed: %s", webhook_host_only(url), type(exc).__name__)
         return Delivered(False, f"{type(exc).__name__}: {exc}")

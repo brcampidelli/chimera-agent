@@ -5563,6 +5563,11 @@ export interface components {
             attempts: components["schemas"]["AttemptReceiptOut"][];
             /** Paused */
             paused: boolean;
+            /**
+             * Stopped Reason
+             * @default
+             */
+            stopped_reason: string;
             /** Success */
             success: boolean;
             /** Task */

@@ -317,6 +317,9 @@ export function receipt(over: Partial<RunReceipt> = {}): RunReceipt {
     // Empty, matching a receipt written before the field existed — the case every upgrade has and
     // the one a per-project filter must not silently attribute to whatever project is open.
     workspace: "",
+    // Same reason, same shape: a row from before the loop's stop reason reached the receipt. The
+    // default is the OLD case on purpose, so a test that cares about a stop reason has to say so.
+    stopped_reason: "",
     ...over,
   };
 }

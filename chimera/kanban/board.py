@@ -7,6 +7,7 @@ import threading
 import uuid
 from pathlib import Path
 
+from chimera.core.state_format import report
 from chimera.kanban.models import Column, KanbanCard
 from chimera.telemetry import get_logger
 
@@ -26,30 +27,54 @@ class KanbanBoard:
     def __init__(self, path: Path) -> None:
         self.path = Path(path)
         self._cards: dict[str, KanbanCard] = {}
+        #: True when the file could not be read, or nothing in it validated. A stale board does not
+        #: write: `save()` replaces the file wholesale.
+        self.stale = False
         # Re-entrant: the public mutators call `save()`, which takes it again.
         self._lock = threading.RLock()
         self.load()
 
     def load(self) -> None:
         self._cards = {}
+        self.stale = False
         if not self.path.exists():
             return
-        raw = json.loads(self.path.read_text(encoding="utf-8") or "[]")
+        # Inside a handler now. It sat outside, so the per-card tolerance below was unreachable for
+        # the one failure that actually happens — a write cut short — and a truncated file took the
+        # whole board down. `memory/store.py` learned this and wrote it in its own docstring.
+        try:
+            raw = json.loads(self.path.read_text(encoding="utf-8") or "[]")
+        except (OSError, ValueError) as exc:
+            _log.error("could not read the kanban file %s: %s", self.path, exc)
+            self.stale = True
+            return
+        pulados = 0
         for item in raw:
             # Skip a single malformed card (schema drift, hand-edit) instead of aborting the whole
             # load — one bad entry must not make every board command crash.
             try:
                 card = KanbanCard.model_validate(item)
             except ValueError as exc:
-                _log.warning("skipping malformed kanban card: %s", exc)
+                _log.debug("malformed kanban card: %s", exc)
+                pulados += 1
                 continue
             self._cards[card.id] = card
+        self.stale = report(
+            kept=len(self._cards), skipped=pulados, what="kanban card", path=self.path
+        )
 
     def save(self) -> None:
         with self._lock:
             self._save_locked()
 
     def _save_locked(self) -> None:
+        if self.stale:
+            _log.error(
+                "refusing to write %s: it was not read successfully (truncated, or a format from "
+                "another version)",
+                self.path,
+            )
+            return
         self.path.parent.mkdir(parents=True, exist_ok=True)
         data = [card.model_dump() for card in self._cards.values()]
         # Atomic write: a crash mid-write must not truncate the board and lose every card.
