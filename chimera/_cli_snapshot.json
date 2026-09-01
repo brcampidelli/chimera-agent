@@ -378,6 +378,47 @@
     },
     {
       "deprecated": false,
+      "help": "Answer a decision the agent is waiting on, from anywhere.\n\nWithout a terminal the approval gate collapsed to a refusal: `ask` degraded to `deny`, so every\nREVIEW verdict on the VPS, in a container or under cron was a no, and the mandate that says\n\"confirm before billing, before a destructive migration, before touching RLS\" had nothing to\nconfirm with. The question is written down and sent to wherever this deployment delivers; this\nis how it gets answered.\n\nSilence is still a refusal \u2014 a question times out. That is deliberate: a gate that reads silence\nas consent produces a record of an approval nobody gave.",
+      "hidden": false,
+      "name": "approve",
+      "params": [
+        {
+          "help": "The id from the message. Omit to list what is waiting.",
+          "kind": "argument",
+          "name": "request_id",
+          "opts": [
+            "request_id"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Approve it.",
+          "kind": "option",
+          "name": "yes",
+          "opts": [
+            "--yes",
+            "-y"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Refuse it.",
+          "kind": "option",
+          "name": "no",
+          "opts": [
+            "--no",
+            "-n"
+          ],
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": "approve"
+    },
+    {
+      "deprecated": false,
       "help": "Your daily-driver assistant: cheap by default, escalates when it must.\n\nAssist = chat with the second-brain defaults ON: the tier cascade routes\nchit-chat to cheap models and escalates hard asks; your persistent profile\n(chimera profile) is the stable preamble; memory, nudges and end-of-session\nconsolidation are active. On exit it prints the session cost receipt \u2014\ntier distribution + measured tokens \u2014 so 'cheap by default' is a number.",
       "hidden": false,
       "name": "assist",

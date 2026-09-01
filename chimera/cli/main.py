@@ -3363,7 +3363,12 @@ def solve(
         # calls refused on any run that read something external — the gate was never too strict,
         # there was nothing behind it. `ask` degrades to `deny` without a terminal, and every
         # decision is recorded so a refused run can be told apart from an idle one.
-        approve = approver_for(settings.approval_mode, approvals)
+        # `home=` is what lets `ask` reach somebody who is not at this keyboard. Without it the
+        # posture degraded to `deny` on every unattended surface — the VPS, a container, cron — so
+        # the three-state gate had two states there and the mandate ("confirm before billing, before
+        # a destructive migration, before touching RLS") had nothing to confirm with. Silence still
+        # refuses; the question just gets asked now.
+        approve = approver_for(settings.approval_mode, approvals, home=settings.home)
         if guard:
             from chimera.governance import TrustKernel, govern_registry
 
@@ -3766,12 +3771,29 @@ def crew_isolated(
     # independent, so sharing there would only false-block; that's why it's crew-only.)
     ledgers: dict[str, Any] = {}
     shared_taint = SharedTaint()
+    # The approval half of the same argument the shared taint makes two comments up. These workers
+    # collaborate on ONE task, so a decision about that task is one decision — and they run in
+    # parallel, so without sharing they asked N times at the same moment onto one terminal, where
+    # two prompts interleave into a question nobody can answer correctly.
+    #
+    # Neither the CLI nor the API ever passed an approver here at all, which meant a REVIEW verdict
+    # inside a crew worker was refused by nobody having been asked. `approve=` below is the first
+    # time this path has one.
+    from chimera.governance import approver_for
+    from chimera.governance.shared_approval import SharedApprovals
+
+    aprovacoes = SharedApprovals(
+        approver_for(settings.approval_mode, home=settings.home)
+    )
 
     def make_factory(wname: str) -> Callable[[Path], Any]:
         def factory(ws: Path) -> Any:
             ledger = TaintLedger(shared=shared_taint)
             ledgers[wname] = ledger
-            return ledger_registry(default_registry(ws), ledger, narrow_on_taint=taint)
+            return ledger_registry(
+                default_registry(ws), ledger,
+                approve=aprovacoes.approver(), narrow_on_taint=taint,
+            )
 
         return factory
 
@@ -4581,6 +4603,54 @@ def migrate(
 
 
 # --- cron subcommands ---------------------------------------------------------
+
+@app.command()
+def approve(
+    request_id: str = typer.Argument(None, help="The id from the message. Omit to list what is waiting."),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Approve it."),
+    no: bool = typer.Option(False, "--no", "-n", help="Refuse it."),
+) -> None:
+    """Answer a decision the agent is waiting on, from anywhere.
+
+    Without a terminal the approval gate collapsed to a refusal: `ask` degraded to `deny`, so every
+    REVIEW verdict on the VPS, in a container or under cron was a no, and the mandate that says
+    "confirm before billing, before a destructive migration, before touching RLS" had nothing to
+    confirm with. The question is written down and sent to wherever this deployment delivers; this
+    is how it gets answered.
+
+    Silence is still a refusal — a question times out. That is deliberate: a gate that reads silence
+    as consent produces a record of an approval nobody gave.
+    """
+    from chimera.governance.pending import answer as responder
+    from chimera.governance.pending import pending as esperando
+
+    home = Path(get_settings().home)
+    if not request_id:
+        aguardando = esperando(home)
+        if not aguardando:
+            console.print("[dim]nothing is waiting for a decision[/dim]")
+            return
+        tabela = Table(title="Waiting for you")
+        tabela.add_column("id")
+        tabela.add_column("waiting")
+        tabela.add_column("why")
+        tabela.add_column("action")
+        for p in aguardando:
+            tabela.add_row(p.id, f"{p.age_seconds / 60:.0f} min", p.reason[:40], p.action[:60])
+        console.print(tabela)
+        console.print("[dim]answer with: chimera approve <id> --yes | --no[/dim]")
+        return
+
+    if yes == no:
+        # Both or neither. An approval this important must be typed, never inferred from a default:
+        # whichever way the default fell, half the answers would be the one nobody chose.
+        console.print("[yellow]say which: --yes or --no[/yellow]")
+        raise typer.Exit(code=1)
+    if not responder(home, request_id, yes):
+        console.print(f"[yellow]no question waiting with id {request_id}[/yellow]")
+        raise typer.Exit(code=1)
+    console.print(f"[green]{'approved' if yes else 'refused'}[/green] {request_id}")
+
 
 cron_app = typer.Typer(help="Manage scheduled jobs (crons and event SOPs).", no_args_is_help=True)
 app.add_typer(cron_app, name="cron")

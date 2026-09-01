@@ -137,12 +137,25 @@ def ask(ledger: ApprovalLedger | None = None, *, stream: Any = None) -> Approver
     return approve
 
 
-def approver_for(mode: str, ledger: ApprovalLedger | None = None) -> Approver:
+def approver_for(
+    mode: str,
+    ledger: ApprovalLedger | None = None,
+    *,
+    home: Any = None,
+    deliver: Any = None,
+) -> Approver:
     """Build the approver for a configured mode: ``ask`` | ``deny`` | ``allow``.
 
     ``ask`` degrades to ``deny`` with no terminal attached, which is what a cron job has. Degrading
     the other way — falling back to allow because nobody could be asked — would turn an unattended
     deployment into the most permissive configuration in the product, which is exactly backwards.
+
+    ``home`` opts into asking somebody who is NOT at the keyboard. Without a terminal the three-state
+    gate used to collapse into two — every REVIEW became a refusal — so the mandate that says
+    "confirm before billing, before a destructive migration, before touching RLS" had nothing to
+    confirm with. With a home (and ideally a ``deliver``), the question is written down, sent
+    wherever this deployment sends things, and answered with ``chimera approve``. Silence still
+    refuses; see :mod:`chimera.governance.pending`.
     """
     mode = (mode or "ask").strip().lower()
     if mode == "allow":
@@ -150,6 +163,22 @@ def approver_for(mode: str, ledger: ApprovalLedger | None = None) -> Approver:
     if mode == "deny":
         return deny(ledger)
     if not sys.stdin or not sys.stdin.isatty():
+        if home is not None:
+            return ask_elsewhere(home, ledger, deliver=deliver)
         _log.info("approval mode 'ask' with no terminal: denying and recording")
         return deny(ledger)
     return ask(ledger)
+
+
+def ask_elsewhere(home: Any, ledger: ApprovalLedger | None = None, *, deliver: Any = None) -> Approver:
+    """Ask a person who is elsewhere, and wait. Anything but an explicit yes is a no."""
+    from chimera.governance.pending import ask_durably
+
+    def approve(*args: Any) -> bool:
+        action, reason = _describe(*args)
+        approved = ask_durably(home, action, reason, deliver=deliver)
+        if ledger is not None:
+            ledger.record(action or reason, approved=approved)
+        return approved
+
+    return approve
