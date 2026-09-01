@@ -140,7 +140,11 @@ def test_stream_complete_survives_malformed_chunks(monkeypatch: pytest.MonkeyPat
 
     result = LLMGateway().stream_complete([Message(role="user", content="hi")], model="prov/m")
     assert result.content == "ok"
-    assert result.tool_calls is not None and result.tool_calls[0].arguments == {}  # bad args -> {}
+    # The junk chunk must not raise — that is what this test is for — and the half-written argument
+    # string is DROPPED. It used to become `arguments={}`, which ran the tool with nothing and got
+    # the model blamed for the failure; `{bad json` is a call we did not receive, not a call with no
+    # arguments. The text that did arrive is still returned.
+    assert result.tool_calls is None
 
 
 def test_fallback_models_split_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
