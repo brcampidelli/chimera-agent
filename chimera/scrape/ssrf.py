@@ -21,7 +21,15 @@ def _resolve_ips(host: str) -> list[str]:
         return []
 
 
+#: Carrier-grade NAT (RFC 6598). NOT reported as private by `ipaddress` on the interpreters this
+#: project runs, so every attribute check below misses it — and `100.100.100.200` inside it is
+#: Alibaba Cloud's instance metadata service, the same role `169.254.169.254` plays on AWS and GCP.
+#: A `/10`, not a `/8`: `100.128.0.0` onwards is ordinary public space and must keep working.
+_CGNAT = ipaddress.ip_network("100.64.0.0/10")
+
+
 def _is_blocked(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    mapped = getattr(ip, "ipv4_mapped", None) or ip
     return (
         ip.is_private
         or ip.is_loopback
@@ -29,6 +37,7 @@ def _is_blocked(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
         or ip.is_reserved
         or ip.is_multicast
         or ip.is_unspecified
+        or (isinstance(mapped, ipaddress.IPv4Address) and mapped in _CGNAT)
     )
 
 

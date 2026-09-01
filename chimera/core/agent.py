@@ -628,14 +628,18 @@ class Agent:
                 observation = self._run_tool(call.name, call.arguments)
                 if on_edit is not None and edit_before is not None:
                     self._emit_edit(edit_before, on_edit)
+                # A refusal is not a success. This read `not startswith("error:")`, so a
+                # governance or taint gate declining to run the tool produced `ok=True` — the
+                # screen drew a tick, the receipt counted a completed call, and the model,
+                # reading an ordinary-looking observation, answered "Done. I force-pushed the
+                # branch to origin as requested" for a command that never ran. Measured, on
+                # this loop, with the real kernel.
+                #
+                # Computed OUTSIDE the `on_tool` block, because the loop breaker below needs the
+                # same answer: it used to be told only that the call repeated, so a tool stonewalled
+                # by a gate ended the run with words that blamed the model for it.
+                ran = not observation.startswith("error:") and not is_refusal(observation)
                 if on_tool is not None:
-                    # A refusal is not a success. This read `not startswith("error:")`, so a
-                    # governance or taint gate declining to run the tool produced `ok=True` — the
-                    # screen drew a tick, the receipt counted a completed call, and the model,
-                    # reading an ordinary-looking observation, answered "Done. I force-pushed the
-                    # branch to origin as requested" for a command that never ran. Measured, on
-                    # this loop, with the real kernel.
-                    ran = not observation.startswith("error:") and not is_refusal(observation)
                     on_tool(ToolActivity(call.name, call.arguments, ran, observation))
                 record.tools.append(tool_record(call.name, call.arguments, observation))
                 messages.append(
@@ -643,7 +647,7 @@ class Agent:
                 )
                 answered.add(call.id)
                 if loop_detector is not None:
-                    verdict = loop_detector.record(call.name, call.arguments, observation)
+                    verdict = loop_detector.record(call.name, call.arguments, observation, ok=ran)
                     if verdict.tripped:
                         tripped = verdict.reason
                         break

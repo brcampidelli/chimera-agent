@@ -20,6 +20,7 @@ instead of an error.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sqlite3
@@ -293,8 +294,15 @@ def default_index_path(home: Path, workspace: Path) -> Path:
 
     Not inside the workspace: an index file in someone's repository is a file they have to gitignore
     and a diff they have to explain, for a cache they did not ask to store there.
+
+    The digest is a real hash, not the builtin. ``hash()`` of a ``str`` is salted per process, so
+    this returned a DIFFERENT filename in every interpreter — and each `chimera find` is a new one.
+    The index was therefore never found: every run built a fresh empty database, re-embedded the
+    whole corpus, and left the last one on disk as a file nothing would open again. Nothing errored;
+    the command worked every time, by doing all of the work every time.
     """
-    digest = str(abs(hash(str(Path(workspace).resolve()))))[:16]
+    key = str(Path(workspace).resolve())
+    digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
     return Path(home) / "rag" / f"{Path(workspace).name}-{digest}.sqlite3"
 
 
