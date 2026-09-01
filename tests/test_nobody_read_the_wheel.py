@@ -18,6 +18,7 @@ second list drifts from the first, and the first is the one with tests.
 
 from __future__ import annotations
 
+import os
 import zipfile
 from pathlib import Path
 
@@ -98,3 +99,40 @@ def test_a_binary_member_is_skipped(tmp_path: Path) -> None:
         z.writestr("chimera/logo.png", bytes(range(256)) * 8)
 
     assert scan(caminho) == []
+
+
+def test_it_runs_where_it_is_actually_run(tmp_path: Path) -> None:
+    """The gate must work with the standard library alone, because that is all the publish job has.
+
+    Every test above passes in an environment where `chimera` is installed with its runtime
+    dependencies. The publish job is not that environment: it installs build tooling, builds the
+    wheel, and runs this scanner — and nothing else. On 2026-09-01, the first time the gate ever
+    executed, it died on `ModuleNotFoundError: No module named 'rich'` before reading a single byte,
+    because `chimera.core.redact` imported `_SECRET_MARKERS` from `chimera.sandbox.local`, which
+    reaches `chimera.proc` and then `chimera.telemetry`.
+
+    The shape of that defect is worth naming: **a gate whose only execution path is the irreversible
+    operation it guards.** It had five green tests and had never run. This one runs it the way the
+    job does — `-S` drops site-packages, so a third-party import fails exactly as it would there.
+    """
+    import subprocess
+    import sys
+
+    raiz = Path(__file__).resolve().parents[1]
+    roda = subprocess.run(
+        [sys.executable, "-S", str(raiz / "scripts" / "scan_artifact.py"), str(_wheel(tmp_path, **LIMPO))],
+        capture_output=True,
+        text=True,
+        env={"PYTHONPATH": str(raiz), "PATH": os.environ.get("PATH", ""), "SYSTEMROOT": os.environ.get("SYSTEMROOT", "")},
+    )
+
+    # The control that keeps this honest: without it, `-S` silently keeping site-packages would make
+    # the test pass while proving nothing about the environment it claims to reproduce.
+    sem_terceiros = subprocess.run(
+        [sys.executable, "-S", "-c", "import rich"],
+        capture_output=True,
+        env={"PYTHONPATH": str(raiz), "PATH": os.environ.get("PATH", ""), "SYSTEMROOT": os.environ.get("SYSTEMROOT", "")},
+    )
+    assert sem_terceiros.returncode != 0, "`-S` did not remove third-party packages; this test proves nothing"
+
+    assert roda.returncode == 0, roda.stderr
