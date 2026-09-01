@@ -1254,11 +1254,74 @@ export async function streamCodeTurn(
     handlers.onError?.(await streamRefusal(res));
     return;
   }
-  const cut = await readFrames(res.body, (frame) => dispatchCodeTurn(frame, handlers));
-  if (cut) handlers.onError?.(cut);
+  // The turn's durable identity and how far this client has read. Both come off the wire: the id
+  // rides in the first `session` frame, and every frame after it carries a `seq`.
+  let turnId = "";
+  let seq = 0;
+  const track = (frame: string) => {
+    const applied = dispatchCodeTurn(frame, handlers, seq);
+    if (applied.turnId) turnId = applied.turnId;
+    if (applied.seq > seq) seq = applied.seq;
+  };
+
+  const cut = await readFrames(res.body, track);
+  if (!cut) return;
+
+  // Resume ONCE, from where this client stopped reading. The work is still running on the server
+  // and is still being paid for; the only thing the drop took away was the client's view of it.
+  // Once, because a resume that can itself resume is a poll loop wearing a recovery's clothes —
+  // and if the second read fails too, the error is the honest answer.
+  if (!turnId) {
+    handlers.onError?.(cut);
+    return;
+  }
+  try {
+    const res2 = await fetch(apiUrl(`/api/code/turns/${turnId}?since=${seq}`), {
+      headers: authHeaders(),
+    });
+    if (!res2.ok) {
+      handlers.onError?.(cut);
+      return;
+    }
+    const body = (await res2.json()) as { frames: Record<string, unknown>[] };
+    for (const frame of body.frames) applyCodeTurnFrame(frame, handlers, seq);
+  } catch {
+    handlers.onError?.(cut);
+  }
 }
 
-function dispatchCodeTurn(frame: string, h: CodeTurnHandlers): void {
+/** What a dispatched frame told us about where we are in the stream. */
+interface Applied {
+  turnId: string;
+  seq: number;
+}
+
+/** Route one already-parsed frame to the handlers, unless it has been applied before.
+ *
+ *  `seen` is what makes replay idempotent, and it is the whole reason replay is safe: a client that
+ *  read up to `seq` asks the server for what came after, and anything that slips through anyway is
+ *  dropped here. Replay-then-live and live-only land on the same state.
+ */
+function applyCodeTurnFrame(
+  payload: Record<string, unknown>,
+  h: CodeTurnHandlers,
+  seen: number,
+): Applied {
+  const seq = Number(payload.seq ?? 0);
+  const turnId = String(payload.turn_id ?? "");
+  if (seq && seq <= seen) return { turnId, seq: 0 };
+  const event = String(payload.event ?? "");
+  if (event === "session") h.onSession?.(payload.session_id as string);
+  else if (event === "token") h.onToken?.(payload.text as string);
+  else if (event === "tool") h.onTool?.(payload as unknown as CodeToolEvent);
+  else if (event === "edit") h.onEdit?.(payload.path as string, payload.patch as string);
+  else if (event === "verified") h.onVerified?.(payload as unknown as CodeVerified);
+  else if (event === "done") h.onDone?.(payload as unknown as CodeTurnDone);
+  else if (event === "error") h.onError?.(payload.message as string);
+  return { turnId, seq };
+}
+
+function dispatchCodeTurn(frame: string, h: CodeTurnHandlers, seen = 0): Applied {
   let event = "message";
   let data = "";
   for (const line of frame.split("\n")) {
@@ -1267,20 +1330,17 @@ function dispatchCodeTurn(frame: string, h: CodeTurnHandlers): void {
     // streamed prose into a wall of runtogetherwords.
     else if (line.startsWith("data:")) data += line.slice(5).replace(/^ /, "");
   }
-  if (!data) return;
+  if (!data) return { turnId: "", seq: 0 };
   let payload: Record<string, unknown>;
   try {
     payload = JSON.parse(data);
   } catch {
-    return;
+    return { turnId: "", seq: 0 };
   }
-  if (event === "session") h.onSession?.(payload.session_id as string);
-  else if (event === "token") h.onToken?.(payload.text as string);
-  else if (event === "tool") h.onTool?.(payload as unknown as CodeToolEvent);
-  else if (event === "edit") h.onEdit?.(payload.path as string, payload.patch as string);
-  else if (event === "verified") h.onVerified?.(payload as unknown as CodeVerified);
-  else if (event === "done") h.onDone?.(payload as unknown as CodeTurnDone);
-  else if (event === "error") h.onError?.(payload.message as string);
+  // The SSE frame carries its name outside the JSON and the replayed frame carries it inside, so
+  // the wire shape is normalised here and there is exactly ONE place that routes an event to a
+  // handler. Two would eventually route them differently, which is the bug replay exists to avoid.
+  return applyCodeTurnFrame({ ...payload, event }, h, seen);
 }
 
 // --- Posture (how far the agent reaches, and when it stops to ask) ---

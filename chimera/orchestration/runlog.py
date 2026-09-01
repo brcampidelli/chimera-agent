@@ -38,14 +38,26 @@ MAX_RUNS = 50
 MAX_BYTES = 4 * 1024 * 1024
 
 
-def run_dir(home: Path, run_id: str) -> Path:
+#: Where a transcript lives, by the surface that produced it. Separate directories so a listing of
+#: one never has to filter out the other, and so pruning one cannot reach the other's runs.
+AREAS = ("orchestration", "code")
+
+
+def run_dir(home: Path, run_id: str, *, area: str = "orchestration") -> Path:
     """Where one run's transcript lives. The id is hex from `uuid4`, so it needs no sanitising —
     but it is checked anyway, because a path built from a request parameter is a path built from a
-    request parameter."""
+    request parameter.
+
+    ``area`` is checked against a fixed list rather than sanitised. It is not user input today, and
+    the day it becomes user input a whitelist is the difference between a directory name and a path
+    traversal — that is not a bet worth taking twice.
+    """
+    if area not in AREAS:
+        raise ValueError(f"unknown transcript area {area!r}")
     safe = "".join(ch for ch in run_id if ch.isalnum() or ch in "-_")[:64]
     if not safe:
         raise ValueError("empty run id")
-    return Path(home) / "orchestration" / safe
+    return Path(home) / area / safe
 
 
 @dataclass(frozen=True)
@@ -60,14 +72,16 @@ class RunSummary:
     done: bool
 
 
-def append(home: Path, run_id: str, event: str, payload: dict[str, Any]) -> None:
+def append(
+    home: Path, run_id: str, event: str, payload: dict[str, Any], *, area: str = "orchestration"
+) -> None:
     """Record one frame. Best-effort: a transcript that cannot be written must not fail the run.
 
     The run is the product and it is already being paid for; losing the record of it is bad, and
     losing the run to preserve the record would be worse.
     """
     try:
-        directory = run_dir(home, run_id)
+        directory = run_dir(home, run_id, area=area)
         directory.mkdir(parents=True, exist_ok=True)
         path = directory / "frames.jsonl"
         line = json.dumps({"event": event, **payload}, ensure_ascii=False, default=str)
@@ -80,7 +94,7 @@ def append(home: Path, run_id: str, event: str, payload: dict[str, Any]) -> None
         _log.debug("orchestration frame not persisted: %s", exc)
 
 
-def exists(home: Path, run_id: str) -> bool:
+def exists(home: Path, run_id: str, *, area: str = "orchestration") -> bool:
     """Whether this run was ever recorded.
 
     `frames()` cannot answer it: an unknown id and a run that has not produced anything past
@@ -88,12 +102,14 @@ def exists(home: Path, run_id: str) -> bool:
     — which are opposite instructions for a client deciding whether to keep polling.
     """
     try:
-        return (run_dir(home, run_id) / "frames.jsonl").exists()
+        return (run_dir(home, run_id, area=area) / "frames.jsonl").exists()
     except ValueError:
         return False
 
 
-def frames(home: Path, run_id: str, *, since: int = 0) -> list[dict[str, Any]]:
+def frames(
+    home: Path, run_id: str, *, since: int = 0, area: str = "orchestration"
+) -> list[dict[str, Any]]:
     """Every frame after ``since``, oldest first.
 
     A malformed line is skipped rather than fatal: the file is appended to from a live run, and a
@@ -101,7 +117,7 @@ def frames(home: Path, run_id: str, *, since: int = 0) -> list[dict[str, Any]]:
     frames it could have replayed.
     """
     try:
-        path = run_dir(home, run_id) / "frames.jsonl"
+        path = run_dir(home, run_id, area=area) / "frames.jsonl"
         raw = path.read_text(encoding="utf-8") if path.exists() else ""
     except (OSError, ValueError) as exc:
         _log.debug("orchestration transcript unreadable: %s", exc)

@@ -218,6 +218,22 @@ class CodeExchangeOut(BaseModel):
     replaying one would put a button on a reopened conversation that cannot do what it says."""
 
 
+class CodeTurnFramesOut(BaseModel):
+    """One coding turn's transcript from ``since`` onward, in the order its single writer stamped.
+
+    The mechanism existed for orchestration and not for this route, which is the one that costs the
+    most: a fan-out is recorded frame by frame and replayable, while a coding turn that lost its
+    connection was gone. Same shape on purpose — the client already owns a reducer that ignores a
+    `seq` it has applied, and two shapes would mean two reducers and eventually two behaviours.
+    """
+
+    turn_id: str
+    frames: list[dict[str, Any]]
+    #: The highest `seq` in `frames`, or the `since` that was asked for when there are none. A
+    #: client stores this and asks again from it, which is what makes a second replay cheap.
+    seq: int
+
+
 class CodeSessionOut(BaseModel):
     id: str
     workspace: str
