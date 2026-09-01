@@ -273,8 +273,17 @@ class StepLog:
 
 
 def tool_record(name: str, arguments: dict[str, Any], observation: str) -> ToolRecord:
-    """Build a clipped record. `ok` follows the loop's own convention: an observation that starts
-    with "error:" is what every other consumer in the codebase already treats as a failure."""
+    """Build a clipped record. `ok` follows the loop's own convention: a tool failed if it errored
+    OR if a gate refused to run it.
+
+    The second half was missing here long after `agent.py` and `registry.py` had it, and the
+    consequence landed exactly where it hurts most: `traces.jsonl` is the artefact someone opens
+    *after* a run went wrong, and it was the last place still recording a refused tool as a
+    completed one. `is_refusal` deliberately excludes `[idempotent: …]` — that marker means the
+    effect already happened and is not being repeated, which is a success, not a refusal.
+    """
+    from chimera.tools.base import is_refusal  # lazy: `chimera.tools` resolves names on first use
+
     try:
         args = json.dumps(arguments, ensure_ascii=False, sort_keys=True)
     except (TypeError, ValueError):
@@ -283,5 +292,5 @@ def tool_record(name: str, arguments: dict[str, Any], observation: str) -> ToolR
         name=name,
         arguments=clip(args, _ARG_CHARS),
         observation=clip(observation, _OBS_CHARS),
-        ok=not observation.startswith("error:"),
+        ok=not observation.startswith("error:") and not is_refusal(observation),
     )
