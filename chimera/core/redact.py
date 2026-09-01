@@ -21,8 +21,17 @@ from __future__ import annotations
 import os
 import re
 
-#: Same markers the sandbox uses to strip the child environment. One list, one meaning of "secret".
-from chimera.sandbox.local import _SECRET_MARKERS
+#: What makes a variable NAME a credential. One list, one meaning of "secret", and it lives here
+#: rather than in the sandbox because this is the module the meaning belongs to — the sandbox strips
+#: the child environment with it, and this file masks values with it.
+#:
+#: It used to live in `chimera.sandbox.local`, and importing it from there is what made THIS module
+#: drag in the sandbox subsystem, `chimera.proc`, `chimera.telemetry` and finally `rich`. Nothing
+#: noticed until `scripts/scan_artifact.py` — which imports the patterns below to check a built
+#: wheel — ran for the first time in the publish job, where the package's runtime dependencies are
+#: deliberately not installed, and died on `No module named 'rich'` before scanning a single byte.
+#: Keep this module importable with the standard library alone.
+_SECRET_MARKERS = ("API_KEY", "SECRET", "TOKEN", "PASSWORD", "PASSWD", "CREDENTIAL", "PRIVATE_KEY")
 
 MASK = "[redacted]"
 

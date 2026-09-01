@@ -11,12 +11,14 @@ import subprocess
 from contextlib import suppress
 from pathlib import Path
 
+# Env-var name fragments that mark a secret — scrubbed from the child env so an injected/rogue
+# command can't `echo $OPENROUTER_API_KEY` and exfiltrate provider keys (the gateway exports them to
+# os.environ). Defined in `chimera.core.redact`, which is the module the meaning belongs to, and
+# imported here because this file has always been where it was read. It used to be the other way
+# round, which made the redaction module drag in this whole subsystem.
+from chimera.core.redact import _SECRET_MARKERS
 from chimera.proc.stdio import kill_tree
 from chimera.sandbox.base import SandboxResult
-
-# Env-var name fragments that mark a secret — scrubbed from the child env so an injected/rogue command
-# can't `echo $OPENROUTER_API_KEY` and exfiltrate provider keys (the gateway exports them to os.environ).
-_SECRET_MARKERS = ("API_KEY", "SECRET", "TOKEN", "PASSWORD", "PASSWD", "CREDENTIAL", "PRIVATE_KEY")
 
 
 def _child_env() -> dict[str, str]:
