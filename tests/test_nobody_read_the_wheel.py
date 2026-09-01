@@ -153,11 +153,17 @@ def test_it_runs_where_it_is_actually_run(tmp_path: Path) -> None:
 
 
 def _repo_falso(tmp_path: Path, arquivos: dict[str, str]) -> Path:
+    """A checked-out tree, written as BYTES.
+
+    `write_text` translates `\\n` to `\\r\\n` on Windows while `zipfile.writestr` does not, so the
+    two sides of a byte comparison differed by line ending alone and this fixture failed on Windows
+    only. The rule under test is content identity; the platform's newline policy is not part of it.
+    """
     raiz = tmp_path / "repo"
     for nome, conteudo in arquivos.items():
         destino = raiz / nome
         destino.parent.mkdir(parents=True, exist_ok=True)
-        destino.write_text(conteudo, encoding="utf-8")
+        destino.write_bytes(conteudo.encode("utf-8"))
     return raiz
 
 
