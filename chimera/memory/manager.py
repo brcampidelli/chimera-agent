@@ -12,6 +12,7 @@ import re
 import uuid
 from collections.abc import Callable
 
+from chimera.core.redact import redact
 from chimera.memory.models import EVERY_PROJECT, MemoryItem, MemoryKind
 from chimera.memory.semantic import EmbedFn, SemanticIndex
 from chimera.memory.store import MemoryBackend
@@ -100,6 +101,16 @@ class MemoryManager:
         from a tainted run also taints the stored item (poison must not launder itself
         into a previously clean fact).
         """
+        # Masked BEFORE the duplicate check, not after: the same fact written twice differs before
+        # masking and matches after, so redacting later would store it twice. And masked here rather
+        # than at the two call sites — `ChatSession` and the desktop turn both parse "remember
+        # that …" and hand the text over, and the next writer would be one forgotten call from the
+        # same hole.
+        #
+        # Memory is the surface with the longest reach: a fact written today is read back into the
+        # system prompt of every matching conversation from now on, and nothing re-reads it to
+        # notice. `redact` is narrow on purpose, which matters more here than anywhere else.
+        content = redact(content)
         duplicate = self._find_duplicate(content, key)
         if duplicate is None:
             return "ADD", self.add(
