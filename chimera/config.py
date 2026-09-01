@@ -943,4 +943,14 @@ def _export_env_file_credentials() -> None:
 def get_settings() -> Settings:
     """Return the cached process-wide settings instance."""
     _export_env_file_credentials()
+    # The OS vault, for anyone who put their keys there instead of in a file. Filled here, beside
+    # the `.env` export, because both answer the same question — what credentials does this process
+    # have — and a vault consulted somewhere deeper would be a second source of truth that
+    # disagrees with the first under conditions nobody could predict.
+    #
+    # Gap-filling only: anything already in the environment wins, so an install that works today is
+    # untouched and `OPENROUTER_API_KEY=… chimera solve` still means what it says.
+    from chimera.config_vault import load_into_environment
+
+    load_into_environment()
     return Settings()

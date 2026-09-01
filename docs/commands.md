@@ -65,6 +65,7 @@ Run `chimera <command> --help` for the full text of any entry.
 | [`sandbox-bench`](#sandbox-bench) | State-based bench: grade the final workspace state + count harmful side effects. |
 | [`scenarios`](#scenarios) | Run the daily right-hand scenario suite (live). Requires a key. |
 | [`schema-bench`](#schema-bench) | Measure tool-schema token cost, full vs compacted (advertise-time). No model calls. |
+| [`secrets`](#secrets) | Keep provider keys in the OS vault instead of a file. |
 | [`serve`](#serve) | Run the messaging gateway on HTTP, Discord, Telegram, Slack or Signal. Requires a key. |
 | [`sessions`](#sessions) | List the saved conversations — the same ones the desktop app shows. |
 | [`skillcard-bench`](#skillcard-bench) | A/B reasoning with vs without injected TRS skill cards. Calls real models. |
@@ -962,6 +963,14 @@ chimera schema-bench
 | `--openapi` | Path or URL to an OpenAPI spec to include (its tools are verbose). |  |
 | `--demo` | Include a couple of synthetic verbose tools to show the effect. |  |
 | `--model`, `-m` | Tokenizer model (default: your default). |  |
+
+## secrets
+
+Keep provider keys in the OS vault instead of a file.
+
+```bash
+chimera secrets
+```
 
 ## serve
 
