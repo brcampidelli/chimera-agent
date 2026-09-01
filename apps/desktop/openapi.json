@@ -1531,6 +1531,34 @@
         "title": "CodeToolOut",
         "type": "object"
       },
+      "CodeTurnFramesOut": {
+        "description": "One coding turn's transcript from ``since`` onward, in the order its single writer stamped.\n\nThe mechanism existed for orchestration and not for this route, which is the one that costs the\nmost: a fan-out is recorded frame by frame and replayable, while a coding turn that lost its\nconnection was gone. Same shape on purpose \u2014 the client already owns a reducer that ignores a\n`seq` it has applied, and two shapes would mean two reducers and eventually two behaviours.",
+        "properties": {
+          "frames": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Frames",
+            "type": "array"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "turn_id",
+          "frames",
+          "seq"
+        ],
+        "title": "CodeTurnFramesOut",
+        "type": "object"
+      },
       "CodeTurnRequest": {
         "description": "One turn of a coding conversation.",
         "properties": {
@@ -9023,6 +9051,56 @@
           }
         },
         "summary": "Code Turn"
+      }
+    },
+    "/api/code/turns/{turn_id}": {
+      "get": {
+        "description": "Everything this turn emitted after ``since``, so a dropped stream costs nothing.\n\nThe same shape the orchestration route has had since it landed, on the route that actually\nneeded it: a coding turn is the most expensive thing this product does, and losing the\nconnection threw away work that had already been paid for while the bill stayed.\n\nThe frames go through the SAME handlers the live stream feeds, and a client that ignores a\n`seq` it has already applied gets one state whether it replayed first or not.\n\n404 for an id that was never recorded, never 200-with-nothing: an unknown turn and a turn\nwith no new frames are opposite instructions for a client deciding whether to keep asking.",
+        "operationId": "code_turn_frames_api_code_turns__turn_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "turn_id",
+            "required": true,
+            "schema": {
+              "title": "Turn Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "title": "Since",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeTurnFramesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Code Turn Frames"
       }
     },
     "/api/code/worth": {
