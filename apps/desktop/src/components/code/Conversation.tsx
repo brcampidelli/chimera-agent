@@ -328,12 +328,20 @@ function ToolRow({
  *  `usd` is null when the model's price is unknown, and this renders that as "price unknown" rather
  *  than as 0 or as nothing — the backend never guesses a price and neither does the UI. */
 /** Reasons a turn ended that the user needs to know about. `final` is absent on purpose: a turn
- *  that finished needs no badge saying so, and adding one would bury the four that mean the work
- *  is INCOMPLETE among nine that are routine. */
+ *  that finished needs no badge saying so, and adding one would bury the ones that mean the work
+ *  is INCOMPLETE among nine that are routine.
+ *
+ *  `spend` was missing here, and it is the one this surface actually produces: the chat route
+ *  passes `max_usd` and never wraps the backend in a token budget, so `budget` cannot reach us and
+ *  `spend` can. A turn cut off by the dollar ceiling drew every other badge and not the one that
+ *  says whether to believe them — the exact failure the comment below says this map exists to fix.
+ *  They are separate entries with separate wording because they are separate ceilings: tokens for
+ *  one delegation, dollars for the whole run. */
 const STOP_REASONS: Record<string, string> = {
   max_steps: "code.chat.stopped.maxSteps",
   tool_loop: "code.chat.stopped.toolLoop",
   budget: "code.chat.stopped.budget",
+  spend: "code.chat.stopped.spend",
   cancelled: "code.chat.stopped.cancelled",
 };
 
