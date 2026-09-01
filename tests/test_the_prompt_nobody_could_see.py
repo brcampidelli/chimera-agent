@@ -77,7 +77,16 @@ def test_a_real_terminal_still_gets_its_prompt(monkeypatch: pytest.MonkeyPatch) 
     """The control. Someone running `chimera solve` in their own terminal is the case the gate was
     written for, and a fix that refuses everywhere would be a different bug, not a fix."""
     monkeypatch.setattr(confirm_mod.sys, "stdin", _FakeStdin())
-    assert resolve_host_exec_confirm(_Settings("local", "ask")) is confirm_mod._prompt
+    # By behaviour, not identity: the gate is wrapped now — a command that can be PROVED to change
+    # nothing is approved without asking — so `is _prompt` would fail for a change that has nothing
+    # to do with what this test is about. What it must still show is that a command needing a
+    # decision reaches the terminal.
+    perguntado: list[str] = []
+    monkeypatch.setattr(confirm_mod, "_prompt", lambda cmd: perguntado.append(cmd) or True)
+    gate = resolve_host_exec_confirm(_Settings("local", "ask"))
+
+    assert gate is not None and gate("rm -rf /tmp/x") is True
+    assert perguntado == ["rm -rf /tmp/x"]
 
 
 def test_the_declaration_does_not_override_allow(monkeypatch: pytest.MonkeyPatch) -> None:
