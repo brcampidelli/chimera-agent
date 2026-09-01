@@ -225,12 +225,24 @@ class ChatSession:
         return "\n\n".join(parts)
 
 
+#: Sentinel for "the caller said nothing about a gate", which is not the same as "no gate".
+#:
+#: This parameter defaulted to ``None`` and the body only filtered ``if gate is not None``, so
+#: forgetting the keyword silently disabled a trust boundary. The desktop coding turn was that
+#: caller, on the path its own docstring calls "every conversation in the app": a memory carrying
+#: override text arrived labelled as tainted and was not stopped. Fixing the call site alone would
+#: leave the next caller one forgotten keyword from the same hole, which is how this one happened.
+#: ``None`` still means "no gate" — the memory benchmark needs ungated recall to measure what the
+#: gate costs — but it has to be typed now.
+_GATE_UNSET: Any = object()
+
+
 def recall_facts(
     message: str,
     *,
     memory: Any = None,
     graph: Any = None,
-    gate: Any = None,
+    gate: Any = _GATE_UNSET,
     k: int = 3,
     search: Any = None,
     project: str | None = EVERY_PROJECT,
@@ -244,7 +256,11 @@ def recall_facts(
     ``project`` narrows what may be recalled to that folder's facts plus the ones that belong
     everywhere. It defaults to :data:`EVERY_PROJECT` — no narrowing — because this function is also
     the chat's recall, and a conversation with no folder open is not a project.
+
+    ``gate`` defaults to a real :class:`MemoryGate`. Pass ``None`` to opt out explicitly.
     """
+    if gate is _GATE_UNSET:
+        gate = MemoryGate()
     facts: list[str] = []
     layers: list[str] = []
     if memory is not None:

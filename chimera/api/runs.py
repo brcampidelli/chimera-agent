@@ -121,6 +121,21 @@ class RunReceipt(BaseModel):
     because every receipt written before this field existed came from a typed command — the field
     was the only way to supply one."""
     answer: str = ""  # the final answer, truncated in the builder
+
+    stopped_reason: str = ""
+    """Why the loop stopped: ``final`` | ``max_steps`` | ``tool_loop`` | ``budget`` | ``spend`` |
+    ``cancelled``.
+
+    The loop has always known this — it is assigned at one place per value, reaches ``traces.jsonl``
+    and the SSE ``done`` frame, and draws a badge on screen. It stopped at this boundary, so a run
+    the user cancelled, a run cut off by the dollar ceiling and a run whose work the verifier
+    rejected all persisted the same ``success: false``. The file kept as the durable record could
+    not answer "how many runs stopped at the cap this month".
+
+    Empty means a receipt written before this field existed. Not filled in with a plausible guess,
+    for the reason ``workspace`` and ``profile`` give above: attributing an outcome a run may not
+    have had would put invented evidence into the one view whose job is to say what happened."""
+
     attempts: list[AttemptReceipt] = []
     #: Which model-role configuration ran this — "economy" / "balanced" / "max", or ``null`` for a
     #: run that predates the field or named none. Null is kept as its own group rather than folded
@@ -215,6 +230,10 @@ def build_receipt(
         verify_source=verify_source,
         profile_source=profile_source,
         answer=(result.answer or "")[:2000],
+        # `getattr`, like every other field read off `result` here: this builder takes duck-typed
+        # results from several call sites, and a required read would turn a new field into a crash
+        # on the path that persists the run — after the work was already paid for.
+        stopped_reason=str(getattr(result, "stopped_reason", "") or ""),
         attempts=attempts,
         profile=profile,
         workspace=workspace,

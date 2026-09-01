@@ -6762,6 +6762,11 @@
             "title": "Paused",
             "type": "boolean"
           },
+          "stopped_reason": {
+            "default": "",
+            "title": "Stopped Reason",
+            "type": "string"
+          },
           "success": {
             "title": "Success",
             "type": "boolean"

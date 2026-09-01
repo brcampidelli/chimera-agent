@@ -1280,6 +1280,16 @@ class RunReceiptOut(BaseModel):
     verify_command: str | None  # the shell command that judged the run, or null (no verifier)
     answer: str  # the final answer, truncated
     attempts: list[AttemptReceiptOut]  # the per-attempt verify-or-revert proof trail
+
+    stopped_reason: str = ""
+    """Why the loop stopped: ``final`` | ``max_steps`` | ``tool_loop`` | ``budget`` | ``spend`` |
+    ``cancelled``. Empty for a receipt written before the field existed.
+
+    On the wire because a Runs list without it renders three different endings as one: the run the
+    user cancelled, the run the dollar ceiling cut off, and the run whose work the verifier rejected
+    all carry ``success: false`` and are otherwise indistinguishable on screen. The chat turn's
+    badge already makes this distinction from the ``done`` frame; the durable list could not."""
+
     workspace: str = ""
     """The project this run happened in. Empty for a receipt written before the field existed.
 

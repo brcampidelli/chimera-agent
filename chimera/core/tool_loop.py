@@ -70,15 +70,42 @@ class ToolLoopDetector:
         self._names: deque[str] = deque(maxlen=window)
         self._sigs: deque[str] = deque(maxlen=window)
         self._obs: deque[str] = deque(maxlen=window)
+        self._ok: deque[bool | None] = deque(maxlen=window)
 
     def record(
-        self, name: str, arguments: dict[str, Any], observation: str | None = None
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        observation: str | None = None,
+        *,
+        ok: bool | None = None,
     ) -> ToolLoopVerdict:
-        """Record one tool call (+ its observation) and return the current loop verdict."""
+        """Record one tool call (+ its observation) and return the current loop verdict.
+
+        ``ok`` says whether the call actually ran — false for an error and for a gate refusal. The
+        loop computes that value one line before calling here and used to throw it away, so a tool
+        stonewalled five times by a governance gate broke the run with the words "called with
+        identical args", which reads as the model looping when the model asked, was told no, and
+        asked again. The breaker still fires either way; what it says changes.
+
+        ``None`` means the caller did not report an outcome, and the wording is then exactly what it
+        was before this parameter existed.
+        """
         self._names.append(name)
         self._sigs.append(_sig(name, arguments))
         self._obs.append(_obs_hash(observation))
+        self._ok.append(ok)
         return self._assess()
+
+    def _never_ran(self, mask: list[bool]) -> bool:
+        """True when every call selected by ``mask`` reported failure, and at least one said so.
+
+        Asks "did this call ever get through", not "were the last few blocked". A run with one
+        success among the failures is a loop — something DID happen — and calling it a wall would be
+        the same wrong attribution in the other direction.
+        """
+        chosen = [flag for flag, keep in zip(self._ok, mask, strict=True) if keep]
+        return bool(chosen) and all(flag is False for flag in chosen)
 
     def _assess(self) -> ToolLoopVerdict:
         verdict = ToolLoopVerdict("ok")
@@ -93,8 +120,13 @@ class ToolLoopDetector:
         if not self._sigs:
             return ToolLoopVerdict("ok")
         last = self._sigs[-1]
-        count = sum(1 for s in self._sigs if s == last)
+        matches = [s == last for s in self._sigs]
+        count = sum(matches)
         if count >= self.repeat_break:
+            if self._never_ran(matches):
+                return ToolLoopVerdict(
+                    "break", f"{self._names[-1]} was refused or failed {count}× — nothing ran"
+                )
             return ToolLoopVerdict("break", f"{self._names[-1]} called with identical args {count}×")
         if count >= self.repeat_warn:
             return ToolLoopVerdict("warn", f"{self._names[-1]} repeated {count}× with identical args")
@@ -112,6 +144,11 @@ class ToolLoopDetector:
             else:
                 break
         if run >= self.stall_break:
+            tail = [i >= len(self._names) - run for i in range(len(self._names))]
+            if self._never_ran(tail):
+                return ToolLoopVerdict(
+                    "break", f"{name} was refused or failed {run}× — nothing ran"
+                )
             return ToolLoopVerdict("break", f"{name} polled {run}× with unchanged output")
         return ToolLoopVerdict("ok")
 
