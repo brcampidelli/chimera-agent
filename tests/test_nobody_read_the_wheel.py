@@ -83,12 +83,23 @@ def test_an_ordinary_wheel_passes(tmp_path: Path) -> None:
 
 def test_the_redaction_module_is_exempt(tmp_path: Path) -> None:
     """A wheel carries this project's own source, and this project's source DESCRIBES the shapes of
-    secrets. A file whose whole job is to say what a key looks like is not a key."""
-    fonte = (Path(__file__).resolve().parents[1] / "chimera" / "core" / "redact.py").read_text(
-        encoding="utf-8"
-    )
+    secrets. A file whose whole job is to say what a key looks like is not a key.
 
-    assert scan(_wheel(tmp_path, chimera__core__redact__py=fonte)) == []
+    Two things were wrong with this test for its whole life. It passed `chimera__core__redact__py`,
+    which `_wheel` turns into `chimera/core/redact/py` — no suffix, so `TEXTO` dropped the member
+    before a byte was read and `== []` held without the exemption running. And its payload was
+    `redact.py`'s real source, which matches none of its own patterns (`sk|pk|rk)-...` is not
+    `sk-...`), so even read, there was nothing to exempt. It asserted that a file with no findings
+    has no findings.
+
+    The payload below does match, and the control puts the same bytes at a path that is not exempt.
+    """
+    payload = 'EXEMPLO = "sk-AAAABBBBCCCCDDDD1234"  # what a key looks like\n'
+
+    assert scan(_wheel(tmp_path, **{"chimera/core/redact.py": payload})) == []
+    assert scan(_wheel(tmp_path, **{"chimera/core/outro.py": payload})) != [], (
+        "the same bytes under a non-exempt name must be found, or this proves nothing about ISENTOS"
+    )
 
 
 def test_a_binary_member_is_skipped(tmp_path: Path) -> None:
@@ -136,3 +147,64 @@ def test_it_runs_where_it_is_actually_run(tmp_path: Path) -> None:
     assert sem_terceiros.returncode != 0, "`-S` did not remove third-party packages; this test proves nothing"
 
     assert roda.returncode == 0, roda.stderr
+
+
+# ------------------------------------------------------ what the last commit already accounted for
+
+
+def _repo_falso(tmp_path: Path, arquivos: dict[str, str]) -> Path:
+    """A checked-out tree, written as BYTES.
+
+    `write_text` translates `\\n` to `\\r\\n` on Windows while `zipfile.writestr` does not, so the
+    two sides of a byte comparison differed by line ending alone and this fixture failed on Windows
+    only. The rule under test is content identity; the platform's newline policy is not part of it.
+    """
+    raiz = tmp_path / "repo"
+    for nome, conteudo in arquivos.items():
+        destino = raiz / nome
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        destino.write_bytes(conteudo.encode("utf-8"))
+    return raiz
+
+
+#: A test whose subject IS the shape of a key. It cannot be written without one.
+SOBRE_CHAVES = 'def test_a_key_is_masked():\n    assert redact("sk-AAAABBBBCCCCDDDD1234") == MASK\n'
+
+#: A real suffix. `TEXTO` drops anything else before a byte is read, which is how the exemption test
+#: above spent its whole life green without scanning a thing.
+ALVO = "tests/test_keys.py"
+
+
+def test_a_member_that_came_from_the_last_commit_is_not_read(tmp_path: Path) -> None:
+    """`gitleaks` runs on the same tree with `fetch-depth: 0`. Reading committed source here a
+    second time buys nothing, and on the first release this gate ever guarded it cost the publish:
+    twenty-nine hits, every one a fake key inside a test about what a key looks like."""
+    repo = _repo_falso(tmp_path, {ALVO: SOBRE_CHAVES})
+    wheel = _wheel(tmp_path, **{ALVO: SOBRE_CHAVES})
+
+    assert scan(wheel, repo) == []
+
+
+def test_the_same_path_with_different_bytes_is_still_read(tmp_path: Path) -> None:
+    """The one that decides whether this is a rule or a hole.
+
+    Comparing PATHS would let anything through under a name the repository happens to carry — which
+    is what `ISENTOS` does, and why it does not scale past three entries. The comparison is on
+    bytes, so a member the build altered is read even where the path is familiar.
+    """
+    repo = _repo_falso(tmp_path, {ALVO: SOBRE_CHAVES})
+    adulterado = SOBRE_CHAVES + '\nTOKEN = "sk-ZZZZYYYYXXXXWWWW9876"\n'
+    wheel = _wheel(tmp_path, **{ALVO: adulterado})
+
+    achados = scan(wheel, repo)
+
+    assert len(achados) == 2, achados
+
+
+def test_with_no_repository_everything_is_read(tmp_path: Path) -> None:
+    """Fail closed. A missing checkout must not read as "nothing to see" — that is how a gate ends
+    up green because the thing it compares against was not there."""
+    wheel = _wheel(tmp_path, **{ALVO: SOBRE_CHAVES})
+
+    assert scan(wheel, None) != []
+    assert scan(wheel, tmp_path / "nao-existe") != []
