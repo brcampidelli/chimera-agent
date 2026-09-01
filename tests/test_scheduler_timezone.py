@@ -47,7 +47,11 @@ def fuso(monkeypatch: pytest.MonkeyPatch):
 
 
 def _agendar(tmp_path: Path, expr: str, *, now: float = NOW) -> float:
-    sched = Scheduler(CronStore(tmp_path / "jobs.json"))
+    # No spread: these tests ask WHICH CLOCK an expression is read against, and the schedule offset
+    # is noise for that question — it moved "09:30" to "09:32" and the failure read as a timezone
+    # bug. The offset has its own tests; this file keeps the boundary exact so the minute it
+    # asserts is the minute the expression names.
+    sched = Scheduler(CronStore(tmp_path / "jobs.json"), jitter=False)
     job = sched.schedule_cron("resumo", expr, "diga bom dia", now=now)
     assert job.next_run is not None
     return job.next_run

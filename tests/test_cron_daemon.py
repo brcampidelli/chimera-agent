@@ -14,12 +14,17 @@ def _scheduler(tmp_path: Path) -> Scheduler:
 
 def test_tick_fires_due_job_and_advances(tmp_path: Path) -> None:
     sch = _scheduler(tmp_path)
-    sch.schedule_cron("report", "* * * * *", "write the daily report", now=0)  # next_run = 60
+    job = sch.schedule_cron("report", "* * * * *", "write the daily report", now=0)
     fired: list[str] = []
-    daemon = CronDaemon(sch, lambda job: fired.append(job.name))
-    assert [j.name for j in daemon.tick(now=60)] == ["report"]  # due at t=60
+    daemon = CronDaemon(sch, lambda j: fired.append(j.name))
+    # Read rather than assumed. This said `now=60` when a minute schedule was due exactly on the
+    # minute; schedules now carry a per-job offset, so the boundary is 60 plus a few seconds. The
+    # offset stays ON here on purpose — this is the closest test to the real daemon, and it is
+    # where a spread that stopped a job firing at all would show.
+    devido = (job.next_run or 0) + 1
+    assert [j.name for j in daemon.tick(now=devido)] == ["report"]
     assert fired == ["report"]
-    assert daemon.tick(now=60) == []  # already advanced to t=120; not due again at 60
+    assert daemon.tick(now=devido) == []  # advanced past this tick; not due again
 
 
 def test_future_job_is_not_fired(tmp_path: Path) -> None:
@@ -83,10 +88,11 @@ def test_tick_reloads_jobs_added_out_of_process(tmp_path: Path) -> None:
     assert daemon.tick(now=60) == []  # daemon starts with no jobs
 
     # A *separate* process (its own store on the same file) schedules a cron.
-    Scheduler(CronStore(path)).schedule_cron("report", "* * * * *", "daily report", now=0)
+    job = Scheduler(CronStore(path)).schedule_cron("report", "* * * * *", "daily report", now=0)
 
-    # Without a restart, the daemon picks it up on the next tick and fires it.
-    assert [j.name for j in daemon.tick(now=60)] == ["report"]
+    # Without a restart, the daemon picks it up on the next tick and fires it. Due time read from
+    # the job rather than assumed to be the exact minute — schedules carry a per-job offset now.
+    assert [j.name for j in daemon.tick(now=(job.next_run or 0) + 1)] == ["report"]
     assert fired == ["report"]
 
 

@@ -115,8 +115,11 @@ def test_a_real_failure_still_counts(tmp_path: Path) -> None:
     def boom(_job: CronJob) -> None:
         raise RuntimeError("broken")
 
-    sch.run_due(now=120, dispatch=boom)
-    sch.run_due(now=180, dispatch=boom)
+    # Two dispatches, each past its own boundary. Hardcoded 120/180 before schedules carried a
+    # per-job offset, and then the second tick fell BEFORE the next due time — so only one dispatch
+    # happened and the counter read 1, which looks like the counter being broken.
+    for _ in range(2):
+        sch.run_due(now=(sch.store.list()[0].next_run or 0) + 1, dispatch=boom)
 
     job = sch.store.list()[0]
     assert job.last_status == "error"

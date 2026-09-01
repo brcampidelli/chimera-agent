@@ -66,6 +66,16 @@ class CronJob(BaseModel):
     action: str
     created_by: CreatedBy = "human"
     enabled: bool = True
+    disabled_by: str = ""
+    """Who switched this job off: ``""`` (running, or off before this field existed), ``"human"``,
+    or ``"brake"``.
+
+    Not decoration on ``enabled``. A job somebody deliberately paused and a job the scheduler
+    switched off after five straight failures are the same boolean and opposite facts, and
+    :meth:`~chimera.scheduler.engine.Scheduler.failing` — the report whose entire job is to name
+    broken jobs — filters on ``enabled``. Without this field the brake would HIDE its own findings
+    in the one place someone goes to look for them."""
+
     next_run: float | None = None
     last_run: float | None = None
     """When a dispatch was last ATTEMPTED. Says nothing about whether it worked — see
