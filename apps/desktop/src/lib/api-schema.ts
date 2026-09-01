@@ -402,6 +402,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/turns/{turn_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Code Turn Frames
+         * @description Everything this turn emitted after ``since``, so a dropped stream costs nothing.
+         *
+         *     The same shape the orchestration route has had since it landed, on the route that actually
+         *     needed it: a coding turn is the most expensive thing this product does, and losing the
+         *     connection threw away work that had already been paid for while the bill stayed.
+         *
+         *     The frames go through the SAME handlers the live stream feeds, and a client that ignores a
+         *     `seq` it has already applied gets one state whether it replayed first or not.
+         *
+         *     404 for an id that was never recorded, never 200-with-nothing: an unknown turn and a turn
+         *     with no new frames are opposite instructions for a client deciding whether to keep asking.
+         */
+        get: operations["code_turn_frames_api_code_turns__turn_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/worth": {
         parameters: {
             query?: never;
@@ -3245,6 +3275,25 @@ export interface components {
             observation: string;
             /** Ok */
             ok: boolean;
+        };
+        /**
+         * CodeTurnFramesOut
+         * @description One coding turn's transcript from ``since`` onward, in the order its single writer stamped.
+         *
+         *     The mechanism existed for orchestration and not for this route, which is the one that costs the
+         *     most: a fan-out is recorded frame by frame and replayable, while a coding turn that lost its
+         *     connection was gone. Same shape on purpose — the client already owns a reducer that ignores a
+         *     `seq` it has applied, and two shapes would mean two reducers and eventually two behaviours.
+         */
+        CodeTurnFramesOut: {
+            /** Frames */
+            frames: {
+                [key: string]: unknown;
+            }[];
+            /** Seq */
+            seq: number;
+            /** Turn Id */
+            turn_id: string;
         };
         /**
          * CodeTurnRequest
@@ -6847,6 +6896,39 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                     "text/event-stream": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    code_turn_frames_api_code_turns__turn_id__get: {
+        parameters: {
+            query?: {
+                since?: number;
+            };
+            header?: never;
+            path: {
+                turn_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeTurnFramesOut"];
                 };
             };
             /** @description Validation Error */
