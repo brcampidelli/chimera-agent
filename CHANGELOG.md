@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.48.0] - 2026-09-01
 
 An eleven-lens audit read this application — 65,760 lines of Python, 41,782 of frontend — and
 produced 66 recommendations. Classified by their own diagnosis, 26 were *"exists and is switched
@@ -752,6 +752,82 @@ You could not choose which model answered you. The endpoint accepted one all alo
   every model is now remembered on disk (refreshed whenever the model list is fetched, warmed once
   at app boot) and consulted by exact slug. It also corrects a quiet error: the family pattern
   `deepseek-chat` matched `deepseek-chat-v3.1` and priced it at the v3 rate, 3x low on output.
+
+### Fixed — twenty-eight places where nothing ever reported a failure
+
+Reading another agent's source end to end turned up twenty-eight gaps here, and they share one
+shape: **the code ran, returned, logged, and was wrong, and nothing anywhere said so.** Each fix
+below was accepted only after the fix was reverted and a test went red for it — a hundred-odd
+sabotages, of which around fifteen caught a defect in the test rather than in the code.
+
+- **A refused tool and a turn cut off at the budget both read as successes.** `steplog` marked a
+  step `ok` unless the observation began with `error:`, so every governance refusal — the whole
+  point of the kernel — went into the receipt as work that happened. And the desktop had no string
+  for the `spend` stop reason, so a turn that stopped because it ran out of money rendered as one
+  that simply ended. Ten languages gained the wording; the old `budget` copy moved to `spend`,
+  where it was always about money.
+- **What a failed provider call carried out of the process.** Five separate leaks: the exception
+  text from a provider carried the URL, and the URL carried the key. Added `NO_CREDIT` as a class
+  of its own — retrying a call that failed for lack of money is spending latency to be told no
+  again — and a `ProviderTrace` so a failover reports which provider refused and why.
+- **Five values the code already had and never read.** `abs(hash(...))` keyed the RAG store, and
+  Python salts `hash` per process, so the same document keyed differently on every run; the loop
+  breaker counted steps but not whether any of them ran, so a tool refused ten times looked like
+  ten steps of progress; `recall_facts` built no `MemoryGate` unless one was passed; the SSRF
+  filter did not know carrier-grade NAT (`100.64.0.0/10`) is internal; and the run receipt had a
+  stop reason that no response model exposed.
+- **A cron job that only ever failed kept its slot forever, and event jobs had no dispatcher.**
+  `cron add --event deploy` accepted the job and `cron list` showed it enabled, and nothing in the
+  package ever called `fire_event` — the job's silence was indistinguishable from a job whose time
+  had not come. Now `chimera cron fire <event>` runs them, five consecutive failures brake a job
+  (and a braked job is reported as broken, not hidden), and each job's start is offset by a
+  deterministic jitter so a hundred hourly jobs stop firing in the same second.
+- **The stop reason was never read, and a dropped stream was the end of the answer.** A stream that
+  died before emitting a single token now falls back to one batch call rather than returning
+  nothing; a tool-call fragment that is not valid JSON is dropped instead of poisoning the turn;
+  and a compaction that cannot free any room stops the run with `context_stuck` instead of looping
+  against the same wall.
+- **A secret is given away by its place, not only by its shape.** Seven credential-carrying
+  strings went in, one came out masked: `redact` knew six string shapes and the values in this
+  process's environment, and nothing structural. URL userinfo, a query parameter whose *name* is
+  `api_key`, an `Authorization` header, a database DSN, a chat webhook path — none needs to be
+  recognised. This is not hypothetical here: delivery goes through a Discord webhook whose URL
+  *is* the secret, and `steplog` writes every tool's arguments to a file that lives for weeks.
+- **A format change was indistinguishable from a corrupt file.** Every store skipped records it
+  could not parse and carried on, so a schema change and a truncated write produced the same
+  silence and the same data loss. Now a store that skipped everything refuses to write over what
+  it could not read, the home records the version that made it, and a RAG index whose embedder
+  changed is aligned before the pending set is chosen instead of after — the difference is
+  re-embedding nothing instead of the whole corpus.
+- **A cancelled run was recorded as one that never happened.** The partial attempt — the work
+  already paid for — was dropped on cancel and duplicated on cap. Both paths now go through one
+  helper, and the desktop's eight stream-reading loops became one `readFrames`.
+
+### Added — four things the package did not have
+
+- **A coding turn survives a dropped connection.** Every frame of a turn is stamped with a turn id
+  and a sequence number and appended to disk as it is sent, and `GET /api/code/turns/{id}?since=N`
+  replays what was missed. Closing a laptop lid no longer costs the turn.
+- **Commands that cannot change anything stop asking.** A conservative classifier proves a command
+  read-only — no metacharacters, a known-safe binary, and flags checked against an allowlist — so
+  `ask` posture stops interrupting for `ls` and `git status`. `git diff --output=` is treated as a
+  write, and `echo` is deliberately absent.
+- **A decision can be answered by someone who is not at the keyboard.** Without a terminal the
+  approval gate collapsed to a refusal, so every REVIEW verdict on the 24/7 deployment was a no,
+  and the mandate that says *confirm before billing, before a destructive migration, before
+  touching RLS* had nothing to confirm with. The question is now written down, delivered, and
+  answered with `chimera approve <id> --yes|--no`. Silence is still a refusal — a gate that read
+  silence as consent would produce a record of an approval nobody gave. Parallel workers that ask
+  the same question ask a person once and share the answer.
+- **Credentials live in the operating system's vault.** `grep -rn "keyring|keychain|libsecret|DPAPI"`
+  returned nothing: fourteen credentials sat in environment variables and, for most installs, in a
+  `.env` beside the project — readable in plain text by anything running as that user, including
+  the agent itself. `chimera secrets set|list|rm` uses the macOS Keychain, Windows Credential
+  Manager, or the Linux Secret Service via `keyring`, an **optional** extra. The environment always
+  wins, listings show names and never values, and no vault at all behaves exactly as today.
+- **Three gates in CI.** What a pull request brings in (pipe-to-shell, shortened URLs, encoded
+  blobs), what the built wheel actually ships, and — via `chimera doctor --probe` — whether the
+  configured key works at all.
 
 ### Changed
 
