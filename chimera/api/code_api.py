@@ -24,6 +24,7 @@ pressing that button does not change what the agent is allowed to do.
 from __future__ import annotations
 
 import asyncio
+import itertools
 import json
 import re
 import threading
@@ -62,6 +63,7 @@ from chimera.api.schemas import (
     CodeSessionMetaOut,
     CodeSessionOut,
     CodeSessionRawOut,
+    CodeTurnFramesOut,
     DeletedCountOut,
     DictationOut,
     TranscriptOut,
@@ -69,6 +71,7 @@ from chimera.api.schemas import (
 )
 from chimera.api.sse import SSE_RESPONSE
 from chimera.api.worth import WorthReport, summarize_worth
+from chimera.orchestration import runlog
 from chimera.telemetry import get_logger
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -1038,9 +1041,21 @@ def register_code_api(
 
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue[tuple[str, Any] | None] = asyncio.Queue()
+        # This turn's durable identity, and the counter that makes replay safe. The orchestration
+        # route has had both since it landed; the coding turn — the most expensive route in the
+        # product — emitted frames with no number and kept none of them, so a dropped connection
+        # threw away work that had already been paid for. `runlog`'s own docstring says why the
+        # number is the load-bearing part: a client that has seen up to `seq` asks for what came
+        # after, and a reducer that ignores what it has makes replay-then-live and live-only
+        # converge on the same state.
+        turn_id = uuid.uuid4().hex
+        seq = itertools.count(1)
 
         def emit(event: str, payload: Any) -> None:
-            loop.call_soon_threadsafe(queue.put_nowait, (event, payload))
+            numbered = {**payload, "seq": next(seq)} if isinstance(payload, dict) else payload
+            if isinstance(numbered, dict):
+                runlog.append(settings.home, turn_id, event, numbered, area="code")
+            loop.call_soon_threadsafe(queue.put_nowait, (event, numbered))
 
         def on_token(text: str) -> None:
             emit("token", {"text": text})
@@ -1294,7 +1309,12 @@ def register_code_api(
         async def events() -> AsyncIterator[dict[str, str]]:
             # The session id first, so a client that minted a new conversation can address it from
             # the very first frame rather than after the turn it is already watching.
-            yield {"event": "session", "data": json.dumps({"session_id": session_id})}
+            yield {
+                "event": "session",
+                # The turn id rides with the session id because a client that loses the stream needs
+                # both: the session to reopen the conversation, and the turn to ask what it missed.
+                "data": json.dumps({"session_id": session_id, "turn_id": turn_id}),
+            }
             while True:
                 item = await queue.get()
                 if item is None:
@@ -1303,6 +1323,29 @@ def register_code_api(
                 yield {"event": event, "data": json.dumps(payload)}
 
         return EventSourceResponse(events())
+
+    @app.get(
+        "/api/code/turns/{turn_id}", dependencies=[guard], response_model=CodeTurnFramesOut
+    )
+    def code_turn_frames(turn_id: str, since: int = 0) -> dict[str, Any]:
+        """Everything this turn emitted after ``since``, so a dropped stream costs nothing.
+
+        The same shape the orchestration route has had since it landed, on the route that actually
+        needed it: a coding turn is the most expensive thing this product does, and losing the
+        connection threw away work that had already been paid for while the bill stayed.
+
+        The frames go through the SAME handlers the live stream feeds, and a client that ignores a
+        `seq` it has already applied gets one state whether it replayed first or not.
+
+        404 for an id that was never recorded, never 200-with-nothing: an unknown turn and a turn
+        with no new frames are opposite instructions for a client deciding whether to keep asking.
+        """
+        home = Path(settings.home)
+        if not runlog.exists(home, turn_id, area="code"):
+            raise HTTPException(status_code=404, detail="no such turn")
+        quadros = runlog.frames(home, turn_id, since=since, area="code")
+        maior = max((int(f.get("seq") or 0) for f in quadros), default=since)
+        return {"turn_id": turn_id, "frames": quadros, "seq": maior}
 
     @app.post("/api/code/posture", dependencies=[guard], response_model=PostureFacts)
     def code_posture(req: PostureQuery) -> PostureFacts:
