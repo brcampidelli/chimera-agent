@@ -30,6 +30,49 @@ MASK = "[redacted]"
 #: var set to `1` or `true` would otherwise mask every digit in the file.
 _MIN_SECRET_LEN = 8
 
+#: Names that make a query parameter or a header a credential. Matched on the NAME, so the value
+#: never has to be recognised — which is the point: a token minted by a remote API has no shape a
+#: list can hold, and the parameter it arrives in does.
+_SENSITIVE_NAME = r"(?:api[_-]?key|apikey|access[_-]?token|auth|authorization|token|secret|password|passwd|pwd|sig|signature|session)"
+
+#: Structural leaks — a secret given away by WHERE it sits rather than by what it looks like.
+#:
+#: Six of seven shapes measured against the shape list below survived it intact: URL userinfo, a
+#: query parameter named `api_key`, an `Authorization` header, a cookie, a database DSN, and a
+#: Discord webhook path. None of them needs to be recognised; the place identifies them. That
+#: matters here specifically — delivery on the 24/7 deployment goes through a webhook whose URL IS
+#: the secret, and `steplog` writes every tool argument and result through this function.
+#:
+#: Every one keeps its context. `api_key=[redacted]` says a key was sent; a line reduced to
+#: `[redacted]` says only that a request happened, and the file exists to answer more than that.
+_PLACES = (
+    # scheme://user:SECRET@host — the password half of URL userinfo, never the user or the host.
+    re.compile(r"(?P<keep>://[^\s:/@]+:)(?P<hide>[^\s@/]+)(?P<tail>@)"),
+    # ?name=SECRET or &name=SECRET, where the NAME is what marks it.
+    re.compile(rf'(?P<keep>[?&]{_SENSITIVE_NAME}=)(?P<hide>[^\s&#"\']+)', re.IGNORECASE),
+    # A credential header inside a quoted argument — `curl -H 'x-api-key: …'`. First, because the
+    # line-anchored form below would otherwise swallow the closing quote and everything after it.
+    # This is the shape a tool observation actually carries; a header on its own line is the rarer
+    # one here, and writing only that missed the case the whole change is for.
+    re.compile(
+        rf"(?P<keep>['\"](?:{_SENSITIVE_NAME}|x-api-key|cookie|proxy-authorization)[ \t]*:[ \t]*)"
+        r"(?P<hide>[^'\"]+)(?P<tail>['\"])",
+        re.IGNORECASE,
+    ),
+    # A credential header on its own line, to the end of it. The value may contain spaces —
+    # `Authorization: Basic dXNlcjpzZW5oYQ==` is one value, not a scheme and a separate token.
+    re.compile(
+        rf"(?P<keep>^[ \t]*(?:{_SENSITIVE_NAME}|x-api-key|cookie|proxy-authorization)[ \t]*:[ \t]*)"
+        r"(?P<hide>\S.*)$",
+        re.IGNORECASE | re.MULTILINE,
+    ),
+    # A chat webhook path: the id/token tail is the credential, and the host says which service.
+    re.compile(
+        r"(?P<keep>https://(?:discord(?:app)?\.com|hooks\.slack\.com)/[^\s?]*?/)(?P<hide>[A-Za-z0-9_-]{16,})",
+        re.IGNORECASE,
+    ),
+)
+
 #: High-confidence shapes, as a second net. Deliberately narrow: a greedy pattern that redacted
 #: ordinary output would make the trace useless, and a useless trace gets turned off.
 _PATTERNS = (
@@ -60,11 +103,20 @@ def known_secrets() -> list[str]:
 
 
 def redact(text: str) -> str:
-    """Replace known secrets and credential-shaped strings in ``text``."""
+    """Replace known secrets, structurally-placed secrets, and credential-shaped strings.
+
+    Three nets, in order of confidence. The environment values are a guarantee over the set that
+    matters most; the places are structural and need no knowledge of the value; the shapes are a
+    guess at the string and are deliberately the narrowest of the three.
+    """
     if not text:
         return text
     for secret in known_secrets():
         text = text.replace(secret, MASK)
+    for pattern in _PLACES:
+        # The surrounding context is kept and only the captured value replaced. A line that reads
+        # `[redacted]` and nothing else cannot be diagnosed, which defeats the file's purpose.
+        text = pattern.sub(lambda m: f"{m.group('keep')}{MASK}{m.groupdict().get('tail') or ''}", text)
     for pattern in _PATTERNS:
         text = pattern.sub(MASK, text)
     return text

@@ -23,7 +23,7 @@ from chimera.scheduler.delivery import (
     clip,
     deliver_to_webhook,
     payload_for,
-    redact,
+    webhook_host_only,
 )
 
 
@@ -221,7 +221,7 @@ def test_the_app_uses_this_sink_rather_than_one_of_its_own() -> None:
 def test_the_url_is_never_repeated_in_full() -> None:
     """A webhook URL is a credential: whoever holds it can post in that channel."""
     url = "https://discord.com/api/webhooks/123456789/segredo-que-nao-pode-vazar"
-    escondida = redact(url)
+    escondida = webhook_host_only(url)
 
     assert "segredo-que-nao-pode-vazar" not in escondida
     assert "123456789" not in escondida
