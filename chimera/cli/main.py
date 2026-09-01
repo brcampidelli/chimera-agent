@@ -440,6 +440,7 @@ def doctor(
     # paying LiteLLM's import to check is worth it — and where an unavailable LiteLLM has to degrade
     # to saying nothing, never to a warning that might be wrong. The five with settings fields are
     # never questioned; only what was discovered from the environment.
+    from chimera.core import state_version
     from chimera.providers.discovery import generic_providers, litellm_known
 
     discovered = generic_providers()
@@ -456,6 +457,18 @@ def doctor(
     table.add_row("Python", platform.python_version())
     table.add_row("Platform", platform.platform())
     table.add_row("Home (state dir)", str(settings.home))
+    # WHICH version wrote that directory, which nothing recorded until now: ~27 artefacts live under
+    # it and not one carried a version, so every question about an upgrade was answered by guessing.
+    # Stamped here rather than at import: `doctor` is the command whose job is to know the state of
+    # this machine, and stamping from a library import would write to disk on `import chimera`.
+    marca = state_version.stamp(settings.home)
+    if not marca.known:
+        estado = "[yellow]not recorded before now[/yellow]"
+    elif marca.chimera_version == __version__:
+        estado = marca.chimera_version
+    else:
+        estado = f"[yellow]{marca.chimera_version} -> {__version__}[/yellow]"
+    table.add_row("State written by", estado)
     table.add_row("Default model", settings.default_model)
     table.add_row(
         "Configured providers",

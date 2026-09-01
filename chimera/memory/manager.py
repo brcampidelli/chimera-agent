@@ -9,6 +9,7 @@ memory-merge (which must never overwrite existing history blindly).
 from __future__ import annotations
 
 import re
+import time
 import uuid
 from collections.abc import Callable
 
@@ -27,8 +28,18 @@ def _normalize(text: str) -> str:
 class MemoryManager:
     """Curates a :class:`MemoryStore`."""
 
-    def __init__(self, store: MemoryBackend, *, embed: EmbedFn | None = None) -> None:
+    def __init__(
+        self,
+        store: MemoryBackend,
+        *,
+        embed: EmbedFn | None = None,
+        clock: Callable[[], float] = time.time,
+    ) -> None:
         self.store = store
+        #: Injected so a test can write a fact at a chosen time. `failover.py` takes its clock the
+        #: same way, and for the same reason: a timestamp nothing can control is a timestamp nothing
+        #: can assert.
+        self._clock = clock
         # Opt-in semantic recall: when an embedder is supplied, ``search`` ranks by cosine
         # similarity (bridges paraphrases keyword search can't). Absent/failing embedder ->
         # the keyword/FTS path always remains as a fallback.
@@ -61,6 +72,7 @@ class MemoryManager:
             source=source,
             provenance=provenance,
             project=project,
+            created_at=self._clock(),
         )
         self.store.add(item)
         return item
