@@ -1233,7 +1233,7 @@
     },
     {
       "deprecated": false,
-      "help": "Check the environment and configuration. With --fix, repair safe setup issues.",
+      "help": "Check the environment and configuration. With --fix, repair safe setup issues.\n\n`--probe` is off by default and that is deliberate: `doctor` should stay instant, offline and\nfree. What it buys when you ask for it is the difference between a claim and a measurement \u2014\n\"Ready\" below is an assertion about the NAME of an environment variable, so a revoked key, an\naccount with no credit, or a value pasted with a trailing space all pass it and fail on the\nfirst real call. The argument for measuring is already written in `config_api.pricing_capability`\na few files over: the time to find out is while reading the doctor, not when a 3 a.m. cron stalls.",
       "hidden": false,
       "name": "doctor",
       "params": [
@@ -1243,6 +1243,16 @@
           "name": "fix",
           "opts": [
             "--fix"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Actually call the provider once, instead of trusting the key's name.",
+          "kind": "option",
+          "name": "probe",
+          "opts": [
+            "--probe"
           ],
           "required": false,
           "type": "boolean"
