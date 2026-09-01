@@ -257,7 +257,6 @@ class PlanRequest(BaseModel):
     itself reads no files — it is a pure model call — but the field mirrors the run request's shape.)"""
 
 
-
 class RunRequest(CodeSeams):
     """An autonomous run: plan → execute → verify-or-revert → receipt.
 
@@ -451,6 +450,8 @@ def _persist_crashed_run(
         import json as _json
         from pathlib import Path as _Path
 
+        from chimera.core.redact import redact as _redact
+
         attempts = list(getattr(agent, "attempts", None) or [])
         rows = [
             {
@@ -472,7 +473,15 @@ def _persist_crashed_run(
             # The two fields that make this row readable as what it is, rather than as a run that
             # merely failed its verifier.
             "crashed": True,
-            "crash_reason": f"{type(cause).__name__}: {cause}"[:500],
+            # Redacted, and redacted BEFORE the cut. This is the one place a provider's error body
+            # reaches disk: a failed completion arrives as a LiteLLM exception whose message is the
+            # upstream response, and that body has been measured to carry an echoed prompt fragment
+            # and the provider's internal trace. (The API key itself does not survive — LiteLLM masks
+            # `Bearer …` on the way in — so what this protects is the user's own content.)
+            # `steplog.py` already writes through `redact` for exactly this reason; this row was
+            # written by hand and never picked it up. Truncating first would leave the front half of
+            # a secret that the cut split in two.
+            "crash_reason": _redact(f"{type(cause).__name__}: {cause}")[:500],
             "attempts": rows,
         }
         log = _Path(str(home)) / "runs.jsonl"
@@ -537,11 +546,17 @@ def build_api_app(
         a test or a bench comparing two configurations is asking for.
         """
         return settings_override or get_settings()
+
     store = SessionStore(settings.home / "sessions")
     manager = SessionManager(factory, store)
     guard = Depends(_require_token())
 
-    app = FastAPI(title="Chimera Desktop API", version="1", docs_url="/api/docs", openapi_url="/api/openapi.json")
+    app = FastAPI(
+        title="Chimera Desktop API",
+        version="1",
+        docs_url="/api/docs",
+        openapi_url="/api/openapi.json",
+    )
 
     # Cross-origin, only for the origins the operator named, and only when they named some.
     #
@@ -707,8 +722,9 @@ def build_api_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return [a.model_dump() for a in upsert_agent(live_settings().home, entry)]
 
-    @app.delete("/api/agents/registry/{agent_id}", dependencies=[guard],
-                response_model=list[AgentDefOut])
+    @app.delete(
+        "/api/agents/registry/{agent_id}", dependencies=[guard], response_model=list[AgentDefOut]
+    )
     def remove_agent_endpoint(agent_id: str) -> list[Any]:
         # Cards already filed under this agent's lane are deliberately untouched: they keep their
         # lane and stop being dispatched, which is recoverable. Deleting the work is not.
@@ -865,10 +881,7 @@ def build_api_app(
         # see `_already_counted`, and the measured $0.049 it was billing twice.
         turnos = load_usage(settings.home / "usage.jsonl")
         return summarize_usage(
-            turnos
-            + usage_from_runs(
-                settings.home / "runs.jsonl", already=_already_counted(turnos)
-            )
+            turnos + usage_from_runs(settings.home / "runs.jsonl", already=_already_counted(turnos))
         )
 
     @app.get("/api/runs", dependencies=[guard], response_model=list[RunReceiptOut])
@@ -954,9 +967,7 @@ def build_api_app(
         # The chain state travels with the entries. Every write pays for a digest of the entry
         # before it, and until now nothing ever walked it — so the log detected tampering the way an
         # unread smoke alarm detects fire.
-        return {
-            "events": events, "count": len(events), "populated": bool(events), "chain": chain
-        }
+        return {"events": events, "count": len(events), "populated": bool(events), "chain": chain}
 
     @app.get("/api/governance/sandbox", dependencies=[guard], response_model=SandboxStateOut)
     def governance_sandbox_endpoint() -> dict[str, Any]:
@@ -983,9 +994,12 @@ def build_api_app(
             isolated = False
         if isolated:
             backend = (
-                "docker" if configured == "docker"
-                else "seatbelt" if seatbelt_available()
-                else "bubblewrap" if bubblewrap_available()
+                "docker"
+                if configured == "docker"
+                else "seatbelt"
+                if seatbelt_available()
+                else "bubblewrap"
+                if bubblewrap_available()
                 else "isolated"
             )
         else:
@@ -1171,14 +1185,19 @@ def build_api_app(
                 # secret; the message is bounded and appended because without it "RuntimeError" is
                 # only marginally better than "failed".
                 _log.warning("run failed: %s: %s", type(exc).__name__, exc, exc_info=True)
-                emit("error", {
-                    "message": "the run failed",
-                    "reason": f"{type(exc).__name__}: {exc}"[:400],
-                    "run_id": run_id,
-                })
+                emit(
+                    "error",
+                    {
+                        "message": "the run failed",
+                        "reason": f"{type(exc).__name__}: {exc}"[:400],
+                        "run_id": run_id,
+                    },
+                )
                 _persist_crashed_run(settings.home, run_id, req, ws, auto, exc)
             finally:
-                _run_cancels.pop(run_id, None)  # done (or crashed): the run is no longer cancellable
+                _run_cancels.pop(
+                    run_id, None
+                )  # done (or crashed): the run is no longer cancellable
                 loop.call_soon_threadsafe(queue.put_nowait, None)  # sentinel: end of stream
 
         # Each run is independent (its own agent + workspace snapshot), so no per-session lock is
@@ -1670,7 +1689,9 @@ def build_api_app(
 
         ws = _resolve_fs_workspace(req.workspace)
         try:
-            resolve_exec_cwd(ws, req.cwd)  # pre-validate so a cwd escape is a clean 400, not a stream
+            resolve_exec_cwd(
+                ws, req.cwd
+            )  # pre-validate so a cwd escape is a clean 400, not a stream
         except ValueError as exc:
             raise HTTPException(status_code=400, detail="invalid cwd") from exc
         timeout = max(1.0, min(float(req.timeout), 3600.0))  # clamp to the shell tool's 1..3600 cap
@@ -1890,9 +1911,7 @@ def build_api_app(
     # Registered unconditionally: `schema_dump` builds the app through this function, so a route
     # behind a flag or a try-import would be present at runtime and absent from the schema, and
     # the drift gate would pass while the generated client was missing half the surface.
-    register_orchestration_api(
-        app, guard, workspace, settings, live_settings=live_settings
-    )
+    register_orchestration_api(app, guard, workspace, settings, live_settings=live_settings)
     # /api/lifecycle — plan → build → test → review, one frame per stage. Registered here and not
     # behind a flag for the same reason as above: `schema_dump` builds the app through this
     # function, so a conditional route would be present at runtime and missing from the schema.
@@ -2018,7 +2037,11 @@ def _audit_event(entry: dict[str, Any]) -> dict[str, Any]:
     seq = entry.get("seq", 0)
     etype = str(entry.get("type", ""))
     parts = [f"{k}={v}" for k, v in entry.items() if k not in ("seq", "type")]
-    return {"seq": int(seq) if isinstance(seq, int) else 0, "type": etype, "summary": " ".join(parts)}
+    return {
+        "seq": int(seq) if isinstance(seq, int) else 0,
+        "type": etype,
+        "summary": " ".join(parts),
+    }
 
 
 def _api_cascade_backend(gateway: SupportsComplete, settings: Settings) -> SupportsComplete:
@@ -2043,7 +2066,9 @@ def _api_cascade_backend(gateway: SupportsComplete, settings: Settings) -> Suppo
         entry=ladder.entry,
         log_path=settings.home / "routes.jsonl",
     )
-    return CascadeBackend(gateway, cast("SupportsComplete", fusion_for_role(gateway, settings)), config)
+    return CascadeBackend(
+        gateway, cast("SupportsComplete", fusion_for_role(gateway, settings)), config
+    )
 
 
 def resolve_verify(requested: str | None, workspace: Path) -> tuple[str | None, str]:
@@ -2126,7 +2151,9 @@ def _build_solve_agent(
         from chimera.fusion import FusionEngine, RoutedBackend, RoutingPolicy
 
         backend = _api_cascade_backend(gateway, settings)
-        escalate_backend = RoutedBackend(gateway, FusionEngine(gateway), RoutingPolicy(mode="always"))
+        escalate_backend = RoutedBackend(
+            gateway, FusionEngine(gateway), RoutingPolicy(mode="always")
+        )
     elif req.fuse:
         from chimera.fusion import FusionEngine, RoutedBackend, RoutingPolicy
 
@@ -2179,9 +2206,7 @@ def _build_solve_agent(
     # be answered rather than only refused) is the follow-up.
     steps = resolve_steps(req.max_steps)
     posture = resolve_posture(req.posture)
-    registry, ledger = assemble_registry(
-        req, ws, settings, gateway, steps=steps, surface="api:run"
-    )
+    registry, ledger = assemble_registry(req, ws, settings, gateway, steps=steps, surface="api:run")
     # insist_on_action: solve is task completion, so a described-but-unexecuted plan is pushed back
     # to actually run (mirrors the CLI worker config).
     cfg = AgentConfig(
@@ -2298,7 +2323,9 @@ def _build_solve_agent(
         # it would arm an acceptance criterion its owner never read, which is the same failure this
         # feature exists to fix wearing the opposite sign. An empty list is a different answer:
         # reviewed, and there is nothing to gate on.
-        checklist=RequirementChecklist(gateway, req.model) if req.requirements is not None else None,
+        checklist=RequirementChecklist(gateway, req.model)
+        if req.requirements is not None
+        else None,
         given_requirements=list(req.requirements) if req.requirements is not None else None,
         # Spec-grounded tests, only where they replace something weaker. The loop itself requires
         # no verifier and a non-empty requirement list before it uses this, so asking for it with
