@@ -4728,6 +4728,74 @@ def cron_disable(job_id: str = typer.Argument(..., help="The job id to disable."
     console.print(f"[green]disabled[/green] {job_id}")
 
 
+secrets_app = typer.Typer(help="Keep provider keys in the OS vault instead of a file.", no_args_is_help=True)
+app.add_typer(secrets_app, name="secrets")
+
+
+@secrets_app.command("list")
+def secrets_list() -> None:
+    """What the OS vault holds — names only, never values.
+
+    Printing a secret would put it in this terminal's scrollback, in any screenshot of it, and in
+    whatever recorded the session, which undoes the reason for having a vault.
+    """
+    from chimera.config_vault import available, stored
+
+    if not available():
+        console.print(
+            "[yellow]no OS vault on this machine[/yellow] — install the extra with "
+            r"[bold]pip install 'chimera-agent\[secrets]'[/bold], or keep using .env "
+            "(a container or a headless server usually has no keychain, and that is fine)."
+        )
+        return
+    guardados = stored()
+    if not guardados:
+        console.print("[dim]the vault holds no Chimera credentials[/dim]")
+        return
+    for nome in guardados:
+        console.print(f"  {nome}")
+    console.print("[dim]values are never printed[/dim]")
+
+
+@secrets_app.command("set")
+def secrets_set(
+    name: str = typer.Argument(..., help="e.g. OPENROUTER_API_KEY"),
+    value: str = typer.Option(None, "--value", help="Omit to be prompted without echo."),
+) -> None:
+    """Put one credential in the OS vault.
+
+    Prompted without echo by default, and that is not politeness: a key typed as an argument lands
+    in the shell history of every machine it is typed on, which is the kind of file this command
+    exists to stop using.
+    """
+    from chimera.config_vault import STORABLE, available, store
+
+    if name.upper() not in STORABLE:
+        console.print(f"[yellow]{name} is not a credential this vault stores[/yellow]")
+        console.print("[dim]storable: " + ", ".join(STORABLE) + "[/dim]")
+        raise typer.Exit(code=1)
+    if not available():
+        console.print("[yellow]no OS vault on this machine[/yellow] — see `chimera secrets list`.")
+        raise typer.Exit(code=1)
+    if value is None:
+        value = typer.prompt(f"{name.upper()}", hide_input=True)
+    if not store(name, value):
+        console.print("[red]the vault refused to store it[/red] (locked, or the prompt was cancelled)")
+        raise typer.Exit(code=1)
+    console.print(f"[green]stored[/green] {name.upper()} — the environment still wins over it")
+
+
+@secrets_app.command("rm")
+def secrets_rm(name: str = typer.Argument(..., help="The credential to forget.")) -> None:
+    """Remove one credential from the OS vault."""
+    from chimera.config_vault import forget
+
+    if not forget(name):
+        console.print(f"[yellow]{name.upper()} was not in the vault[/yellow]")
+        raise typer.Exit(code=1)
+    console.print(f"[green]forgot[/green] {name.upper()}")
+
+
 @cron_app.command("learn")
 def cron_learn(
     min_occurrences: int = typer.Option(3, "--min", help="Min repeats to propose."),

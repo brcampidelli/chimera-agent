@@ -3839,6 +3839,72 @@
       "path": "schema-bench"
     },
     {
+      "commands": [
+        {
+          "deprecated": false,
+          "help": "What the OS vault holds \u2014 names only, never values.\n\nPrinting a secret would put it in this terminal's scrollback, in any screenshot of it, and in\nwhatever recorded the session, which undoes the reason for having a vault.",
+          "hidden": false,
+          "name": "list",
+          "params": [],
+          "path": "secrets list"
+        },
+        {
+          "deprecated": false,
+          "help": "Remove one credential from the OS vault.",
+          "hidden": false,
+          "name": "rm",
+          "params": [
+            {
+              "help": "The credential to forget.",
+              "kind": "argument",
+              "name": "name",
+              "opts": [
+                "name"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "secrets rm"
+        },
+        {
+          "deprecated": false,
+          "help": "Put one credential in the OS vault.\n\nPrompted without echo by default, and that is not politeness: a key typed as an argument lands\nin the shell history of every machine it is typed on, which is the kind of file this command\nexists to stop using.",
+          "hidden": false,
+          "name": "set",
+          "params": [
+            {
+              "help": "e.g. OPENROUTER_API_KEY",
+              "kind": "argument",
+              "name": "name",
+              "opts": [
+                "name"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "Omit to be prompted without echo.",
+              "kind": "option",
+              "name": "value",
+              "opts": [
+                "--value"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "secrets set"
+        }
+      ],
+      "deprecated": false,
+      "help": "Keep provider keys in the OS vault instead of a file.",
+      "hidden": false,
+      "name": "secrets",
+      "params": [],
+      "path": "secrets"
+    },
+    {
       "deprecated": false,
       "help": "Run the messaging gateway on HTTP, Discord, Telegram, Slack or Signal. Requires a key.\n\nAdd ``--cron`` to also fire scheduled jobs on a real clock \u2014 turning the reactive gateway\ninto an agent that acts on time (the daemon that makes proactivity real). Pass ``--mcp`` to\ninstead expose Chimera *as* an MCP server on stdio, so any MCP client (Claude Desktop, an\nIDE, another agent) can call ``chimera_solve`` / ``chimera_fuse`` / ``chimera_memory_search``.",
       "hidden": false,

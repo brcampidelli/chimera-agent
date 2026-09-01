@@ -81,6 +81,13 @@ youtube = [
 stt = [
     "faster-whisper>=1.0",
 ]
+# Provider keys in the operating system's own vault — macOS Keychain, Windows Credential Manager,
+# Linux SecretService — instead of in a `.env` any process running as this user can read. Opt-in,
+# and it has to be: a container has no keychain and a server has no session bus, so a hard
+# dependency would break the deployments that most need the file it replaces.
+secrets = [
+    "keyring>=25",
+]
 # Media download for the download_media tool: yt-dlp (1000+ sites, actively maintained — the robust
 # alternative to pytube). Audio extraction also needs ffmpeg on PATH. Opt-in.
 media-dl = [
@@ -129,7 +136,7 @@ documents = [
 # multi-GB extras (`imagegen-local`, `train`) — install those explicitly if you have a GPU.
 # One command for "I want all the features": pip install 'chimera-agent[full]'.
 full = [
-    "chimera-agent[messaging,mcp,documents,media-dl,stt,data,viz,youtube]",
+    "chimera-agent[messaging,mcp,documents,media-dl,stt,data,viz,youtube,secrets]",
 ]
 # Back-compat alias: the browser (playwright) is now a CORE dependency, so `pip install
 # 'chimera-agent[browser]'` still works but installs nothing extra. The Chromium binary is
