@@ -43,4 +43,15 @@ class MemoryItem(BaseModel):
     #: ``None`` is the migration. Every fact written before this field existed has no project and is
     #: therefore global, which is what it always effectively was — nobody loses a memory by updating.
     project: str | None = None
+    created_at: float | None = None
+    """When this fact was written, as epoch seconds, or ``None`` for one written before the field.
+
+    ``None`` is the migration, exactly as ``project`` above: a memory that predates this has no age
+    and must not be given a plausible one — a fact stamped with the moment of the upgrade would
+    read as written today, which is the opposite of what it is.
+
+    Recency had no source before this. :func:`chimera.memory.value.rank` uses POSITION in the list
+    as the proxy and says so, and nothing could tell a reader that a `file:line` citation in a
+    six-month-old memory may have moved — the age was simply not recorded."""
+
     metadata: dict[str, Any] = Field(default_factory=dict)

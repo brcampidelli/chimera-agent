@@ -369,7 +369,11 @@ def test_bench_items_match_what_manager_add_builds(tmp_path: Path) -> None:
     stored = written.store.all()[0]
 
     reference = MemoryManager(MemoryStore(tmp_path / "reference.json")).add("Orion uses the queue.")
-    assert stored.model_dump(exclude={"id"}) == reference.model_dump(exclude={"id"})
+    # `created_at` is excluded alongside `id`, and for the same reason: it is the wall clock, and a
+    # bench whose output depends on when it ran is a bench whose seed does not determine its result.
+    # Ranking is unaffected — `value.rank` uses position, not this field.
+    ignorar = {"id", "created_at"}
+    assert stored.model_dump(exclude=ignorar) == reference.model_dump(exclude=ignorar)
     assert stored.id != reference.id  # the one field the bench controls
 
 
