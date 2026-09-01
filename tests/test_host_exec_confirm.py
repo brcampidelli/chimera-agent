@@ -390,7 +390,16 @@ def test_auto_detect_tty_resolves_to_the_interactive_prompt(monkeypatch: pytest.
 
     monkeypatch.setattr(confirm_mod.sys, "stdin", _FakeStdin(tty=True))
     gate = resolve_host_exec_confirm(_Settings("local", "ask"))  # no explicit `interactive`
-    assert gate is confirm_mod._prompt
+
+    # Asserted by BEHAVIOUR, not identity. The gate is wrapped now — a command that can be proved
+    # to change nothing is approved without a prompt — and `gate is _prompt` would fail for a
+    # change that alters nothing this test is about. What it must still show is that a command
+    # needing a decision reaches the interactive prompt.
+    perguntado: list[str] = []
+    monkeypatch.setattr(confirm_mod, "_prompt", lambda cmd: perguntado.append(cmd) or True)
+    gate = resolve_host_exec_confirm(_Settings("local", "ask"))
+    assert gate is not None and gate("rm -rf /tmp/x") is True
+    assert perguntado == ["rm -rf /tmp/x"]
 
 
 def test_auto_detect_no_tty_refuses(monkeypatch: pytest.MonkeyPatch) -> None:
