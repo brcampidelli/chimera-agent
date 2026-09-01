@@ -30,6 +30,7 @@ from chimera.providers.failover import (
     RecoveryAction,
     action_for,
     classify,
+    trace_of,
 )
 from chimera.providers.prompt_cache import apply_cache_control
 from chimera.providers.thinking import ThinkFilter, strip_think
@@ -150,7 +151,11 @@ def _to_message_dicts(messages: list[MessageLike]) -> list[dict[str, Any]]:
         if not images:
             # No images to fold in — but drop the key if it is present-and-empty, since no provider
             # knows it and an empty list is not worth a round trip's risk.
-            out.append({k: v for k, v in message.items() if k != "images"} if "images" in message else message)
+            out.append(
+                {k: v for k, v in message.items() if k != "images"}
+                if "images" in message
+                else message
+            )
             continue
         out.append(
             Message(
@@ -225,23 +230,32 @@ class CredentialRejectedError(MissingCredentialsError):
 def _credential_error(exc: BaseException) -> CredentialRejectedError | None:
     """Translate a spent-all-credentials failure into an actionable error, or ``None`` if unrelated.
 
-    Only AUTH and RATE_LIMIT qualify. Both mean "your credentials are the problem": a rejected key,
-    or one whose quota/credit is gone. Everything else (a provider outage, a bad model slug, a
-    context overflow) keeps its original exception, because the original text is the useful part.
+    Only AUTH, NO_CREDIT and RATE_LIMIT qualify. All three mean "your credentials are the problem":
+    a rejected key, an empty balance, or a quota that is gone for now. Everything else (a provider
+    outage, a bad model slug, a context overflow) keeps its original exception, because the original
+    text is the useful part.
+
+    NO_CREDIT is separate from RATE_LIMIT because the two sentences a person needs are different, and
+    the wrong one wastes their night: a rate limit resets on its own, an empty account does not. It
+    used to land in UNKNOWN, which returns None here — so the single most likely failure for a
+    prepaid provider was the one that surfaced as a raw exception with no advice at all.
     """
     reason = classify(exc)
     if reason is FailoverReason.AUTH:
         what = "Every configured provider key was rejected (401/403)."
         fix = "Check the key is correct and still active"
+    elif reason is FailoverReason.NO_CREDIT:
+        what = "Every configured provider key is out of credit (402)."
+        fix = "Top up the account, or add a key billed to another one — waiting will not clear this"
     elif reason is FailoverReason.RATE_LIMIT:
-        what = "Every configured provider key is rate-limited or out of credit."
-        fix = "Wait for the limit to reset, top up the account, or add another key"
+        what = "Every configured provider key is rate-limited."
+        fix = "Wait for the limit to reset, or add another key"
     else:
         return None
     return CredentialRejectedError(
         f"{what} {fix} — the relevant variables are {list(_KEY_ENV_VARS.values())} "
-        "(or use a local model, e.g. CHIMERA_DEFAULT_MODEL=ollama/llama3, which needs no key). "
-        f"Provider said: {exc}"
+        "(or use a local model, e.g. CHIMERA_DEFAULT_MODEL=ollama/llama3, which needs no key)."
+        f"{trace_of(exc).as_suffix()} Provider said: {exc}"
     )
 
 
@@ -285,7 +299,9 @@ class LLMGateway:
     def __init__(self, settings: Settings | None = None) -> None:
         self._settings_override = settings
         self._rotators: dict[str, _KeyRotator] = {}
-        self._rotators_lock = threading.Lock()  # the fusion panel calls _key_order from many threads
+        self._rotators_lock = (
+            threading.Lock()
+        )  # the fusion panel calls _key_order from many threads
         # M15-C2: per-credential cooldown pool — a rate-limited/revoked key is rested, not hammered.
         self._cred_pool = CredentialPool()
         self._cache: CompletionCache | None = None
@@ -511,11 +527,26 @@ class LLMGateway:
                     last_exc = exc
                     reason = classify(exc)
                     action = action_for(reason)
-                    if api_key and reason in (FailoverReason.AUTH, FailoverReason.RATE_LIMIT,
-                                              FailoverReason.OVERLOADED, FailoverReason.TIMEOUT,
-                                              FailoverReason.UNKNOWN):
+                    if api_key and reason in (
+                        FailoverReason.AUTH,
+                        FailoverReason.RATE_LIMIT,
+                        FailoverReason.OVERLOADED,
+                        FailoverReason.TIMEOUT,
+                        FailoverReason.UNKNOWN,
+                    ):
                         self._cred_pool.penalize(api_key, reason)  # rest this credential
-                    _log.warning("model %s failed (%s -> %s): %s", candidate, reason.value, action.value, exc)
+                    # The provider's own identifiers go in the line, not just our verdict. Without
+                    # them "my call failed" is unanswerable by a support desk, and they are the one
+                    # part of a failed response safe to quote back — minted by the provider, never
+                    # containing anything we sent.
+                    _log.warning(
+                        "model %s failed (%s -> %s)%s: %s",
+                        candidate,
+                        reason.value,
+                        action.value,
+                        trace_of(exc).as_suffix(),
+                        exc,
+                    )
                     if action is RecoveryAction.ABORT:
                         raise  # context-overflow / content-policy: another key/model won't help
                     if action is RecoveryAction.FALLBACK_MODEL:
@@ -574,7 +605,6 @@ class LLMGateway:
             messages.append(Message(role="system", content=system))
         messages.append(Message(role="user", content=prompt))
         return self.complete(messages, model=model).content
-
 
     def _think_filter(self) -> ThinkFilter | None:
         """A fresh filter per call, or None when the user asked to keep the tags.
