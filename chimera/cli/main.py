@@ -424,8 +424,19 @@ def context_curve_cmd(
 @app.command()
 def doctor(
     fix: bool = typer.Option(False, "--fix", help="Auto-repair safe setup issues (state dir, .env scaffold)."),
+    probe: bool = typer.Option(
+        False, "--probe", help="Actually call the provider once, instead of trusting the key's name."
+    ),
 ) -> None:
-    """Check the environment and configuration. With --fix, repair safe setup issues."""
+    """Check the environment and configuration. With --fix, repair safe setup issues.
+
+    `--probe` is off by default and that is deliberate: `doctor` should stay instant, offline and
+    free. What it buys when you ask for it is the difference between a claim and a measurement —
+    "Ready" below is an assertion about the NAME of an environment variable, so a revoked key, an
+    account with no credit, or a value pasted with a trailing space all pass it and fail on the
+    first real call. The argument for measuring is already written in `config_api.pricing_capability`
+    a few files over: the time to find out is while reading the doctor, not when a 3 a.m. cron stalls.
+    """
     settings = get_settings()
 
     if fix:
@@ -506,8 +517,28 @@ def doctor(
         )
     console.print(caps)
 
-    if providers:
-        console.print("[green]Ready[/green] — at least one provider key is configured.")
+    if providers and probe:
+        # One token, on the default model, through the same gateway a real run uses — including its
+        # failover, so "the primary is down and a fallback answered" reads as ready, which it is.
+        from chimera.providers import LLMGateway
+
+        try:
+            LLMGateway().quick("ok", model=settings.default_model)
+        except Exception as exc:  # noqa: BLE001 — every provider failure is an answer here
+            from chimera.core.redact import redact
+
+            console.print(
+                f"[red]Not ready[/red] — the provider refused: {redact(str(exc))[:300]}"
+            )
+        else:
+            console.print(
+                f"[green]Ready[/green] — {settings.default_model} answered a live call."
+            )
+    elif providers:
+        console.print(
+            "[green]Ready[/green] — at least one provider key is configured "
+            "[dim](a name, not a call — use --probe to check)[/dim]."
+        )
     else:
         console.print(
             Panel.fit(

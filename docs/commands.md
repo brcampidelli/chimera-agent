@@ -411,6 +411,13 @@ chimera deliver REQUEST
 
 Check the environment and configuration. With --fix, repair safe setup issues.
 
+`--probe` is off by default and that is deliberate: `doctor` should stay instant, offline and
+free. What it buys when you ask for it is the difference between a claim and a measurement —
+"Ready" below is an assertion about the NAME of an environment variable, so a revoked key, an
+account with no credit, or a value pasted with a trailing space all pass it and fail on the
+first real call. The argument for measuring is already written in `config_api.pricing_capability`
+a few files over: the time to find out is while reading the doctor, not when a 3 a.m. cron stalls.
+
 ```bash
 chimera doctor
 ```
@@ -418,6 +425,7 @@ chimera doctor
 | Option | | Default |
 | --- | --- | --- |
 | `--fix` | Auto-repair safe setup issues (state dir, .env scaffold). |  |
+| `--probe` | Actually call the provider once, instead of trusting the key's name. |  |
 
 ## drift
 
