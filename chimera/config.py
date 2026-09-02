@@ -276,6 +276,20 @@ class Settings(BaseSettings):
     # half on your own servers; until the second half is measured here, this stays a choice.
     mcp_defer: bool = Field(default=False, validation_alias="CHIMERA_MCP_DEFER")
 
+    # --- The same shape for the BUILT-IN tools, which are the larger half of the bill.
+    #
+    # Twenty-two schemas go out on every step: ~3,205 tokens before the user types. Measured on 28
+    # sessions of an installed 0.48.0 (33 tool calls), four tools did all of it — read_file,
+    # write_file, list_dir, edit_file — and the eighteen never called were 86% of the schema.
+    #
+    # `chimera.tools.defer.CORE` is declared in full regardless, so the tools that observed use
+    # actually reaches are never behind a lookup, and the saving comes from schemas the model did not
+    # ask for. OFF by default for the reason above it: selection accuracy is still the unmeasured
+    # half, and this project has rules against turning something on by conviction.
+    # `chimera.tools.defer.describe_saving` reports the measured half on your own registry — and can
+    # report a LOSS, which below a handful of tools it truthfully is.
+    defer_tools: bool = Field(default=False, validation_alias="CHIMERA_DEFER_TOOLS")
+
     # --- Auto-fuse error-sensitive turns in solve/crew without an explicit --fuse.
     # Off by default (fusion costs 2-3x); when on, the cost-aware router still keeps
     # cheap/tool turns single-model and only fuses deep or error-sensitive ones. ---
