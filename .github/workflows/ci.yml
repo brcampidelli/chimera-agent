@@ -229,6 +229,24 @@ jobs:
             exit 1
           fi
 
+      # The grouping, which the documentation site renders. It used to live in the site's
+      # repository, so the check that every command lands in a theme could only run at DEPLOY time
+      # — after the release. Three times it caught the same omission and three times the download
+      # page sat on the previous version until somebody read a red deploy. `tests/` asserts the
+      # completeness on the pull request that adds the command; this asserts the file the site
+      # actually reads is what the module says.
+      - name: Regenerate the CLI theme grouping
+        run: uv run python -m chimera.cli.themes_dump > chimera/_cli_themes.json
+
+      - name: Fail if the CLI theme grouping is stale
+        run: |
+          if ! git diff --quiet -- chimera/_cli_themes.json; then
+            echo "::error::The command reference grouping is out of date. Run this and commit it:"
+            echo "  python -m chimera.cli.themes_dump > chimera/_cli_themes.json"
+            git --no-pager diff --stat -- chimera/_cli_themes.json
+            exit 1
+          fi
+
       # The drift gate: if the committed schema/types differ from a fresh regeneration, someone changed
       # a backend response model without running `gen:api`. Fail loudly with the fix.
       - name: Fail if the generated API types are stale
