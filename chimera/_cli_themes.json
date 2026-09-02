@@ -1,0 +1,134 @@
+[
+  {
+    "key": "cli.themeSetup",
+    "commands": [
+      "init",
+      "doctor",
+      "version",
+      "features",
+      "maturity",
+      "migrate",
+      "models",
+      "secrets"
+    ]
+  },
+  {
+    "key": "cli.themeWork",
+    "commands": [
+      "chat",
+      "sessions",
+      "tui",
+      "assist",
+      "run",
+      "agent",
+      "deliver",
+      "solve",
+      "solve-batch",
+      "crew",
+      "crew-isolated",
+      "lifecycle",
+      "meta",
+      "explore",
+      "find",
+      "workflow",
+      "drift",
+      "scenarios"
+    ]
+  },
+  {
+    "key": "cli.themeFusion",
+    "commands": [
+      "fuse",
+      "fusion-receipts",
+      "orchestrate",
+      "brief",
+      "delegations"
+    ]
+  },
+  {
+    "key": "cli.themeMemory",
+    "commands": [
+      "memory",
+      "profile",
+      "playbook",
+      "skills",
+      "tools"
+    ]
+  },
+  {
+    "key": "cli.themeSkills",
+    "commands": [
+      "skills-library",
+      "skills-pending",
+      "skills-stats",
+      "skills-approve",
+      "skills-export",
+      "skills-import",
+      "skills-retire",
+      "skills-lifecycle",
+      "skills-evolve",
+      "skills-catalog",
+      "skills-install",
+      "skills-bundles",
+      "skills-bundle-enable",
+      "skills-bundle-disable",
+      "skills-uninstall",
+      "evolve"
+    ]
+  },
+  {
+    "key": "cli.themeAutomation",
+    "commands": [
+      "cron",
+      "kanban",
+      "project",
+      "agents"
+    ]
+  },
+  {
+    "key": "cli.themeServe",
+    "commands": [
+      "serve",
+      "app",
+      "mcp",
+      "a2a-card",
+      "acp"
+    ]
+  },
+  {
+    "key": "cli.themeSafety",
+    "commands": [
+      "guard",
+      "redteam",
+      "approve"
+    ]
+  },
+  {
+    "key": "cli.themeBench",
+    "commands": [
+      "bench",
+      "measure",
+      "bench-compare",
+      "swe-bench-compare",
+      "fusion-bench",
+      "cascade-bench",
+      "hierarchy-bench",
+      "skillcard-bench",
+      "schema-bench",
+      "sandbox-bench",
+      "memory-bench",
+      "memory-poison",
+      "probe-select",
+      "transfer-gate",
+      "evoclaw",
+      "rubric-grade",
+      "context-curve"
+    ]
+  },
+  {
+    "key": "cli.themeFun",
+    "commands": [
+      "pet"
+    ]
+  }
+]
