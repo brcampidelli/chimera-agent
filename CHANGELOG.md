@@ -8,6 +8,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A freshly updated app reported the version it used to be.** Measured on a real machine
+  immediately after a real in-place update from 0.48.0 to 0.49.0: `chimera-desktop.exe` was 0.49.0
+  and `/api/version` said 0.48.0. The backend process was fresh — spawned by the new shell, same
+  second — so nothing had survived. A **file** had.
+
+  The frozen sidecar is a PyInstaller bundle whose names carry versions; NSIS overwrites what it is
+  given and leaves the rest, so upgrading MERGED the two releases and `_internal` ended up holding
+  both `chimera_agent-0.48.0.dist-info` and `chimera_agent-0.49.0.dist-info`.
+  `importlib.metadata.version("chimera-agent")` answers with the first it finds.
+
+  What it broke: the app kept offering an update to the version it already was — the badge never
+  went away, and the next launch asked again. Anything else keyed on the version was reading the
+  previous release. The installer now removes the sidecar bundle before writing the new one, after
+  killing the processes that hold it open and never before.
+
+  **The pipeline could not have caught it, and that is the part worth keeping.** There is already a
+  step called *"the frozen sidecar knows its own version"* — it ran, and it passed, because CI
+  builds into an empty tree where exactly one dist-info exists. The defect needs a previous install
+  to merge with. A check that runs where the effect cannot occur produces no evidence about it,
+  however green it is.
+
+  That guard also encoded *"not zero"* rather than *"the right one"*: written for a real
+  `0.0.0+source` defect, it would pass a sidecar stamped 0.48.0 inside a v0.49.0 build. It compares
+  against the release being built now.
+
+  Said plainly rather than left to be assumed: **nothing automated exercises an upgrade.** The tests
+  added here assert the fix is present and the guard is honest; only installing the previous release
+  and then the new one would assert that it works, and no test in this repository does that.
+
+
 - **For twenty-five minutes after every release, auto-update was broken for everyone.** The updater
   asks GitHub for `releases/latest/download/latest.json`, which resolves to whatever is called the
   latest release — and a release becomes latest the *instant* it is created, while `latest.json` is

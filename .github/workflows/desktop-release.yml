@@ -136,6 +136,16 @@ jobs:
               exit 1
               ;;
           esac
+          # And that it is the RIGHT version, not merely a non-zero one. The rule above was written
+          # for `0.0.0+source` and encodes "not zero"; a sidecar stamped with the PREVIOUS release
+          # passes it, which is the way a version is actually wrong — plausibly, not obviously.
+          # Empty on a manual dispatch, where there is no release to compare against.
+          ESPERADA="${{ github.event.release.tag_name }}"
+          ESPERADA="${ESPERADA#v}"
+          if [ -n "$ESPERADA" ] && [ "$VERSION" != "$ESPERADA" ]; then
+            echo "::error::the frozen sidecar reports $VERSION inside a $ESPERADA release"
+            exit 1
+          fi
 
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@stable

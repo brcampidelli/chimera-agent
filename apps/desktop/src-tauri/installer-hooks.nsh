@@ -32,6 +32,29 @@
   ; Windows releases file handles asynchronously: the process is gone before its locks are. Without
   ; this pause the very next step can still meet a locked DLL, which is the failure being fixed.
   Sleep 1500
+
+  ; --- and then the directory goes, rather than being installed over.
+  ;
+  ; The frozen sidecar is a PyInstaller bundle: a pile of files whose NAMES carry versions. NSIS
+  ; overwrites what it is given and leaves everything else, so upgrading MERGED the two releases —
+  ; and `_internal` ended up holding both `chimera_agent-0.48.0.dist-info` and
+  ; `chimera_agent-0.49.0.dist-info`. `importlib.metadata.version("chimera-agent")` answers with the
+  ; first one it finds, so a freshly updated 0.49.0 app reported 0.48.0 of itself.
+  ;
+  ; What that broke, measured on a real machine after a real update: `/api/version` compared the
+  ; stale version against GitHub and kept saying "v0.49.0 available" on an app that WAS 0.49.0. The
+  ; badge never goes away, and the next launch offers the update again. Anything else keyed on the
+  ; version — receipts, telemetry, the update check itself — was reading the previous release.
+  ;
+  ; **CI cannot catch this**, and that is why it shipped. The pipeline's "the frozen sidecar knows
+  ; its own version" step builds into an empty tree, where there is exactly one dist-info; the defect
+  ; needs a PREVIOUS install to merge with. An instrument that cannot exhibit an effect produces no
+  ; evidence about it. Nothing here proves the upgrade path except an actual upgrade.
+  ;
+  ; Safe to wipe: everything under `sidecar-dist` is build output, replaced wholesale by this
+  ; installer. User data lives in the app data directory, which this does not touch.
+  DetailPrint "Removing the previous sidecar bundle…"
+  RMDir /r "$INSTDIR\sidecar-dist"
 !macroend
 
 !macro NSIS_HOOK_PREUNINSTALL
