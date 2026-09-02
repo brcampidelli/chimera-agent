@@ -167,9 +167,37 @@ def _apply_tool_allowlist(
 
     allow_names = _csv(allow) if allow is not None else (settings.tool_allowlist or None)
     deny_names = _csv(deny) if deny is not None else list(settings.tool_denylist)
-    if allow_names is None and not deny_names:
+    if allow_names is not None or deny_names:
+        registry = restrict_registry(registry, allow=allow_names, deny=deny_names, audit=audit)
+    return _maybe_defer(registry, allow_names, deny_names, settings)
+
+
+def _maybe_defer(
+    registry: Any, allow_names: list[str] | None, deny_names: list[str], settings: Settings
+) -> Any:
+    """Put the non-core tools behind `tool_list` when the setting says so.
+
+    Here, and not in `default_registry`, for two reasons that pull in the same direction.
+
+    **Order.** Deferral takes the names out of the registry, so it has to run AFTER the restriction
+    filter or the filter has nothing left to match — a denylist naming `scrape` would report success
+    while the proxy still reached it. `default_registry` runs before, so wiring it there would build
+    exactly that hole.
+
+    **One place.** `default_registry` is called ten times in this file alone. Wiring a toggle into
+    each is the "second code path that has to remember to run" that `mcp_defer` names, and this
+    function is already the single point every CLI surface routes its tool governance through.
+    """
+    if not settings.defer_tools:
         return registry
-    return restrict_registry(registry, allow=allow_names, deny=deny_names, audit=audit)
+    from chimera.tools.defer import defer_builtins
+
+    deferido, _ = defer_builtins(
+        registry,
+        denied=frozenset(deny_names),
+        allowed=frozenset(allow_names) if allow_names else None,
+    )
+    return deferido
 
 
 def _session_profile(mem: Any) -> str:
