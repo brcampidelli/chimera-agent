@@ -548,17 +548,25 @@ enum Supervised {
 ///
 /// It names a file on purpose. A give-up with nothing to open is the "nothing happens" failure
 /// again, one level up: the user is told the app is broken and given no way to find out why.
-fn gave_up_message(fuse: &Fuse, report: Option<&Path>, last_error: Option<&str>) -> String {
-    let mut message = format!(
-        "Chimera's backend stopped, and the app could not bring it back (it tried {} times).\n\n\
-         Close Chimera and open it again.",
-        fuse.spent
-    );
+fn gave_up_message(
+    d: &Dialogo,
+    fuse: &Fuse,
+    report: Option<&Path>,
+    last_error: Option<&str>,
+) -> String {
+    // The language arrives as a PARAMETER rather than from `dialogo()`, and that is what keeps the
+    // supervisor's tests deterministic: they drive `supervise` end to end and read the announced
+    // string, so a message built from the machine's locale would assert in English on the CI runner
+    // and in Portuguese on the machine that wrote it. The tests pass `&DIALOGO[0]` explicitly.
+    let mut message = d.parou.replace("{n}", &fuse.spent.to_string());
     if let Some(path) = report {
-        message.push_str(&format!("\n\nWhat the backend said before it stopped:\n{}", path.display()));
+        // The path itself is not translated — it is a path.
+        message.push_str(&format!("\n\n{}\n{}", d.relatorio, path.display()));
     }
     if let Some(why) = last_error {
-        message.push_str(&format!("\n\nThe last attempt to restart it: {why}"));
+        // Neither is this: it is the OS's or the backend's own words, and it is what a bug report
+        // needs to be searchable.
+        message.push_str(&format!("\n\n{} {why}", d.ultima_tentativa));
     }
     message
 }
@@ -581,6 +589,9 @@ fn supervise(
     state: Arc<Sidecar>,
     paths: Paths,
     tuning: Tuning,
+    // The language the give-up message is written in. A parameter and not `dialogo()` — see the
+    // note on `gave_up_message`. (A line comment: Rust does not take doc comments on parameters.)
+    d: &'static Dialogo,
     mut announce: impl FnMut(Supervised),
 ) {
     let mut fuse = Fuse::new(&tuning);
@@ -654,6 +665,7 @@ fn supervise(
 
         if !fuse.allows(Instant::now()) {
             announce(Supervised::GaveUp(gave_up_message(
+                d,
                 &fuse,
                 last_report.as_deref(),
                 last_error.as_deref(),
@@ -693,7 +705,7 @@ fn supervise(
 mod tests {
     use super::{
         drain_stderr, idioma_do_dialogo, look, port_of, remembered_port, start_sidecar, supervise,
-        write_report, Backend, Budget, Fuse, Health, Paths, Sidecar, Supervised, Trouble, Tuning,
+        write_report, Backend, Budget, Dialogo, Fuse, Health, Paths, Sidecar, Supervised, Trouble, Tuning,
         DIALOGO, STDERR_KEEP,
     };
     use std::collections::VecDeque;
@@ -855,21 +867,66 @@ mod tests {
     ///
     /// An empty button label renders as a button with nothing on it — you would not know which one
     /// installs and which one postpones, on the dialog that asks to change your machine.
+    /// Every string in one language, paired with its field name. One list, so the tests below and
+    /// `nenhum_campo_do_dialogo_fica_sem_teste` are talking about the same set.
+    fn campos(d: &'static Dialogo) -> Vec<(&'static str, &'static str)> {
+        vec![
+            ("menu", d.menu),
+            ("titulo", d.titulo),
+            ("mensagem", d.mensagem),
+            ("atualizar", d.atualizar),
+            ("depois", d.depois),
+            ("atual", d.atual),
+            ("falhou", d.falhou),
+            ("sair", d.sair),
+            ("nao_iniciou_titulo", d.nao_iniciou_titulo),
+            ("nao_iniciou", d.nao_iniciou),
+            ("parou_titulo", d.parou_titulo),
+            ("parou", d.parou),
+            ("relatorio", d.relatorio),
+            ("ultima_tentativa", d.ultima_tentativa),
+        ]
+    }
+
+    /// Every language has every string, and none of them is empty.
+    ///
+    /// An empty button label renders as a button with nothing on it — you would not know which one
+    /// installs and which one postpones, on the dialog that asks to change your machine.
     #[test]
     fn cada_idioma_tem_o_dialogo_inteiro() {
         for d in &DIALOGO {
-            for (campo, texto) in [
-                ("menu", d.menu),
-                ("titulo", d.titulo),
-                ("mensagem", d.mensagem),
-                ("ok", d.atualizar),
-                ("cancelar", d.depois),
-                ("atual", d.atual),
-                ("falhou", d.falhou),
-            ] {
+            for (campo, texto) in campos(d) {
                 assert!(!texto.trim().is_empty(), "{}: {campo} vazio", d.codigo);
             }
         }
+    }
+
+    /// No field of `Dialogo` escapes the tests by being added and not listed.
+    ///
+    /// `campos()` is written by hand because Rust has no reflection here, and a hand-written list
+    /// is exactly the kind that stops covering a field somebody adds next month. So the list is
+    /// checked against the struct definition, read out of this very file: adding a fourteenth
+    /// string and forgetting it here fails, rather than shipping untested in ten languages.
+    #[test]
+    fn nenhum_campo_do_dialogo_fica_sem_teste() {
+        let fonte = producao();
+        let corpo = fonte
+            .split_once("struct Dialogo {")
+            .expect("a struct existe")
+            .1
+            .split_once("\n}")
+            .expect("a struct fecha")
+            .0;
+        let na_struct: Vec<&str> = corpo
+            .lines()
+            .filter_map(|l| l.trim().strip_suffix(": &'static str,"))
+            .filter(|nome| *nome != "codigo")
+            .collect();
+        let na_lista: Vec<&str> = campos(&DIALOGO[0]).into_iter().map(|(n, _)| n).collect();
+        assert_eq!(
+            na_struct, na_lista,
+            "campos(): a lista dos testes saiu de sincronia com a struct Dialogo"
+        );
     }
 
     /// The version placeholder survives translation.
@@ -884,6 +941,7 @@ mod tests {
                 ("mensagem", d.mensagem, "{v}"),
                 ("atual", d.atual, "{v}"),
                 ("falhou", d.falhou, "{e}"),
+                ("parou", d.parou, "{n}"),
             ] {
                 assert!(
                     texto.contains(marcador),
@@ -1086,6 +1144,41 @@ mod tests {
         );
     }
 
+    /// The backend-failure dialogs and the tray's Quit come from the table too.
+    ///
+    /// These were left English when the updater was translated, and named in the changelog so they
+    /// would be found rather than discovered. This is that debt paid, and pinned: three dialogs and
+    /// a menu item, each one a place where a literal is the easy thing to write.
+    ///
+    /// What is deliberately NOT translated, and must stay that way: the detail that follows
+    /// `nao_iniciou`, the report path, and the last restart error. They are a path, an OS error and
+    /// the backend's own stderr — they go into a bug report, and a translated system error is one
+    /// nobody can search for.
+    #[test]
+    fn os_dialogos_de_falha_tambem_falam_a_lingua_do_usuario() {
+        let producao = producao();
+        for (o_que, agulha) in [
+            ("o titulo do 'nao iniciou'", ".title(d.nao_iniciou_titulo)"),
+            ("o corpo do 'nao iniciou'", concat!("d.nao_iniciou", ")")),
+            ("o titulo do 'backend parou'", concat!("dialogo().parou_", "titulo")),
+            ("o item Quit da bandeja", concat!("dialogo()", ".sair")),
+            ("a frase do 'nao consegui trazer de volta'", concat!("d.parou.rep", "lace(\"{n}\"")),
+            ("o rotulo do relatorio", "d.relatorio"),
+            ("o rotulo da ultima tentativa", "d.ultima_tentativa"),
+        ] {
+            assert!(
+                producao.contains(agulha),
+                "{o_que} nao vem mais da tabela de idiomas"
+            );
+        }
+
+        // And the diagnostics are still passed through verbatim, not wrapped in a translation.
+        assert!(
+            producao.contains("path.display()") && producao.contains("{why}"),
+            "o diagnostico tecnico parou de ser repassado verbatim — ele e' o que vai no bug report"
+        );
+    }
+
     #[test]
     fn a_url_yields_its_port() {
         assert_eq!(port_of("http://127.0.0.1:51234"), Some(51234));
@@ -1255,7 +1348,8 @@ mod tests {
         let seen = Arc::new(Mutex::new(Vec::<String>::new()));
         let (state, paths, sink) = (Arc::clone(state), paths.clone(), Arc::clone(&seen));
         let handle = std::thread::spawn(move || {
-            supervise(state, paths, tuning, move |event| {
+            // English explicitly, so the assertions below read in English wherever this runs.
+            supervise(state, paths, tuning, &DIALOGO[0], move |event| {
                 let note = match event {
                     Supervised::Restarted(url) => format!("restarted {url}"),
                     Supervised::GaveUp(why) => format!("gave up {why}"),
@@ -1650,6 +1744,18 @@ struct Dialogo {
     /// at every launch is the nagging the automatic path exists to avoid.
     atual: &'static str,
     falhou: &'static str,
+    /// The tray's Quit item.
+    sair: &'static str,
+    nao_iniciou_titulo: &'static str,
+    /// The lead sentence of the startup failure. What follows it is the technical detail, and that
+    /// stays in ENGLISH on purpose: it is a path, an OS error or the backend's own stderr, it goes
+    /// into a bug report, and a translated system error is one nobody can search for.
+    nao_iniciou: &'static str,
+    parou_titulo: &'static str,
+    /// `{n}` is how many times the app tried to bring the backend back.
+    parou: &'static str,
+    relatorio: &'static str,
+    ultima_tentativa: &'static str,
 }
 
 /// The update dialog, in the ten languages the app ships.
@@ -1671,6 +1777,13 @@ const DIALOGO: [Dialogo; 10] = [
         depois: "Later",
         atual: "Chimera is up to date (v{v}).",
         falhou: "Could not check for updates: {e}",
+        sair: "Quit Chimera",
+        nao_iniciou_titulo: "Chimera could not start",
+        nao_iniciou: "Chimera could not start its backend. The detail below is for a bug report:",
+        parou_titulo: "Chimera's backend stopped",
+        parou: "Chimera's backend stopped, and the app could not bring it back (it tried {n} times).\n\nClose Chimera and open it again.",
+        relatorio: "What the backend said before it stopped:",
+        ultima_tentativa: "The last attempt to restart it:",
     },
     Dialogo {
         codigo: "pt",
@@ -1681,6 +1794,13 @@ const DIALOGO: [Dialogo; 10] = [
         depois: "Depois",
         atual: "O Chimera está atualizado (v{v}).",
         falhou: "Não foi possível verificar atualizações: {e}",
+        sair: "Sair do Chimera",
+        nao_iniciou_titulo: "O Chimera não conseguiu iniciar",
+        nao_iniciou: "O Chimera não conseguiu iniciar o backend. O detalhe abaixo é para um relatório de bug:",
+        parou_titulo: "O backend do Chimera parou",
+        parou: "O backend do Chimera parou e o app não conseguiu trazê-lo de volta (tentou {n} vezes).\n\nFeche o Chimera e abra de novo.",
+        relatorio: "O que o backend disse antes de parar:",
+        ultima_tentativa: "A última tentativa de reiniciá-lo:",
     },
     Dialogo {
         codigo: "es",
@@ -1691,6 +1811,13 @@ const DIALOGO: [Dialogo; 10] = [
         depois: "Más tarde",
         atual: "Chimera está actualizado (v{v}).",
         falhou: "No se pudo buscar actualizaciones: {e}",
+        sair: "Salir de Chimera",
+        nao_iniciou_titulo: "Chimera no pudo iniciar",
+        nao_iniciou: "Chimera no pudo iniciar su backend. El detalle de abajo es para un informe de error:",
+        parou_titulo: "El backend de Chimera se detuvo",
+        parou: "El backend de Chimera se detuvo y la app no pudo recuperarlo (lo intentó {n} veces).\n\nCierra Chimera y ábrelo de nuevo.",
+        relatorio: "Lo que dijo el backend antes de detenerse:",
+        ultima_tentativa: "El último intento de reiniciarlo:",
     },
     Dialogo {
         codigo: "fr",
@@ -1701,6 +1828,13 @@ const DIALOGO: [Dialogo; 10] = [
         depois: "Plus tard",
         atual: "Chimera est à jour (v{v}).",
         falhou: "Impossible de vérifier les mises à jour : {e}",
+        sair: "Quitter Chimera",
+        nao_iniciou_titulo: "Chimera n'a pas pu démarrer",
+        nao_iniciou: "Chimera n'a pas pu démarrer son backend. Le détail ci-dessous sert à un rapport de bogue :",
+        parou_titulo: "Le backend de Chimera s'est arrêté",
+        parou: "Le backend de Chimera s'est arrêté et l'application n'a pas pu le relancer ({n} tentatives).\n\nFermez Chimera et rouvrez-le.",
+        relatorio: "Ce que le backend a dit avant de s'arrêter :",
+        ultima_tentativa: "La dernière tentative de redémarrage :",
     },
     Dialogo {
         codigo: "de",
@@ -1711,6 +1845,13 @@ const DIALOGO: [Dialogo; 10] = [
         depois: "Später",
         atual: "Chimera ist aktuell (v{v}).",
         falhou: "Nach Updates konnte nicht gesucht werden: {e}",
+        sair: "Chimera beenden",
+        nao_iniciou_titulo: "Chimera konnte nicht starten",
+        nao_iniciou: "Chimera konnte sein Backend nicht starten. Die Details unten sind für einen Fehlerbericht:",
+        parou_titulo: "Chimeras Backend wurde beendet",
+        parou: "Chimeras Backend wurde beendet und die App konnte es nicht wiederherstellen ({n} Versuche).\n\nSchließen Sie Chimera und öffnen Sie es erneut.",
+        relatorio: "Was das Backend zuletzt gemeldet hat:",
+        ultima_tentativa: "Der letzte Neustartversuch:",
     },
     Dialogo {
         codigo: "it",
@@ -1721,6 +1862,13 @@ const DIALOGO: [Dialogo; 10] = [
         depois: "Più tardi",
         atual: "Chimera è aggiornato (v{v}).",
         falhou: "Impossibile controllare gli aggiornamenti: {e}",
+        sair: "Esci da Chimera",
+        nao_iniciou_titulo: "Chimera non è riuscito ad avviarsi",
+        nao_iniciou: "Chimera non è riuscito ad avviare il backend. Il dettaglio qui sotto serve per una segnalazione di bug:",
+        parou_titulo: "Il backend di Chimera si è fermato",
+        parou: "Il backend di Chimera si è fermato e l'app non è riuscita a riavviarlo ({n} tentativi).\n\nChiudi Chimera e riaprilo.",
+        relatorio: "Che cosa ha detto il backend prima di fermarsi:",
+        ultima_tentativa: "L'ultimo tentativo di riavviarlo:",
     },
     Dialogo {
         codigo: "pl",
@@ -1731,6 +1879,13 @@ const DIALOGO: [Dialogo; 10] = [
         depois: "Później",
         atual: "Chimera jest aktualna (v{v}).",
         falhou: "Nie udało się sprawdzić aktualizacji: {e}",
+        sair: "Zakończ Chimerę",
+        nao_iniciou_titulo: "Chimera nie mogła się uruchomić",
+        nao_iniciou: "Chimera nie mogła uruchomić swojego backendu. Szczegóły poniżej są do zgłoszenia błędu:",
+        parou_titulo: "Backend Chimery zatrzymał się",
+        parou: "Backend Chimery zatrzymał się, a aplikacja nie zdołała go przywrócić (prób: {n}).\n\nZamknij Chimerę i otwórz ją ponownie.",
+        relatorio: "Co backend powiedział, zanim się zatrzymał:",
+        ultima_tentativa: "Ostatnia próba ponownego uruchomienia:",
     },
     Dialogo {
         codigo: "zh",
@@ -1741,6 +1896,13 @@ const DIALOGO: [Dialogo; 10] = [
         depois: "稍后",
         atual: "Chimera 已是最新版本 (v{v})。",
         falhou: "无法检查更新：{e}",
+        sair: "退出 Chimera",
+        nao_iniciou_titulo: "Chimera 无法启动",
+        nao_iniciou: "Chimera 无法启动后端。下面的细节用于提交问题报告：",
+        parou_titulo: "Chimera 的后端已停止",
+        parou: "Chimera 的后端已停止，应用无法将其恢复（已尝试 {n} 次）。\n\n请关闭 Chimera 后重新打开。",
+        relatorio: "后端停止前的输出：",
+        ultima_tentativa: "最后一次重启尝试：",
     },
     Dialogo {
         codigo: "ja",
@@ -1751,6 +1913,13 @@ const DIALOGO: [Dialogo; 10] = [
         depois: "後で",
         atual: "Chimera は最新です (v{v})。",
         falhou: "アップデートを確認できませんでした: {e}",
+        sair: "Chimera を終了",
+        nao_iniciou_titulo: "Chimera を起動できませんでした",
+        nao_iniciou: "Chimera はバックエンドを起動できませんでした。以下の詳細は不具合報告用です:",
+        parou_titulo: "Chimera のバックエンドが停止しました",
+        parou: "Chimera のバックエンドが停止し、アプリは復帰させられませんでした ({n} 回試行)。\n\nChimera を閉じて開き直してください。",
+        relatorio: "停止する前にバックエンドが出力した内容:",
+        ultima_tentativa: "最後の再起動の試み:",
     },
     Dialogo {
         codigo: "ru",
@@ -1761,6 +1930,13 @@ const DIALOGO: [Dialogo; 10] = [
         depois: "Позже",
         atual: "Chimera обновлена до последней версии (v{v}).",
         falhou: "Не удалось проверить обновления: {e}",
+        sair: "Выйти из Chimera",
+        nao_iniciou_titulo: "Chimera не смогла запуститься",
+        nao_iniciou: "Chimera не смогла запустить бэкенд. Подробности ниже — для отчёта об ошибке:",
+        parou_titulo: "Бэкенд Chimera остановился",
+        parou: "Бэкенд Chimera остановился, и приложение не смогло его восстановить (попыток: {n}).\n\nЗакройте Chimera и откройте снова.",
+        relatorio: "Что бэкенд сообщил перед остановкой:",
+        ultima_tentativa: "Последняя попытка перезапуска:",
     },
 ];
 
@@ -1872,9 +2048,10 @@ fn main() {
                 Ok(pair) => pair,
                 Err(why) => {
                     // Blocking, so the process cannot exit before the user has read it.
+                    let d = dialogo();
                     app.dialog()
-                        .message(&why)
-                        .title("Chimera could not start")
+                        .message(format!("{}\n\n{why}", d.nao_iniciou))
+                        .title(d.nao_iniciou_titulo)
                         .buttons(MessageDialogButtons::Ok)
                         .blocking_show();
                     return Err(Box::<dyn std::error::Error>::from(why));
@@ -1899,7 +2076,7 @@ fn main() {
             // stays silent when there is nothing — deliberately, so it never nags — which left the
             // user with no way to find out except launching again tomorrow.
             let atualizar = MenuItem::with_id(app, "update", dialogo().menu, true, None::<&str>)?;
-            let quit = MenuItem::with_id(app, "quit", "Quit Chimera", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", dialogo().sair, true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&atualizar, &quit])?;
             let icon = app.default_window_icon().cloned();
             let mut tray = TrayIconBuilder::new().menu(&menu).tooltip("Chimera");
@@ -1940,7 +2117,7 @@ fn main() {
             let watched = paths.clone();
             let mut showing = url.clone();
             std::thread::spawn(move || {
-                supervise(sidecar, watched, Tuning::default(), move |event| match event {
+                supervise(sidecar, watched, Tuning::default(), dialogo(), move |event| match event {
                     Supervised::Restarted(fresh) => {
                         // Same origin is the normal case and needs nothing: the page is still
                         // loaded, and its next poll simply succeeds. A DIFFERENT origin means the
@@ -1963,7 +2140,7 @@ fn main() {
                         supervisor
                             .dialog()
                             .message(&why)
-                            .title("Chimera's backend stopped")
+                            .title(dialogo().parou_titulo)
                             .buttons(MessageDialogButtons::Ok)
                             .blocking_show();
                     }
