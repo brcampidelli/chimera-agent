@@ -692,10 +692,35 @@ fn supervise(
 #[cfg(test)]
 mod tests {
     use super::{
-        drain_stderr, look, port_of, remembered_port, start_sidecar, supervise, write_report,
-        Backend, Budget, Fuse, Health, Paths, Sidecar, Supervised, Trouble, Tuning, STDERR_KEEP,
+        drain_stderr, idioma_do_dialogo, look, port_of, remembered_port, start_sidecar, supervise,
+        write_report, Backend, Budget, Fuse, Health, Paths, Sidecar, Supervised, Trouble, Tuning,
+        DIALOGO, STDERR_KEEP,
     };
     use std::collections::VecDeque;
+
+    /// This file, minus its own test module.
+    ///
+    /// TWO TRAPS live here, both the shape `the_sidecar_actually_pipes_its_stderr` documents.
+    ///
+    /// 1. `mod tests` sits in the MIDDLE of the file — `check_for_update` is defined after it — so
+    ///    "everything before `#[cfg(test)]`" is not the production code, it is the first half of
+    ///    it. A window that stopped there made one assert panic and another pass VACUOUSLY, over a
+    ///    region that could not contain what it was looking for. A test that cannot fail is worse
+    ///    than no test.
+    /// 2. Line endings are normalised FIRST. The file is checked out CRLF on Windows and LF on the
+    ///    Linux runner, so a window anchored on "\n}\n" matches on one and silently never matches
+    ///    on the other — green on CI and red on the machine that wrote it. It was that way round.
+    fn producao() -> String {
+        let fonte = include_str!("main.rs").replace("\r\n", "\n");
+        let (antes, resto) = fonte
+            .split_once("#[cfg(test)]")
+            .expect("o modulo de testes marca onde a producao e' interrompida");
+        // The module's closing brace is the first `}` at column zero after it; every brace inside
+        // is indented. Production resumes after that.
+        let depois = resto.split_once("\n}\n").map_or("", |(_, d)| d);
+        format!("{antes}{depois}")
+    }
+
     use std::net::TcpListener;
     use std::path::{Path, PathBuf};
     use std::process::{Child, Command, Stdio};
@@ -824,6 +849,241 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(500));
         assert!(tail.lock().unwrap().len() <= STDERR_KEEP);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Every language has all four strings, and none of them is empty.
+    ///
+    /// An empty button label renders as a button with nothing on it — you would not know which one
+    /// installs and which one postpones, on the dialog that asks to change your machine.
+    #[test]
+    fn cada_idioma_tem_o_dialogo_inteiro() {
+        for d in &DIALOGO {
+            for (campo, texto) in [
+                ("menu", d.menu),
+                ("titulo", d.titulo),
+                ("mensagem", d.mensagem),
+                ("ok", d.atualizar),
+                ("cancelar", d.depois),
+                ("atual", d.atual),
+                ("falhou", d.falhou),
+            ] {
+                assert!(!texto.trim().is_empty(), "{}: {campo} vazio", d.codigo);
+            }
+        }
+    }
+
+    /// The version placeholder survives translation.
+    ///
+    /// The template is a lookup, not a literal, so `format!` cannot check it and a translation that
+    /// dropped `{v}` would ship a dialog that never names the version it is offering. The frontend
+    /// has the same test for the same reason (`i18n.test.tsx`, "keeps every {placeholder} intact").
+    #[test]
+    fn dialogo_mantem_os_marcadores() {
+        for d in &DIALOGO {
+            for (campo, texto, marcador) in [
+                ("mensagem", d.mensagem, "{v}"),
+                ("atual", d.atual, "{v}"),
+                ("falhou", d.falhou, "{e}"),
+            ] {
+                assert!(
+                    texto.contains(marcador),
+                    "{}: {campo} perdeu o {marcador} e nunca vai dizer qual",
+                    d.codigo
+                );
+            }
+        }
+        // And it is really substituted, not merely present.
+        let pronta = idioma_do_dialogo(Some("pt-BR")).mensagem.replace("{v}", "0.49.0");
+        assert!(pronta.contains("0.49.0") && !pronta.contains("{v}"));
+    }
+
+    /// The ten languages here are the ten the app ships — read out of the frontend, not copied.
+    ///
+    /// Two lists of one fact in two languages that no compiler relates. Adding an eleventh language
+    /// to the app and not here would leave its users an English dialog, and nothing would say so.
+    #[test]
+    fn os_idiomas_sao_os_mesmos_do_aplicativo() {
+        let fonte = include_str!("../../src/lib/i18n.tsx");
+        let lista = fonte
+            .split_once("export const LANGS = [")
+            .expect("LANGS existe em i18n.tsx")
+            .1
+            .split_once("] as const;")
+            .expect("LANGS fecha")
+            .0;
+        let do_app: Vec<&str> = lista
+            .split("code: \"")
+            .skip(1)
+            .filter_map(|resto| resto.split_once('"').map(|(codigo, _)| codigo))
+            .collect();
+        let daqui: Vec<&str> = DIALOGO.iter().map(|d| d.codigo).collect();
+        assert_eq!(
+            do_app, daqui,
+            "a lista de idiomas do dialogo saiu de sincronia com a do aplicativo"
+        );
+    }
+
+    /// A locale tag becomes one of the ten, or English.
+    #[test]
+    fn o_locale_do_sistema_escolhe_o_idioma() {
+        let codigo = |tag: Option<&str>| idioma_do_dialogo(tag).codigo;
+
+        // A region suffix must not defeat the match — nobody's locale is a bare "pt".
+        assert_eq!(codigo(Some("pt-BR")), "pt");
+        assert_eq!(codigo(Some("pt_PT")), "pt"); // macOS uses an underscore
+        assert_eq!(codigo(Some("zh-Hans-CN")), "zh");
+        assert_eq!(codigo(Some("PT-br")), "pt"); // and it is case-insensitive
+        assert_eq!(codigo(Some("de")), "de");
+
+        // Anything unknown lands on English rather than on nothing.
+        assert_eq!(codigo(Some("sv-SE")), "en");
+        assert_eq!(codigo(Some("")), "en");
+        assert_eq!(codigo(None), "en");
+    }
+
+    /// The dialog is NOT still the hardcoded English it used to be.
+    ///
+    /// The control for the four tests above: they all pass against a `check_for_update` that builds
+    /// the table correctly and then ignores it. This one reads the call site.
+    ///
+    /// TWO TRAPS, both hit while writing it, both the same shape as the one
+    /// `the_sidecar_actually_pipes_its_stderr` documents above.
+    ///
+    /// 1. `mod tests` sits in the MIDDLE of this file — `check_for_update` is defined after it — so
+    ///    "everything before `#[cfg(test)]`" is not the production code, it is the first half of it.
+    ///    The positive assert panicked; the negative one passed VACUOUSLY, searching a region that
+    ///    could not contain what it was looking for. A test that cannot fail is worse than none.
+    /// 2. The needles are assembled with `concat!` so this test's own source never contains the
+    ///    strings it searches for. Spelled out, the search window would find its own answer.
+    #[test]
+    fn o_dialogo_usa_a_tabela_e_nao_um_literal() {
+        let producao = producao();
+
+        let assinatura = concat!("async fn ", "check_for_update");
+        let corpo = producao
+            .split_once(assinatura)
+            .expect("check_for_update existe fora do modulo de testes")
+            .1;
+
+        // COUNTED, not merely present — and that distinction was earned twice.
+        //
+        // First version: checked the button and the table lookup, and a sabotage that replaced
+        // `.title(...)` with the old English literal went through. The test named the right
+        // property and covered a quarter of it.
+        //
+        // Second version: one `contains` per string. Also went through, for a subtler reason —
+        // production now opens THREE dialogs (already-up-to-date, the update itself, and the tray's
+        // failure), so `contains(".title(d.titulo)")` is satisfied by any one of them while the
+        // other two say whatever they like. A presence check over repeated call sites can only ever
+        // prove that at least one is right.
+        // Scoped to the updater, and only it. The first counting version swept all of production
+        // and read 6 `.title(` against 3 from the table — the other three are the backend-failure
+        // dialogs, which are a different feature and are still English. A rule that fails correct
+        // code is as useless as one that passes broken code.
+        let ate_o_fim_da_fn = corpo.split_once("\nfn ").map_or(corpo, |(cabeca, _)| cabeca);
+        let braco = producao
+            .split_once(concat!("\"update\" =", ">"))
+            .and_then(|(_, resto)| resto.split_once("_ => {}"))
+            .map_or(String::new(), |(arm, _)| arm.to_string());
+        let regiao = format!("{ate_o_fim_da_fn}{braco}");
+
+        for (chamada, da_tabela) in [(".title(", ".title(d."), (".message(", ".message(d.")] {
+            let todas = regiao.matches(chamada).count();
+            let certas = regiao.matches(da_tabela).count();
+            assert!(todas > 0, "sumiram as chamadas {chamada} — o teste parou de medir algo");
+            assert_eq!(
+                todas, certas,
+                "{} de {todas} chamadas {chamada} do updater nao vem da tabela de idiomas",
+                todas - certas
+            );
+        }
+
+        // The buttons have one call site, so presence is enough for them.
+        for (parte, agulha) in [
+            ("o idioma", concat!("let d = dial", "ogo();")),
+            ("o botao de atualizar", "d.atualizar.to_string()"),
+            ("o botao de adiar", "d.depois.to_string()"),
+        ] {
+            assert!(
+                corpo.contains(agulha),
+                "{parte} do dialogo nao vem mais da tabela de idiomas"
+            );
+        }
+
+        // There is no "and the old English literals are gone" assertion, and the reason is worth
+        // keeping: one was written, and it failed on CORRECT code. "Chimera update available" is
+        // still in this file — as the English row of the table, which is exactly where it belongs.
+        // A rule phrased over the string could not tell the translation from the hardcoding; the
+        // five above are phrased over the CALL SITE, which is the thing that can be wrong.
+        //
+        // It was caught late for a method reason worth writing down too: the sabotages were run
+        // without re-running the suite clean afterwards, so "it fails when broken" was established
+        // and "it passes when correct" was assumed. Both directions, every time.
+    }
+
+    /// The tray offers a way to ASK, and its label comes from the table like everything else.
+    ///
+    /// Without this item the only update check is the one at startup, which says nothing when
+    /// there is nothing — so a user who wanted to know had to relaunch and hope. The label is the
+    /// one string of the four that is NOT in a dialog, and it would be the easy one to hardcode.
+    #[test]
+    fn a_bandeja_oferece_verificar_atualizacoes() {
+        let producao = producao();
+        let menu = producao
+            .split_once(concat!("let atualizar = MenuItem", "::with_id"))
+            .expect("o item de atualizar existe na bandeja")
+            .1;
+        assert!(
+            menu.contains(concat!("dialogo()", ".menu")),
+            "o rotulo do item de bandeja parou de vir da tabela de idiomas"
+        );
+        assert!(
+            producao.contains(concat!("&[&atual", "izar, &quit]")),
+            "o item saiu do menu da bandeja"
+        );
+        assert!(
+            producao.contains(concat!("\"update\" =", ">")),
+            "o clique no item nao e' mais tratado"
+        );
+    }
+
+    /// Only a check the user asked for says "you are already up to date".
+    ///
+    /// The two paths differ in exactly one way and it is the whole design: at startup, silence is
+    /// correct — an app that announces "nothing to do" every launch is nagging. After a click,
+    /// silence is a bug: a menu item that does nothing visible reads as broken, and the next move
+    /// is to click it again.
+    ///
+    /// Read from the source because the alternative is booting Tauri, opening a tray and clicking
+    /// it. This pins the branch and the two call sites, which is where the distinction lives.
+    #[test]
+    fn so_a_verificacao_pedida_diz_que_ja_esta_atualizado() {
+        let producao = producao();
+        let corpo = producao
+            .split_once(concat!("async fn ", "check_for_update"))
+            .expect("check_for_update existe fora do modulo de testes")
+            .1;
+        let ate_o_update = corpo
+            .split_once("let confirmed")
+            .expect("o ramo do 'ja atualizado' vem antes do dialogo de update")
+            .0;
+        assert!(
+            ate_o_update.contains("if pedida {"),
+            "o aviso de 'ja esta atualizado' deixou de ser condicional — o arranque voltou a avisar"
+        );
+        assert!(
+            ate_o_update.contains(concat!("d.atu", "al.replace")),
+            "o 'ja esta atualizado' nao vem mais da tabela de idiomas"
+        );
+        // E os dois chamadores dizem coisas diferentes, que e' o que faz o ramo significar algo.
+        assert!(
+            producao.contains(concat!("check_for_update(handle, fal", "se)")),
+            "a checagem do arranque deixou de ser silenciosa"
+        );
+        assert!(
+            producao.contains(concat!("check_for_update(handle.clone(), tr", "ue)")),
+            "a checagem da bandeja deixou de se anunciar como pedida"
+        );
     }
 
     #[test]
@@ -1371,28 +1631,207 @@ fn kill_sidecar(app: &tauri::AppHandle) {
     }
 }
 
+/// One language's worth of the update dialog.
+///
+/// A struct rather than a tuple because it grew: the tray's manual check needs a menu label,
+/// an "already up to date" line and a failure line on top of the four the automatic check
+/// used, and `DIALOGO[i].4` stops being readable somewhere around the fifth field.
+struct Dialogo {
+    codigo: &'static str,
+    /// The tray item. Its presence is the whole point of the manual path: the automatic check
+    /// runs once at startup and says nothing when there is no update, so without this there is
+    /// no way to ASK — you wait for the next launch and hope.
+    menu: &'static str,
+    titulo: &'static str,
+    mensagem: &'static str,
+    atualizar: &'static str,
+    depois: &'static str,
+    /// Only ever shown for a check the user ASKED for. Saying "you are up to date" unprompted
+    /// at every launch is the nagging the automatic path exists to avoid.
+    atual: &'static str,
+    falhou: &'static str,
+}
+
+/// The update dialog, in the ten languages the app ships.
+///
+/// `{v}` is the version and `{e}` the error, substituted at runtime — `format!` cannot be used
+/// because the template is a lookup, not a literal, and a translation that dropped a
+/// placeholder would be a silent hole rather than a compile error.
+/// `dialogo_mantem_os_marcadores` is the test that closes that.
+///
+/// Through 0.48.1 this was English for everyone: the one screen in a ten-language app that did
+/// not speak the user's language, and the one that asks permission to change their machine.
+const DIALOGO: [Dialogo; 10] = [
+    Dialogo {
+        codigo: "en",
+        menu: "Check for updates",
+        titulo: "Chimera update available",
+        mensagem: "A new version (v{v}) is available. Download and install now? The app will restart.",
+        atualizar: "Update & Restart",
+        depois: "Later",
+        atual: "Chimera is up to date (v{v}).",
+        falhou: "Could not check for updates: {e}",
+    },
+    Dialogo {
+        codigo: "pt",
+        menu: "Verificar atualizações",
+        titulo: "Atualização do Chimera disponível",
+        mensagem: "Uma versão nova (v{v}) está disponível. Baixar e instalar agora? O app vai reiniciar.",
+        atualizar: "Atualizar e reiniciar",
+        depois: "Depois",
+        atual: "O Chimera está atualizado (v{v}).",
+        falhou: "Não foi possível verificar atualizações: {e}",
+    },
+    Dialogo {
+        codigo: "es",
+        menu: "Buscar actualizaciones",
+        titulo: "Actualización de Chimera disponible",
+        mensagem: "Hay una versión nueva (v{v}). ¿Descargar e instalar ahora? La app se reiniciará.",
+        atualizar: "Actualizar y reiniciar",
+        depois: "Más tarde",
+        atual: "Chimera está actualizado (v{v}).",
+        falhou: "No se pudo buscar actualizaciones: {e}",
+    },
+    Dialogo {
+        codigo: "fr",
+        menu: "Rechercher des mises à jour",
+        titulo: "Mise à jour de Chimera disponible",
+        mensagem: "Une nouvelle version (v{v}) est disponible. Télécharger et installer maintenant ? L'application redémarrera.",
+        atualizar: "Mettre à jour et redémarrer",
+        depois: "Plus tard",
+        atual: "Chimera est à jour (v{v}).",
+        falhou: "Impossible de vérifier les mises à jour : {e}",
+    },
+    Dialogo {
+        codigo: "de",
+        menu: "Nach Updates suchen",
+        titulo: "Chimera-Update verfügbar",
+        mensagem: "Eine neue Version (v{v}) ist verfügbar. Jetzt herunterladen und installieren? Die App startet neu.",
+        atualizar: "Aktualisieren und neu starten",
+        depois: "Später",
+        atual: "Chimera ist aktuell (v{v}).",
+        falhou: "Nach Updates konnte nicht gesucht werden: {e}",
+    },
+    Dialogo {
+        codigo: "it",
+        menu: "Controlla aggiornamenti",
+        titulo: "Aggiornamento di Chimera disponibile",
+        mensagem: "È disponibile una nuova versione (v{v}). Scaricare e installare ora? L'app si riavvierà.",
+        atualizar: "Aggiorna e riavvia",
+        depois: "Più tardi",
+        atual: "Chimera è aggiornato (v{v}).",
+        falhou: "Impossibile controllare gli aggiornamenti: {e}",
+    },
+    Dialogo {
+        codigo: "pl",
+        menu: "Sprawdź aktualizacje",
+        titulo: "Dostępna aktualizacja Chimery",
+        mensagem: "Dostępna jest nowa wersja (v{v}). Pobrać i zainstalować teraz? Aplikacja uruchomi się ponownie.",
+        atualizar: "Zaktualizuj i uruchom ponownie",
+        depois: "Później",
+        atual: "Chimera jest aktualna (v{v}).",
+        falhou: "Nie udało się sprawdzić aktualizacji: {e}",
+    },
+    Dialogo {
+        codigo: "zh",
+        menu: "检查更新",
+        titulo: "Chimera 有可用更新",
+        mensagem: "有新版本 (v{v})。现在下载并安装吗？应用将重启。",
+        atualizar: "更新并重启",
+        depois: "稍后",
+        atual: "Chimera 已是最新版本 (v{v})。",
+        falhou: "无法检查更新：{e}",
+    },
+    Dialogo {
+        codigo: "ja",
+        menu: "アップデートを確認",
+        titulo: "Chimera のアップデートがあります",
+        mensagem: "新しいバージョン (v{v}) があります。今すぐダウンロードしてインストールしますか？アプリは再起動します。",
+        atualizar: "更新して再起動",
+        depois: "後で",
+        atual: "Chimera は最新です (v{v})。",
+        falhou: "アップデートを確認できませんでした: {e}",
+    },
+    Dialogo {
+        codigo: "ru",
+        menu: "Проверить обновления",
+        titulo: "Доступно обновление Chimera",
+        mensagem: "Доступна новая версия (v{v}). Скачать и установить сейчас? Приложение перезапустится.",
+        atualizar: "Обновить и перезапустить",
+        depois: "Позже",
+        atual: "Chimera обновлена до последней версии (v{v}).",
+        falhou: "Не удалось проверить обновления: {e}",
+    },
+];
+
+/// Pick the dialog's language from an OS locale tag.
+///
+/// **This reads the OPERATING SYSTEM's language, not the one picked inside the app**, and the
+/// distinction is worth writing down because it is a real limitation with a real reason.
+///
+/// The app stores its language in `localStorage` (`chimera.lang` in `src/lib/i18n.tsx`), which
+/// this process cannot read: the window loads the sidecar's `http://127.0.0.1:PORT` origin, and
+/// `capabilities/default.json` deliberately grants no IPC to it. Getting the value here would mean
+/// opening a Tauri command to an http origin — widening the security surface of the app to
+/// translate one dialog, which is the wrong trade.
+///
+/// It is right for everybody who never changed it, because `detectLang()` falls back to
+/// `navigator.language`, which is this same locale. It is wrong only for someone who deliberately
+/// picked a different language in the app — and then it shows their system language rather than
+/// English, which is still closer than what shipped before.
+fn idioma_do_dialogo(locale: Option<&str>) -> &'static Dialogo {
+    // "pt-BR" -> "pt", "zh-Hans-CN" -> "zh". Lowercased: macOS reports "pt_BR", Windows "pt-BR".
+    let base = locale
+        .unwrap_or("en")
+        .split(['-', '_'])
+        .next()
+        .unwrap_or("en")
+        .to_ascii_lowercase();
+    DIALOGO
+        .iter()
+        .find(|d| d.codigo == base)
+        .unwrap_or(&DIALOGO[0])
+}
+
+/// The dialog for the machine's language. One place, so the tray label and the dialogs it opens
+/// can never disagree about which language this session is in.
+fn dialogo() -> &'static Dialogo {
+    idioma_do_dialogo(sys_locale::get_locale().as_deref())
+}
+
 /// Check GitHub for a signed update and, if the user consents, install it and relaunch.
 ///
 /// Honest-by-construction: the signature is verified against the embedded pubkey by the updater
 /// plugin (we never disable it); nothing installs without the explicit confirm dialog; and every
 /// failure path (offline, no release, rate-limit, bad signature) returns `Err` so the caller can
 /// stay silent — the user is never nagged and the app never crashes over an update check.
-async fn check_for_update(app: tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+async fn check_for_update(
+    app: tauri::AppHandle,
+    pedida: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let d = dialogo();
+
     // `check()` fetches the manifest and verifies the signature; `None` = already up to date.
     let Some(update) = app.updater()?.check().await? else {
+        // Silence is right at startup and WRONG after a click. A menu item that does nothing
+        // visible reads as broken, and the user's next move is to click it again.
+        if pedida {
+            app.dialog()
+                .message(d.atual.replace("{v}", app.package_info().version.to_string().as_str()))
+                .title(d.titulo)
+                .buttons(MessageDialogButtons::Ok)
+                .blocking_show();
+        }
         return Ok(());
     };
 
     let confirmed = app
         .dialog()
-        .message(format!(
-            "A new version (v{}) is available. Download and install now? The app will restart.",
-            update.version
-        ))
-        .title("Chimera update available")
+        .message(d.mensagem.replace("{v}", &update.version))
+        .title(d.titulo)
         .buttons(MessageDialogButtons::OkCancelCustom(
-            "Update & Restart".to_string(),
-            "Later".to_string(),
+            d.atualizar.to_string(),
+            d.depois.to_string(),
         ))
         // Safe here: this runs inside `tauri::async_runtime::spawn` (a worker thread), not the main
         // thread, so blocking for the answer doesn't freeze the UI.
@@ -1454,18 +1893,41 @@ fn main() {
                 .min_inner_size(760.0, 520.0)
                 .build()?;
 
-            // Tray with a Quit item (kills the sidecar via the exit hook below).
+            // Tray: check for updates, and quit (which kills the sidecar via the exit hook below).
+            //
+            // The update item is the only way to ASK. The automatic check runs once at startup and
+            // stays silent when there is nothing — deliberately, so it never nags — which left the
+            // user with no way to find out except launching again tomorrow.
+            let atualizar = MenuItem::with_id(app, "update", dialogo().menu, true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit Chimera", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&quit])?;
+            let menu = Menu::with_items(app, &[&atualizar, &quit])?;
             let icon = app.default_window_icon().cloned();
             let mut tray = TrayIconBuilder::new().menu(&menu).tooltip("Chimera");
             if let Some(icon) = icon {
                 tray = tray.icon(icon);
             }
-            tray.on_menu_event(|app, event| {
-                if event.id.as_ref() == "quit" {
-                    app.exit(0);
+            tray.on_menu_event(|app, event| match event.id.as_ref() {
+                "quit" => app.exit(0),
+                "update" => {
+                    // Spawned, not awaited: this handler runs on the UI thread and the check does
+                    // network I/O. Blocking here freezes the window while GitHub is asked.
+                    let handle = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        if let Err(erro) = check_for_update(handle.clone(), true).await {
+                            // A check the user asked for reports its own failure. The startup one
+                            // swallows this same error on purpose; here, saying nothing would be
+                            // indistinguishable from "you are up to date".
+                            let d = dialogo();
+                            handle
+                                .dialog()
+                                .message(d.falhou.replace("{e}", &erro.to_string()))
+                                .title(d.titulo)
+                                .buttons(MessageDialogButtons::Ok)
+                                .blocking_show();
+                        }
+                    });
                 }
+                _ => {}
             })
             .build(app)?;
 
@@ -1513,7 +1975,7 @@ fn main() {
             // and unaffected; this is the native in-place path.
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                let _ = check_for_update(handle).await;
+                let _ = check_for_update(handle, false).await;
             });
 
             Ok(())

@@ -4,6 +4,39 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **The update dialog speaks the user's language, and there is now a way to ask for an update.**
+  Ten languages in the app and one screen in English — the screen that asks permission to change
+  your machine. It is translated into all ten now, and the tray gained a **Check for updates** item.
+
+  The item is not a convenience. The automatic check runs once at startup and says nothing when
+  there is no update, deliberately, so that it never nags — which left no way to ASK: you waited for
+  the next launch and hoped. So the two paths now differ in exactly one way, and that difference is
+  the design. A check you asked for always answers, including *"you are already up to date"*; the
+  startup one stays silent. A menu item that does nothing visible reads as broken, and the next
+  thing a person does is click it again.
+
+  **It follows the OPERATING SYSTEM's language, not the one picked inside the app** — a real
+  limitation, written into the code beside its reason. The app keeps its language in
+  `localStorage`, which this process cannot read: the window loads the sidecar's
+  `http://127.0.0.1:PORT` origin and `capabilities/default.json` grants it no Tauri IPC. Reading it
+  would mean opening an IPC surface to an http origin in order to translate a dialog, which is the
+  wrong trade. It is right for everybody who never changed the setting, because the app's own
+  `detectLang()` falls back to that same locale; it is wrong only for somebody who deliberately
+  picked a different language, and then it shows their system language rather than English — still
+  closer than what shipped.
+
+  Five tests, twelve sabotages. The one worth naming: `.title(d.titulo)` was checked with
+  `contains`, and production opens three dialogs, so replacing one of them with the old English
+  literal passed. Presence over repeated call sites can only ever prove that *at least one* is
+  right; it counts now, scoped to the updater.
+
+  Still English, and named here rather than left to be found: the three **backend-failure** dialogs
+  ("Chimera's backend stopped") and the tray's **Quit** item.
+
 ## [0.48.1] - 2026-09-02
 
 An audit of the shipped 0.48.0, run against the running app rather than the source. Almost all of it
