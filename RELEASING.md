@@ -93,9 +93,27 @@ uv run --no-sync python -m chimera.cli.schema_dump > chimera/_cli_snapshot.json
 # 3. CHANGELOG: rename [Unreleased] -> [X.Y.Z] - <date>   (STABLE ONLY — an rc previews the
 #    [Unreleased] section and leaves it alone; the stable is what names and dates it)
 # 4. commit, push, then:
-gh release create vX.Y.0 --title "..." --notes "..."            # stable
-gh release create vX.Y.0rc1 --prerelease --title "..." --notes "..."   # rc
+gh release create vX.Y.0 --latest=false --title "..." --notes "..."          # stable
+gh release create vX.Y.0rc1 --prerelease --title "..." --notes "..."        # rc
 ```
+
+**`--latest=false` on a stable release is not optional.** The updater's endpoint is
+`releases/latest/download/latest.json`, which resolves to whatever GitHub calls the latest release —
+and a release becomes latest the instant it is created, about twenty-five minutes before
+`desktop-release.yml` attaches the manifest. For that whole window the endpoint 404s and every
+installed app's update check fails, silently, because the startup check swallows errors so it never
+nags. Measured on v0.49.0.
+
+The last job of `desktop-release.yml` promotes it (`gh release edit --latest`) once the manifest is
+up. Until then the endpoint keeps resolving to the previous release, whose manifest names a real
+version — old clients are offered that, which is correct, instead of meeting a 404. It also means a
+build that dies halfway leaves the previous release as latest: a broken release is simply not
+offered.
+
+An rc needs no flag: `--prerelease` already keeps it out of "latest".
+
+Do **not** reach for `--draft` instead. A draft fires no release event at all, so neither workflow
+would start.
 
 Publishing fires two workflows: **publish.yml** (PyPI, via OIDC — no token) and
 **desktop-release.yml** (installers + signed updater artifacts + `latest.json`).

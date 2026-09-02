@@ -1179,6 +1179,53 @@ mod tests {
         );
     }
 
+    /// The tray's label and the label the app's own panel tells you to look for are the same text.
+    ///
+    /// They live in two tables in two languages: `Dialogo.menu` here, and `update.trayItem` in
+    /// `i18n.tsx`. The panel that appears when a new version is found now says "update it from the
+    /// tray menu — «Verificar atualizações»", so a drift between them would send somebody hunting
+    /// for a menu item spelled differently from the menu item. Pointing at the wrong name is worse
+    /// than pointing at nothing, because the person concludes the feature is missing.
+    ///
+    /// Nothing else can catch this: one side is Rust and the other is TypeScript, they are shipped
+    /// in the same binary, and no compiler sees both.
+    #[test]
+    fn o_rotulo_da_bandeja_e_o_mesmo_dos_dois_lados() {
+        let fonte = include_str!("../../src/lib/i18n.tsx");
+
+        // Matched by LANGUAGE CODE, never by position — and that is not caution, it is a bug this
+        // test hit on its first run. The dictionaries are DEFINED in the file as en, pt, es, fr,
+        // de, zh, ja, it, pl, ru; `LANGS` (and so `DIALOGO`) orders them en, pt, es, fr, de, it,
+        // pl, zh, ja, ru. Zipping the two lists compared Italian against Chinese and reported a
+        // drift that did not exist. `os_idiomas_sao_os_mesmos_do_aplicativo` cannot catch this: it
+        // reads `LANGS`, which agrees, while the definitions below it do not.
+        let mut conferidos = 0;
+        for d in &DIALOGO {
+            let cabeca = format!("const {}: Dict = {{", d.codigo);
+            let dicionario = fonte
+                .split_once(cabeca.as_str())
+                .unwrap_or_else(|| panic!("o dicionario {} existe em i18n.tsx", d.codigo))
+                .1;
+            // Bounded at the next dictionary, so a missing key here cannot silently read the next
+            // language's value and pass.
+            let dicionario = dicionario.split_once("\n};").map_or(dicionario, |(head, _)| head);
+            let no_app = dicionario
+                .split_once("\"update.trayItem\": \"")
+                .unwrap_or_else(|| panic!("{}: nao tem update.trayItem", d.codigo))
+                .1
+                .split_once('"')
+                .expect("a string fecha")
+                .0;
+            assert_eq!(
+                d.menu, no_app,
+                "{}: o rotulo da bandeja no Rust e no i18n.tsx divergiram",
+                d.codigo
+            );
+            conferidos += 1;
+        }
+        assert_eq!(conferidos, DIALOGO.len(), "algum idioma nao foi conferido");
+    }
+
     #[test]
     fn a_url_yields_its_port() {
         assert_eq!(port_of("http://127.0.0.1:51234"), Some(51234));
