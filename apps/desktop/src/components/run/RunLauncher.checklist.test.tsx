@@ -2,7 +2,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { RunLauncher } from "@/components/run/RunLauncher";
+import { TaskConsole } from "@/components/work/TaskConsole";
 import { getPausedRuns, getPlan, getRequirements, streamRun } from "@/lib/api";
 import { renderWithProviders } from "@/test/utils";
 
@@ -35,7 +35,7 @@ describe("the requirement checklist", () => {
   });
 
   async function askForThePlan(task = "faça uma página da padaria") {
-    renderWithProviders(<RunLauncher />);
+    renderWithProviders(<TaskConsole workspace="" onOpenCode={() => {}} />);
     await userEvent.type(screen.getByLabelText(/task/i), task);
     await userEvent.click(screen.getByRole("button", { name: /see the plan/i }));
     await screen.findByText(/has to cover/i);
@@ -107,7 +107,7 @@ describe("the requirement checklist", () => {
   it("sends null when nobody was ever asked", async () => {
     // The control, and it carries the ethics. A run that arms an acceptance gate on a list its
     // owner never saw is the same failure this feature exists to fix, wearing the opposite sign.
-    renderWithProviders(<RunLauncher />);
+    renderWithProviders(<TaskConsole workspace="" onOpenCode={() => {}} />);
     await userEvent.type(screen.getByLabelText(/task/i), "faça x");
     await userEvent.click(screen.getByRole("button", { name: /^run$/i }));
 
@@ -133,7 +133,7 @@ describe("the requirement checklist", () => {
     // left the panel open, empty and silent. A local `npm test` did not fail on the unhandled
     // rejection and CI did, which is precisely why this is pinned rather than trusted to types.
     vi.mocked(getRequirements).mockResolvedValue(undefined as never);
-    renderWithProviders(<RunLauncher />);
+    renderWithProviders(<TaskConsole workspace="" onOpenCode={() => {}} />);
     await userEvent.type(screen.getByLabelText(/task/i), "x");
     await userEvent.click(screen.getByRole("button", { name: /see the plan/i }));
 
@@ -147,7 +147,7 @@ describe("the requirement checklist", () => {
   it("says nothing was read rather than showing an empty list", async () => {
     // An empty checklist reads as "this task has no requirements", which is a claim nobody made.
     vi.mocked(getRequirements).mockResolvedValue({ items: [], note: "" } as never);
-    renderWithProviders(<RunLauncher />);
+    renderWithProviders(<TaskConsole workspace="" onOpenCode={() => {}} />);
     await userEvent.type(screen.getByLabelText(/task/i), "x");
     await userEvent.click(screen.getByRole("button", { name: /see the plan/i }));
 

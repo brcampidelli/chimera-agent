@@ -58,6 +58,9 @@ const DYNAMIC = [
   "skills.stage.",
   "skills.status.",
   "tasks.column.",
+  // `` t(`work.mode.${mode}`) `` and `` t(`work.mode.${mode}.what`) `` — the console names the
+  // four ways one task can be run, and says what each one does, from the mode it is in.
+  "work.mode.",
   "tools.desc.",
   "tools.tag.",
 ];

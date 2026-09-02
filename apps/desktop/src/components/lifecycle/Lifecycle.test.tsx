@@ -1,8 +1,9 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { Lifecycle, STAGES, stageState } from "@/components/lifecycle/Lifecycle";
+import { STAGES, stageState } from "@/components/lifecycle/Lifecycle";
+import { TaskConsole } from "@/components/work/TaskConsole";
 import { cancelLifecycle, streamLifecycle } from "@/lib/api";
 import { renderWithProviders } from "@/test/utils";
 
@@ -40,13 +41,16 @@ describe("the lifecycle screen", () => {
     // Named up front, not accumulated. A list that grows a row at a time says where you are and
     // never how far there is to go, and the build stage alone can take minutes.
     feed(() => {});
-    renderWithProviders(<Lifecycle workspace="/ws" />);
+    renderWithProviders(<TaskConsole workspace="/ws" initialMode="lifecycle" onOpenCode={() => {}} />);
 
     await userEvent.type(screen.getByLabelText(/the task/i), "add a greeting");
     await userEvent.click(screen.getByRole("button", { name: /start/i }));
 
+    // Scoped to the stage list. Unscoped, "plan" and "test" also match the sentence above the
+    // task box that says what this mode does — which is prose about the stages, not the stages.
+    const stages = within(await screen.findByRole("list"));
     for (const name of STAGES) {
-      expect(await screen.findByText(new RegExp(name, "i"))).toBeTruthy();
+      expect(stages.getByText(new RegExp(name, "i"))).toBeTruthy();
     }
   });
 
@@ -58,7 +62,7 @@ describe("the lifecycle screen", () => {
           handlers = h;
         }),
     );
-    renderWithProviders(<Lifecycle workspace="/ws" />);
+    renderWithProviders(<TaskConsole workspace="/ws" initialMode="lifecycle" onOpenCode={() => {}} />);
     await userEvent.type(screen.getByLabelText(/the task/i), "x");
     await userEvent.click(screen.getByRole("button", { name: /start/i }));
 
@@ -73,7 +77,7 @@ describe("the lifecycle screen", () => {
     // "No verify command — a model reads the answer" has always been true whenever the box was
     // empty, and a screen that does not say so lets an approving paragraph pass for a passing test.
     feed((h) => h.onVerify?.({ command: "", source: "none" } as never));
-    renderWithProviders(<Lifecycle workspace="/ws" />);
+    renderWithProviders(<TaskConsole workspace="/ws" initialMode="lifecycle" onOpenCode={() => {}} />);
     await userEvent.type(screen.getByLabelText(/the task/i), "x");
     await userEvent.click(screen.getByRole("button", { name: /start/i }));
 
@@ -83,7 +87,7 @@ describe("the lifecycle screen", () => {
   it("names the command when there is one", async () => {
     // The control. Two branches that print the same thing carry no information.
     feed((h) => h.onVerify?.({ command: "pytest -q", source: "you" } as never));
-    renderWithProviders(<Lifecycle workspace="/ws" />);
+    renderWithProviders(<TaskConsole workspace="/ws" initialMode="lifecycle" onOpenCode={() => {}} />);
     await userEvent.type(screen.getByLabelText(/the task/i), "x");
     await userEvent.click(screen.getByRole("button", { name: /start/i }));
 
@@ -97,7 +101,7 @@ describe("the lifecycle screen", () => {
       h.onStage?.(stage("plan"));
       h.onDone?.({ success: false, answer: "", cancelled: true });
     });
-    renderWithProviders(<Lifecycle workspace="/ws" />);
+    renderWithProviders(<TaskConsole workspace="/ws" initialMode="lifecycle" onOpenCode={() => {}} />);
     await userEvent.type(screen.getByLabelText(/the task/i), "x");
     await userEvent.click(screen.getByRole("button", { name: /start/i }));
 
@@ -107,7 +111,7 @@ describe("the lifecycle screen", () => {
 
   it("says plainly when the work failed its test", async () => {
     feed((h) => h.onDone?.({ success: false, answer: "", cancelled: false }));
-    renderWithProviders(<Lifecycle workspace="/ws" />);
+    renderWithProviders(<TaskConsole workspace="/ws" initialMode="lifecycle" onOpenCode={() => {}} />);
     await userEvent.type(screen.getByLabelText(/the task/i), "x");
     await userEvent.click(screen.getByRole("button", { name: /start/i }));
 
@@ -122,7 +126,7 @@ describe("the lifecycle screen", () => {
           handlers = h;
         }),
     );
-    renderWithProviders(<Lifecycle workspace="/ws" />);
+    renderWithProviders(<TaskConsole workspace="/ws" initialMode="lifecycle" onOpenCode={() => {}} />);
     await userEvent.type(screen.getByLabelText(/the task/i), "x");
     await userEvent.click(screen.getByRole("button", { name: /start/i }));
     await waitFor(() => expect(handlers).not.toBeNull());
@@ -137,7 +141,7 @@ describe("the lifecycle screen", () => {
     // An in-flight model call cannot be interrupted and is billed. A Stop button that implies
     // otherwise is a promise the machinery does not keep.
     vi.mocked(streamLifecycle).mockImplementation(async () => new Promise<void>(() => {}));
-    renderWithProviders(<Lifecycle workspace="/ws" />);
+    renderWithProviders(<TaskConsole workspace="/ws" initialMode="lifecycle" onOpenCode={() => {}} />);
     await userEvent.type(screen.getByLabelText(/the task/i), "x");
     await userEvent.click(screen.getByRole("button", { name: /start/i }));
 
@@ -146,7 +150,7 @@ describe("the lifecycle screen", () => {
 
   it("runs in the project folder it was given", async () => {
     feed(() => {});
-    renderWithProviders(<Lifecycle workspace="/ws" />);
+    renderWithProviders(<TaskConsole workspace="/ws" initialMode="lifecycle" onOpenCode={() => {}} />);
     await userEvent.type(screen.getByLabelText(/the task/i), "x");
     await userEvent.click(screen.getByRole("button", { name: /start/i }));
 
@@ -156,7 +160,7 @@ describe("the lifecycle screen", () => {
 
   it("surfaces an error instead of pretending the run is still going", async () => {
     feed((h) => h.onError?.("the run failed"));
-    renderWithProviders(<Lifecycle workspace="/ws" />);
+    renderWithProviders(<TaskConsole workspace="/ws" initialMode="lifecycle" onOpenCode={() => {}} />);
     await userEvent.type(screen.getByLabelText(/the task/i), "x");
     await userEvent.click(screen.getByRole("button", { name: /start/i }));
 
@@ -164,7 +168,7 @@ describe("the lifecycle screen", () => {
   });
 
   it("will not start without a task", () => {
-    renderWithProviders(<Lifecycle workspace="/ws" />);
+    renderWithProviders(<TaskConsole workspace="/ws" initialMode="lifecycle" onOpenCode={() => {}} />);
     expect(screen.getByRole("button", { name: /start/i })).toHaveProperty("disabled", true);
   });
 });

@@ -3,7 +3,6 @@ import { ListChecks } from "lucide-react";
 import { getRuns } from "@/lib/api";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
 import { ErrorState } from "@/components/ui/async";
-import { RunLauncher } from "@/components/run/RunLauncher";
 import { useT, type TFunc } from "@/lib/i18n";
 import type { AttemptReceipt, RunReceipt } from "@/lib/types";
 
@@ -110,6 +109,13 @@ function RunCard({ run, t }: { run: RunReceipt; t: TFunc }) {
 /** Render one streamed run event as a compact live line, or null to skip (e.g. the `final` event —
  *  the `done` payload drives the terminal line). Backend `text` is English; map to the UI language. */
 
+/** What the autonomous runs did, most recent first.
+ *
+ *  The launcher used to sit on top of this list, which made it one of four boxes on the Work
+ *  screen asking for the same sentence. It is one place now — the task console — and this is the archive of what that
+ *  console started. Reading what a run did and starting the next one are different activities and
+ *  they were sharing a column.
+ */
 export function Runs({
   embedded = false,
   workspace,
@@ -122,11 +128,6 @@ export function Runs({
 
   return (
     <Screen title={t("runs.title")} icon={<ListChecks className="h-5 w-5" />} embedded={embedded}>
-      {/* The same project the list above is filtered by. Without it the launcher showed an empty
-          folder field whose placeholder reads "defaults to the app's workspace" — and that default
-          is the app's own install directory, which is nobody's project. `undefined` rather than ""
-          when nothing is chosen: that is what keeps the field visible so the user can say where. */}
-      <RunLauncher workspace={workspace || undefined} />
       {q.isError ? (
         <Panel>
           <ErrorState error={q.error} onRetry={() => q.refetch()} />

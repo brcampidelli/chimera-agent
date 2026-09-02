@@ -36,19 +36,18 @@ describe("Work — the tab in the address", () => {
   // how this broke the first time: the union type gained "lifecycle", `choose` wrote it into the
   // URL, `TABS` did not list it, and the typechecker had nothing to say because they are two
   // separate declarations of the same fact.
-  it.each(TABS.filter((x) => x !== "run"))("opens on ?tab=%s", async (tab) => {
+  it.each(TABS.filter((x) => x !== "task"))("opens on ?tab=%s", async (tab) => {
     at(tab);
 
     renderWithProviders(<Work />);
 
-    await waitFor(() =>
-      expect(screen.getByRole("tab", { selected: true })).toHaveAttribute(
-        "aria-selected",
-        "true",
-      ),
-    );
-    const selected = screen.getByRole("tab", { selected: true });
-    expect(selected.textContent?.toLowerCase()).not.toBe("runs");
+    await waitFor(() => expect(screen.getByRole("tab", { selected: true })).toBeInTheDocument());
+    // By POSITION, against the same list the URL names are read from. It used to assert only that
+    // the label was not "runs" — a proxy for "it did not fall back", which stopped meaning that
+    // the moment Runs became an ordinary tab rather than the default. Position needs no label map
+    // and fails for the right reason: the tab that opened is not the tab the URL asked for.
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs.indexOf(screen.getByRole("tab", { selected: true }))).toBe(TABS.indexOf(tab));
   });
 
   it("has a URL name for every tab it renders", async () => {
@@ -62,13 +61,14 @@ describe("Work — the tab in the address", () => {
     expect(await screen.findAllByRole("tab")).toHaveLength(TABS.length);
   });
 
-  it("falls back to Runs for a tab name that is not one", async () => {
+  it("falls back to the first tab for a tab name that is not one", async () => {
     // A hand-edited or stale URL must not leave the screen blank.
     at("nonsense");
 
     renderWithProviders(<Work />);
 
-    expect(screen.getByRole("tab", { selected: true })).toHaveTextContent(/runs/i);
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs.indexOf(screen.getByRole("tab", { selected: true }))).toBe(0);
   });
 
   it("puts the tab it switched to into the address", async () => {
@@ -78,5 +78,38 @@ describe("Work — the tab in the address", () => {
     await userEvent.click(await screen.findByRole("tab", { name: /git/i }));
 
     expect(window.location.hash).toContain("tab=git");
+  });
+
+  it("opens the console in the mode the address names", async () => {
+    window.location.hash = "#/work?mode=lifecycle";
+
+    renderWithProviders(<Work />);
+
+    expect(await screen.findByRole("radio", { name: /four stages/i })).toBeChecked();
+  });
+
+  it("puts the mode it switched to into the address", async () => {
+    // `setParams` REPLACES the query rather than merging into it, so the tab and the mode are
+    // written by one function that emits the whole thing. Anything added to that query later has
+    // to go through the same place, or it will be dropped by whichever of the two writes last.
+    window.location.hash = "#/work?tab=task";
+    renderWithProviders(<Work />);
+
+    await userEvent.click(await screen.findByRole("radio", { name: /four stages/i }));
+
+    expect(window.location.hash).toContain("mode=lifecycle");
+    expect(screen.getByRole("tab", { selected: true })).toHaveTextContent(/task/i);
+  });
+
+  it("does not leave a mode behind on a tab that has no modes", async () => {
+    window.location.hash = "#/work?mode=lifecycle";
+    renderWithProviders(<Work />);
+
+    await userEvent.click(await screen.findByRole("tab", { name: /git/i }));
+
+    // A `?mode=` sitting on the git tab describes a control that is not on screen — and reopening
+    // that URL would land on Git while the address advertised a lifecycle.
+    expect(window.location.hash).toContain("tab=git");
+    expect(window.location.hash).not.toContain("mode=");
   });
 });

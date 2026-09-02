@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Loader2, Play, Square, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -46,10 +46,21 @@ export function stageState(
  *  gate is a step you can watch fail and the reviewer's opinion is separate from the verdict, so
  *  the stages arrive as they land rather than as one block at the end.
  */
-export function Lifecycle({ workspace }: { workspace: string | null }) {
+export function Lifecycle({
+  task,
+  verify,
+  workspace,
+  onBusy,
+}: {
+  /** The shared task and check, from the console above. This screen used to ask for both itself,
+   *  which made it the third place on one screen asking for the same sentence — and the reason
+   *  trying the same task a second way meant typing it a second time. */
+  task: string;
+  verify: string;
+  workspace: string | null;
+  onBusy?: (busy: boolean) => void;
+}) {
   const t = useT();
-  const [task, setTask] = useState("");
-  const [verify, setVerify] = useState("");
   const [state, setState] = useState<State>("idle");
   const [stages, setStages] = useState<LifecycleStage[]>([]);
   const [gate, setGate] = useState<RunVerify | null>(null);
@@ -86,26 +97,14 @@ export function Lifecycle({ workspace }: { workspace: string | null }) {
 
   const running = state === "running";
 
+  useEffect(() => {
+    onBusy?.(running);
+  }, [running, onBusy]);
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-2">
-        <textarea
-          className="field min-h-16 px-2 py-1.5 text-xs"
-          placeholder={t("lifecycle.taskPlaceholder")}
-          aria-label={t("lifecycle.task")}
-          value={task}
-          onChange={(e) => setTask(e.target.value)}
-          disabled={running}
-        />
         <div className="flex flex-wrap items-center gap-2">
-          <input
-            className="field h-7 min-w-48 flex-1 px-2 font-mono text-xs"
-            placeholder={t("lifecycle.verifyPlaceholder")}
-            aria-label={t("lifecycle.verify")}
-            value={verify}
-            onChange={(e) => setVerify(e.target.value)}
-            disabled={running}
-          />
           {running ? (
             <Button
               size="sm"

@@ -1,8 +1,9 @@
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { Runs } from "@/components/Runs";
-import { getRuns } from "@/lib/api";
+import { TaskConsole } from "@/components/work/TaskConsole";
+import { streamRun } from "@/lib/api";
 import { renderWithProviders } from "@/test/utils";
 
 // The shared mock: this screen mounts the launcher, which mounts the model pickers, which fetch
@@ -10,42 +11,51 @@ import { renderWithProviders } from "@/test/utils";
 vi.mock("@/lib/api", async () => (await import("@/test/code-api-mock")).makeCodeApiMock());
 
 /**
- * The launcher on the Work tab was mounted with no workspace at all.
+ * The run has to work in the project the screen is showing.
  *
- * `RunLauncher` hides its folder field when it is given one — "Code already knows where it is
- * working", says its own prop. Work knows too: it reads the same stored choice to filter the run
- * list right beside it, and to label the Git panel one tab over. It just never handed it down, so
- * the screen showed an empty folder box promising to fall back to "the app's workspace" — which on
- * an installed build is the app's own install directory, holding its `.env`.
+ * The launcher on the Work tab was once mounted with no workspace at all, so it showed an empty
+ * folder box promising to fall back to "the app's workspace" — which on an installed build is the
+ * app's own install directory, holding its `.env`.
+ *
+ * That box is gone: the console shows the project instead of asking for it, because a second folder
+ * field is a second answer to one question. Which moves what has to be asserted. Checking that a
+ * field is hidden was only ever a proxy for the thing that matters, and it stopped being one the
+ * moment the field stopped existing — so these check what actually travels to the server.
  */
-describe("the run launcher knows which project it is in", () => {
+describe("the run knows which project it is in", () => {
   beforeEach(() => {
-    vi.mocked(getRuns).mockReset().mockResolvedValue([]);
+    vi.mocked(streamRun).mockReset().mockImplementation(async () => {});
   });
 
-  it("hides the folder field when the tab already knows the project", async () => {
-    renderWithProviders(<Runs embedded workspace="/projects/cafe-aurora" />);
+  async function runIn(workspace: string) {
+    const user = userEvent.setup();
+    renderWithProviders(<TaskConsole workspace={workspace} onOpenCode={() => {}} />);
+    await user.type(await screen.findByLabelText(/the task/i), "fix the loader");
+    await user.click(screen.getByRole("button", { name: /^run$/i }));
+    return vi.mocked(streamRun).mock.calls[0][0];
+  }
 
-    await screen.findByRole("button", { name: /run/i });
+  it("sends the project the screen is showing", async () => {
+    expect(await runIn("/projects/cafe-aurora")).toMatchObject({
+      workspace: "/projects/cafe-aurora",
+    });
+  });
+
+  it("sends nothing rather than an empty string when no project was chosen", async () => {
+    // `readWorkspace()` returns "" when the key is absent. Passed straight through, "" is a
+    // workspace the server would try to resolve; `null` is the absence of one, and the two are
+    // different requests. The worst of both was hiding the field AND sending the empty string.
+    expect(await runIn("")).toMatchObject({ workspace: null });
+  });
+
+  it("shows the project instead of asking for it", async () => {
+    renderWithProviders(
+      <TaskConsole workspace="/projects/cafe-aurora" onOpenCode={() => {}} />,
+    );
+
+    expect(await screen.findByText("/projects/cafe-aurora")).toBeInTheDocument();
+    // The control for the two above: a screen that neither showed the folder nor asked for it
+    // would still pass them, and would be the original defect with the evidence removed.
     expect(screen.queryByLabelText(/workspace|folder path/i)).toBeNull();
-  });
-
-  it("still asks when nothing has been chosen", async () => {
-    // The control. Hiding the field unconditionally would pass the test above and leave a user with
-    // no project silently launching runs into whatever the backend decides — which is the defect,
-    // not the fix.
-    renderWithProviders(<Runs embedded />);
-
-    await screen.findByRole("button", { name: /run/i });
-    expect(screen.getByLabelText(/workspace|folder path/i)).toBeTruthy();
-  });
-
-  it("an empty stored choice counts as no choice", async () => {
-    // `readWorkspace()` returns "" when the key is absent, and "" passed straight through would
-    // hide the field while sending nothing — the worst of both.
-    renderWithProviders(<Runs embedded workspace="" />);
-
-    await screen.findByRole("button", { name: /run/i });
-    expect(screen.getByLabelText(/workspace|folder path/i)).toBeTruthy();
   });
 });

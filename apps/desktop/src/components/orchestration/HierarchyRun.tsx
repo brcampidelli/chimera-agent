@@ -28,6 +28,7 @@ export function HierarchyRun({
   request,
   resume,
   onOpenCode,
+  onBusy,
 }: {
   /** Start a run. Absent when `resume` is given — a transcript is read, never re-run. */
   request?: HierarchyRunInput;
@@ -35,6 +36,11 @@ export function HierarchyRun({
    *  live one differ in exactly one thing: whether more is coming. */
   resume?: OrchFrame[];
   onOpenCode: () => void;
+  /** Told while this run is in flight, so the console above can refuse to change mode under it.
+   *
+   *  Derived from the frames rather than from "we pressed Run": a run that ended, failed or was
+   *  stopped has to release the lock, and only the stream knows which of those happened. */
+  onBusy?: (busy: boolean) => void;
 }) {
   const t = useT();
   const [state, dispatch] = useReducer(applyFrame, EMPTY_RUN);
@@ -87,6 +93,10 @@ export function HierarchyRun({
   const running = !resume && isRunning(state);
   const stop = useStop(state.runId ?? "", running);
   const interrupted = Boolean(resume) && isRunning(state);
+
+  useEffect(() => {
+    onBusy?.(running);
+  }, [running, onBusy]);
 
   return (
     <div className="space-y-4">
