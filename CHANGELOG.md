@@ -4,6 +4,88 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.48.1] - 2026-09-02
+
+An audit of the shipped 0.48.0, run against the running app rather than the source. Almost all of it
+is the same defect wearing different clothes: **something existed, had tests, and had never run.**
+
+### ⚠️ Read this one before upgrading
+
+**`CHIMERA_APPROVAL_MODE=allow` now does something on the desktop app and on `chimera serve`.** It
+reached `solve` and `crew` and no other surface, so an owner who set it still got a refusal from the
+two surfaces most people use. If that variable has been sitting in your `.env` since before this
+release, the agent will stop refusing dangerous tools after it reads untrusted content — which is
+what the setting always said it would do, and did not.
+
+The number that justifies wiring it, from `bench/injection`, which carried a pre-registration from
+2026-08-14 and had never been run:
+
+    no approver     blocks 85.7% of attacks · refuses 50.0% of honest work · FAIL
+    with approver   blocks 85.7% of attacks · refuses  0.0% of honest work · PASS
+
+The refused work is ordinary — *fix the file the issue names*, *apply the upgrade the docs
+describe* — and the control (tasks that read the repository first) is refused 0%, which isolates the
+cause to the external door. **The 85.7% that does not move is not a free lunch:** the bench hands
+the approver to the legitimate corpus only, modelling a person approving work they asked for. A
+standing `allow` approves whatever an injected page asks for too. The default does not move, and
+`ask` is deliberately not wired on a server — with nobody at a console it would wait fifteen minutes
+inside an HTTP request.
+
+### Fixed
+
+- **An empty variable stopped the app from starting.** `CHIMERA_GUARD_CHAT=` in a `.env` and nothing
+  runs — all twenty-six boolean settings, with a pydantic traceback naming a type rather than the
+  line to fix. `VAR=` is how a line gets turned off without being deleted, and this repository's own
+  `.env` ships with `OPENROUTER_API_KEY=` empty. An empty value now reads as unset. The key is
+  dropped rather than coerced to `False`, which would have silently switched off every setting that
+  defaults on — a security posture among them.
+- **The cost meter went quiet on exactly the expensive models.** Nine of the fifteen models the app
+  ships with reported an unknown cost, `claude-opus-5` ($5/$25 per 1M) and `gpt-5.5` ($5/$30) among
+  them, because `register_catalog_prices()` had five tests and no caller. Nobody noticed because the
+  default model is one of the six that resolved: the meter read correctly until somebody chose an
+  expensive model, and went quiet at the moment the number mattered. Fixing it exposed a second,
+  older fragility — "a `:free` slug beats its own paid family" was a POSITION in a mutable list, one
+  `set_price` call away from breaking for any caller, and is now a rule of its own.
+- **The focus ring the button never adopted.** `ui/focus.ts` exists because the ring used to live
+  inside the Button, leaving the icon rail with no focus indicator. Twenty-one components import it;
+  the Button was not one of them, and the two had drifted — the shared ring carries `relative z-10`
+  so the glow is not clipped, and the copy did not. The test meant to prevent this asserted
+  `total >= 1`: a floor, on a rule whose name promises a ceiling. It was green at eight.
+- **Two publish gates that could not run where they run.** The wheel scanner died on
+  `ModuleNotFoundError: rich` before reading a byte — the publish job installs build tooling and
+  nothing else — and once fixed, it stopped the release on twenty-nine fake keys inside tests whose
+  subject *is* what a key looks like. Committed source is `gitleaks`' scope; the scanner now reads
+  only what the build assembled after the last commit.
+
+### Added
+
+- **`CHIMERA_DEFER_TOOLS`** — twenty-two tool schemas go out on every step of every turn, ~3,224
+  tokens before the user types. Measured on twenty-eight sessions of an installed 0.48.0, four tools
+  account for all 33 calls; the eighteen never called are 86% of the schema. With this on, the core
+  (files, search, shell) stays declared and the rest sits behind `tool_list` → `tool_describe` →
+  `tool_call`: 22 tools to 11, and the floor per turn from ~3,572 to ~1,695 tokens.
+
+  **Off by default, and `bench/tool_defer` is why.** Sixty paired executions: cost fell 26% per task
+  *completed*, and the agent reached the proxy in 23 of 30 runs with no case of failing to find a
+  tool and giving up. But the completion rate came out A 52% × B 35% with four discordances all one
+  way — **McNemar p = 0.125, inconclusive**, exactly as the pre-registration said a difference that
+  size would be. And the reason it cannot answer is the bench's own fault: four of its ten tasks fail
+  in both arms, so much of the comparison measured task difficulty rather than tool selection. The
+  selection-accuracy half stays unmeasured, now with the reason written down.
+- **The command reference gate fires on the pull request, not on the deploy.** "Every command is
+  listed" was already checked — on the documentation site, which meant it could only run *after* a
+  release. Three times it caught the same omission and three times the download page sat on the
+  previous version until somebody read a red deploy.
+
+### Measured, and left alone
+
+Two security benches carried pre-registrations and had never been run. Both are committed as
+artefacts under `bench/*/results/`, and `bench/memory_poison` **fails its own gate**: 25% of honest
+memory destroyed, the casualties being `security_doc_quoting_an_attack` and
+`ticket_forwarding_an_attempt` — text that quotes an attack in order to explain it. Its own output
+names the cause: a pattern matcher on content cannot tell the quote from the command. No threshold
+was moved to make that number look better.
+
 ## [0.48.0] - 2026-09-01
 
 An eleven-lens audit read this application — 65,760 lines of Python, 41,782 of frontend — and
