@@ -5558,7 +5558,7 @@
       "path": "workflow"
     }
   ],
-  "generated_for": "0.48.0",
+  "generated_for": "0.48.1",
   "help": "Self-evolving AI agent with an LLM-Fusion reasoning core.",
   "name": "chimera"
 }
