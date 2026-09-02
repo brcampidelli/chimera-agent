@@ -244,3 +244,55 @@ def test_the_setting_changes_what_a_real_request_gets(tmp_path: Any) -> None:
         "the core must be identical either way — that is what keeps the saving free of risk "
         "for the tools observed use actually reaches"
     )
+
+
+def test_the_cli_path_defers_too(tmp_path: Any) -> None:
+    """`solve` and `run` route their tool governance through `_apply_tool_allowlist`, not through
+    the API's `assemble_registry`.
+
+    This was wired to the API only, and the gap surfaced the way gaps like this always do — by
+    trying to MEASURE the feature and finding the bench would have exercised nothing. Ten call sites
+    build a registry in `cli/main.py`; the toggle belongs at the one place they all route their
+    governance through, after the restriction filter rather than before it.
+    """
+    from pathlib import Path
+
+    from chimera.cli.main import _apply_tool_allowlist
+    from chimera.config import Settings
+    from chimera.tools import default_registry
+
+    def monta(**over: Any) -> ToolRegistry:
+        return _apply_tool_allowlist(
+            default_registry(Path(tmp_path)),
+            allow=None,
+            deny=None,
+            settings=Settings(CHIMERA_HOME=str(tmp_path / "home"), **over),
+        )
+
+    assert "tool_list" not in monta()
+    assert "tool_list" in monta(CHIMERA_DEFER_TOOLS="1")
+
+
+def test_deferral_still_obeys_a_cli_denylist(tmp_path: Any) -> None:
+    """Deferral runs after the filter, so `--deny-tools scrape` still removes `scrape` — and the
+    proxy does not hand it back.
+
+    The order is the whole property: deferral before the filter would leave the filter matching
+    names that are no longer in the registry, reporting success and removing nothing.
+    """
+    from pathlib import Path
+
+    from chimera.cli.main import _apply_tool_allowlist
+    from chimera.config import Settings
+    from chimera.tools import default_registry
+
+    registry = _apply_tool_allowlist(
+        default_registry(Path(tmp_path)),
+        allow=None,
+        deny="scrape",
+        settings=Settings(CHIMERA_HOME=str(tmp_path / "home"), CHIMERA_DEFER_TOOLS="1"),
+    )
+
+    assert "scrape" not in registry
+    assert "scrape" not in registry.get("tool_list").run()
+    assert "no tool named" in registry.get("tool_call").run(tool="scrape", arguments={})
