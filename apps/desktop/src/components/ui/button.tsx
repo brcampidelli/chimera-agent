@@ -1,4 +1,6 @@
 import { forwardRef, type ButtonHTMLAttributes } from "react";
+
+import { focusRing } from "@/components/ui/focus";
 import { cn } from "@/lib/utils";
 
 type Variant = "primary" | "ghost" | "outline";
@@ -41,7 +43,12 @@ export const Button = forwardRef<HTMLButtonElement, Props>(
         // pill stops looking like one. Measured on the running app — "Ver o plano antes" wrapped
         // to three lines the moment two checkboxes were added to its row.
         "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-chip font-medium transition-all duration-150",
-        "focus-visible:outline-none focus-visible:shadow-glow",
+        // The shared ring, not a copy of it. `focusRing` was EXTRACTED from this component —
+        // twenty-one others adopted it and the original was never migrated, so "one definition,
+        // one place to change it" was false for the most-used control in the app. The two had
+        // already drifted: the shared ring carries `relative z-10` so the glow is not clipped by
+        // a neighbour, and the copy here did not.
+        focusRing,
         "disabled:cursor-not-allowed",
         variants[variant],
         sizes[size],

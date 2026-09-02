@@ -7,5 +7,12 @@
   ],
   "arbitraryUtilities": 22,
   "transitionsWithoutTokens": 17,
-  "focusVisibleRules": 1
+  "_focusRingOwners": [
+    "Files declaring a focus ring outside ui/focus.ts. This replaced focusVisibleRules, which",
+    "was a FLOOR (>= 1) on a rule whose name promises a ceiling — it could not fail for the",
+    "reason it is named, and was green at eight while ui/button.tsx still carried its own copy",
+    "of the ring it had been extracted from. Two remain, both turning the browser default OFF",
+    "on a scroll container, which is not a ring."
+  ],
+  "focusRingOwners": 2
 }

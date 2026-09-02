@@ -337,10 +337,27 @@ describe("motion", () => {
 
 describe("accessibility", () => {
   it("keeps a single shared focus ring rather than growing per-component ones", () => {
-    // One definition means one place to fix it. Ratcheted from 1 (ui/button.tsx) — the rail and the
-    // primitives will import it rather than each inventing a ring.
-    const { total } = countMatches(/focus-visible:/g);
-    expect(total).toBeGreaterThanOrEqual(ratchet.focusVisibleRules);
+    // One definition means one place to fix it. The rail and the primitives import `ui/focus`
+    // rather than each inventing a ring.
+    //
+    // This asserted `total >= ratchet.focusVisibleRules`, with the ratchet at 1 — a FLOOR, on a test
+    // whose name promises a ceiling. It could not fail for the reason it is named: a ring added to
+    // ten more components would only push the number up, and up was the passing direction. It was
+    // green at eight while the thing it forbids was happening — `ui/button.tsx`, the component the
+    // shared ring was extracted FROM, still carried its own copy, and the two had drifted (the
+    // shared one has `relative z-10` so the glow is not clipped; the copy did not).
+    //
+    // What it counts now is FILES that declare a ring outside `ui/focus.ts`, which is the property
+    // the name claims. Two remain and both are legitimate: a scroll container turning the browser
+    // default OFF is not a ring.
+    const donos = appSources()
+      .filter(([file, text]) => !file.endsWith("ui/focus.ts") && /focus-visible:/.test(text))
+      .map(([file]) => file);
+
+    expect(
+      donos.length,
+      `components declaring their own focus ring: ${donos.join(", ")}`,
+    ).toBeLessThanOrEqual(ratchet.focusRingOwners);
   });
 });
 
