@@ -77,6 +77,26 @@ inside an HTTP request.
   release. Three times it caught the same omission and three times the download page sat on the
   previous version until somebody read a red deploy.
 
+### Changed
+
+- **Four ways to run a task, and one box to type it in.** The Work screen had four forms asking for
+  the same sentence — a run, a lifecycle, a fan-out, and the crew buried two clicks inside the
+  fan-out. So the choice of *how* came before the task existed, and trying the second way meant
+  typing it a second time. Which is why nobody tried the second way. They are one screen now, with
+  four buttons for what happens to what you typed, and the tabs go from five to four. The task and
+  the check travel between modes because they are the same thing in each; attempts, roles and worker
+  slots stay inside the mode that means them.
+
+  Three things a merge like this does quietly, and this one does not. **The fan-out has no check to
+  send** — its workers are mounted tool-free — so the field is hidden *and*, when something is
+  already typed in it, the screen says the text is kept and not sent; a field that vanishes with
+  text in it looks like the text went somewhere. **The mode strip locks while a run is live**, with
+  the reason on screen, because switching would unmount the running mode and kill its stream while
+  the tokens keep being spent — new on paper and nothing in practice, since leaving by switching
+  tabs already did exactly that, in silence. And **the fallback note now selects the crew** instead
+  of only recommending it: it has always been able to say *this task writes files, that goes to a
+  crew*, and saying it was all it could do.
+
 ### Measured, and left alone
 
 Two security benches carried pre-registrations and had never been run. Both are committed as
