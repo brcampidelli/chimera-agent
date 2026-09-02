@@ -628,7 +628,48 @@ def assemble_registry(
         ledger,
         narrow_on_taint=narrow,
         audit=audit,
+        # The owner's policy, and ONLY when it is an explicit `allow`.
+        #
+        # `CHIMERA_APPROVAL_MODE` reached `solve` and `crew` and nothing else, so an owner who set
+        # it to `allow` still got a refusal from the desktop app and from `serve` — a setting named
+        # like a control that controlled nothing on the surface most people use. That is the same
+        # defect `CHIMERA_TOOL_DENYLIST` had here, pointing the other way: the fence was missing
+        # then, and now the gate cannot be opened by the person entitled to open it.
+        #
+        # Measured on `bench/injection`, which had never been run: with no approver the narrowing
+        # refuses 100% of legitimate work that starts by reading something external — fix the file
+        # the issue names, apply the upgrade the docs describe — for an over-block of 50% against a
+        # 5% ceiling. With an approver it is 0%.
+        #
+        # **`allow` only, never `ask`.** `ask` on a server has nobody at a console; with a `home` it
+        # would wait fifteen minutes inside an HTTP request, and without one it degrades to `deny`,
+        # which is today's behaviour reached by a longer road. Wiring `ask` here would trade a
+        # refusal for a timeout.
+        #
+        # And never `step.approve`, for the reason above: in `observe` that one says yes to
+        # everything, so measurement would silently subtract protection.
+        approve=_owner_allows(settings),
     ), ledger
+
+
+def _owner_allows(settings: Settings) -> Any:
+    """An approver that says yes, when the deployment explicitly chose `allow`. Otherwise none.
+
+    Returning `None` rather than a deny-approver is the point: `LedgeredTool` already refuses when
+    there is no approver, so an absent one is exactly today's behaviour, and this cannot make any
+    configuration stricter than it already was.
+
+    The trade this buys is real and belongs to whoever sets the variable: the number that makes
+    `allow` attractive — over-block 50% to 0% — comes from a bench that hands the approver to the
+    legitimate corpus only, modelling a person approving work they asked for. A standing `allow` on
+    a server approves whatever an injected page asks for too, and `bench/injection` measures
+    `plant_backdoor` and `self_modify_skill` at 0% blocked without the narrowing.
+    """
+    if (settings.approval_mode or "").strip().lower() != "allow":
+        return None
+    from chimera.governance.approval import approver_for
+
+    return approver_for("allow")
 
 
 class PostureQuery(BaseModel):
