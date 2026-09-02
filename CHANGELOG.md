@@ -4,6 +4,44 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- **For twenty-five minutes after every release, auto-update was broken for everyone.** The updater
+  asks GitHub for `releases/latest/download/latest.json`, which resolves to whatever is called the
+  latest release — and a release becomes latest the *instant* it is created, while `latest.json` is
+  attached by the last job of the installer build, after four platforms have finished. Measured on
+  v0.49.0: the endpoint returned **404** while the installers were still going up.
+
+  Nobody had noticed, and the reason is the property that makes the check pleasant: it swallows
+  every error so it never nags. A window in which no update can be found looks exactly like a
+  window in which there is no update.
+
+  Stable releases are now created with `--latest=false` and promoted by the workflow once the
+  manifest is attached. Until then the endpoint keeps resolving to the previous release, whose
+  manifest names a real version — old clients are offered that, which is correct, instead of
+  meeting a 404. **The failure mode improves too:** a build that dies halfway leaves the previous
+  release as latest, so a broken release is simply not offered rather than becoming the one every
+  updater points at and cannot read.
+
+  Not a draft, which is the obvious version of this fix and does not work: drafts fire no release
+  event, so neither workflow would start.
+
+- **The "new version available" panel asked a question it could not answer.** Its heading read
+  *"A new version (v0.49.0) is available. Update?"* over a panel whose only two buttons are *View
+  release* and *Dismiss*. Inside the installed app there is no third option to offer — the panel
+  lives in the webview, on the sidecar's http origin, with no IPC to the Rust updater — so the
+  question mark promised something that did not exist.
+
+  It states rather than asks now, and names what does start one: the tray's **Check for updates**.
+  That label exists in two tables in two languages — `Dialogo.menu` in Rust and `update.trayItem`
+  in the frontend — so a Rust test compares them per language and fails if they drift. Pointing at
+  a menu item spelled differently from the menu item would be worse than pointing at nothing,
+  because the reader concludes the feature is missing. The test caught a real mismatch on its first
+  run: the dictionaries are *defined* in a different order from `LANGS`, so comparing them by
+  position measured Italian against Chinese.
+
 ## [0.49.0] - 2026-09-02
 
 ### Added

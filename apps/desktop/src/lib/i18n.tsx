@@ -1128,8 +1128,10 @@ const en: Dict = {
   "settings.hint.mcpAutoload": "load configured servers at app start",
   "update.available": "v{latest} available",
   "update.prompt": "A new version (v{latest}) is available. Update?",
+  "update.promptNative": "A new version (v{latest}) is available.",
+  "update.trayItem": "Check for updates",
   "update.howtoNative":
-    "This app updates itself: it offers each new release at launch, verifies the signature, installs and restarts. Reopen it to be asked again, or read the release notes first.",
+    "Update it from the tray menu — \"{item}\" — or by closing and reopening the app. Either way it verifies the signature, installs in place and restarts.",
   "update.howto":
     "You are viewing this in a browser, so update the package: run the command below, or read the release notes.",
   "update.copy": "Copy",
@@ -2415,8 +2417,10 @@ const pt: Dict = {
     "carrega os servidores configurados ao iniciar o app",
   "update.available": "v{latest} disponível",
   "update.prompt": "Uma nova versão (v{latest}) está disponível. Atualizar?",
+  "update.promptNative": "Uma versão nova (v{latest}) está disponível.",
+  "update.trayItem": "Verificar atualizações",
   "update.howtoNative":
-    "Este aplicativo se atualiza sozinho: ele oferece cada versão nova ao abrir, confere a assinatura, instala e reinicia. Feche e abra de novo para ser perguntado outra vez, ou leia as notas da versão antes.",
+    "Atualize pelo menu da bandeja — \"{item}\" — ou fechando e abrindo o app. Nos dois casos ele confere a assinatura, instala no lugar e reinicia.",
   "update.howto":
     "Você está vendo isto num navegador, então atualize o pacote: rode o comando abaixo, ou leia as notas da versão.",
   "update.copy": "Copiar",
@@ -3713,8 +3717,10 @@ const es: Dict = {
     "carga los servidores configurados al iniciar la app",
   "update.available": "v{latest} disponible",
   "update.prompt": "Hay una nueva versión (v{latest}) disponible. ¿Actualizar?",
+  "update.promptNative": "Hay una versión nueva (v{latest}) disponible.",
+  "update.trayItem": "Buscar actualizaciones",
   "update.howtoNative":
-    "Esta app se actualiza sola: ofrece cada versión nueva al abrirse, verifica la firma, instala y reinicia. Ábrela de nuevo para que te lo vuelva a preguntar, o lee antes las notas de la versión.",
+    "Actualiza desde el menú de la bandeja — \"{item}\" — o cerrando y abriendo la app. En ambos casos verifica la firma, instala y reinicia.",
   "update.howto":
     "Estás viendo esto en un navegador, así que actualiza el paquete: ejecuta el comando de abajo, o lee las notas de la versión.",
   "update.copy": "Copiar",
@@ -5023,8 +5029,10 @@ const fr: Dict = {
   "update.available": "v{latest} disponible",
   "update.prompt":
     "Une nouvelle version (v{latest}) est disponible. Mettre à jour ?",
+  "update.promptNative": "Une nouvelle version (v{latest}) est disponible.",
+  "update.trayItem": "Rechercher des mises à jour",
   "update.howtoNative":
-    "Cette application se met à jour elle-même : elle propose chaque nouvelle version au lancement, vérifie la signature, installe et redémarre. Rouvrez-la pour qu'elle vous le redemande, ou lisez d'abord les notes de version.",
+    "Mettez à jour depuis le menu de la zone de notification — « {item} » — ou en fermant et rouvrant l'application. Dans les deux cas, la signature est vérifiée, l'installation se fait sur place et l'app redémarre.",
   "update.howto":
     "Vous consultez ceci dans un navigateur : mettez donc le paquet à jour avec la commande ci-dessous, ou lisez les notes de version.",
   "update.copy": "Copier",
@@ -6332,8 +6340,10 @@ const de: Dict = {
   "update.available": "v{latest} verfügbar",
   "update.prompt":
     "Eine neue Version (v{latest}) ist verfügbar. Aktualisieren?",
+  "update.promptNative": "Eine neue Version (v{latest}) ist verfügbar.",
+  "update.trayItem": "Nach Updates suchen",
   "update.howtoNative":
-    "Diese App aktualisiert sich selbst: Sie bietet jede neue Version beim Start an, prüft die Signatur, installiert und startet neu. Erneut öffnen, um wieder gefragt zu werden — oder vorher die Release-Notes lesen.",
+    "Aktualisieren Sie über das Tray-Menü — „{item}“ — oder indem Sie die App schließen und neu öffnen. In beiden Fällen wird die Signatur geprüft, an Ort und Stelle installiert und neu gestartet.",
   "update.howto":
     "Sie sehen dies im Browser — aktualisieren Sie also das Paket: mit dem Befehl unten, oder lesen Sie die Release-Notes.",
   "update.copy": "Kopieren",
@@ -7563,8 +7573,10 @@ const zh: Dict = {
   "settings.hint.mcpAutoload": "在应用启动时加载已配置的服务器",
   "update.available": "v{latest} 可用",
   "update.prompt": "有新版本（v{latest}）可用。要更新吗？",
+  "update.promptNative": "有新版本 (v{latest})。",
+  "update.trayItem": "检查更新",
   "update.howtoNative":
-    "这个应用会自己更新：每次启动时提议新版本，校验签名，安装并重启。重新打开它就会再问一次，或者先读发布说明。",
+    "从托盘菜单更新——「{item}」——或关闭后重新打开应用。两种方式都会校验签名、原地安装并重启。",
   "update.howto":
     "你是在浏览器里看这个的，所以请更新包：运行下面的命令，或者去读发布说明。",
   "update.copy": "复制",
@@ -8853,8 +8865,10 @@ const ja: Dict = {
   "update.available": "v{latest} が利用可能",
   "update.prompt":
     "新しいバージョン（v{latest}）が利用可能です。更新しますか？",
+  "update.promptNative": "新しいバージョン (v{latest}) があります。",
+  "update.trayItem": "アップデートを確認",
   "update.howtoNative":
-    "このアプリは自分で更新します。起動時に新しいリリースを提案し、署名を確かめ、インストールして再起動します。もう一度尋ねてほしければ開き直してください。先にリリースノートを読むこともできます。",
+    "トレイメニューの「{item}」から更新するか、アプリを閉じて開き直してください。どちらも署名を検証し、その場で更新して再起動します。",
   "update.howto":
     "これはブラウザで見ています。パッケージを更新してください — 下のコマンドを実行するか、リリースノートをご覧ください。",
   "update.copy": "コピー",
@@ -10155,8 +10169,10 @@ const it: Dict = {
   "settings.hint.mcpAutoload": "carica i server configurati all'avvio dell'app",
   "update.available": "v{latest} disponibile",
   "update.prompt": "È disponibile una nuova versione (v{latest}). Aggiornare?",
+  "update.promptNative": "È disponibile una nuova versione (v{latest}).",
+  "update.trayItem": "Controlla aggiornamenti",
   "update.howtoNative":
-    "Questa app si aggiorna da sola: propone ogni nuova versione all'avvio, verifica la firma, installa e riavvia. Riaprila per essere richiesto, oppure leggi prima le note di rilascio.",
+    "Aggiorna dal menu nella barra delle applicazioni — \"{item}\" — o chiudendo e riaprendo l'app. In entrambi i casi verifica la firma, installa e riavvia.",
   "update.howto":
     "Stai guardando questo in un browser, quindi aggiorna il pacchetto: esegui il comando qui sotto, oppure leggi le note di rilascio.",
   "update.copy": "Copia",
@@ -11450,8 +11466,10 @@ const pl: Dict = {
     "wczytuj skonfigurowane serwery przy starcie aplikacji",
   "update.available": "dostępna v{latest}",
   "update.prompt": "Dostępna jest nowa wersja (v{latest}). Zaktualizować?",
+  "update.promptNative": "Dostępna jest nowa wersja (v{latest}).",
+  "update.trayItem": "Sprawdź aktualizacje",
   "update.howtoNative":
-    "Ta aplikacja aktualizuje się sama: przy starcie proponuje każde nowe wydanie, sprawdza podpis, instaluje i restartuje. Otwórz ją ponownie, żeby zapytała jeszcze raz, albo najpierw przeczytaj informacje o wydaniu.",
+    "Zaktualizuj z menu w zasobniku — „{item}” — albo zamykając i otwierając aplikację. W obu przypadkach sprawdza podpis, instaluje w miejscu i uruchamia się ponownie.",
   "update.howto":
     "Oglądasz to w przeglądarce, więc zaktualizuj pakiet: uruchom polecenie poniżej albo przeczytaj informacje o wydaniu.",
   "update.copy": "Kopiuj",
@@ -12751,8 +12769,10 @@ const ru: Dict = {
     "загружать настроенные серверы при запуске приложения",
   "update.available": "доступна v{latest}",
   "update.prompt": "Доступна новая версия (v{latest}). Обновить?",
+  "update.promptNative": "Доступна новая версия (v{latest}).",
+  "update.trayItem": "Проверить обновления",
   "update.howtoNative":
-    "Это приложение обновляется само: при запуске предлагает каждый новый выпуск, проверяет подпись, устанавливает и перезапускается. Откройте его заново, чтобы вопрос появился снова, или сначала прочитайте примечания к выпуску.",
+    "Обновите через меню в трее — «{item}» — или закройте и откройте приложение. В обоих случаях подпись проверяется, установка идёт на месте, приложение перезапускается.",
   "update.howto":
     "Вы смотрите это в браузере, значит обновлять нужно пакет: выполните команду ниже или прочитайте примечания к выпуску.",
   "update.copy": "Копировать",

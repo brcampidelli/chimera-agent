@@ -53,9 +53,32 @@ describe("the version badge", () => {
 
     await open();
 
-    expect(screen.getByText(/updates itself/i)).toBeInTheDocument();
     // The pip command updates the Python package. The user is looking at the bundle.
     expect(screen.queryByText(/pip install -U/)).toBeNull();
+  });
+
+  it("names the thing that starts the update, instead of asking a question it cannot answer",
+    async () => {
+      (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {};
+
+      await open();
+
+      // The heading used to read "A new version is available. Update?" over a panel whose only two
+      // buttons are "View release" and "Dismiss". Inside the bundle there is no third option to
+      // offer: this panel is in the webview, on the sidecar's http origin, with no IPC to the Rust
+      // updater. A question mark promises an answer that does not exist.
+      expect(screen.queryByText(/Update\?/)).toBeNull();
+      // And it points at what DOES start one.
+      expect(screen.getByText(/Check for updates/)).toBeInTheDocument();
+      expect(screen.getByText(/tray menu/i)).toBeInTheDocument();
+    });
+
+  it("still asks in a browser, where the question has an answer", async () => {
+    // The control. Dropping the question everywhere would pass the test above and take away a
+    // reasonable prompt from the one place the panel really can tell you what to do next.
+    await open();
+
+    expect(screen.getByText(/Update\?/)).toBeInTheDocument();
   });
 
   it("stays quiet when there is nothing newer", async () => {

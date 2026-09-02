@@ -8,6 +8,10 @@ name: Build desktop installers
 # files (using the TAURI_SIGNING_PRIVATE_KEY secret), and a final job assembles a `latest.json` manifest
 # and publishes it to the Release so the app's in-place auto-updater can find + verify updates.
 #
+# The release is created with `--latest=false` and PROMOTED by the last job, once latest.json is
+# attached. `releases/latest/download/latest.json` is the updater's endpoint, so a release that
+# becomes "latest" before its manifest exists breaks auto-update for everyone until the build ends.
+#
 # A manual `gh workflow run desktop-release.yml` is a full DRY RUN: it builds every platform, signs,
 # and assembles latest.json as an artifact WITHOUT publishing anything. Do that before every release
 # (see RELEASING.md) — the manifest path used to be release-only, which is why v0.32.0-v0.32.2 were
@@ -381,6 +385,33 @@ jobs:
       # a release that goes red because a website was not notified would be a far worse outcome than
       # a website that updates on the nightly instead. `continue-on-error` covers the other half —
       # the site being down does not make this release wrong.
+      # THE RELEASE BECOMES "LATEST" HERE, and the position is the whole point.
+      #
+      # The updater endpoint is `releases/latest/download/latest.json`, which resolves to whatever
+      # GitHub calls the latest release. Published the ordinary way, a release becomes latest the
+      # INSTANT it is created — twenty-five minutes before this job attaches the manifest — and for
+      # that whole window the endpoint 404s and every installed app's update check fails. Silently,
+      # by design: the startup check swallows errors so it never nags. Measured on v0.49.0.
+      #
+      # So `RELEASING.md` says to create it with `--latest=false`, and this promotes it once the
+      # manifest is up. Until then the endpoint keeps resolving to the PREVIOUS release, which has
+      # a valid manifest naming a real version — old clients are offered that, which is correct,
+      # instead of meeting a 404.
+      #
+      # The failure mode improves too, and that is not a side effect. A build that dies halfway now
+      # leaves the previous release as latest: a broken release is simply not offered, rather than
+      # becoming the one everybody's updater points at and cannot read.
+      #
+      # `--latest=false` still fires `release: published`, so this workflow triggers exactly as
+      # before. A DRAFT would not have: drafts fire no release event at all, which is why the
+      # obvious "create it as a draft" version of this fix does not work.
+      - name: Mark the release as latest, now that the manifest is attached
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --latest
+
       - name: Tell the website a release is out
         # Reads the JOB's env, set above. Not `secrets.…` (unparseable in a step `if`, and it takes
         # the whole workflow file down with it), and not the step's own `env` (not in scope for the
