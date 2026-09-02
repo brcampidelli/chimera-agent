@@ -34,8 +34,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   literal passed. Presence over repeated call sites can only ever prove that *at least one* is
   right; it counts now, scoped to the updater.
 
-  Still English, and named here rather than left to be found: the three **backend-failure** dialogs
-  ("Chimera's backend stopped") and the tray's **Quit** item.
+- **Every native dialog speaks the user's language now, and the diagnostics deliberately do not.**
+  The entry above shipped with three dialogs still in English, named there rather than left to be
+  found — the two backend failures and the tray's Quit. They are translated.
+
+  Where the line falls is the decision worth recording. **What tells you what to do is translated;
+  what goes into a bug report is not.** So "Chimera's backend stopped, and the app could not bring
+  it back (it tried 3 times). Close Chimera and open it again." is in your language, and the path,
+  the OS error and the backend's own stderr underneath it stay verbatim in English — a translated
+  system error is one nobody can search for. A test asserts both halves: that the sentences come
+  from the table, and that the diagnostics are still passed through untouched.
+
+  The window title and the tray tooltip are also untranslated, and that is not an oversight either:
+  they are the product's name.
+
+  One structural change came with it. `supervise` takes the language as a parameter instead of
+  reading it from the OS, because its tests drive it end to end and read the message it announces —
+  built from the machine's locale, that assertion would pass in English on the CI runner and fail
+  in Portuguese on the machine that wrote it. The tests pass English explicitly.
+
+  Twenty sabotages, all caught, suite green before and after. One of them exists because a
+  hand-written list of fields is exactly the kind that stops covering a field somebody adds next
+  month: the list the tests iterate is now checked against the struct definition read out of the
+  source, so a fourteenth string cannot ship untested in ten languages.
 
 ## [0.48.1] - 2026-09-02
 
