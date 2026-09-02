@@ -35,13 +35,20 @@ class ModelPrice:
     output_per_m: float
 
 
+#: A free-tier slug bills nothing, and that is a measurement rather than a default.
+#:
+#: It used to be the first entry of the table below, which made the property "free beats its own
+#: paid family" depend on nothing ever being prepended in front of it — and `set_price` prepends.
+#: Folding the shipped catalogue in was enough to break it: `llama-3.3-70b-instruct:free` started
+#: pricing at the paid family rate, because the catalogue's `llama-3.3-70b-instruct` is a substring
+#: of it and now sat higher in the list. The rule was one `set_price` call away from breaking for
+#: anybody, so it stops being a position in a list and becomes a check of its own.
+_FREE_TIER = ModelPrice(0.0, 0.0)
+
 # Approximate public list prices (USD / 1M tokens) as of mid-2026, for cost *estimation* only.
 # Matched by substring against a normalized model id, longest/most-specific pattern first. Override
 # or extend with set_price(); an unmatched model yields an unknown (None) cost rather than a guess.
 _PRICES: list[tuple[str, ModelPrice]] = [
-    # ":free" first: any OpenRouter free-tier slug prices as measured-zero, and must win
-    # over its paid family substring (e.g. "llama-3.3-70b-instruct:free" vs "llama-3.3-70b").
-    (":free", ModelPrice(0.0, 0.0)),
     ("deepseek-r1", ModelPrice(0.55, 2.19)),
     ("deepseek-reasoner", ModelPrice(0.55, 2.19)),
     ("claude-sonnet", ModelPrice(3.0, 15.0)),
@@ -67,6 +74,40 @@ def set_price(pattern: str, price: ModelPrice) -> None:
     _PRICES.insert(0, (pattern.lower(), price))
 
 
+#: Whether the shipped catalogue's own prices have been folded into the table above.
+_catalog_registered = False
+
+
+def _ensure_catalog_registered() -> None:
+    """Fold the shipped catalogue's prices into the table, once, before the first lookup.
+
+    `register_catalog_prices()` was written for exactly this and nothing called it, so nine of the
+    fifteen models the app ships with resolved to *price unknown* — `claude-opus-5` at $5/$25 per
+    1M among them. The six that did resolve included the default, `deepseek-chat-v3.1`, which is
+    why it went unnoticed: the meter read correctly until somebody chose an expensive model, and
+    then went quiet at precisely the moment the number mattered.
+
+    **Called from the read, not from a startup hook.** A hook is a second code path that every new
+    entrypoint has to remember, and the CLI, the API, the sidecar and every bench are separate
+    entrypoints. `listing.remember_models` already states this rule about itself — refreshing as a
+    side effect of the picker being used, so "there is no second code path that has to remember to
+    run" — and this is the same rule applied to the same table from the other side.
+
+    After the exact-match pass would be wrong: `register_catalog_prices` prepends, so a price a
+    human typed with `set_price` must be registered *after* the catalogue to still win. Doing this
+    first preserves that order.
+    """
+    global _catalog_registered
+    if _catalog_registered:
+        return
+    # Set before the call, not after: `register_catalog_prices` calls `set_price`, and a future
+    # version of it that priced by consulting `resolve_price` would recurse forever otherwise.
+    _catalog_registered = True
+    from chimera.providers.catalog import register_catalog_prices
+
+    register_catalog_prices()
+
+
 #: Priced at zero, and that is a measurement rather than a default. A model on `ollama/`, `vllm/` or
 #: an LM Studio endpoint bills nothing to any provider — the cost is electricity, which is not what
 #: a dollar figure in a receipt is about. Treating it as *unknown* would be the more cautious-looking
@@ -78,17 +119,23 @@ _LOCAL_ZERO = ModelPrice(0.0, 0.0)
 def resolve_price(model: str) -> ModelPrice | None:
     """The list price for ``model``, or ``None`` if unknown (never guessed).
 
-    Four sources, most specific first, and the ORDER is the whole design:
+    Five sources, most specific first, and the ORDER is the whole design:
 
     1. **An exact match in the table.** ``set_price("openrouter/x/y", …)`` names one model, and
        somebody who named a model meant that model.
-    2. **The provider's own published price**, for this exact slug, from the index the model picker
+    2. **A `:free` slug**, which bills nothing. Above every substring pass because a free slug is a
+       paid model's id with a suffix, so any family pattern for that model matches it too. This used
+       to be the first row of the table and therefore depended on nothing ever being prepended in
+       front of it — a property one `set_price` call away from breaking, and folding the shipped
+       catalogue in is what broke it.
+    3. **The provider's own published price**, for this exact slug, from the index the model picker
        fetches (see :func:`chimera.providers.listing.known_price`). This is why the default model
        stopped reporting "price unknown": the table below is hand-maintained and knew about twenty
        families, while the index knows four hundred models and is refreshed by using the app.
-    3. **The table by family substring** — the original behaviour, unchanged, and still the answer
-       for every model the index has never seen (a local gateway, a vendor not on OpenRouter).
-    4. Local models, which bill nothing.
+    4. **The table by family substring** — the original behaviour, unchanged, and still the answer
+       for every model the index has never seen (a local gateway, a vendor not on OpenRouter). The
+       shipped catalogue is folded in here, once, on the first lookup.
+    5. Local models, which bill nothing.
 
     Why the index sits BETWEEN the two table lookups rather than after both: those patterns are
     substrings, and a substring is a guess about a family. ``deepseek-chat`` matched
@@ -99,10 +146,17 @@ def resolve_price(model: str) -> ModelPrice | None:
     from chimera.providers.gateway import _is_local_model
     from chimera.providers.listing import known_price
 
+    _ensure_catalog_registered()
     norm = model.lower()
     for pattern, price in _PRICES:
         if pattern == norm:
             return price
+
+    # Before every substring pass, including the catalogue's: a `:free` slug is the paid model's id
+    # with a suffix, so ANY family pattern for that model also matches it. An explicit exact-match
+    # `set_price` for the free slug still wins, above.
+    if ":free" in norm:
+        return _FREE_TIER
 
     live = known_price(model)
     if live is not None:
