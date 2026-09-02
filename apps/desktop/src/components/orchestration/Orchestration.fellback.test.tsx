@@ -2,7 +2,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { Orchestration } from "@/components/orchestration/Orchestration";
+import { TaskConsole } from "@/components/work/TaskConsole";
 import { previewHierarchy, streamHierarchy } from "@/lib/api";
 import { renderWithProviders } from "@/test/utils";
 import type { HierarchyPreview } from "@/lib/types";
@@ -39,7 +39,7 @@ function plan(over: Partial<HierarchyPreview> = {}): HierarchyPreview {
 async function preview(over: Partial<HierarchyPreview> = {}) {
   const user = userEvent.setup();
   mockPreview.mockResolvedValue(plan(over));
-  renderWithProviders(<Orchestration workspace="/repo" onOpenCode={vi.fn()} />);
+  renderWithProviders(<TaskConsole workspace="/repo" initialMode="hierarchy" onOpenCode={vi.fn()} />);
   await user.type(screen.getByLabelText(/tarefa|task|aufgabe/i), "Implement the retry");
   await user.click(screen.getByRole("button", { name: /see the plan/i }));
   await waitFor(() => expect(mockPreview).toHaveBeenCalled());
@@ -82,7 +82,7 @@ describe("when the orchestrator picks one agent", () => {
     const onOpenCode = vi.fn();
     const user = userEvent.setup();
     mockPreview.mockResolvedValue(plan());
-    renderWithProviders(<Orchestration workspace="/repo" onOpenCode={onOpenCode} />);
+    renderWithProviders(<TaskConsole workspace="/repo" initialMode="hierarchy" onOpenCode={onOpenCode} />);
     await user.type(screen.getByLabelText(/task/i), "Implement the retry");
     await user.click(screen.getByRole("button", { name: /see the plan/i }));
     await waitFor(() => expect(mockPreview).toHaveBeenCalled());

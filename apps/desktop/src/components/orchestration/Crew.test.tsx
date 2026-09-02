@@ -2,7 +2,7 @@ import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { Orchestration } from "@/components/orchestration/Orchestration";
+import { TaskConsole } from "@/components/work/TaskConsole";
 import {
   cancelOrchestration,
   getApproaches,
@@ -64,7 +64,7 @@ async function openCrewForm() {
   const user = userEvent.setup();
   mockPreview.mockResolvedValue(WRITE_PLAN);
   mockApproaches.mockResolvedValue(CATALOGUE);
-  renderWithProviders(<Orchestration workspace="/repo" onOpenCode={vi.fn()} />);
+  renderWithProviders(<TaskConsole workspace="/repo" initialMode="hierarchy" onOpenCode={vi.fn()} />);
   await user.type(screen.getByLabelText(/task/i), "implemente o retry");
   await user.click(screen.getByRole("button", { name: /see the plan/i }));
   await waitFor(() => expect(screen.getByRole("button", { name: /build a crew/i })).toBeInTheDocument());

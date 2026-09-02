@@ -6,13 +6,13 @@ import { useT } from "@/lib/i18n";
 import { getApproaches, type CrewApproach, type CrewWorkerInput } from "@/lib/api";
 
 /**
- * Assembling a crew: who tries, and what decides which attempt lands.
- *
- * The check is the first field rather than the last, and that is not a layout preference. Every
- * worker attacks the SAME task, so they tend to edit the same files — and the merge rule is
- * one-file-one-owner, meaning that when two of them succeed on the same file, NEITHER lands.
- * Which inverts the intuition twice over: a crew with no check usually produces nothing, and a
- * check that every worker passes produces nothing either. What a crew needs is a check that
+ * Assembling a crew: who tries. What decides which attempt lands is the check, and that is the
+ * shared field in the console above — the same shell command a run or a lifecycle would be judged
+ * by, asked for once. It is above this form rather than below it, and that is not a layout
+ * preference: every worker attacks the SAME task, so they tend to edit the same files — and the
+ * merge rule is one-file-one-owner, meaning that when two of them succeed on the same file, NEITHER
+ * lands. Which inverts the intuition twice over: a crew with no check usually produces nothing, and
+ * a check that every worker passes produces nothing either. What a crew needs is a check that
  * DISCRIMINATES, and workers different enough for it to have something to discriminate between.
  *
  * That is why the roles are picked from a catalogue instead of typed. Two blank instruction boxes
@@ -40,14 +40,16 @@ function slotName(slot: Slot): string {
 }
 
 export function CrewForm({
+  task,
   onRun,
-  running,
 }: {
-  onRun: (workers: CrewWorkerInput[], verify: string) => void;
-  running: boolean;
+  /** The shared task. Only read to refuse an empty one — a crew with no task is N workers with
+   *  nothing to attempt, and it used to be unreachable without one only because the plan preview
+   *  was the only door in. */
+  task: string;
+  onRun: (workers: CrewWorkerInput[]) => void;
 }) {
   const t = useT();
-  const [verify, setVerify] = useState("");
   const [catalogue, setCatalogue] = useState<CrewApproach[]>([]);
   const [slots, setSlots] = useState<Slot[]>([blankSlot(), blankSlot()]);
 
@@ -96,25 +98,6 @@ export function CrewForm({
 
   return (
     <div className="space-y-4 rounded-card border border-hairline bg-surface-2/40 p-4">
-      <div>
-        <label
-          className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-          htmlFor="crew-verify"
-        >
-          {t("crew.verify.label")}
-        </label>
-        <input
-          id="crew-verify"
-          value={verify}
-          onChange={(event) => setVerify(event.target.value)}
-          placeholder={t("crew.verify.placeholder")}
-          className="mt-1 w-full rounded-card border border-hairline bg-surface-2/40 p-2 font-mono text-xs text-foreground placeholder:text-muted-foreground"
-        />
-        <p className="mt-1 text-xs text-muted-foreground">
-          {verify.trim() ? t("crew.verify.why") : t("crew.verify.missing")}
-        </p>
-      </div>
-
       <div className="space-y-3">
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {t("crew.workers.label")}
@@ -198,13 +181,8 @@ export function CrewForm({
 
       <Button
         size="sm"
-        disabled={running || named.length < 2 || duplicated}
-        onClick={() =>
-          onRun(
-            named.map((s) => ({ name: slotName(s), instruction: s.instruction.trim() })),
-            verify.trim(),
-          )
-        }
+        disabled={!task.trim() || named.length < 2 || duplicated}
+        onClick={() => onRun(named.map((s) => ({ name: slotName(s), instruction: s.instruction.trim() })))}
       >
         {t("crew.run")}
       </Button>

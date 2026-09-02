@@ -136,6 +136,17 @@ export function makeCodeApiMock() {
     respondToRun: vi.fn(),
     streamAgents: vi.fn(),
     cancelAgents: vi.fn(),
+    // The task console mounts whichever of the four modes is selected, so a suite that switches
+    // mode reaches these — and an absent export throws "No export is defined on the mock", which
+    // reads like a broken test rather than a missing stub. Bare `vi.fn()` where nothing renders
+    // until an action is taken; resolved where a query would otherwise hand react-query undefined.
+    streamLifecycle: vi.fn(),
+    cancelLifecycle: vi.fn(),
+    previewHierarchy: vi.fn(),
+    streamHierarchy: vi.fn(),
+    streamCrew: vi.fn(),
+    cancelOrchestration: vi.fn(),
+    getApproaches: vi.fn(async () => ({ approaches: [], default: [] })),
   };
 }
 

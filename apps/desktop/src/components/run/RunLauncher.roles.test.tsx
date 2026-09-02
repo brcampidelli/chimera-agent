@@ -2,7 +2,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { RunLauncher } from "@/components/run/RunLauncher";
+import { TaskConsole } from "@/components/work/TaskConsole";
 import { getPausedRuns, getRoleModels, streamRun } from "@/lib/api";
 import { renderWithProviders } from "@/test/utils";
 
@@ -38,7 +38,7 @@ describe("RunLauncher — the choice reaches the run", () => {
 
   async function launch(task = "arrume o build") {
     const user = userEvent.setup();
-    renderWithProviders(<RunLauncher />);
+    renderWithProviders(<TaskConsole workspace="" onOpenCode={() => {}} />);
     await user.type(await screen.findByPlaceholderText(/task|tarefa/i), task);
     return user;
   }

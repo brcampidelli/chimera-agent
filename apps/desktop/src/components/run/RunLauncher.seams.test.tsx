@@ -2,7 +2,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { RunLauncher } from "@/components/run/RunLauncher";
+import { TaskConsole } from "@/components/work/TaskConsole";
 import { getPausedRuns, getPlan, getRequirements, streamRun } from "@/lib/api";
 import { renderWithProviders } from "@/test/utils";
 
@@ -36,7 +36,7 @@ describe("the run seams", () => {
   }
 
   it("sends both halves of knowing the repository from one control", async () => {
-    renderWithProviders(<RunLauncher />);
+    renderWithProviders(<TaskConsole workspace="" onOpenCode={() => {}} />);
     await userEvent.type(screen.getByLabelText(/task/i), "conserte o login");
     await userEvent.click(screen.getByLabelText(/way around this project/i));
 
@@ -48,7 +48,7 @@ describe("the run seams", () => {
   it("leaves them off when nobody asked", async () => {
     // The control. These are not free — a repository map is a digest the planner pays for, and an
     // explorer is a tool the worker can spend steps in.
-    renderWithProviders(<RunLauncher />);
+    renderWithProviders(<TaskConsole workspace="" onOpenCode={() => {}} />);
     await userEvent.type(screen.getByLabelText(/task/i), "x");
 
     const sent = await run();
@@ -57,7 +57,7 @@ describe("the run seams", () => {
   });
 
   it("sends replan when asked", async () => {
-    renderWithProviders(<RunLauncher />);
+    renderWithProviders(<TaskConsole workspace="" onOpenCode={() => {}} />);
     await userEvent.type(screen.getByLabelText(/task/i), "x");
     await userEvent.click(screen.getByLabelText(/rethink instead of retrying/i));
 
@@ -66,7 +66,7 @@ describe("the run seams", () => {
 
   it("offers test generation only once a checklist has been reviewed", async () => {
     // There is nothing to ground the generation in before that, and the loop would ignore it.
-    renderWithProviders(<RunLauncher />);
+    renderWithProviders(<TaskConsole workspace="" onOpenCode={() => {}} />);
     await userEvent.type(screen.getByLabelText(/task/i), "x");
 
     expect(screen.queryByLabelText(/real tests/i)).toBeNull();
@@ -75,9 +75,9 @@ describe("the run seams", () => {
   it("does not offer it when a test command is already typed", async () => {
     // With a real command the tests ARE the ground truth. Offering to generate more would be
     // offering to replace something strong with something weaker.
-    renderWithProviders(<RunLauncher />);
+    renderWithProviders(<TaskConsole workspace="" onOpenCode={() => {}} />);
     await userEvent.type(screen.getByLabelText(/task/i), "x");
-    await userEvent.type(screen.getByLabelText(/verify/i), "pytest -q");
+    await userEvent.type(screen.getByLabelText(/the check/i), "pytest -q");
     await userEvent.click(screen.getByRole("button", { name: /see the plan/i }));
     await screen.findByText(/has to cover/i);
 
@@ -85,7 +85,7 @@ describe("the run seams", () => {
   });
 
   it("sends it when there is a checklist and no test command", async () => {
-    renderWithProviders(<RunLauncher />);
+    renderWithProviders(<TaskConsole workspace="" onOpenCode={() => {}} />);
     await userEvent.type(screen.getByLabelText(/task/i), "x");
     await userEvent.click(screen.getByRole("button", { name: /see the plan/i }));
     await screen.findByText(/has to cover/i);
@@ -97,7 +97,7 @@ describe("the run seams", () => {
   it("says it writes a file, because it does", async () => {
     // Writing into somebody's project is a side effect, and a checkbox that causes one without
     // saying so is the app doing something its owner did not agree to.
-    renderWithProviders(<RunLauncher />);
+    renderWithProviders(<TaskConsole workspace="" onOpenCode={() => {}} />);
     await userEvent.type(screen.getByLabelText(/task/i), "x");
     await userEvent.click(screen.getByRole("button", { name: /see the plan/i }));
     await screen.findByText(/has to cover/i);
@@ -108,7 +108,7 @@ describe("the run seams", () => {
   it("withdraws the request when the checklist is emptied after being ticked", async () => {
     // The tick can outlive the thing it was about: delete every line and the loop would ignore
     // `gen_tests` anyway, so sending true would be the screen claiming a gate that will not run.
-    renderWithProviders(<RunLauncher />);
+    renderWithProviders(<TaskConsole workspace="" onOpenCode={() => {}} />);
     await userEvent.type(screen.getByLabelText(/task/i), "x");
     await userEvent.click(screen.getByRole("button", { name: /see the plan/i }));
     await screen.findByText(/has to cover/i);

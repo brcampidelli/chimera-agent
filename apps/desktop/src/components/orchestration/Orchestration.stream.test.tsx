@@ -2,7 +2,7 @@ import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { Orchestration } from "@/components/orchestration/Orchestration";
+import { TaskConsole } from "@/components/work/TaskConsole";
 import {
   cancelOrchestration,
   previewHierarchy,
@@ -71,7 +71,7 @@ async function startRun() {
     return new Promise<void>(() => {}); // never settles: the run is in flight
   });
 
-  renderWithProviders(<Orchestration workspace="/repo" onOpenCode={vi.fn()} />);
+  renderWithProviders(<TaskConsole workspace="/repo" initialMode="hierarchy" onOpenCode={vi.fn()} />);
   await user.type(screen.getByLabelText(/task/i), "Compare doc A and doc B and list the risks");
   await user.click(screen.getByRole("button", { name: /see the plan/i }));
   await waitFor(() => expect(screen.getByRole("button", { name: /run the plan/i })).toBeInTheDocument());

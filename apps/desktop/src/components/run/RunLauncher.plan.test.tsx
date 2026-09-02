@@ -2,7 +2,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { RunLauncher } from "@/components/run/RunLauncher";
+import { TaskConsole } from "@/components/work/TaskConsole";
 import { getPausedRuns, getPlan, streamRun } from "@/lib/api";
 import { renderWithProviders } from "@/test/utils";
 
@@ -32,8 +32,8 @@ describe("the plan gate", () => {
 
   async function askFor(task: string) {
     const user = userEvent.setup();
-    renderWithProviders(<RunLauncher workspace="/proj" />);
-    await user.type(screen.getByLabelText(/describe the task/i), task);
+    renderWithProviders(<TaskConsole workspace="/proj" onOpenCode={() => {}} />);
+    await user.type(screen.getByLabelText(/the task/i), task);
     return user;
   }
 
@@ -128,8 +128,8 @@ describe("the plan panel stays put while you edit it", () => {
     // clearing the box to rewrite the plan removed the box. The person is left staring at the
     // place their plan used to be, with no way back except asking for a new one.
     const user = userEvent.setup();
-    renderWithProviders(<RunLauncher workspace="/proj" />);
-    await user.type(screen.getByLabelText(/describe the task/i), "adiciona o meta viewport");
+    renderWithProviders(<TaskConsole workspace="/proj" onOpenCode={() => {}} />);
+    await user.type(screen.getByLabelText(/the task/i), "adiciona o meta viewport");
     await user.click(screen.getByRole("button", { name: /see the plan/i }));
 
     const box = await screen.findByLabelText(/^the plan$/i);
@@ -140,8 +140,8 @@ describe("the plan panel stays put while you edit it", () => {
 
   it("closes only when the person says so", async () => {
     const user = userEvent.setup();
-    renderWithProviders(<RunLauncher workspace="/proj" />);
-    await user.type(screen.getByLabelText(/describe the task/i), "adiciona o meta viewport");
+    renderWithProviders(<TaskConsole workspace="/proj" onOpenCode={() => {}} />);
+    await user.type(screen.getByLabelText(/the task/i), "adiciona o meta viewport");
     await user.click(screen.getByRole("button", { name: /see the plan/i }));
     await screen.findByLabelText(/^the plan$/i);
 

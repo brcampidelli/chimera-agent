@@ -1,17 +1,17 @@
 import { useId, useState } from "react";
 import { ListChecks } from "lucide-react";
 
-import { Orchestration } from "@/components/orchestration/Orchestration";
 import { Runs } from "@/components/Runs";
 import { GitPanel } from "@/components/code/GitPanel";
 import { WorthPanel } from "@/components/code/WorthPanel";
-import { Lifecycle } from "@/components/lifecycle/Lifecycle";
+import { TaskConsole } from "@/components/work/TaskConsole";
+import { readMode, type WorkMode } from "@/components/work/modes";
 import { Tabs, TabPanel } from "@/components/ui/tabs";
 import { useT } from "@/lib/i18n";
 import { useRoute } from "@/lib/router";
 import { readWorkspace } from "@/lib/workspace";
 
-type Tab = "run" | "git" | "worth" | "orchestration" | "lifecycle";
+type Tab = "task" | "runs" | "git" | "worth";
 
 /** The tab names the URL understands.
  *
@@ -19,12 +19,12 @@ type Tab = "run" | "git" | "worth" | "orchestration" | "lifecycle";
  *  this array are two declarations of one fact and the typechecker cannot relate them: adding the
  *  fifth tab left `?tab=lifecycle` falling back to Runs, silently, with everything compiling.
  */
-export const TABS = ["run", "git", "worth", "orchestration", "lifecycle"] as const;
+export const TABS = ["task", "runs", "git", "worth"] as const;
 
-/** The tab named in the URL, or "run".
+/** The tab named in the URL, or "task".
  *
  *  Read straight from the hash rather than through `useRoute` so the FIRST render already has it: a
- *  deep link that resolved one render late would show the Runs tab and then jump, which reads as a
+ *  deep link that resolved one render late would show the first tab and then jump, which reads as a
  *  bug even though it settles correctly.
  *
  *  Checked against the whole list. It used to recognise `orchestration` and nothing else, so
@@ -33,22 +33,23 @@ export const TABS = ["run", "git", "worth", "orchestration", "lifecycle"] as con
 function readTab(): Tab {
   const query = window.location.hash.split("?")[1] ?? "";
   const named = new URLSearchParams(query).get("tab") ?? "";
-  return (TABS as readonly string[]).includes(named) ? (named as Tab) : "run";
+  return (TABS as readonly string[]).includes(named) ? (named as Tab) : "task";
 }
 
 /**
  * The agent working on its own.
  *
- * Runs is one task with verify-or-revert. Several of the same, in parallel git worktrees, used to be
- * the tab beside it — a destination chosen before anyone knew whether the work was parallel. It is
- * reached from the conversation now, by asking for several things and confirming the split, so the
- * only remaining question is asked before the worktrees exist rather than reported after.
+ * There were four ways to hand it a task and four forms to do it on — a run, a lifecycle, a
+ * fan-out, and the crew buried inside the fan-out. Each asked for the task again, so the choice of
+ * how to run it came before the task existed, and changing your mind cost retyping. They are one
+ * screen now, with the task typed once and buttons for what happens to it. Several agents at once
+ * made the same move earlier and for the same reason, written down in `Code.tsx`: it was
+ * "a destination chosen before anyone knew whether the work was parallel".
  *
- * Git and "was it worth it?" moved here from the Code screen. Both are about work that already
- * happened — reviewing the diff a run produced, and asking whether the expensive profile earned its
- * cost — which is this screen's subject, not the subject of a screen you use to write code. On Code
- * they were two of five panels sharing one column, and the arithmetic did not work: the panels that
- * could not shrink took every pixel and the conversation was laid out at zero height.
+ * What is left beside it is what is not a way of starting work: the archive of what the runs did,
+ * the diff they produced, and whether the expensive profile earned its cost. Git and "was it worth
+ * it?" moved here from the Code screen because both are about work that already happened, which is
+ * this screen's subject and not the subject of a screen you use to write code.
  *
  * Maturity would have been the other candidate for the cost panel and was rejected on a fact rather
  * than a preference: `App.tsx` renders it only under `import.meta.env.DEV`, so a shipped build would
@@ -58,6 +59,9 @@ export function Work() {
   const t = useT();
   const id = useId();
   const [tab, setTab] = useState<Tab>(readTab);
+  // Read once, for the same reason as the tab. The console owns it from there on — it can change
+  // its own mode, and the fallback note does exactly that.
+  const [mode, setMode] = useState<WorkMode>(() => readMode(window.location.hash));
   // Only to leave: the fallback note on a write-shaped task offers the screen that IS for writing
   // work, and a suggestion you have to act on yourself is a suggestion with a step missing.
   const { navigate, setParams } = useRoute();
@@ -67,18 +71,29 @@ export function Work() {
   const [workspace] = useState(readWorkspace);
 
   const items = [
-    { value: "run" as const, label: t("nav.runs") },
+    { value: "task" as const, label: t("nav.task") },
+    { value: "runs" as const, label: t("nav.runs") },
     { value: "git" as const, label: t("code.git.title") },
     { value: "worth" as const, label: t("code.worth.title") },
-    { value: "orchestration" as const, label: t("nav.orchestration") },
-    { value: "lifecycle" as const, label: t("nav.lifecycle") },
   ];
 
-  // `setParams` and not `navigate`: switching a tab replaces rather than pushes, so the back
-  // button still leaves this screen instead of walking back through four tabs first.
+  // `setParams` REPLACES the query, so one function emits the WHOLE of it. Two callers each
+  // writing their own key would take turns dropping the other's — and the loss is invisible until
+  // somebody reopens the URL and lands on a screen the address bar disagrees with.
+  function write(nextTab: Tab, nextMode: WorkMode) {
+    const params: Record<string, string> = {};
+    if (nextTab !== "task") params.tab = nextTab;
+    // Only when it is not the default and only on the tab it belongs to — a `?mode=` left behind
+    // on the git tab describes a control that is not on screen.
+    if (nextTab === "task" && nextMode !== "single") params.mode = nextMode;
+    // Replaces rather than pushes, so the back button still leaves this screen instead of walking
+    // back through four tabs first.
+    setParams(params);
+  }
+
   function choose(next: Tab) {
     setTab(next);
-    setParams(next === "run" ? {} : { tab: next });
+    write(next, mode);
   }
 
   return (
@@ -90,7 +105,19 @@ export function Work() {
       <Tabs items={items} value={tab} onChange={choose} aria-label={t("nav.work")} className="px-6" />
       <div className="min-h-0 flex-1 overflow-y-auto">
         <TabPanel tabsId={id} value={tab}>
-          {tab === "run" ? (
+          {tab === "task" ? (
+            <div className="mx-auto max-w-5xl px-6 py-4">
+              <TaskConsole
+                workspace={workspace}
+                initialMode={mode}
+                onMode={(next) => {
+                  setMode(next);
+                  write(tab, next);
+                }}
+                onOpenCode={() => navigate("code")}
+              />
+            </div>
+          ) : tab === "runs" ? (
             <div className="mx-auto max-w-3xl px-6 py-6">
               <Runs embedded workspace={workspace} />
             </div>
@@ -109,17 +136,9 @@ export function Work() {
               )}
               <GitPanel workspace={workspace} />
             </div>
-          ) : tab === "worth" ? (
-            <div className="mx-auto max-w-5xl px-6 py-4">
-              <WorthPanel workspace={workspace} />
-            </div>
-          ) : tab === "lifecycle" ? (
-            <div className="mx-auto max-w-5xl px-6 py-4">
-              <Lifecycle workspace={workspace} />
-            </div>
           ) : (
             <div className="mx-auto max-w-5xl px-6 py-4">
-              <Orchestration workspace={workspace} onOpenCode={() => navigate("code")} />
+              <WorthPanel workspace={workspace} />
             </div>
           )}
         </TabPanel>

@@ -177,6 +177,7 @@ function CrewWorkerCard({ worker }: { worker: CrewWorkerState }) {
 export function CrewRun({
   request,
   resume,
+  onBusy,
 }: {
   /** Start a run. Absent when `resume` is given — a transcript is read, never re-run. */
   request?: CrewRunInput;
@@ -187,6 +188,10 @@ export function CrewRun({
    *  expensive of the two — N workers, each with its own worktree — which makes it the worse half
    *  to lose. */
   resume?: OrchFrame[];
+  /** Told while this crew is in flight, so the console above can refuse to change mode under it.
+   *  Derived from the frames: a crew that finished, failed or was stopped releases the lock, and
+   *  only the stream knows which of those happened. */
+  onBusy?: (busy: boolean) => void;
 }) {
   const t = useT();
   const [state, dispatch] = useReducer(applyCrewFrame, EMPTY_CREW);
@@ -223,6 +228,10 @@ export function CrewRun({
 
   const running = isCrewRunning(state);
   const stop = useStop(state.runId ?? "", running);
+
+  useEffect(() => {
+    onBusy?.(running);
+  }, [running, onBusy]);
 
   return (
     <div className="space-y-4">

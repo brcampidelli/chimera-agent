@@ -1,9 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ListChecks, Loader2, Play, Square, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Panel } from "@/components/ui/panel";
 import { Switch } from "@/components/ui/switch";
 import { PausedRunCard } from "@/components/run/PausedRunCard";
 import { focusRing } from "@/components/ui/focus";
@@ -22,23 +21,34 @@ const fieldCls = "field w-full px-3 text-sm";
  * same thing — a task, an optional verify command, an attempt budget — and all drifting apart,
  * because the only thing holding them in sync was whoever remembered to edit all three.
  *
+ * Now there is one, and it no longer owns the task or the check either: those are the console's,
+ * shared with the three other ways the same task can be run. What is left here is what only a run
+ * means — how many attempts, who writes the patch, whether it stops when it reads something
+ * untrusted.
+ *
  * The form is local; the RUN is not. It lives in the shell's run session, so leaving this screen
  * no longer abandons it: come back and the progress is still here, and the Stop below is the same
  * Stop the status bar offers from every other screen.
  */
 export function RunLauncher({
-  variant = "panel",
+  task,
+  verify,
   workspace,
+  onBusy,
 }: {
-  variant?: "panel" | "inline";
-  /** Fixed workspace. When given, the field is hidden — Code already knows where it is working. */
-  workspace?: string;
+  /** The shared task and check, from the console above. */
+  task: string;
+  verify: string;
+  /** Where the run works. The console shows it; this screen no longer asks for it, because a
+   *  second folder field is a second answer to one question — and the field it used to show
+   *  offered "defaults to the app's workspace", which for an installed build is the install
+   *  directory and nobody's project. */
+  workspace: string;
+  onBusy?: (busy: boolean) => void;
 }) {
   const t = useT();
   const qc = useQueryClient();
   const run = useRunSession();
-  const [task, setTask] = useState("");
-  const [verify, setVerify] = useState("");
   // The plan the user has read, and possibly rewritten. Empty means "plan for yourself", which is
   // what every run did before this and still does when nobody asks to see it first.
   const [plan, setPlan] = useState("");
@@ -61,7 +71,6 @@ export function RunLauncher({
   const [genTests, setGenTests] = useState(false);
   const [replan, setReplan] = useState(false);
   const [requireDiff, setRequireDiff] = useState(false);
-  const [ws, setWs] = useState("");
   const [maxAttempts, setMaxAttempts] = useState(3);
   const [pauseOnTaint, setPauseOnTaint] = useState(false);
   // Who does what. `touched` is not decoration: `worth.py` groups evidence by
@@ -77,6 +86,13 @@ export function RunLauncher({
   const parked = useQuery({ queryKey: ["runs", "paused"], queryFn: getPausedRuns });
 
   const running = run.running;
+
+  // The shell's run session is global, so this is true for a run started from the Code screen's
+  // hand-off too — and correctly so: the stream and the Stop below are that run's, on this screen.
+  useEffect(() => {
+    onBusy?.(running);
+  }, [running, onBusy]);
+
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ["runs"] });
   };
@@ -85,7 +101,7 @@ export function RunLauncher({
   const request = (threadId: string | null) => ({
     task: task.trim(),
     verify: verify.trim() || null,
-    workspace: workspace ?? (ws.trim() || null),
+    workspace: workspace || null,
     max_attempts: maxAttempts,
     thread_id: threadId,
     pause_on_taint: pauseOnTaint,
@@ -142,7 +158,7 @@ export function RunLauncher({
       // first rejection, so a checklist call that fell over discarded a perfectly good plan and
       // reported the PLAN as failed — a broken half reporting the working half as broken.
       const [p, r] = await Promise.allSettled([
-        getPlan(task.trim(), workspace ?? (ws.trim() || null)),
+        getPlan(task.trim(), workspace || null),
         getRequirements(task.trim()),
       ]);
       // Neither half is trusted to have the shape its type promises. `allSettled` reports a
@@ -195,16 +211,8 @@ export function RunLauncher({
   if (run.done) lines.push(run.done.success ? t("runs.doneOk") : t("runs.doneFail"));
   else if (run.broken) lines.push(t("runs.doneFail"));
 
-  const body = (
-    <div className={cn("space-y-2.5", variant === "panel" && "px-4 py-3")}>
-      <textarea
-        className={cn(fieldCls, "min-h-[72px] resize-y py-2")}
-        placeholder={t("runs.taskPlaceholder")}
-        aria-label={t("runs.taskPlaceholder")}
-        value={task}
-        onChange={(e) => setTask(e.target.value)}
-        disabled={running}
-      />
+  return (
+    <div className="space-y-2.5">
       {planOpen ? (
         <div className="space-y-1.5 rounded-chip border border-accent/40 bg-accent/5 p-2">
           <div className="flex items-center justify-between gap-2">
@@ -310,24 +318,6 @@ export function RunLauncher({
           ) : null}
         </div>
       ) : null}
-      <input
-        className={cn(fieldCls, "h-9 font-mono text-xs")}
-        placeholder={t("runs.verifyPlaceholder")}
-        aria-label={t("runs.verifyPlaceholder")}
-        value={verify}
-        onChange={(e) => setVerify(e.target.value)}
-        disabled={running}
-      />
-      {workspace === undefined && (
-        <input
-          className={cn(fieldCls, "h-9 font-mono text-xs")}
-          placeholder={t("runs.workspacePlaceholder")}
-          aria-label={t("runs.workspacePlaceholder")}
-          value={ws}
-          onChange={(e) => setWs(e.target.value)}
-          disabled={running}
-        />
-      )}
       {/* Beside the attempt budget rather than behind a settings screen: which model writes the
           patch is a property of THIS run, and the receipt it produces is grouped by it. */}
       <div className="border-t border-hairline pt-3">
@@ -479,8 +469,6 @@ export function RunLauncher({
       ))}
     </div>
   );
-
-  return variant === "panel" ? <Panel title={t("runs.new")}>{body}</Panel> : body;
 }
 
 /** The live progress of a run. Separate so Code can show it in its own column. */

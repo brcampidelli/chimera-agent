@@ -2,8 +2,8 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { Runs } from "@/components/Runs";
-import { getRuns, streamRun } from "@/lib/api";
+import { TaskConsole } from "@/components/work/TaskConsole";
+import { streamRun } from "@/lib/api";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", async () => (await import("@/test/code-api-mock")).makeCodeApiMock());
@@ -19,13 +19,12 @@ vi.mock("@/lib/api", async () => (await import("@/test/code-api-mock")).makeCode
  */
 describe("starting a run", () => {
   beforeEach(() => {
-    vi.mocked(getRuns).mockResolvedValue([]);
     vi.mocked(streamRun).mockImplementation(async () => {});
   });
 
   it("says the profile came from the system, because no screen asks", async () => {
     const user = userEvent.setup();
-    renderWithProviders(<Runs workspace="/repo" />);
+    renderWithProviders(<TaskConsole workspace="/repo" onOpenCode={() => {}} />);
 
     await user.type(await screen.findByLabelText(/task/i), "fix the loader");
     await user.click(screen.getByRole("button", { name: /^run$/i }));
