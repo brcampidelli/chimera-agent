@@ -518,6 +518,24 @@ def assemble_registry(
     # explorer below documents about itself, only more so. Deferral takes the servers' N names out
     # of the registry, so the restriction filter has nothing left to match: a denylist naming an MCP
     # tool would silently stop removing it while one proxy could still reach every one of them.
+    # Before the MCP deferral, and deliberately: this one only ever moves BUILT-IN tools, and the
+    # MCP proxies are registered after the filter for their own reasons. Running it second would
+    # sweep `mcp_list`/`mcp_describe`/`mcp_call` into the deferred set — a proxy behind a proxy,
+    # costing a round trip to reach a round trip.
+    if settings.defer_tools:
+        from chimera.tools.defer import defer_builtins
+
+        # The lists travel with it for the reason the MCP block below states: after deferral the
+        # names are gone from the registry, so the filter that already ran cannot match them, and a
+        # denylist would keep reporting success while `tool_call` still reached the tool.
+        registry, _ = defer_builtins(
+            registry,
+            denied=frozenset(denied),
+            # The DEPLOYMENT ceiling only, never the request's own list — a caller may narrow
+            # itself and may not raise an owner's ceiling.
+            allowed=frozenset(settings.tool_allowlist) if settings.tool_allowlist else None,
+        )
+
     if pool is not None and settings.mcp_defer:
         from chimera.integrations.mcp_defer import register_deferred_mcp
 

@@ -12,9 +12,9 @@ import os
 from collections.abc import Iterable
 from functools import lru_cache
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Any
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 # stdlib logging rather than `chimera.telemetry.get_logger`: telemetry reads settings, so importing
@@ -82,6 +82,39 @@ class Settings(BaseSettings):
         extra="ignore",
         case_sensitive=False,
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _empty_boolean_is_unset(cls, data: Any) -> Any:
+        """`CHIMERA_GUARD_CHAT=` must not stop the app from starting.
+
+        Writing `VAR=` is how a line gets turned off without being deleted, it is what `export VAR=`
+        leaves behind, and this repository's own `.env` ships with `OPENROUTER_API_KEY=` empty. Every
+        one of the twenty-six boolean settings raised on it — and the failure was total (no CLI, no
+        API, no desktop sidecar) with a pydantic traceback naming a type instead of a sentence naming
+        the line to fix.
+
+        An empty value is the absence of a value, and the absence of a value is what a default is
+        for. Dropping the key rather than coercing to `False` is the whole of the care here: `False`
+        would silently switch off every setting that defaults ON, a security posture among them, for
+        anybody who left a blank line in their `.env`.
+
+        **Booleans only.** For a string `""` can be a real answer — an empty allowlist is not the
+        same as no allowlist — so sweeping every empty value into "unset" would change what those
+        mean in order to fix a type that has no empty case at all.
+        """
+        if not isinstance(data, dict):
+            return data
+        booleanos = {
+            str(campo.validation_alias or nome).lower()
+            for nome, campo in cls.model_fields.items()
+            if campo.annotation is bool
+        }
+        return {
+            chave: valor
+            for chave, valor in data.items()
+            if not (str(chave).lower() in booleanos and isinstance(valor, str) and not valor.strip())
+        }
 
     # --- Provider keys (each optional; LiteLLM also reads these directly) ---
     openrouter_api_key: str | None = Field(default=None, validation_alias="OPENROUTER_API_KEY")
@@ -275,6 +308,20 @@ class Settings(BaseSettings):
     # than one handed the list. `chimera.integrations.mcp_defer.describe_saving` reports the first
     # half on your own servers; until the second half is measured here, this stays a choice.
     mcp_defer: bool = Field(default=False, validation_alias="CHIMERA_MCP_DEFER")
+
+    # --- The same shape for the BUILT-IN tools, which are the larger half of the bill.
+    #
+    # Twenty-two schemas go out on every step: ~3,205 tokens before the user types. Measured on 28
+    # sessions of an installed 0.48.0 (33 tool calls), four tools did all of it — read_file,
+    # write_file, list_dir, edit_file — and the eighteen never called were 86% of the schema.
+    #
+    # `chimera.tools.defer.CORE` is declared in full regardless, so the tools that observed use
+    # actually reaches are never behind a lookup, and the saving comes from schemas the model did not
+    # ask for. OFF by default for the reason above it: selection accuracy is still the unmeasured
+    # half, and this project has rules against turning something on by conviction.
+    # `chimera.tools.defer.describe_saving` reports the measured half on your own registry — and can
+    # report a LOSS, which below a handful of tools it truthfully is.
+    defer_tools: bool = Field(default=False, validation_alias="CHIMERA_DEFER_TOOLS")
 
     # --- Auto-fuse error-sensitive turns in solve/crew without an explicit --fuse.
     # Off by default (fusion costs 2-3x); when on, the cost-aware router still keeps
