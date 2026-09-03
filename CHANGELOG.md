@@ -4,6 +4,34 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- **An app left open never learned about a release.** The update check ran once, at launch, and
+  never again — which is a check this app in particular never gets to make, because it is a working
+  tool that stays open. Measured on 2026-09-02: a user sat on 0.49.0 with 0.49.1 published, was
+  offered nothing, and fetched the installer from the website by hand.
+
+  It looks again every six hours now, for as long as the app runs.
+
+  **Two things made it worse, and both are worth naming.** The tray's *Check for updates* — shipped
+  in 0.49.0 as "the way to ask" — sits behind the hidden-icons chevron on a default Windows install,
+  which was never measured before recommending it. And the `--latest=false` fix widened the period
+  in which a launch finds nothing, from the instant of publication to the whole twenty-five minute
+  build. That fix is right, and it made the single launch-time check likelier to land in the gap.
+
+  Checking every six hours would mean *asking* every six hours, which is the nagging the automatic
+  path has always avoided — so declining an update remembers that version for the life of the
+  process. A newer one asks again, which falls out of comparing rather than needing a rule. A check
+  you asked for by clicking the menu item always asks: answering "you already declined that" to
+  somebody who just requested it would be refusing what they asked for.
+
+  That rule is a function, tested with assertions rather than by reading — and one of the eight
+  sabotages found that nothing asserted it was *wired*: deleting the line that remembers the
+  decision left every other assertion passing, which is a rule that holds in the abstract while the
+  dialog asks again in six hours.
+
 ## [0.49.1] - 2026-09-02
 
 ### Fixed
