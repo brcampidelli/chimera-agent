@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Any
 
 from chimera.config import Settings
 
@@ -40,14 +41,27 @@ def _ativas() -> dict[str, str]:
     return fora
 
 
+def _declarado(campo: str) -> Any:
+    """The default the CODE declares, not what this process happens to be configured with.
+
+    `Settings()` reads the environment, and under the full suite some earlier test has exported a
+    `CHIMERA_*` — so an instance answers "what is in force here", which is a different question and
+    made this test pass alone and fail in the suite. The example file is compared against what the
+    code ships, so the field default is the right reading either way.
+    """
+    campo_info = Settings.model_fields[campo]
+    if campo_info.default_factory is not None:
+        return campo_info.default_factory()
+    return campo_info.default
+
+
 def test_the_example_config_agrees_with_the_code() -> None:
-    s = Settings()
     ativas = _ativas()
     esperado = {
-        "CHIMERA_DEFAULT_MODEL": s.default_model,
-        "CHIMERA_FUSION_PANEL": ",".join(s.fusion_panel),
-        "CHIMERA_FUSION_JUDGE": s.fusion_judge,
-        "CHIMERA_FUSION_SYNTHESIZER": s.fusion_synthesizer,
+        "CHIMERA_DEFAULT_MODEL": _declarado("default_model"),
+        "CHIMERA_FUSION_PANEL": ",".join(_declarado("fusion_panel")),
+        "CHIMERA_FUSION_JUDGE": _declarado("fusion_judge"),
+        "CHIMERA_FUSION_SYNTHESIZER": _declarado("fusion_synthesizer"),
     }
     divergentes = {
         k: (ativas[k], v) for k, v in esperado.items() if k in ativas and ativas[k] != v
