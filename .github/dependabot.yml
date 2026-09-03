@@ -7,6 +7,13 @@
 #
 # Grouped by ecosystem and batched weekly: an unbatched dependabot on three ecosystems opens enough
 # PRs to train maintainers to rubber-stamp them, which is worse than not running it.
+#
+# Majors are NOT grouped, and that is the point of `update-types` below. Grouping them with patches
+# produced one weekly PR that could not be merged and could not be split: twelve dev packages at
+# once, carrying Tailwind 3->4, TypeScript 5->7, Vite 6->8 and Vitest 3->4. Each of those is a
+# migration; together they are a rewrite nobody reviews. The batched PR is now patches and minors —
+# safe to read and merge in one sitting — and every major arrives on its own, where it can be
+# migrated and tested by itself.
 version: 2
 updates:
   - package-ecosystem: "pip"
@@ -18,8 +25,10 @@ updates:
     groups:
       python-dev:
         dependency-type: "development"
+        update-types: ["minor", "patch"]
       python-runtime:
         dependency-type: "production"
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -30,6 +39,7 @@ updates:
     groups:
       actions:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   # The desktop app ships in the [desktop] extra, so its npm tree is part of what users install.
   - package-ecosystem: "npm"
@@ -41,5 +51,7 @@ updates:
     groups:
       npm-dev:
         dependency-type: "development"
+        update-types: ["minor", "patch"]
       npm-runtime:
         dependency-type: "production"
+        update-types: ["minor", "patch"]
