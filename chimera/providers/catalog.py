@@ -89,6 +89,16 @@ CATALOG: tuple[CatalogEntry, ...] = (
     ),
     # --- mid: the daily workhorses. Reliable tools, cents per task. ---
     CatalogEntry(
+        "openrouter/deepseek/deepseek-v4-flash-0731", "mid", "DeepSeek",
+        0.065, 0.18, tools=True, context_k=1310,
+        notes="the product default and the fusion judge since 2026-09-03. Same vendor as the chat-v3.1 it replaced, at 0.065/0.18 against 0.25/0.95 (3.8x cheaper in, 5.3x out) with eight times the window. Wrote a file on the first ask in a live probe, in 72s",
+    ),
+    CatalogEntry(
+        "openrouter/z-ai/glm-5.3-flash", "mid", "Zhipu (GLM)",
+        0.075, 0.25, tools=True, context_k=1310,
+        notes="the best price-to-index here by a distance: 0.075/0.25 with a third-party agentic index of 58.2, within a point of claude-opus-5 at 66x the input price. NOT the default, and the reason is measured: on the same one-file probe it took 257s against 72s for the slug above. Reach for it when the window or the index matters more than latency",
+    ),
+    CatalogEntry(
         "openrouter/deepseek/deepseek-chat-v3.1", "mid", "DeepSeek",
         0.25, 0.95, tools=True, context_k=163,
         notes="proven in this repo's benches; the product default. Priced 0.55/1.65 here until a\n        live check on 2026-09-03 measured 0.25/0.95",
@@ -115,6 +125,11 @@ CATALOG: tuple[CatalogEntry, ...] = (
     ),
     # --- top: orchestrator/judge class. Decompose, adjudicate, synthesize. ---
     CatalogEntry(
+        "openrouter/z-ai/glm-5.3", "top", "Zhipu (GLM)",
+        1.40, 4.40, tools=True, context_k=1310,
+        notes="the top rung of `balanced` and `auto` since 2026-09-03, and the reason is the slug below rather than this one: R1 carried a 64k window into a tier that asks for 100k. This has 1310k, a third-party agentic index of 59.1 against R1's 3.1, and wrote a file in 51s against R1's 209s. It costs twice as much per token and buys a working top tier",
+    ),
+    CatalogEntry(
         "openrouter/deepseek/deepseek-r1", "top", "DeepSeek",
         0.70, 2.50, tools=True, context_k=64,
         notes="economic reasoner; the default economic orchestrator. Note the SMALL window",
@@ -128,6 +143,11 @@ CATALOG: tuple[CatalogEntry, ...] = (
         "openrouter/openai/gpt-5.5", "top", "OpenAI",
         5.00, 30.00, tools=True, context_k=1050,
         notes="frontier; this repo's default_model until 2026-08-18, and the reason it changed",
+    ),
+    CatalogEntry(
+        "openrouter/google/gemini-3.8-flash", "top", "Google",
+        0.75, 3.75, tools=True, context_k=1048,
+        notes="the Google seat on the default fusion panel since 2026-09-03, replacing the -preview slug below there. A -preview in a DEFAULT is a default that can be withdrawn without notice, and there is no stable Gemini 3.x pro to move to: only the flash line ships non-preview. Cheaper (0.75/3.75 against 2.00/12.00) AND the better third-party agentic index (50 against 23)",
     ),
     CatalogEntry(
         "openrouter/google/gemini-3.1-pro-preview", "top", "Google",
@@ -188,7 +208,7 @@ PROVIDERS: tuple[ProviderInfo, ...] = (
     ProviderInfo(
         "OPENROUTER_API_KEY",
         "OpenRouter",
-        "openrouter/deepseek/deepseek-chat-v3.1",
+        "openrouter/deepseek/deepseek-v4-flash-0731",
         "https://openrouter.ai/keys",
     ),
     # gpt-5.6-sol, via its documented alias; same $5/$30 as the 5.5 it replaces.
@@ -276,24 +296,24 @@ class TierLadder:
 _PRESETS: dict[CostMode, TierLadder] = {
     "cheap": TierLadder(
         weak="openrouter/mistralai/mistral-small-3.2-24b-instruct",
-        mid="openrouter/deepseek/deepseek-chat-v3.1",
-        top="openrouter/deepseek/deepseek-chat-v3.1",  # never pay reasoner rates
+        mid="openrouter/deepseek/deepseek-v4-flash-0731",
+        top="openrouter/deepseek/deepseek-v4-flash-0731",  # never pay reasoner rates
         entry="weak",
     ),
     "balanced": TierLadder(
         weak="openrouter/mistralai/mistral-small-3.2-24b-instruct",
-        mid="openrouter/deepseek/deepseek-chat-v3.1",
-        top="openrouter/deepseek/deepseek-r1",
+        mid="openrouter/deepseek/deepseek-v4-flash-0731",
+        top="openrouter/z-ai/glm-5.3",
         entry="weak",
     ),
     "auto": TierLadder(
         weak="openrouter/mistralai/mistral-small-3.2-24b-instruct",
-        mid="openrouter/deepseek/deepseek-chat-v3.1",
-        top="openrouter/deepseek/deepseek-r1",
+        mid="openrouter/deepseek/deepseek-v4-flash-0731",
+        top="openrouter/z-ai/glm-5.3",
         entry="mid",
     ),
     "premium": TierLadder(
-        weak="openrouter/deepseek/deepseek-chat-v3.1",
+        weak="openrouter/deepseek/deepseek-v4-flash-0731",
         mid="openrouter/openai/gpt-5.5",
         top="openrouter/anthropic/claude-opus-5",
         entry="mid",

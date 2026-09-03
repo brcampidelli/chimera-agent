@@ -6,6 +6,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **The shipped model defaults were a generation behind, and one of them could be withdrawn without
+  notice.** Surveyed against the live OpenRouter index on 2026-09-03 and changed on the measurements
+  below. Nothing is removed from the catalogue — what changes is which entry is the DEFAULT.
+
+  | role | was | is | why |
+  |---|---|---|---|
+  | `default_model`, mid rung | `deepseek-chat-v3.1` 0.25/0.95 | `deepseek-v4-flash-0731` 0.065/0.18 | 3.8x cheaper in, 5.3x out, 8x the window, same vendor |
+  | top rung (`balanced`, `auto`) | `deepseek-r1` 0.70/2.50 | `z-ai/glm-5.3` 1.40/4.40 | R1 carried a **64k** window into a tier that asks for 100k |
+  | `fusion_judge` | `deepseek-r1` | `deepseek-v4-flash-0731` | same window problem, and it judges what the panel wrote |
+  | fusion panel, Google seat | `gemini-3.1-pro-preview` | `gemini-3.8-flash` | a `-preview` in a default; also cheaper AND the better index |
+
+  R1 is the clearest case and it was in two roles. Third-party agentic index **3.1** — the lowest of
+  any candidate examined, tied with a 20B model in the *weak* tier — and on a trivial write-a-file
+  probe it took **209s** against 29s for the then-default and 51s for the model that replaced it.
+
+  **The probe that was supposed to decide this did not decide it, and that is worth stating.** The
+  write-a-file smoke test exists because a model in an earlier session described an HTML file instead
+  of writing it and burned US$ 1.50 delivering nothing. Run across eight candidates, **8 of 8 wrote
+  the file** — so it rules out catastrophic tool-calling failure and separates nothing. One candidate
+  appeared to fail and turned out to be a transient: retried three times, it wrote in 4.6-9.5s, the
+  fastest of the set. The swap therefore rests on price, context window, a third-party index and
+  latency — all measured, none of them a claim about output quality, which was not measured.
+
+  `glm-5.3-flash` is the striking number and is deliberately **not** the default: 0.075/0.25 with an
+  agentic index of 58.2, within a point of `claude-opus-5` at 66x the input price — and 257s on the
+  same one-file probe, against 72s for the slug that took the role. It is in the catalogue with that
+  written beside it.
+
+  The weak tier does not move. `mistral-small-3.2` is the fastest thing measured here and the only
+  one with validation inside this repo.
+
 ### Fixed
 
 - **The skill install error blamed a limit that was not the one that bit.** Installing from the
