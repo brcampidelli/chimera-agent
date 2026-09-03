@@ -146,12 +146,19 @@ def govern_step(
     # module's docstring reached neither list. `GovernedTool` now writes them to `refused` — the
     # `ledger=` below is what lets it — and the price of enforcement is `granted` (would start
     # refusing) plus `refused` (already refusing, in every mode).
+    # Why no approver can say yes, for the refusal to name. "" means one genuinely can, so a
+    # decline is a decline; the two values below are the cases where retrying cannot change the
+    # answer, and the refusal has to say so instead of inviting a retry that costs money.
+    no_approver = ""
     if resolved == "observe":
         approver_name = "allow"
         approve = allow_everything(approvals)
     else:
         wanted = settings.approval_mode
+        if wanted == "deny":
+            no_approver = "owner_denies"
         if not attended and wanted == "ask":
+            no_approver = "unattended"
             # `deny` is what `approver_for` picks for itself once it finds no terminal; this reaches
             # the same fail-closed answer one step earlier, before a tty that belongs to somebody
             # else can be mistaken for the requester.
@@ -164,6 +171,7 @@ def govern_step(
         TrustKernel(audit=audit, audit_allows=audit_allows),
         approve=approve,
         ledger=approvals,
+        no_approver=no_approver,
     )
     # One line per assembly, and the only place the deployment's mode is written where a reader can
     # find it. Two holes close here.

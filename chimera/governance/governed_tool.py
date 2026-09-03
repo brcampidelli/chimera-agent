@@ -194,10 +194,22 @@ class GovernedTool(Tool):
         approve: ApproveFn | None = None,
         context: ContextFn | None = None,
         ledger: ApprovalLedger | None = None,
+        no_approver: str = "",
     ) -> None:
         self.inner = inner
         self.kernel = kernel
         self.approve = approve
+        # WHY no approver can say yes here, or "" when one genuinely can. Two situations produce the
+        # same refusal and need different sentences: an approver was asked and declined, and no
+        # approver could be asked at all. Only the assembly knows which — `profile.py` is where the
+        # unattended surface turns `ask` into `deny` — so it is passed in rather than guessed.
+        #
+        # Measured, and this is what it cost: a run reading a data catalogue over MCP tainted itself,
+        # every write then needed approval, and on an HTTP surface nothing can approve. The agent was
+        # told "nobody approved it", retried, spent its whole budget, and reported the environment as
+        # broken. Four runs, US$ 5.11, nothing written. The identical task without the MCP delivered
+        # in 236 seconds for US$ 0.37. The refusal was correct every time and named none of it.
+        self.no_approver = no_approver
         # Where a BLOCK gets written down. Deliberately NOT the approver: `observe`'s approver says
         # yes to everything, so routing a BLOCK through it would either record a grant that did not
         # happen or turn `rm -rf /` into an execution. What a BLOCK needs is the ledger's `record`,
@@ -251,9 +263,34 @@ class GovernedTool(Tool):
             approved = self.approve(verdict, action) if self.approve else False
             if not approved:
                 return refusal(f"[governance: needs review — {verdict.reason}] "
-                               f"The tool did NOT run and nobody approved it. Do not "
+                               f"The tool did NOT run. {self._why_nobody_approved()} Do not "
                                f"report this as done.")
         return self.inner.run(**kwargs)
+
+    def _why_nobody_approved(self) -> str:
+        """The sentence after "the tool did NOT run" — different per reason, because the fixes are.
+
+        "Nobody approved it" is true in all three cases and actionable in none. Retrying is the only
+        thing it suggests, and retrying is the one thing that cannot work when no approver exists:
+        the answer is structurally the same every time, so a three-attempt budget buys three
+        identical refusals and a bill.
+        """
+        if self.no_approver == "unattended":
+            return (
+                "Nobody could be asked: this request arrived over the API, where the only terminal "
+                "belongs to somebody who did not make it and cannot consent for whoever did. "
+                "Retrying will be refused identically. To let this through, start the run with "
+                "pause-on-taint — in the app, 'pause for my approval if the run reads untrusted "
+                "content' — which parks it for a verdict instead of refusing it. Or keep untrusted "
+                "content out of the run: reading data through an MCP server taints it, and the same "
+                "read done with the built-in tools does not."
+            )
+        if self.no_approver == "owner_denies":
+            return (
+                "Nobody was asked: this deployment sets approvals to deny, so a review is a refusal "
+                "by configuration. Retrying will be refused identically."
+            )
+        return "Nobody approved it."
 
     def _context(self) -> str:
         """The current task, or ``""``. Never raises: a broken provider must not block a tool.
@@ -277,6 +314,7 @@ def govern_registry(
     approve: ApproveFn | None = None,
     context: ContextFn | None = None,
     ledger: ApprovalLedger | None = None,
+    no_approver: str = "",
 ) -> ToolRegistry:
     """Return a new registry with every tool wrapped in a :class:`GovernedTool`.
 
@@ -287,6 +325,9 @@ def govern_registry(
     governed = ToolRegistry()
     for tool in registry.tools():
         governed.register(
-            GovernedTool(tool, kernel, approve=approve, context=context, ledger=ledger)
+            GovernedTool(
+                tool, kernel, approve=approve, context=context, ledger=ledger,
+                no_approver=no_approver,
+            )
         )
     return governed
