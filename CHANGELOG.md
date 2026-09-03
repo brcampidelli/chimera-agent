@@ -45,6 +45,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   globs, and when a declared pattern looks absolute names that pattern and what to write instead. A
   path resolving outside the workspace and one hitting `ALWAYS_DENIED` get their own messages,
   because those have different remedies and pointing at the region would send the reader nowhere.
+- **A run that read data over MCP could not write a file, and nothing said why.** Measured: four
+  runs of the same task, **US$ 5.11, not one file written.** The identical task reading the same
+  catalogue with the built-in tools instead delivered on the first pass, in 236 seconds, for
+  **US$ 0.37**.
+
+  The mechanism is correct at every step. MCP output is untrusted content, so reading it taints the
+  run; a tainted write needs human approval; and on an HTTP surface `approver_for("ask")` finds no
+  terminal and degrades to deny — because whoever is looking at the console did not make the request
+  and cannot consent for whoever did.
+
+  What was wrong is that the refusal said *"the tool did NOT run and nobody approved it"*. That
+  sentence is true when a person was asked and declined, true when the owner configured deny, and
+  true when **no approver could exist at all** — three situations with three different fixes, and
+  the only thing it suggests is retrying. Retrying is the one thing that cannot work in the third
+  case: the answer is structurally identical every time, so a three-attempt budget buys three
+  identical refusals and a bill.
+
+  Each case now gets its own sentence. The unattended one says nobody *could* be asked, says why the
+  console cannot consent, says retrying will be refused identically, and names both ways out — the
+  pause-for-approval switch that parks the run for a verdict (quoted as it is labelled on the
+  screen), and keeping untrusted content out of the run in the first place. A configured deny says
+  so and does **not** offer the pause switch, which cannot release it. A human who declined keeps
+  the plain sentence, because they may well approve the next one.
+
 - **The MCP Test button proved the server and said nothing about the agent.** A SQLite server was
   registered, Test connected, answered *ok* and listed all four of its tools by name. The run that
   followed made **twenty-two tool calls over nineteen minutes and not one of them was from that
