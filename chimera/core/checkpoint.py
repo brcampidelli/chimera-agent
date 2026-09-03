@@ -22,6 +22,7 @@ them. Leftover junk is recoverable; deleting a developer's tracked files is not.
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -52,6 +53,36 @@ class FileSnapshot:
 
     files: dict[str, str] = field(default_factory=dict)
     present: set[str] = field(default_factory=set)
+
+
+def fingerprint(snap: FileSnapshot) -> str:
+    """A stable digest of everything a snapshot captured — content AND presence.
+
+    Exists so a receipt can be checked rather than believed. A run reported ``verified: True`` with
+    the verifier's own output showing ``Ran 20 tests ... OK``, and the tree it left on disk failed
+    all twenty, deterministically: the diff the receipt stored contained one line the delivered file
+    did not have. Something wrote after the moment the verdict describes.
+
+    Comparing two of these answers "is what was delivered still what was verified?" without needing
+    to know which step wrote afterwards — which is the point. A guard that requires you to have
+    already found the culprit is not a guard.
+
+    Presence is in the digest and not only content: a file that appears or disappears changes what
+    the verify command would do, and a digest over content alone would call that no change. Binary
+    and unreadable files are in ``present`` without content (see :meth:`WorkspaceGuard.snapshot`),
+    so they are covered by presence and not by their bytes — a limit worth knowing rather than
+    hiding, and it matches exactly what the snapshot could see in the first place.
+    """
+    h = hashlib.sha256()
+    for rel in sorted(snap.present):
+        h.update(rel.encode("utf-8"))
+        h.update(b"\x00")
+        conteudo = snap.files.get(rel)
+        # A file present-but-unread is distinguished from one that is present and empty. Hashing
+        # both as b"" would make replacing a text file with a binary of the same name invisible.
+        h.update(b"?" if conteudo is None else hashlib.sha256(conteudo.encode("utf-8")).digest())
+        h.update(b"\x00")
+    return h.hexdigest()
 
 
 class WorkspaceGuard:

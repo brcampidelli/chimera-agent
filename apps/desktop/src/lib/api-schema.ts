@@ -4909,6 +4909,10 @@ export interface components {
             error: string | null;
             /** Ok */
             ok: boolean;
+            /** Reaches Agent */
+            reaches_agent?: boolean | null;
+            /** Reaches Agent Reason */
+            reaches_agent_reason?: string | null;
             /** Tools */
             tools: components["schemas"]["McpToolOut"][];
         };
@@ -5610,6 +5614,8 @@ export interface components {
             answer: string;
             /** Attempts */
             attempts: components["schemas"]["AttemptReceiptOut"][];
+            /** Delivered Matches Verified */
+            delivered_matches_verified?: boolean | null;
             /** Paused */
             paused: boolean;
             /**

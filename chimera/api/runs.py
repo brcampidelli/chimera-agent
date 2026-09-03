@@ -54,6 +54,10 @@ class AttemptReceipt(BaseModel):
 
     index: int = 0
     verified: bool = False
+    #: Digest of the tree at the moment this verdict was given, or "" when nothing captured it.
+    #: Kept so ``delivered_matches_verified`` on the run can be recomputed later by a reader, rather
+    #: than only believed — the whole point of the field is that a claim be checkable.
+    verified_fingerprint: str = ""
     reverted: bool = False
     success: bool = False
     verify_output: str = ""  # the concrete verifier output (test/assert), truncated in the builder
@@ -122,6 +126,19 @@ class RunReceipt(BaseModel):
     was the only way to supply one."""
     answer: str = ""  # the final answer, truncated in the builder
 
+    delivered_matches_verified: bool | None = None
+    """Is the tree on disk still the one the winning attempt's verdict was about?
+
+    ``verified`` is a statement about an instant; this row is read as a statement about the
+    delivery, and those came apart in a measured run — the receipt said ``verified: True`` with
+    ``Ran 20 tests ... OK`` stored beside it, and the delivered tree failed all twenty on every one
+    of twenty executions, because a line present in the stored diff was missing from the file.
+
+    ``None`` means not checkable (no successful attempt, no workspace guard, or a row written before
+    the check existed) and is deliberately not ``True``: "we did not look" and "we looked and it
+    matched" are different claims, and defaulting to the stronger one would stamp it on every old
+    row in the file."""
+
     stopped_reason: str = ""
     """Why the loop stopped: ``final`` | ``max_steps`` | ``tool_loop`` | ``budget`` | ``spend`` |
     ``cancelled``.
@@ -183,6 +200,7 @@ def build_receipt(
     verify_source: str = "user",
     profile_source: str = "user",
     workspace: str = "",
+    delivered_matches_verified: bool | None = None,
 ) -> RunReceipt:
     """Map an ``AutonomousResult`` (and its attempts) into a receipt, truncating the bounded fields."""
     attempts = [
@@ -218,6 +236,7 @@ def build_receipt(
             completion_tokens=int(getattr(a, "completion_tokens", 0) or 0),
             model=str(getattr(a, "model", "") or ""),
             discarded_at=str(getattr(a, "discarded_at", "") or ""),
+            verified_fingerprint=str(getattr(a, "verified_fingerprint", "") or ""),
         )
         for a in result.attempts
     ]
@@ -238,6 +257,7 @@ def build_receipt(
         profile=profile,
         workspace=workspace,
         usd=total_usd(attempts),
+        delivered_matches_verified=delivered_matches_verified,
     )
 
 
