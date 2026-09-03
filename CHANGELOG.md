@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.49.1] - 2026-09-02
 
 ### Fixed
 
@@ -21,10 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   The rest of the class was checked rather than assumed: every other `Select` on the Settings
   screen already passes `render=`, and the one that does not (`json` / `sqlite`) is naming file
   formats, which is the same deliberate call that leaves `docker` untranslated beside it.
-
-## [0.49.1] - 2026-09-02
-
-### Fixed
 
 - **A freshly updated app reported the version it used to be.** Measured on a real machine
   immediately after a real in-place update from 0.48.0 to 0.49.0: `chimera-desktop.exe` was 0.49.0
