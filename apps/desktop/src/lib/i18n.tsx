@@ -553,6 +553,8 @@ const en: Dict = {
   "runs.empty":
     'No runs yet — start one on the Task tab, or run `chimera solve "…" --verify "…"` from the CLI.',
   "runs.passed": "passed",
+  "runs.deliveryMoved": "files changed after",
+  "runs.deliveryMoved.why": "The verdict was true when it was given. The files on disk are no longer the ones it was about.",
   "runs.failed": "failed",
   "runs.paused": "paused",
   "runs.verifyCmd": "Verify",
@@ -1113,6 +1115,8 @@ const en: Dict = {
   "mcp.testFailed": "The test connect failed.",
   "mcp.connected": "connected · {n} tools",
   "mcp.toolsExposed": "{n} tools exposed",
+  "mcp.reach.autoloadOff": "Works, but no run can use it yet — loading MCP servers at start is off.",
+  "mcp.reach.addedAfterConnect": "Works, but it arrived after the servers connected — restart the app.",
   "mcp.autoloadOff":
     "Autoload is off — configured servers are saved but not loaded into the agent. Turn on MCP autoload in Settings (needs a restart) to make their tools callable. Test proves a server is live either way.",
   "mcp.note":
@@ -1836,6 +1840,8 @@ const pt: Dict = {
   "runs.empty":
     'Nenhuma execução ainda — inicie uma na aba Tarefa, ou rode `chimera solve "…" --verify "…"` pelo CLI.',
   "runs.passed": "aprovada",
+  "runs.deliveryMoved": "arquivos mudaram depois",
+  "runs.deliveryMoved.why": "O veredito era verdadeiro quando foi dado. Os arquivos em disco já não são os que ele julgou.",
   "runs.failed": "falhou",
   "runs.paused": "pausada",
   "runs.verifyCmd": "Verificação",
@@ -2401,6 +2407,8 @@ const pt: Dict = {
   "mcp.testFailed": "A conexão de teste falhou.",
   "mcp.connected": "conectado · {n} ferramentas",
   "mcp.toolsExposed": "{n} ferramentas expostas",
+  "mcp.reach.autoloadOff": "Funciona, mas nenhuma execução pode usar ainda — carregar servidores MCP no início está desligado.",
+  "mcp.reach.addedAfterConnect": "Funciona, mas entrou depois que os servidores conectaram — reinicie o aplicativo.",
   "mcp.autoloadOff":
     "O autoload está desligado — os servidores configurados são salvos, mas não carregados no agente. Ative o autoload de MCP nas Configurações (requer reinício) para tornar as ferramentas chamáveis. O Testar prova que um servidor está ativo de qualquer forma.",
   "mcp.note":
@@ -3131,6 +3139,8 @@ const es: Dict = {
   "runs.empty":
     'Aún no hay ejecuciones — inicia una en la pestaña Tarea, o ejecuta `chimera solve "…" --verify "…"` desde el CLI.',
   "runs.passed": "aprobada",
+  "runs.deliveryMoved": "archivos cambiaron después",
+  "runs.deliveryMoved.why": "El veredicto era cierto cuando se dio. Los archivos en disco ya no son los que juzgó.",
   "runs.failed": "fallida",
   "runs.paused": "pausada",
   "runs.verifyCmd": "Verificación",
@@ -3701,6 +3711,8 @@ const es: Dict = {
   "mcp.testFailed": "La conexión de prueba falló.",
   "mcp.connected": "conectado · {n} herramientas",
   "mcp.toolsExposed": "{n} herramientas expuestas",
+  "mcp.reach.autoloadOff": "Funciona, pero ninguna ejecución puede usarlo aún: cargar servidores MCP al inicio está desactivado.",
+  "mcp.reach.addedAfterConnect": "Funciona, pero se añadió después de conectar los servidores: reinicia la aplicación.",
   "mcp.autoloadOff":
     "El autoload está desactivado — los servidores configurados se guardan pero no se cargan en el agente. Activa el autoload de MCP en Ajustes (requiere reinicio) para que sus herramientas sean invocables. Probar demuestra que un servidor está activo en cualquier caso.",
   "mcp.note":
@@ -4436,6 +4448,8 @@ const fr: Dict = {
   "runs.empty":
     'Aucune exécution pour l\'instant — lancez-en une dans l\'onglet Tâche, ou exécutez `chimera solve "…" --verify "…"` depuis le CLI.',
   "runs.passed": "réussie",
+  "runs.deliveryMoved": "fichiers modifiés après",
+  "runs.deliveryMoved.why": "Le verdict était vrai au moment donné. Les fichiers sur le disque ne sont plus ceux qu'il jugeait.",
   "runs.failed": "échouée",
   "runs.paused": "en pause",
   "runs.verifyCmd": "Vérification",
@@ -5012,6 +5026,8 @@ const fr: Dict = {
   "mcp.testFailed": "La connexion de test a échoué.",
   "mcp.connected": "connecté · {n} outils",
   "mcp.toolsExposed": "{n} outils exposés",
+  "mcp.reach.autoloadOff": "Fonctionne, mais aucune exécution ne peut encore l'utiliser : le chargement des serveurs MCP au démarrage est désactivé.",
+  "mcp.reach.addedAfterConnect": "Fonctionne, mais ajouté après la connexion des serveurs : redémarrez l'application.",
   "mcp.autoloadOff":
     "L'autoload est désactivé — les serveurs configurés sont enregistrés mais pas chargés dans l'agent. Activez l'autoload MCP dans les Paramètres (nécessite un redémarrage) pour rendre leurs outils appelables. Tester prouve qu'un serveur est actif dans tous les cas.",
   "mcp.note":
@@ -5747,6 +5763,8 @@ const de: Dict = {
   "runs.empty":
     'Noch keine Läufe — starte einen im Tab Aufgabe, oder führe `chimera solve "…" --verify "…"` im CLI aus.',
   "runs.passed": "bestanden",
+  "runs.deliveryMoved": "Dateien danach geändert",
+  "runs.deliveryMoved.why": "Das Urteil war zum Zeitpunkt richtig. Die Dateien auf der Platte sind nicht mehr die beurteilten.",
   "runs.failed": "fehlgeschlagen",
   "runs.paused": "pausiert",
   "runs.verifyCmd": "Verifikation",
@@ -6324,6 +6342,8 @@ const de: Dict = {
   "mcp.testFailed": "Der Test-Verbindungsaufbau ist fehlgeschlagen.",
   "mcp.connected": "verbunden · {n} Tools",
   "mcp.toolsExposed": "{n} Tools bereitgestellt",
+  "mcp.reach.autoloadOff": "Funktioniert, aber noch kein Lauf kann es nutzen — das Laden der MCP-Server beim Start ist aus.",
+  "mcp.reach.addedAfterConnect": "Funktioniert, wurde aber nach dem Verbinden der Server hinzugefügt — App neu starten.",
   "mcp.autoloadOff":
     "Autoload ist aus — konfigurierte Server werden gespeichert, aber nicht in den Agenten geladen. Aktiviere MCP-Autoload in den Einstellungen (Neustart nötig), damit ihre Tools aufrufbar werden. Testen beweist ohnehin, dass ein Server live ist.",
   "mcp.note":
@@ -7022,6 +7042,8 @@ const zh: Dict = {
   "runs.empty":
     '还没有运行 —— 在「任务」标签页开始一个，或在 CLI 中执行 `chimera solve "…" --verify "…"`。',
   "runs.passed": "通过",
+  "runs.deliveryMoved": "之后文件已变更",
+  "runs.deliveryMoved.why": "该判定在做出时是真的。磁盘上的文件已不是它所判定的那些。",
   "runs.failed": "失败",
   "runs.paused": "已暂停",
   "runs.verifyCmd": "验证",
@@ -7558,6 +7580,8 @@ const zh: Dict = {
   "mcp.testFailed": "测试连接失败。",
   "mcp.connected": "已连接 · {n} 个工具",
   "mcp.toolsExposed": "暴露了 {n} 个工具",
+  "mcp.reach.autoloadOff": "可以连接，但运行还用不上——启动时加载 MCP 服务器已关闭。",
+  "mcp.reach.addedAfterConnect": "可以连接，但它是在服务器连接之后添加的——请重启应用。",
   "mcp.autoloadOff":
     "自动加载已关闭 — 已配置的服务器会保存但不会加载到智能体中。在设置中开启 MCP 自动加载（需重启）以使其工具可调用。无论如何，测试都能证明服务器是否在线。",
   "mcp.note":
@@ -8284,6 +8308,8 @@ const ja: Dict = {
   "runs.empty":
     'まだ実行がありません — 「タスク」タブで開始するか、CLI で `chimera solve "…" --verify "…"` を実行してください。',
   "runs.passed": "合格",
+  "runs.deliveryMoved": "判定後にファイルが変更",
+  "runs.deliveryMoved.why": "判定はその時点では正しかったものです。ディスク上のファイルはもう判定対象のものではありません。",
   "runs.failed": "失敗",
   "runs.paused": "一時停止",
   "runs.verifyCmd": "検証",
@@ -8849,6 +8875,8 @@ const ja: Dict = {
   "mcp.testFailed": "テスト接続に失敗しました。",
   "mcp.connected": "接続済み · {n} ツール",
   "mcp.toolsExposed": "{n} ツールを公開",
+  "mcp.reach.autoloadOff": "接続できますが、実行はまだ使えません — 起動時の MCP サーバー読み込みがオフです。",
+  "mcp.reach.addedAfterConnect": "接続できますが、サーバー接続後に追加されました — アプリを再起動してください。",
   "mcp.autoloadOff":
     "オートロードはオフです — 設定済みサーバーは保存されますが、エージェントには読み込まれません。設定で MCP オートロードを有効にする（再起動が必要）とツールが呼び出し可能になります。テストはいずれにせよサーバーが稼働中か証明します。",
   "mcp.note":
@@ -9581,6 +9609,8 @@ const it: Dict = {
   "runs.empty":
     'Ancora nessuna esecuzione — avviane una nella scheda Attività, o lancia `chimera solve "…" --verify "…"` dalla CLI.',
   "runs.passed": "superata",
+  "runs.deliveryMoved": "file cambiati dopo",
+  "runs.deliveryMoved.why": "Il verdetto era vero quando è stato dato. I file su disco non sono più quelli giudicati.",
   "runs.failed": "fallita",
   "runs.paused": "in pausa",
   "runs.verifyCmd": "Verifica",
@@ -10154,6 +10184,8 @@ const it: Dict = {
   "mcp.testFailed": "La connessione di prova è fallita.",
   "mcp.connected": "connesso · {n} strumenti",
   "mcp.toolsExposed": "{n} strumenti esposti",
+  "mcp.reach.autoloadOff": "Funziona, ma nessuna esecuzione può ancora usarlo: il caricamento dei server MCP all'avvio è disattivato.",
+  "mcp.reach.addedAfterConnect": "Funziona, ma è stato aggiunto dopo la connessione dei server: riavvia l'applicazione.",
   "mcp.autoloadOff":
     "Il caricamento automatico è spento — i server configurati sono salvati ma non caricati nell'agente. Attiva l'autoload MCP nelle Impostazioni (richiede un riavvio) per rendere i loro strumenti chiamabili. La prova dimostra comunque che un server è attivo.",
   "mcp.note":
@@ -10880,6 +10912,8 @@ const pl: Dict = {
   "runs.empty":
     'Jeszcze brak przebiegów — zacznij jeden w zakładce Zadanie albo uruchom `chimera solve "…" --verify "…"` z CLI.',
   "runs.passed": "zaliczony",
+  "runs.deliveryMoved": "pliki zmienione później",
+  "runs.deliveryMoved.why": "Ten werdykt był prawdziwy w chwili wydania. Pliki na dysku to już nie te, które oceniał.",
   "runs.failed": "nieudany",
   "runs.paused": "wstrzymany",
   "runs.verifyCmd": "Weryfikacja",
@@ -11450,6 +11484,8 @@ const pl: Dict = {
   "mcp.testFailed": "Testowe połączenie nie powiodło się.",
   "mcp.connected": "połączony · narzędzia: {n}",
   "mcp.toolsExposed": "udostępnione narzędzia: {n}",
+  "mcp.reach.autoloadOff": "Działa, ale żadne uruchomienie jeszcze go nie użyje — wczytywanie serwerów MCP na starcie jest wyłączone.",
+  "mcp.reach.addedAfterConnect": "Działa, ale został dodany po połączeniu serwerów — zrestartuj aplikację.",
   "mcp.autoloadOff":
     "Automatyczne ładowanie jest wyłączone — skonfigurowane serwery są zapisane, ale nie wczytane do agenta. Włącz autoload MCP w Ustawieniach (wymaga restartu), żeby ich narzędzia dało się wywoływać. Test i tak dowodzi, że serwer żyje.",
   "mcp.note":
@@ -12180,6 +12216,8 @@ const ru: Dict = {
   "runs.empty":
     'Запусков пока нет — начните один на вкладке «Задача» или выполните `chimera solve "…" --verify "…"` в командной строке.',
   "runs.passed": "пройден",
+  "runs.deliveryMoved": "файлы изменены после",
+  "runs.deliveryMoved.why": "Вердикт был верен в момент вынесения. Файлы на диске — уже не те, о которых он был.",
   "runs.failed": "провален",
   "runs.paused": "приостановлен",
   "runs.verifyCmd": "Проверка",
@@ -12753,6 +12791,8 @@ const ru: Dict = {
   "mcp.testFailed": "Проверочное подключение не удалось.",
   "mcp.connected": "подключён · инструментов: {n}",
   "mcp.toolsExposed": "открыто инструментов: {n}",
+  "mcp.reach.autoloadOff": "Работает, но ни один запуск пока не может это использовать — загрузка MCP-серверов при старте отключена.",
+  "mcp.reach.addedAfterConnect": "Работает, но добавлен после подключения серверов — перезапустите приложение.",
   "mcp.autoloadOff":
     "Автозагрузка выключена — настроенные серверы сохранены, но в агента не загружаются. Включите автозагрузку MCP в настройках (нужен перезапуск), чтобы их инструменты стали вызываемыми. Проверка в любом случае доказывает, что сервер жив.",
   "mcp.note":

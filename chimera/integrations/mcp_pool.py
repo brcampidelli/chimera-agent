@@ -25,6 +25,7 @@ stock install behaves exactly as it did.
 from __future__ import annotations
 
 import threading
+from dataclasses import dataclass
 from typing import Any
 
 from chimera.config import Settings
@@ -88,6 +89,42 @@ def _build(settings: Settings) -> Any:
             # true forever.
             _log.warning("MCP: skipping server %r — %s", cfg.name, str(exc)[:300])
     return pool if pool.names() else None
+
+
+@dataclass(frozen=True)
+class PoolState:
+    """Whether a run started right now would receive the configured MCP tools.
+
+    Exists because :func:`connectors` cannot answer that question: calling it BUILDS the pool, which
+    spawns a subprocess per configured server. A screen asking "will the agent see this?" must not
+    be the thing that connects them.
+
+    ``connected`` is ``None`` when the pool has not been built yet, which is not the same as "no
+    servers": the pool is built lazily on the first turn, so a server configured while autoload is
+    on will be picked up then. Collapsing that into an empty tuple would report "the agent cannot
+    see it" about a server the agent is about to see.
+    """
+
+    autoload: bool
+    built: bool
+    connected: tuple[str, ...] | None
+
+
+def pool_state(settings: Settings) -> PoolState:
+    """Report the pool without building it. Safe to call from a read-only endpoint."""
+    with _lock:
+        nomes: tuple[str, ...] | None = None
+        if _pool is not None:
+            try:
+                nomes = tuple(_pool.names())
+            except Exception:  # noqa: BLE001 -- a broken pool must not break a status read
+                nomes = ()
+        elif _tried:
+            # Built and came back empty (no servers, or every one failed to connect). That is a real
+            # answer, and reporting it as "not built yet" would promise a later pickup that is not
+            # coming — `_tried` latches, so nothing will try again in this process.
+            nomes = ()
+        return PoolState(autoload=bool(settings.mcp_autoload), built=_tried, connected=nomes)
 
 
 def reset_for_tests() -> None:

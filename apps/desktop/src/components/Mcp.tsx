@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plug, Trash2, Check, X, Loader2, Plus, ExternalLink } from "lucide-react";
+import { Plug, Trash2, Check, X, Loader2, Plus, ExternalLink, TriangleAlert } from "lucide-react";
 import {
   addMcpServer,
   getConfig,
@@ -76,6 +76,21 @@ function ServerRow({
         </div>
       </div>
 
+      {/* "It works" and "the agent can use it" are different facts. A server can connect, list its
+          tools, and still reach no run — autoload is off by default, and the servers are connected
+          once per process. Measured: a server tested green and the next run made twenty-two tool
+          calls over nineteen minutes without one of them being its. The green block below stays
+          green, because the server DOES work; this line is what was missing beside it. */}
+      {result?.reaches_agent === false && (
+        <div className="flex items-start gap-1.5 rounded-chip border border-warn/30 bg-warn/10 px-3 py-2 text-xs text-warn-foreground">
+          <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            {result.reaches_agent_reason === "added_after_connect"
+              ? t("mcp.reach.addedAfterConnect")
+              : t("mcp.reach.autoloadOff")}
+          </span>
+        </div>
+      )}
       {result && result.ok && (
         <div className="rounded-xl2 bg-ok/[0.06] px-3 py-2 ring-1 ring-ok/15">
           <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-ok-foreground">
