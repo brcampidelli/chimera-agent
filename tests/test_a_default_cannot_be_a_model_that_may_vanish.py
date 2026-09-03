@@ -22,7 +22,7 @@ from __future__ import annotations
 import pytest
 
 from chimera.config import Settings
-from chimera.providers.catalog import PROVIDERS, _PRESETS
+from chimera.providers.catalog import _PRESETS, PROVIDERS
 
 #: Substrings that mark a slug as one a vendor may withdraw or repoint under you.
 FRAGIL = ("preview", "-beta", "-exp", ":free", "-latest")
@@ -79,7 +79,7 @@ def test_every_default_is_a_real_slug_shape(onde: str, slug: str) -> None:
     """Cheap shape check — a default that is empty or half-written fails at call time, not here."""
     assert slug, f"{onde} is empty"
     assert "/" in slug, f"{onde} = {slug!r} is not a provider-qualified slug"
-    assert not slug.strip() != slug, f"{onde} = {slug!r} has surrounding whitespace"
+    assert slug.strip() == slug, f"{onde} = {slug!r} has surrounding whitespace"
 
 
 def test_the_check_would_actually_have_caught_the_one_that_shipped() -> None:
