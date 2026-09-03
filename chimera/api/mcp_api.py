@@ -78,17 +78,62 @@ def test_server(home: Path, name: str) -> dict[str, Any]:
     ``{ok:true, tools:[{name, description}], error:null}`` on a real connect; ``{ok:false, tools:[],
     error}`` on ANY failure (unknown server, connect timeout, missing ``mcp`` extra, handshake error).
     The error string is a short class-name-based summary — it never carries an env value or a traceback.
+
+    ``ok`` answers "does this server work". ``reaches_agent`` answers the question the person
+    clicking Test is actually asking — "can the agent use it" — and the two are not the same. See
+    :func:`_reach`.
     """
     servers = load_servers(_mcp_path(home))
     cfg = next((s for s in servers if s.name == name), None)
     if cfg is None:
-        return {"ok": False, "tools": [], "error": "no such server"}
+        return {"ok": False, "tools": [], "error": "no such server", **_reach(name)}
     try:
         tools = _live_test(cfg)
-        return {"ok": True, "tools": tools, "error": None}
+        return {"ok": True, "tools": tools, "error": None, **_reach(name)}
     except Exception as exc:  # noqa: BLE001 — every failure becomes a short, secret-free error
         _log.warning("MCP test for %r failed: %s", name, type(exc).__name__)
-        return {"ok": False, "tools": [], "error": _short_error(exc)}
+        return {"ok": False, "tools": [], "error": _short_error(exc), **_reach(name)}
+
+
+def _reach(name: str) -> dict[str, Any]:
+    """Whether a run started right now would receive this server's tools, and if not, why not.
+
+    A live connect proves the server works. It does not prove the *agent* can reach it, and the gap
+    between those two facts was measured: a server was registered, Test answered "ok, 4 tools" and
+    listed all four, and the next run made twenty-two tool calls over nineteen minutes without one
+    of them being from the server — because ``mcp_autoload`` is off by default. Nothing on the
+    screen said so. "It works" and "you can use it" looked identical, and only one was true.
+
+    Three states, and each has a different remedy:
+
+    * autoload off — nothing reaches any run. Turn it on; no relaunch needed, because the pool is
+      built lazily on the first turn that asks for it.
+    * autoload on, pool not built yet — the next run builds it and picks this server up.
+    * autoload on, pool already built without this name — this server was added after the servers
+      were connected, and the pool is deliberately never rebuilt in a process (see
+      :mod:`chimera.integrations.mcp_pool`). It needs a relaunch.
+
+    The reason is an ENUM, not a sentence. The app is translated into ten languages, and a screen
+    that prints an English string from the server is a screen where one line is in the wrong
+    language — the same rule the orchestration frames already follow for ``fell_back.reason``.
+
+    Reads the pool WITHOUT building it, so asking the question never has the side effect of
+    answering it — clicking Test must not spawn a subprocess per configured server.
+    """
+    from chimera.config import get_settings
+    from chimera.integrations.mcp_pool import pool_state
+
+    try:
+        estado = pool_state(get_settings())
+    except Exception as exc:  # noqa: BLE001 -- a status read must never fail a test
+        _log.debug("MCP reach unknown: %s", type(exc).__name__)
+        return {"reaches_agent": None, "reaches_agent_reason": None}
+
+    if not estado.autoload:
+        return {"reaches_agent": False, "reaches_agent_reason": "autoload_off"}
+    if estado.connected is None or name in estado.connected:
+        return {"reaches_agent": True, "reaches_agent_reason": None}
+    return {"reaches_agent": False, "reaches_agent_reason": "added_after_connect"}
 
 
 def _short_error(exc: Exception) -> str:

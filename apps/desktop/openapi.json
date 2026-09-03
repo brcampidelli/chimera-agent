@@ -5253,6 +5253,28 @@
             "title": "Ok",
             "type": "boolean"
           },
+          "reaches_agent": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reaches Agent"
+          },
+          "reaches_agent_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reaches Agent Reason"
+          },
           "tools": {
             "items": {
               "$ref": "#/components/schemas/McpToolOut"
@@ -6785,6 +6807,17 @@
             },
             "title": "Attempts",
             "type": "array"
+          },
+          "delivered_matches_verified": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivered Matches Verified"
           },
           "paused": {
             "title": "Paused",

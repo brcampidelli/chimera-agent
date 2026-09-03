@@ -74,13 +74,13 @@ CATALOG: tuple[CatalogEntry, ...] = (
     ),
     CatalogEntry(
         "openrouter/mistralai/mistral-small-3.2-24b-instruct", "weak", "Mistral",
-        0.075, 0.20, tools=True, context_k=256,
-        notes="the local-lift goldilocks model; cheap paid weak with usable tools",
+        0.075, 0.20, tools=True, context_k=131,
+        notes="the local-lift goldilocks model; cheap paid weak with usable tools. The window read\n        256k here until 2026-09-03; the provider serves 131k",
     ),
     CatalogEntry(
         "openrouter/meta-llama/llama-3.3-70b-instruct", "weak", "Meta",
-        0.71, 0.71, tools=True, context_k=131,
-        notes="the paid variant; the :free one was withdrawn on 2026-08-18. Input and output\n        cost the same here, which is unusual and is what the provider charges",
+        0.10, 0.32, tools=True, context_k=131,
+        notes="the paid variant; the :free one was withdrawn on 2026-08-18. Priced 0.71/0.71 here\n        until a live check on 2026-09-03 measured 0.10/0.32 — and the note that input and\n        output cost the same stopped being true with it",
     ),
     CatalogEntry(
         "openrouter/openai/gpt-oss-20b", "weak", "OpenAI",
@@ -90,13 +90,13 @@ CATALOG: tuple[CatalogEntry, ...] = (
     # --- mid: the daily workhorses. Reliable tools, cents per task. ---
     CatalogEntry(
         "openrouter/deepseek/deepseek-chat-v3.1", "mid", "DeepSeek",
-        0.55, 1.65, tools=True, context_k=163,
-        notes="proven in this repo's benches; the product default",
+        0.25, 0.95, tools=True, context_k=163,
+        notes="proven in this repo's benches; the product default. Priced 0.55/1.65 here until a\n        live check on 2026-09-03 measured 0.25/0.95",
     ),
     CatalogEntry(
         "openrouter/z-ai/glm-4.6", "mid", "Zhipu (GLM)",
-        0.50, 2.00, tools=True, context_k=204,
-        notes="strong agentic mid",
+        0.55, 2.20, tools=True, context_k=204,
+        notes="strong agentic mid. Priced 0.50/2.00 here until a live check on 2026-09-03 measured\n        0.55/2.20 — this one went UP, which is the case a drift check has to be able to see:\n        anything written assuming prices only fall would have read this as still correct",
     ),
     CatalogEntry(
         "openrouter/google/gemini-2.5-flash", "mid", "Google",

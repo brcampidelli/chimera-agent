@@ -105,4 +105,11 @@ def test_mcp_test_failure_is_short_and_secret_free(tmp_path: Any, monkeypatch: A
 def test_mcp_test_unknown_server(tmp_path: Any) -> None:
     client = _client(tmp_path)
     data = client.post("/api/mcp/ghost/test").json()
-    assert data == {"ok": False, "tools": [], "error": "no such server"}
+    # The reach fields joined this response in
+    # `test_the_server_tested_green_and_the_agent_could_not_reach_it`, because "it works" and "the
+    # agent can use it" are different facts. Asserting the three that matter here rather than the
+    # whole dict: this test is about an unknown NAME, and pinning every key makes it fail again the
+    # next time an unrelated field is added.
+    assert data["ok"] is False
+    assert data["tools"] == []
+    assert data["error"] == "no such server"

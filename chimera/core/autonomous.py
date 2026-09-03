@@ -244,6 +244,16 @@ class Attempt:
     verify_output: str = ""
     diff_summary: str = ""
     diffs: list[FileDiff] = field(default_factory=list)  # real per-file unified diffs (pre-revert)
+    #: Digest da arvore NO MOMENTO em que este veredito foi dado, ou "" quando nao houve captura.
+    #:
+    #: Existe porque `verified` descreve um instante e o recibo e lido como se descrevesse a
+    #: entrega. Medido: um run gravou `verified=True` com a saida do verificador dizendo
+    #: `Ran 20 tests ... OK`, e a arvore em disco falhava as vinte, deterministicamente — o diff
+    #: guardado no proprio recibo tinha uma linha que o arquivo entregue nao tinha. Comparar este
+    #: digest com um novo, na hora de gravar o recibo, responde "o que foi entregue ainda e o que
+    #: foi verificado?" sem exigir que se saiba QUEM escreveu depois.
+    verified_fingerprint: str = ""
+
     #: Onde o trabalho revertido foi guardado inteiro, ou "" quando nao houve reversao.
     #:
     #: `diffs` acima existe e nao serve para recuperar nada: o recibo corta cada patch em 4.000
@@ -884,6 +894,10 @@ class AutonomousAgent:
             diff_productive: bool | None = None
             diff_summary: str | None = None
             diffs: list[FileDiff] = []
+            # Per attempt, not `last_after`: that one survives the loop for `--keep-workspace`, so
+            # on a second attempt without a capture it would still hold the FIRST attempt's tree and
+            # this receipt would attest to a verdict about somebody else's files.
+            impressao_verificada = ""
             if snapshot is not None and self.guard is not None:
                 from chimera.evolution.diff_gate import diff_snapshots, unified_diffs
 
@@ -901,6 +915,11 @@ class AutonomousAgent:
                 diff_productive = pdiff.is_productive
                 diff_summary = pdiff.audit_summary()
                 diffs = unified_diffs(snapshot, after)  # real diffs, BEFORE any revert below
+                # The tree AS VERIFIED: `_verify()` ran just above, so this capture is the state the
+                # verdict is about — not a fresh read a later write could already have changed.
+                from chimera.core.checkpoint import fingerprint as _impressao
+
+                impressao_verificada = _impressao(after)
 
             # What the attempt actually did, handed to the reviewer as EVIDENCE.
             #
@@ -1080,6 +1099,9 @@ class AutonomousAgent:
             attempt.diff_summary = diff_summary or ""
             attempt.diffs = diffs
             attempt.diff_productive = diff_productive
+            # Empty when there was no guard to capture with, which reads as "not checkable" rather
+            # than as "unchanged".
+            attempt.verified_fingerprint = impressao_verificada
             attempt.side_effects = _side_effects(steplog)
             # The key that joins this outcome to the trace line the same run just wrote. Read off
             # the worker's result, like  above and for the same reason: it is the worker that
@@ -1489,6 +1511,43 @@ class AutonomousAgent:
             _log.warning("nao consegui guardar o trabalho revertido: %s", exc)
             return ""
 
+    def _delivered_matches_verified(self, result: AutonomousResult) -> bool | None:
+        """Is the tree on disk still the tree the winning attempt's verdict was about?
+
+        ``verified`` is a statement about an instant. The receipt is read as a statement about the
+        delivery, and those came apart in a measured run: the row said ``verified: True`` with the
+        verifier's own ``Ran 20 tests ... OK`` stored beside it, and the delivered tree failed all
+        twenty on every one of twenty executions. The diff the same receipt carried contained a line
+        the file on disk did not have — something wrote after the moment the verdict describes.
+
+        This does not try to name what wrote. Naming it would mean guessing, and a guess in a
+        receipt is worse than a gap. It compares two digests and reports the answer:
+
+        * ``True`` — the delivered tree is byte-for-byte the verified one;
+        * ``False`` — it is not, and ``verified`` should be read as being about a tree that no
+          longer exists;
+        * ``None`` — not checkable. No successful attempt, no guard to capture with, or a receipt
+          from before the digest existed. Distinct from ``True`` on purpose: "we did not look" and
+          "we looked and it matched" are different claims, and collapsing them would put the
+          stronger one on every old row.
+
+        Never raises. A run that finished is a run whose receipt must be written, and a status read
+        that can fail the write is a worse defect than the one it reports.
+        """
+        try:
+            vencedora = next((a for a in reversed(result.attempts) if a.success), None)
+            if vencedora is None:
+                return None
+            esperada = getattr(vencedora, "verified_fingerprint", "") or ""
+            if not esperada or self.guard is None:
+                return None
+            from chimera.core.checkpoint import fingerprint as _impressao
+
+            return _impressao(self.guard.snapshot()) == esperada
+        except Exception as exc:  # noqa: BLE001 -- never break a receipt to report on one
+            _log.debug("delivery check skipped: %s", type(exc).__name__)
+            return None
+
     def _persist_receipt(self, result: AutonomousResult, task: str) -> None:
         """Append a run receipt recording how this finished run PROVED its work (read-only evidence).
 
@@ -1506,6 +1565,9 @@ class AutonomousAgent:
 
         Reads the verify command off the verifier when it exposes one (``CommandVerifier.command``);
         ``None`` for a run with no executable verifier.
+
+        Also asks, one last time, whether the tree still IS the tree the verdict describes. See
+        :meth:`_delivered_matches_verified`.
         """
         if self.run_log is None:
             return
@@ -1522,6 +1584,7 @@ class AutonomousAgent:
                 # built without a workspace records none rather than the process cwd, which would be
                 # a guess wearing the same clothes as a fact.
                 workspace=str(self.workspace) if self.workspace else "",
+                delivered_matches_verified=self._delivered_matches_verified(result),
             )
             append_run(self.run_log, receipt)
         except Exception as exc:  # noqa: BLE001 — receipt persistence is best-effort, never fatal

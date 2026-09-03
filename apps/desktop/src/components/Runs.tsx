@@ -13,13 +13,31 @@ function truncate(text: string, n: number): string {
   return text.length > n ? `${text.slice(0, n)}…` : text;
 }
 
-/** The run's terminal verdict as a tone-coded badge: paused (warn) → passed (ok) → failed (bad). */
+/** The run's terminal verdict as a tone-coded badge: paused (warn) → passed (ok) → failed (bad).
+ *
+ *  A passed run can also carry the one caveat that undoes what "passed" is read to mean: the tree on
+ *  disk is no longer the tree that verdict was about. Measured — a receipt said `verified: True` with
+ *  the verifier's own `Ran 20 tests ... OK` stored beside it, and the delivered files failed all
+ *  twenty. The verdict was true when it was given, so it stays; the caveat sits next to it rather
+ *  than replacing it. Only `false` shows: `null` means nothing looked, and a badge for that would
+ *  put a warning on every receipt written before the check existed.
+ */
 function StatusBadge({ run, t }: { run: RunReceipt; t: TFunc }) {
   if (run.paused) return <Badge tone="warn">{t("runs.paused")}</Badge>;
-  return run.success ? (
-    <Badge tone="ok">{t("runs.passed")}</Badge>
-  ) : (
-    <Badge tone="bad">{t("runs.failed")}</Badge>
+  const moveu = run.delivered_matches_verified === false;
+  return (
+    <>
+      {run.success ? (
+        <Badge tone="ok">{t("runs.passed")}</Badge>
+      ) : (
+        <Badge tone="bad">{t("runs.failed")}</Badge>
+      )}
+      {moveu && (
+        <Badge tone="warn" title={t("runs.deliveryMoved.why")}>
+          {t("runs.deliveryMoved")}
+        </Badge>
+      )}
+    </>
   );
 }
 

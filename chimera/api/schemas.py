@@ -1313,6 +1313,17 @@ class RunReceiptOut(BaseModel):
     narrowed to one project and a Runs list that happens to contain one project look identical, and
     the reader is the one who has to tell them apart."""
 
+    delivered_matches_verified: bool | None = None
+    """Is the tree on disk still the one the winning attempt's verdict was about?
+
+    On the wire because ``success`` is read as a statement about the delivery while it is a statement
+    about an instant, and the two came apart in a measured run: the row said verified with the
+    verifier's own ``Ran 20 tests ... OK`` beside it, and the delivered files failed all twenty.
+
+    ``null`` means nothing looked — no successful attempt, no workspace guard, or a receipt written
+    before the check existed — and is deliberately not ``true``, so the screen does not stamp the
+    stronger claim on every row already in the file."""
+
 
 class CancelOut(BaseModel):
     ok: bool  # True when the run_id was known and its stop flag was set; False for a finished/unknown id
@@ -1613,6 +1624,16 @@ class McpTestOut(BaseModel):
     ok: bool  # True ONLY after a real stdio connect + tool enumeration — the sole "connected" signal
     tools: list[McpToolOut]  # the tools the server exposed on a successful connect; [] otherwise
     error: str | None  # a short, secret-free failure message when ok is False; null on success
+    # "It works" and "the agent can use it" are different facts, and only reporting the first is how
+    # a server that tested green sat unreachable through a nineteen-minute run. False means a run
+    # started now gets none of these tools; null means the answer could not be read.
+    reaches_agent: bool | None = None
+    # WHY not, as an enum the app translates: "autoload_off" (the toggle is off, so no run is given
+    # these tools) or "added_after_connect" (the servers are connected once per process and this one
+    # arrived later, so it needs a restart). The remedies differ, which is why one flag is not
+    # enough. An enum rather than a sentence because the app ships in ten languages. Null whenever
+    # `reaches_agent` is not False.
+    reaches_agent_reason: str | None = None
 
 
 class McpAddRequest(BaseModel):

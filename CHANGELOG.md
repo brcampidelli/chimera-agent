@@ -45,6 +45,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   globs, and when a declared pattern looks absolute names that pattern and what to write instead. A
   path resolving outside the workspace and one hitting `ALWAYS_DENIED` get their own messages,
   because those have different remedies and pointing at the region would send the reader nowhere.
+- **The MCP Test button proved the server and said nothing about the agent.** A SQLite server was
+  registered, Test connected, answered *ok* and listed all four of its tools by name. The run that
+  followed made **twenty-two tool calls over nineteen minutes and not one of them was from that
+  server**, because `mcp_autoload` is off by default. Nothing on the screen said so — *"it works"*
+  and *"you can use it"* looked identical while only one was true.
+
+  Test answers both now. When a run started right now would get none of these tools, the screen says
+  so beside the green result — the server *does* work, so the caveat sits next to the verdict rather
+  than replacing it — and the reason splits three ways because the remedies differ: the toggle is
+  off (turn it on; no relaunch needed, the servers connect lazily on the first turn), the servers
+  have not connected yet (the next run picks this one up), or they connected before this server
+  existed (they are connected once per process — restart).
+
+  Two things it deliberately does not do. It does not build the connection pool to find out:
+  `connectors()` spawns a subprocess per configured server, and a screen asking *"will the agent see
+  this?"* must not be the thing that connects them. And the reason crosses the wire as an enum, not a
+  sentence — the app ships in ten languages, and a server-side English string is one line in the
+  wrong one.
+
+- **"Verified" described an instant and was read as the delivery.** A run finished with
+  `verified: True`, `evidence: verifier`, and the verifier's own output in the receipt:
+  `Ran 20 tests in 0.001s / OK`. Running the same command against the tree that run left behind:
+  **20 failures out of 20 executions.** Not flaky — impossible. The diff the same receipt carried
+  explained it: the verified version had a line the delivered file did not, and restoring that one
+  line gave 20/20. Something wrote after the moment the verdict describes.
+
+  This does not try to name what wrote. That was never established from the artifacts, and a guess in
+  a receipt is worse than a gap. It makes the claim **checkable** instead — a digest of the tree as
+  verified, another at receipt time, and the answer on the row, with the per-attempt digest kept so a
+  reader can recompute it rather than believe it.
+
+  `delivered_matches_verified` is three-valued on purpose. `null` means nothing looked, and is
+  deliberately not `true`: defaulting to the stronger claim would stamp it on every row already in
+  the file. `verified` itself is untouched — it was true when it was given, and the Runs list shows
+  the caveat beside the verdict, never instead of it.
+
+- **The example config set a default 20× dearer than the code's, and two withdrawn models.**
+  `.env.example` tells the reader to copy it to `.env`, so its assignments are not documentation —
+  they are what a new install runs on. It set `CHIMERA_DEFAULT_MODEL=openrouter/openai/gpt-5.5`
+  (5.00/30.00 per million) while the real default was `deepseek-chat-v3.1` (0.25/0.95): **20× on
+  input, 31× on output**, silently. Its fusion panel named `claude-opus-4-8` and `gemini-3.1-pro`,
+  both gone from OpenRouter, so a copied example failed at call time. And its judge was the panel's
+  own first member — the judge grading its own answer, which is the exact defect the comment above
+  `_DEFAULT_JUDGE` records having been fixed once already. The example file had quietly kept a copy.
+
+  Nothing caught it, because the live drift gate reads `Settings()` and `Settings()` never reads this
+  file in a test process. A new offline test holds the narrower invariant: an active assignment must
+  agree with the code default it sets, must not make the judge a panellist or its vendor-mate, and
+  must not ship a `:free` slug the file's own comment warns against.
+
+- **Four catalogue entries were out of date**, all checked against the live index rather than
+  assumed: `llama-3.3-70b-instruct` 0.71/0.71 → **0.10/0.32**, `deepseek-chat-v3.1` 0.55/1.65 →
+  **0.25/0.95**, `z-ai/glm-4.6` 0.50/2.00 → **0.55/2.20**, and `mistral-small-3.2`'s window 256k →
+  **131k**. `glm-4.6` is the one worth naming: it got *dearer*. Anything written on the assumption
+  that prices only ever fall would have read that entry as still correct.
 
 ## [0.49.2] - 2026-09-02
 
