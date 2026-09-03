@@ -4,6 +4,24 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- **The first-run wizard was translated except for four words.** Its cost-mode dropdown rendered
+  the raw values — `auto / cheap / balanced / premium` — in the middle of an otherwise fully
+  Portuguese screen. The labels already existed and were already translated: the Settings screen,
+  which sets the *same* variable, has been rendering them through `settings.value.*` all along.
+  Two vocabularies for one setting is the app disagreeing with itself about what you chose.
+
+  Only the label is translated. The value stays English because `CostMode` in
+  `providers/catalog.py` is a `Literal` and the server would refuse `"econômico"` — and that half
+  has its own assertion, because it is the half a careless fix breaks.
+
+  The rest of the class was checked rather than assumed: every other `Select` on the Settings
+  screen already passes `render=`, and the one that does not (`json` / `sqlite`) is naming file
+  formats, which is the same deliberate call that leaves `docker` untranslated beside it.
+
 ## [0.49.1] - 2026-09-02
 
 ### Fixed

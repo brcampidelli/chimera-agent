@@ -69,6 +69,36 @@ const combo = () => screen.getAllByRole("combobox")[0];
 const keyField = () => screen.getByLabelText(/API key/);
 
 describe("the first-run wizard", () => {
+  it("names the cost modes in the reader's language, and sends the server English", async () => {
+    // This wizard was fully translated except for four words: the cost-mode dropdown rendered its
+    // raw values — "auto / cheap / balanced / premium" — in the middle of a Portuguese screen. The
+    // labels already existed and were already translated; the Settings screen, which sets the SAME
+    // variable, was using them. Two vocabularies for one setting is the app disagreeing with itself
+    // about what you chose.
+    localStorage.setItem("chimera.lang", "pt");
+    try {
+      renderWithProviders(<Onboarding onSkip={() => {}} />);
+      await waitFor(() => expect(screen.getAllByRole("combobox").length).toBeGreaterThan(1));
+      const custo = within(screen.getAllByRole("combobox")[1]);
+
+      expect(custo.getByRole("option", { name: "econômico" })).toBeTruthy();
+      expect(custo.getByRole("option", { name: "equilibrado" })).toBeTruthy();
+      expect(custo.getByRole("option", { name: "automático" })).toBeTruthy();
+      expect(custo.queryByRole("option", { name: "cheap" })).toBeNull();
+
+      // The CONTROL, and the half a careless fix would break: `CostMode` in
+      // `providers/catalog.py` is a Literal, so the server refuses "econômico". Only the label is
+      // translated; the value stays English.
+      const valores = custo
+        .getAllByRole("option")
+        .map((o) => (o as HTMLOptionElement).value)
+        .sort();
+      expect(valores).toEqual(["auto", "balanced", "cheap", "premium"]);
+    } finally {
+      localStorage.removeItem("chimera.lang");
+    }
+  });
+
   it("offers the providers that serve a model, and none of the tool credentials", async () => {
     renderWithProviders(<Onboarding onSkip={() => {}} />);
     await waitFor(() => expect(screen.getByRole("option", { name: "Anthropic" })).toBeTruthy());
