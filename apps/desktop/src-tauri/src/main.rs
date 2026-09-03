@@ -704,9 +704,9 @@ fn supervise(
 #[cfg(test)]
 mod tests {
     use super::{
-        drain_stderr, idioma_do_dialogo, look, port_of, remembered_port, start_sidecar, supervise,
-        write_report, Backend, Budget, Dialogo, Fuse, Health, Paths, Sidecar, Supervised, Trouble, Tuning,
-        DIALOGO, STDERR_KEEP,
+        deve_perguntar, drain_stderr, idioma_do_dialogo, look, port_of, remembered_port,
+        start_sidecar, supervise, write_report, Backend, Budget, Dialogo, Fuse, Health, Paths,
+        Sidecar, Supervised, Trouble, Tuning, DIALOGO, INTERVALO_DE_CHECAGEM, STDERR_KEEP,
     };
     use std::collections::VecDeque;
 
@@ -1135,7 +1135,7 @@ mod tests {
         );
         // E os dois chamadores dizem coisas diferentes, que e' o que faz o ramo significar algo.
         assert!(
-            producao.contains(concat!("check_for_update(handle, fal", "se)")),
+            producao.contains(concat!("check_for_update(handle.clone(), fal", "se)")),
             "a checagem do arranque deixou de ser silenciosa"
         );
         assert!(
@@ -1224,6 +1224,97 @@ mod tests {
             conferidos += 1;
         }
         assert_eq!(conferidos, DIALOGO.len(), "algum idioma nao foi conferido");
+    }
+
+    /// Declining an update silences the AUTOMATIC rounds, and nothing else.
+    ///
+    /// This is the whole rule of the periodic check, and it is a function so it can be asserted
+    /// rather than read. Without it, looking every six hours means asking every six hours — the
+    /// nagging the automatic path has always avoided, arriving through the front door.
+    #[test]
+    fn dizer_depois_cala_as_rondas_automaticas_e_nada_mais() {
+        // Nothing declined yet: ask.
+        assert!(deve_perguntar(false, "0.49.2", None));
+
+        // Declined THIS version, on an automatic round: stay quiet.
+        assert!(!deve_perguntar(false, "0.49.2", Some("0.49.2")));
+
+        // A NEWER version is a different string, so it asks again — the property falls out of
+        // comparing rather than needing a rule of its own, and this is what pins that.
+        assert!(deve_perguntar(false, "0.49.3", Some("0.49.2")));
+
+        // And a check the user ASKED for always asks. Answering "you already declined that one" to
+        // somebody who just clicked the menu item would be refusing what they requested.
+        assert!(deve_perguntar(true, "0.49.2", Some("0.49.2")));
+
+        // And the rule is WIRED, not merely correct. Deleting the line that REMEMBERS the decision
+        // leaves every assertion above passing — a pure function nobody feeds is a rule that holds
+        // in the abstract while the dialog asks again in six hours. The sabotage that found this
+        // gap removed exactly that line.
+        let producao = producao();
+        assert!(
+            producao.contains(concat!("deve_perg", "untar(pedida, &update.version")),
+            "check_for_update parou de consultar a regra antes de abrir o dialogo"
+        );
+        assert!(
+            producao.contains(concat!("*adiada = Some(update.", "version.clone())")),
+            "dizer 'depois' nao guarda mais a versao, entao a proxima ronda pergunta de novo"
+        );
+    }
+
+    /// The check is not launch-only, which is the defect this all exists for.
+    ///
+    /// Read from the source because the alternative is waiting six hours. What it pins is the shape
+    /// that was missing: a loop, a sleep of the declared interval, and a call inside it. A single
+    /// call at startup satisfied every other test in this file.
+    #[test]
+    fn um_app_aberto_o_dia_todo_volta_a_olhar() {
+        let producao = producao();
+        // TWO wrong windows before this one, both mine, both the same shape — a needle that finds
+        // something other than what it names:
+        //
+        //   1. `std::thread::spawn(move || {` matches the SUPERVISOR first, which also runs on a
+        //      thread and comes earlier in the file. That window reported the update check as
+        //      launch-only while the loop sat twenty lines below it, untouched.
+        //   2. `split_once` CONSUMES the delimiter, so anchoring on the startup call removed that
+        //      call from the window and the count came out one instead of two.
+        //
+        // Sliced by index, delimiter kept: from the `spawn` that precedes this thread's own first
+        // call, to the `});` that closes it.
+        let marca = concat!("block_on(check_for_", "update(handle.clone(), false))");
+        let em = producao
+            .find(marca)
+            .expect("o arranque ainda dispara a checagem numa thread");
+        let inicio = producao[..em].rfind("std::thread::spawn").unwrap_or(0);
+        let fim = producao[em..].find("});").map_or(producao.len(), |i| em + i);
+        let bloco = &producao[inicio..fim];
+
+        assert!(bloco.contains("loop {"), "a checagem voltou a ser so' no arranque");
+        assert!(
+            bloco.contains("INTERVALO_DE_CHECAGEM"),
+            "o laco nao dorme o intervalo declarado"
+        );
+        assert_eq!(
+            bloco.matches(concat!("check_for_", "update(")).count(),
+            2,
+            "esperava a checagem do arranque MAIS a do laco — uma so' e' o defeito de volta"
+        );
+    }
+
+    /// Six hours, not six minutes.
+    ///
+    /// The interval is the difference between a background check and a poll. Nothing enforces a
+    /// sane number, and a stray `from_secs(6)` reads almost the same on the page.
+    #[test]
+    fn o_intervalo_e_de_horas() {
+        assert!(
+            INTERVALO_DE_CHECAGEM >= std::time::Duration::from_secs(60 * 60),
+            "checar mais de uma vez por hora e' polling, nao verificacao de fundo"
+        );
+        assert!(
+            INTERVALO_DE_CHECAGEM <= std::time::Duration::from_secs(24 * 60 * 60),
+            "mais de um dia entre checagens devolve o defeito para quem deixa o app aberto"
+        );
     }
 
     #[test]
@@ -2022,6 +2113,39 @@ fn dialogo() -> &'static Dialogo {
     idioma_do_dialogo(sys_locale::get_locale().as_deref())
 }
 
+/// How often a running app looks again.
+///
+/// The check used to happen once, at launch, and never again. An app that stays open — which this
+/// one is, being a working tool — therefore never learned about a release: measured on 2026-09-02,
+/// a user sat on 0.49.0 with 0.49.1 published and had to fetch the installer from the website by
+/// hand. The tray's "check for updates" existed and is, on a default Windows install, behind the
+/// hidden-icons chevron.
+///
+/// The `--latest=false` fix made this worse before it made it better: a release is now not offered
+/// until its installers finish building, which is correct — offering one whose installers do not
+/// exist is worse — but it widens the period in which the single launch-time check finds nothing,
+/// from the instant of publication to the whole twenty-five minute build.
+const INTERVALO_DE_CHECAGEM: Duration = Duration::from_secs(6 * 60 * 60);
+
+/// The version the user said "Later" to, for as long as this process lives.
+///
+/// Deliberately in memory and not on disk: "not now" is about this sitting, not forever. The
+/// frontend badge has its own persistent dismissal (`chimera.updateDismissed`) and that is a
+/// different promise — this one comes back when you reopen the app.
+static ADIADA: Mutex<Option<String>> = Mutex::new(None);
+
+/// Whether to put the dialog up for this version.
+///
+/// The whole rule of the periodic check, extracted so it can be tested with assertions instead of
+/// by reading. Without it, checking every six hours would ask every six hours — which is the
+/// nagging the automatic path has always been careful to avoid, arriving through the front door.
+///
+/// A check the user ASKED for always asks: they clicked the menu item, and answering "you already
+/// declined this one" would be refusing to do the thing they just requested.
+fn deve_perguntar(pedida: bool, versao: &str, adiada: Option<&str>) -> bool {
+    pedida || adiada != Some(versao)
+}
+
 /// Check GitHub for a signed update and, if the user consents, install it and relaunch.
 ///
 /// Honest-by-construction: the signature is verified against the embedded pubkey by the updater
@@ -2048,6 +2172,13 @@ async fn check_for_update(
         return Ok(());
     };
 
+    // Asked already, and declined? Then this automatic round says nothing. A newer version has a
+    // different string and asks again, which falls out of comparing rather than needing a rule.
+    let adiada = ADIADA.lock().ok().and_then(|g| g.clone());
+    if !deve_perguntar(pedida, &update.version, adiada.as_deref()) {
+        return Ok(());
+    }
+
     let confirmed = app
         .dialog()
         .message(d.mensagem.replace("{v}", &update.version))
@@ -2061,6 +2192,10 @@ async fn check_for_update(
         .blocking_show();
 
     if !confirmed {
+        // Remembered, so the next round in six hours does not ask about the same release again.
+        if let Ok(mut adiada) = ADIADA.lock() {
+            *adiada = Some(update.version.clone());
+        }
         return Ok(());
     }
 
@@ -2194,12 +2329,27 @@ fn main() {
                 });
             });
 
-            // Fire-and-forget update check. Any error (offline, no update, verification failure) is
-            // swallowed — the check must never nag or crash. The pip/web "update signal" is separate
-            // and unaffected; this is the native in-place path.
+            // The update check: once at startup, then every few hours for as long as the app runs.
+            //
+            // It used to be the startup one alone, and that is a check an app like this never gets
+            // to make. Chimera is left open; the launch that would have found the release happened
+            // yesterday. Measured on 2026-09-02: a user sat on 0.49.0 with 0.49.1 published, saw
+            // nothing, and installed it from the website by hand.
+            //
+            // A THREAD rather than the async runtime, for the reason the supervisor above gives
+            // about itself: this loop mostly sleeps, and a sleeping task does not belong on an
+            // executor shared with work that has somewhere to be. It also keeps `blocking_show`
+            // honest — the dialog blocks for the answer, and this is not the main thread.
+            //
+            // Any error (offline, no release, rate-limit, bad signature) is swallowed, as before:
+            // the check must never nag or crash. The pip/web "update signal" is separate.
             let handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                let _ = check_for_update(handle, false).await;
+            std::thread::spawn(move || {
+                let _ = tauri::async_runtime::block_on(check_for_update(handle.clone(), false));
+                loop {
+                    std::thread::sleep(INTERVALO_DE_CHECAGEM);
+                    let _ = tauri::async_runtime::block_on(check_for_update(handle.clone(), false));
+                }
             });
 
             Ok(())
