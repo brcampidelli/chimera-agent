@@ -22,6 +22,18 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    # `mcp` is pinned `<2` on purpose and the reason is written above the pin: 2.x removed the API
+    # `ChimeraMCP.build` uses, so `@server.list_tools()` raises AttributeError and `chimera mcp-serve`
+    # dies on start. `tests/test_mcp_dependency_is_real.py::test_the_sdk_pin_has_a_ceiling` catches
+    # any widening, which means the bot proposes it weekly and the build refuses it weekly — a PR
+    # that can only ever be closed, arriving forever.
+    #
+    # Ignoring the MAJOR only. A 1.x release still gets proposed, which is the part that can be
+    # taken. Lift this together with the pin, when `ChimeraMCP.build` is ported to the 2.x handler
+    # API — not before, and not instead.
+    ignore:
+      - dependency-name: "mcp"
+        update-types: ["version-update:semver-major"]
     groups:
       python-dev:
         dependency-type: "development"
