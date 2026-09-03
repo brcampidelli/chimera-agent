@@ -37,14 +37,29 @@ if TYPE_CHECKING:
 _DEFAULT_PANEL = [
     "openrouter/anthropic/claude-opus-5",
     "openrouter/openai/gpt-5.5",
-    "openrouter/google/gemini-3.1-pro-preview",
+    # Was `gemini-3.1-pro-preview`. A `-preview` slug in a DEFAULT is a default that can be
+    # withdrawn without notice, and there is no stable Gemini 3.x "pro" to move to — only the flash
+    # line ships non-preview. Measured on the live index 2026-09-03: 2.000/12.000 -> 0.750/3.750 per
+    # million, and the third-party agentic index goes 23 -> 50. Cheaper AND the better number, which
+    # is unusual enough to say out loud.
+    "openrouter/google/gemini-3.8-flash",
 ]
 # The judge must not be a panelist. It shipped as `_DEFAULT_PANEL[0]` — the same slug, verbatim —
 # which made the default fusion self-evaluating in the one place this project claims to have an
 # independent signal rather than a self-report. Nothing guarded it; `validate_fusion_roles` below
 # does now. DeepSeek-R1 is a fourth vendor (the panel is Anthropic/OpenAI/Google) and is reasoning-
 # tuned, which is what judging asks for.
-_DEFAULT_JUDGE = "openrouter/deepseek/deepseek-r1"
+#
+# Moved off R1 on 2026-09-03, on three measurements rather than a preference. Its context window is
+# 64k — the tier it serves asks for 100k, so the judge could not read what the panel produced on a
+# long turn. Its third-party agentic index is 3.1, the lowest of any candidate examined, tied with a
+# 20B model in the weak tier. And on a trivial write-a-file probe it took 209s against 29s for the
+# then-default and 51s for the top model that replaced it.
+#
+# The replacement keeps DeepSeek as the judge's vendor, so the independence argument above is
+# unchanged: the panel is Anthropic/OpenAI/Google and the judge is neither a panelist nor a
+# vendor-mate of one.
+_DEFAULT_JUDGE = "openrouter/deepseek/deepseek-v4-flash-0731"
 # Spelled out rather than reusing `_DEFAULT_JUDGE`, which is what it did before. Changing the judge
 # would otherwise have moved the synthesiser too, silently — the synthesiser's job is composition,
 # not evaluation, so it is a separate decision and stays where it was.
@@ -172,7 +187,7 @@ class Settings(BaseSettings):
     # wizard SHOWS that suggestion without writing it when the user leaves it alone, so a mismatch
     # puts one slug on screen and runs another.
     default_model: str = Field(
-        default="openrouter/deepseek/deepseek-chat-v3.1", validation_alias="CHIMERA_DEFAULT_MODEL"
+        default="openrouter/deepseek/deepseek-v4-flash-0731", validation_alias="CHIMERA_DEFAULT_MODEL"
     )
 
     # --- Model tiers (M16): weak -> mid -> top, vendor-agnostic. Any LiteLLM/OpenRouter
