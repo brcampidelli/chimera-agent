@@ -25,7 +25,11 @@ def test_patterns_gate_paths(tmp_path: Path) -> None:
     assert region.allows(tmp_path / "README.md") is True
     assert region.allows(tmp_path / "config" / "secrets.py") is False
     err = region.check(tmp_path / "config" / "secrets.py")
-    assert err is not None and "outside the declared write-region" in err and "config/secrets.py" in err
+    # The wording changed in `test_the_refusal_pointed_at_a_directory_the_file_was_inside`: "outside
+    # the declared write-region" read as a directory comparison, which is not the comparison made.
+    # What this test protects is unchanged — the refusal names the path AS COMPARED.
+    assert err is not None and "does not match the declared write-region" in err
+    assert "config/secrets.py" in err
 
 
 # --- tool integration -------------------------------------------------------------------

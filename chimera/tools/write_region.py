@@ -72,16 +72,64 @@ class WriteRegion:
             return True
         return any(fnmatch.fnmatch(rel, pat) for pat in self.patterns)
 
+    def looks_absolute(self) -> list[str]:
+        """Declared patterns that look like absolute paths, which can never match anything.
+
+        Patterns are matched against the workspace-RELATIVE path, so an absolute one — a drive
+        letter, a leading slash, or a UNC prefix — cannot match any write however it is spelled.
+        Worth naming rather than merely refusing: it is a caller mistake with an exact remedy, and
+        the refusal it produces is indistinguishable from a genuinely out-of-region write.
+        """
+        suspeitos = []
+        for p in self.patterns:
+            if p.startswith("/") or p.startswith("//") or (len(p) > 1 and p[1] == ":"):
+                suspeitos.append(p)
+        return suspeitos
+
     def check(self, path: Path) -> str | None:
-        """Return an error string if the write is disallowed, else None."""
+        """Return an error string if the write is disallowed, else None.
+
+        The message has to carry three things the caller cannot see from the refusal alone: the
+        path AS COMPARED (workspace-relative, which is not what they passed), what the region
+        actually is (globs, not a directory), and — when the region cannot match anything at all —
+        that fact, because otherwise every path they try produces the same refusal.
+
+        Measured before this was written: a run given an absolute directory as its region tried the
+        same write four ways — bare name, absolute forward-slash, ``./`` prefix, absolute backslash
+        — and got a message naming a directory the file was plainly inside, every time. It then
+        spent its whole retry budget and reported an environment fault. The refusal was correct;
+        nothing in it pointed at the one thing that was wrong.
+        """
         if self.allows(path):
             return None
         rel = self._rel(path)
-        target = rel if rel is not None else str(path)
-        return (
-            f"error: write to {target!r} is outside the declared write-region "
-            f"({', '.join(self.patterns) or 'workspace'}) — refused"
+        if rel is None:
+            return (
+                f"error: write to {str(path)!r} resolves outside the workspace "
+                f"({self.workspace}) — refused"
+            )
+        if any(_under(rel, denied) for denied in ALWAYS_DENIED):
+            # A different refusal with a different remedy: no declared region can grant these, so
+            # offering the region as the thing to adjust would send the reader somewhere useless.
+            return (
+                f"error: write to {rel!r} is never permitted — {', '.join(ALWAYS_DENIED)} hold the "
+                "machinery the workspace is governed by, and no write-region can grant them"
+            )
+        recado = (
+            f"error: write to {rel!r} (relative to the workspace) does not match the declared "
+            f"write-region, which is a list of workspace-relative globs: "
+            f"{', '.join(self.patterns) or 'workspace'} — refused"
         )
+        absolutos = self.looks_absolute()
+        if absolutos:
+            um = len(absolutos) == 1
+            recado += (
+                f". Note that {', '.join(repr(a) for a in absolutos)} "
+                f"{'looks' if um else 'look'} like an absolute path"
+                f"{'' if um else 's'}, and an absolute pattern matches nothing here: use a glob "
+                "relative to the workspace, such as '**' for everything or 'src/**' for one directory"
+            )
+        return recado
 
 
 def refuse_write(workspace: Path, path: Path, region: WriteRegion | None) -> str | None:
