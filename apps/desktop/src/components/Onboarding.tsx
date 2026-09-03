@@ -192,9 +192,15 @@ export function Onboarding({ onSkip }: { onSkip: () => void }) {
               value={costMode}
               onChange={(e) => setCostMode(e.target.value)}
             >
+              {/* The VALUE stays English — `CostMode` in `providers/catalog.py` is a Literal and
+                  the server would refuse "econômico". Only the label is translated, and through the
+                  same keys the Settings screen already uses: this dropdown and the one in Settings
+                  set the identical variable, so two vocabularies for it would be the app disagreeing
+                  with itself about what the user chose. This one was rendering the raw value, which
+                  put "cheap / balanced / premium" on an otherwise fully translated wizard. */}
               {["auto", "cheap", "balanced", "premium"].map((m) => (
                 <option key={m} value={m}>
-                  {m}
+                  {t(`settings.value.${m}`)}
                 </option>
               ))}
             </select>
