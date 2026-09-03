@@ -7,9 +7,13 @@ name = "chimera-agent"
 version = "0.49.2"
 description = "An open-source, self-evolving AI agent whose reasoning core is an LLM-Fusion engine (panel -> judge -> synthesizer)."
 readme = "README.md"
-# Upper bound tracks the litellm ceiling below (<1.92, which requires Python <3.14). Without it a
-# 3.14 user reads ">=3.11", installs, and hits an opaque resolution failure instead of a clear
-# "requires a Python before 3.14". Lift both together when litellm ships Windows/macOS wheels again.
+# The bound stays, and its REASON changed. It used to track the litellm ceiling below (<1.92, which
+# required Python <3.14); that ceiling has been lifted, and 1.96.2+ requires <3.15. What holds the
+# bound now is narrower and checkable: the test matrix in `.github/workflows/ci.yml` runs 3.11, 3.12
+# and 3.13. Declaring support for a version nothing runs would be a claim with no measurement behind
+# it, which is the one kind of promise this project does not make.
+#
+# Lift it by ADDING 3.14 to that matrix and watching it pass — not by widening this line.
 requires-python = ">=3.11,<3.14"
 license = { text = "Apache-2.0" }
 authors = [{ name = "The Chimera Agent Authors", email = "chimeraagent01@gmail.com" }]
@@ -31,12 +35,22 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-    # Ceiling, not preference: 1.92 moved litellm to a compiled Rust core and publishes wheels ONLY
-    # for manylinux (x86_64/aarch64) — no Windows, no macOS. On those platforms pip falls back to the
-    # sdist, which needs a Rust toolchain + maturin and fails on a normal machine. 1.91.4 is the last
-    # release with a pure-Python `py3-none-any` wheel, so it installs everywhere. Lift this the moment
-    # upstream ships Windows/macOS wheels again.
-    "litellm>=1.40,<1.92",
+    # Upstream shipped the wheels again, so the ceiling that existed for them is gone — and the FLOOR
+    # is what replaces it. Checked against PyPI on 2026-09-03, release by release:
+    #
+    #     1.92.0  1.92.1        manylinux only        <- the reason the old ceiling existed
+    #     1.93.0                manylinux only
+    #     1.93.1  1.94.0  1.94.1  1.95.0    Windows, no macOS
+    #     1.96.2 and every release after     Windows AND macOS AND manylinux AND musllinux
+    #
+    # So `<1.99`, which is what the bot proposed, is not safe: the range still admits 1.93.0, where a
+    # macOS or Windows user falls back to the sdist and needs a Rust toolchain to install. The floor
+    # has to sit at the first release of the CONTINUOUS run that covers both — 1.96.2 — and it is the
+    # continuity that matters, not the newest version, because a resolver is free to pick any member
+    # of the range.
+    #
+    # The ceiling is now an ordinary major bound rather than a platform workaround.
+    "litellm>=1.96.2,<2",
     "pydantic>=2.7",
     "pydantic-settings>=2.3",
     "typer>=0.12",
