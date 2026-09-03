@@ -125,25 +125,57 @@ def bundles_root(home: Path) -> Path:
 #: catalogue had no chance at all, and the error told the user their network was unreachable, which
 #: was true of that one connection and not of anything they could act on.
 #:
-#: Only transport failures are retried. A 404 will be a 404 next time, and repeating a 403 spends
-#: the same anonymous budget that caused it.
+#: Transport failures and 429s are retried; a 404 will be a 404 next time, and repeating a 403
+#: spends the same budget that caused it. 429 is the one status whose meaning IS "ask again
+#: later", so treating it as a refusal threw away an answer the server had already given.
 FETCH_ATTEMPTS = 3
 FETCH_BACKOFF_S = 0.4
+
+#: Throttling gets its own budget, because a 429 is a different animal from a dropped socket.
+#:
+#: `raw.githubusercontent.com` throttles a burst per network, and a skill is downloaded one file
+#: per request — the largest in the catalogue is fifty-five. Measured against that host with
+#: distinct files: the 429 arrives somewhere around the thirteenth to eighteenth request, and the
+#: bucket refills within tens of seconds. So a big skill WILL be throttled partway through, and
+#: waiting it out is the only thing that finishes the install.
+#:
+#: Spacing the requests was tried first and is deliberately not here: at 0.15s the throttle
+#: arrived SOONER than with no pause at all (2nd request against 13th). That comparison is
+#: confounded — consecutive probes share one bucket, so a later arm starts already penalised —
+#: which is the point: the measurement could not show pacing helping, so pacing is not shipped
+#: as though it did. Retrying is the mechanism the evidence does support.
+THROTTLE_ATTEMPTS = 5
+THROTTLE_BASE_S = 2.0
+THROTTLE_MAX_WAIT_S = 30.0
 
 
 def _get(url: str, *, accept: str = "application/vnd.github+json",
          limit: int = MAX_FILE_BYTES) -> bytes:
     """One bounded GET against an allowlisted host, retried on a dropped connection."""
     ultima: BundleError | None = None
-    for tentativa in range(FETCH_ATTEMPTS):
+    transporte = 0
+    estrangulado = 0
+    # Two budgets, not one shared counter: a link that drops sockets and a host that is asking us
+    # to slow down are different failures, and spending the retries of one on the other means a
+    # big install gives up on the throttle it was always going to meet.
+    while transporte < FETCH_ATTEMPTS and estrangulado < THROTTLE_ATTEMPTS:
         try:
             return _get_once(url, accept=accept, limit=limit)
         except _TransportError as exc:
+            transporte += 1
             ultima = BundleError(
                 f"could not reach the source after {FETCH_ATTEMPTS} attempts: {exc.original}"
             )
-            if tentativa < FETCH_ATTEMPTS - 1:
-                time.sleep(FETCH_BACKOFF_S * (tentativa + 1))
+            if transporte < FETCH_ATTEMPTS:
+                time.sleep(FETCH_BACKOFF_S * transporte)
+        except _ThrottledError as exc:
+            estrangulado += 1
+            ultima = BundleError(exc.message)
+            if estrangulado < THROTTLE_ATTEMPTS:
+                # The server's own number when it gave one, our doubling when it did not; capped
+                # either way, so a ten-minute Retry-After becomes a message and not a silent stall.
+                padrao = THROTTLE_BASE_S * (2 ** (estrangulado - 1))
+                time.sleep(min(exc.espera or padrao, THROTTLE_MAX_WAIT_S))
     assert ultima is not None  # the loop runs at least once
     raise ultima
 
@@ -154,6 +186,35 @@ class _TransportError(Exception):
     def __init__(self, original: Exception) -> None:
         super().__init__(str(original))
         self.original = original
+
+
+class _ThrottledError(Exception):
+    """A 429: the host asked us to slow down, which is a request and not a refusal.
+
+    Carries the wait the server named, so the retry honours it instead of guessing, and the
+    message a person should see if every attempt is throttled. Never leaves this module.
+    """
+
+    def __init__(self, message: str, espera: float) -> None:
+        super().__init__(message)
+        self.message = message
+        self.espera = espera
+
+
+def _retry_after(exc: urllib.error.HTTPError, padrao: float) -> float:
+    """The wait the server asked for, in seconds, or ``padrao`` when it named none we can read.
+
+    `Retry-After` is defined as either a number of seconds or an HTTP date. Only the numeric form
+    is read: the date form needs a clock both ends agree on, and reading it wrong buys a wait
+    measured in hours. Anything unparseable falls back rather than raising — a malformed header
+    is not a reason to fail an install that a short pause would have fixed.
+    """
+    bruto = (exc.headers.get("Retry-After") or "").strip() if exc.headers else ""
+    try:
+        segundos = float(bruto)
+    except ValueError:
+        return padrao
+    return segundos if segundos > 0 else padrao
 
 
 def _get_once(url: str, *, accept: str = "application/vnd.github+json",
@@ -169,9 +230,16 @@ def _get_once(url: str, *, accept: str = "application/vnd.github+json",
     # A token if the environment offers one. Not required — one API call per install fits inside
     # the anonymous ceiling — but somebody installing a dozen skills in a sitting should not have
     # to wait for an hour they were never told about.
+    #
+    # It goes to BOTH allowlisted hosts, and that is a correction rather than a widening. Files
+    # are fetched one per request from `raw.githubusercontent.com`, which throttles harder than
+    # the API and was the host actually refusing — so sending the token only to `api.github.com`
+    # left the advice printed on failure ("set GITHUB_TOKEN") unable to affect the request that
+    # failed. Both are GitHub's own hosts and both were already in `_ALLOWED_HOSTS`; the test is
+    # against that tuple, so a future entry cannot quietly become a third place credentials go.
     token = os.environ.get("GH_TOKEN", "").strip() or os.environ.get("GITHUB_TOKEN", "").strip()
     headers = {"User-Agent": _USER_AGENT, "Accept": accept}
-    if token and parsed.hostname == "api.github.com":
+    if token and parsed.hostname in _ALLOWED_HOSTS:
         headers["Authorization"] = f"Bearer {token}"
     req = urllib.request.Request(url, headers=headers)  # noqa: S310 -- scheme and host checked above
     try:
@@ -187,12 +255,19 @@ def _get_once(url: str, *, accept: str = "application/vnd.github+json",
         if exc.code == 404:
             raise BundleError(f"not found at the source: {url}") from exc
         if exc.code in (403, 429):
-            # The unauthenticated GitHub API allows 60 requests an hour, and a person who has just
-            # installed three skills has no way to know that is what happened.
-            raise BundleError(
-                "GitHub refused the request — most likely its hourly limit for anonymous "
-                "downloads. Try again later, or set GITHUB_TOKEN."
-            ) from exc
+            # Name the host. The two throttle for different reasons on different clocks —
+            # `api.github.com` allows sixty an hour unauthenticated, `raw.githubusercontent.com`
+            # throttles a burst per network — and a message that blames the wrong one sends the
+            # reader to the wrong remedy. Both accept the token, so the advice holds for either.
+            hospedeiro = parsed.hostname or "GitHub"
+            recado = (
+                f"{hospedeiro} refused the request (HTTP {exc.code}) — its rate limit for "
+                "unauthenticated downloads. Try again in a few minutes, or set GITHUB_TOKEN."
+            )
+            if exc.code == 429:
+                # A request to wait, not a refusal: hand it to `_get`, which retries.
+                raise _ThrottledError(recado, _retry_after(exc, 0.0)) from exc
+            raise BundleError(recado) from exc
         raise BundleError(f"the source answered {exc.code}") from exc
     except BundleError:
         raise

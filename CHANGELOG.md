@@ -4,6 +4,48 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- **The skill install error blamed a limit that was not the one that bit.** Installing from the
+  catalogue failed with *"GitHub refused the request — most likely its hourly limit for anonymous
+  downloads. Try again later, or set `GITHUB_TOKEN`."* Measured at that moment: **55 of the 60
+  anonymous API calls were still unspent.**
+
+  Every clause was wrong. The refusal came from `raw.githubusercontent.com`, which serves the files
+  one per request — not from `api.github.com`, whose hourly limit the message described. Setting
+  `GITHUB_TOKEN` could not affect the failing request, because the header was attached only for
+  `api.github.com`: the advice was inert for the only failure that ever printed it. And 429 means
+  *ask again later*, so handling it beside 403 as a flat refusal threw away an answer the server had
+  already given, often with a `Retry-After` naming the wait.
+
+  The token now goes to both already-allowlisted hosts, checked against `_ALLOWED_HOSTS` itself so a
+  future entry cannot quietly become a third place credentials go. 429 gets a budget of its own with
+  exponential backoff, honouring `Retry-After` and capping the wait so a ten-minute ask becomes a
+  message rather than a stall. Measured against the live host: `dogfood` went from failing to
+  installing, absorbing a 429 on the way.
+
+  **Spacing the per-file requests was tried and is deliberately not here.** At 0.15s the throttle
+  arrived on the 2nd request against the 13th with no pause at all. That comparison is confounded —
+  consecutive probes share one bucket — which is exactly why it cannot ship as though it worked. The
+  note and the absent constant are guarded together, so neither can drift from the other.
+
+- **The write refusal pointed at a directory the file was inside.** A run declaring
+  `["C:/Users/.../sonda"]` as its write-region and asking to write `sonda/ZAP2.txt` was told the file
+  was *outside* that very directory. Patterns match the workspace-**relative** path, so an absolute
+  one matches nothing however it is spelled — the refusal was right, and what it said was not.
+
+  The agent did the only thing that message invites: it retried the same write four ways — bare name,
+  absolute forward-slash, `./` prefix, absolute backslash — spent its whole retry budget across three
+  attempts and about twelve minutes, and reported an environment fault. The identical run with
+  `["**"]` wrote the file on the first try in 57 seconds.
+
+  The refusal now carries the path **as compared**, says the region is a list of workspace-relative
+  globs, and when a declared pattern looks absolute names that pattern and what to write instead. A
+  path resolving outside the workspace and one hitting `ALWAYS_DENIED` get their own messages,
+  because those have different remedies and pointing at the region would send the reader nowhere.
+
 ## [0.49.2] - 2026-09-02
 
 ### Fixed
