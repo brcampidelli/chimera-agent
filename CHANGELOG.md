@@ -155,6 +155,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   recall@10 falls as the haystack grows. The old figure was right about an older corpus; the record
   now carries the chunk count beside every recall number, and names what it supersedes.
 
+## [Unreleased]
+
+### Changed
+
+- **Parallel tool calls: measured, and not built.** `chimera/core/agent.py` runs a turn's tool calls
+  in a plain `for`. Making that concurrent needs a read-only marking on `Tool` that does not exist,
+  thread-safety on a `TaintLedger` that has none, and a change to what the loop-breaker *is* — its
+  `break` currently stops the rest of a batch from running, and in a concurrent batch they have
+  already run by the time a verdict exists.
+
+  One number decides whether that is worth doing, and nobody had it. `StepRecord.tools` is exactly
+  the batch and `traces.jsonl` already held it, so the census cost nothing: **137 runs, 868
+  tool-calling steps, complete rather than sampled.**
+
+  | | |
+  |---|---:|
+  | median step (model call + its tools) | **5,578 ms** |
+  | total saved by parallelising every safe batch, across all 137 runs | **589 ms** |
+  | per run | **4.3 ms** — 0.08% of one step |
+
+  Parallelising every safe tool call in a run saves less than one hundredth of a single model call.
+  The waits in an agent loop are seconds of inference; tool calls are milliseconds of local
+  filesystem — `read_file` 0.3 ms, `list_dir` 1.0 ms, against 0.13 ms to dispatch a thread.
+
+  **And the aggregate would have been the wrong number.** 6.9% of steps carry two or more calls, but
+  that is a mixture over models that behave in opposite ways: `gemini-3.8-flash` and
+  `deepseek-chat-v3.1` never batch at all across 414 steps, while the shipped default
+  `deepseek-v4-flash-0731` batches 23.3% of the time. Two models with zero account for half the
+  corpus. Any measurement of loop behaviour averaged over models is averaging over that.
+
+  `bench/parallel_tools/RESULTS.md` has the per-model table and what the census could not show;
+  `scripts/count_tool_batches.py` reproduces it from your own traces.
+
 ## [0.49.3] - 2026-09-03
 
 ### Changed
