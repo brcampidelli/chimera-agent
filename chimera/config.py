@@ -351,6 +351,26 @@ class Settings(BaseSettings):
     # watch is adoption: a tool the model never calls is 657 characters of nothing, and that is the
     # number that would turn this default off.
     todo_list: bool = Field(default=True, validation_alias="CHIMERA_TODO_LIST")
+    # --- Where an approval question goes when there is nobody at a console.
+    #
+    # This is what makes the three-state gate reachable on the surfaces that need it most. A cron
+    # job, a messaging bot and the Kanban board all run unattended, and all three ALREADY asked for
+    # the durable approval path — `home=settings.home`, with a comment at one of them reading
+    # "Governance on the path that runs unattended". The parameter was dropped one layer down and
+    # never reached the approver, so every REVIEW on those surfaces was refused without anybody
+    # being asked, and the only trace was a line in `audit.jsonl`.
+    #
+    # Forwarding it alone would not have been a fix. `pending.ask_durably` waits fifteen minutes,
+    # and no call site ever passed a `deliver` — so the question would have been a JSON file in
+    # `<home>/approvals/` that nobody was told about, which `pending.py` itself names as the thing
+    # to avoid: "pretending otherwise would park a worker for fifteen minutes to reach the same
+    # refusal." So the durable ask is used when, and only when, this says where to send it.
+    #
+    # A webhook URL rather than a bot token, for the reason `scheduler/delivery.py` gives about job
+    # results: a URL is copied out of a channel's settings, while a bot needs an application, a
+    # token, an invite and a server to administer. **The URL is a credential** — whoever holds it
+    # can post into that channel — so it is never logged in full.
+    approval_webhook: str = Field(default="", validation_alias="CHIMERA_APPROVAL_WEBHOOK")
 
     # --- Auto-fuse error-sensitive turns in solve/crew without an explicit --fuse.
     # Off by default (fusion costs 2-3x); when on, the cost-aware router still keeps

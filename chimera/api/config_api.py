@@ -94,6 +94,16 @@ _EDITABLE_SETTINGS = {
     "CHIMERA_REACH",
     "CHIMERA_APPROVAL",
     "CHIMERA_HOST_EXEC",
+    # The trust kernel's own switch, and the last of this group that was still `.env`-only. The
+    # three above it decide what a run may reach; this one decides whether anything JUDGES what
+    # it does. It shipped `off` on every surface, with a Security screen that reported an audit
+    # log and had no control to turn on the thing writing it — so the one way to get the product's
+    # advertised defence was a file the app never mentions.
+    "CHIMERA_GOVERNANCE",
+    # Where an approval question goes when there is nobody at a console. Editable for the same
+    # reason: without it a review on an unattended surface is a refusal, and the setting that
+    # changes that would be discoverable only by reading the source.
+    "CHIMERA_APPROVAL_WEBHOOK",
     "CHIMERA_TOOL_DENYLIST",
     # Who plays each part in a fused turn. The engine has taken these three per instance since it
     # existed; only the wire to a user was missing, so the panel a person could actually change was
@@ -332,6 +342,13 @@ def read_config(settings: Settings) -> dict[str, Any]:
             "approval": settings.approval,
             "host_exec": settings.host_exec,
             "denied_tools": list(settings.tool_denylist),
+            # The kernel's own switch, beside the three settings that say what a run may reach.
+            # It decides whether anything judges what a run DOES, and it was the only one of the
+            # four with no way to change it but a text editor.
+            "governance": settings.governance_mode,
+            # Reported as a fact about configuration, never as the value: the URL is a credential,
+            # and whoever holds it can post into that channel. Same shape as `server.token_set`.
+            "approval_webhook_set": bool(settings.approval_webhook.strip()),
         },
         # Off by default and that is a real exposure — see Settings.guard_chat. Exposed here because
         # the posture line points at this switch by name when it reports a conversation as unguarded.

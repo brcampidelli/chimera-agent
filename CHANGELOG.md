@@ -48,6 +48,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   allowlist: a registry an operator scoped to two tools does not quietly gain a third. Bound per
   thread, so the several workers a crew runs off one shared registry keep separate lists.
 
+- **`CHIMERA_APPROVAL_WEBHOOK` — where an approval question goes when nobody is at a console.** A
+  channel webhook URL, for the reason `scheduler/delivery.py` already gives about job results: a URL
+  is copied out of a channel's settings, while a bot needs an application, a token, an invite and a
+  server to administer. The URL is a credential and is never logged, never returned to a client, and
+  never shown back in the field that sets it.
+
+  With one, an unattended REVIEW is sent and answered with `chimera approve <id> --yes`. Without one
+  the refusal is immediate and names the setting, instead of inviting a retry that cannot work.
+
+- **A control for the trust kernel, which had none.** `CHIMERA_GOVERNANCE` ships `off` on every
+  surface, and the Security screen reported an audit log with nothing anywhere to turn on the thing
+  that writes it — so the only way to get the product's advertised defence was a file the app never
+  mentions. It now sits in Settings beside the three controls that say what a run may *reach*, since
+  this is the one that decides whether anything *judges* what it does.
+
+  What turning it on costs is on the screen, measured, rather than behind a confirmation dialog:
+  20 allowed, 2 warned, 3 sent for review and **8 refused** over a 33-call corpus of real tool calls
+  — and those 8 are fixed signatures, refused under `observe` too. The note also says which surfaces
+  pick the change up on their next turn and which keep what they started with until the app is
+  relaunched, because a control that confirms and does nothing spends the trust of every other
+  control on the screen.
+
+  The Security screen now says when the kernel is off, so an empty audit log reads as *nobody was
+  watching* rather than *nothing risky happened*.
+
+  `CHIMERA_APPROVAL_MODE` is deliberately **not** editable from the app, and there is a test saying
+  so: its third value is `allow`, which approves everything including a request that arrived inside
+  content the run fetched from the web. Turning a gate on is safe in every direction and belongs on
+  a screen; making it permissive stays a deliberate act in a file.
+
 ### Fixed
 
 - `CodeSession.send` forwarded a new callback to any agent whose `run` declared `**kwargs`, on the
@@ -55,6 +85,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   working. A catch-all usually forwards to something narrower, so the comment described a safety the
   code did not provide: six API turns died before their first tool call. The signature is now read
   for the parameter by name.
+
+- **Three unattended surfaces asked to be able to ask a person, and the parameter was dropped one
+  layer down.** `scheduler/job_runner`, `server/manager` and `kanban/lanes` all call
+  `governed_profile(..., home=settings.home)` — one of them with a comment on the line above reading
+  *"Governance on the path that runs unattended"*. `home` is what `approver_for` reads to opt into
+  asking somebody who is not at the keyboard, and the whole mechanism behind it
+  (`chimera/governance/pending.py`, a durable question answered with `chimera approve`) exists and is
+  tested.
+
+  `governed_profile` used the parameter for `AuditLog(home / "audit.jsonl")` and never handed it on
+  to `govern_step`, which is what builds the approver. So on all three surfaces every REVIEW was
+  refused with nobody asked. An operator who set `CHIMERA_APPROVAL_MODE=ask` believed they would be
+  told before anything risky; the only trace was a line in `audit.jsonl`. The parameter was named in
+  the signature, which is what made the omission read as wiring rather than as a decision.
+
+  **Forwarding it alone would have been a regression.** `ask_durably` waits fifteen minutes, and no
+  call site has ever passed a `deliver` — so the question would have been a JSON file nobody was
+  told about, which `pending.py` names itself: *"pretending otherwise would park a worker for fifteen
+  minutes to reach the same refusal."* So the durable ask travels only with somewhere to send it.
+
 
 ## [0.49.3] - 2026-09-03
 

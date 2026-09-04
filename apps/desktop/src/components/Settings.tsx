@@ -318,6 +318,52 @@ function AutonomyCard({
           </div>
         </div>
       )}
+      <Row
+        label={t("settings.row.governance")}
+        hint={t("settings.hint.governance")}
+        env="CHIMERA_GOVERNANCE"
+      >
+        <Select
+          value={c.autonomy.governance || "off"}
+          options={["off", "observe", "enforce"]}
+          // Spelled out, not composed: the dead-key gate reads the source for literal key
+          // strings, so an interpolated key is one it cannot see — and would report as unused.
+          render={(v) =>
+            v === "enforce"
+              ? t("settings.value.governance.enforce")
+              : v === "observe"
+                ? t("settings.value.governance.observe")
+                : t("settings.value.governance.off")
+          }
+          // No confirmation on the way up, deliberately, for the reason written on `host_exec`
+          // above: asking to confirm a NARROWING trains people to click through the one
+          // confirmation that matters. What the two modes cost is stated below instead, as a
+          // measurement, so the decision is made with the number rather than after it.
+          onChange={(v) => save({ CHIMERA_GOVERNANCE: v })}
+        />
+      </Row>
+      {(c.autonomy.governance || "off") !== "off" && (
+        <p className="px-4 pb-3 text-xs text-muted-foreground">
+          {t("settings.governance.cost")}
+        </p>
+      )}
+      <Row
+        label={t("settings.row.approvalWebhook")}
+        hint={t("settings.hint.approvalWebhook")}
+        env="CHIMERA_APPROVAL_WEBHOOK"
+      >
+        <TextField
+          // Never the value. The URL is a credential — whoever holds it can post into that
+          // channel — so the API reports only whether one is saved, and the field says which.
+          value=""
+          placeholder={
+            c.autonomy.approval_webhook_set
+              ? t("settings.approvalWebhook.saved")
+              : "https://…/webhook"
+          }
+          onSave={(v) => save({ CHIMERA_APPROVAL_WEBHOOK: v })}
+        />
+      </Row>
       {(c.autonomy.denied_tools ?? []).length > 0 && (
         <Row
           label={t("settings.row.deniedTools")}

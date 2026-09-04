@@ -17,6 +17,10 @@ import { getGovernanceAudit, getGovernanceInjection, getSandboxState } from "@/l
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", () => ({
+  // The screen now also asks whether the trust kernel is installed at all, so it can say that
+  // an empty audit means nobody was watching. Answering `off` here keeps that line out of the
+  // way of tests about the panels below — and a mock missing the call throws the whole screen.
+  getConfig: vi.fn(async () => ({ autonomy: { governance: "off" } })),
   getGovernanceInjection: vi.fn(),
   getGovernanceAudit: vi.fn(),
   getSandboxState: vi.fn(),

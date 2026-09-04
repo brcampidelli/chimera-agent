@@ -97,6 +97,7 @@ def govern_step(
     surface: str = "",
     attended: bool = True,
     audit_allows: bool = True,
+    home: Path | None = None,
 ) -> GovernanceStep:
     """Apply the deployment's trust kernel to ``registry``, under the deployment's mode.
 
@@ -122,10 +123,22 @@ def govern_step(
     the request and cannot see what it was for, and the worker blocks until they answer. An approval
     means something only when the person answering is the person who asked, which on this surface is
     never — so an unattended caller passes ``attended=False`` and the prompt is never built.
+
+    ``home`` is the other half of that, for the surfaces where ``attended=False`` is the wrong
+    answer: a cron job, a messaging bot and the Kanban board have nobody at a console either, but
+    the person who wants the decision is reachable — they are just not in the room. With a home
+    AND somewhere to send the question (``CHIMERA_APPROVAL_WEBHOOK``), the question is written
+    down, sent, and answered with ``chimera approve``. With a home and no destination, this
+    refuses immediately and says which setting would have let it ask, rather than parking the
+    worker for fifteen minutes to reach the same refusal.
     """
     from chimera.governance import ApprovalLedger, TrustKernel
     from chimera.governance.approval import allow as allow_everything
-    from chimera.governance.approval import approver_for
+    from chimera.governance.approval import (
+        approver_for,
+        deliverer_for,
+        nobody_is_at_a_terminal,
+    )
     from chimera.governance.governed_tool import govern_registry
 
     resolved = (mode or settings.governance_mode or "off").strip().lower()
@@ -155,6 +168,9 @@ def govern_step(
         approve = allow_everything(approvals)
     else:
         wanted = settings.approval_mode
+        # Where a question would go if one had to be asked, resolved before the mode is: on an
+        # unattended surface it is what decides whether "ask" has anywhere to go at all.
+        deliver = deliverer_for(settings)
         if wanted == "deny":
             no_approver = "owner_denies"
         if not attended and wanted == "ask":
@@ -163,8 +179,28 @@ def govern_step(
             # the same fail-closed answer one step earlier, before a tty that belongs to somebody
             # else can be mistaken for the requester.
             wanted = "deny"
+        elif (
+            wanted == "ask"
+            and home is not None
+            and deliver is None
+            and nobody_is_at_a_terminal()
+        ):
+            # The caller opted into asking somebody who is not at the keyboard — and this deployment
+            # has not said where such a question would go. Refusing HERE rather than letting
+            # `ask_durably` write a file and wait is the difference between a refusal and the same
+            # refusal fifteen minutes later, which `pending.py` names as the thing to avoid. The
+            # reason travels so the message can name the setting that turns asking on, instead of
+            # inviting a retry that will be refused identically.
+            no_approver = "unreachable"
+            wanted = "deny"
         approver_name = wanted
-        approve = approver_for(wanted, approvals)
+        # `home` travels unconditionally, and the branch above is the only thing deciding whether
+        # it can be used: with no destination `wanted` is already `deny`, and `approver_for`
+        # returns before it reads a home at all. An earlier draft ALSO withheld `home` here, and
+        # the sabotage matrix found that no test could tell the two versions apart — because in
+        # every reachable path the branch had already answered. A second guard that cannot be
+        # observed to fail is not depth; it is a line the next reader has to reason about twice.
+        approve = approver_for(wanted, approvals, home=home, deliver=deliver)
 
     registry = govern_registry(
         registry,
@@ -280,7 +316,14 @@ def governed_profile(
     # The mode resolution and the kernel now live in `govern_step`, which the API's own assembly
     # calls too. They were written out here and nowhere else, which is why for a long time the kernel
     # reached `chimera run --guard` and the cron and nothing served over HTTP.
-    step = govern_step(registry, settings=settings, audit=audit, mode=mode, surface=surface)
+    # `home` travels. It used to stop here — read for the audit path and never handed on — so the
+    # three callers that pass `settings.home` believing they enable "ask a person who is not at
+    # the keyboard" (`scheduler/job_runner`, `server/manager`, `kanban/lanes`) enabled nothing,
+    # and every REVIEW on those surfaces was refused with nobody asked. The parameter was named
+    # in the signature, so the omission read as wiring rather than as a decision.
+    step = govern_step(
+        registry, settings=settings, audit=audit, mode=mode, surface=surface, home=home
+    )
     if step.mode == "off":
         return step.registry, step.approvals
 

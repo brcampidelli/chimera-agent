@@ -2863,8 +2863,18 @@ export interface components {
              * @default
              */
             approval: string;
+            /**
+             * Approval Webhook Set
+             * @default false
+             */
+            approval_webhook_set: boolean;
             /** Denied Tools */
             denied_tools?: string[];
+            /**
+             * Governance
+             * @default off
+             */
+            governance: string;
             /**
              * Host Exec
              * @default ask

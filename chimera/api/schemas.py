@@ -369,6 +369,19 @@ class AutonomyCfgOut(BaseModel):
     approval: str = ""
     host_exec: str = "ask"
     denied_tools: list[str] = Field(default_factory=list)
+    governance: str = "off"
+    """Whether anything JUDGES what a run does — ``off`` | ``observe`` | ``enforce``.
+
+    The fourth control, and the one that was missing from every screen. The three above decide
+    what a run may reach; this decides whether the trust kernel is in the path at all. It ships
+    ``off``, so on a stock install the only thing between the model and a `git push --force`
+    inside the workspace is the folder jail."""
+    approval_webhook_set: bool = False
+    """Whether this deployment has said where an approval question goes.
+
+    A fact about configuration, never the value: the URL is a credential and whoever holds it
+    can post into that channel. Without one, a review on an unattended surface is a refusal —
+    which the refusal now says, naming this setting."""
 
 
 class ServerCfgOut(BaseModel):

@@ -787,12 +787,22 @@
             "title": "Approval",
             "type": "string"
           },
+          "approval_webhook_set": {
+            "default": false,
+            "title": "Approval Webhook Set",
+            "type": "boolean"
+          },
           "denied_tools": {
             "items": {
               "type": "string"
             },
             "title": "Denied Tools",
             "type": "array"
+          },
+          "governance": {
+            "default": "off",
+            "title": "Governance",
+            "type": "string"
           },
           "host_exec": {
             "default": "ask",
