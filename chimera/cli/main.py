@@ -900,6 +900,9 @@ def bench_rag(
     root: Path = _BENCH_ROOT,
     k: int = _BENCH_K,
     max_probes: int = _BENCH_PROBES,
+    semantic: bool = typer.Option(
+        False, "--semantic", help="Measure the vector and hybrid arms too. Costs money."
+    ),
 ) -> None:
     """Recall@k of each retriever over a real folder — lexical, and vector when an embedder is set.
 
@@ -907,8 +910,14 @@ def bench_rag(
     is not a claim that it helps. That sentence pointed at a module you could not run: `rag_bench`
     had no caller outside its own test and was not exported from `chimera.eval`.
 
-    No embedder is passed, so the vector and hybrid figures come back as None rather than zero —
-    an embedder that was never called did not fail, and printing 0.0 invites the wrong conclusion.
+    Without `--semantic` no embedder is passed, so the vector and hybrid figures come back as None
+    rather than zero — an embedder that was never called did not fail, and printing 0.0 invites the
+    wrong conclusion.
+
+    With it, the run that `bench/rag/RESULTS.md` reports is reproducible from the CLI rather than
+    from a script somebody has to write. It costs an embedding pass over the corpus: about two cents
+    for this repository's 3,459 chunks and 400 probes, and the figure it produces belongs to the
+    embedder that produced it — vector spaces do not convert between models.
     """
     import tempfile
 
@@ -924,8 +933,21 @@ def bench_rag(
     # The scratch index is worth nothing once the report is printed. Failing to remove it must not
     # fail the thing it was for.
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+        embed = None
+        if semantic:
+            from chimera.evolution.wiring import semantic_embed
+
+            embed = semantic_embed(get_settings(), force=True)
+            console.print(
+                f"[dim]embedding with {get_settings().embed_model} — this costs money[/dim]"
+            )
         report = run_rag_bench(
-            Path(root), index_path=Path(tmp) / "index.db", k=k, max_probes=max_probes
+            Path(root),
+            index_path=Path(tmp) / "index.db",
+            embed=embed,
+            embedder=get_settings().embed_model if semantic else "",
+            k=k,
+            max_probes=max_probes,
         )
     table = Table(title=f"RAG recall@{k} over {root}", show_header=True, header_style="bold")
     table.add_column("retriever")
@@ -941,6 +963,10 @@ def bench_rag(
         table.add_row(name, shown)
     console.print(table)
     console.print(f"[dim]{report.probes} probes over {report.chunks} chunks[/dim]")
+    if report.embedder:
+        # Inside the report, not in a footnote: a recall figure without the model that produced it
+        # is a number about nothing in particular.
+        console.print(f"[dim]embedder: {report.embedder} ({report.dimensions} dimensions)[/dim]")
     # The number that says whether a semantic layer could help at all: the share of probes keyword
     # retrieval misses. A headroom near zero means the embedding bill buys nothing here.
     console.print(f"[dim]headroom for a semantic layer: {report.headroom:.1%}[/dim]")
@@ -6725,6 +6751,9 @@ def find_command(
     path: str = typer.Option(".", "--path", help="Repository to search."),
     k: int = typer.Option(8, "--k", help="How many results."),
     reindex: bool = typer.Option(False, "--reindex", help="Rebuild the index before searching."),
+    semantic: bool = typer.Option(
+        False, "--semantic", help="Fuse keyword with embeddings. Costs money to index."
+    ),
 ) -> None:
     """Search a repository by what code DOES, not by the string it contains.
 
@@ -6732,30 +6761,87 @@ def find_command(
     SQLite file with an FTS5 index, RRF fusion — measured, documented, and reachable from nothing.
     A library with no entrance is a library nobody has. This is the entrance.
 
-    Keyword retrieval only, and that is stated rather than glossed: the semantic half needs an
-    embedder, none is wired, and the pre-registered baseline in `bench/rag/` says exactly what the
-    keyword half is worth on this repository — recall@10 of 0.4925 over 400 probes. Half the
-    answers are not in the top ten. Printing that beside the results is the difference between a
-    tool you can calibrate and one you learn to distrust.
+    Keyword by default; `--semantic` fuses it with embeddings, and the fusion is what was measured
+    and adopted in `bench/rag/RESULTS.md`: hybrid 0.5050 against keyword 0.4425 on this repository,
+    +6.25 pp paired over 400 probes, McNemar p = 1.7e-04.
+
+    **`--semantic` means HYBRID, never vectors alone**, and that is the measurement rather than a
+    preference: the vector arm on its own scored **0.4100 — worse than keyword**. Every point of the
+    win comes from fusing two rankings that are wrong about different things. A flag that gave you
+    the vector arm would be a flag that made your search worse.
+
+    The recall figure is printed with every search because it is per-corpus and per-embedder: the
+    same harness measures 0.4750 on this repository as it stood three weeks ago, and there is no
+    conversion from one embedding model's vector space to another's.
     """
     from chimera.rag import ChunkStore, default_index_path, walk
+    from chimera.rag.hybrid import reciprocal_rank_fusion
 
     root = Path(path).expanduser().resolve()
     if not root.is_dir():
         console.print(f"[red]{root} is not a directory[/red]")
         raise typer.Exit(code=1)
 
-    index = default_index_path(get_settings().home, root)
+    settings = get_settings()
+    embed = None
+    if semantic:
+        from chimera.evolution.wiring import semantic_embed
+
+        embed = semantic_embed(settings, force=True)
+        if embed is None:
+            console.print("[red]--semantic needs an embedder; none could be built[/red]")
+            raise typer.Exit(code=1)
+
+    index = default_index_path(settings.home, root)
     store = ChunkStore(index)
     try:
         if reindex or store.stats()["chunks"] == 0:
             with console.status("indexing..."):
                 n = store.replace_all(walk(root))
             console.print(f"[dim]indexed {n} chunks from {root}[/dim]")
-        hits = store.search_keyword(query, k=k)
+        keyword = store.search_keyword(query, k=k)
+        hits = keyword
+        if embed is not None:
+            pending = store.stats()["chunks"] - store.stats().get("embedded", 0)
+            # Said BEFORE the money is spent, not in a footnote afterwards. Embedding a corpus is
+            # the one part of this command with a bill, and a user who did not expect one has no way
+            # to un-spend it.
+            if pending > 0:
+                console.print(
+                    f"[dim]embedding {pending} chunks with {settings.embed_model} — "
+                    f"this costs money, and only the first time or after --reindex[/dim]"
+                )
+            with console.status("embedding..."):
+                # `embedder=` arms the guard that zeroes every vector when the model or its width
+                # changes. Without it a mixed-dimension index reports healthy and returns nothing.
+                store.embed_missing(embed, embedder=settings.embed_model)
+            vector = store.search_vector(embed([query])[0], k=k)
+            hits = reciprocal_rank_fusion([keyword, vector], limit=k)
         stats = store.stats()
     finally:
         store.close()
+
+    def calibration() -> None:
+        """The measured recall, printed on every search — including one that found nothing.
+
+        It used to sit only after the results table, so the `return` below skipped it: a search that
+        matched nothing showed no number at all. That is the moment the number is worth most, because
+        an empty screen is where a reader has to decide between "my query was wrong" and "this
+        retriever misses half of what it is asked for", and only one of those is true here.
+        """
+        if semantic:
+            console.print(
+                f"[dim]hybrid (keyword + {settings.embed_model}). Measured on this repository, "
+                "3459 chunks: recall@10 of 0.505 against 0.443 for keyword alone — +6.25 pp paired "
+                "over 400 probes, p = 1.7e-04. The vector arm ALONE scores 0.410, below keyword: "
+                "the gain is the fusion, not the embeddings.[/dim]"
+            )
+        else:
+            console.print(
+                "[dim]keyword only. Measured on this repository, 3459 chunks: recall@10 of 0.443 — "
+                "more than half of what you look for is NOT in the top ten. --semantic measures "
+                "0.505, and costs an embedding pass over the corpus.[/dim]"
+            )
 
     if not hits:
         # Named, because "no results" from a stale index and "no results" from a repository that
@@ -6764,6 +6850,7 @@ def find_command(
             f"[dim]nothing matched in {stats['chunks']} chunks from {stats['files']} files. "
             f"If the code moved since the index was built, try --reindex.[/dim]"
         )
+        calibration()
         return
 
     table = Table(title=repr(query), show_header=True, title_style="bold")
@@ -6780,11 +6867,7 @@ def find_command(
     console.print(table)
     # The number, every time. Measured on this repository, pre-registered before any embedder
     # existed so it could not be chosen after seeing what looked good.
-    console.print(
-        "[dim]keyword retrieval only (no embedder wired). Measured on this repository: "
-        "recall@10 of 0.4925 over 400 probes — about half of what you look for is NOT in the "
-        "top ten.[/dim]"
-    )
+    calibration()
 
 
 if __name__ == "__main__":

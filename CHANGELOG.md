@@ -238,6 +238,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   2.5× the wall clock** of `deepseek-v4-flash-0731` for the same tasks at the same pass rate. Both
   are "flash"-tier by name.
 
+## [Unreleased]
+
+### Added
+
+- **`chimera find --semantic`, and `chimera measure rag --semantic`.** `bench/rag/RESULTS.md` said
+  ADOPT three commits ago and the command kept running keyword-only: a verdict is not a delivery.
+
+  **`--semantic` means hybrid, never vectors alone**, and that is the measurement rather than a
+  preference — the vector arm on its own scored **0.4100, below keyword's 0.4425**. A flag that
+  handed back the vector arm would make a search worse while sounding like an upgrade. The
+  embedding bill is announced **before** the pass, not in a footnote after it, and the footer names
+  the embedder, because a recall figure without the model that produced it is a number about
+  nothing in particular.
+
+### Fixed
+
+- **A catalogue price was wrong by 2.2x, and its own note said it had been verified.**
+  `deepseek-chat-v3.1` carried 0.25/0.95 against a live 0.55/1.65 — recorded by a survey on
+  2026-09-03 that misread it. The entry feeds `register_catalog_prices`, so **every receipt for that
+  model under-reported by the same factor** for as long as it stood, and it sits in
+  `transfer_panel`, a default nobody chose. Restored, with the misreading kept in the note rather
+  than deleted.
+- **The guard that should have caught it tolerated a factor of five.** `test_catalog_is_live` fired
+  only on an order of magnitude, so 2.2x passed. Tightened to 50%: the catalogue price is not
+  decoration, it is what a user is told they spent.
+- **Five catalogue entries promised a window the provider does not serve.** `context_length` and
+  `top_provider.context_length` are different numbers in 39 of OpenRouter's 431 models, and the gap
+  reaches 20% on the shipped default, the fusion judge and the top rung of two presets — 1,310,720
+  advertised against 1,048,576 served. It never bit, and only by accident: the compaction trigger is
+  0.48 of the window, so 628,800 sat inside what was served. A new integration guard holds the rule
+  that a catalogue window may be smaller than the provider's, never larger.
+- **A search that matched nothing printed no calibration figure.** The measured recall sat after the
+  results table, so the empty-result path skipped it — at exactly the moment a reader has to decide
+  between "my query was wrong" and "this retriever misses half of what it is asked for".
+
 ## [0.49.3] - 2026-09-03
 
 ### Changed

@@ -25,9 +25,16 @@ if TYPE_CHECKING:
     from chimera.memory import EmbedFn, MemoryManager
 
 
-def semantic_embed(settings: Settings) -> EmbedFn | None:
-    """The gateway embedder when semantic memory is on, else None (keyword recall)."""
-    if not settings.semantic_memory:
+def semantic_embed(settings: Settings, *, force: bool = False) -> EmbedFn | None:
+    """The gateway embedder when semantic memory is on, else None (keyword recall).
+
+    ``force`` is for a caller who asked for embeddings in so many words — `chimera find --semantic`
+    — rather than inheriting the memory setting. The two are different decisions: turning on
+    semantic *memory* is a standing choice about every run, and typing `--semantic` on one search is
+    a choice about that search. Reading the first as consent to the second would put a bill on a
+    flag the user did not set.
+    """
+    if not settings.semantic_memory and not force:
         return None
     from chimera.providers import LLMGateway
 
