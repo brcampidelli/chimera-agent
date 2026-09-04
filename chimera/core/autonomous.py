@@ -41,6 +41,7 @@ from chimera.core.events import edit as _ev_edit
 from chimera.core.events import final as _ev_final
 from chimera.core.events import result as _ev_result
 from chimera.core.events import status as _ev_status
+from chimera.core.events import todo as _ev_todo
 from chimera.core.events import tool as _ev_tool
 from chimera.core.ledger import ProgressLedger, TaskLedger
 from chimera.core.planner import Plan, Planner
@@ -525,6 +526,19 @@ class AutonomousAgent:
             )
         )
 
+    def _emit_todo(self, items: list[dict[str, str]]) -> None:
+        """Forward the worker's own task list as a ``todo`` event through the sink.
+
+        The one frame in this vocabulary that reports a *claim* rather than an observation, which
+        the event carries as ``claimed`` so no consumer has to infer it. Worth the distinction:
+        ``result`` frames come from a verifier's exit code and ``edit`` frames from a diff read off
+        disk, so a reader who learned to trust those would have no reason to read this one
+        differently — and a row of ticks is exactly the shape that gets trusted.
+        """
+        if self.on_event is None:
+            return
+        self._emit(_ev_todo(items))
+
     def _run_worker(
         self, worker: Worker, prompt: str, *, spend: SpendBudget | None = None
     ) -> AgentResult:
@@ -559,6 +573,8 @@ class AutonomousAgent:
                 kwargs["on_edit"] = self._emit_edit
             if "on_tool" in accepted:
                 kwargs["on_tool"] = self._emit_tool
+            if "on_todo" in accepted:
+                kwargs["on_todo"] = self._emit_todo
         if not kwargs:
             return worker.run(prompt)
         try:

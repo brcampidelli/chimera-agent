@@ -845,6 +845,12 @@ export interface RunEvent {
   // fabricated — read from the file on disk before/after the write-tool call).
   path?: string;
   patch?: string;
+  // `kind === "todo"`: the run's task list, whole, as the AGENT declared it. `claimed` is what
+  // separates it from every other frame here — `edit` is a diff read off disk and `result` is a
+  // verifier's exit code, while this is the model's account of its own progress and nothing
+  // checked it. A renderer that drops the distinction draws a row of ticks that reads as verified.
+  items?: { task: string; status: string }[];
+  claimed?: boolean;
 }
 
 /** The terminal `done` payload of a run. */
@@ -1134,6 +1140,7 @@ export interface CodeTurnHandlers {
   onToken?: (text: string) => void;
   onTool?: (e: CodeToolEvent) => void;
   onEdit?: (path: string, patch: string) => void;
+  onTodo?: (items: { task: string; status: string }[]) => void;
   onVerified?: (v: CodeVerified) => void;
   onDone?: (d: CodeTurnDone) => void;
   onError?: (msg: string) => void;
@@ -1315,6 +1322,8 @@ function applyCodeTurnFrame(
   else if (event === "token") h.onToken?.(payload.text as string);
   else if (event === "tool") h.onTool?.(payload as unknown as CodeToolEvent);
   else if (event === "edit") h.onEdit?.(payload.path as string, payload.patch as string);
+  else if (event === "todo")
+    h.onTodo?.((payload.items ?? []) as { task: string; status: string }[]);
   else if (event === "verified") h.onVerified?.(payload as unknown as CodeVerified);
   else if (event === "done") h.onDone?.(payload as unknown as CodeTurnDone);
   else if (event === "error") h.onError?.(payload.message as string);

@@ -495,5 +495,13 @@ export function liveLine(e: RunEvent, t: TFunc): string | null {
   if (e.kind === "attempt") return `${t("runs.attempt")} ${e.index} — ${t("runs.verifying")}`;
   if (e.kind === "result")
     return `${t("runs.attempt")} ${e.index}: ${e.success ? t("runs.passed") : t("runs.failed")}`;
+  // The one line here that is a CLAIM rather than an observation, which is why it reuses the
+  // wording the panel uses instead of inventing a shorter one: a bare "3/5 done" on a live
+  // feed of verified events reads as a fifth verified event.
+  if (e.kind === "todo" && e.items)
+    return t("code.todo.claimed", {
+      done: String(e.items.filter((i) => i.status === "done").length),
+      total: String(e.items.length),
+    });
   return null; // `final` is covered by onDone
 }

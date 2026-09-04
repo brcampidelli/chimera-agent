@@ -243,6 +243,7 @@ export function scriptTurn(
     verified?: CodeVerified;
     done?: Partial<CodeTurnDone>;
     error?: boolean;
+    todos?: { task: string; status: string }[][];
   } = {},
 ) {
   return async (_req: unknown, h: CodeTurnHandlers) => {
@@ -250,6 +251,8 @@ export function scriptTurn(
     for (const token of script.tokens ?? []) h.onToken?.(token);
     for (const tool of script.tools ?? []) h.onTool?.(tool);
     for (const edit of script.edits ?? []) h.onEdit?.(edit.path, edit.patch);
+    // Each frame is the WHOLE list, so a script sends snapshots, not additions.
+    for (const todo of script.todos ?? []) h.onTodo?.(todo);
     if (script.error) {
       h.onError?.("boom");
       return;

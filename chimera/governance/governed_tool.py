@@ -75,6 +75,14 @@ _DOCUMENT_ARGS = frozenset(
         # walking in would print them. The tool name stays as the identifier, so the audit line
         # still says WHAT was called; only the payload becomes a character count.
         "arguments",
+        # todo_write: the whole task list. A body rather than an identifier, on both counts the
+        # list is read for. The identity of the call is "recorded a task list"; the text is prose
+        # the model wrote, of no fixed length, and a step reading "delete the old keys from
+        # config/secrets.env" would be judged by shell rules for words that describe an intention
+        # rather than issue a command. It is NOT nested: the keys inside are ours (`task`,
+        # `status`), but neither is a secret-shaped name, so walking in would print the same
+        # prose the elision exists to keep out of a log the app serves over HTTP.
+        "items",
     }
 )
 

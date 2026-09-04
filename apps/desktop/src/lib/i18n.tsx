@@ -83,6 +83,8 @@ const en: Dict = {
     "Replace an exact substring in a workspace file (surgical edit — prefer this over write_file for changing an existing file). 'old' must match exactly and, unless replace_all is true, appear exactly once; a missing or ambiguous match is refused.",
   "tools.desc.apply_patch":
     "Apply multiple search/replace hunks to one workspace file, atomically. The patch is a sequence of '<<<<<<< SEARCH / ======= / >>>>>>> REPLACE' blocks; each SEARCH must match exactly once. If any hunk fails to anchor, the file is left unchanged.",
+  "tools.desc.todo_write":
+    "Record your task list for this run, replacing whatever you recorded before. Send every item each time, including the finished ones. At most one item may be 'doing'. Use this for work with several steps so progress survives a context compaction and the person watching can see where you are.",
   "tools.desc.list_dir": "List entries of a directory in the workspace.",
   "tools.desc.grep":
     "Search file contents by regular expression. Returns 'relpath:lineno: line' matches. Optionally restrict to a subdirectory and to files matching a glob (e.g. '*.py').",
@@ -903,6 +905,12 @@ const en: Dict = {
   "code.roles.panel": "panel",
   "code.roles.unproven":
     "Routing each role to a different model is NOT yet measured. See bench/role_routing — until that runs, this is a choice about cost and models, not a claim that it works better.",
+  "code.todo.title": "Task list",
+  "code.todo.claimed":
+    "{done} of {total} done — what the agent says about its own progress, not a verdict.",
+  "code.todo.status.done": "done",
+  "code.todo.status.doing": "doing",
+  "code.todo.status.pending": "to do",
   "code.worth.title": "Was it worth it?",
   "code.worth.profile": "profile",
   "code.worth.runs": "runs",
@@ -1366,6 +1374,8 @@ const pt: Dict = {
     "Substitui uma substring exata em um arquivo do workspace (edição cirúrgica — prefira isto a write_file para alterar um arquivo existente). 'old' precisa corresponder exatamente e, a menos que replace_all seja true, aparecer exatamente uma vez; correspondência ausente ou ambígua é recusada.",
   "tools.desc.apply_patch":
     "Aplica vários trechos de busca/substituição a um único arquivo do workspace, de forma atômica. O patch é uma sequência de blocos '<<<<<<< SEARCH / ======= / >>>>>>> REPLACE'; cada SEARCH precisa corresponder exatamente uma vez. Se algum trecho não ancorar, o arquivo fica inalterado.",
+  "tools.desc.todo_write":
+    "Registre sua lista de tarefas desta execução, substituindo o que você registrou antes. Envie todos os itens sempre, inclusive os concluídos. No máximo um item pode estar em 'doing'. Use isto em trabalhos de várias etapas, para que o progresso sobreviva a uma compactação de contexto e quem estiver acompanhando veja onde você está.",
   "tools.desc.list_dir": "Lista as entradas de um diretório no workspace.",
   "tools.desc.grep":
     "Busca no conteúdo dos arquivos por expressão regular. Devolve correspondências no formato 'relpath:lineno: line'. Opcionalmente restringe a um subdiretório e a arquivos que casem com um glob (ex.: '*.py').",
@@ -2194,6 +2204,12 @@ const pt: Dict = {
   "code.roles.panel": "painel",
   "code.roles.unproven":
     "Rotear cada papel para um modelo diferente AINDA não foi medido. Veja bench/role_routing — até isso rodar, esta é uma escolha de custo e de modelos, não uma alegação de que funciona melhor.",
+  "code.todo.title": "Lista de tarefas",
+  "code.todo.claimed":
+    "{done} de {total} concluídas — o que o agente diz do próprio progresso, não um veredito.",
+  "code.todo.status.done": "feito",
+  "code.todo.status.doing": "fazendo",
+  "code.todo.status.pending": "a fazer",
   "code.worth.title": "Valeu a pena?",
   "code.worth.profile": "perfil",
   "code.worth.runs": "execuções",
@@ -2698,6 +2714,8 @@ const es: Dict = {
     "Reemplaza una subcadena exacta en un archivo del workspace (edición quirúrgica — prefiere esto a write_file para cambiar un archivo existente). 'old' debe coincidir exactamente y, salvo que replace_all sea true, aparecer exactamente una vez; una coincidencia ausente o ambigua se rechaza.",
   "tools.desc.apply_patch":
     "Aplica varios bloques de búsqueda/reemplazo a un solo archivo del workspace, de forma atómica. El patch es una secuencia de bloques '<<<<<<< SEARCH / ======= / >>>>>>> REPLACE'; cada SEARCH debe coincidir exactamente una vez. Si algún bloque no ancla, el archivo queda sin cambios.",
+  "tools.desc.todo_write":
+    "Registra tu lista de tareas de esta ejecución, reemplazando lo que registraste antes. Envía todos los elementos cada vez, incluidos los terminados. Como máximo un elemento puede estar en 'doing'. Úsalo en trabajos de varios pasos, para que el progreso sobreviva a una compactación de contexto y quien mire vea dónde estás.",
   "tools.desc.list_dir": "Lista las entradas de un directorio del workspace.",
   "tools.desc.grep":
     "Busca en el contenido de los archivos por expresión regular. Devuelve coincidencias con el formato 'relpath:lineno: line'. Opcionalmente se restringe a un subdirectorio y a archivos que coincidan con un glob (p. ej. '*.py').",
@@ -3496,6 +3514,12 @@ const es: Dict = {
   "code.roles.panel": "panel",
   "code.roles.unproven":
     "Enrutar cada rol a un modelo distinto AÚN no está medido. Ver bench/role_routing — hasta que se ejecute, esto es una elección de coste y de modelos, no una afirmación de que funcione mejor.",
+  "code.todo.title": "Lista de tareas",
+  "code.todo.claimed":
+    "{done} de {total} completadas — lo que el agente dice de su propio avance, no un veredicto.",
+  "code.todo.status.done": "hecho",
+  "code.todo.status.doing": "haciendo",
+  "code.todo.status.pending": "por hacer",
   "code.worth.title": "¿Valió la pena?",
   "code.worth.profile": "perfil",
   "code.worth.runs": "ejecuciones",
@@ -4004,6 +4028,8 @@ const fr: Dict = {
     "Remplace une sous-chaîne exacte dans un fichier du workspace (édition chirurgicale — préférez ceci à write_file pour modifier un fichier existant). 'old' doit correspondre exactement et, sauf si replace_all vaut true, apparaître exactement une fois ; une correspondance absente ou ambiguë est refusée.",
   "tools.desc.apply_patch":
     "Applique plusieurs hunks search/replace à un seul fichier du workspace, de façon atomique. Le patch est une suite de blocs '<<<<<<< SEARCH / ======= / >>>>>>> REPLACE' ; chaque SEARCH doit correspondre exactement une fois. Si un hunk ne s'ancre pas, le fichier reste inchangé.",
+  "tools.desc.todo_write":
+    "Enregistrez votre liste de tâches pour cette exécution, en remplaçant ce que vous aviez enregistré. Envoyez tous les éléments à chaque fois, y compris ceux qui sont terminés. Au plus un élément peut être en « doing ». À utiliser pour un travail en plusieurs étapes, afin que la progression survive à une compaction du contexte et que la personne qui regarde voie où vous en êtes.",
   "tools.desc.list_dir": "Liste les entrées d'un répertoire du workspace.",
   "tools.desc.grep":
     "Cherche dans le contenu des fichiers par expression régulière. Renvoie les correspondances au format 'relpath:lineno: line'. Peut se restreindre à un sous-répertoire et aux fichiers correspondant à un glob (par ex. '*.py').",
@@ -4811,6 +4837,12 @@ const fr: Dict = {
   "code.roles.panel": "panel",
   "code.roles.unproven":
     "Router chaque rôle vers un modèle différent n'est PAS encore mesuré. Voir bench/role_routing — tant que ce n'est pas exécuté, c'est un choix de coût et de modèles, pas une affirmation que cela marche mieux.",
+  "code.todo.title": "Liste de tâches",
+  "code.todo.claimed":
+    "{done} sur {total} terminées — ce que l'agent dit de sa propre progression, pas un verdict.",
+  "code.todo.status.done": "fait",
+  "code.todo.status.doing": "en cours",
+  "code.todo.status.pending": "à faire",
   "code.worth.title": "Est-ce que ça valait le coup ?",
   "code.worth.profile": "profil",
   "code.worth.runs": "exécutions",
@@ -5319,6 +5351,8 @@ const de: Dict = {
     "Ersetzt einen exakten Teilstring in einer Datei im Workspace (chirurgische Änderung — nimm dafür lieber das hier als write_file, wenn du eine bestehende Datei änderst). 'old' muss exakt passen und, sofern replace_all nicht true ist, genau einmal vorkommen; eine fehlende oder mehrdeutige Fundstelle wird abgelehnt.",
   "tools.desc.apply_patch":
     "Wendet mehrere search/replace-Hunks atomar auf eine einzelne Datei im Workspace an. Der Patch ist eine Folge von '<<<<<<< SEARCH / ======= / >>>>>>> REPLACE'-Blöcken; jedes SEARCH muss genau einmal passen. Verankert sich ein Hunk nicht, bleibt die Datei unverändert.",
+  "tools.desc.todo_write":
+    "Halten Sie Ihre Aufgabenliste für diesen Lauf fest und ersetzen Sie damit die vorherige. Senden Sie jedes Mal alle Einträge, auch die erledigten. Höchstens ein Eintrag darf auf 'doing' stehen. Nutzen Sie das bei mehrstufiger Arbeit, damit der Fortschritt eine Kontextverdichtung übersteht und wer zusieht erkennt, wo Sie stehen.",
   "tools.desc.list_dir":
     "Listet die Einträge eines Verzeichnisses im Workspace auf.",
   "tools.desc.grep":
@@ -6125,6 +6159,12 @@ const de: Dict = {
   "code.roles.panel": "Panel",
   "code.roles.unproven":
     "Jede Rolle auf ein eigenes Modell zu routen ist NOCH NICHT gemessen. Siehe bench/role_routing — bis das läuft, ist das eine Entscheidung über Kosten und Modelle, keine Behauptung, dass es besser funktioniert.",
+  "code.todo.title": "Aufgabenliste",
+  "code.todo.claimed":
+    "{done} von {total} erledigt — was der Agent über seinen eigenen Fortschritt sagt, kein Urteil.",
+  "code.todo.status.done": "erledigt",
+  "code.todo.status.doing": "läuft",
+  "code.todo.status.pending": "offen",
   "code.worth.title": "Hat es sich gelohnt?",
   "code.worth.profile": "Profil",
   "code.worth.runs": "Läufe",
@@ -6627,6 +6667,8 @@ const zh: Dict = {
     "替换工作区文件中的一段精确子串（精准编辑——要改动已有文件，优先用它而不是 write_file）。'old' 必须完全匹配；除非 replace_all 为 true，否则只能出现一次。匹配不到或有歧义时会被拒绝。",
   "tools.desc.apply_patch":
     "对工作区里的一个文件原子地应用多个搜索/替换块。补丁是一串 '<<<<<<< SEARCH / ======= / >>>>>>> REPLACE' 块；每个 SEARCH 必须恰好匹配一次。只要有一个块定位失败，文件就原样不动。",
+  "tools.desc.todo_write":
+    "记录本次运行的任务清单，覆盖你此前记录的内容。每次都发送全部条目，包括已完成的。最多只能有一个条目处于 'doing'。用于多步骤的工作，让进度在上下文压缩后仍然保留，观看的人也能看到你进行到哪一步。",
   "tools.desc.list_dir": "列出工作区中某个目录的条目。",
   "tools.desc.grep":
     "用正则表达式搜索文件内容。返回 'relpath:lineno: line' 形式的匹配。可选择只搜某个子目录，以及只搜匹配某个 glob 的文件（例如 '*.py'）。",
@@ -7372,6 +7414,12 @@ const zh: Dict = {
   "code.roles.panel": "面板",
   "code.roles.unproven":
     "把每个角色路由到不同模型这件事尚未被测量。见 bench/role_routing——在那跑完之前，这只是关于成本和模型的选择，不是它更好用的主张。",
+  "code.todo.title": "任务清单",
+  "code.todo.claimed":
+    "{total} 项中已完成 {done} 项 — 这是智能体对自身进度的说法，不是核验结论。",
+  "code.todo.status.done": "已完成",
+  "code.todo.status.doing": "进行中",
+  "code.todo.status.pending": "待办",
   "code.worth.title": "值得吗？",
   "code.worth.profile": "配置",
   "code.worth.runs": "运行",
@@ -7872,6 +7920,8 @@ const ja: Dict = {
     "ワークスペースのファイル内で、完全一致する部分文字列を置き換えます（外科的な編集 — 既存ファイルを変更するなら write_file よりこちらを使ってください）。'old' は完全に一致し、replace_all が true でない限りちょうど 1 回だけ現れる必要があります。見つからない場合や複数該当する場合は拒否されます。",
   "tools.desc.apply_patch":
     "ワークスペースの 1 つのファイルに、複数の検索／置換ハンクをアトミックに適用します。パッチは '<<<<<<< SEARCH / ======= / >>>>>>> REPLACE' ブロックの並びで、各 SEARCH はちょうど 1 回だけ一致する必要があります。どれか 1 つでも位置を特定できなければ、ファイルは変更されません。",
+  "tools.desc.todo_write":
+    "この実行のタスクリストを記録し、以前に記録した内容を置き換えます。完了したものも含め、毎回すべての項目を送ってください。'doing' にできる項目は最大 1 件です。複数の手順がある作業で使うと、コンテキストの圧縮後も進捗が残り、見ている人が現在地を把握できます。",
   "tools.desc.list_dir": "ワークスペース内のディレクトリの項目を一覧します。",
   "tools.desc.grep":
     "正規表現でファイルの内容を検索します。一致は 'relpath:lineno: line' の形で返します。サブディレクトリに限定したり、glob に一致するファイル（例: '*.py'）に限定したりもできます。",
@@ -8662,6 +8712,12 @@ const ja: Dict = {
   "code.roles.panel": "パネル",
   "code.roles.unproven":
     "役割ごとに別のモデルへ振り分けることは、まだ測定されていません。bench/role_routing を参照してください — それが走るまで、これはコストとモデルの選択であって、より良く動くという主張ではありません。",
+  "code.todo.title": "タスクリスト",
+  "code.todo.claimed":
+    "{total} 件中 {done} 件完了 — エージェント自身の申告であり、検証結果ではありません。",
+  "code.todo.status.done": "完了",
+  "code.todo.status.doing": "作業中",
+  "code.todo.status.pending": "未着手",
   "code.worth.title": "割に合った？",
   "code.worth.profile": "プロファイル",
   "code.worth.runs": "実行",
@@ -9127,6 +9183,8 @@ const it: Dict = {
     "Sostituisce una sottostringa esatta in un file del workspace (modifica chirurgica — preferiscilo a write_file per cambiare un file esistente). 'old' deve corrispondere esattamente e, a meno che replace_all sia true, comparire esattamente una volta; una corrispondenza mancante o ambigua viene rifiutata.",
   "tools.desc.apply_patch":
     "Applica più blocchi di ricerca/sostituzione a un solo file del workspace, in modo atomico. La patch è una sequenza di blocchi '<<<<<<< SEARCH / ======= / >>>>>>> REPLACE'; ogni SEARCH deve corrispondere esattamente una volta. Se un blocco non si ancora, il file resta invariato.",
+  "tools.desc.todo_write":
+    "Registra il tuo elenco di attività per questa esecuzione, sostituendo quello registrato prima. Invia ogni volta tutti gli elementi, compresi quelli conclusi. Al massimo un elemento può essere in 'doing'. Usalo per lavori in più passaggi, così l'avanzamento sopravvive a una compattazione del contesto e chi guarda vede a che punto sei.",
   "tools.desc.list_dir": "Elenca le voci di una directory nel workspace.",
   "tools.desc.grep":
     "Cerca nel contenuto dei file con un'espressione regolare. Restituisce le corrispondenze nel formato 'relpath:lineno: line'. Facoltativamente si limita a una sottodirectory e ai file che corrispondono a un glob (es.: '*.py').",
@@ -9968,6 +10026,12 @@ const it: Dict = {
   "code.roles.panel": "panel",
   "code.roles.unproven":
     "Instradare ogni ruolo su un modello diverso NON è ancora misurato. Vedi bench/role_routing — finché non viene eseguito, questa è una scelta di costo e di modelli, non un'affermazione che funzioni meglio.",
+  "code.todo.title": "Elenco delle attività",
+  "code.todo.claimed":
+    "{done} di {total} completate — ciò che l'agente dice del proprio avanzamento, non un verdetto.",
+  "code.todo.status.done": "fatto",
+  "code.todo.status.doing": "in corso",
+  "code.todo.status.pending": "da fare",
   "code.worth.title": "Ne è valsa la pena?",
   "code.worth.profile": "profilo",
   "code.worth.runs": "esecuzioni",
@@ -10435,6 +10499,8 @@ const pl: Dict = {
     "Zamienia dokładny podciąg w pliku w workspace (chirurgiczna edycja — do zmiany istniejącego pliku wybierz to zamiast write_file). 'old' musi pasować dokładnie i — o ile replace_all nie jest true — wystąpić dokładnie raz; brak dopasowania albo dopasowanie niejednoznaczne kończy się odmową.",
   "tools.desc.apply_patch":
     "Nakłada wiele fragmentów search/replace na jeden plik w workspace, atomowo. Patch to ciąg bloków '<<<<<<< SEARCH / ======= / >>>>>>> REPLACE'; każdy SEARCH musi pasować dokładnie raz. Jeśli którykolwiek fragment się nie zakotwiczy, plik zostaje bez zmian.",
+  "tools.desc.todo_write":
+    "Zapisz swoją listę zadań dla tego przebiegu, zastępując to, co zapisałeś wcześniej. Za każdym razem wysyłaj wszystkie pozycje, także ukończone. Najwyżej jedna pozycja może mieć status 'doing'. Używaj tego przy pracy wieloetapowej, aby postęp przetrwał kompaktowanie kontekstu, a osoba obserwująca widziała, gdzie jesteś.",
   "tools.desc.list_dir": "Wypisuje wpisy katalogu w workspace.",
   "tools.desc.grep":
     "Przeszukuje zawartość plików wyrażeniem regularnym. Zwraca dopasowania w postaci 'relpath:lineno: line'. Opcjonalnie ogranicza się do podkatalogu i do plików pasujących do glob (np. '*.py').",
@@ -11269,6 +11335,12 @@ const pl: Dict = {
   "code.roles.panel": "panel",
   "code.roles.unproven":
     "Kierowanie każdej roli do innego modelu NIE zostało jeszcze zmierzone. Zobacz bench/role_routing — dopóki to nie zostanie uruchomione, jest to wybór kosztu i modeli, a nie twierdzenie, że działa lepiej.",
+  "code.todo.title": "Lista zadań",
+  "code.todo.claimed":
+    "{done} z {total} ukończonych — to, co agent mówi o własnym postępie, a nie werdykt.",
+  "code.todo.status.done": "gotowe",
+  "code.todo.status.doing": "w toku",
+  "code.todo.status.pending": "do zrobienia",
   "code.worth.title": "Czy było warto?",
   "code.worth.profile": "profil",
   "code.worth.runs": "uruchomienia",
@@ -11736,6 +11808,8 @@ const ru: Dict = {
     "Заменяет точную подстроку в файле рабочей папки (точечная правка — для изменения существующего файла берите это, а не write_file). 'old' должен совпадать буквально и, если replace_all не true, встречаться ровно один раз; если совпадения нет или их несколько, правка отклоняется.",
   "tools.desc.apply_patch":
     "Применяет несколько блоков поиска/замены к одному файлу рабочей папки, атомарно. Патч — это последовательность блоков '<<<<<<< SEARCH / ======= / >>>>>>> REPLACE'; каждый SEARCH должен совпасть ровно один раз. Если хотя бы один блок не находит своё место, файл остаётся нетронутым.",
+  "tools.desc.todo_write":
+    "Запишите список задач для этого запуска, заменив то, что записали раньше. Каждый раз отправляйте все пункты, включая завершённые. Не более одного пункта может быть в состоянии 'doing'. Используйте это для работы из нескольких шагов, чтобы прогресс пережил уплотнение контекста и наблюдающий видел, где вы находитесь.",
   "tools.desc.list_dir": "Перечисляет содержимое каталога в рабочей папке.",
   "tools.desc.grep":
     "Ищет по содержимому файлов регулярным выражением. Возвращает совпадения в виде 'relpath:lineno: line'. Можно ограничить поиск подкаталогом и файлами, подходящими под glob (например, '*.py').",
@@ -12576,6 +12650,12 @@ const ru: Dict = {
   "code.roles.panel": "панель",
   "code.roles.unproven":
     "Направление каждой роли к своей модели ПОКА не измерено. Смотрите bench/role_routing — пока это не запущено, перед вами выбор про стоимость и модели, а не утверждение, что так лучше.",
+  "code.todo.title": "Список задач",
+  "code.todo.claimed":
+    "{done} из {total} выполнено — это слова самого агента о своём прогрессе, а не проверенный результат.",
+  "code.todo.status.done": "готово",
+  "code.todo.status.doing": "в работе",
+  "code.todo.status.pending": "к выполнению",
   "code.worth.title": "Стоило ли оно того?",
   "code.worth.profile": "профиль",
   "code.worth.runs": "запуски",

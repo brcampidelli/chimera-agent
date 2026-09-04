@@ -47,6 +47,7 @@ import {
 } from "@/components/code/Attachments";
 import { BatchProposal } from "@/components/code/BatchProposal";
 import { DiffView } from "@/components/code/DiffView";
+import { TodoPanel, type TodoEntry } from "@/components/code/TodoPanel";
 import {
   EMPTY_CAST,
   FusionCast,
@@ -108,6 +109,10 @@ interface Exchange {
   answer: string;
   tools: CodeToolEvent[];
   edits: { path: string; patch: string }[];
+  /** The agent's own task list for this turn — its claim about its progress, not a verdict.
+   *  Replaced wholesale on every frame, because the frame carries the whole list: merging
+   *  would build a list out of two snapshots and show one that never existed. */
+  todos: TodoEntry[];
   done: CodeTurnDone | null;
   failed?: boolean;
   /** What the server actually said when the turn failed. A wrong API key, a rate limit, a model
@@ -557,6 +562,11 @@ export function Conversation({
             ...e,
             done: (e.done ?? null) as Exchange["done"],
             verified: (e.verified ?? undefined) as Exchange["verified"],
+            // Empty on a replay, for the reason `CodeExchangeOut` already gives about `edits`: the
+            // list was streamed and never entered the message list, so a reopened conversation can
+            // show the tool call that recorded it but not the list itself. An absent list reads as
+            // "none was kept", which is true, rather than as a claim about the work.
+            todos: [],
           })),
         );
         setReplayed(true);
@@ -740,7 +750,7 @@ export function Conversation({
     setBusy(true);
     setExchanges((prev) => [
       ...prev,
-      { you: message, answer: "", tools: [], edits: [], done: null },
+      { you: message, answer: "", tools: [], edits: [], todos: [], done: null },
     ]);
     let touchedFiles = false;
     // Whether THIS turn's verifier failed. It decides what happens to a queued follow-up, and it
@@ -827,6 +837,10 @@ export function Conversation({
         onEdit: (path, patch) => {
           touchedFiles = true;
           patchLast((e) => ({ ...e, edits: [...e.edits, { path, patch }] }));
+        },
+        onTodo: (items) => {
+          // Replaced, not appended. Unlike `edits`, each frame is the complete list.
+          patchLast((e) => ({ ...e, todos: items }));
         },
         onVerified: (v) => {
           verifyFailed = v.state === "failed";
@@ -1065,6 +1079,7 @@ export function Conversation({
                   ))}
                 </div>
               ) : null}
+              <TodoPanel items={e.todos} />
               {e.edits.map((edit, j) => (
                 <div key={j} className="space-y-1">
                   <button
