@@ -106,6 +106,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   minutes to reach the same refusal."* So the durable ask travels only with somewhere to send it.
 
 
+## [Unreleased]
+
+### Changed
+
+- **`chimera find` has a semantic half, and it earns its place by a rule fixed before the run.**
+  `bench/rag/baseline.json` has held `keyword_recall: 0.4925` with `vector_recall: null` since
+  2026-08-13. `bench/rag/` was the only one of sixteen benches with no pre-registration; it has one
+  now, written before an embedder was called, and the run against it says **ADOPT**.
+
+  | arm | recall@10 |
+  |---|---:|
+  | keyword (FTS5 + BM25) | 0.4425 |
+  | vector (cosine, diagnostic) | **0.4100** |
+  | hybrid (reciprocal rank fusion) | **0.5050** |
+
+  Paired over the same 400 probes: **+6.25 pp**, 95% CI [+3.2, +8.3], McNemar exact p = 1.7e-04.
+  Against the rule as written — delta ≥ +5 pp, p < 0.01, hybrid not below keyword — all three hold.
+
+  **The finding that was not obvious: semantic retrieval on its own is WORSE than keyword here.**
+  Every point of the win is the fusion. Naming `vector` as the arm under test — the intuitive
+  choice, since the embedder is the thing being added — would have read this run as a refutation and
+  abandoned the path. The two rankings are wrong about different probes, and RRF is what turns that
+  into recall neither has alone.
+
+  What the fusion costs is in the table too: 34 probes gained, **9 lost** — probes keyword found
+  alone that the hybrid pushed out of the top ten.
+
+  Measured with `openrouter/openai/text-embedding-3-small` at 1536 dimensions, and the embedder and
+  width are recorded **inside** the result. Vector spaces do not convert, so this does not choose the
+  shipped default; a local embedder needs its own run, and now has a measured reason to get one.
+
+### Fixed
+
+- **The RAG bench could not answer a paired question.** `RagReport` carried three totals and nothing
+  per probe, so the pairs a McNemar test needs were computed and discarded inside the loop that
+  computed them. Per-probe hit/miss is now recorded for all three arms and feeds
+  `chimera/eval/paired.py` directly.
+- **`embed_missing` was called without `embedder=`**, leaving `ChunkStore._align_embedder` inert in
+  exactly the run that first writes vectors. That guard zeroes every vector when the model identity
+  or width changes; without it a mixed-dimension index reports healthy and returns nothing, because
+  `_cosine` gives 0.0 on a mismatch and the `score > 0` filter then drops everything.
+- **Query embeddings were one call per probe**, inside the loop — 400 round-trips for the same money
+  as two batches. A provider returning a short batch now voids the semantic arms rather than pairing
+  each query with the next one's vector.
+- **The published baseline was stale, and says so.** The same harness measures 0.4750 on the
+  2026-08-14 tree (2,838 chunks) and 0.4425 today (3,459). `chimera/` is 29% larger than it was and
+  recall@10 falls as the haystack grows. The old figure was right about an older corpus; the record
+  now carries the chunk count beside every recall number, and names what it supersedes.
+
 ## [0.49.3] - 2026-09-03
 
 ### Changed
